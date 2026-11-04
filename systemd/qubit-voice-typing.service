@@ -22,7 +22,7 @@ StartLimitBurst=5
 [Service]
 Type=simple
 # __PROJECT_DIR__ is replaced with the actual path by scripts/install_systemd_unit.sh
-ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge.desktop_helper
+ExecStart="__PROJECT_DIR__/.venv/bin/python" -m voicebridge.desktop_helper
 WorkingDirectory=__PROJECT_DIR__
 # Explicit Qubit-owned home (the helper re-pins it defensively too).
 Environment=QUBIT_HOME=%h/.local/state/qubit-voicebridge/runtime

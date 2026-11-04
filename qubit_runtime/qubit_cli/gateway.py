@@ -196,7 +196,9 @@ def _get_service_pids(all_profiles: bool = False) -> set:
                 if result.returncode == 0:
                     for line in result.stdout.strip().splitlines():
                         parts = line.split()
-                        if len(parts) >= 3 and parts[-1].startswith("ai.hermes.gateway"):
+                        if len(parts) >= 3 and parts[-1].startswith(
+                            ("ai.qubit.gateway", "ai.hermes.gateway")
+                        ):
                             try:
                                 pid = int(parts[0])
                                 if pid > 0:
@@ -3075,9 +3077,9 @@ def launchd_gateway_labels_for_install() -> list[str]:
     profile_labels: list[str] = []
     for profile in list_profiles():
         if profile.is_default:
-            root_label.append("ai.hermes.gateway")
+            root_label.append("ai.qubit.gateway")
         elif _re.match(r"^[a-z0-9][a-z0-9_-]{0,63}$", profile.name):
-            profile_labels.append(f"ai.hermes.gateway-{profile.name}")
+            profile_labels.append(f"ai.qubit.gateway-{profile.name}")
     return root_label + sorted(profile_labels)
 
 
@@ -3085,12 +3087,13 @@ def legacy_launchd_labels_for_install(exclude=()) -> list[str]:
     """Launchd labels of THIS install that the profile-layout derivation can't map (#115254).
 
     A unit whose label predates the profile-name suffix scheme (``ai.hermes.gateway-<8hex>`` from the
-    historical hash suffix) is invisible to ``launchd_gateway_labels_for_install()`` and therefore to
-    the update restart pass. This reads the account's LaunchAgents and credits a plist only when its
-    pinned ``QUBIT_HOME`` is this install's root or one of its ``profiles/<name>`` homes — ownership
-    judged from the plist's content, never from label shape or directory membership — so the
-    derivation's boundary holds: a sandboxed QUBIT_HOME (tests, side-by-side installs) never
-    enumerates, let alone restarts, another install's fleet (#41403).
+    historical hash suffix) or the whole pre-rebrand ``ai.hermes.gateway*`` family is invisible to
+    ``launchd_gateway_labels_for_install()`` and therefore to the update restart pass. This reads the
+    account's LaunchAgents and credits a plist only when its pinned ``QUBIT_HOME`` is this install's
+    root or one of its ``profiles/<name>`` homes — ownership judged from the plist's content, never
+    from label shape or directory membership — so the derivation's boundary holds: a sandboxed
+    QUBIT_HOME (tests, side-by-side installs) never enumerates, let alone restarts, another install's
+    fleet (#41403).
     """
     import plistlib
     import pwd
@@ -3107,7 +3110,11 @@ def legacy_launchd_labels_for_install(exclude=()) -> list[str]:
         return []
     excluded = set(exclude)
     labels: set[str] = set()
-    for plist_path in sorted(agents_dir.glob("ai.hermes.gateway*.plist")):
+    plist_paths = sorted({
+        *agents_dir.glob("ai.qubit.gateway*.plist"),
+        *agents_dir.glob("ai.hermes.gateway*.plist"),
+    })
+    for plist_path in plist_paths:
         try:
             data = plistlib.loads(plist_path.read_bytes())
             label = data["Label"]
@@ -3115,7 +3122,9 @@ def legacy_launchd_labels_for_install(exclude=()) -> list[str]:
             rel = pinned.relative_to(root).parts
         except Exception:
             continue  # unreadable plist, no pinned home, or a home outside this root: not ours — fail closed
-        if not isinstance(label, str) or label in excluded or not label.startswith("ai.hermes.gateway"):
+        if not isinstance(label, str) or label in excluded or not label.startswith(
+            ("ai.qubit.gateway", "ai.hermes.gateway")
+        ):
             continue
         if not rel or (len(rel) == 2 and rel[0] == "profiles"):
             labels.add(label)

@@ -743,7 +743,7 @@ def test_startup_binds_power_policy_without_nameerror(tmp_path, monkeypatch):
 def test_canonical_service_template():
     text = (REPO / "systemd" / "qubit-voicebridge.service").read_text()
     assert "Description=Qubit Agent (Qubit VoiceBridge" in text
-    assert "__PROJECT_DIR__/.venv/bin/python -m voicebridge run" in text
+    assert '"__PROJECT_DIR__/.venv/bin/python" -m voicebridge run' in text
     assert "WorkingDirectory=__PROJECT_DIR__" in text
     assert "%h/.config/qubit-voicebridge/voice.yaml" in text
     assert "Restart=on-failure" in text or "Restart=always" in text
@@ -821,6 +821,7 @@ def test_live_canonical_unit_points_at_canonical_tree():
     root = Path(__file__).resolve().parents[1]
     assert f"{root}/.venv/bin/python -m voicebridge run" in text
     assert f"WorkingDirectory={root}" in text or \
+        f'WorkingDirectory="{root}"' in text or \
         "WorkingDirectory=%h/Projects/Repos/Qubit" in text
     assert "qubit-voicebridge/voice.yaml" in text
     assert "openclaw-voice-bridge" not in text.replace(

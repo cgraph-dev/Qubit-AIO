@@ -8,7 +8,7 @@ ConditionPathExists=__PROJECT_DIR__/scripts/communications_monitor.py
 [Service]
 Type=oneshot
 WorkingDirectory=__PROJECT_DIR__
-ExecStart=__PROJECT_DIR__/.venv/bin/python scripts/communications_monitor.py --hourly
+ExecStart="__PROJECT_DIR__/.venv/bin/python" "scripts/communications_monitor.py" --hourly
 # Never a watchdog restart loop: a oneshot that fails is surfaced by the timer
 # status + the monitor health command, not auto-restarted.
 # Bounded resources (repository defaults; tune per host in the INSTALLED unit).

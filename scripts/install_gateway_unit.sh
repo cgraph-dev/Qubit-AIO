@@ -9,8 +9,8 @@
 #
 # Usage: install_gateway_unit.sh <repo-root>
 # Env:   INSTALL_FORCE_UNIT(=1 to overwrite a divergent installed unit),
-#        SYSTEMD_UNIT_DIR (default $HOME/.config/systemd/user; override for
-#        hermetic tests/deploys)
+#        SYSTEMD_UNIT_DIR (default $XDG_CONFIG_HOME/systemd/user, falling
+#        back to $HOME/.config/systemd/user; override for hermetic tests/deploys)
 set -eu
 
 REPO="${1:?usage: install_gateway_unit.sh <repo-root>}"

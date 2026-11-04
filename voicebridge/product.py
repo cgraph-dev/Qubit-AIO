@@ -1808,7 +1808,7 @@ def service_owner(paths: Optional[ProductPaths] = None, *,
         return {"state": "UNAVAILABLE",
                 "detail": "systemd user units are Linux-only"}
     udir = Path(unit_dir) if unit_dir else \
-        (Path("~").expanduser() / ".config/systemd/user")
+        (_xdg_base("XDG_CONFIG_HOME", ".config") / "systemd" / "user")
     unit = udir / f"{PRODUCT_NAME}.service"
     legacy_unit = udir / f"{LEGACY_NAME}.service"
     legacy7d_unit = udir / f"{LEGACY_NAME_7D}.service"

@@ -291,7 +291,7 @@ def test_release_qualify_has_uv_build_fallback_and_runtime_checks():
 # ===========================================================================
 def test_canonical_unit_is_portable_and_correct():
     text = CANONICAL_UNIT.read_text(encoding="utf-8")
-    assert "ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge run" in text
+    assert 'ExecStart="__PROJECT_DIR__/.venv/bin/python" -m voicebridge run' in text
     assert "WorkingDirectory=__PROJECT_DIR__" in text
     assert "Environment=VOICE_BRIDGE_CONFIG=%h/.config/qubit-voicebridge/voice.yaml" in text
     assert "WantedBy=default.target" in text
