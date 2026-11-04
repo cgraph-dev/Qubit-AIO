@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import wave
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 import numpy as np
 
@@ -179,3 +179,68 @@ class SpeakerVerifier:
             frames = wf.readframes(wf.getnframes())
         samples = np.frombuffer(frames, dtype=np.int16).astype(np.float32) / 32768.0
         return self.verify(samples, sr, name)
+
+
+def load_verifier(cfg: Any, *, default_enabled: bool = True) -> Optional[SpeakerVerifier]:
+    """Build and load the configured speaker verifier, or ``None``.
+
+    This is the ONE place a runtime caller (message bridge or desktop helper)
+    decides whether voice-ID is active. It fails OPEN: disabled config, a
+    missing model, missing enrollment or any load error logs a typed event and
+    returns ``None`` — which callers treat as "any speaker", the historical
+    behaviour. A truthy, ready verifier means only the enrolled voice passes.
+
+    Never raises.
+    """
+    try:
+        cfg_any = cfg
+        enabled = cfg_any.get("speaker_verify", "enabled", default=default_enabled)
+    except Exception:
+        enabled = default_enabled
+    if not enabled:
+        return None
+    try:
+        name = str(cfg.get("speaker_verify", "name", default="user") or "user")
+        threshold = float(cfg.get("speaker_verify", "threshold", default=0.65))
+        verifier = SpeakerVerifier(cfg.model_dir(), cfg.state_dir(),
+                                   name=name, threshold=threshold)
+        verifier.load()
+        if verifier.ready:
+            log_event("speaker.verify.active", model=MODEL_NAME,
+                      name=name, threshold=threshold,
+                      speakers=int(verifier.num_speakers))
+            return verifier
+        log_event("speaker.verify.no_enrollment",
+                  hint="run `qubit voice enroll` to enrol your voice")
+    except Exception as exc:  # noqa: BLE001 - voice-ID is fail-open
+        log_event("speaker.verify.unavailable", error=str(exc)[:160])
+    return None
+
+
+def allows_pcm(verifier: Optional[SpeakerVerifier], pcm: bytes,
+               sample_rate: int = 16000, *, min_seconds: float = 1.0,
+               via: str = "") -> bool:
+    """True when ``pcm`` may act as the owner (fail-open).
+
+    Shared by the message bridge's barge monitor and the desktop helper's
+    wake-phrase barge gate, so both enforce the SAME rule. No verifier, no
+    enrollment, a too-short sample (under ``min_seconds``) or any embedding
+    error returns True: voice-ID must never wedge normal speech. Only a
+    successful embedding that scores below the threshold returns False.
+    """
+    if verifier is None or not getattr(verifier, "ready", False):
+        return True
+    try:
+        n = max(0, int(min_seconds * max(1, int(sample_rate))))
+        if len(pcm) // 2 < n:
+            return True
+        samples = (np.frombuffer(bytes(pcm), dtype="<i2").astype(np.float32)
+                   / 32768.0)
+        accepted, score = verifier.verify(samples, int(sample_rate))
+        log_event("speaker.verify", accepted=bool(accepted),
+                  score=round(float(score), 3), via=via or None)
+        return bool(accepted)
+    except Exception as exc:  # noqa: BLE001 - fail open, never block speech
+        log_event("speaker.verify.error", error=str(exc)[:120],
+                  via=via or None)
+        return True

@@ -434,8 +434,11 @@ DEFAULTS: Dict[str, Any] = {
         "beeps": True,              # short beep when recording starts/stops
     },
     "speaker_verify": {
-        "enabled": True,            # gate barge-in on voice-ID when enrolled;
-                                    # no enrollment = old behavior (any speech barges)
+        "enabled": True,            # gate barge-in on voice-ID when enrolled
+                                    # (service monitor + desktop helper); no
+                                    # enrollment = old behavior (any speech
+                                    # barges). Wake commands and spoken
+                                    # confirmations are NOT voice-gated.
         "name": "user",
         "threshold": 0.65,          # cosine similarity; eres2net: self 0.7-0.96 / cross ~0.3
         "window_s": 2.0,            # analysis window for barge verification
@@ -703,6 +706,10 @@ DEFAULTS: Dict[str, Any] = {
         "level": "INFO",
         "jsonl": True,          # structured event log (observability)
         "jsonl_path": None,     # default: $STATE_DIR/events.jsonl
+        # Rotate the append-only journal instead of letting it grow without
+        # bound (a real install reached 361 MB). 0 disables rotation.
+        "jsonl_max_bytes": 32 * 1024 * 1024,
+        "jsonl_backups": 3,
     },
     "webui": {
         "host": "127.0.0.1",    # loopback default; LAN requires allow_lan + token

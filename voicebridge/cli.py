@@ -4707,7 +4707,10 @@ def main(argv=None) -> int:
     cfg = Config.load(args.config)
     setup(level=cfg.get("logging", "level", default="INFO"),
           jsonl=cfg.get("logging", "jsonl", default=True),
-          state_dir=cfg.state_dir())
+          state_dir=cfg.state_dir(),
+          max_bytes=cfg.get("logging", "jsonl_max_bytes", default=32 * 1024 * 1024),
+          backups=cfg.get("logging", "jsonl_backups", default=3),
+          log_transcripts=cfg.get("voice_edit", "debug_log", default=False))
 
     # Owner-scoped autonomy admin is a native family: pause/resume/revoke call
     # the canonical backend directly with an explicit --confirm (the dashboard

@@ -1921,8 +1921,11 @@ class WakeMonitor:
                 self._reset_continuous()
                 self._emit(trailing)
                 return
-            _trace("discarded", chars=len(text),
-                   **(_dbg.text_fields(self.cfg, text=text)))
+            # Ambient speech that was never directed at Qubit is not a turn:
+            # keep only its length. Persisting the words (even under verbose
+            # logging) would turn room conversation into a searchable journal
+            # entry with no user value.
+            _trace("discarded", chars=len(text))
             self._maybe_hint(text)
             return  # not a wake phrase: discard, never type it
         if wake_match_kind(text, aliases=aliases) == "bare":

@@ -3949,6 +3949,45 @@ class DesktopHelper:
             except Exception:
                 return False
 
+    def _speaker_verifier(self) -> Any:
+        """The lazily-loaded voice-ID verifier, or ``None``.
+
+        Loading a sherpa-onnx model at helper start would add boot time even
+        for users who never barge in, so it is loaded on the first interrupting
+        utterance and cached. Disabled/unenrolled/unavailable config returns
+        ``None`` (fail open: any voice, the historical behaviour).
+        """
+        if getattr(self, "_speaker_loaded", False):
+            return getattr(self, "_speaker", None)
+        lock = getattr(self, "_speaker_lock", None)
+        if lock is None:
+            lock = threading.Lock()
+            self._speaker_lock = lock
+        with lock:
+            if getattr(self, "_speaker_loaded", False):
+                return getattr(self, "_speaker", None)
+            try:
+                from .voice_id import load_verifier
+                self._speaker = load_verifier(self.cfg)
+            except Exception:
+                self._speaker = None
+            self._speaker_loaded = True
+            return self._speaker
+
+    def _barge_speaker_allows(self, pcm: bytes) -> bool:
+        """True when this interrupting audio may stop the reply.
+
+        Enforces ``speaker_verify`` on the helper's barge-in path (the same
+        rule the service's barge monitor uses). Fails open on any verifier
+        problem, so voice-ID can never wedge normal speech.
+        """
+        try:
+            from .voice_id import allows_pcm
+            return allows_pcm(self._speaker_verifier(), bytes(pcm or b""),
+                              16000, via="helper")
+        except Exception:
+            return True
+
     def _barge_in_wake_command(self, pcm: bytes) -> Optional[str]:
         """Return the command spoken after the wake phrase, or None.
 
@@ -3986,16 +4025,29 @@ class DesktopHelper:
                 aliases.extend(_ww.active_triggers())
             except Exception:
                 pass
+            verified: Optional[bool] = None
+
+            def _gate(value: Optional[str]) -> Optional[str]:
+                nonlocal verified
+                if value is None:
+                    return None
+                if verified is None:
+                    verified = self._barge_speaker_allows(pcm)
+                if not verified:
+                    _trace("speak.barge_in_speaker_rejected", chars=len(text))
+                    return None
+                return value
+
             if _matches_custom_trigger(text):
-                return str(_strip_custom_trigger(text) or "").strip()
+                return _gate(str(_strip_custom_trigger(text) or "").strip())
             remainder = strip_wake(text, aliases=aliases)
             if remainder is not None:
                 if wake_match_kind(text, aliases=aliases) == "bare":
-                    return ""
-                return str(remainder).strip()
+                    return _gate("")
+                return _gate(str(remainder).strip())
             trailing = strip_wake_trailing(text, aliases=aliases)
             if trailing is not None:
-                return str(trailing).strip()
+                return _gate(str(trailing).strip())
             _trace("speak.barge_in_not_wake", chars=len(text))
             return None
         except Exception:
@@ -4751,6 +4803,18 @@ def main(argv: Optional[list] = None) -> int:
     except Exception:
         pass
     cfg = build_cfg()
+    try:
+        # Apply the journal bounds and the verbose-transcript gate from the
+        # owner's config (the early setup above only fixes the path).
+        _setup_logging(
+            state_dir=canonical_state_dir(),
+            max_bytes=_read_cfg(cfg, "logging", "jsonl_max_bytes",
+                                default=32 * 1024 * 1024),
+            backups=_read_cfg(cfg, "logging", "jsonl_backups", default=3),
+            log_transcripts=_read_cfg(cfg, "voice_edit", "debug_log",
+                                      default=False))
+    except Exception:
+        pass
     if args.check:
         print(json.dumps(check(cfg), indent=2, sort_keys=True))
         return 0

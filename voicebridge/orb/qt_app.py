@@ -1284,6 +1284,11 @@ def _is_near(item: Any, near: bool) -> bool:
 
 
 def _finite(v: Any, default: float = 0.0) -> float:
+    kind = type(v)
+    if kind is float:
+        return v if math.isfinite(v) else default
+    if kind is int:
+        return float(v)
     try:
         f = float(v)
     except (TypeError, ValueError):
@@ -1387,12 +1392,15 @@ def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
             return 0
 
     def _num(v: Any, default: float) -> float:
-        # Fast path: the field hands us floats almost every call, so skip the
-        # float()/try entirely for the common case. Behaviour is identical.
-        # ``isfinite`` is NOT optional here either: same contract as
+        # Fast path: the field hands us floats/ints almost every call, so skip
+        # the float()/try entirely for the common case. Behaviour is identical.
+        # ``isfinite`` is NOT optional for floats here: same contract as
         # ``mark_field._finite`` — callers pass NaN/inf and expect the default.
-        if type(v) is float:
+        kind = type(v)
+        if kind is float:
             return v if math.isfinite(v) else default
+        if kind is int:
+            return float(v)
         try:
             f = float(v)
         except (TypeError, ValueError):

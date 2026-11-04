@@ -288,12 +288,12 @@ class ActivityFeed:
         the dashboard reflects EVERYTHING the bridge did — mic loop, duplex
         taps, typed tasks, web — including activity from before this process
         started (the ring buffer alone only covers this process's lifetime)."""
-        try:
-            with events_path.open("r", errors="replace") as fh:
-                lines = fh.readlines()
-        except OSError:
-            return
-        for line in lines[-4000:]:  # bound the scan; ring keeps newest `limit`
+        # Bound the scan by BYTES, not just by line count: the journal can be
+        # hundreds of megabytes and ``readlines()`` copied all of it into
+        # memory before slicing off the newest 4,000 lines.
+        from .journal_io import tail_lines
+        lines = tail_lines(events_path, max_bytes=4_000_000)
+        for line in lines[-4000:]:  # ring keeps newest `limit`
             try:
                 ev = json.loads(line)
             except Exception:
@@ -6135,40 +6135,52 @@ class WebUI:
         """Delete events.jsonl entries older than max_age_days. Returns removed count."""
         import time
         path = self.orch.cfg.state_dir() / "events.jsonl" if self.orch and self.orch.cfg else Path("/tmp") / "events.jsonl"
-        try:
-            lines = path.read_text(errors="replace").splitlines()
-        except OSError:
-            return 0
+        # Stream line-by-line instead of materialising the whole journal: a
+        # 361 MB journal used to be copied into memory (twice) just to drop
+        # old rows.
+        from .journal_io import iter_lines
         cutoff = time.time() - max_age_days * 86400
-        kept = []
         removed = 0
-        for l in lines:
+        tmp = path.with_suffix(".tmp")
+        try:
+            with tmp.open("w", errors="replace") as out:
+                for l in iter_lines(path):
+                    try:
+                        ev = __import__("json").loads(l)
+                        ts = float(ev.get("ts") or 0)
+                        if ts and ts < cutoff:
+                            removed += 1
+                            continue
+                    except Exception:
+                        pass
+                    out.write(l + "\n")
+            if removed:
+                tmp.replace(path)
+                try:
+                    self.feed.load_history(path, limit=200)
+                except Exception:
+                    pass
+            else:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
+        except OSError:
             try:
-                ev = __import__("json").loads(l)
-                ts = float(ev.get("ts") or 0)
-                if ts and ts < cutoff:
-                    removed += 1
-                    continue
-            except Exception:
+                tmp.unlink()
+            except OSError:
                 pass
-            kept.append(l)
-        if removed:
-            # atomic replace
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text("\n".join(kept) + ("\n" if kept else ""), errors="replace")
-            tmp.replace(path)
-            try:
-                self.feed.load_history(path, limit=200)
-            except Exception:
-                pass
+            return 0
         return removed
 
     def logs(self, limit: int = 200, q: str = "", since: float = 0.0) -> List[Dict[str, Any]]:
         path = self.orch.cfg.state_dir() / "events.jsonl" if self.orch and self.orch.cfg else Path("/tmp") / "events.jsonl"
-        try:
-            lines = path.read_text(errors="replace").splitlines()[-max(limit * 6, 6000):]
-        except OSError:
-            return []
+        from .journal_io import tail_lines
+        # Read a bounded tail: enough for the requested page even with a query
+        # filter, without copying the full journal into memory.
+        want = max(limit * 6, 6000)
+        lines = tail_lines(path, max_bytes=max(2_000_000, want * 400),
+                           limit=want)
         out: List[Dict[str, Any]] = []
         ql = q.lower() if q else ""
         for l in lines:

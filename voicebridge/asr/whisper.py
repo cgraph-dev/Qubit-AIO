@@ -17,7 +17,7 @@ import threading
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from ..logging_setup import get_logger, log_event
+from ..logging_setup import get_logger, log_event, transcript_fields
 from .base import ASRProvider, ASRUnavailable, Segment, Transcript
 
 log = get_logger()
@@ -185,9 +185,13 @@ class FasterWhisperASR(ASRProvider):
             probs = [p for p in probs if p is not None]
             if probs:
                 conf = max(0.0, min(1.0, (sum(probs) / len(probs) + 1.0) / 2.0))
+        # The decoded words are ambient speech: persist them only when the
+        # owner enabled verbose transcript logging. Metadata (engine, device,
+        # model, character count, confidence, duration) is always recorded.
         log_event("asr.transcribe", provider=self.name, device=self._actual_device,
-                  model=self._actual_model, text=text,
-                  confidence=round(conf, 3), duration_s=info.duration)
+                  model=self._actual_model, chars=len(text),
+                  confidence=round(conf, 3), duration_s=info.duration,
+                  **transcript_fields(text=text))
         return Transcript(text=text, language=getattr(info, "language", self.language),
                           confidence=conf, duration_s=info.duration,
                           segments=segs, provider=self.name)
