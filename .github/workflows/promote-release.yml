@@ -127,6 +127,10 @@ jobs:
               echo "::error::release $TAG is published; refusing to modify it"
               exit 1
             fi
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Qubit ${TAG#v}" \
+              --notes-file release-assets/release-notes.md
             gh release upload "$TAG" "${assets[@]}" \
               --repo "$GITHUB_REPOSITORY" --clobber
             echo "updated existing draft release $TAG"
