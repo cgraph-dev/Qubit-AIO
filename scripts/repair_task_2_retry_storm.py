@@ -39,8 +39,7 @@ write-up still carries the finding AND the pricing alias stays pinned by its tes
 """
 
 EXIT_CHECK = (
-    "cd /home/trick/Projects/Repos/qubit-voicebridge"
-    " && grep -q \"opencode-go\" docs/RETRY_STORM_ROOT_CAUSE_2026-10-17.md"
+    "grep -q \"opencode-go\" docs/RETRY_STORM_ROOT_CAUSE_2026-10-17.md"
     " && grep -q \"UNKNOWN_SPEND\" docs/RETRY_STORM_ROOT_CAUSE_2026-10-17.md"
     " && .venv/bin/python -m pytest qubit_runtime/tests/agent/test_usage_pricing.py"
     " -q >/dev/null 2>&1"

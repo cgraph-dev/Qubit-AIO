@@ -181,7 +181,13 @@ SECRET_SHAPES = (
     ("openai_key", re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")),
     ("github_token", re.compile(r"\bghp_[A-Za-z0-9]{30,}\b")),
     ("aws_key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
-    ("private_key", re.compile(r"-----BEGIN (RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----")),
+    # Require key BODY material, not only the PEM header. Tooling that detects
+    # private keys (e.g. scripts/check_commit_hygiene.py) necessarily contains
+    # the bare header literal; a committed key is still caught because a real
+    # PEM block carries base64 body lines after the header.
+    ("private_key", re.compile(
+        r"-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----"
+        r"\s*\r?\n(?:[A-Za-z0-9+/=]{16,}\r?\n)+")),
     ("jwt", re.compile(r"\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b")),
 )
 
@@ -192,7 +198,11 @@ SECRET_SHAPES = (
 SECRET_SHAPES_ALL = SECRET_SHAPES + (
     ("assign_secret", re.compile(
         r"(?i)\b(api[_-]?key|token|secret|password|passwd|bearer)\s*[=:]\s*"
-        r"(?:\"[^\"]+\"|'[^']+'|[^\s\"']\S*)")),
+        # A value that is a shell/py variable expansion or f-string
+        # placeholder is a reference, not a credential: ``TOKEN="$TOK"`` /
+        # ``TOKEN="${2:-}"`` / ``Token: {tok}`` must not trip the gate. A
+        # literal value (hunter2, sk-…) still does.
+        r"(?![\"']?[\$%{])(?:\"[^\"]+\"|'[^']+'|[^\s\"']\S*)")),
 )
 
 _CONFIG_EXT = {".yaml", ".yml", ".env", ".service", ".timer", ".json",
@@ -304,6 +314,63 @@ def _is_skipped(rel: str, skip: set) -> bool:
 # (tests/test_qubit_runtime_vendor8u.py) covers it instead.
 _VENDORED_UPSTREAM = {"qubit_runtime"}
 
+# Developer-only material that is never a shipped product surface. A working
+# checkout legitimately carries scratch probes, audit output, session reports,
+# and sync/vendor helpers that record the developer's home path. Those files
+# must not fail the shipped-code gate and must not be swept into the sdist;
+# a real user-home path in product code still does. Keep this list narrow and
+# explicit — never add a product tree (voicebridge/, frontend/, config/, …).
+DEV_ONLY_DIRS = frozenset({"tmp", "errs", "output", "captures"})
+DEV_ONLY_PREFIXES = ("REPORT-",)
+DEV_ONLY_PATHS = frozenset({
+    # root scratch probes / session ledgers
+    "HANDOFF.md",
+    "INDEPENDENCE_VERDICT.md",
+    "PLATFORM_SMOKE.md",
+    "PORT-METHOD.md",
+    "PORTED-chunk-10.json",
+    "baseline_errs.json",
+    "chain_probe.py",
+    "deletion_probe.py",
+    "deletion_test.sh",
+    "harness_run.txt",
+    "lane-baseline.txt",
+    "pf.sh",
+    "resolve_probe.py",
+    "run_failing.sh",
+    "run_lane.sh",
+})
+
+_SDIST_ROOT_RE = re.compile(r"^[A-Za-z0-9_.]+-\d")
+
+
+def _strip_sdist_root(name: str) -> str:
+    """Drop a ``<project>-<version>/`` source root from an sdist member."""
+    clean = name.replace("\\", "/").lstrip("./")
+    parts = clean.split("/")
+    if len(parts) > 1 and _SDIST_ROOT_RE.match(parts[0]):
+        return "/".join(parts[1:])
+    return clean
+
+
+def is_dev_only_path(name: str) -> bool:
+    """True for developer-only paths that are never a shipped product surface.
+
+    Matches both checkout-relative names (``tmp/audit/x.py``) and sdist member
+    names with the ``<project>-<version>/`` prefix. The match is anchored to
+    the repository root / artifact root, so a product file with a similar name
+    deeper in a real tree is not exempted.
+    """
+    rel = _strip_sdist_root(name)
+    if not rel:
+        return False
+    first = rel.split("/", 1)[0]
+    if first in DEV_ONLY_DIRS:
+        return True
+    if rel in DEV_ONLY_PATHS:
+        return True
+    return rel.startswith(DEV_ONLY_PREFIXES)
+
 
 def _iter_tree(root: Path, pattern: str, skip: set):
     """Yield files matching ``pattern`` while pruning skipped directories.
@@ -342,7 +409,7 @@ def secret_scan(root: Path, *, include_py: bool = True,
     browser state, and (by default) test fixtures, which intentionally carry
     FAKE secrets. Reads are size-capped."""
     results: Dict[str, List[str]] = {}
-    skip = _private_paths() | _VENDORED_UPSTREAM
+    skip = _private_paths() | _VENDORED_UPSTREAM | set(DEV_ONLY_DIRS)
     if exclude_tests:
         skip.add("tests")
     # voicebridge/evaluation/ is the documented private eval corpus (plan
@@ -364,7 +431,8 @@ def secret_scan(root: Path, *, include_py: bool = True,
     for pattern in patterns:
         for p in sorted(_iter_tree(root, pattern, skip)):
             rel = p.relative_to(root).as_posix()
-            if not p.is_file() or _is_skipped(rel, skip):
+            if (not p.is_file() or _is_skipped(rel, skip)
+                    or is_dev_only_path(rel)):
                 continue
             is_py = rel.endswith(".py")
             is_cfg = Path(p).suffix.lower() in _CONFIG_EXT
@@ -383,13 +451,14 @@ def machine_path_scan(root: Path) -> Dict[str, List[str]]:
     core: Dict[str, List[str]] = {}
     personal: Dict[str, List[str]] = {}
     skip = (_private_paths() | _VENDORED_UPSTREAM
-            | {"frontend/", "docs/", "benchmarks/", "tests/"})
+            | {"frontend/", "docs/", "benchmarks/", "tests/"}
+            | set(DEV_ONLY_DIRS))
     for pattern in ("*.py", "*.sh", "*.service", "*.timer", "*.yaml"):
         for p in sorted(_iter_tree(root, pattern, skip)):
             if not p.is_file():
                 continue
             rel = p.relative_to(root).as_posix()
-            if _is_skipped(rel, skip):
+            if _is_skipped(rel, skip) or is_dev_only_path(rel):
                 continue
             hits = scan_text_machine_paths(_read_capped(p))
             if not hits:
@@ -441,6 +510,81 @@ def _toml(path: Path) -> Dict[str, Any]:
     import tomllib
     with open(path, "rb") as fh:
         return tomllib.load(fh)
+
+
+def _dist_version(path: Path, table: str = "project") -> Optional[str]:
+    try:
+        return str(_toml(path).get(table, {}).get("version") or "") or None
+    except Exception:
+        return None
+
+
+def version_identity(repo: Optional[Path] = None, tag: Optional[str] = None,
+                     package_version: Optional[str] = None) -> Dict[str, Any]:
+    """Check the release identity: tag ↔ root ``pyproject.toml`` ↔
+    ``voicebridge.__version__``.
+
+    The vendored runtime (``qubit_runtime/pyproject.toml``) carries its own
+    upstream-derived version and is reported informationally; it is not
+    required to equal the product version. ``tag`` may be ``None`` when not
+    running from a release tag; in that case only the pyproject/package pair
+    is gated. A supplied tag must be the ``v<version>`` form.
+    """
+    root = Path(repo) if repo else REPO
+    project_version = _dist_version(root / "pyproject.toml")
+    runtime_version = _dist_version(root / "qubit_runtime" / "pyproject.toml")
+    if package_version is None:
+        try:
+            from . import __version__ as package_version  # type: ignore[no-redef]
+        except Exception:
+            package_version = None
+    raw_tag = (tag or "").strip()
+    tag_version = raw_tag[1:] if raw_tag.startswith("v") else raw_tag
+    tag_format_ok = (not raw_tag) or (
+        raw_tag.startswith("v") and len(raw_tag) > 1)
+    package_matches = bool(
+        project_version and package_version
+        and project_version == package_version)
+    tag_matches = None if not raw_tag else bool(
+        tag_format_ok and project_version
+        and tag_version == project_version)
+    checks = {
+        "pyproject_version_present": bool(project_version),
+        "package_version_present": bool(package_version),
+        "package_matches_pyproject": package_matches,
+        "tag_provided": bool(raw_tag),
+        "tag_format_ok": tag_format_ok,
+        "tag_matches_pyproject": tag_matches,
+    }
+    ok = (checks["pyproject_version_present"]
+          and checks["package_version_present"]
+          and package_matches
+          and (not raw_tag or tag_matches is True))
+    reasons = []
+    if not project_version:
+        reasons.append("root pyproject.toml has no [project].version")
+    if not package_version:
+        reasons.append("voicebridge.__version__ is missing")
+    if project_version and package_version and not package_matches:
+        reasons.append(
+            f"voicebridge.__version__={package_version} != "
+            f"pyproject.version={project_version}")
+    if raw_tag and not tag_format_ok:
+        reasons.append(f"release tag {raw_tag!r} is not the v<version> form")
+    elif raw_tag and tag_matches is False:
+        reasons.append(
+            f"release tag {raw_tag!r} != v{project_version}")
+    return {
+        "state": "OK" if ok else "FAIL",
+        "detail": "tag/pyproject/package versions agree" if ok
+                  else "; ".join(reasons),
+        "tag": raw_tag or None,
+        "tag_version": tag_version or None,
+        "pyproject_version": project_version,
+        "package_version": package_version,
+        "runtime_version": runtime_version,
+        "checks": checks,
+    }
 
 
 def _project_license_text(repo: Optional[Path] = None) -> str:
@@ -512,6 +656,15 @@ def _vendored_top_level_names(base: Path) -> set[str]:
     is a local module, not an undeclared PyPI dependency.
     """
     root = Path(base) / "_data" / "qubit_runtime"
+    if not root.is_dir():
+        # Source checkout: the wheel reparents the fork under ``_data`` but a
+        # checkout keeps it at the repo root, next to the ``voicebridge``
+        # package. Use it so the source-run import contract matches the
+        # installed one instead of reporting the vendored modules as
+        # undeclared PyPI dependencies.
+        checkout = Path(base).parent / "qubit_runtime"
+        if checkout.is_dir():
+            root = checkout
     names: set[str] = set()
     if not root.is_dir():
         return names
@@ -576,7 +729,8 @@ def import_scan_installed(base: Path, declared: set[str],
                 mods = [node.module]
             for m in mods:
                 top = m.split(".")[0]
-                if top in stdlib | declared | local | guarded:
+                key = top.lower()
+                if key in stdlib | declared | local | guarded:
                     continue
                 failures.append(f"{top} at {rel}:{node.lineno}")
     return failures
@@ -599,7 +753,10 @@ _DIST_ALIASES = {"pyyaml": "yaml", "piper_tts": "piper"}
 # gracefully, so their absence is a warning, not a fresh-install failure
 # (mirrors scripts/config_doctor.OPTIONAL_GUARDED).
 OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
-                    "pystray"}
+                    "pystray",
+                    # optional extras / guarded imports that raise a typed
+                    # degradation when absent (orb-qt, embedding router).
+                    "pyside6", "onnxruntime", "tokenizers"}
 
 
 def _normalize_import(name: str) -> str:
@@ -669,7 +826,8 @@ def artifact_member_hits(artifact: Path, forbidden: Tuple[str, ...] = ARTIFACT_F
 # normalizes ``-`` to ``_`` in the distribution name). Matched generically so
 # the classifier survives a project rename; repo top-level dirs (voicebridge,
 # tests, docs, config, …) never match ``name-<digit>``.
-_SDIST_ROOT_RE = re.compile(r"^[A-Za-z0-9_.]+-\d")
+# (``_SDIST_ROOT_RE`` and ``_strip_sdist_root`` are declared above with the
+# developer-only path predicate that also needs them.)
 
 
 def artifact_member_class(name: str) -> str:
@@ -708,6 +866,8 @@ def artifact_content_scan(artifact: Path) -> Dict[str, Dict[str, List[str]]]:
     machine_noncore: Dict[str, List[str]] = {}
 
     def _handle(name: str, text: str) -> None:
+        if is_dev_only_path(name):
+            return
         is_py = name.endswith(".py")
         is_cfg = Path(name).suffix.lower() in _CONFIG_EXT
         sh = scan_text_secrets(text, is_python=is_py, is_config=is_cfg)
@@ -870,17 +1030,20 @@ def resource_ceilings(root: Optional[Path] = None) -> Dict[str, Any]:
 def operator_runbook_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     """Required operator documentation present and non-empty."""
     root = Path(root) if root else REPO
+    # Live, authoritative operator docs. The 2026-09-21 archive markdown was
+    # purged (eafb54e26) and must NOT be re-created or required; the live
+    # replacements below are the docs AGENTS.md points at.
     required = [
         "README.md",
         "LICENSE",
-        "docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md",
-        "docs/archive/2026-09-21/AUDIO_SETUP.md",
-        "docs/archive/2026-09-21/VOICE_BRIDGE_TROUBLESHOOTING.md",
-        "docs/archive/2026-09-21/OPERATIONS_8J.md",
-        "docs/archive/2026-09-21/OPERATIONS_8K.md",
-        "docs/archive/2026-09-21/MIGRATIONS.md",
-        "docs/archive/2026-09-21/UPSTREAM_REUSE.md",
         "THIRD_PARTY_NOTICES.md",
+        "docs/README.md",
+        "docs/ARCHITECTURE.md",
+        "docs/MIGRATION.md",
+        "docs/VOICE-BRIDGE-AUDIT.md",
+        "docs/BRAND.md",
+        "docs/DECISIONS.md",
+        "config/voice.example.yaml",
     ]
     results: List[Dict[str, str]] = []
     for rel in required:
@@ -899,11 +1062,13 @@ def backup_migration_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
     """Migration history + newer-schema refusal + atomic restore contract."""
     root = Path(root) if root else REPO
     results: List[Dict[str, str]] = []
-    mig = root / "docs/archive/2026-09-21/MIGRATIONS.md"
+    # The live migration authority re-authored after the 2026-09-21 archive
+    # purge; the archived MIGRATIONS.md path is not in this tree.
+    mig = root / "docs/MIGRATION.md"
     results.append({
         "name": "migration.history",
         "state": "OK" if mig.exists() else "MISSING",
-        "detail": "docs/archive/2026-09-21/MIGRATIONS.md" if mig.exists() else "absent",
+        "detail": "docs/MIGRATION.md" if mig.exists() else "absent",
     })
     portable_text = _read_capped(root / "voicebridge/portable.py")
     recov_text = _read_capped(root / "voicebridge/communications/recovery_qualify.py")
@@ -1113,11 +1278,15 @@ def support_matrix_check(root: Optional[Path] = None) -> List[Dict[str, str]]:
         "detail": f"{platform.python_version()} (documented: >= "
                   f"{target.get('python_min', '3.11')})",
     })
-    for doc in ("docs/archive/2026-09-21/AUDIO_SETUP.md", "docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md",
-                "docs/archive/2026-09-21/VOICE_BRIDGE_TROUBLESHOOTING.md"):
+    # Live replacements for the purged archive docs: the operative audio
+    # config lives in config/voice.example.yaml, the pipeline/routing lanes in
+    # docs/VOICE-BRIDGE-AUDIT.md (see AGENTS.md).
+    for doc, label in (
+            ("config/voice.example.yaml", "AUDIO_SETUP"),
+            ("docs/VOICE-BRIDGE-AUDIT.md", "VOICE_BRIDGE_SYSTEM")):
         p = root / doc
         results.append({
-            "name": f"support.documented.{Path(doc).stem}",
+            "name": f"support.documented.{label}",
             "state": "OK" if p.exists() and p.stat().st_size > 200 else "MISSING",
             "detail": doc,
         })
@@ -1551,10 +1720,10 @@ def verify_release_signing(artifact_dir: Path, *,
             "artifacts": results, "checksums": ck}
 
 
-def certify(repo: Optional[Path] = None) -> Dict[str, Any]:
-    """Hermetic static certification: provenance, scans, contracts, docs,
-    units, ceilings. Does NOT build/install (that is the orchestrator's opt-in
-    step). Returns the typed report."""
+def certify(repo: Optional[Path] = None, tag: Optional[str] = None) -> Dict[str, Any]:
+    """Hermetic static certification: provenance, version identity, scans,
+    contracts, docs, units, ceilings. Does NOT build/install (that is the
+    orchestrator's opt-in step). Returns the typed report."""
     root = Path(repo) if repo else REPO
     provenance = git_provenance(root)
     mpaths = machine_path_scan(root)
@@ -1562,6 +1731,7 @@ def certify(repo: Optional[Path] = None) -> Dict[str, Any]:
     report: Dict[str, Any] = {
         "packet": "8K",
         "provenance": provenance,
+        "version_identity": version_identity(root, tag),
         "toolchain": toolchain(),
         "dependency": sbom(root),
         "machine_paths": {
@@ -1585,6 +1755,9 @@ def report_pass(report: Dict[str, Any]) -> bool:
     """True when every required gate is OK (core machine paths, secrets,
     filesystem modes, runbooks, migration, units). Personalization machine
     values are recorded but not a gate failure."""
+    version = report.get("version_identity") or {}
+    if version and version.get("state") != "OK":
+        return False
     if report["machine_paths"]["core"]:
         return False
     if report["secrets"]:

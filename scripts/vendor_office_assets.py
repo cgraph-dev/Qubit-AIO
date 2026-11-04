@@ -59,6 +59,7 @@ USAGE
     .venv/bin/python scripts/vendor_office_assets.py --refs DIR # alternate source
 """
 from __future__ import annotations
+import os
 
 import argparse
 import hashlib
@@ -88,7 +89,8 @@ TARGETS = [PUBLIC_PLUGIN / "assets", DIST_PLUGIN / "assets"]
 ASSET_ROOT = TARGETS[-1]
 
 #: Default read-only staging area. Overridable with --refs.
-DEFAULT_REFS = Path("/home/trick/Projects/Repos/refs")
+DEFAULT_REFS = Path(os.environ.get("QUBIT_OFFICE_REFS",
+                                   str(REPO.parent / "refs")))
 
 #: Hard ceiling on the vendored tree. Owner decision: 100 MB.
 MAX_TOTAL_BYTES = 100 * 1024 * 1024

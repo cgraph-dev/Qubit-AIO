@@ -24,7 +24,7 @@ are byte-for-byte identical to the committed tree.
 
 Why the earlier "not reproducible" verdict was wrong
 ----------------------------------------------------
-The shared checkout `/home/trick/Projects/habblaud` sits on a DIFFERENT revision
+The shared checkout (a developer-local habblaud clone) sits on a DIFFERENT revision
 (`86c0379…`, a later `main`), so building *that* checkout yields
 `app-DrspyBzY.js` — a different chunk. That is a stale-checkout observation, not
 a reproducibility failure: the vendored bytes never claimed to come from
@@ -110,7 +110,7 @@ def clone_at(commit: str, dest: Path) -> None:
 
     `--filter=blob:none` keeps it fast; blobs materialise on checkout. This is
     read-only w.r.t. any shared checkout — it never touches
-    /home/trick/Projects/habblaud.
+    the shared habblaud checkout.
     """
     proc = _run(["git", "clone", "--filter=blob:none", "--no-checkout",
                  "https://github.com/marmottajr/habblaud.git", str(dest)], timeout=900)

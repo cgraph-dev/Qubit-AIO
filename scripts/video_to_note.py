@@ -44,7 +44,8 @@ HELPER = REPO / "qubit_runtime/skills/media/youtube-content/scripts/fetch_transc
 DASHBOARD = os.environ.get("QUBIT_DASHBOARD", "http://127.0.0.1:8890")
 RUNTIME = Path(
     os.environ.get(
-        "QUBIT_RUNTIME_DIR", "/home/trick/.local/state/qubit-voicebridge/runtime"
+        "QUBIT_RUNTIME_DIR",
+        str(Path.home() / ".local" / "state" / "qubit-voicebridge" / "runtime"),
     )
 )
 # ASCII only: the Obsidian write route does NOT URL-decode its path, so an emoji
@@ -419,7 +420,9 @@ def main() -> int:
     back = read_note(path, token)
     print(f"      GET -> {back['status']} (read-back proves agents can see it)")
 
-    vault_root = Path(os.environ.get("OBSIDIAN_VAULT_PATH", "/home/trick/Documents/ObsidianVault"))
+    vault_root = Path(os.environ.get(
+        "OBSIDIAN_VAULT_PATH",
+        str(Path.home() / "Documents" / "ObsidianVault")))
     idx, link = update_index(
         vault_root, path, summary.get("title") or meta.get("video_id", ""),
         f"https://www.youtube.com/watch?v={meta.get('video_id', '')}",

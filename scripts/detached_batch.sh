@@ -4,7 +4,7 @@
 # bridge restart cannot kill it. Each agent writes its own findings file.
 set -u
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-OUT=/home/trick/.local/state/qubit-voicebridge/runtime/detached/reports
+OUT="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voicebridge/runtime/detached/reports"
 mkdir -p "$OUT"
 cd "$REPO" || exit 1
 

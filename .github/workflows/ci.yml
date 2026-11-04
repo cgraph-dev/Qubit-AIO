@@ -153,11 +153,52 @@ jobs:
       - name: Build, install, and reproduce artifacts
         # Exit 0 PASS, 2 FAIL, 4 DEGRADED, 8 BLOCKED. A dirty tree blocks the
         # artifact steps, so this is a real release gate (not a demo).
+        # CI never signs: the explicit --unsigned-ok policy records that these
+        # are draft, unsigned artifacts (the report still lists NOT_SIGNED).
+        # The tag is bound to pyproject/__version__ only on a real v* tag.
         run: |
           set -o pipefail
-          python scripts/release_qualify.py \
-            --build --install --reproduce --json \
-            --out dist/release | tee dist/release-report.json
+          args=(--build --install --reproduce --unsigned-ok --json
+                --out dist/release)
+          case "${GITHUB_REF_NAME:-}" in
+            v*) args+=(--tag "$GITHUB_REF_NAME") ;;
+          esac
+          python scripts/release_qualify.py "${args[@]}" \
+            | tee dist/release-report.json
+      - name: Report the release verdict
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          path = pathlib.Path("dist/release-report.json")
+          if not path.is_file():
+              print("no release report produced")
+              raise SystemExit(1)
+          report = json.loads(path.read_text())
+          version = report.get("version_identity", {})
+          lines = [
+              f"verdict: {report.get('verdict')}",
+              f"tree: {report.get('tree', {}).get('state')}",
+              "version: tag={tag} pyproject={pyproject} package={package} "
+              "state={state}".format(
+                  tag=version.get("tag"),
+                  pyproject=version.get("pyproject_version"),
+                  package=version.get("package_version"),
+                  state=version.get("state"),
+              ),
+          ]
+          for name, step in report.get("steps", {}).items():
+              lines.append(f"{name}: {step.get('state', '?')}")
+          text = "\n".join(lines)
+          print(text)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("```\n" + text + "\n```\n")
+          PY
       - name: Upload build report and artifacts
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0

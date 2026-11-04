@@ -41,7 +41,10 @@ MISSING, DEGRADED, WARN, FAIL = "MISSING", "DEGRADED", "WARN", "FAIL"
 # inventoried in docs/archive/2026-09-21/PACKET_0A_MISMATCH_REPORT.md section D. They degrade
 # gracefully, so their absence is a warning, not a fresh-install failure.
 OPTIONAL_GUARDED = {"psutil", "onnx", "prompt_toolkit", "websocket",
-                    "pystray"}
+                    "pystray",
+                    # optional extras / guarded imports that degrade typed
+                    # when absent (orb-qt, embedding router).
+                    "pyside6", "onnxruntime", "tokenizers"}
 LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
              # Qubit-owned vendored upstream fork (qubit_runtime/): local source,
              # not a PyPI distribution. The fork's modules are top-level once
@@ -60,7 +63,11 @@ LOCAL_TOP = {"voicebridge", "scripts", "browser_auto",
              # ``qubit_constants`` (home resolution), and ``acp_adapter``
              # (ACP entry). All are local fork source, not PyPI distributions.
              "agent", "tools", "qubit_state", "gateway", "plugins", "cron",
-             "utils", "qubit_state_timeline", "qubit_constants", "acp_adapter"}
+             "utils", "qubit_state_timeline", "qubit_constants", "acp_adapter",
+             # Additional vendored fork top-level modules imported after
+             # ``qubit_runtime.ensure_path()``: the oneshot agent facade, the
+             # TUI gateway, logging, roles and recipes.
+             "run_agent", "tui_gateway", "qubit_logging", "roles", "recipes"}
 
 
 # Distribution-name -> import-name corrections (pip name differs from module).
@@ -104,10 +111,11 @@ def _import_scan() -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
                 mods = [node.module]
             for m in mods:
                 top = m.split(".")[0]
-                if top in stdlib | declared | LOCAL_TOP:
+                key = top.lower()
+                if key in stdlib | declared | LOCAL_TOP:
                     continue
                 loc = f"{rel}:{node.lineno}"
-                if top in OPTIONAL_GUARDED:
+                if key in OPTIONAL_GUARDED:
                     warnings.append((top, loc))
                 elif rel.parts[0] == "scripts":
                     warnings.append((top, loc))  # operational tooling, not package runtime
