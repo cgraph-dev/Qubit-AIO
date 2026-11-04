@@ -42,7 +42,18 @@ async def _followup_while_running(monkeypatch, event, marker, *, fail_admit=Fals
     async def transcribed(self, event, adapter, source, text, *, log_context, metadata=None):
         return "heard this", []
 
+    async def transcribe_clip(self, path, transcribe_audio, transcribe_audio_local_fallback):
+        # The fixture audio is intentionally not decodable. Simulate the normal
+        # "STT unavailable" outcome so the test exercises admission and the
+        # neutral filename note, not a host-specific whisper model.
+        return None, f"[voice message could not be transcribed automatically; the audio is available at: {path}]"
+
     monkeypatch.setattr(GatewayRunner, "_transcribe_and_echo_pending_voice", transcribed)
+    # The fixture intentionally carries a minimal, undecodable Ogg blob: this
+    # test exercises admission, not local STT/model availability. Keep every
+    # transcription seam hermetic so a host with faster-whisper installed does
+    # not turn the fixture into an av.EOFError and mask the admission result.
+    monkeypatch.setattr(GatewayRunner, "_transcribe_one_clip", transcribe_clip)
     adapter.gateway_runner = runner
     runner.adapters = {Platform.DISCORD: adapter}
     await initialize_session_authority(runner, profile_id="default", instance_id="owner")
