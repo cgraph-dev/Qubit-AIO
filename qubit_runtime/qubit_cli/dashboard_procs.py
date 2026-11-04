@@ -199,12 +199,20 @@ def _qubit_home_for_pid(pid: int, *, require_launch_identity: bool = False) -> s
         Path(env_home).parent.name == "profiles" or env.get("HERMES_UPDATE_POST_SWAP") == "1"
     ):
         return env_home
+    # Qubit-owned platform default first; the pre-rebrand ``.hermes`` spelling is
+    # accepted read-old only when a legacy install exists and no canonical home
+    # does, so a migrated install is attributed to the canonical root.
+    suffix = env.get("HERMES_DATA_DIR_SUFFIX", "")
     if sys.platform == "win32":
         local_appdata = env.get("LOCALAPPDATA", "").strip()
         base = Path(local_appdata) if local_appdata else Path(env.get("USERPROFILE") or Path.home()) / "AppData" / "Local"
-        default_home = base / "hermes"
+        canonical = base / ("qubit" + suffix)
+        legacy = base / ("hermes" + suffix)
     else:
-        default_home = Path(env.get("HOME") or _pid_passwd_home(pid) or Path.home()) / ".hermes"
+        base = Path(env.get("HOME") or _pid_passwd_home(pid) or Path.home())
+        canonical = base / (".qubit" + suffix)
+        legacy = base / (".hermes" + suffix)
+    default_home = legacy if (not canonical.exists() and legacy.exists()) else canonical
     root = profile_root_for_env_home(env_home, default_home)
     fixed_identity = supervised_child_marker_present(env) or s6_supervised_child_marker_present(env) \
         or external_supervisor_marker_present(env) or is_desktop_ssh_backend_argv(argv)

@@ -29,7 +29,13 @@ def main(context: Path, result: Path) -> int:
                     or type(port) is not int or not 0 < port <= 65535):
                 skipped += 1
                 continue
-            command = [sys.executable, str(root / "hermes")]
+            # Canonical Qubit launcher first; a pre-rebrand source tree that
+            # only ships ``hermes`` keeps the read-old fallback.
+            canonical = root / ".qubit" / "bin" / "qubit"
+            if canonical.is_file():
+                command = [str(canonical)]
+            else:
+                command = [sys.executable, str(root / "hermes")]
             profile = entry.get("profile")
             if profile and profile != "default":
                 command += ["--profile", str(profile)]

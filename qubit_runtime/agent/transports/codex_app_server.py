@@ -128,7 +128,13 @@ class CodexAppServerClient:
         # workspace: keep the sandbox on, add the Kanban root as writable.
         if owned_task:
             kanban_db = spawn_env.get("HERMES_KANBAN_DB")
-            default_root = os.path.join(spawn_env.get("QUBIT_HOME", os.path.expanduser("~/.hermes")), "kanban")
+            try:
+                from qubit_constants import get_default_qubit_root
+                default_qubit_home = str(get_default_qubit_root())
+            except Exception:  # noqa: BLE001 — a stripped child still gets a Qubit-owned path
+                default_qubit_home = os.path.expanduser("~/.qubit")
+            default_root = os.path.join(
+                spawn_env.get("QUBIT_HOME") or default_qubit_home, "kanban")
             kanban_root = os.path.dirname(kanban_db) if kanban_db else spawn_env.get("HERMES_KANBAN_ROOT", default_root)
             cmd += [
                 "-c", 'sandbox_mode="workspace-write"',

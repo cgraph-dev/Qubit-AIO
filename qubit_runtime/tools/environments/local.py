@@ -661,18 +661,23 @@ def _resolve_qubit_bin_dir() -> str | None:
     if payload_dir is not None and payload_dir.is_dir():
         _QUBIT_BIN_DIR, _HERMES_BIN_DIR_IS_PAYLOAD = str(payload_dir), True
         return _QUBIT_BIN_DIR
-    which = shutil.which("hermes")
+    # Canonical ``qubit`` first; the pre-rebrand ``hermes`` launcher stays a
+    # read-old fallback for an install that has not been renamed yet.
+    which = shutil.which("qubit") or shutil.which("hermes")
     argv0 = sys.argv[0] if sys.argv else ""
     base = os.path.basename(argv0).lower()
     exe_dir = os.path.dirname(sys.executable) if sys.executable else ""
-    shim = "hermes.exe" if _IS_WINDOWS else "hermes"
+    shims = ("qubit.exe", "hermes.exe") if _IS_WINDOWS else ("qubit", "hermes")
     if which:
         candidate = os.path.dirname(which)
-    elif (os.path.isabs(argv0) and (base == "hermes" or base.startswith("qubit."))
+    elif (os.path.isabs(argv0)
+            and (base in ("qubit", "qubit-agent", "hermes")
+                 or base.startswith("qubit."))
             and os.path.isfile(argv0)):
         candidate = os.path.dirname(argv0)
     else:
-        candidate = exe_dir if exe_dir and os.path.isfile(os.path.join(exe_dir, shim)) else None
+        candidate = (exe_dir if exe_dir and any(
+            os.path.isfile(os.path.join(exe_dir, shim)) for shim in shims) else None)
     _QUBIT_BIN_DIR = candidate if candidate and os.path.isdir(candidate) else None
     _HERMES_BIN_DIR_IS_PAYLOAD = False
     return _QUBIT_BIN_DIR
