@@ -1477,6 +1477,8 @@ function PluginRowCard(props: PluginRowCardProps) {
                 disabled={busy}
                 ghost
                 size="sm"
+                title={t.pluginsPage.removeConfirm}
+                aria-label={t.pluginsPage.removeConfirm}
                 onClick={() => setConfirmRemove(true)}
               >
 

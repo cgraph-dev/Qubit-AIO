@@ -298,3 +298,38 @@ describe("ChannelsPage reference-only credentials (audit AI10 item 2)", () => {
     );
   });
 });
+
+describe("ChannelsPage connected-state copy", () => {
+  it("hides a stale install hint beside a connected channel", async () => {
+    apiMocks.getMessagingPlatforms.mockResolvedValue({
+      env_path: "/home/u/.local/state/qubit-voicebridge/runtime/.env",
+      gateway_start_command: "qubit gateway start",
+      platforms: [
+        platform({
+          id: "telegram",
+          name: "Telegram",
+          state: "connected",
+          configured: true,
+          enabled: true,
+          description: "Run `qubit setup` to install Telegram support.",
+        }),
+        platform({
+          id: "discord",
+          name: "Discord",
+          state: "connected",
+          configured: true,
+          enabled: true,
+          description: "Run Qubit from Discord.",
+        }),
+      ],
+    });
+    await renderChannels();
+
+    // The stale install hint is not shown next to "Connected"...
+    expect(container.textContent).not.toContain(
+      "Run `qubit setup` to install Telegram support.",
+    );
+    // ...but a real channel description still is.
+    expect(container.textContent).toContain("Run Qubit from Discord.");
+  });
+});

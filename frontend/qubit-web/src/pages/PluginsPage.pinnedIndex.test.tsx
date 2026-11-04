@@ -558,3 +558,45 @@ describe("PluginsPage memory provider refusal", () => {
     expect(save?.disabled).toBe(true);
   });
 });
+
+describe("PluginsPage plugin row controls", () => {
+  it("gives the icon-only remove control an accessible name", async () => {
+    apiMocks.getPluginsHub.mockResolvedValue({
+      plugins: [
+        {
+          name: "demo-plugin",
+          version: "1.0.0",
+          description: "A removable demo plugin.",
+          source: "user",
+          runtime_status: "enabled",
+          has_dashboard_manifest: false,
+          dashboard_manifest: null,
+          path: "/tmp/demo-plugin",
+          can_remove: true,
+          can_update_git: false,
+          auth_required: false,
+          auth_command: "",
+          user_hidden: false,
+        },
+      ],
+      orphan_dashboard_plugins: [],
+      providers: {
+        memory_provider: "",
+        memory_options: [],
+        context_engine: "compressor",
+        context_options: [],
+      },
+      catalog_index: pinnedIndex,
+    });
+    await renderPage();
+    await waitFor(
+      () => container.textContent?.includes("demo-plugin") === true,
+    );
+
+    const remove = [...container.querySelectorAll("button")].find((button) =>
+      (button.getAttribute("aria-label") ?? "").includes("Remove this plugin"),
+    );
+    expect(remove).toBeTruthy();
+    expect(remove?.getAttribute("title")).toContain("Remove this plugin");
+  });
+});

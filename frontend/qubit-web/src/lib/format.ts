@@ -69,6 +69,26 @@ export function formatDurationLong(
 }
 
 /**
+ * Render a product version for display without doubling the product name or
+ * the `v` prefix. The Qubit boundary reports values like `qubit-0.0.1`, the
+ * system-stats payload reports a bare `1.0.0`, and some payloads already carry
+ * a `v`; all three should read `v0.0.1` / `v1.0.0`, never `vqubit-0.0.1`.
+ *
+ * Non-version strings (e.g. `unknown`) pass through unchanged, and an absent
+ * value reads as an em dash so callers never print `vundefined`.
+ */
+export function formatProductVersion(value: string | null | undefined): string {
+  if (value == null) return "—";
+  const trimmed = String(value).trim();
+  if (!trimmed) return "—";
+  const bare = trimmed
+    .replace(/^qubit[-_\s]*/i, "")
+    .replace(/^v(?=\d)/i, "");
+  const looksLikeVersion = /^\d/.test(bare);
+  return looksLikeVersion ? `v${bare}` : trimmed;
+}
+
+/**
  * Normalize an epoch timestamp to milliseconds.
  *
  * Qubit backends are not consistent: most dates are ISO strings or already in
