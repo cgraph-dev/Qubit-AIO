@@ -429,7 +429,17 @@ path = "scripts/hatch_build_qubit.py"
 # been built before packaging; scripts/install.sh builds it deterministically
 # from a clean clone when node/npm are available and otherwise fails typed
 # (see the wheel comment above and docs/CLEAN_CLONE_AUDIT_WAVE5.md).
-artifacts = ["frontend/qubit-dist"]
+#
+# docs/generated/ is git-ignored, so hatchling's VCS file selection omits a
+# tracked file there even though ``git ls-files`` reports it. The vendor
+# manifest is force-included by the wheel, so without this ``artifacts`` entry
+# a wheel rebuilt from the sdist fails with "Forced include not found" — the
+# sdist would not be self-contained. Declare it here so the generated
+# provenance record ships and a downstream ``pip install <sdist>`` works.
+artifacts = [
+  "frontend/qubit-dist",
+  "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json",
+]
 # NEVER ship the developer's live config, private browser state, or accidental
 # dirty/untracked files (Packet 8K "no private developer state in the release").
 # The sdist carries the portable example config only.
@@ -607,7 +617,9 @@ exclude = [
   "docs/STARNET_VOICE_STUDY.md",
   "docs/TEST-HONESTY-AUDIT.md",
   "docs/TEST_PORT_RECOVERY_2026-10-19.md",
-  "docs/VOICE-BRIDGE-AUDIT.md",
+  # docs/VOICE-BRIDGE-AUDIT.md is NOT excluded: it is force-included into the
+  # wheel as the installed AUDIO_SETUP guide, so the sdist must carry it or a
+  # wheel rebuilt from the sdist dies with "Forced include not found".
   "docs/game-office",
   # The whole vendored fork is excluded from the default sdist tree walk; the
   # runtime subset is force-included below at its original qubit_runtime/
@@ -620,9 +632,10 @@ exclude = [
 # Files land at their original qubit_runtime/ paths so a wheel can be rebuilt
 # from the sdist with the wheel force-include table above.
 [tool.hatch.build.targets.sdist.force-include]
-# The generated provenance manifest is currently absent (see the wheel note);
-# no mapping is declared until it exists, so the sdist never promises a file
-# it cannot carry.
+# The generated provenance manifest is carried via the sdist ``artifacts`` list
+# above (docs/generated/ is git-ignored, so a force-include source there would
+# be dropped by the VCS file selection). Every other runtime mapping below
+# mirrors the wheel so the sdist rebuilds it without the checkout.
 "qubit_runtime/qubit_cli" = "qubit_runtime/qubit_cli"
 "qubit_runtime/agent" = "qubit_runtime/agent"
 "qubit_runtime/tools" = "qubit_runtime/tools"

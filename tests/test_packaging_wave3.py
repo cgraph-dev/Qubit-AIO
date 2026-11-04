@@ -191,6 +191,62 @@ def test_force_include_sources_are_tracked_so_a_clean_clone_can_build():
     assert tracked_dirs  # git produced a real listing
 
 
+def _git_ignored(path: str) -> bool:
+    """True when ``path`` matches .gitignore (tracked files included).
+
+    ``git check-ignore`` hides tracked files by default, so ``--no-index`` is
+    required: hatchling's sdist selection is VCS-based and drops ignored paths
+    even when they are committed.
+    """
+    return subprocess.run(
+        ["git", "check-ignore", "--no-index", "-q", "--", path],
+        cwd=REPO,
+    ).returncode == 0
+
+
+def test_every_wheel_force_include_source_survives_in_the_sdist():
+    """Every wheel force-include source must also reach the sdist.
+
+    Two hatchling behaviours make a source disappear from the sdist even
+    though the wheel needs it: the sdist's default file selection is VCS-based
+    (a git-ignored but tracked path is dropped), and an entry in the sdist
+    ``exclude`` list removes a tracked path outright. Either way a wheel
+    rebuilt from the sdist dies with "Forced include not found", so the sdist
+    is not self-contained.
+
+    A source survives when it is declared as an sdist artifact (the generated
+    vendor manifest under the ignored docs/generated/ tree), mirrored in the
+    sdist force-include table (the vendored runtime), or left in the default
+    tracked tree walk (the shipped docs).
+    """
+    wheel, sdist = _targets()
+    artifacts = set(sdist.get("artifacts", []))
+    sforce = sdist.get("force-include", {})
+    excluded = [e.rstrip("/") for e in sdist.get("exclude", [])]
+
+    def _excluded(source: str) -> bool:
+        return any(source == e or source.startswith(e + "/") for e in excluded)
+
+    broken = [
+        source for source in wheel["force-include"]
+        if source != "frontend"
+        and source not in artifacts
+        and source not in sforce
+        and (_git_ignored(source) or _excluded(source))
+    ]
+    assert not broken, (
+        "wheel force-include source(s) cannot survive in the sdist (a wheel "
+        f"rebuilt from it fails): {broken}")
+
+    manifest = "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json"
+    assert _git_ignored(manifest)
+    assert manifest in artifacts
+    assert (REPO / manifest).is_file()
+    # The installed AUDIO_SETUP guide is force-included from a tracked doc;
+    # exclusions must never remove a force-include source.
+    assert "docs/VOICE-BRIDGE-AUDIT.md" not in excluded
+
+
 # ===========================================================================
 # 2. No hardcoded developer-home path in packaging surfaces
 # ===========================================================================
