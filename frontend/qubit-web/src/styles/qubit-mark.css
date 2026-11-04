@@ -10,7 +10,8 @@
  * fringes a thin bright line. That is what reads as technical rather than
  * childish; a drop-shadow bloom reads as a sticker.
  *
- * No drop-shadow, no radial gradients, no blur on this mark.
+ * The chromatic fringe below is a hard 0.45px channel offset, NOT a blur, and it
+ * is the one deliberate exception: at 56px anything softer swallows the hairline.
  */
 
 /* ---------- Base ---------- */
@@ -92,18 +93,31 @@
  * solid stroke here would bury them. */
 .qubit-mark__ring--near {
   stroke: currentColor;
-  stroke-opacity: 0.35;
+  stroke-opacity: 0.62;
 }
 
 .qubit-mark__ring--far {
   stroke: currentColor;
-  stroke-opacity: 0.22;
+  stroke-opacity: 0.34;
 }
 
-/* Deepest line stays the faintest — it is a depth cue, not a third feature. */
+/* Deepest line stays the faintest — it is a depth cue, not a feature. */
 .qubit-mark__ring--deep {
   stroke: currentColor;
-  stroke-opacity: 0.18;
+  stroke-opacity: 0.26;
+}
+
+/* The two innermost planes. Lower opacity keeps five rings from reading as
+ * clutter: the eye follows the two brightest (near and closest) and resolves the
+ * rest as depth. */
+.qubit-mark__ring--mid {
+  stroke: currentColor;
+  stroke-opacity: 0.24;
+}
+
+.qubit-mark__ring--closest {
+  stroke: currentColor;
+  stroke-opacity: 0.5;
 }
 
 /* RGB fringe.
@@ -116,11 +130,12 @@
  * red/blue. */
 .qubit-mark__ring--near,
 .qubit-mark__ring--far,
-.qubit-mark__ring--deep {
+.qubit-mark__ring--deep,
+.qubit-mark__ring--mid,
+.qubit-mark__ring--closest {
   filter:
-    drop-shadow(0.7px 0 0 rgb(255 45 85 / 0.95))
-    drop-shadow(-0.7px 0 0 rgb(45 130 255 / 0.95))
-    drop-shadow(0 0.5px 0 rgb(60 255 150 / 0.55));
+    drop-shadow(0.45px 0 0 rgb(255 45 85 / 0.75))
+    drop-shadow(-0.45px 0 0 rgb(45 130 255 / 0.75));
 }
 
 /* ---------- Particles ---------- */
@@ -129,6 +144,7 @@
  * scale/opacity beat is layered on top of a transform that already moves them. */
 .qubit-mark__bead {
   fill: currentColor;
+  fill-opacity: 0.92;
 }
 
 /* ---------- Nucleus ---------- */
@@ -170,8 +186,9 @@
 }
 
 /* Deepest plane sits behind both crossed fields. */
+.qubit-mark__field--mid,
 .qubit-mark__field--deep {
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
 .qubit-mark__ring {
@@ -197,8 +214,10 @@
   opacity: 0.9;
 }
 
-.qagent-sidebar__brand-row:hover .qubit-mark__ring--far {
-  stroke-opacity: 0.7;
+.qagent-sidebar__brand-row:hover .qubit-mark__ring--far,
+.qagent-sidebar__brand-row:hover .qubit-mark__ring--mid,
+.qagent-sidebar__brand-row:hover .qubit-mark__ring--deep {
+  stroke-opacity: 0.6;
 }
 
 /* Hover speeds every plane up, so the mark visibly responds to contact without
@@ -530,6 +549,12 @@
   }
   .qubit-mark__field--deep .qubit-mark__plane {
     transform: scale(1, 0.9);
+  }
+  .qubit-mark__field--mid .qubit-mark__plane {
+    transform: scale(1, 0.61);
+  }
+  .qubit-mark__field--closest .qubit-mark__plane {
+    transform: scale(1, 0.5);
   }
   .qubit-mark__bead {
     opacity: 0.9;
