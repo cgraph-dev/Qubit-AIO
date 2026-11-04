@@ -18,7 +18,7 @@ const LINE_FINAL_COLON_RE = /:\s*$/gm
 // stay so older backends' frames are still stripped). These lines must never
 // be spoken: the user hears the reply, not the spinner.
 const THINKING_PREFIX_RE =
-  /^\s*(?:\([^)\n]{1,48}\)\s*)?(?:processing|thinking|reasoning|analyzing|pondering|contemplating|musing|cogitating|ruminating|deliberating|mulling|reflecting|computing|synthesizing|formulating|brainstorming|pwn3d you yet\?|youre a retard, lmao|fuck you, reading|watching you sweat|nice typo, dipshit|rooting your box|looting your keys|rm -rf your hopes|hacking the mainframe|3l1t3 mode|harvesting karma|oh no, youre dumb|judging your diff|mocking your commits|brb, pwning|git commit -m lol|sudo think harder|bruteforcing you|piping to \/dev\/null|trolling in prod|laughing at you|ieet, hold on|backdooring it|sniffing packets|keylogging u, jk|your code, my bot|skill issue, signal|404 clue not found|zero-day-ing this|hex-dumping honestly)(?:\.\.\.|…)?\s*/i
+  /^\s*(?:\([^)\n]{1,48}\)\s*)?(?:obfuscating|penetrating|rootkitting|fuzzing\ the\ heap|bruteforcing|pivoting\ laterally|deauth\-ing\ the\ link|poisoning\ the\ cache|hijacking\ the\ socket|escalating\ privilege|exfiltrating\ quietly|shellshocking|decompiling\ you|keylogging\ the\ daemon|cracking\ the\ checksum|tunnelling\ through|ghosting\ the\ tracer|spoofing\ the\ handshake|heap\-spraying|weaponising\ the\ diff|puking\ bytes|shitting\ out\ packets|fermenting\ a\ fork|vomiting\ stack\ traces|nuking\ the\ build|digesting\ your\ code|rotting\ in\ RAM|secreting\ glue\ code|swallowing\ the\ panic|hacking\ up\ tokens|coughing\ up\ errors|mutating\ in\ the\ dark|bleeding\ edge\ cases|moulting\ the\ lockfile|regurgitating\ the\ spec|birthing\ a\ bug)(?:\.\.\.|…)?\s*/i
 
 const URL_RE = /\bhttps?:\/\/\S+/gi
 

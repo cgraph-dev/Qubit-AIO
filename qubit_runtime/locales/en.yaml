@@ -3515,7 +3515,14 @@ display:
     omitted_lines: "… omitted {count} diff line(s)"
     omitted_files: " across {count} additional file(s)/section(s)"
   # Comma-separated; a skin's spinner.thinking_verbs wins over this list.
-  thinking_verbs: "pondering,contemplating,musing,cogitating,ruminating,deliberating,mulling,reflecting,processing,reasoning,analyzing,computing,synthesizing,formulating,brainstorming"
+  #
+  # Voice: the agent narrating its own work to the user mid-turn. Netrunner
+  # energy (obfuscating, penetrating, rootkitting) mixed with body-horror gross
+  # (puking, shitting, fermenting). Deliberately NOT the old "contemplating /
+  # pondering" register — those read as a customer-service bot.
+  # Keep every entry <= 24 chars: the status rule pads to the longest one.
+  # Plain words only, no kaomoji — the face is rendered in front of the verb.
+  thinking_verbs: "obfuscating,penetrating,rootkitting,fuzzing the heap,bruteforcing,pivoting laterally,deauth-ing the link,poisoning the cache,hijacking the socket,escalating privilege,exfiltrating quietly,shellshocking,decompiling you,keylogging the daemon,cracking the checksum,tunnelling through,ghosting the tracer,spoofing the handshake,heap-spraying,weaponising the diff,puking bytes,shitting out packets,fermenting a fork,vomiting stack traces,nuking the build,digesting your code,rotting in RAM,secreting glue code,swallowing the panic,hacking up tokens,coughing up errors,mutating in the dark,bleeding edge cases,moulting the lockfile,regurgitating the spec,birthing a bug"
   spinner:
     tool_line: "  [tool] {message}"
     done_line: "  [done] {message}{elapsed}"
