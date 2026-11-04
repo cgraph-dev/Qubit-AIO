@@ -336,6 +336,14 @@ def scan_forbidden(dest: Path, public_docs: set[str]) -> tuple[list[str], list[s
     return sorted(set(forbidden)), sorted(set(personal))
 
 
+def expected_seed_file_count(report: dict) -> int:
+    """Exported files plus the seed's manifest and VERSION (unless exported)."""
+    extra = 1  # PUBLIC_TREE_MANIFEST.md
+    if "VERSION" not in report.get("public_root_files", ()):
+        extra += 1
+    return int(report["included_files"]) + extra
+
+
 def verify_export(dest: Path, report: dict, version: str, public_docs: set[str], checks: Checks) -> None:
     checks.require("dest is a directory", dest.is_dir(), str(dest))
     checks.require(
@@ -355,9 +363,9 @@ def verify_export(dest: Path, report: dict, version: str, public_docs: set[str],
     )
     checks.require(
         "included count matches export report",
-        exported_files == int(report["included_files"]) + 2,
-        "expected %d (included + manifest + VERSION), found %d"
-        % (int(report["included_files"]) + 2, exported_files),
+        exported_files == expected_seed_file_count(report),
+        "expected %d (included + manifest + VERSION when not exported), found %d"
+        % (expected_seed_file_count(report), exported_files),
     )
     pyproject = dest / "pyproject.toml"
     import tomllib
@@ -735,7 +743,7 @@ def main(argv: list[str] | None = None) -> int:
         report["source"]["commit"],
         tag,
         checks,
-        int(report["included_files"]) + 2,
+        expected_seed_file_count(report),
     )
     checks.finish()
 

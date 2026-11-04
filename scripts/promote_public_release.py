@@ -341,7 +341,9 @@ def _write_report(
             "tree": seed_tree,
             "version": version,
             "tag": tag,
-            "tracked_files": report["included_files"] + 2,
+            "tracked_files": report["included_files"] + (
+                1 if "VERSION" in report.get("public_root_files", ()) else 2
+            ),
         },
         "export": {
             "included_files": report["included_files"],
@@ -508,7 +510,7 @@ def main(argv: list[str] | None = None) -> int:
             source_commit,
             tag,
             checks,
-            int(report["included_files"]) + 2,
+            seed.expected_seed_file_count(report),
         )
     checks.finish()
 
