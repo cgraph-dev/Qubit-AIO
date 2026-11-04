@@ -37,6 +37,10 @@ One line (Linux, full install including voice):
 git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scripts/install.sh
 ```
 
+A source install builds the dashboard bundle, so it needs Node.js 22+ and
+`npm`. Pass `--without-dashboard` for a headless install, or use a release
+archive that already contains `frontend/qubit-dist`.
+
 macOS core install (runtime, CLI, dashboard and the gateway LaunchAgent; the
 voice bridge/orb/typing stay unsupported):
 
@@ -44,12 +48,13 @@ voice bridge/orb/typing stay unsupported):
 git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scripts/install.sh --with-launchd
 ```
 
-Use the Qubit download URL if it differs from the repository above. For options,
-prerequisites, profiles, and offline notes, see [INSTALL.md](INSTALL.md).
+For options, prerequisites, profiles, and offline notes, see
+[INSTALL.md](INSTALL.md).
 
-Checkout-free path (once a release publishes its installer asset):
+Release-asset bootstrap (once a release publishes its installer asset):
 `scripts/bootstrap.sh <release-base>` downloads the release installer, verifies
-its SHA-256, and runs only the verified copy. See
+its SHA-256, and runs only the verified copy. It never reads the source
+checkout to install. See
 [INSTALL.md](INSTALL.md#bootstrap-installer-release-assets).
 
 New installs keep runtime state and voice under `$QUBIT_HOME`
@@ -67,11 +72,10 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -QubitHome "%LOCA
 ```
 
 Flags: `-QubitHome DIR`, `-Channel stable|main`, `-NoModels`, `-NoDashboard`.
-`scripts\install.cmd` is the CMD wrapper for the same entry. Windows CI
-(`.github/workflows/windows-installer.yml`) parses the installer, runs
-`-Help`/`-DryRun`, and performs a no-model/no-dashboard checkout install; the
-pinned model downloads, dashboard build, and update/uninstall paths remain
-unverified on Windows.
+`scripts\install.cmd` is the CMD wrapper for the same entry. Windows CI parses
+the installer, runs `-Help`/`-DryRun`, and performs a no-model/no-dashboard
+checkout install; the pinned model downloads, dashboard build, and
+update/uninstall paths remain unverified on Windows.
 
 ## Quickstart
 
@@ -83,7 +87,8 @@ qubit status
 qubit run                        # push-to-talk loop
 ```
 
-Open the dashboard at <http://127.0.0.1:8890/>. It binds to loopback by default.
+Open the dashboard at <http://127.0.0.1:8890/> (served by the bridge started by
+`qubit run`). It binds to loopback by default.
 For voice identity, enroll your voice once before the first voice turn:
 
 ```bash
@@ -93,7 +98,8 @@ qubit enroll
 ## What is optional
 
 - Local model assets: skip with `--without-models`.
-- Dashboard bundle: skip with `--without-dashboard`.
+- Dashboard bundle build: skip with `--without-dashboard` (a source checkout
+  does not include the prebuilt bundle).
 - Auto-start user services: add `--with-systemd`.
 - Voice hardware and voice identity: the text and dashboard paths work without them.
 - Cloud provider keys: see `.env.example`; the core local path does not require them.
@@ -101,7 +107,7 @@ qubit enroll
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) — install, prerequisites, options, offline notes.
-- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — dashboard, models, audio, dependencies, uninstall.
+- [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — dashboard, models, local brain (VRAM), audio, dependencies, uninstall.
 - [SECURITY.md](SECURITY.md) — vulnerability reporting and scope.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development setup and pull requests.
 

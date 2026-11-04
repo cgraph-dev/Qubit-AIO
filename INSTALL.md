@@ -23,6 +23,10 @@ Required:
   `>=3.12,<3.15`.
 - At least **4 GB RAM** and **2 GB free disk** for the base install. Model
   assets need additional disk space.
+- Node.js **22 or newer** and `npm` for a source install that serves the
+  dashboard: the source tree does not include the built bundle
+  (`frontend/qubit-dist`). Skip with `--without-dashboard`, or use a release
+  archive that already contains the bundle.
 
 Optional:
 
@@ -30,11 +34,6 @@ Optional:
 - `tar` plus `sha256sum`, `shasum`, or `openssl` when model assets are
   downloaded; the installer verifies pinned checksums. These assets are
   Linux-only: macOS never downloads the voice models.
-- Node.js **20.19+ or 22.12+** (the pinned Vite 8 engine range; Node 22 LTS is
-  recommended) and `npm` when the dashboard bundle (`frontend/qubit-dist`) is
-  absent and must be built. Node 18 (e.g. Ubuntu 24.04's `nodejs` package) is
-  below that range: the build fails and the installer exits with the typed
-  `DASHBOARD_UNAVAILABLE` (exit 4).
 
 ## Install
 
@@ -59,10 +58,10 @@ installation.
 
 ## Bootstrap installer (release assets)
 
-`scripts/bootstrap.sh` is the checkout-free entry point for a published
+`scripts/bootstrap.sh` is the release-asset entry point for a published
 release. It downloads the release installer (`install.sh`) and its checksum
 into a temporary directory, verifies the SHA-256, and executes **only** the
-verified copy. It never reads a source checkout.
+verified copy. It never reads a source checkout to install.
 
 ```bash
 ./scripts/bootstrap.sh --help
@@ -71,7 +70,8 @@ verified copy. It never reads a source checkout.
 ```
 
 `<release-base>` is an HTTPS URL, a `file://` URL, or a local directory that
-contains `install.sh` and `SHA256SUMS` (or `install.sh.sha256`).
+contains `install.sh` and `SHA256SUMS` (or `install.sh.sha256` /
+`install.sh.sha256sum`).
 `--checksum FILE` overrides checksum discovery. `--profile NAME` is exported
 to the verified installer as `QUBIT_PROFILE`; `--prefix DIR` is forwarded as
 `--prefix DIR`.
@@ -103,7 +103,7 @@ public one-line URL.
 | `--with-launchd` | Install the macOS gateway LaunchAgent (`ai.qubit.gateway.plist`); macOS only. |
 | `--without-models` | Skip model asset downloads and local model provisioning. |
 | `--without-dashboard` | Skip the dashboard bundle check and build (headless installs). |
-| `--prefix DIR` | Install the new `DIR/voice` tree and the launcher under `DIR` (equivalent to setting `QUBIT_HOME=DIR`); a portable install never adopts an old XDG tree. |
+| `--prefix DIR` | Install the new `DIR/voice` tree and the launcher under `DIR` (the voice tree is equivalent to `QUBIT_HOME=DIR`), with the prefix's own XDG directories; a portable install never adopts an old XDG tree. |
 | `-y`, `--yes` | Do not prompt before enabling the user services. |
 | `--launcher-only` | Repair the `qubit` launcher and exit. |
 
@@ -119,7 +119,7 @@ Environment variables:
 A new install keeps everything under the Qubit home:
 
 - runtime home and state: `$QUBIT_HOME` (default `~/.qubit`)
-- voice config: `$QUBIT_HOME/voice/config/`
+- voice config: `$QUBIT_HOME/voice/config/` (`voice.yaml`, `.env`)
 - voice data and models: `$QUBIT_HOME/voice/data/`, `$QUBIT_HOME/voice/models/`
 - voice state: `$QUBIT_HOME/voice/state/`
 - launcher: `~/.local/bin/qubit`

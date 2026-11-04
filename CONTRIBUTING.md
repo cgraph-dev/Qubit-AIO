@@ -4,7 +4,7 @@
 
 Requirements:
 
-- Linux (the supported target is Ubuntu x86_64).
+- Linux (the supported release target is Ubuntu x86_64).
 - Python **3.12 or newer, below 3.15**.
 - Node.js **22 or newer** for the dashboard and desktop tooling.
 - `git`, `bash`, and the usual build toolchain.
@@ -25,7 +25,7 @@ Run the focused tests for the area you changed:
 python -m pytest tests -q
 ```
 
-Do not run release-wide test matrices for a small change.
+Keep test runs focused; run the wider suite only when the change needs it.
 
 ## Pull requests
 
