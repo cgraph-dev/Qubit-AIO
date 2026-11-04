@@ -2,49 +2,260 @@
 # Install Qubit Agent (Qubit VoiceBridge) on a FRESH machine (or re-run to repair).
 # Idempotent. Qubit-only: it never installs, launches, or requires a foreign assistant.
 #
-#   ./scripts/install.sh                    # venv, deps, models, config
-#   ./scripts/install.sh --with-systemd     # also install the systemd user service
+#   ./scripts/install.sh --help              # options, no changes
+#   ./scripts/install.sh --dry-run           # preflight + layout, no writes
+#   ./scripts/install.sh                     # venv, deps, verified models, config
+#   ./scripts/install.sh --with-systemd      # also install/enable/start user units
 #
-# Requires: bash, curl, uv (https://astral.sh/uv), ollama (https://ollama.com),
-#           a working mic + speaker, and (for hotkeys) an X11/Wayland session.
-# Keys (optional, for complex/web answers): DEEPSEEK_API_KEY and
-# PERPLEXITY_API_KEY in ~/.config/qubit-voicebridge/.env — see .env.example.
+# Requires: bash, curl, uv (https://astral.sh/uv). Optional: ollama (local
+# brain), node/npm (dashboard build when frontend/qubit-dist is absent), and
+# sha256sum/shasum/openssl + tar for model assets. Keys (optional, for
+# complex/web answers): DEEPSEEK_API_KEY and PERPLEXITY_API_KEY in
+# ~/.config/qubit-voicebridge/.env — see .env.example.
 set -euo pipefail
 
-case "${1:-}" in
-  ""|--with-systemd|-s) ;;
-  -h|--help)
-    cat <<'EOF'
+WITH_SYSTEMD=0
+DRY_RUN=0
+WITHOUT_MODELS=0
+WITHOUT_DASHBOARD=0
+LAUNCHER_ONLY=0
+ASSUME_YES=0
+PREFIX=""
+
+usage() {
+  cat <<'EOF'
 Qubit installer
 
 Usage:
-  ./scripts/install.sh [--with-systemd]
+  ./scripts/install.sh [options]
 
-  --with-systemd, -s   install the user systemd units after the base install
-  -h, --help           show this help without changing the machine
+Options:
+  -h, --help            show this help without changing the machine
+  -s, --with-systemd    install the user units, then enable and start them
+                        (asks before enabling when interactive; non-interactive
+                        runs proceed because the option is explicit)
+  --dry-run             run preflight and print the install layout; make no changes
+  --without-models      skip model asset downloads and ollama model provisioning
+  --without-dashboard   skip the dashboard bundle check/build (headless installs)
+  --prefix DIR          install data/config/state/bin under DIR instead of the
+                        XDG defaults (QUBIT_PREFIX is the env equivalent). The
+                        installer exports these paths for this run; export the
+                        same XDG_* / QUBIT_HOME values for the installed service
+  -y, --yes             do not prompt before enabling the user services
+  --launcher-only       (repair) re-render the `qubit` launcher and exit
 
-Requires: bash, curl, uv, ollama (for the local brain), and node/npm (for the
-dashboard build when frontend/qubit-dist is absent).
+Environment:
+  QUBIT_HOME            runtime/agent home; printed in the layout and used by the
+                        installed product (default: ~/.qubit, or DIR with --prefix)
+  QUBIT_PREFIX          same as --prefix when the flag is absent
+  QUBIT_NO_LAUNCHER=1   do not install the `qubit` user launcher
+
+Requires: bash, curl, uv. Optional: ollama (local brain), node/npm (dashboard
+build when frontend/qubit-dist is absent), and sha256sum/shasum/openssl + tar
+for model assets (unless --without-models).
 EOF
-    exit 0
-    ;;
-  *)
-    echo "unknown option: $1" >&2
-    echo "run ./scripts/install.sh --help" >&2
-    exit 2
-    ;;
-esac
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -s|--with-systemd)
+      WITH_SYSTEMD=1
+      ;;
+    --dry-run)
+      DRY_RUN=1
+      ;;
+    --without-models)
+      WITHOUT_MODELS=1
+      ;;
+    --without-dashboard)
+      WITHOUT_DASHBOARD=1
+      ;;
+    -y|--yes)
+      ASSUME_YES=1
+      ;;
+    --prefix)
+      if [ "$#" -lt 2 ] || [ -z "${2:-}" ]; then
+        echo "option --prefix requires a directory" >&2
+        echo "run ./scripts/install.sh --help" >&2
+        exit 2
+      fi
+      PREFIX="$2"
+      shift
+      ;;
+    --prefix=*)
+      PREFIX="${1#*=}"
+      if [ -z "$PREFIX" ]; then
+        echo "option --prefix requires a directory" >&2
+        echo "run ./scripts/install.sh --help" >&2
+        exit 2
+      fi
+      ;;
+    --launcher-only|--install-launcher)
+      LAUNCHER_ONLY=1
+      ;;
+    --)
+      shift
+      if [ "$#" -gt 0 ]; then
+        echo "unexpected argument: $1" >&2
+        echo "run ./scripts/install.sh --help" >&2
+        exit 2
+      fi
+      ;;
+    -*)
+      echo "unknown option: $1" >&2
+      echo "run ./scripts/install.sh --help" >&2
+      exit 2
+      ;;
+    *)
+      echo "unexpected argument: $1" >&2
+      echo "run ./scripts/install.sh --help" >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$PROJECT_DIR/.venv"
-DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voicebridge"
+
+# --------------------------------------------------------------- layout
+# One resolved prefix drives data/config/state/bin so the paths we print and
+# the paths we write can never disagree. --prefix wins, then QUBIT_PREFIX; with
+# neither, the existing XDG defaults are kept. QUBIT_HOME is the runtime home
+# (default ~/.qubit) and is printed alongside the install tree.
+QUBIT_HOME_EXPLICIT=0
+if [ -n "${QUBIT_HOME:-}" ]; then
+  QUBIT_HOME_EXPLICIT=1
+fi
+if [ -z "$PREFIX" ]; then
+  PREFIX="${QUBIT_PREFIX:-}"
+fi
+if [ -n "$PREFIX" ]; then
+  case "$PREFIX" in
+    /*) ;;
+    *) PREFIX="$(pwd)/$PREFIX" ;;
+  esac
+  case "$PREFIX" in
+    /) ;;
+    */) PREFIX="${PREFIX%/}" ;;
+  esac
+  DATA_DIR="$PREFIX/share/qubit-voicebridge"
+  CONFIG_DIR="$PREFIX/config/qubit-voicebridge"
+  STATE_DIR="$PREFIX/state/qubit-voicebridge"
+  LAUNCHER_DIR="$PREFIX/bin"
+  # Child processes (uv, the built dashboard, the bridge) must resolve the same
+  # tree instead of silently falling back to ~/.config, ~/.local/share, etc.
+  export XDG_DATA_HOME="$PREFIX/share"
+  export XDG_CONFIG_HOME="$PREFIX/config"
+  export XDG_STATE_HOME="$PREFIX/state"
+  export XDG_CACHE_HOME="$PREFIX/cache"
+else
+  DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voicebridge"
+  CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/qubit-voicebridge"
+  STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voicebridge"
+  LAUNCHER_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
+fi
+QUBIT_HOME="${QUBIT_HOME:-${PREFIX:-$HOME/.qubit}}"
 MODELS="$DATA_DIR/models"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/qubit-voicebridge"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voicebridge"
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
-LAUNCHER_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
+DASHBOARD_STATE="present"
 
 SR="https://github.com/k2-fsa/sherpa-onnx/releases/download"
+
+# --------------------------------------------------------------- preflight
+MISSING_REQUIRED=0
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+check_required() { # check_required <tool> <why>
+  local name="$1" why="${2:-}"
+  if have "$name"; then
+    printf '    OK       %-10s %s\n' "$name" "$why"
+  else
+    printf '    MISSING  %-10s %s\n' "$name" "$why"
+    MISSING_REQUIRED=1
+  fi
+}
+
+check_optional() { # check_optional <tool> <why>
+  local name="$1" why="${2:-}"
+  if have "$name"; then
+    printf '    OK       %-10s %s\n' "$name" "$why"
+  else
+    printf '    DEGRADED %-10s missing: %s\n' "$name" "$why"
+  fi
+}
+
+preflight() {
+  echo "==> preflight"
+  check_required bash "the installer is a bash script"
+  check_required curl "downloads model assets (skip with --without-models)"
+  check_required uv "creates the Python venv and installs the package"
+
+  if [ "$WITHOUT_MODELS" = "1" ]; then
+    echo "    SKIP     ollama     model provisioning skipped (--without-models)"
+    echo "    SKIP     models     model assets skipped (--without-models)"
+  else
+    check_optional ollama "local brain; DeepSeek API still works without it"
+    if have sha256sum || have shasum || have openssl; then
+      echo "    OK       checksum   sha256 tool present (model integrity)"
+    else
+      echo "    MISSING  checksum   need sha256sum, shasum, or openssl to verify model assets"
+      MISSING_REQUIRED=1
+    fi
+    check_required tar "extracts the sherpa-onnx model archives"
+  fi
+
+  if [ "$WITHOUT_DASHBOARD" = "1" ]; then
+    echo "    SKIP     dashboard  dashboard bundle skipped (--without-dashboard)"
+  elif [ -f "$PROJECT_DIR/frontend/qubit-dist/index.html" ]; then
+    echo "    OK       dashboard  frontend/qubit-dist present"
+  else
+    check_optional node "dashboard build (frontend/qubit-dist is missing)"
+    check_optional npm "dashboard build (frontend/qubit-dist is missing)"
+  fi
+
+  if [ "$MISSING_REQUIRED" = "1" ]; then
+    echo "preflight failed: install the MISSING tools above and re-run." >&2
+    return 1
+  fi
+}
+
+print_layout() {
+  echo "==> Qubit Agent install layout"
+  printf '    project   : %s\n' "$PROJECT_DIR"
+  printf '    venv      : %s\n' "$VENV"
+  if [ -n "$PREFIX" ]; then
+    printf '    prefix    : %s\n' "$PREFIX"
+    echo "    note      : export the matching XDG_* / QUBIT_HOME values for the installed service"
+  else
+    printf '    prefix    : (XDG defaults)\n'
+  fi
+  printf '    QUBIT_HOME: %s\n' "$QUBIT_HOME"
+  printf '    data      : %s\n' "$DATA_DIR"
+  printf '    models    : %s\n' "$MODELS"
+  printf '    config    : %s/voice.yaml\n' "$CONFIG_DIR"
+  printf '    state     : %s\n' "$STATE_DIR"
+  printf '    launcher  : %s/qubit\n' "$LAUNCHER_DIR"
+  if [ "$QUBIT_HOME_EXPLICIT" = "1" ] && [ -n "$PREFIX" ] && [ "$QUBIT_HOME" != "$PREFIX" ]; then
+    echo "    note      : QUBIT_HOME is explicit and differs from the prefix; runtime state stays at QUBIT_HOME"
+  fi
+  if [ "$WITHOUT_MODELS" = "1" ]; then
+    echo "    models    : skipped (--without-models)"
+  fi
+  if [ "$WITHOUT_DASHBOARD" = "1" ]; then
+    echo "    dashboard : skipped (--without-dashboard)"
+  fi
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "    mode      : dry-run (no changes)"
+  else
+    echo "    mode      : install"
+  fi
+}
 
 # --------------------------------------------------------------- launcher
 # Install the user-facing `qubit` shim that delegates to THIS checkout's
@@ -116,38 +327,63 @@ QUBIT_LAUNCHER
   echo "==> launcher installed: $target -> $PROJECT_DIR/.venv/bin/qubit"
 }
 
-# --launcher-only: (re)render just the `qubit` shim and exit. Used to repair a
-# stale operator shim without a full install. Requires the checkout console
-# script to already exist.
-if [ "${1:-}" = "--launcher-only" ] || [ "${1:-}" = "--install-launcher" ]; then
-  if [ ! -x "$VENV/bin/qubit" ]; then
-    echo "ERROR: $VENV/bin/qubit missing — run the full install first" >&2
-    exit 1
+# ------------------------------------------------------------ venv/package
+install_venv_and_package() {
+  if [ "$DRY_RUN" = "1" ]; then
+    if [ -x "$VENV/bin/python" ]; then
+      echo "==> [dry-run] venv already present: $VENV"
+    else
+      echo "==> [dry-run] would create venv (uv) and install package + declared dependencies"
+    fi
+    if [ "${QUBIT_NO_LAUNCHER:-0}" != "1" ]; then
+      echo "==> [dry-run] would install the user launcher: $LAUNCHER_DIR/qubit"
+    fi
+    return 0
   fi
-  echo "==> Qubit launcher install"
-  install_launcher
-  exit 0
-fi
 
-echo "==> Qubit Agent install"
-echo "    project : $PROJECT_DIR"
-echo "    models  : $MODELS"
-echo "    config  : $CONFIG_DIR/voice.yaml"
+  if [ ! -x "$VENV/bin/python" ]; then
+    echo "==> creating venv (uv)"
+    command -v uv >/dev/null || { echo "ERROR: uv not found — install: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
+    (cd "$PROJECT_DIR" && uv venv --python 3.12 .venv)
+  fi
 
-# ------------------------------------------------------------------ venv/deps
-if [ ! -x "$VENV/bin/python" ]; then
-  echo "==> creating venv (uv)"
-  command -v uv >/dev/null || { echo "ERROR: uv not found — install: curl -LsSf https://astral.sh/uv/install.sh | sh"; exit 1; }
-  (cd "$PROJECT_DIR" && uv venv --python 3.12 .venv)
-fi
+  echo "==> installing Qubit package + declared dependencies (pyproject.toml)"
+  # Install the package ITSELF so the venv is a real isolated install whose
+  # dependencies come from pyproject.toml (never a hand-maintained list that
+  # drifts). hotkey/edge/test are the optional runtime surfaces.
+  uv pip install --python "$VENV/bin/python" "$PROJECT_DIR[hotkey,edge,test]"
+  # webrtcvad needs the legacy pkg_resources API (removed in setuptools 81+)
+  uv pip install --python "$VENV/bin/python" 'setuptools<81'
+
+  # Make the canonical `qubit` console script reachable from any shell/terminal
+  # (and repair a stale operator shim). QUBIT_NO_LAUNCHER=1 opts out.
+  if [ "${QUBIT_NO_LAUNCHER:-0}" != "1" ]; then
+    install_launcher
+  fi
+}
+
+# --------------------------------------------------------------- dashboard
 # The dashboard bundle (frontend/qubit-dist) is a build artifact and is not
 # tracked in git; a fresh checkout/sdist without it would install a package
 # that cannot serve the dashboard. Build it deterministically when node/npm are
 # available; otherwise record a typed DEGRADED state that fails loudly at the
 # end of the install (never a silent skip, never a dashboard-less PASS).
-DASHBOARD_STATE="present"
-if [ ! -f "$PROJECT_DIR/frontend/qubit-dist/index.html" ]; then
-  if command -v node >/dev/null 2>&1 && command -v npm >/dev/null 2>&1; then
+install_dashboard() {
+  DASHBOARD_STATE="present"
+  if [ "$WITHOUT_DASHBOARD" = "1" ]; then
+    DASHBOARD_STATE="skipped"
+    echo "==> dashboard skipped (--without-dashboard)"
+    return 0
+  fi
+  if [ -f "$PROJECT_DIR/frontend/qubit-dist/index.html" ]; then
+    return 0
+  fi
+  if have node && have npm; then
+    if [ "$DRY_RUN" = "1" ]; then
+      DASHBOARD_STATE="would_build"
+      echo "==> [dry-run] would build dashboard (frontend/qubit-dist missing)"
+      return 0
+    fi
     echo "==> building dashboard (frontend/qubit-dist missing)"
     if "$PROJECT_DIR/scripts/build_dashboard.sh"; then
       DASHBOARD_STATE="built"
@@ -161,24 +397,7 @@ if [ ! -f "$PROJECT_DIR/frontend/qubit-dist/index.html" ]; then
     echo "    WARNING: frontend/qubit-dist missing and node/npm not found —"
     echo "             the dashboard will be unavailable until you run scripts/build_dashboard.sh"
   fi
-fi
-
-echo "==> installing Qubit package + declared dependencies (pyproject.toml)"
-# Install the package ITSELF so the venv is a real isolated install whose
-# dependencies come from pyproject.toml (never a hand-maintained list that
-# drifts). hotkey/edge/test are the optional runtime surfaces.
-uv pip install --python "$VENV/bin/python" "$PROJECT_DIR[hotkey,edge,test]"
-# webrtcvad needs the legacy pkg_resources API (removed in setuptools 81+)
-uv pip install --python "$VENV/bin/python" 'setuptools<81'
-
-# Make the canonical `qubit` console script reachable from any shell/terminal
-# (and repair a stale operator shim). QUBIT_NO_LAUNCHER=1 opts out.
-if [ "${QUBIT_NO_LAUNCHER:-0}" != "1" ]; then
-  install_launcher
-fi
-
-# ------------------------------------------------------------------ models
-mkdir -p "$MODELS"
+}
 
 # ---------------------------------------------------- download integrity
 # Every network download is verified against a PINNED sha256 before it is
@@ -270,49 +489,61 @@ dl() { # dl <dest> <url> <expected_sha256|-> [<source-label>]
   mv -f "$tmp" "$dest"
 }
 
-# piper voice (TTS)
-VOICE="en_US-amy-medium"
-# sha256: .onnx = HuggingFace LFS oid (v1.0.0); .onnx.json = observed on the
-# pinned v1.0.0 URL (HuggingFace publishes no sha256 for the small JSON).
-dl "$MODELS/$VOICE.onnx" \
-   "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx" \
-   "$VOICE_SHA256" "piper-voices v1.0.0"
-dl "$MODELS/$VOICE.onnx.json" \
-   "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx.json" \
-   "$VOICE_JSON_SHA256" "piper-voices v1.0.0"
+install_model_assets() {
+  if [ "$WITHOUT_MODELS" = "1" ]; then
+    echo "==> models skipped (--without-models)"
+    return 0
+  fi
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "==> [dry-run] would verify/download sha256-pinned model assets under $MODELS"
+    return 0
+  fi
 
-# sherpa-onnx ASR: Moonshine base (CPU, 0 VRAM) — fallback engine
-# sha256 from the sherpa-onnx `asr-models` release checksum.txt.
-MOON="sherpa-onnx-moonshine-base-en-quantized-2026-02-27"
-MOON_TAR="$MODELS/.$MOON.tar.bz2"
-if [ ! -d "$MODELS/$MOON" ]; then
-  echo "==> downloading Moonshine ASR (~200 MB)"
-  dl "$MOON_TAR" "$SR/asr-models/$MOON.tar.bz2" "$MOON_SHA256" "sherpa-onnx asr-models"
-  (cd "$MODELS" && tar xjf "$MOON_TAR" && rm -f "$MOON_TAR")
-else
-  echo "    have   $MOON"
-fi
+  mkdir -p "$MODELS"
 
-# sherpa-onnx ASR: Parakeet-TDT 0.6B v3 int8 (CPU, 0 VRAM) — DEFAULT engine
-# (asr.engine: parakeet). 25 European languages incl. Romanian, max accuracy.
-# sha256 from the sherpa-onnx `asr-models` release checksum.txt.
-PKT="sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
-PKT_TAR="$MODELS/.$PKT.tar.bz2"
-if [ ! -d "$MODELS/$PKT" ]; then
-  echo "==> downloading Parakeet-TDT ASR (~640 MB)"
-  dl "$PKT_TAR" "$SR/asr-models/$PKT.tar.bz2" "$PKT_SHA256" "sherpa-onnx asr-models"
-  (cd "$MODELS" && tar xjf "$PKT_TAR" && rm -f "$PKT_TAR")
-else
-  echo "    have   $PKT"
-fi
-# sherpa 1.13.6 hard-errors without vocab_size/context_size metadata on the
-# decoder/joiner ONNX — patch them in if missing (idempotent). Requires the
-# optional 'onnx' package; skipping the patch only risks a sherpa load error,
-# never a broken install.
-if ! "$VENV/bin/python" -c 'import onnx' 2>/dev/null; then
-  echo "    [warn] onnx not installed — skipping Parakeet metadata patch"
-else
-"$VENV/bin/python" - "$MODELS/$PKT" <<'PYEOF'
+  # piper voice (TTS)
+  VOICE="en_US-amy-medium"
+  # sha256: .onnx = HuggingFace LFS oid (v1.0.0); .onnx.json = observed on the
+  # pinned v1.0.0 URL (HuggingFace publishes no sha256 for the small JSON).
+  dl "$MODELS/$VOICE.onnx" \
+     "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx" \
+     "$VOICE_SHA256" "piper-voices v1.0.0"
+  dl "$MODELS/$VOICE.onnx.json" \
+     "https://huggingface.co/rhasspy/piper-voices/resolve/v1.0.0/en/en_US/amy/medium/$VOICE.onnx.json" \
+     "$VOICE_JSON_SHA256" "piper-voices v1.0.0"
+
+  # sherpa-onnx ASR: Moonshine base (CPU, 0 VRAM) — fallback engine
+  # sha256 from the sherpa-onnx `asr-models` release checksum.txt.
+  MOON="sherpa-onnx-moonshine-base-en-quantized-2026-02-27"
+  MOON_TAR="$MODELS/.$MOON.tar.bz2"
+  if [ ! -d "$MODELS/$MOON" ]; then
+    echo "==> downloading Moonshine ASR (~200 MB)"
+    dl "$MOON_TAR" "$SR/asr-models/$MOON.tar.bz2" "$MOON_SHA256" "sherpa-onnx asr-models"
+    (cd "$MODELS" && tar xjf "$MOON_TAR" && rm -f "$MOON_TAR")
+  else
+    echo "    have   $MOON"
+  fi
+
+  # sherpa-onnx ASR: Parakeet-TDT 0.6B v3 int8 (CPU, 0 VRAM) — DEFAULT engine
+  # (asr.engine: parakeet). 25 European languages incl. Romanian, max accuracy.
+  # sha256 from the sherpa-onnx `asr-models` release checksum.txt.
+  PKT="sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8"
+  PKT_TAR="$MODELS/.$PKT.tar.bz2"
+  if [ ! -d "$MODELS/$PKT" ]; then
+    echo "==> downloading Parakeet-TDT ASR (~640 MB)"
+    dl "$PKT_TAR" "$SR/asr-models/$PKT.tar.bz2" "$PKT_SHA256" "sherpa-onnx asr-models"
+    (cd "$MODELS" && tar xjf "$PKT_TAR" && rm -f "$PKT_TAR")
+  else
+    echo "    have   $PKT"
+  fi
+  # sherpa 1.13.6 hard-errors without vocab_size/context_size metadata on the
+  # decoder/joiner ONNX — patch them in if missing (idempotent). Requires the
+  # optional 'onnx' package; skipping the patch only risks a sherpa load error,
+  # never a broken install.
+  if ! "$VENV/bin/python" -c 'import onnx' 2>/dev/null; then
+    echo "    [warn] onnx not installed — skipping Parakeet metadata patch"
+  else
+  "$VENV/bin/python" - "$MODELS/$PKT" <<'PYEOF'
 import sys, onnx
 from pathlib import Path
 base = Path(sys.argv[1])
@@ -334,143 +565,192 @@ for fname in ("decoder.int8.onnx", "joiner.int8.onnx"):
         onnx.save(m, str(p))
         print(f"    patched {fname} metadata (vocab_size={n_tokens}, context_size=1)")
 PYEOF
-fi
+  fi
 
-# Silero VAD v5 (sherpa-onnx) — sha256 from that release's checksum.txt.
-dl "$MODELS/silero_vad_v5.onnx" "$SR/asr-models/silero_vad_v5.onnx" \
-   "$SILERO_V5_SHA256" "sherpa-onnx asr-models"
-# Silero VAD v6 (Aug 2025: ~16% fewer errors than v5 on noisy real data) —
-# the bridge prefers v6 and falls back to v5 automatically.
-# sha256 observed on the pinned v6.2.1 raw URL (upstream publishes no digest).
-dl "$MODELS/silero_vad_v6.onnx" \
-   "https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.1/src/silero_vad/data/silero_vad.onnx" \
-   "$SILERO_V6_SHA256" "silero-vad v6.2.1"
+  # Silero VAD v5 (sherpa-onnx) — sha256 from that release's checksum.txt.
+  dl "$MODELS/silero_vad_v5.onnx" "$SR/asr-models/silero_vad_v5.onnx" \
+     "$SILERO_V5_SHA256" "sherpa-onnx asr-models"
+  # Silero VAD v6 (Aug 2025: ~16% fewer errors than v5 on noisy real data) —
+  # the bridge prefers v6 and falls back to v5 automatically.
+  # sha256 observed on the pinned v6.2.1 raw URL (upstream publishes no digest).
+  dl "$MODELS/silero_vad_v6.onnx" \
+     "https://raw.githubusercontent.com/snakers4/silero-vad/v6.2.1/src/silero_vad/data/silero_vad.onnx" \
+     "$SILERO_V6_SHA256" "silero-vad v6.2.1"
 
-# Speaker verification (voice-ID): eres2net English
-# sha256 from the sherpa-onnx `speaker-recongition-models` checksum.txt.
-dl "$MODELS/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx" \
-   "$SR/speaker-recongition-models/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx" \
-   "$ERES2NET_SHA256" "sherpa-onnx speaker-recongition-models"
+  # Speaker verification (voice-ID): eres2net English
+  # sha256 from the sherpa-onnx `speaker-recongition-models` checksum.txt.
+  dl "$MODELS/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx" \
+     "$SR/speaker-recongition-models/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx" \
+     "$ERES2NET_SHA256" "sherpa-onnx speaker-recongition-models"
 
-# Optional: Parakeet-TDT (max ASR accuracy) and Kokoro (quality TTS) —
-# uncomment if you want them; config knobs: asr.engine / tts.provider.
-# curl -sL -o /tmp/p.tar.bz2 "$SR/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2" && (cd "$MODELS" && tar xjf /tmp/p.tar.bz2 && rm /tmp/p.tar.bz2)
-# curl -sL -o /tmp/k.tar.bz2 "$SR/tts-models/kokoro-int8-en-v0_19.tar.bz2" && (cd "$MODELS" && tar xjf /tmp/k.tar.bz2 && rm /tmp/k.tar.bz2)
+  # Optional: Parakeet-TDT (max ASR accuracy) and Kokoro (quality TTS) —
+  # uncomment if you want them; config knobs: asr.engine / tts.provider.
+  # curl -sL -o /tmp/p.tar.bz2 "$SR/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v3-int8.tar.bz2" && (cd "$MODELS" && tar xjf /tmp/p.tar.bz2 && rm /tmp/p.tar.bz2)
+  # curl -sL -o /tmp/k.tar.bz2 "$SR/tts-models/kokoro-int8-en-v0_19.tar.bz2" && (cd "$MODELS" && tar xjf /tmp/k.tar.bz2 && rm /tmp/k.tar.bz2)
+}
 
 # ------------------------------------------------------------------ ollama
-echo "==> checking ollama"
-if command -v ollama >/dev/null; then
-  if ! ollama list >/dev/null 2>&1; then
-    echo "    (starting ollama daemon…)"
-    (ollama serve >/dev/null 2>&1 &) || true
-    for i in $(seq 1 15); do ollama list >/dev/null 2>&1 && break; sleep 1; done
+install_ollama_models() {
+  if [ "$WITHOUT_MODELS" = "1" ]; then
+    return 0
   fi
-  # Optional EN-only smart mode. NOT the default brain (that is
-  # ``qubit-brain``, built below); pull only when the operator opts in.
-  if [ "${QUBIT_OPTIONAL_PHI4:-0}" = "1" ]; then
-    if ! ollama list | grep -q "huihui_ai/phi4-mini-abliterated"; then
-      echo "==> pulling huihui_ai/phi4-mini-abliterated (optional EN-only smart mode, 3.1GB)"
-      ollama pull huihui_ai/phi4-mini-abliterated
+  if [ "$DRY_RUN" = "1" ]; then
+    if have ollama; then
+      echo "==> [dry-run] would ensure ollama models: nomic-embed-text, qubit-brain"
     else
-      echo "    have   huihui_ai/phi4-mini-abliterated"
+      echo "==> [dry-run] ollama missing: local brain/embeddings would be DEGRADED"
     fi
+    return 0
   fi
-  # NOTE: the 3B alias (huihui_ai/llama3.2-abliterate:3b) is retired and is
-  # intentionally not installed; the configured default is qubit-brain below.
-  # Qubit gateway memory embeddings need this tiny model (274 MB CPU) —
-  # the gateway spins on 'memory embeddings retryable error' without it
-  if ! ollama list | grep -q "nomic-embed-text"; then
-    echo "==> pulling nomic-embed-text (gateway memory embeddings, 274 MB)"
-    ollama pull nomic-embed-text
-  else
-    echo "    have   nomic-embed-text"
-  fi
-  # Qubit's configured default brain for chat/intent/summary. Build it from the
-  # pinned Modelfile when absent so a fresh install has the model the config
-  # actually names (no hand-baked step needed).
-  # Prefer the machine-local bake artifact; fall back to the tracked, sanitized
-  # persona fixture so a clean clone can still build the configured default.
-  BRAIN_MODEFILE="$PROJECT_DIR/Modelfile.qubit4"
-  if [ ! -f "$BRAIN_MODEFILE" ]; then
-    BRAIN_MODEFILE="$PROJECT_DIR/tests/fixtures/modelfiles/qubit4.sanitized"
-  fi
-  if ! ollama list | grep -q "^qubit-brain"; then
-    if [ -f "$BRAIN_MODEFILE" ]; then
-      echo "==> creating qubit-brain (Qwen3-4B default brain)"
-      ollama create qubit-brain -f "$BRAIN_MODEFILE" \
-        || echo "    WARNING: could not create qubit-brain; run 'ollama create qubit-brain -f $BRAIN_MODEFILE'"
+
+  echo "==> checking ollama"
+  if command -v ollama >/dev/null; then
+    if ! ollama list >/dev/null 2>&1; then
+      echo "    (starting ollama daemon…)"
+      (ollama serve >/dev/null 2>&1 &) || true
+      for i in $(seq 1 15); do ollama list >/dev/null 2>&1 && break; sleep 1; done
+    fi
+    # Optional EN-only smart mode. NOT the default brain (that is
+    # ``qubit-brain``, built below); pull only when the operator opts in.
+    if [ "${QUBIT_OPTIONAL_PHI4:-0}" = "1" ]; then
+      if ! ollama list | grep -q "huihui_ai/phi4-mini-abliterated"; then
+        echo "==> pulling huihui_ai/phi4-mini-abliterated (optional EN-only smart mode, 3.1GB)"
+        ollama pull huihui_ai/phi4-mini-abliterated
+      else
+        echo "    have   huihui_ai/phi4-mini-abliterated"
+      fi
+    fi
+    # NOTE: the 3B alias (huihui_ai/llama3.2-abliterate:3b) is retired and is
+    # intentionally not installed; the configured default is qubit-brain below.
+    # Qubit gateway memory embeddings need this tiny model (274 MB CPU) —
+    # the gateway spins on 'memory embeddings retryable error' without it
+    if ! ollama list | grep -q "nomic-embed-text"; then
+      echo "==> pulling nomic-embed-text (gateway memory embeddings, 274 MB)"
+      ollama pull nomic-embed-text
     else
-      echo "    WARNING: no Modelfile found for qubit-brain; run 'ollama create qubit-brain -f Modelfile.qubit4'"
+      echo "    have   nomic-embed-text"
+    fi
+    # Qubit's configured default brain for chat/intent/summary. Build it from the
+    # pinned Modelfile when absent so a fresh install has the model the config
+    # actually names (no hand-baked step needed).
+    # Prefer the machine-local bake artifact; fall back to the tracked, sanitized
+    # persona fixture so a clean clone can still build the configured default.
+    BRAIN_MODEFILE="$PROJECT_DIR/Modelfile.qubit4"
+    if [ ! -f "$BRAIN_MODEFILE" ]; then
+      BRAIN_MODEFILE="$PROJECT_DIR/tests/fixtures/modelfiles/qubit4.sanitized"
+    fi
+    if ! ollama list | grep -q "^qubit-brain"; then
+      if [ -f "$BRAIN_MODEFILE" ]; then
+        echo "==> creating qubit-brain (Qwen3-4B default brain)"
+        ollama create qubit-brain -f "$BRAIN_MODEFILE" \
+          || echo "    WARNING: could not create qubit-brain; run 'ollama create qubit-brain -f $BRAIN_MODEFILE'"
+      else
+        echo "    WARNING: no Modelfile found for qubit-brain; run 'ollama create qubit-brain -f Modelfile.qubit4'"
+      fi
+    else
+      echo "    have   qubit-brain"
     fi
   else
-    echo "    have   qubit-brain"
+    echo "    WARNING: ollama not found — install https://ollama.com then re-run"
+    echo "    (local short replies need qubit-brain; DeepSeek API still works)"
   fi
-else
-  echo "    WARNING: ollama not found — install https://ollama.com then re-run"
-  echo "    (local short replies need qubit-brain; DeepSeek API still works)"
-fi
+}
 
 # ------------------------------------------------------------------ config
-mkdir -p "$CONFIG_DIR"
-if [ ! -f "$CONFIG_DIR/voice.yaml" ]; then
-  cp "$PROJECT_DIR/config/voice.example.yaml" "$CONFIG_DIR/voice.yaml"
-  echo "==> config created: $CONFIG_DIR/voice.yaml"
-else
-  echo "==> config exists:  $CONFIG_DIR/voice.yaml (leave as-is; merge new keys from"
-  echo "    config/voice.example.yaml manually if you want them)"
-fi
-# personal knowledge for the local chat model (user-editable). The sdist
-# intentionally excludes the developer's own file, so a release install must
-# not fail on its absence — create an empty starter instead.
-if [ ! -f "$CONFIG_DIR/personal-knowledge.md" ]; then
-  if [ -f "$PROJECT_DIR/config/personal-knowledge.md" ]; then
-    cp "$PROJECT_DIR/config/personal-knowledge.md" "$CONFIG_DIR/personal-knowledge.md"
+install_config_files() {
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "==> [dry-run] would create/update $CONFIG_DIR/{voice.yaml,personal-knowledge.md,task-templates.yaml}"
+    return 0
+  fi
+
+  mkdir -p "$CONFIG_DIR"
+  if [ ! -f "$CONFIG_DIR/voice.yaml" ]; then
+    cp "$PROJECT_DIR/config/voice.example.yaml" "$CONFIG_DIR/voice.yaml"
+    echo "==> config created: $CONFIG_DIR/voice.yaml"
   else
-    cat > "$CONFIG_DIR/personal-knowledge.md" <<'EOF'
+    echo "==> config exists:  $CONFIG_DIR/voice.yaml (leave as-is; merge new keys from"
+    echo "    config/voice.example.yaml manually if you want them)"
+  fi
+  # personal knowledge for the local chat model (user-editable). The sdist
+  # intentionally excludes the developer's own file, so a release install must
+  # not fail on its absence — create an empty starter instead.
+  if [ ! -f "$CONFIG_DIR/personal-knowledge.md" ]; then
+    if [ -f "$PROJECT_DIR/config/personal-knowledge.md" ]; then
+      cp "$PROJECT_DIR/config/personal-knowledge.md" "$CONFIG_DIR/personal-knowledge.md"
+    else
+      cat > "$CONFIG_DIR/personal-knowledge.md" <<'EOF'
 # Personal knowledge (optional)
 # Add stable facts the assistant may use when answering. This starter ships
 # with the release; the developer's own file is never distributed.
 EOF
+    fi
+    echo "==> personal-knowledge.md created: edit it, then restart the bridge"
+  else
+    echo "==> personal-knowledge.md exists (leave as-is)"
   fi
-  echo "==> personal-knowledge.md created: edit it, then restart the bridge"
-else
-  echo "==> personal-knowledge.md exists (leave as-is)"
-fi
-# task templates (user-editable). The developer's own file is excluded from the
-# sdist, so fall back to the portable example as a starter.
-if [ ! -f "$CONFIG_DIR/task-templates.yaml" ]; then
-  if [ -f "$PROJECT_DIR/config/task-templates.example.yaml" ]; then
-    cp "$PROJECT_DIR/config/task-templates.example.yaml" "$CONFIG_DIR/task-templates.yaml"
+  # task templates (user-editable). The developer's own file is excluded from the
+  # sdist, so fall back to the portable example as a starter.
+  if [ ! -f "$CONFIG_DIR/task-templates.yaml" ]; then
+    if [ -f "$PROJECT_DIR/config/task-templates.example.yaml" ]; then
+      cp "$PROJECT_DIR/config/task-templates.example.yaml" "$CONFIG_DIR/task-templates.yaml"
+    fi
+    echo "==> task-templates.yaml created from the example: edit it, then restart the bridge"
+  else
+    echo "==> task-templates.yaml exists (leave as-is)"
   fi
-  echo "==> task-templates.yaml created from the example: edit it, then restart the bridge"
-else
-  echo "==> task-templates.yaml exists (leave as-is)"
-fi
-
-# ------------------------------------------------- dashboard availability gate
-# A missing dashboard build is a TYPED DEGRADED install (exit 4), never a
-# silent success: the CLI/runtime work, but the dashboard cannot be served.
-# The systemd unit is not installed in that state so a broken dashboard is
-# never auto-started.
-if [ "$DASHBOARD_STATE" = "toolchain_missing" ] || \
-   [ "$DASHBOARD_STATE" = "build_failed" ]; then
-  echo
-  echo "DASHBOARD_UNAVAILABLE: the dashboard bundle is missing ($DASHBOARD_STATE)."
-  echo "  The Qubit CLI and runtime are installed, but the dashboard cannot be served."
-  echo "  Action: install node/npm and run:"
-  echo "      $PROJECT_DIR/scripts/build_dashboard.sh"
-  echo "  or install from a release archive that already contains frontend/qubit-dist."
-  echo "  Typed DEGRADED install (exit 4)."
-  exit 4
-fi
+}
 
 # ------------------------------------------------------------- systemd (opt)
-if [ "${1:-}" = "--with-systemd" ] || [ "${1:-}" = "-s" ]; then
+# install_systemd_unit.sh only renders files; this installer must not pretend
+# that is the same as "the service is installed". After rendering, enable and
+# start the units explicitly (with confirmation when interactive).
+install_systemd_units() {
+  local units=(qubit-voicebridge.service qubit-gateway.service)
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "==> [dry-run] would install user units: ${units[*]}"
+    echo "==> [dry-run] would run: systemctl --user enable --now ${units[*]}"
+    return 0
+  fi
+
   echo "==> installing systemd user service"
   "$PROJECT_DIR/scripts/install_systemd_unit.sh" "$PROJECT_DIR"
   echo "==> installing systemd messaging-gateway unit (qubit-gateway.service)"
   "$PROJECT_DIR/scripts/install_gateway_unit.sh" "$PROJECT_DIR"
-else
+
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "DEGRADED: systemctl not found; unit files are installed but not enabled." >&2
+    echo "  enable later: systemctl --user enable --now ${units[*]}" >&2
+    return 0
+  fi
+
+  local do_enable=0
+  if [ "$ASSUME_YES" = "1" ] || [ ! -t 0 ]; then
+    do_enable=1
+  else
+    local reply=""
+    printf 'Enable and start the Qubit user services now? [y/N] '
+    read -r reply || reply=""
+    case "$reply" in
+      y|Y|yes|YES) do_enable=1 ;;
+      *) do_enable=0 ;;
+    esac
+  fi
+
+  if [ "$do_enable" != "1" ]; then
+    echo "    services not enabled (no confirmation)."
+    echo "    enable later: systemctl --user enable --now ${units[*]}"
+    return 0
+  fi
+
+  if systemctl --user enable --now "${units[@]}"; then
+    echo "==> enabled and started: ${units[*]}"
+  else
+    echo "DEGRADED: systemctl --user enable --now failed; unit files are installed." >&2
+    echo "  run manually: systemctl --user enable --now ${units[*]}" >&2
+  fi
+}
+
+print_next_steps() {
   echo
   echo "==> done. Run:"
   echo "    $VENV/bin/python -m voicebridge status"
@@ -478,4 +758,61 @@ else
   echo "    $VENV/bin/python -m voicebridge enroll     # enroll YOUR voice (voice-ID)"
   echo
   echo "    Auto-start instead?  $0 --with-systemd"
+}
+
+# ---------------------------------------------------------------- main flow
+print_layout
+
+if [ "$LAUNCHER_ONLY" = "1" ]; then
+  echo "==> Qubit launcher install"
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "==> [dry-run] would render $LAUNCHER_DIR/qubit -> $VENV/bin/qubit"
+    exit 0
+  fi
+  if [ ! -x "$VENV/bin/qubit" ]; then
+    echo "ERROR: $VENV/bin/qubit missing — run the full install first" >&2
+    exit 1
+  fi
+  install_launcher
+  exit 0
+fi
+
+if ! preflight; then
+  exit 1
+fi
+
+install_venv_and_package
+install_dashboard
+
+install_model_assets
+install_ollama_models
+install_config_files
+
+if [ "$DASHBOARD_STATE" = "toolchain_missing" ] || \
+   [ "$DASHBOARD_STATE" = "build_failed" ]; then
+  echo
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "DASHBOARD_UNAVAILABLE (dry-run): the dashboard bundle is missing ($DASHBOARD_STATE)."
+    echo "  A real install would exit 4 until node/npm are available."
+  else
+    echo "DASHBOARD_UNAVAILABLE: the dashboard bundle is missing ($DASHBOARD_STATE)."
+    echo "  The Qubit CLI and runtime are installed, but the dashboard cannot be served."
+    echo "  Action: install node/npm and run:"
+    echo "      $PROJECT_DIR/scripts/build_dashboard.sh"
+    echo "  or install from a release archive that already contains frontend/qubit-dist."
+    echo "  Typed DEGRADED install (exit 4)."
+    exit 4
+  fi
+fi
+
+if [ "$WITH_SYSTEMD" = "1" ]; then
+  install_systemd_units
+elif [ "$DRY_RUN" != "1" ]; then
+  print_next_steps
+fi
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo
+  echo "==> dry-run complete: no changes were made."
+  exit 0
 fi
