@@ -304,12 +304,14 @@ def _remove_systemd_gateway() -> bool:
     return removed_any
 
 
-# Both gateway LaunchAgent naming schemes: the current ``ai.qubit.gateway*``
-# label and the ``io.nousresearch.qubit.gateway*`` label older builds
-# installed. An uninstall must sweep BOTH — a stale agent keeps respawning the
+# Every gateway LaunchAgent naming scheme: the current ``ai.qubit.gateway*``
+# label, the pre-rebrand ``ai.hermes.gateway*`` label (read-old cleanup), and
+# the ``io.nousresearch.qubit.gateway*`` label older builds installed. An
+# uninstall must sweep ALL of them — a stale agent keeps respawning the
 # gateway after the code tree is gone (#62209).
 _LAUNCHD_GATEWAY_PLIST_PATTERNS = (
     "ai.qubit.gateway*.plist",
+    "ai.hermes.gateway*.plist",
     "io.nousresearch.qubit.gateway*.plist",
 )
 

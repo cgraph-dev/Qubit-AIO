@@ -28,9 +28,15 @@ def _gw():
 
 
 def get_launchd_label() -> str:
-    """Return the launchd service label, scoped per profile."""
+    """Return the launchd service label, scoped per profile.
+
+    Must match the installed plist stem (``get_launchd_plist_path``): a label
+    that disagrees with the file launchd loads means every status/stop/restart
+    targets a job that does not exist. The pre-rebrand ``ai.hermes.gateway``
+    labels stay discoverable read-old by ``legacy_launchd_labels_for_install``.
+    """
     suffix = _gw()._profile_suffix()
-    return f"ai.hermes.gateway-{suffix}" if suffix else "ai.hermes.gateway"
+    return f"ai.qubit.gateway-{suffix}" if suffix else "ai.qubit.gateway"
 
 
 def _probe_launchd_domain_for_label(label: str) -> str:

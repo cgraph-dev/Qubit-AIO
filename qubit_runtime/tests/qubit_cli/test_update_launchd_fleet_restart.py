@@ -94,9 +94,9 @@ class TestLaunchdGatewayLabelsForInstall:
             ],
         )
         assert launchd_gateway_labels_for_install() == [
-            "ai.hermes.gateway",
-            "ai.hermes.gateway-merit-ops",
-            "ai.hermes.gateway-tfl-wiki",
+            "ai.qubit.gateway",
+            "ai.qubit.gateway-merit-ops",
+            "ai.qubit.gateway-tfl-wiki",
         ]
 
     def test_no_profiles_means_no_fleet(self, monkeypatch):
@@ -636,13 +636,14 @@ class TestLegacyLaunchdLabelsForInstall:
         venv_python = str(root.parent / "install" / ".venv" / "bin" / "python")
         _write_launchd_plist(agents, "ai.hermes.gateway-398559f7", argv=[venv_python], qubit_home=root / "profiles" / "gopod")
         _write_launchd_plist(agents, "ai.hermes.gateway-1a2b3c4d", argv=[venv_python], qubit_home=root)
+        _write_launchd_plist(agents, "ai.qubit.gateway-feedface", argv=[venv_python], qubit_home=root)
         _write_launchd_plist(agents, "ai.hermes.gateway-gopod", argv=[venv_python], qubit_home=root / "profiles" / "gopod")
         # Another install's unit: same venv on disk, but its home lives under a different root.
         _write_launchd_plist(agents, "ai.hermes.gateway-5db8084b", argv=[venv_python], qubit_home=tmp_path / "other-root" / "profiles" / "gopod")
         _write_launchd_plist(agents, "ai.hermes.gateway-nohome", argv=[venv_python])  # no pinned home: unattributable
         _write_launchd_plist(agents, "ai.hermes.gateway-broken", raw="not a plist at all")
         assert gw.legacy_launchd_labels_for_install(exclude={"ai.hermes.gateway-gopod", "ai.hermes.gateway"}) == [
-            "ai.hermes.gateway-1a2b3c4d", "ai.hermes.gateway-398559f7",
+            "ai.hermes.gateway-1a2b3c4d", "ai.hermes.gateway-398559f7", "ai.qubit.gateway-feedface",
         ]
 
 
