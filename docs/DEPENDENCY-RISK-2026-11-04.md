@@ -29,6 +29,13 @@ npm audit --package-lock-only --omit=dev --json   # shipped/runtime view
 npm audit --package-lock-only --json              # full tree (includes dev/build)
 ```
 
+The four shipped npm lockfiles are `frontend/qubit-web/package-lock.json` (dashboard build),
+`qubit_runtime/package-lock.json` (workspace lock covering runtime deps plus the desktop/TUI/web
+workspaces), `qubit_runtime/scripts/whatsapp-bridge/package-lock.json` (runtime sidecar), and
+`qubit_runtime/plugins/platforms/photon/sidecar/package-lock.json` (runtime sidecar). The fifth
+lockfile, `qubit_runtime/website/package-lock.json`, builds the separately deployed docs site and
+is not in the product wheel.
+
 Both instruments disagree by design: Dependabot counts an alert per manifest and uses its own
 dependency graph; `npm audit` rolls advisories up the tree and can flag build-only packages in
 `--omit=dev` when a prod dependency reaches them. Counts below name which instrument produced
