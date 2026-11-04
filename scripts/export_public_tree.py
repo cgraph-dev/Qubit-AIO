@@ -82,13 +82,11 @@ ALLOWED_ROOT_FILES = frozenset({
     "pytest.ini",
 })
 
-#: The complete public docs set under ``docs/``.  Everything else there is an
-#: internal report, audit, plan, handoff, generated ledger, or frozen history.
-#: This is an allowlist on purpose: new internal docs must not leak by default.
+#: The complete public docs set under ``docs/``: agreed feature docs only.
+#: Everything else there is an internal report, audit, plan, handoff, generated
+#: ledger, frozen history, or process/meta doc.  This is an allowlist on
+#: purpose: new internal docs must not leak by default.
 PUBLIC_DOC_FILES = frozenset({
-    "docs/ARCHITECTURE.md",
-    "docs/BRAND.md",
-    "docs/IDENTITY.md",
     "docs/OFFICE-CLI-COMPLETENESS.md",
     "docs/OFFICE-DEPLOYMENT-CONTRACT.md",
     "docs/ORB_FX_SPEC.md",
@@ -488,7 +486,7 @@ def _build_report(
             count = sum(1 for p in included if p.startswith(prefix + "/"))
         surfaces[label] = {"path": prefix, "files": count, "present": count > 0}
     surfaces["public_docs"] = {
-        "path": "docs + root docs",
+        "path": "docs/",
         "files": len(public_docs),
         "present": bool(public_docs),
     }
