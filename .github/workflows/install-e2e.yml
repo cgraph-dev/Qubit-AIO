@@ -21,7 +21,7 @@ on:
       - "frontend/**"
       - ".github/workflows/install-e2e.yml"
   push:
-    branches: [main]
+    branches: [main, production]
     paths:
       - "pyproject.toml"
       - "install.sh"

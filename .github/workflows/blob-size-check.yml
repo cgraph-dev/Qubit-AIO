@@ -7,7 +7,7 @@ name: Blob Size Check
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, production]
   workflow_dispatch:
 
 permissions:

@@ -6,7 +6,7 @@ name: Case Collision Check
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, production]
   workflow_dispatch:
 
 permissions:

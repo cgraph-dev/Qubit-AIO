@@ -16,7 +16,7 @@ on:
       - "qubit_runtime/optional-skills/**"
       - ".github/workflows/docs-site-checks.yml"
   push:
-    branches: [main]
+    branches: [main, production]
     paths:
       - "qubit_runtime/website/**"
       - "qubit_runtime/skills/**"
