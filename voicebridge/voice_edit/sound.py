@@ -28,8 +28,8 @@ _CUES = {
 
 def _cache_dir() -> Path:
     try:
-        from ..config import canonical_cache_dir
-        return Path(canonical_cache_dir())
+        from ..config import preferred_cache_dir
+        return Path(preferred_cache_dir())
     except Exception:
         import os
         return Path(os.path.expanduser("~/.cache/qubit-voicebridge"))

@@ -244,7 +244,7 @@ def test_post_tts_tail_is_short_not_the_old_five_seconds(tmp_path, monkeypatch):
         json.dumps({"ts": now - 0.3, "event": "voice_edit.helper.speak_done"})
         + "\n")
     import voicebridge.config as VC
-    monkeypatch.setattr(VC, "canonical_state_dir", lambda: tmp_path)
+    monkeypatch.setattr(VC, "preferred_state_dir", lambda: tmp_path)
     probe = dh.DesktopHelper.__new__(dh.DesktopHelper)
     probe._barge_interrupted = False
     probe._tts_echo_checked = 0.0

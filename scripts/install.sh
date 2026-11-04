@@ -10,8 +10,10 @@
 # Requires: bash, curl, uv (https://astral.sh/uv). Optional: ollama (local
 # brain), node/npm (dashboard build when frontend/qubit-dist is absent), and
 # sha256sum/shasum/openssl + tar for model assets. Keys (optional, for
-# complex/web answers): DEEPSEEK_API_KEY and PERPLEXITY_API_KEY in
-# ~/.config/qubit-voicebridge/.env — see .env.example.
+# complex/web answers): DEEPSEEK_API_KEY and PERPLEXITY_API_KEY in the
+# config dir printed by --dry-run (new installs: $QUBIT_HOME/voice/config;
+# existing XDG installs keep ~/.config/qubit-voicebridge read-old).
+# See .env.example.
 set -euo pipefail
 
 WITH_SYSTEMD=0
@@ -37,16 +39,17 @@ Options:
   --dry-run             run preflight and print the install layout; make no changes
   --without-models      skip model asset downloads and ollama model provisioning
   --without-dashboard   skip the dashboard bundle check/build (headless installs)
-  --prefix DIR          install data/config/state/bin under DIR instead of the
-                        XDG defaults (QUBIT_PREFIX is the env equivalent). The
-                        installer exports these paths for this run; export the
-                        same XDG_* / QUBIT_HOME values for the installed service
+  --prefix DIR          install the new $DIR/voice tree and bin under DIR
+                        (QUBIT_PREFIX is the env equivalent); a portable
+                        install never adopts an old XDG tree
   -y, --yes             do not prompt before enabling the user services
   --launcher-only       (repair) re-render the `qubit` launcher and exit
 
 Environment:
-  QUBIT_HOME            runtime/agent home; printed in the layout and used by the
-                        installed product (default: ~/.qubit, or DIR with --prefix)
+  QUBIT_HOME            runtime/agent home (default: ~/.qubit, or DIR with
+                        --prefix). New installs place VoiceBridge under
+                        $QUBIT_HOME/voice; existing XDG installs are kept
+                        read-old and are never migrated or deleted here.
   QUBIT_PREFIX          same as --prefix when the flag is absent
   QUBIT_NO_LAUNCHER=1   do not install the `qubit` user launcher
 
@@ -123,10 +126,14 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VENV="$PROJECT_DIR/.venv"
 
 # --------------------------------------------------------------- layout
-# One resolved prefix drives data/config/state/bin so the paths we print and
-# the paths we write can never disagree. --prefix wins, then QUBIT_PREFIX; with
-# neither, the existing XDG defaults are kept. QUBIT_HOME is the runtime home
-# (default ~/.qubit) and is printed alongside the install tree.
+# VoiceBridge has ONE path resolver (``voicebridge.paths``): new installs live
+# under ``$QUBIT_HOME/voice/{config,data,state,cache,models}`` and an existing
+# XDG install keeps its paths in place, read-old. The installer never moves or
+# deletes an existing tree; it only initializes the new one when this machine
+# has no old data (or when --prefix asks for a portable install).
+#
+# --prefix wins, then QUBIT_PREFIX; without either, QUBIT_HOME is the runtime
+# home (default ~/.qubit) the new tree is placed under.
 QUBIT_HOME_EXPLICIT=0
 if [ -n "${QUBIT_HOME:-}" ]; then
   QUBIT_HOME_EXPLICIT=1
@@ -143,24 +150,95 @@ if [ -n "$PREFIX" ]; then
     /) ;;
     */) PREFIX="${PREFIX%/}" ;;
   esac
-  DATA_DIR="$PREFIX/share/qubit-voicebridge"
-  CONFIG_DIR="$PREFIX/config/qubit-voicebridge"
-  STATE_DIR="$PREFIX/state/qubit-voicebridge"
   LAUNCHER_DIR="$PREFIX/bin"
-  # Child processes (uv, the built dashboard, the bridge) must resolve the same
-  # tree instead of silently falling back to ~/.config, ~/.local/share, etc.
+  # Child tooling (uv, the dashboard build, systemd unit install) keeps the
+  # prefix-scoped XDG view. The VoiceBridge layout itself is resolved below.
   export XDG_DATA_HOME="$PREFIX/share"
   export XDG_CONFIG_HOME="$PREFIX/config"
   export XDG_STATE_HOME="$PREFIX/state"
   export XDG_CACHE_HOME="$PREFIX/cache"
 else
-  DATA_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voicebridge"
-  CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/qubit-voicebridge"
-  STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voicebridge"
   LAUNCHER_DIR="${XDG_BIN_HOME:-$HOME/.local/bin}"
 fi
 QUBIT_HOME="${QUBIT_HOME:-${PREFIX:-$HOME/.qubit}}"
-MODELS="$DATA_DIR/models"
+export QUBIT_HOME
+
+# Resolver output (kept in this one function so the printed layout and the
+# paths written below cannot disagree):
+#   VOICE_LAYOUT_MODE   new | read-old | uninitialized
+#   VOICE_INSTALL_MODE  new | read-old
+#   VOICE_NEW_* / VOICE_OLD_*
+resolve_voice_layout() {
+  local py="" out=""
+  if [ -x "$PROJECT_DIR/.venv/bin/python" ]; then
+    py="$PROJECT_DIR/.venv/bin/python"
+  elif command -v python3 >/dev/null 2>&1; then
+    py="$(command -v python3)"
+  elif command -v python >/dev/null 2>&1; then
+    py="$(command -v python)"
+  fi
+  if [ -n "$py" ]; then
+    if out="$(PYTHONPATH="$PROJECT_DIR${PYTHONPATH:+:$PYTHONPATH}" "$py" -c '
+import shlex
+from voicebridge.paths import voice_layout
+lay = voice_layout()
+print("VOICE_LAYOUT_MODE=" + shlex.quote(lay.mode))
+print("VOICE_INSTALL_MODE=" + shlex.quote(lay.install_mode))
+for kind, path in lay.new.items():
+    print("VOICE_NEW_%s=%s" % (kind.upper(), shlex.quote(str(path))))
+for kind, path in lay.read_old.items():
+    print("VOICE_OLD_%s=%s" % (kind.upper(), shlex.quote(str(path))))
+' 2>/dev/null)" && [ -n "$out" ]; then
+      eval "$out"
+      return 0
+    fi
+  fi
+
+  # Mirror of voicebridge.paths.voice_layout() for hosts where no Python
+  # exists yet (the installer may be the thing that creates the venv).
+  local new_root="$QUBIT_HOME/voice"
+  VOICE_NEW_CONFIG="$new_root/config"
+  VOICE_NEW_DATA="$new_root/data"
+  VOICE_NEW_STATE="$new_root/state"
+  VOICE_NEW_CACHE="$new_root/cache"
+  VOICE_NEW_MODELS="$new_root/models"
+  VOICE_OLD_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/qubit-voicebridge"
+  VOICE_OLD_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/qubit-voicebridge"
+  VOICE_OLD_STATE="${XDG_STATE_HOME:-$HOME/.local/state}/qubit-voicebridge"
+  VOICE_OLD_CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/qubit-voicebridge"
+  VOICE_OLD_MODELS="$VOICE_OLD_DATA/models"
+  if [ -d "$new_root" ]; then
+    VOICE_LAYOUT_MODE="new"
+    VOICE_INSTALL_MODE="new"
+  elif [ -d "$VOICE_OLD_CONFIG" ] || [ -d "$VOICE_OLD_DATA" ] \
+       || [ -d "$VOICE_OLD_STATE" ]; then
+    VOICE_LAYOUT_MODE="read-old"
+    VOICE_INSTALL_MODE="read-old"
+  else
+    VOICE_LAYOUT_MODE="uninitialized"
+    VOICE_INSTALL_MODE="new"
+  fi
+}
+
+resolve_voice_layout
+# A portable --prefix install is always a new tree under its QUBIT_HOME; it
+# never adopts an unrelated old XDG tree in the real HOME.
+if [ -n "$PREFIX" ]; then
+  VOICE_INSTALL_MODE="new"
+fi
+if [ "$VOICE_INSTALL_MODE" = "new" ]; then
+  CONFIG_DIR="$VOICE_NEW_CONFIG"
+  DATA_DIR="$VOICE_NEW_DATA"
+  STATE_DIR="$VOICE_NEW_STATE"
+  CACHE_DIR="$VOICE_NEW_CACHE"
+  MODELS="$VOICE_NEW_MODELS"
+else
+  CONFIG_DIR="$VOICE_OLD_CONFIG"
+  DATA_DIR="$VOICE_OLD_DATA"
+  STATE_DIR="$VOICE_OLD_STATE"
+  CACHE_DIR="$VOICE_OLD_CACHE"
+  MODELS="$VOICE_OLD_MODELS"
+fi
 OLLAMA_URL="${OLLAMA_URL:-http://127.0.0.1:11434}"
 DASHBOARD_STATE="present"
 
@@ -231,15 +309,22 @@ print_layout() {
   printf '    venv      : %s\n' "$VENV"
   if [ -n "$PREFIX" ]; then
     printf '    prefix    : %s\n' "$PREFIX"
-    echo "    note      : export the matching XDG_* / QUBIT_HOME values for the installed service"
+    echo "    note      : export QUBIT_HOME for the installed service (new layout)"
   else
-    printf '    prefix    : (XDG defaults)\n'
+    printf '    prefix    : (QUBIT_HOME layout)\n'
   fi
   printf '    QUBIT_HOME: %s\n' "$QUBIT_HOME"
+  if [ "$VOICE_INSTALL_MODE" = "read-old" ]; then
+    printf '    layout    : read-old (existing XDG install preserved; no migration)\n'
+    printf '    new-tree  : %s/voice (not initialized)\n' "$QUBIT_HOME"
+  else
+    printf '    layout    : new (%s/voice)\n' "$QUBIT_HOME"
+  fi
   printf '    data      : %s\n' "$DATA_DIR"
   printf '    models    : %s\n' "$MODELS"
   printf '    config    : %s/voice.yaml\n' "$CONFIG_DIR"
   printf '    state     : %s\n' "$STATE_DIR"
+  printf '    cache     : %s\n' "$CACHE_DIR"
   printf '    launcher  : %s/qubit\n' "$LAUNCHER_DIR"
   if [ "$QUBIT_HOME_EXPLICIT" = "1" ] && [ -n "$PREFIX" ] && [ "$QUBIT_HOME" != "$PREFIX" ]; then
     echo "    note      : QUBIT_HOME is explicit and differs from the prefix; runtime state stays at QUBIT_HOME"
@@ -656,6 +741,24 @@ install_ollama_models() {
   fi
 }
 
+# ------------------------------------------------------------------ layout
+# Initialize the new ``$QUBIT_HOME/voice`` tree once. A read-old install is
+# never initialized, migrated, or touched by this step.
+install_voice_layout() {
+  if [ "$VOICE_INSTALL_MODE" = "read-old" ]; then
+    echo "==> existing VoiceBridge install detected (read-old XDG paths)"
+    echo "    preserved in place: $CONFIG_DIR"
+    echo "    new layout not initialized: $QUBIT_HOME/voice (migration deferred)"
+    return 0
+  fi
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "==> [dry-run] would initialize $QUBIT_HOME/voice/{config,data,state,cache,models}"
+    return 0
+  fi
+  mkdir -p "$CONFIG_DIR" "$DATA_DIR" "$STATE_DIR" "$CACHE_DIR" "$MODELS"
+  echo "==> VoiceBridge layout initialized: $QUBIT_HOME/voice"
+}
+
 # ------------------------------------------------------------------ config
 install_config_files() {
   if [ "$DRY_RUN" = "1" ]; then
@@ -706,8 +809,12 @@ EOF
 # start the units explicitly (with confirmation when interactive).
 install_systemd_units() {
   local units=(qubit-voicebridge.service qubit-gateway.service)
+  local unit_dir="${SYSTEMD_UNIT_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}"
   if [ "$DRY_RUN" = "1" ]; then
     echo "==> [dry-run] would install user units: ${units[*]}"
+    if [ "$VOICE_INSTALL_MODE" = "new" ]; then
+      echo "==> [dry-run] would install layout drop-ins: $unit_dir/<unit>.d/10-qubit-home.conf"
+    fi
     echo "==> [dry-run] would run: systemctl --user enable --now ${units[*]}"
     return 0
   fi
@@ -716,6 +823,23 @@ install_systemd_units() {
   "$PROJECT_DIR/scripts/install_systemd_unit.sh" "$PROJECT_DIR"
   echo "==> installing systemd messaging-gateway unit (qubit-gateway.service)"
   "$PROJECT_DIR/scripts/install_gateway_unit.sh" "$PROJECT_DIR"
+
+  # The shipped unit templates keep the historical XDG paths for existing
+  # installs. A new-layout install drops its QUBIT_HOME/config override in a
+  # drop-in so the templates (and every existing tuned unit) stay untouched.
+  if [ "$VOICE_INSTALL_MODE" = "new" ]; then
+    local unit drop
+    for unit in "${units[@]}"; do
+      drop="$unit_dir/$unit.d"
+      mkdir -p "$drop"
+      cat > "$drop/10-qubit-home.conf" <<EOF
+[Service]
+Environment=QUBIT_HOME=$QUBIT_HOME
+Environment=VOICE_BRIDGE_CONFIG=$CONFIG_DIR/voice.yaml
+EOF
+      echo "    layout drop-in: $drop/10-qubit-home.conf"
+    done
+  fi
 
   if ! command -v systemctl >/dev/null 2>&1; then
     echo "DEGRADED: systemctl not found; unit files are installed but not enabled." >&2
@@ -784,6 +908,7 @@ fi
 install_venv_and_package
 install_dashboard
 
+install_voice_layout
 install_model_assets
 install_ollama_models
 install_config_files

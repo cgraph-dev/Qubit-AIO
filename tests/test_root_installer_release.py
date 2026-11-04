@@ -118,6 +118,7 @@ def test_dry_run_prints_layout_and_writes_nothing(tmp_path: Path):
     assert "Qubit Agent install layout" in r.stdout
     assert "QUBIT_HOME:" in r.stdout
     assert str(prefix) in r.stdout
+    assert f"layout    : new ({prefix}/voice)" in r.stdout
     assert "models    : skipped (--without-models)" in r.stdout
     assert "dashboard : skipped (--without-dashboard)" in r.stdout
     assert "dry-run complete" in r.stdout
@@ -136,10 +137,15 @@ def test_dry_run_uses_qbit_home_and_prefix_consistently(tmp_path: Path):
     prefix = tmp_path / "portable"
     r = _run(["--dry-run", "--prefix", str(prefix), "--without-models", "--without-dashboard"], _env(home))
     assert r.returncode == 0, (r.stdout, r.stderr)
-    # With --prefix and no explicit QUBIT_HOME, the runtime home follows the prefix.
+    # With --prefix and no explicit QUBIT_HOME, the runtime home follows the
+    # prefix and the new VoiceBridge tree is <prefix>/voice/{config,data,...}.
     assert f"QUBIT_HOME: {prefix}" in r.stdout
-    assert f"data      : {prefix}/share/qubit-voicebridge" in r.stdout
-    assert f"config    : {prefix}/config/qubit-voicebridge/voice.yaml" in r.stdout
+    assert f"layout    : new ({prefix}/voice)" in r.stdout
+    assert f"data      : {prefix}/voice/data" in r.stdout
+    assert f"models    : {prefix}/voice/models" in r.stdout
+    assert f"config    : {prefix}/voice/config/voice.yaml" in r.stdout
+    assert f"state     : {prefix}/voice/state" in r.stdout
+    assert f"cache     : {prefix}/voice/cache" in r.stdout
     assert f"launcher  : {prefix}/bin/qubit" in r.stdout
 
 
@@ -220,9 +226,63 @@ def test_prefix_env_and_equals_form_are_accepted(tmp_path: Path):
     assert f"prefix    : {env_prefix}" in r.stdout
 
 
+@needs_uv
+def test_dry_run_fresh_home_prints_new_qubit_home_layout(tmp_path: Path):
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run(["--dry-run", "--without-models", "--without-dashboard"], _env(home))
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    qh = home / ".qubit"
+    assert f"QUBIT_HOME: {qh}" in r.stdout
+    assert f"layout    : new ({qh}/voice)" in r.stdout
+    assert f"config    : {qh}/voice/config/voice.yaml" in r.stdout
+    assert f"data      : {qh}/voice/data" in r.stdout
+    assert f"state     : {qh}/voice/state" in r.stdout
+    assert f"cache     : {qh}/voice/cache" in r.stdout
+    assert f"models    : {qh}/voice/models" in r.stdout
+    # Dry-run must not initialize the new tree.
+    assert not qh.exists()
+
+
+@needs_uv
+def test_dry_run_existing_xdg_install_is_read_old_and_preserved(tmp_path: Path):
+    home = tmp_path / "home"
+    old = home / ".config" / "qubit-voicebridge"
+    old.mkdir(parents=True)
+    old_cfg = old / "voice.yaml"
+    old_cfg.write_text("logging:\n  jsonl: false\n", encoding="utf-8")
+    before = old_cfg.read_bytes()
+
+    r = _run(["--dry-run", "--without-models", "--without-dashboard"], _env(home))
+
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "layout    : read-old" in r.stdout
+    assert "existing XDG install preserved" in r.stdout
+    assert f"config    : {old}/voice.yaml" in r.stdout
+    assert f"new-tree  : {home}/.qubit/voice (not initialized)" in r.stdout
+    # Nothing migrated, moved, or created; old data is byte-identical.
+    assert old_cfg.read_bytes() == before
+    assert not (home / ".qubit").exists()
+    assert not (home / ".local").exists()
+
+
+@needs_uv
+def test_dry_run_new_layout_plans_systemd_dropin(tmp_path: Path):
+    home = tmp_path / "home"
+    home.mkdir()
+    r = _run(
+        ["--dry-run", "--with-systemd", "--without-models", "--without-dashboard"],
+        _env(home),
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "layout drop-ins:" in r.stdout
+    assert "10-qubit-home.conf" in r.stdout
+
+
 def test_with_systemd_really_enables_and_starts_units():
     """Source guard: --with-systemd must act, not just render unit files."""
     src = INSTALL.read_text(encoding="utf-8")
     assert "systemctl --user enable --now" in src
     assert "install_systemd_unit.sh" in src
     assert "install_gateway_unit.sh" in src
+    assert "10-qubit-home.conf" in src

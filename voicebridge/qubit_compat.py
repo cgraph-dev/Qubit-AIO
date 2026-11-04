@@ -1500,8 +1500,8 @@ def _newest_config_write(cfg: Any) -> Optional[float]:
     """Newest mtime across the three config stores (None when none exist)."""
     candidates = []
     try:
-        from .config import canonical_config_dir
-        candidates.append(canonical_config_dir() / "voice.yaml")
+        from .config import preferred_config_dir
+        candidates.append(preferred_config_dir() / "voice.yaml")
     except Exception:
         pass
     try:

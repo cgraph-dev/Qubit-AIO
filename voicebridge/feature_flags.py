@@ -21,9 +21,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from .config import canonical_state_dir
+from .config import preferred_state_dir
 
-DEFAULT_FLAG_STATE = canonical_state_dir() / "flags.state.json"
+DEFAULT_FLAG_STATE = preferred_state_dir() / "flags.state.json"
 
 
 @dataclass(frozen=True)

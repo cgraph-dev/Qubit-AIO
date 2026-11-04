@@ -56,7 +56,7 @@ from typing import Any, Dict, List, Optional
 
 from . import resources
 from .config import (LEGACY_NAME, LEGACY_NAME_7D, LEGACY_NAMES, PRODUCT_NAME,
-                     PRODUCT_TITLE, _xdg_base)
+                     PRODUCT_TITLE, _xdg_base, voice_layout)
 
 # Canonical public identity (Packet 8S) — single-sourced from
 # voicebridge.config (the centralized XDG-aware path resolver).
@@ -217,12 +217,15 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         legacy7d = b / "legacy7d"
         legacy7d_state = b / "legacy7d-state"
         legacy7d_data = b / "legacy7d-data"
+        model = data / "models"
     else:
         b = Path("~").expanduser()
-        cfg = _xdg("XDG_CONFIG_HOME", ".config") / PRODUCT_NAME
-        data = _xdg("XDG_DATA_HOME", ".local/share") / PRODUCT_NAME
-        state = _xdg("XDG_STATE_HOME", ".local/state") / PRODUCT_NAME
-        cache = _xdg("XDG_CACHE_HOME", ".cache") / PRODUCT_NAME
+        layout = voice_layout()
+        cfg = layout.effective["config"]
+        data = layout.effective["data"]
+        state = layout.effective["state"]
+        cache = layout.effective["cache"]
+        model = layout.effective["models"]
         legacy = _xdg("XDG_CONFIG_HOME", ".config") / LEGACY_NAME
         legacy_state = _xdg("XDG_STATE_HOME", ".local/state") / LEGACY_NAME
         legacy_data = _xdg("XDG_DATA_HOME", ".local/share") / LEGACY_NAME
@@ -234,7 +237,7 @@ def default_paths(base: Optional[Path] = None) -> ProductPaths:
         config_dir=cfg,
         data_dir=data,
         state_dir=state,
-        model_dir=data / "models",
+        model_dir=model,
         cache_dir=cache,
         log_dir=state / "logs",
         export_dir=state / "exports",

@@ -29,76 +29,31 @@ from typing import Any, Dict, List, Optional
 import yaml
 
 # ---------------------------------------------------------------------------
-# Canonical product identity (Packet 8S). The internal import package stays
-# ``voicebridge``; the two legacy names are compatibility-only.
+# Path identity and layout live in the dependency-free ``voicebridge.paths``
+# module: the root installer must resolve the same tree before the venv (and
+# PyYAML) exist. Re-exported here because every historical caller imports
+# these names from ``voicebridge.config``.
 # ---------------------------------------------------------------------------
-PRODUCT_NAME = "qubit-voicebridge"
-PRODUCT_TITLE = "Qubit VoiceBridge"
-LEGACY_NAME = "openclaw-voice-bridge"
-LEGACY_NAME_7D = "qubit-voice-agent"
-LEGACY_NAMES = (LEGACY_NAME, LEGACY_NAME_7D)
+from .paths import (  # noqa: E402  (after stdlib imports, before use)
+    LEGACY_NAME,
+    LEGACY_NAME_7D,
+    LEGACY_NAMES,
+    PRODUCT_NAME,
+    PRODUCT_TITLE,
+    VOICE_KINDS,
+    _XDG_REDIRECTS,
+    _xdg_base,
+    new_voice_dirs,
+    qubit_home,
+    read_old_voice_dirs,
+    resolve_voice_dir,
+    voice_home,
+    voice_layout,
+    voice_layout_report,
+    xdg_report,
+)
+
 _LEGACY_CONFIG_FILES = ("voice.yaml",)
-
-# Snap-confinement redirects are LOUD, never silent: every decision is
-# recorded here and surfaced via xdg_report() (product paths diagnostic,
-# status output, repair/doctor flows).
-_XDG_REDIRECTS: List[Dict[str, Any]] = []
-_XDG_VARS = ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
-             "XDG_CACHE_HOME")
-_XDG_DEFAULTS = {"XDG_CONFIG_HOME": ".config", "XDG_DATA_HOME": ".local/share",
-                 "XDG_STATE_HOME": ".local/state", "XDG_CACHE_HOME": ".cache"}
-
-
-def _is_snap_confinement(p: Path) -> bool:
-    """True when a path lives inside a snap sandbox (e.g. VS Code's
-    ``~/snap/code/<rev>/...``). Snap-confined processes inherit sandbox
-    XDG_*_HOME values that must not fragment the voice bridge's data tree."""
-    return "snap" in p.parts
-
-
-def _xdg_base(env: str, default: str) -> Path:
-    """XDG-aware base directory: honored env var wins (whitespace ignored),
-    otherwise ``~/<default>``. Never returns ``.``.
-
-    A value inside snap confinement is NOT honored: the sandbox path would
-    fragment installs per snap revision. It redirects to the real-home
-    default LOUDLY (recorded in _XDG_REDIRECTS, reported by xdg_report())."""
-    raw = os.environ.get(env, "")
-    if raw is not None and str(raw).strip():
-        candidate = Path(str(raw).strip()).expanduser()
-        if _is_snap_confinement(candidate):
-            effective = Path("~").expanduser() / default
-            if not any(r["var"] == env and r["raw"] == str(raw).strip()
-                       for r in _XDG_REDIRECTS):
-                _XDG_REDIRECTS.append({
-                    "var": env, "raw": str(raw).strip(),
-                    "effective": str(effective),
-                    "reason": "snap-confinement-redirect"})
-            return effective
-        return candidate
-    return Path("~").expanduser() / default
-
-
-def xdg_report() -> List[Dict[str, Any]]:
-    """Effective XDG resolution for every directory variable: raw value,
-    effective base, and source (``env`` | ``default`` |
-    ``snap-confinement-redirect``). Read-only; the redirect is never silent."""
-    out: List[Dict[str, Any]] = []
-    for env in _XDG_VARS:
-        raw = os.environ.get(env, "")
-        raw_text = str(raw).strip() if raw is not None else ""
-        effective = str(_xdg_base(env, _XDG_DEFAULTS[env]))
-        redir = next((r for r in _XDG_REDIRECTS
-                      if r["var"] == env and r["raw"] == raw_text), None)
-        if redir is not None:
-            source = "snap-confinement-redirect"
-        elif raw_text:
-            source = "env"
-        else:
-            source = "default"
-        out.append({"var": env, "raw": raw_text, "effective": effective,
-                    "source": source})
-    return out
 
 
 def canonical_config_dir() -> Path:
@@ -117,13 +72,60 @@ def canonical_cache_dir() -> Path:
     return _xdg_base("XDG_CACHE_HOME", ".cache") / PRODUCT_NAME
 
 
-def canonical_runtime_home() -> Path:
-    """Canonical Qubit runtime (fork) home: ``<state_dir>/runtime``.
+def canonical_models_dir() -> Path:
+    """New-install model directory (``$QUBIT_HOME/voice/models``)."""
+    return voice_home() / "models"
 
-    Matches ``voicebridge.qubit_runtime.default_home()`` for the default
-    profile — the one directory the vendored runtime, the session store, and
-    the PTY/TUI share. Never the operator's external ``~/.hermes``.
+
+def preferred_voice_dirs() -> Dict[str, Path]:
+    """Effective config/data/state/cache/models for this process.
+
+    ``new`` when the root installer initialized ``$QUBIT_HOME/voice``,
+    ``read-old`` XDG paths when an existing install is present, and the
+    historical XDG paths while neither exists (a runtime must not create a
+    new tree before the installer says which layout this machine uses).
     """
+    return voice_layout().effective
+
+
+def preferred_models_dir() -> Path:
+    """Effective model directory (new ``voice/models`` or read-old XDG)."""
+    return voice_layout().effective["models"]
+
+
+def preferred_config_dir() -> Path:
+    """Effective config directory (new tree or read-old XDG)."""
+    return voice_layout().effective["config"]
+
+
+def preferred_data_dir() -> Path:
+    """Effective data directory (new tree or read-old XDG)."""
+    return voice_layout().effective["data"]
+
+
+def preferred_state_dir() -> Path:
+    """Effective state directory (new tree or read-old XDG)."""
+    return voice_layout().effective["state"]
+
+
+def preferred_cache_dir() -> Path:
+    """Effective cache directory (new tree or read-old XDG)."""
+    return voice_layout().effective["cache"]
+
+
+def canonical_runtime_home() -> Path:
+    """Qubit runtime (fork) home.
+
+    A new-layout install uses ``$QUBIT_HOME`` itself (VoiceBridge state lives
+    under ``$QUBIT_HOME/voice/state``); an existing XDG install keeps
+    ``<state_dir>/runtime``. Matches
+    ``voicebridge.qubit_runtime.default_home()`` — the one directory the
+    vendored runtime, the session store, and the PTY/TUI share. Never the
+    operator's external ``~/.hermes``.
+    """
+    layout = voice_layout()
+    if layout.mode == "new":
+        return layout.qubit_home
     return canonical_state_dir() / "runtime"
 
 
@@ -131,15 +133,30 @@ def canonical_runtime_env_path() -> Path:
     """The canonical runtime ``.env`` holding provider keys (never committed).
 
     Credential references of the form ``env:NAME`` fall back to this file when
-    the process environment does not carry ``NAME``. It is read server-side
-    only; the values are never logged, returned in diagnostics, printed, or
-    echoed to any surface.
+    the process environment does not carry ``NAME``. A new-layout install
+    keeps it with the VoiceBridge config (``$QUBIT_HOME/voice/config/.env``);
+    an existing install keeps the historical ``<runtime>/.env``. It is read
+    server-side only; the values are never logged, returned in diagnostics,
+    printed, or echoed to any surface.
     """
+    layout = voice_layout()
+    if layout.mode == "new":
+        return layout.new["config"] / ".env"
     return canonical_runtime_home() / ".env"
 
 
 def canonical_config_path() -> Path:
     return canonical_config_dir() / "voice.yaml"
+
+
+def preferred_config_path() -> Path:
+    """Config file for the layout this process/install actually uses.
+
+    ``$QUBIT_HOME/voice/config/voice.yaml`` once the new install tree exists,
+    the legacy XDG file for an existing install, and the historical XDG
+    default while neither layout has been initialized.
+    """
+    return voice_layout().effective["config"] / "voice.yaml"
 
 
 DEFAULT_CONFIG_PATH = canonical_config_path()
@@ -151,19 +168,20 @@ def resolve_config_path(path: Optional[Path | str] = None) -> Path:
     """Resolve the effective config file path without touching the fs.
 
     Precedence: explicit ``path`` > non-empty ``VOICE_BRIDGE_CONFIG`` >
-    canonical default. An empty/whitespace ``VOICE_BRIDGE_CONFIG`` safely
-    falls back to the canonical default (never ``.``). A path that exists
-    as a directory fails closed with ``ValueError`` (never a bare
-    ``IsADirectoryError`` from a later ``open``)."""
+    :func:`preferred_config_path` (new QUBIT_HOME tree, read-old XDG, or the
+    historical XDG default when uninitialized). An empty/whitespace
+    ``VOICE_BRIDGE_CONFIG`` safely falls back to that default (never ``.``).
+    A path that exists as a directory fails closed with ``ValueError`` (never
+    a bare ``IsADirectoryError`` from a later ``open``)."""
     if path is not None:
         text = str(path).strip()
         if not text:
-            return canonical_config_path()
+            return preferred_config_path()
         candidate = Path(text).expanduser()
     else:
         raw = os.environ.get("VOICE_BRIDGE_CONFIG", "")
         if raw is None or not str(raw).strip():
-            return canonical_config_path()
+            return preferred_config_path()
         candidate = Path(str(raw).strip()).expanduser()
     if candidate.exists() and candidate.is_dir():
         raise ValueError(
@@ -241,20 +259,26 @@ def detect_legacy_configs() -> List[Dict[str, Any]]:
 
 
 def resolve_model_file(relative: Path | str) -> Path:
-    """Canonical-first, legacy-fallback resolution for model artifact FILES.
+    """Preferred-first, read-old-fallback resolution for model artifact FILES.
 
-    Returns the canonical ``<data>/models/<relative>`` path when it exists;
-    otherwise the first existing legacy copy (read-only compatibility read —
-    the caller must never write through the returned legacy path; downloads
-    and bootstrap always target the canonical tree); otherwise the canonical
-    path (so missing-file errors and acquisition flows name the canonical
-    location). Never touches the filesystem beyond existence checks."""
+    Returns the effective model path (``$QUBIT_HOME/voice/models`` for a new
+    install, the XDG product tree for an existing one) when the file exists;
+    otherwise the first existing read-old copy (the XDG product tree and the
+    two legacy identities, read-only — the caller must never write through the
+    returned legacy path); otherwise the effective path, so missing-file
+    errors and acquisition flows name where a new download would land. Never
+    touches the filesystem beyond existence checks."""
     rel = Path(relative)
-    canon = canonical_data_dir() / "models" / rel
+    layout = voice_layout()
+    canon = layout.effective["models"] / rel
     if canon.exists():
         return canon
-    for family in LEGACY_NAMES:
-        cand = _xdg_base("XDG_DATA_HOME", ".local/share") / family / "models" / rel
+    legacy_roots = [layout.read_old["models"]]
+    legacy_roots.extend(
+        _xdg_base("XDG_DATA_HOME", ".local/share") / family / "models"
+        for family in LEGACY_NAMES)
+    for root in legacy_roots:
+        cand = root / rel
         try:
             if cand.exists():
                 return cand
@@ -782,6 +806,56 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
     return out
 
 
+def _rewrite_path_value(value: Any, layout: Any) -> Any:
+    """Rewrite a default path string from the XDG tree to the new tree.
+
+    Only applied to a *new* install (``layout.mode == "new"``) and only when
+    the value is the legacy directory itself or lives under it. The shipped
+    example config still names ``~/.config/qubit-voicebridge/...``; a new
+    install copies those defaults verbatim, so without this rewrite its key
+    files, templates, workspace, and L1.5 model would keep pointing at a tree
+    the new install never created. User paths that are not under the legacy
+    product roots are left byte-identical.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return value
+    try:
+        expanded = Path(os.path.expanduser(value.strip()))
+    except (OSError, ValueError):
+        return value
+    pairs = (
+        (layout.read_old["models"], layout.new["models"]),
+        (layout.read_old["config"], layout.new["config"]),
+        (layout.read_old["data"], layout.new["data"]),
+        (layout.read_old["state"], layout.new["state"]),
+        (layout.read_old["cache"], layout.new["cache"]),
+    )
+    for old, new in pairs:
+        try:
+            old_text = str(old)
+            exp_text = str(expanded)
+            if exp_text == old_text:
+                return str(new)
+            prefix = old_text + os.sep
+            if exp_text.startswith(prefix):
+                return str(new) + exp_text[len(old_text):]
+        except (OSError, ValueError):
+            continue
+    return value
+
+
+def _apply_voice_layout_defaults(data: Any) -> Any:
+    """Recursively rewrite legacy default paths for a new-layout install."""
+    layout = voice_layout()
+    if layout.mode != "new":
+        return data
+    if isinstance(data, dict):
+        return {k: _apply_voice_layout_defaults(v) for k, v in data.items()}
+    if isinstance(data, list):
+        return [_apply_voice_layout_defaults(v) for v in data]
+    return _rewrite_path_value(data, layout)
+
+
 def _env_overrides() -> Dict[str, Any]:
     """Read VOICE_BRIDGE_* env vars into a nested dict.
 
@@ -859,26 +933,39 @@ class Config:
                     break
         data = deep_merge(data, _env_overrides())
         data = _migrate_legacy_sections(data)
+        layout = voice_layout()
+        if layout.mode == "read-old" and cfg_path.exists():
+            try:
+                if cfg_path.parent == layout.read_old["config"]:
+                    # Read-old is explicit: the file is used in place, never
+                    # migrated or rewritten by this lane.
+                    legacy_source = str(cfg_path)
+            except OSError:
+                pass
+        data = _apply_voice_layout_defaults(data)
         return cls(data=data, path=cfg_path if cfg_path.exists() else None,
                    legacy_source=legacy_source)
 
 
-    # --- resolved paths (runtime XDG resolution — never the import-time
-    # constants, so CLI, service, installer, and status always agree) ---
+    # --- resolved paths (single layout resolver — never import-time
+    # constants, so CLI, service, installer, and status always agree).
+    # New installs resolve under ``$QUBIT_HOME/voice/...``; an existing XDG
+    # install keeps its read-old paths in place. ---
     def state_dir(self) -> Path:
-        p = Path(self.get("logging", "jsonl_path") or canonical_state_dir())
+        effective = voice_layout().effective["state"]
+        p = Path(self.get("logging", "jsonl_path") or effective)
         if not self.get("logging", "jsonl"):
-            p = canonical_state_dir()
+            p = effective
         p.mkdir(parents=True, exist_ok=True)
         return p
 
     def data_dir(self) -> Path:
-        p = canonical_data_dir()
+        p = voice_layout().effective["data"]
         p.mkdir(parents=True, exist_ok=True)
         return p
 
     def model_dir(self) -> Path:
-        p = self.data_dir() / "models"
+        p = voice_layout().effective["models"]
         p.mkdir(parents=True, exist_ok=True)
         return p
 

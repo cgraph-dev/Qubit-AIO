@@ -30,8 +30,8 @@ from typing import Any, Callable, Deque, Dict, List, Optional
 def journal_path() -> Optional[Path]:
     """Canonical voice journal path, or None when unresolvable."""
     try:
-        from voicebridge.config import canonical_state_dir
-        return Path(canonical_state_dir()) / "events.jsonl"
+        from voicebridge.config import preferred_state_dir
+        return Path(preferred_state_dir()) / "events.jsonl"
     except Exception:
         return None
 
