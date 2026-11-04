@@ -31,10 +31,17 @@ PowerShell installer but has not been validated on a Windows release runner.
 
 ## Install
 
-One line (Linux):
+One line (Linux, full install including voice):
 
 ```bash
 git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scripts/install.sh
+```
+
+macOS core install (runtime, CLI, dashboard and the gateway LaunchAgent; the
+voice bridge/orb/typing stay unsupported):
+
+```bash
+git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scripts/install.sh --with-launchd
 ```
 
 Use the Qubit download URL if it differs from the repository above. For options,

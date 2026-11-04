@@ -85,6 +85,40 @@ jobs:
       - name: Check the checkout is clean
         uses: ./.github/actions/check-clean-worktree
 
+  macos-core:
+    name: macOS core install and launchd contract
+    # Opt-in stub: this job is complete, but it only runs on manual dispatch so
+    # PRs do not wait on macOS runner provisioning. Enable it for every push by
+    # removing the `if:` once a macOS runner is available to the repository.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: macos-14
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        # `uv` is what the installer uses to create the venv; the dry-run tests
+        # only need the binary on PATH, so no real install is performed here.
+        run: python -m pip install --disable-pip-version-check pytest uv
+      - name: Compile the installer and launchd surface
+        run: >
+          python -m compileall -q
+          qubit_runtime/qubit_cli
+          scripts
+      - name: macOS install path and launchd contract
+        env:
+          PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/qubit_runtime
+        run: |
+          python -m pytest -q tests/test_macos_install_path.py
+          cd qubit_runtime
+          python -m pytest -q tests/qubit_cli/test_release_paths_contract.py
+      - name: Check the checkout is clean
+        uses: ./.github/actions/check-clean-worktree
+
   frontend:
     name: Frontend typecheck, tests, and build
     runs-on: ubuntu-latest

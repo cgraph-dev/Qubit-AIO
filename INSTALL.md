@@ -1,19 +1,23 @@
 # Install Qubit
 
 Qubit installs from source on Linux and macOS, and through a PowerShell
-installer on Windows. Linux is the reference platform. On macOS the core
-runtime, CLI, dashboard and the messaging-gateway LaunchAgent are supported;
-the voice bridge, hotkey, orb and voice-typing are Linux-only. The Windows
-installer is provided but has not been validated on a Windows release runner.
+installer on Windows. Linux is the reference platform and includes the full
+voice stack. macOS supports the core runtime, CLI, dashboard and the
+messaging-gateway LaunchAgent; the voice bridge, hotkey, orb and voice-typing
+are Linux-only. The Windows PowerShell installer is provided but has not been
+validated on a Windows release runner.
 
 ## Prerequisites
 
 Required:
 
 - Linux (Ubuntu x86_64) or macOS for the shell installer; Windows PowerShell
-  5.1+ for `scripts\install.ps1`.
+  5.1+ for `scripts\install.ps1`. On macOS the core runtime/CLI/dashboard and
+  one gateway LaunchAgent are installed.
 - `bash`, `curl`, and `uv` (the installer uses `uv` to create the virtual
   environment).
+- On macOS, Apple's Command Line Tools (run `xcode-select --install` if `git`
+  is missing).
 - Python **3.12 or newer, below 3.15**. The installer creates the environment
   with Python 3.12 through `uv`; the project metadata accepts
   `>=3.12,<3.15`.
@@ -24,7 +28,8 @@ Optional:
 
 - `ollama` for local model provisioning.
 - `tar` plus `sha256sum`, `shasum`, or `openssl` when model assets are
-  downloaded; the installer verifies pinned checksums.
+  downloaded; the installer verifies pinned checksums. These assets are
+  Linux-only: macOS never downloads the voice models.
 - Node.js **22 or newer** and `npm` when the dashboard bundle
   (`frontend/qubit-dist`) is absent and must be built.
 
@@ -39,7 +44,15 @@ cd Qubit-AIO
 ./scripts/install.sh              # venv, dependencies, config, launcher
 ```
 
-The installer is idempotent and can be re-run to repair an installation.
+On macOS, install the core and its gateway LaunchAgent with:
+
+```bash
+./scripts/install.sh --with-launchd
+```
+
+`--with-systemd` is accepted on macOS as a compatibility alias for the
+LaunchAgent. The installer is idempotent and can be re-run to repair an
+installation.
 
 ## Bootstrap installer (release assets)
 
@@ -75,7 +88,8 @@ the release base. This repository does not yet host a public one-line URL.
 |---|---|
 | `--help` | Show options without changing the machine. |
 | `--dry-run` | Run preflight and print the install layout; make no changes. |
-| `--with-systemd` | Install the user units, then enable and start them. |
+| `--with-systemd` | Install the user units, then enable and start them. On macOS this is a compatibility alias for `--with-launchd`. |
+| `--with-launchd` | Install the macOS gateway LaunchAgent (`ai.qubit.gateway.plist`); macOS only. |
 | `--without-models` | Skip model asset downloads and local model provisioning. |
 | `--without-dashboard` | Skip the dashboard bundle check and build (headless installs). |
 | `--prefix DIR` | Install the new `DIR/voice` tree and the launcher under `DIR` (equivalent to setting `QUBIT_HOME=DIR`); a portable install never adopts an old XDG tree. |
@@ -105,6 +119,10 @@ An **existing** install that already has `qubit-voicebridge` XDG directories
 place, read-old. The installer never migrates, moves, or deletes that data and
 does not initialize the new tree beside it. On Windows the read-old roots are
 under `%LOCALAPPDATA%\qubit\{config,data,state,cache}\qubit-voicebridge`.
+
+On macOS the core install writes `~/Library/LaunchAgents/ai.qubit.gateway.plist`
+(or `ai.qubit.gateway-<profile>.plist`); pre-rebrand `ai.hermes.gateway*` plists
+are read-old and never deleted by the installer.
 
 With `--prefix DIR`, `QUBIT_HOME` defaults to `DIR`: the voice tree is
 `DIR/voice`, and the launcher is `DIR/bin/qubit`. If `QUBIT_HOME` is also set

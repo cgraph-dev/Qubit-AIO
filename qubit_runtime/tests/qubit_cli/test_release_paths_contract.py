@@ -51,6 +51,38 @@ def test_fleet_labels_derive_from_the_current_label_family(monkeypatch):
     ]
 
 
+def test_generated_launchd_plist_pins_qubit_home_and_has_no_voice_units(
+    monkeypatch, tmp_path
+):
+    """The macOS core LaunchAgent is Qubit-owned and carries only the gateway.
+
+    ``scripts/install_launchd_unit.sh`` delegates to this plist generator, so a
+    regression here would silently point launchd at the wrong home or try to
+    supervise a voice service that does not exist on macOS.
+    """
+    import plistlib
+
+    monkeypatch.setattr(gateway, "_profile_suffix", lambda: "")
+    monkeypatch.setattr(gateway, "get_qubit_home", lambda: tmp_path)
+    monkeypatch.setattr(gateway, "_stable_service_working_dir", lambda: str(tmp_path))
+    monkeypatch.setattr(gateway, "_build_service_path_dirs", lambda: ["/usr/bin", "/bin"])
+    monkeypatch.setattr(gateway, "_append_node_dir_for_service", lambda _dirs: None)
+
+    text = gateway.generate_launchd_plist()
+    plist = plistlib.loads(text.encode("utf-8"))
+
+    assert plist["Label"] == "ai.qubit.gateway"
+    assert plist["EnvironmentVariables"]["QUBIT_HOME"] == str(tmp_path.resolve())
+    assert plist["EnvironmentVariables"]["QUBIT_SUPERVISED_CHILD"] == "1"
+    assert plist["RunAtLoad"] is True
+    for voice_unit in (
+        "qubit-voicebridge",
+        "qubit-voice-orb",
+        "qubit-voice-typing",
+    ):
+        assert voice_unit not in text
+
+
 def _write_plist(agents: Path, label: str, home: Path) -> None:
     import plistlib
 
