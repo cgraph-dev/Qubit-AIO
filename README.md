@@ -34,7 +34,7 @@ PowerShell installer but has not been validated on a Windows release runner.
 One line (Linux, full install including voice):
 
 ```bash
-git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scripts/install.sh
+git clone https://github.com/cgraph-dev/Qubit.git && cd Qubit && ./scripts/install.sh
 ```
 
 A source install builds the dashboard bundle with Vite 8, so it needs
@@ -45,7 +45,7 @@ macOS core install (runtime, CLI, dashboard and the gateway LaunchAgent; the
 voice bridge/orb/typing stay unsupported):
 
 ```bash
-git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scripts/install.sh --with-launchd
+git clone https://github.com/cgraph-dev/Qubit.git && cd Qubit && ./scripts/install.sh --with-launchd
 ```
 
 For options, prerequisites, profiles, and offline notes, see

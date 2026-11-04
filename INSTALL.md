@@ -39,8 +39,8 @@ Optional:
 ## Install
 
 ```bash
-git clone https://github.com/cgraph-dev/Qubit-AIO.git
-cd Qubit-AIO
+git clone https://github.com/cgraph-dev/Qubit.git
+cd Qubit
 
 ./scripts/install.sh --help       # options; changes nothing
 ./scripts/install.sh --dry-run    # preflight and resolved layout; no writes
