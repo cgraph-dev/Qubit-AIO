@@ -55,11 +55,11 @@
   "local_root": "qubit_runtime",
   "counts": {
    "upstream_files": 16078,
-   "local_files": 20647,
-   "identical": 7122,
+   "local_files": 20648,
+   "identical": 7117,
    "missing": 321,
-   "extra": 4890,
-   "changed": 8635
+   "extra": 4891,
+   "changed": 8640
   },
   "missing": [
    {
@@ -2563,7 +2563,7 @@
    },
    {
     "path": "apps/desktop/electron/challenge-window.ts",
-    "local_sha256": "0f5ac5b226b822d7785e30b68d1ae79274f1d9d07d226e5e58d3d41fc9e7e5a1"
+    "local_sha256": "26cd0d9a220c6459c59e2d9d60dc5d935ed0ca2df4b1fadb24bc7dec19e5ddcb"
    },
    {
     "path": "apps/desktop/electron/clipboard-image.test.ts",
@@ -2647,7 +2647,7 @@
    },
    {
     "path": "apps/desktop/electron/fixtures/nvidia-recovery.ts",
-    "local_sha256": "a32c447e2d57a9ef5a68885a7996234fc0df0497010b2dcfdca9c93dc1b1a9ea"
+    "local_sha256": "abd6c1ea3b0874713982f234208c53476ad80d731f30d645e4b6d320e5cbcb91"
    },
    {
     "path": "apps/desktop/electron/fixtures/system-ca.ts",
@@ -2759,7 +2759,7 @@
    },
    {
     "path": "apps/desktop/electron/local-gateway-deadline.test.ts",
-    "local_sha256": "e0f8e3cd333cc7ca7fb15cb4a333398eeccb7aa96eb740c8d4fd9ad8aaec7335"
+    "local_sha256": "af79553a3e685a66a65f887c69cd4a0010e18551d2a2f08a8ab161710ed28732"
    },
    {
     "path": "apps/desktop/electron/local-gateway-python-native.test.ts",
@@ -2767,11 +2767,11 @@
    },
    {
     "path": "apps/desktop/electron/local-gateway-python-runtime.test.ts",
-    "local_sha256": "7b37beb539ced1b3cbc56099fd6c8b3e8988dd071e3db06865dbc373dba5bd6d"
+    "local_sha256": "55d41cc60a069610360de621839f7732e974fcfb0efc507ea86b8bbbe0a59981"
    },
    {
     "path": "apps/desktop/electron/local-gateway-python.ts",
-    "local_sha256": "19ec01b81f3599f95cbadc991be2a13f89935a194f08aead89ea0291b1cb96ff"
+    "local_sha256": "42058209dcd9dba50cd1111bb711e28f3ff13755271d9112421b970737c52c1a"
    },
    {
     "path": "apps/desktop/electron/local-gateway-restart-detach.test.ts",
@@ -2791,7 +2791,7 @@
    },
    {
     "path": "apps/desktop/electron/local-gateway-unsafe-path.test.ts",
-    "local_sha256": "c7e5b78997497ff06d6018bfa922e89485401308045346198f65b15374f0ebb9"
+    "local_sha256": "2c00f248ecb5dbce0b6c8c34f4f0edb0473bd008fb320938b0288473e07a1497"
    },
    {
     "path": "apps/desktop/electron/local-gateway.test-helpers.ts",
@@ -2799,11 +2799,11 @@
    },
    {
     "path": "apps/desktop/electron/local-gateway.test.ts",
-    "local_sha256": "b9416fbe7ce6b3d0041902fb530407e12eeff871bfea0ef20b4c524dda1e2ddd"
+    "local_sha256": "cfa7152abda18a867e7a1d004bc689c7d7f7b54ee4d742d31bcd3e2062412dfc"
    },
    {
     "path": "apps/desktop/electron/local-gateway.ts",
-    "local_sha256": "df7d1cbf7106c7ada791d5876e2398ea3629e0f320070da1d6c05037da5c9ac1"
+    "local_sha256": "aeb3f02d3ef7bce169df567f9edd267f60fce96d76559f7c53d3e95b847afa18"
    },
    {
     "path": "apps/desktop/electron/local-read-path.test.ts",
@@ -2963,7 +2963,7 @@
    },
    {
     "path": "apps/desktop/electron/plugin-files-guards.ts",
-    "local_sha256": "1a36b1b488f5ec65b65a5d0879e5d9e466d30f30c5f0def6b8ba133f029b6cf2"
+    "local_sha256": "a3b5bf65aca50322778f7bb67b21f868314c9dfe700e659212808093a3702c89"
    },
    {
     "path": "apps/desktop/electron/plugin-files-hardening.test.ts",
@@ -2991,7 +2991,7 @@
    },
    {
     "path": "apps/desktop/electron/plugin-files.ts",
-    "local_sha256": "0db69621b31bf4657daa3e13306330013db6b892b9e488e36c12f0878fbfd170"
+    "local_sha256": "b730c148fe7ff918d71919ab8d7e37643e09238b67c56617698ccd1a08f91394"
    },
    {
     "path": "apps/desktop/electron/plugin-ws-url.test.ts",
@@ -3087,7 +3087,7 @@
    },
    {
     "path": "apps/desktop/electron/relaunch-target.ts",
-    "local_sha256": "d37f6b2887af000357cbc7ef0b7031c3ec28033178aa2f35c6b7c12116819641"
+    "local_sha256": "b0d85c1cb867ec45c88664bc5fc2c8906564bfda086f4676e61e781672723ec4"
    },
    {
     "path": "apps/desktop/electron/remote-owner-cache.test.ts",
@@ -3179,7 +3179,7 @@
    },
    {
     "path": "apps/desktop/electron/ssh-binary.ts",
-    "local_sha256": "4537e2c7c00d5ca8bc1287b6eceada518001267d0747720f577c3fcd781db47b"
+    "local_sha256": "631dfb1fa158c3709cf3f50cc0cd2894329b4040bd365695c0f7eb1337ba427d"
    },
    {
     "path": "apps/desktop/electron/ssh-control-master-holders.test.ts",
@@ -3219,7 +3219,7 @@
    },
    {
     "path": "apps/desktop/electron/ui-preferences.ts",
-    "local_sha256": "985e4e616cb02cbfe923bcf2ef3931f0b040c476c118d0d4f34c9999de8362f7"
+    "local_sha256": "8d81521fdd550189fb6ff08ade5497179539fe012b016fcfd044428505d42239"
    },
    {
     "path": "apps/desktop/electron/update-hold-types.ts",
@@ -3243,7 +3243,7 @@
    },
    {
     "path": "apps/desktop/electron/update-stop-remedy.ts",
-    "local_sha256": "f1b84edb902930053437bdc215c92584b6ed8c5a2603787f10a8c72f9218e333"
+    "local_sha256": "6e908143235e0d47a11a1d55250a67efdca7b973aa4a2a5dbd1b0ad3e0382894"
    },
    {
     "path": "apps/desktop/electron/updater/checkout-current-sha.test.ts",
@@ -3303,7 +3303,7 @@
    },
    {
     "path": "apps/desktop/electron/window-focus-policy.ts",
-    "local_sha256": "74c00582fc34d38cc9ce56a8666f35c42b4928e88df5afd0e1daf3f787444805"
+    "local_sha256": "2e367a2cbec15e88db054187cc272ecc50be2921514fec72c5b596554182d7a1"
    },
    {
     "path": "apps/desktop/electron/window-menu.test.ts",
@@ -3727,7 +3727,7 @@
    },
    {
     "path": "apps/desktop/src/app/session/hooks/use-session-actions/session-create-request.ts",
-    "local_sha256": "10034bb30238a9d0a905b09c9f10620e9ca00bdecdcdb41f810cbf2d912fa63f"
+    "local_sha256": "6190b17b217cc1112dadb0bcb1890df9fe1b9054de4bc4a2471558684f3d2cd4"
    },
    {
     "path": "apps/desktop/src/app/session/hooks/use-session-actions/streamed-reply-survives-sync.test.ts",
@@ -3999,7 +3999,7 @@
    },
    {
     "path": "apps/desktop/src/i18n/ar_artifacts.ts",
-    "local_sha256": "7453f3eec63e557c0c1830a5ea5cbcfe6523d3b61f99e2b6f1158c721fe70fc1"
+    "local_sha256": "77a1e76e7f6799afd477f7d1d7444b4062afc3c34b754dc7678f60543f45cacf"
    },
    {
     "path": "apps/desktop/src/i18n/ar_assistant.ts",
@@ -4007,7 +4007,7 @@
    },
    {
     "path": "apps/desktop/src/i18n/ar_boot.ts",
-    "local_sha256": "83b2c4859c6e135303bcfb85e51573f76b03ad5f4bff53255c81693d74f6c080"
+    "local_sha256": "f6a5c7fa0622af27a46c3eb9ec34c406c8dcb948d332cca2d0bc41c206de89d3"
    },
    {
     "path": "apps/desktop/src/i18n/ar_capabilities.ts",
@@ -4015,31 +4015,31 @@
    },
    {
     "path": "apps/desktop/src/i18n/ar_chat.ts",
-    "local_sha256": "e9cf780211d018b8e28cf6d8bd1b88e95eeba1ffc8971c281097e3ef78ecfd01"
+    "local_sha256": "21bcf94f5915611fdd212febe8fd00d4d4404034facd4812ce61337a6ae018db"
    },
    {
     "path": "apps/desktop/src/i18n/ar_chrome.ts",
-    "local_sha256": "566182f785aaf6547ef40ca144cff01db2dd6400594a776caf0f3dec4e4e2346"
+    "local_sha256": "8e2c8a9796c7d4b472209398db7fb9d91c8352daaa004c156de3f70261318021"
    },
    {
     "path": "apps/desktop/src/i18n/ar_command_center.ts",
-    "local_sha256": "05ab0699fec6bf608e367456f3cea8ddc906f27941b1f89f86b7a7e765f495e6"
+    "local_sha256": "d13097e3e1d9d2f449f70cecd480812a492c1695089b0da12cd5ea64cea6ff3c"
    },
    {
     "path": "apps/desktop/src/i18n/ar_common.ts",
-    "local_sha256": "c2f71292af5d6cbaf82eede4e224a62d37d43345f429a4bf67ee42474425d73b"
+    "local_sha256": "9f39dcb4fc77affb2e878d06b85e21d23001f1f92ca7804d72b8e270ae3e0037"
    },
    {
     "path": "apps/desktop/src/i18n/ar_connectors.ts",
-    "local_sha256": "1cf1de022f88cd07e515228942edb49c1252d736d42d655915590d35d8869b68"
+    "local_sha256": "ae46ea6244df799e6fa39fde2114ced778164e689697617e5244af78721ae4be"
    },
    {
     "path": "apps/desktop/src/i18n/ar_diagnostics.ts",
-    "local_sha256": "5ec4f5df1337af0d8f7fe6afbc2cba1d5195ad4c5e09087c5dfd2daf078fe9ac"
+    "local_sha256": "54eaca63b304a682e0dae106a5141e6caa029046f503edb830c01fc0e218d7bd"
    },
    {
     "path": "apps/desktop/src/i18n/ar_settings.ts",
-    "local_sha256": "dee4c1111a04acf53c97137aae11e2bd08cb302bc12c6dd87a63b10b540fbe44"
+    "local_sha256": "76a7c5e21718855a2dc72ef228bf09ba8671f7795d48dc793d42d3837f9689c7"
    },
    {
     "path": "apps/desktop/src/i18n/backend-packs.test.ts",
@@ -4047,7 +4047,7 @@
    },
    {
     "path": "apps/desktop/src/i18n/backend-packs.ts",
-    "local_sha256": "767e778a6ef894dd07df2218cba57efe18aeec3092ab9ac9d9cf108f3d19e6c1"
+    "local_sha256": "df580c4c175c8ed311bc7757305a137a458d9d04b395d449fa91a66995d672ba"
    },
    {
     "path": "apps/desktop/src/i18n/registry.test.ts",
@@ -4059,31 +4059,31 @@
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_artifacts.ts",
-    "local_sha256": "ee6725df356ec8830d8fb42502ced09b194ff4095c0691124da16f4ad41be359"
+    "local_sha256": "c230b7f567084cb65008fdf05dd6a5325b41fb33d10a0df5c71f945cd87e712a"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_assistant.ts",
-    "local_sha256": "22b1e0fe13770a7f77ebcb617d170a594bd094450fb13810da0e8e3962e3b5c7"
+    "local_sha256": "20e66ac1fe83282d03c53e18c8cc15a810fe54adde84b43656ba615878248231"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_boot.ts",
-    "local_sha256": "4e04d53e25e095d9d9fe2bd14daf3364386ce1b4550bd59d4403440b1085c5be"
+    "local_sha256": "4125b07ef01aba23ddddd8cd4360f60eedaf109725ce8a58237317cc9c0fb0b4"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_capabilities.ts",
-    "local_sha256": "8d9943b4898ab0d3968db2cd69975326d69cf8043146ce2f455c25cbad2b685d"
+    "local_sha256": "dd7109cd733c5909a8078843d99c015032ab01100cf35fb2946030d093d102f2"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_chat.ts",
-    "local_sha256": "2c577f614a7561b7ebd2aecb19dfd289544a5f40acbdd2e586d2bc05da86a103"
+    "local_sha256": "7c5217fe3f0c1dff6657d27bea9872e4ee61116540a4a6d7a0f4d1ac21d867e6"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_chrome.ts",
-    "local_sha256": "af44755a9b7b4fdd9e6f50a91d65c125aafe071e130cc5c6be7c2d0499d8b13a"
+    "local_sha256": "b54fb80986efb83c4f9f0e6fe91d5fe4dd5e5c5b0e8881e71da90575a8ee6256"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_command_center.ts",
-    "local_sha256": "e1a9625a3249e2cca9772c40bc6f570ac78e35a8399d3f7d1388b3960e1ee8ec"
+    "local_sha256": "caee4a8efed70f095c0ae3d7de69fa514f2963aba222619575c3c52c02e3276f"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_common.ts",
@@ -4091,15 +4091,15 @@
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_connectors.ts",
-    "local_sha256": "0ad579d5d63d9e8ef685c869374df93e894b15edac3411da3d153f32be3c463f"
+    "local_sha256": "8f2980132bc1f32510d3471b40a213c3b86e8e78bdd789b62b1e3a59789c3b29"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_diagnostics.ts",
-    "local_sha256": "dca169720131c7be735419232cfbfeec10c3505c92af6b91c6f310135468384e"
+    "local_sha256": "e6735ce24a4efa09521b365e403b748ab561f7a0034e4811d68550b38b443fc3"
    },
    {
     "path": "apps/desktop/src/i18n/zh-hant_settings.ts",
-    "local_sha256": "42c6148ba431bb3fdf578f65d380f8a628a64e07b5eedcbe9b06491d0e2a5008"
+    "local_sha256": "d34a2f7cbdfedd76d7c1f3b5bf7cecf652453052e120b60881b7d5b662422cc4"
    },
    {
     "path": "apps/desktop/src/lib/attachment-upload-policy.ts",
@@ -5519,67 +5519,67 @@
    },
    {
     "path": "locales/af.tui.yaml",
-    "local_sha256": "e5b2e747183ca1d94637c6a5f7bcc5dbb89ef3bda4d96edf48dab6ca65765b38"
+    "local_sha256": "4a8c2b463578c445dae101d0c27c7b95ede5e367de3b52960776ebecbe47033e"
    },
    {
     "path": "locales/ar.tui.yaml",
-    "local_sha256": "6e9776735217335a35c0d1f52b4f989ccfd0f77bd0b7e098df2cb18c8ac4050b"
+    "local_sha256": "94b22855099b759b79ec00b4050966196814ab988bac50e23635a973e78f226f"
    },
    {
     "path": "locales/de.tui.yaml",
-    "local_sha256": "27ae5a2546da0e21a9552e94500a4a353877a801dfff34fb7007477c8d0b8715"
+    "local_sha256": "2e454ae16a9227b8f48d20a96e214744e4b45348828ce2d2746a4bf123c48f86"
    },
    {
     "path": "locales/es.tui.yaml",
-    "local_sha256": "a72eb21d2f94e7e65bb2f61ad6aebb70c09bed76dd2e5913789f579ac6821514"
+    "local_sha256": "69c4f1d2ee96e7da007104ee1cc34f4605db9df117120a5d2973dfd5d126d613"
    },
    {
     "path": "locales/fr.tui.yaml",
-    "local_sha256": "daf8c6c652c511dd066b31d93cca64a4111c8c5684893a16eefb142354a0aa5e"
+    "local_sha256": "987bbcd0ffd95d3b3aefd385a0f7e77da53ca3002775475777aa61ade3f8a745"
    },
    {
     "path": "locales/ga.tui.yaml",
-    "local_sha256": "ca76a3c47c61a25cf1e6c727180ed266e97960bbf3a734bfb6024c61c2c2e737"
+    "local_sha256": "8e5723c6130ddee66bedc5bec8d1da61cc79c57e7ffeb5b007121ee8c6fd11c3"
    },
    {
     "path": "locales/hu.tui.yaml",
-    "local_sha256": "9dc695e255d1d50071fb1bc1cb3aa269749bb51707b9503fa9b6cc42caa9ee65"
+    "local_sha256": "0ea314a2a93031f78f9ea03c8b9378bd2b6d5604474680b6f6245f5d60e0c17f"
    },
    {
     "path": "locales/it.tui.yaml",
-    "local_sha256": "989a520b3d752d344843faa9917fcdfabba87fcab8028834f17da671efe9e555"
+    "local_sha256": "478fe12c69494c1661aa99c211b6ecb3620aeec2e9005bcb06436511bf48517a"
    },
    {
     "path": "locales/ja.tui.yaml",
-    "local_sha256": "cb24fe3c2a399ab5ddd592cbcad32873487d995f18b09badb518b2240d00d2ca"
+    "local_sha256": "c67f3697fe2cd451a62faed64bbff4c403c1878bc294a46984753294f59fe77c"
    },
    {
     "path": "locales/ko.tui.yaml",
-    "local_sha256": "93395658ae50d0a3fc392ffef78ca956fde9b4106867253957a968ad02ead08f"
+    "local_sha256": "f0767ad607d2432334fccc1fd34e0e7b079ba9f2ccc438ce36e2fbd71c3425a6"
    },
    {
     "path": "locales/pt.tui.yaml",
-    "local_sha256": "ca8e68ccf7378a28277d3a318eeb5cccb3f26ca4f3e20747e561a5786f25c164"
+    "local_sha256": "33d38d618fcb81f83c8fc57a6a60b19b8cfcbca113e8f8e4ffafb8c27f57f6b3"
    },
    {
     "path": "locales/ru.tui.yaml",
-    "local_sha256": "4a26b72fc23f2b562c5acf922c320f7231ea13a31142b119c8b6d12507100ebf"
+    "local_sha256": "c5378ed671f8419b9da7dc21377a31f7d80d5c9c7798b6a01274e17204cf8dbb"
    },
    {
     "path": "locales/tr.tui.yaml",
-    "local_sha256": "b8736725f9be4b0e978ee8157f674fe0fce97ff5fe93c83077a0e326a168209c"
+    "local_sha256": "bec6fedcb4b2c3ff6d3b64587f2bb30533f6be7f93aa120e7f4c84c05e5a92ee"
    },
    {
     "path": "locales/uk.tui.yaml",
-    "local_sha256": "126fdcbd383d7ea52c652a6e601723d96d5b1999d91fe1ad6ad7d988272c1b52"
+    "local_sha256": "662f5ac473b6a91e4c43ecfe1d1d6d3cbaf9f8f139c3750edaa377d62491cd75"
    },
    {
     "path": "locales/zh-hant.tui.yaml",
-    "local_sha256": "966336536ba09d72aae259be2898dde1c24b6b31ce5f067da2e7d1f947504855"
+    "local_sha256": "50ce569438c282785534bd5a01aeb5db0c4bb32625203da01f8d59000fca62af"
    },
    {
     "path": "locales/zh.tui.yaml",
-    "local_sha256": "0af9c50a0631a3e898045d92446524ae9c55ae39343e120e90a95a95e4a50198"
+    "local_sha256": "f5862b6e5649e4bae0c98475d1faba352fed0a59c658e739f93c68b9907271e7"
    },
    {
     "path": "nix/qubit-agent.nix",
@@ -17098,6 +17098,10 @@
     "local_sha256": "8e212bde7fd46cacec9c2ed03243f07e0a6604724083108e3163eff25222532c"
    },
    {
+    "path": "tests/qubit_cli/test_mcp_oauth_config_example.py",
+    "local_sha256": "5b1f9f7482345c7fb88d9831063427775fd7ba7a965d522fa0875074460f739f"
+   },
+   {
     "path": "tests/qubit_cli/test_memory_providers_list_fix16.py",
     "local_sha256": "93f06a912f08dc238afecc1c756b0515848e833111d1231fe14bf94cd9ae9330"
    },
@@ -19567,7 +19571,7 @@
    },
    {
     "path": "tests/tools/test_mcp_oauth_required_misconfig.py",
-    "local_sha256": "c2122e9c66fe0407f60c906b2f678821562e9140f7cd0f41a36340ab583f037f"
+    "local_sha256": "427a19ed5a9bc6f00ddb64afbe1b4f7323085711dd32e38293600048206855de"
    },
    {
     "path": "tests/tools/test_mcp_restart_on_new_inputs.py",
@@ -20947,7 +20951,7 @@
    },
    {
     "path": "ui-tui/dist/entry.js",
-    "local_sha256": "c24149e916b269d29f6d5a5d118e96311c4c32c3a7d98d6c20164df3a6a5804b"
+    "local_sha256": "b170870fed14ba4531b5abb3dcd3e7311b7e8c144c2ea18391108114d53fdfbb"
    },
    {
     "path": "ui-tui/dist/hermes-build.json",
@@ -23182,7 +23186,7 @@
     "upstream_path": "agent/transports/codex_app_server.py",
     "upstream_blob": "ee3991827641d3f5cdaf03362f8ad0602e72f704",
     "upstream_sha256": "e08aad3d26369d8cf2a868a84895c3eee41ea2e2b06c9fc1b11cae7c09fd9f13",
-    "local_sha256": "a01a64d79be34f2892fcdfa0a66b04ed23fa52e348ffbdd382203dfa95039b7d"
+    "local_sha256": "9148a85537e353b726e8433c60d172d08e5db657a941640c0df0cc4b6f99b4f0"
    },
    {
     "path": "agent/transports/codex_app_server_session.py",
@@ -24050,7 +24054,7 @@
     "upstream_path": "apps/desktop/electron/backend-env.ts",
     "upstream_blob": "a9ce8cda9724202eb2eb2a60a1c4ae3b701ca776",
     "upstream_sha256": "be55ca8357c5245ffa9d3f439a03ecc59ca899f816c24455c120587b8dd51b4a",
-    "local_sha256": "fa768f25c893e3023617aa8e8c5895e2fcda5ee0ea538a7329c35bc552562772"
+    "local_sha256": "ce56da620a7a834f4a0e13a0595d78f44a6c529a993c943125ec102ce1ccc040"
    },
    {
     "path": "apps/desktop/electron/backend-exit-recovery.test.ts",
@@ -24106,14 +24110,14 @@
     "upstream_path": "apps/desktop/electron/backend-ready.test.ts",
     "upstream_blob": "9a412c6ad193fabfa924b5168ffd3b5e13daf98e",
     "upstream_sha256": "0cdce2d881c650ec27a233e8cc5af7bc6268fccf98d7dc03b0dbc750ca4c5640",
-    "local_sha256": "98d58002db2006373050b3f5bd1c1e21608b3354bab2b988b649906a78ef1564"
+    "local_sha256": "fce6f7614ec946f47dc3be09dcb293466bf41e69757da22a8d33f95632a75174"
    },
    {
     "path": "apps/desktop/electron/backend-ready.ts",
     "upstream_path": "apps/desktop/electron/backend-ready.ts",
     "upstream_blob": "7fd8287d61b343c8144d66c8a1d4c5e3e70c7af9",
     "upstream_sha256": "a99dd03aed6f5af3e7850b85068f5ad2fdc64995b881d05a5ff10b6a8af69810",
-    "local_sha256": "7fbab1b27adbe4dfc3590f355357c0601f183faed7f470d7ed9703af07a32c16"
+    "local_sha256": "82b53d3a912366a1a002a0a51ab8d1e0a43fa7a77be10df86aa2db63624f6728"
    },
    {
     "path": "apps/desktop/electron/backend-release-gate.test.ts",
@@ -24141,7 +24145,7 @@
     "upstream_path": "apps/desktop/electron/backend-start-failure.test.ts",
     "upstream_blob": "ea2261db16f1a9d57346faae231dcaefece0243e",
     "upstream_sha256": "1cb7f4c303cee42e71a3011b4bf8e0dc5f11f3c89e75dc0b61e38fed2083ce82",
-    "local_sha256": "371b77c8401ac49778286e6a4369dcfd50fe85cb81e4efa872929eedd638b63d"
+    "local_sha256": "a14f284d60095fba01103ac95beb9b9679a084ca96a9d5b4a3a679f85260bd1b"
    },
    {
     "path": "apps/desktop/electron/backend-start-failure.ts",
@@ -24274,7 +24278,7 @@
     "upstream_path": "apps/desktop/electron/connection-config.ts",
     "upstream_blob": "6538377337b1a76b93606c0501d1bd85848c1872",
     "upstream_sha256": "02bf23c652f30aaa0aa1295d1f003829218ecaa83bb03fde1b23cd3b31bd1cd5",
-    "local_sha256": "702a3421235ecc32a688467fed71a9d56a29ef7f08387e3713f5710b3dd7f209"
+    "local_sha256": "98d88ffe650053d6bb5dc64d03513a4d19e424cf946b0b1a7dea8c509793fb8a"
    },
    {
     "path": "apps/desktop/electron/connection-registry.test.ts",
@@ -24295,7 +24299,7 @@
     "upstream_path": "apps/desktop/electron/crash-forensics.test.ts",
     "upstream_blob": "59a867ff47756a1fab705491d46e41cdb9329f48",
     "upstream_sha256": "f571feda7a697ed688dc9400776efdf8a40e37daad868603a6ded85b56e90858",
-    "local_sha256": "e474c40f59a8fbabb6e62a8f67d459f76821b9ae5dd434c3a067039ae24e8203"
+    "local_sha256": "436a22b0c8969d1b8cf2f0b0f311268a3cdc7f5a6b0f45c0197037701b940522"
    },
    {
     "path": "apps/desktop/electron/crash-forensics.ts",
@@ -24631,14 +24635,14 @@
     "upstream_path": "apps/desktop/electron/local-backend-lifecycle.test.ts",
     "upstream_blob": "af0cead500182ecb990a2d29e289dc823d76a6e5",
     "upstream_sha256": "4aac224caaa9aa04a18421d206f5766d4d10d11da592ec07e0d69464dd724f37",
-    "local_sha256": "a902175bb736280b2210a079850c8ba5d1eebc60f78761c0f317303f27e76056"
+    "local_sha256": "25ff9df449025e39a07c2a0289be360654a03058801b8b564371278fede207c1"
    },
    {
     "path": "apps/desktop/electron/local-backend-lifecycle.ts",
     "upstream_path": "apps/desktop/electron/local-backend-lifecycle.ts",
     "upstream_blob": "fecacb3707b4ec8050dfb8c6eeabb8b4527d9c57",
     "upstream_sha256": "19b965544b86e2e2b7d2d8100bc0f69b96bd5bea048263955a92e5ca2aa7cdd5",
-    "local_sha256": "67a43f2126cbf1a09bfa07d256071763ab61405af88274e19e8c864275756afa"
+    "local_sha256": "2dd26e518ef9ca91dea363a1352ab096912a9d64807daf4bd7afb63dd6743c03"
    },
    {
     "path": "apps/desktop/electron/local-skin.test.ts",
@@ -24680,7 +24684,7 @@
     "upstream_path": "apps/desktop/electron/managed-ssh-update.ts",
     "upstream_blob": "3efb3b791e03e67e8c085b862e535ff290bf096c",
     "upstream_sha256": "eac3b5e2313f48a5dce3c13b1c2b6338bc31f24602e15da8811418c629926d75",
-    "local_sha256": "be7f9c4657aa8e1f0ca910cc9649d24861c9a0fe2297aea1b12f0cb43c86a430"
+    "local_sha256": "ae5dd8560c0fc7d35cc10b83d1a372d0e8887c26c4546f4a28e6eaf294ff2dfb"
    },
    {
     "path": "apps/desktop/electron/mcp-oauth-callback-ipc.ts",
@@ -25044,7 +25048,7 @@
     "upstream_path": "apps/desktop/electron/quick-entry.ts",
     "upstream_blob": "d8233c217eeee70eef431fb06b80ff0fa936bd1f",
     "upstream_sha256": "f57989a03b6e02e1a5c50cdd33f7d456584dba4056c8b3a534812850129b17c9",
-    "local_sha256": "d6b0b7621eb111adead2d2ffa112e903c9100455fa16e5213b2e273ffa8d86f6"
+    "local_sha256": "54a3642bb4e8471cc7ed3f13e8b144ff6740517299ef70d2914d8fda6f893ec1"
    },
    {
     "path": "apps/desktop/electron/quit-guard.test.ts",
@@ -25114,7 +25118,7 @@
     "upstream_path": "apps/desktop/electron/remote-oauth-ticket.test.ts",
     "upstream_blob": "b67c9abd70c32bb94b97a4cc389d560703f2204d",
     "upstream_sha256": "24b79e78d5843bace34001c720a51219903becc3ff44e4295ed74b8719c3eec7",
-    "local_sha256": "4e70171dbbd55ba8324620062d37c4464f0f03938924822bb21d3306777c16d9"
+    "local_sha256": "94be6a9bdf36ae66cbbdbdccf1af741576179e043dd9fb03334d1955df18450c"
    },
    {
     "path": "apps/desktop/electron/remote-oauth-ticket.ts",
@@ -25163,7 +25167,7 @@
     "upstream_path": "apps/desktop/electron/renderer-log.ts",
     "upstream_blob": "d3a97c6daadfef4fcec2e82214b4d2393d853765",
     "upstream_sha256": "6335ee028058d7aeb2600b3601ec141dfd9bb09bf64148827a2d75322d6c65ad",
-    "local_sha256": "b90b77aa10d9837b027a7a83c53b5e4f8b9ef48f3814f820fb0c8764c412e24f"
+    "local_sha256": "d9629196485e43bcc85474d47124d2456471e98aa9f87e8e15d7fc025d2752f8"
    },
    {
     "path": "apps/desktop/electron/secret-storage-policy.ts",
@@ -25240,7 +25244,7 @@
     "upstream_path": "apps/desktop/electron/ssh-connection.ts",
     "upstream_blob": "63728dc6e5b7e621ce57e780f9fcb1e9cc158f39",
     "upstream_sha256": "a298a9874d0a385bd21705aa63d0ba1e073bd41370a2a0e118192193b52e7069",
-    "local_sha256": "834b67de683ac53f13f92dd10fad5e3d4447ad080f779d357bba7c068ced9371"
+    "local_sha256": "257c1bc02b78c0b20c1163f4b5f38ba728bf59cf56618939ac1adaa55d79a0a6"
    },
    {
     "path": "apps/desktop/electron/stream-throttle.test.ts",
@@ -25513,7 +25517,7 @@
     "upstream_path": "apps/desktop/electron/venv-holder-select.ts",
     "upstream_blob": "d79d2e0a5f309c49a89d51d8ba7117f53ec5c897",
     "upstream_sha256": "65ac85db7c93ca7af26564551903406c8359dd270edbb6a236b6a3eb442bb80d",
-    "local_sha256": "cf6f431a690f9982313bc250026a2ba5aca116e6c077c67f40bfe076a12f8b00"
+    "local_sha256": "73dbd495a567aef283219b18b49a8496f3c10fe08b2e6c6ac26f2be23b18f8d0"
    },
    {
     "path": "apps/desktop/electron/vscode-marketplace.ts",
@@ -25653,7 +25657,7 @@
     "upstream_path": "apps/desktop/electron/windows-remote-lifecycle.ts",
     "upstream_blob": "d042a51bcd228b8de91e748004c566327b094742",
     "upstream_sha256": "ae24b869814af4285cf6ffc756821328bf8437c7703c11be9377176c91d7b4a3",
-    "local_sha256": "f7441557bca71f4c59b67c275bf54ed4ad03ad1b7cbc8721ea0617f2a3bc7f19"
+    "local_sha256": "e26a8ffd66ade913dcb05f48adbce38f969648a188582583e2c9d6eea1eaea58"
    },
    {
     "path": "apps/desktop/electron/windows-sandbox-fallback.test.ts",
@@ -26689,7 +26693,7 @@
     "upstream_path": "apps/desktop/src/app/chat/right-rail/preview-pane.tsx",
     "upstream_blob": "b93e06fa8f9712a856a3ff7b174947d5cb9845f2",
     "upstream_sha256": "75db6bfcce49197173565fcdba738aacc584a49e5005aece541d0d4d02ebdb60",
-    "local_sha256": "9d8d0cdad69ff8a5ef0471fd802ee886c249e5f2c1cf79a8fa3edf86ab09eb99"
+    "local_sha256": "47d17cdeb69f8cabc7d87e15f8bffc52b0ae85a556c3de2be749ae2d76079eb1"
    },
    {
     "path": "apps/desktop/src/app/chat/right-rail/preview-reader.test.ts",
@@ -26829,7 +26833,7 @@
     "upstream_path": "apps/desktop/src/app/chat/sidebar/fleet-rail.ts",
     "upstream_blob": "ac4b80d043e09c7b7f260b3bb34443ded8faa335",
     "upstream_sha256": "12dfeeef83d19bf5ef4ca6adecd3b81ed3f06151cfe03aab465eba3882b18d56",
-    "local_sha256": "699acbfb0e5233b61e3527f00bbec137839cc1e70baaef59542653bdf7cccb7f"
+    "local_sha256": "a68a9998c12ff08ff8f07dc968121e3cfc29b9fd0756b57b258ffbdcc3cf5c46"
    },
    {
     "path": "apps/desktop/src/app/chat/sidebar/index.tsx",
@@ -27102,7 +27106,7 @@
     "upstream_path": "apps/desktop/src/app/contrib/hooks/use-desktop-integrations.ts",
     "upstream_blob": "4da893ab0ed6554c2069a94bbce11a07d540aa0a",
     "upstream_sha256": "55ed2b86af9ebcf04cebc20ed8495cb99d973db426447fbf31f6291eb96e5101",
-    "local_sha256": "bba39f5ce8d047b6e562506622350d96d44ff4b6e8b7f122770a7657838651e3"
+    "local_sha256": "da63ba71e9d6879c40e74fde2f82901dc3b5321c61782ac723be433d414e462d"
    },
    {
     "path": "apps/desktop/src/app/contrib/hooks/use-pet-bridge.ts",
@@ -27809,7 +27813,7 @@
     "upstream_path": "apps/desktop/src/app/session/hooks/use-message-stream/gateway-event/status.ts",
     "upstream_blob": "19411666b3fbc1096a7489d1234127b99c15c5bd",
     "upstream_sha256": "d76224f1e1aca963488570269fa0dfc31d6c4d6d7854831fee715ba0aa5062f6",
-    "local_sha256": "12bba6695724ae1ad7bd77db88215b47780031275bc1bd3859804e094b36d3fb"
+    "local_sha256": "df6077f420f13bcbd9d20e9d9e6d7fde34be805bcff0192088a3ea06ef59c919"
    },
    {
     "path": "apps/desktop/src/app/session/hooks/use-message-stream/gateway-event/tools-preview.test.ts",
@@ -28712,7 +28716,7 @@
     "upstream_path": "apps/desktop/src/components/assistant-ui/directive-text.tsx",
     "upstream_blob": "fadb18d7cad8512fac24605a484fb9aca6ab9546",
     "upstream_sha256": "c39b5e6224e994c3f8bce6d254a9e9b598b081f414b529d8476b5738a7a3837f",
-    "local_sha256": "a45fb87126e1508cd6ddea44d871577066c41a127a00c2959c4fc8071d11627c"
+    "local_sha256": "7fff27b86d125792b2d5d84788f80ec3a817cbb5afcf068584853be5635b3278"
    },
    {
     "path": "apps/desktop/src/components/assistant-ui/embeds/embed-consent.tsx",
@@ -28845,7 +28849,7 @@
     "upstream_path": "apps/desktop/src/components/assistant-ui/thread/assistant-message.tsx",
     "upstream_blob": "dfbf763bc8b7fdaeba083966b9a96907006487cf",
     "upstream_sha256": "bab02bbae86bbf76dd6543c4c829dd62bc03b843f4ebdd9d9e7d2a69313c734a",
-    "local_sha256": "f74f9c67091d6796858460ee61fb0d78939d11911fc7fc022bc6381ec2e707d9"
+    "local_sha256": "08e2a58f8763bbd4ec47c8e850e5522dfdf4a35918c5b02c8dfa83afc1303657"
    },
    {
     "path": "apps/desktop/src/components/assistant-ui/thread/duplicate-activity-indicator.test.tsx",
@@ -29119,6 +29123,13 @@
     "upstream_blob": "0e1642a587c05c2cc2df8972fba15cbe84edd32a",
     "upstream_sha256": "e5470d94a07b30a71a8ac414f4d1aa1d55f587ac36006a3745fe2734aca200de",
     "local_sha256": "0fba9de7762c9d5a11e0bf878e2b976ff66e6d9f877a870529baba7931ebda60"
+   },
+   {
+    "path": "apps/desktop/src/components/boot-failure-reauth.test.ts",
+    "upstream_path": "apps/desktop/src/components/boot-failure-reauth.test.ts",
+    "upstream_blob": "6fe527c7341608952dd129f4bf4a50b73b342229",
+    "upstream_sha256": "500dd20d7f1722bf15e21f92784912c1f4486a4958ce24524b4a55db0a713428",
+    "local_sha256": "260696ca2b73a8729a43f7192c540129481a3392020af4b976ee1c8e66e520f5"
    },
    {
     "path": "apps/desktop/src/components/chat/code-card.tsx",
@@ -29874,7 +29885,7 @@
     "upstream_path": "apps/desktop/src/i18n/ar.ts",
     "upstream_blob": "e103815f96c2a694a18f1d2000992002f605b105",
     "upstream_sha256": "d851b848e00867ba6a0bf5d45eea04915b246ef1113669dd7dee54f31ad6890c",
-    "local_sha256": "03e2bdca08a0e42e0cb6c7df78f92ce5ad625b450ff9002a9f7e366f7c553c5b"
+    "local_sha256": "8138d8355283b0a2851572ab4d9b865147d6194be264c776fc08ac21bed8da58"
    },
    {
     "path": "apps/desktop/src/i18n/bots-advanced.test.tsx",
@@ -29930,7 +29941,7 @@
     "upstream_path": "apps/desktop/src/i18n/de.ts",
     "upstream_blob": "4d31fcc61d3de06bb1cc3bd5404f7cf57ffa8105",
     "upstream_sha256": "3f30dbfbf7386b44177510c578c72a7b82ac6ea3ed21d1249f09d4e987e28344",
-    "local_sha256": "7a726cd286a4e6c8bd201c3c2d64e5495e8825abc0a2ebe790af2d0bca68a33b"
+    "local_sha256": "b9f36f089b628cffeb373149796b004f3dd58714d29c63d91e80764a39050bc0"
    },
    {
     "path": "apps/desktop/src/i18n/define-locale.ts",
@@ -29951,14 +29962,14 @@
     "upstream_path": "apps/desktop/src/i18n/es.ts",
     "upstream_blob": "a490cc9ae80cf454cd1a4b33d1a75834a75c36e9",
     "upstream_sha256": "4c474c120b9199959b7ed9d9948bf1964b277578b201f4d3641c0c19cf5d0502",
-    "local_sha256": "37b6da59fea1bff441585c8d2f21b275092f3889f2fc4946d32b4cb55ea4a8eb"
+    "local_sha256": "da7c14480b161b7254b640acf95bc1372ac6fa6bcd3ec875abb4dd4040e53fca"
    },
    {
     "path": "apps/desktop/src/i18n/fr.ts",
     "upstream_path": "apps/desktop/src/i18n/fr.ts",
     "upstream_blob": "03f5378e30d54079e83fbaf0e0bb4f8f51e9e9ee",
     "upstream_sha256": "214be6e91d704dd84af80b73a5492218f7c7b61914878d56427e8c71122ba0d8",
-    "local_sha256": "82ffbeea2fea1c42d9295b446d8d23f44186464075e96adb6d70c9d1bb7b01a9"
+    "local_sha256": "7a1ab4bd8ef4348455c5a4f9bd43a43119f15ea0bf474ab9ce1f180d2db3d208"
    },
    {
     "path": "apps/desktop/src/i18n/index.ts",
@@ -29979,7 +29990,7 @@
     "upstream_path": "apps/desktop/src/i18n/ja.ts",
     "upstream_blob": "99c945be0ae89106d755809a94cfaf47d9520f4f",
     "upstream_sha256": "32fb188f80132938710ffd0297d79a596d9e6d77c48ed63faca344ca632a93ca",
-    "local_sha256": "2a9ac8b0194f42a8886d2652a72dcc2115829c668761209c8ea219fe5a191b13"
+    "local_sha256": "907e63a2ec6bbbc4c4f917ee79b67fb65b6b879626f329d3c9e5e781fdca773c"
    },
    {
     "path": "apps/desktop/src/i18n/languages.ts",
@@ -30007,7 +30018,7 @@
     "upstream_path": "apps/desktop/src/i18n/ru.ts",
     "upstream_blob": "d87068ad99c2c884eca89a039493af681acb54eb",
     "upstream_sha256": "872bb7b4f0a688ac126c8d74080e0226b7c0064e327192dee673ce689b65ad12",
-    "local_sha256": "7fa763d52a9c16a85c72c3085faf6902eeffd4deaeb77f5a8e982d0370498749"
+    "local_sha256": "983b03888f38d8fe41ac24c6a6efd2170134f283dc0360c2cc79a080db003239"
    },
    {
     "path": "apps/desktop/src/i18n/runtime.ts",
@@ -30028,14 +30039,14 @@
     "upstream_path": "apps/desktop/src/i18n/zh-hant.ts",
     "upstream_blob": "475f3bb339cbe349ee8d0ec4cc27b6978918d44a",
     "upstream_sha256": "ec89243676c33e405edbd7f724378fd6c94b887c48b0e2330235af628d1ca6f0",
-    "local_sha256": "6205f503bce7f7905fbe726deda8eea414e31c7d4fa490904fc95468155ccb9b"
+    "local_sha256": "5ca31fbb109526bd5b2a9e80febd74530e88dcd866c3db146824785558acfd4b"
    },
    {
     "path": "apps/desktop/src/i18n/zh.ts",
     "upstream_path": "apps/desktop/src/i18n/zh.ts",
     "upstream_blob": "bb4d81e38b773c34d2bb5bb009f1bf6ce4c07449",
     "upstream_sha256": "f098a89517616dc1a80c14cf9a4d7db236853332b8f8e41413fcfae18d4ab493",
-    "local_sha256": "710568bc3be1477dcc2cb24298d2164c139dff964d264ae8096b587c02063e66"
+    "local_sha256": "d1bfa68a414a1c9f1e6328e5605fa9630d2b37fb59e620ce4529653e08de669a"
    },
    {
     "path": "apps/desktop/src/lib/chat-messages.test.ts",
@@ -30049,7 +30060,7 @@
     "upstream_path": "apps/desktop/src/lib/chat-messages/hydration.ts",
     "upstream_blob": "31e886a2ca7c4c8c29995d8a97d67ed0118ba82e",
     "upstream_sha256": "3cc5f659b0247ce8ac9830aaa4ee087e83b69abf15b434be1b73cb20f846ff36",
-    "local_sha256": "6be09c50355acea237f4f76bd5836a768b755a890021b07d9142921a73cad936"
+    "local_sha256": "7f9bdba12876650cc51df4163f2d48dc28f106e956c59714c36b1e2246c72a03"
    },
    {
     "path": "apps/desktop/src/lib/chat-messages/index.ts",
@@ -31764,7 +31775,7 @@
     "upstream_path": "apps/desktop/src/plugins/hermes-bots/screen-connection.ts",
     "upstream_blob": "48c773d1dbb6e0fc21a0951d4e1b17f407e756f2",
     "upstream_sha256": "2ffbbde86d5731584696ff7f8d42048be0a7f64f4774c098a8e55f9300428576",
-    "local_sha256": "bca0d020ea3492aa5aa8374fbb0d5f6bff98a439a0e8966416daabb0a4c0be22"
+    "local_sha256": "be42ddfa6e78197e666c95e9abd80d84deb71608f6df666af843d9ee7c51732e"
    },
    {
     "path": "apps/desktop/src/plugins/hermes-bots/screen-hero.tsx",
@@ -31820,7 +31831,7 @@
     "upstream_path": "apps/desktop/src/plugins/hermes-bots/screen-pane.tsx",
     "upstream_blob": "0dc6d21f548eb1f7c21799830a808a3b93109aed",
     "upstream_sha256": "011f00f11be13d04aae0a1990fd71de997e8b615f67a8a5a1efbb491be4d7dfd",
-    "local_sha256": "56783de4462d3713902e3ffe0495f63a10af0aca880bd2c42cd77673408afc3b"
+    "local_sha256": "f71fd238d290282aefcc036798b915478c55a874911e2f0960fbf51dbcdd3aea"
    },
    {
     "path": "apps/desktop/src/plugins/hermes-bots/screen-portal-status-request.test.tsx",
@@ -32576,7 +32587,7 @@
     "upstream_path": "apps/desktop/src/store/onboarding.ts",
     "upstream_blob": "85f82edbede644f31b57a8bd83279f57642dfbdc",
     "upstream_sha256": "44e4a43786781c5cbde99981b2c6188466fc7a5e54e8a431a6827c0845681bf5",
-    "local_sha256": "960bbd23e7d6de5d8af210370b2633b04740950cb4030cea575afb0ae630652d"
+    "local_sha256": "6f8a3f843800b6fda3913c3b468764dff6e7670c1aeb36bbda935e9b72bd9543"
    },
    {
     "path": "apps/desktop/src/store/pet-overlay.ts",
@@ -33115,7 +33126,7 @@
     "upstream_path": "apps/desktop/src/themes/backend-sync.ts",
     "upstream_blob": "cc00d6cdcd48d81e51798709938d49e39dc7ea6b",
     "upstream_sha256": "555f2fac19e0b2db3785dee59bede2908e854e00b3e603ff25e017fd87ba8800",
-    "local_sha256": "a368f42126c07172966ec4c2245932558ce2522fa22f5a2845e9589fff152579"
+    "local_sha256": "9bbac144e8fa19f39f76b379dbc4a445639e615329f41805483348b1f8edf4c4"
    },
    {
     "path": "apps/desktop/src/themes/color.ts",
@@ -33325,7 +33336,7 @@
     "upstream_path": "apps/shared/src/json-rpc-channel.ts",
     "upstream_blob": "38910c9576e416d27bdb4c2e761394a1c6aedbdf",
     "upstream_sha256": "39ca0506154add3036c833ec092b6d36c9da8860025e80fe9813c060364dc18a",
-    "local_sha256": "496c7d24c40ea43a91e4944d166c532bf33e25971be93ddf58b252d817659268"
+    "local_sha256": "f91f8eed034d2bf2a5b7221df32652bd1c35666e06fa16227e48452c3ab46e55"
    },
    {
     "path": "apps/shared/src/json-rpc-gateway-replay.test.ts",
@@ -33339,7 +33350,7 @@
     "upstream_path": "apps/shared/src/json-rpc-gateway.ts",
     "upstream_blob": "c355f12c52b4eb825068b021104b2ba53c707000",
     "upstream_sha256": "e9d41048d763c027a4493e45b8a9ba094602f293cbf4a160bc3807a5eb4f14cb",
-    "local_sha256": "c70142d979b55d54072265e2d08004aa7e8cd601978118de9396ee80d9c4e9cc"
+    "local_sha256": "e8685bee63b2803fd2a1730d327a331b138915956c61e606fe3830db705f1508"
    },
    {
     "path": "apps/shared/src/model-search-text.ts",
@@ -33353,14 +33364,21 @@
     "upstream_path": "apps/shared/src/reasoning-effort.ts",
     "upstream_blob": "e92adf3a1916f0fb29eba8ae0b687bbd5a028573",
     "upstream_sha256": "9ac6319a8947d25e7241c3eab625aa85f1ebd9df16ddf4950a8c98ce3ff070ae",
-    "local_sha256": "e972ebfecf87a1d8544931f5fcc29fce0f49dada2eb4602b59f97c1c79b02903"
+    "local_sha256": "009614ef8138f526ea672bd03c8c6fb5a2d88d45f8b339159f4ee05f390166c6"
+   },
+   {
+    "path": "apps/shared/src/reconnect-backoff.ts",
+    "upstream_path": "apps/shared/src/reconnect-backoff.ts",
+    "upstream_blob": "86b83a91abdcdc41d0738c097e5dbcc6301b6c4c",
+    "upstream_sha256": "066a9efab5237e47b0b892ef72ec129485622a45ff8e1b964e278999c8466328",
+    "local_sha256": "69330ce4ac1a7accbb8b7a4fcb2c37fdcee469716721c109665e7e9e2fcfef03"
    },
    {
     "path": "apps/shared/src/skin.ts",
     "upstream_path": "apps/shared/src/skin.ts",
     "upstream_blob": "d5c600da43f5e9284563dca70f55089c77560921",
     "upstream_sha256": "6b5d780ae165113d7a9daf7062e21043b7c08a0e8ba428ea893ba24ed408d64e",
-    "local_sha256": "f73e061db9afe90c911e7c55b6d2f9bae0e890df71f56c3e11af39542d70a354"
+    "local_sha256": "c1c38dd94cecf0bf9c155843d527c6a7f725eebce4cb785b1fe7575cf5158afc"
    },
    {
     "path": "apps/shared/src/slash.ts",
@@ -33368,6 +33386,20 @@
     "upstream_blob": "5f365d3e40743e6e2b3475a91943a52573b4723c",
     "upstream_sha256": "44118cc7d445af3331999ed354fb85fa160705baab8804787e974bb7be84e869",
     "local_sha256": "8facd385d7cf12d27d2d21b4e8a3b0260488ecb303f764387a818279d925f501"
+   },
+   {
+    "path": "apps/shared/src/theme-presets.ts",
+    "upstream_path": "apps/shared/src/theme-presets.ts",
+    "upstream_blob": "bc0a76b73af45313c21a30e4a81e082f2b3121d9",
+    "upstream_sha256": "ada88929c0500ce1f0a5b9d097c85c0ea6959c65107146bee8017445bd0e937b",
+    "local_sha256": "871058ab0e6c433ebe4feb8b0e621f78513d41ebf9bc9bc3b45f221408b93b14"
+   },
+   {
+    "path": "apps/shared/src/websocket-url.ts",
+    "upstream_path": "apps/shared/src/websocket-url.ts",
+    "upstream_blob": "24592c4642b0f3be18f3fd7911492292a27dfd11",
+    "upstream_sha256": "a4282b7d610d3c022a8dbcb77597b85497885eec606f6f09a354d373fea3d10c",
+    "local_sha256": "bd795c17d2dc329b340ce77cae935c72494af4c0998ac98195be487493f7e81f"
    },
    {
     "path": "batch_runner.py",
@@ -33381,7 +33413,7 @@
     "upstream_path": "cli-config.yaml.example",
     "upstream_blob": "77baaf2cfaed949f3f8f035c34d5c45731991121",
     "upstream_sha256": "77bc4ae491f726e4af08470ecad4555bc2a0816c5ac3afd42adabf14577a54ff",
-    "local_sha256": "c3a2956cd76abc22be09071e954f683b7db90c5332a2935a3b06aa1beeb37b11"
+    "local_sha256": "237d223da1a683a782b96edff74c4e29d49d2b9b582599799c1834cf3715e09c"
    },
    {
     "path": "cli.py",
@@ -35656,7 +35688,7 @@
     "upstream_path": "locales/ar.yaml",
     "upstream_blob": "0c9d28fdb851bea5261c231511fff1fa788c0238",
     "upstream_sha256": "6d98b2fe84e47dc8d1612e5e2b87b134027279917187e116879b9f0155943fe5",
-    "local_sha256": "42ad5b6e99cb83a8403496669b2cc27a1748a7b4f2693c345cb1fd3bc61c6907"
+    "local_sha256": "dc7e3d07d5bbc2c9f08b391d1a7a59211e3c74e90e654135ba44eb39b21a3ea7"
    },
    {
     "path": "locales/de.yaml",
@@ -35895,6 +35927,13 @@
     "upstream_blob": "442145559db8632f90b6d207d936972ea0954704",
     "upstream_sha256": "1be994752cc8ec959080b64320fbe73008151caa75d21f99ba6fd5637235a17a",
     "local_sha256": "21fe511ecd31b064350b6e7ed6fcc19e93ff0c592d3ceedb309bbf7bcd36a159"
+   },
+   {
+    "path": "optional-mcps/airtable/manifest.yaml",
+    "upstream_path": "optional-mcps/airtable/manifest.yaml",
+    "upstream_blob": "cfba44f2d0641e3ea6796d6373047ee39d588b88",
+    "upstream_sha256": "96c7d530059a1b04c9a6cb826da1ee70d4d318bae41993db78727fda5d2552f7",
+    "local_sha256": "0101325b4c57518f30f93aca821483e29ffa7bbdec57809a61ee585bc3d24922"
    },
    {
     "path": "optional-skills/DESCRIPTION.md",
@@ -42075,7 +42114,7 @@
     "upstream_path": "hermes_cli/dashboard_procs.py",
     "upstream_blob": "0b5804dfcfd5fb2b5e494ed1e0e55a5fba72d31a",
     "upstream_sha256": "cbda07a3e7ace62d39b9b802fc8cb58eb708554901f22e24f4074ca9248a5313",
-    "local_sha256": "bf7b4a3c3e12df79dfb2fc8573da50194885a6a81845b942ab3becf43926c898"
+    "local_sha256": "f2755d0d2a7e1072c9ba6348bcc7a744ed8c98f3a15ca51209f227398e41f0a1"
    },
    {
     "path": "qubit_cli/dashboard_register.py",
@@ -42173,7 +42212,7 @@
     "upstream_path": "hermes_cli/doctor_platform.py",
     "upstream_blob": "48bff79e71b745b200c7a88d2c279e2f0c5cbcad",
     "upstream_sha256": "486a928ea93da3c62c69b1206a2abfff31025f9c7e7c76a28416e63afe09881b",
-    "local_sha256": "33c16763558019dd0a647d9d84c14267c72f63a42454fdf5ef8bc25a15683320"
+    "local_sha256": "cea91f4cca645da2aef0c943478da7aa4e321d9916c08a3a09598161800aa9c0"
    },
    {
     "path": "qubit_cli/doctor_report.py",
@@ -42761,7 +42800,7 @@
     "upstream_path": "hermes_cli/main_dashboard.py",
     "upstream_blob": "542b23a721be3c5a724e66c57a27dd1c7eb0af1e",
     "upstream_sha256": "b0b677c7c6835244e8e7174181141a80b325c77019f131feab5681ba6508aa05",
-    "local_sha256": "26c8f52aa8b867b07904ffd42ce4df147dc016684a0a1783fb521b8343a1f905"
+    "local_sha256": "f4d1c683b011ad652e899d0437af81f8d19dd322225e0fd2d02d1c50b1381bd5"
    },
    {
     "path": "qubit_cli/main_dep_hints.py",
@@ -42782,7 +42821,7 @@
     "upstream_path": "hermes_cli/main_install_repair.py",
     "upstream_blob": "1755eb10744d7e16e81c56b1623467dcc720c028",
     "upstream_sha256": "24ca948cb89739982d0cdc0d666112e499d094d4f7982ccaee770a04312f34fa",
-    "local_sha256": "408b318190a1b81ec58bd18939eb30a963c61bc10c9fbe2349d35b6008d3758d"
+    "local_sha256": "565c3d6230e3215fffacdbf99350c8b929436f17c7ea9a3b0a6be838e62b447b"
    },
    {
     "path": "qubit_cli/main_platform_setup.py",
@@ -43524,7 +43563,7 @@
     "upstream_path": "hermes_cli/profiles.py",
     "upstream_blob": "8cb9fc2a17441178d8753a8fdea1feac1caf571b",
     "upstream_sha256": "a57a13a9ccd848f6132c6cd7e7e195b1c61b19a12df6e066b754f05eff785959",
-    "local_sha256": "f01243806a9e0299792aa25ab684959b16880d4fc6c7157942aa30dadc11a9c3"
+    "local_sha256": "d39e46781dde1de9d3fa58b2190178606605ef77791bae8bd5c85bb36faef3e2"
    },
    {
     "path": "qubit_cli/projects_cmd.py",
@@ -44595,7 +44634,7 @@
     "upstream_path": "hermes_cli/tools_config.py",
     "upstream_blob": "95ded5341f4037fd01f4ef637ad4dd0cfa119906",
     "upstream_sha256": "463dde823201d3c88ed1a426ad460155a6b7789ef0e29e1ec68b8b4bab4508ab",
-    "local_sha256": "2fe9eae5d1ce2bdcfa69eb681a4feb94db157adebc134a43e2d15667f72054f9"
+    "local_sha256": "e18a8859e19425b0c5df9c6545412bd4384d1d1bc25e95442a652843dd2f727f"
    },
    {
     "path": "qubit_cli/tools_config_cua.py",
@@ -44714,7 +44753,7 @@
     "upstream_path": "hermes_cli/update_cmd_git.py",
     "upstream_blob": "10be93f7a8de4413c13688da5823eebd92306e11",
     "upstream_sha256": "68506bb004753713a909a460c1ced14df2aae60e0d5de3c7a29b0e0b2e6e4a05",
-    "local_sha256": "0bdc6cecfb09c97bccb98a8a90c599888de4c4d32781200da7203b58b068ff44"
+    "local_sha256": "f083add1bcca71c37b94488b0bc283333e6c8418875aa91a5e884cf2ee2c538a"
    },
    {
     "path": "qubit_cli/update_cmd_maint.py",
@@ -44784,7 +44823,7 @@
     "upstream_path": "hermes_cli/update_fleet_scope.py",
     "upstream_blob": "6c74c5d3e25101b43b354d63adc8276e1ba7af94",
     "upstream_sha256": "457e93ede3ec3f64d688d7a37fa360693e7d225446448bcd271819a3f771b771",
-    "local_sha256": "322c5713504581a0b1a38dbc8e371434584aec9a1057261af50e0b5766efa9ac"
+    "local_sha256": "10f6dc70c4fbe7860d5f8d6e3fd9854ff7d99a10e2dc7cddfc86bd810b3b55ed"
    },
    {
     "path": "qubit_cli/update_handoff.py",
@@ -44840,7 +44879,7 @@
     "upstream_path": "hermes_cli/update_serve_resume.py",
     "upstream_blob": "5dd5ba3892afd90c7fa10b9d0f7ef4ecc778326a",
     "upstream_sha256": "1b92d5de8cdfb794ebc1524316665686c97e471e3c5d48ab6026dc2295f5e9df",
-    "local_sha256": "07634b1027b5a08b2e5615dd876e3f0064bccfdf65cc3ab59aaf1119ef6a1cfe"
+    "local_sha256": "c4c4ead6b2d377abc354d0d65943590bfda446d7b523f2e484016416de1b24e4"
    },
    {
     "path": "qubit_cli/update_stage.py",
@@ -45974,7 +46013,7 @@
     "upstream_path": "scripts/discord-voice-doctor.py",
     "upstream_blob": "dcfad1f0a6f9f946cd95341ced5b3fd7e34fa714",
     "upstream_sha256": "65c55173ee03b6571799c5d32f036a50e9ff8b7980144f4a2f27833e1be576c2",
-    "local_sha256": "5fd1ec32dd4d8e7ff8fcd221579f4a53157df4538945985ee03659a55de0cfce"
+    "local_sha256": "ad4de1fb65dafb77140fe461b9258e8b1f7840e9e7f98b4966e8e8ea0c275d64"
    },
    {
     "path": "scripts/docker_config_migrate.py",
@@ -46093,7 +46132,7 @@
     "upstream_path": "scripts/micro_compaction_report.py",
     "upstream_blob": "61c95f72944b38c8837ad5e86c8b20b25b7c1193",
     "upstream_sha256": "270b69ce72c4f2b9fd670c00eacc77a63b5adde392323c78f2bd7b7ed676ebed",
-    "local_sha256": "b5052ed81d863ba89a0c31fbdaa6e0954d55d988c9383fb442c4735b2a2cccfe"
+    "local_sha256": "395bdf59dce22eae2f885a4ced7d501978f4d1b21359a5b1009e4bb08a4bba95"
    },
    {
     "path": "scripts/msix-shared.mjs",
@@ -65840,7 +65879,7 @@
     "upstream_path": "tests/hermes_cli/test_stale_pid_guard.py",
     "upstream_blob": "091c8c040aefc475b0a9cea25520c904f1c11173",
     "upstream_sha256": "6933a7c3397eb80b0d37a14cf3b758f2ae60cc1ef3952177cc36fb1c7cca183a",
-    "local_sha256": "f9041374901ecb7ef899fc35b8e4588e734294b516f40c9c59e0cc06bd8d91a0"
+    "local_sha256": "898ad848e6a51870a55e8e39ed8c8e8ab82c9442f52ec9c3954348ecdb2f5814"
    },
    {
     "path": "tests/qubit_cli/test_stale_root_module_bridge.py",
@@ -74387,7 +74426,7 @@
     "upstream_path": "tools/environments/local.py",
     "upstream_blob": "df94391845e919f4f68145426dcb7a473e4b2e00",
     "upstream_sha256": "8f16126c36cf0209646007142de11e9e93c5e76d63f371bfa1d0e3892a3e0396",
-    "local_sha256": "f50cbaf75511849bab060d435b46183b319271c89129219bafdacd506f1d7940"
+    "local_sha256": "a7e20bb7cc4770811555a400a46e1d54619daf6d9575e66232f369dc55df3603"
    },
    {
     "path": "tools/environments/local_env_policy.py",
@@ -74716,7 +74755,7 @@
     "upstream_path": "tools/mcp_tool_errors.py",
     "upstream_blob": "1d73820eedfed680f2cb927a6e5b7ed9f99bc792",
     "upstream_sha256": "b42a61212bd2d38818cef4a0e32311596facdeeb4ff1e6ec9be29028fca28872",
-    "local_sha256": "5ae63a79687a825eac545cacf6777525c8d15fe6f8380f92e2f06d9cfd45742c"
+    "local_sha256": "548da01f869f94649dc563d12eda9cb70b8728d7196702a65482998653fcb140"
    },
    {
     "path": "tools/mcp_tool_handlers.py",
@@ -74779,7 +74818,7 @@
     "upstream_path": "tools/mcp_tool_server_run.py",
     "upstream_blob": "db6d7f83fcfa4ebfc7d96f3795e731f99a8c4bec",
     "upstream_sha256": "030e1deb23bcb8ec30594c89816517662ec4696f53e7081ac9755591db813f84",
-    "local_sha256": "ba6c565e66e71533cea4363b79040f350d10013f428e78456746647ccdacf162"
+    "local_sha256": "0360b1d0f18220e71a097630a542378eb099aa7b0b74d028ba6cb41a2f98d91c"
    },
    {
     "path": "tools/mcp_tool_transport.py",
@@ -74968,7 +75007,7 @@
     "upstream_path": "tools/self_repo_guard.py",
     "upstream_blob": "f0fb5aa1691a20f8207af2cdec75a057675fd24a",
     "upstream_sha256": "9c8fcb3bb90e60c63f4832563a53d4cfb6c7b32688ca99de853a8e6b28ae02f7",
-    "local_sha256": "5714309dee158fbc0c54caff0c260a249176c841c2697f40e58b711a99fe0292"
+    "local_sha256": "e1993cb2369a4f2a5c72e60dcaf57c982140561ea486af1af73991f8fa385fbe"
    },
    {
     "path": "tools/send_message_senders.py",
