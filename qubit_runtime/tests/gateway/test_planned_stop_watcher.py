@@ -233,3 +233,47 @@ def test_cli_sigterm_after_watcher_consumed_the_marker_stays_planned(tmp_path, m
     bare, bare_flag = _handler()
     bare(signal.SIGTERM)
     assert bare_flag[0] is True
+
+
+def test_watcher_invocation_is_a_planned_stop_even_if_the_marker_raced_away(monkeypatch):
+    """The watcher only calls the handler after proving a self-targeting marker. If that marker
+    expires/ is consumed between the probe and the handler, the shutdown is still planned — it must
+    not exit 1 and persist gateway_state=running for an operator stop."""
+    import signal
+    from types import SimpleNamespace
+
+    import gateway.run as run_mod
+    import gateway.shutdown_forensics as forensics
+
+    monkeypatch.setattr(status_mod, "consume_takeover_marker_for_self", lambda: False)
+    monkeypatch.setattr(status_mod, "consume_planned_stop_marker_for_self", lambda: False)
+    monkeypatch.setattr(forensics, "snapshot_shutdown_context", lambda *a, **k: None)
+    monkeypatch.setattr(run_mod.asyncio, "create_task", lambda coro: coro.close())
+
+    runner = SimpleNamespace(_signal_initiated_shutdown=False, stop=lambda: asyncio.sleep(0))
+    flag = [False]
+    handler = run_mod._start_gateway_make_shutdown_signal_handler(runner, flag)
+    handler(None)
+
+    assert flag[0] is False
+    assert runner._signal_initiated_shutdown is False
+
+
+def test_bare_sigterm_still_reads_as_an_unexpected_kill(monkeypatch):
+    import signal
+    from types import SimpleNamespace
+
+    import gateway.run as run_mod
+    import gateway.shutdown_forensics as forensics
+
+    monkeypatch.setattr(status_mod, "consume_takeover_marker_for_self", lambda: False)
+    monkeypatch.setattr(status_mod, "consume_planned_stop_marker_for_self", lambda: False)
+    monkeypatch.setattr(forensics, "snapshot_shutdown_context", lambda *a, **k: None)
+    monkeypatch.setattr(run_mod.asyncio, "create_task", lambda coro: coro.close())
+
+    runner = SimpleNamespace(_signal_initiated_shutdown=False, stop=lambda: asyncio.sleep(0))
+    flag = [False]
+    run_mod._start_gateway_make_shutdown_signal_handler(runner, flag)(signal.SIGTERM)
+
+    assert flag[0] is True
+    assert runner._signal_initiated_shutdown is True

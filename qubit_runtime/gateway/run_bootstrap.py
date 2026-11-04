@@ -187,8 +187,19 @@ def _start_gateway_make_shutdown_signal_handler(runner, _signal_initiated_shutdo
             return snapshot_shutdown_context(received_signal)
 
         planned_takeover = bool(_best_effort(_takeover, "Takeover marker check failed: %s"))
-        planned_stop = received_signal == signal.SIGINT or (
-            not planned_takeover and bool(_best_effort(_planned_stop, "Planned stop marker check failed: %s")))
+        # ``received_signal is None`` is the planned-stop watcher's invocation: it only fires for a
+        # self-targeting marker, so it is a planned stop even if the marker expired or a concurrent
+        # real signal consumed it between the watcher's probe and this handler. Classifying that
+        # race as an external kill would exit 1 and persist gateway_state=running for an operator
+        # stop (a Restart=on-failure supervisor would revive a gateway the operator intentionally
+        # stopped).
+        marker_planned_stop = bool(_best_effort(
+            _planned_stop, "Planned stop marker check failed: %s"))
+        planned_stop = (
+            received_signal is None
+            or received_signal == signal.SIGINT
+            or (not planned_takeover and marker_planned_stop)
+        )
         # `qubit gateway stop` writes the marker, THEN signals: the planned-stop watcher can consume
         # the marker in between, and the CLI's own SIGTERM must not then read as an external kill.
         if planned_stop:

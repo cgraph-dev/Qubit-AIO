@@ -145,7 +145,8 @@ class _StuckCallGate:
     A new MemoryManager is built per agent, so a per-instance view would let every fresh manager start
     one more call against a hung backend and pin one more thread. Shared, the gate closes once
     _MAX_STUCK_CALLS calls that started after the key's last successful return are past their deadline,
-    admits one half-open probe per _PROBE_INTERVAL_S while closed, and never lets more than
+    admits one half-open probe per _PROBE_INTERVAL_S while closed (even when the in-flight table is
+    saturated, bounded at _MAX_INFLIGHT_CALLS + 1 total), and otherwise never lets more than
     _MAX_INFLIGHT_CALLS be in flight. Calls not yet overdue are not counted, so healthy concurrent
     sessions run side by side. Each call removes only its own entry.
     """
@@ -164,14 +165,18 @@ class _StuckCallGate:
             calls = self.calls.setdefault(key, {})
             last_ok = self.last_ok.get(key, float("-inf"))
             stuck = sum(start > last_ok and now > deadline for start, deadline in calls.values())
-            if len(calls) >= _MAX_INFLIGHT_CALLS:
-                admit = False
-            elif stuck < _MAX_STUCK_CALLS:
+            if stuck < _MAX_STUCK_CALLS and len(calls) < _MAX_INFLIGHT_CALLS:
                 admit = True
                 self.probe_at.pop(key, None)
                 self.skips.pop(key, None)  # gate open: the next outage warns on its first skip
             else:
-                admit = now - self.probe_at.setdefault(key, now) >= _PROBE_INTERVAL_S
+                # Closed gate, or an open gate whose slots are all pinned by orphans (the shape a
+                # wedged backend leaves): admit one half-open probe per interval, bounded at
+                # MAX_INFLIGHT+1 total, or recovery can never be observed.
+                admit = (
+                    len(calls) <= _MAX_INFLIGHT_CALLS
+                    and now - self.probe_at.setdefault(key, now) >= _PROBE_INTERVAL_S
+                )
                 if admit:
                     self.probe_at[key] = now
             if not admit:

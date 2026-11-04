@@ -56,8 +56,18 @@ def parse_retry_after_seconds(value_or_headers: Any) -> Optional[float]:
     try:
         when = parsedate_to_datetime(text)
     except (TypeError, ValueError):
-        return None
-    if when is None:  # older stdlib returns None instead of raising
+        when = None
+    if when is not None:
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=UTC)
+        return max(0.0, (when - datetime.now(UTC)).total_seconds())
+    # ISO-8601 form: providers put epoch-like timestamps in body hints (``retry_after``,
+    # ``resets_at``, ``reset_at``) as often as they put a delta in the header. ``Z`` is
+    # accepted by recent fromisoformat, but normalize it explicitly for older bindings.
+    iso = text[:-1] + "+00:00" if text[-1:] in {"Z", "z"} else text
+    try:
+        when = datetime.fromisoformat(iso)
+    except (TypeError, ValueError):
         return None
     if when.tzinfo is None:
         when = when.replace(tzinfo=UTC)
@@ -182,14 +192,67 @@ LIVE_RETRY_WAIT_CAP_S = 60.0
 RETRY_AFTER_CAP_S = 600.0
 
 
+# Provider-declared reset hints are preferred over a bare retry_after/Retry-After: a short
+# ``Retry-After`` often describes a throttle inside a longer plan window, and the reset field is
+# the one the provider actually reopens at. ``_at`` fields are absolute timestamps (epoch s/ms or
+# ISO-8601); the ``*_seconds`` fields are relative durations.
+_PROVIDER_RESET_FIELDS = ("reset_seconds", "resets_in_seconds", "resets_at", "reset_at")
+
+
+def _cooldown_reset_seconds(name: str, value: Any) -> Optional[float]:
+    """Seconds from now named by one provider reset field, or None when unusable."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str) and name.endswith("_at"):
+        # A numeric string on an absolute field is still an epoch, not a duration.
+        try:
+            numeric = float(value.strip())
+        except ValueError:
+            pass
+        else:
+            if numeric > 1_000_000_000_000:  # epoch milliseconds
+                numeric /= 1000.0
+            return max(0.0, numeric - time.time())
+    if isinstance(value, (int, float)):
+        numeric = float(value)
+        if name.endswith("_at"):
+            if numeric > 1_000_000_000_000:  # epoch milliseconds
+                numeric /= 1000.0
+            return max(0.0, numeric - time.time())
+        return max(0.0, numeric)
+    return parse_retry_after_seconds(value)
+
+
+def _body_provider_reset_seconds(body: Any) -> Optional[float]:
+    """Seconds until the provider's declared reset, from the top-level or ``error`` body object."""
+    if not isinstance(body, dict):
+        return None
+    for payload in (body.get("error"), body):
+        if not isinstance(payload, dict):
+            continue
+        for name in _PROVIDER_RESET_FIELDS:
+            value = payload.get(name)
+            if value in (None, ""):
+                continue
+            seconds = _cooldown_reset_seconds(name, value)
+            if seconds is not None and seconds > 0:
+                return seconds
+    return None
+
+
 def provider_retry_after_seconds(error: Any) -> Optional[float]:
-    """Provider-declared cooldown: the ``Retry-After`` header, else a ``retry_after`` body field
-    (top level or nested under ``error``). None when absent, unparseable or zero: a zero or expired
-    cooldown carries no usable wait, and treating it as one would hot-loop the provider."""
+    """Provider-declared cooldown, preferring the provider reset (``reset_seconds`` /
+    ``resets_in_seconds`` / ``resets_at`` / ``reset_at``) over a bare ``retry_after``. Falls back to
+    the ``Retry-After`` header, then a ``retry_after`` body field (top level or nested under
+    ``error``); the value may be numeric seconds, an HTTP-date or ISO-8601. None when absent,
+    unparseable or zero: a zero or expired cooldown carries no usable wait, and treating it as one
+    would hot-loop the provider."""
+    body = getattr(error, "body", None)
+    reset = _body_provider_reset_seconds(body)
+    if reset is not None:
+        return reset
     value = parse_retry_after_seconds(getattr(getattr(error, "response", None), "headers", None))
-    if value is None:
-        body = getattr(error, "body", None)
-        if isinstance(body, dict):
-            nested = body.get("error")
-            value = parse_retry_after_seconds((nested if isinstance(nested, dict) else body).get("retry_after"))
+    if value is None and isinstance(body, dict):
+        nested = body.get("error")
+        value = parse_retry_after_seconds((nested if isinstance(nested, dict) else body).get("retry_after"))
     return value if value is not None and value > 0 else None

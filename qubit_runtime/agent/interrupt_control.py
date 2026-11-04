@@ -110,14 +110,18 @@ def _steer_fates(agent) -> dict:
 
 def requeue_drained_steer(agent, steer_text: str) -> None:
     """Put drained steer text back (nothing took it). When it is the last drain's text, its parts go back
-    with their tickets, so a transfer in it reads unconsumed again."""
+    with their tickets, so a transfer in it reads unconsumed again.
+
+    The drained text is older than anything that arrived while the caller held it, so it is
+    PREPENDED: appending would reorder a turn's steers (the newer instruction would be delivered
+    before the one the user sent first)."""
     with _ic_lock(agent, "_pending_steer_lock"):
         drained, parts = vars(agent).pop("_steer_last_drain", (None, None))
         if drained != steer_text or not parts:
             parts = [(None, steer_text)]
         for ticket, _ in parts:
             _steer_fates(agent).pop(ticket, None)
-        _set_steer_parts(agent, _steer_parts(agent) + parts)
+        _set_steer_parts(agent, parts + _steer_parts(agent))
 
 
 def _ic_codex_method(agent, name: str):

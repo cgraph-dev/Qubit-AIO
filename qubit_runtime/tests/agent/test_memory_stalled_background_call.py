@@ -238,19 +238,25 @@ def test_failed_probe_does_not_restart_the_outage_warning(monkeypatch):
         mgr.shutdown_all()
 
 
-def test_sustained_wedge_with_probes_never_exceeds_the_inflight_cap(monkeypatch):
-    """Every failed probe pins one more thread; at the cap, probing stops, so a backend that stays
-    wedged pins a bounded number of threads however long it lasts."""
+def test_saturated_closed_gate_still_admits_one_bounded_probe(monkeypatch):
+    """Every failed probe pins one more thread. When the in-flight table is full of wedged calls
+    the gate must still let ONE half-open probe per interval through (bounded at cap+1), otherwise
+    a recovered backend can never be observed — the exact permanent lockout this fixes."""
     monkeypatch.setattr(mm, "_PROBE_INTERVAL_S", 0.0)
     monkeypatch.setattr(mm, "_MAX_INFLIGHT_CALLS", mm._MAX_STUCK_CALLS + 2)
     hung = [_hang_one_call() for _ in range(mm._MAX_STUCK_CALLS)]
     key = hung[0][0]._registry_key(hung[0][1])
     try:
-        for _ in range(2):  # two probes admitted, and they wedge too
+        for _ in range(2):  # two probes admitted, and they wedge too -> table is at the cap
             hung.append(_hang_one_call())
+        assert len(_GATE.calls[key]) == mm._MAX_INFLIGHT_CALLS
+        # At the cap the gate still admits one bounded probe (cap+1); it wedges too, so every
+        # later call is skipped. The extra thread is the strict bound.
+        hung.append(_hang_one_call())
+        assert len(_GATE.calls[key]) == mm._MAX_INFLIGHT_CALLS + 1
         for turn in range(5):
             _skip(_manager(_HangingProvider()), f"capped {turn}")
-        assert len(_GATE.calls[key]) == mm._MAX_INFLIGHT_CALLS
+        assert len(_GATE.calls[key]) == mm._MAX_INFLIGHT_CALLS + 1
         assert _GATE.skips[key] == 5
     finally:
         for _, provider in hung:

@@ -1316,7 +1316,7 @@ _STATUS_HANDLERS: dict[int, Callable[[_Ctx], Verdict]] = {
 
 # ── Helpers ─────────────────────────────────────────────────────────────
 
-_RESET_FIELDS = ("resets_in_seconds", "resets_at", "reset_at", "retry_after")
+_RESET_FIELDS = ("reset_seconds", "resets_in_seconds", "resets_at", "reset_at", "retry_after")
 _RESET_HEADERS = ("retry-after", "Retry-After", "x-ratelimit-reset", "X-RateLimit-Reset")
 
 
@@ -1335,15 +1335,15 @@ def _has_usage_limit_transient_signal(error_msg: str, body: dict, response_heade
 def _rate_limit_reset_seconds(error_msg: str, body: dict, response_headers) -> Optional[float]:
     """Seconds until a 429's window reopens, from the body's reset fields, ``Retry-After`` or the
     message grammar (``retry after Ns`` / ``resets in 4hr``); None when the response names none."""
-    from agent.retry_utils import parse_retry_after_seconds, reset_delay_from_message
+    from agent.retry_utils import _cooldown_reset_seconds, parse_retry_after_seconds, reset_delay_from_message
     for payload in (p for p in (body, _error_obj(body)) if isinstance(p, dict)):
         for name in _RESET_FIELDS:
             value = payload.get(name)
             if value in (None, ""):
                 continue
-            if name.endswith("_at") and isinstance(value, (int, float)):
-                return max(0.0, float(value) - time.time())
-            if (seconds := parse_retry_after_seconds(value)) is not None:
+            # Absolute hint (epoch s/ms or ISO-8601) or relative seconds; the provider's reset
+            # fields are checked before retry_after so the real window wins over a short throttle.
+            if (seconds := _cooldown_reset_seconds(name, value)) is not None:
                 return seconds
     if (seconds := parse_retry_after_seconds(response_headers)) is not None:
         return seconds

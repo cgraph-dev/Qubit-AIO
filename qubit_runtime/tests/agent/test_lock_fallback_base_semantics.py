@@ -18,12 +18,15 @@ class _Bare:
 # ---------------------------------------------------------------- steer requeue
 
 
-def test_requeue_pending_steer_appends_to_existing_steer():
+def test_requeue_pending_steer_prepends_to_steers_that_arrived_meanwhile():
+    """The drained text is OLDER than anything buffered while it was held, so it goes first;
+    appending would deliver a later instruction before the one the user sent first."""
     agent = _Bare()
     agent._pending_steer_lock = threading.Lock()
-    agent._pending_steer = "old"
-    _requeue_pending_steer(agent, "new")
-    assert agent._pending_steer == "old\nnew"
+    agent._pending_steer_parts = [(None, "newer-1"), (None, "newer-2")]
+    agent._pending_steer = "newer-1\nnewer-2"
+    _requeue_pending_steer(agent, "old")
+    assert agent._pending_steer == "old\nnewer-1\nnewer-2"
 
 
 # ------------------------------------------------------- interrupt_control slots
