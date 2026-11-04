@@ -13247,7 +13247,7 @@
    },
    {
     "path": "tests/gateway/test_busy_photo_interrupt_once.py",
-    "local_sha256": "8a666f322414a6aa78eee7010075119eb7c290df433a383c2258c724fad93736"
+    "local_sha256": "918601d2b971e4e5e036cff17422ffc03116901ee82260c881cf4c278e23fad6"
    },
    {
     "path": "tests/gateway/test_busy_reply_internal_anchor.py",

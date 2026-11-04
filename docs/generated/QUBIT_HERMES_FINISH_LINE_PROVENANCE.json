@@ -35246,7 +35246,7 @@
   {
    "finish_line_blob_sha256": "ba6acd4336038aeb6a73b59a837d0ea6b0d80f11b8788fa45222cacf032f18b9",
    "local": "tests/gateway/test_busy_photo_interrupt_once.py",
-   "local_sha256": "8a666f322414a6aa78eee7010075119eb7c290df433a383c2258c724fad93736",
+   "local_sha256": "918601d2b971e4e5e036cff17422ffc03116901ee82260c881cf4c278e23fad6",
    "path": "tests/gateway/test_busy_photo_interrupt_once.py",
    "source_blob_sha256": null
   },
