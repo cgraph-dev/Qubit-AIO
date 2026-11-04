@@ -532,7 +532,7 @@ def test_compat_chat_validation_and_unknown(tmp_path):
 def test_compat_read_endpoints_smoke(tmp_path):
     from voicebridge import qubit_compat as HC
     cfg = _cfg(tmp_path)
-    for path in ["/api/auth/me", "/api/events", "/api/sessions",
+    for path in ["/api/health", "/api/auth/me", "/api/events", "/api/sessions",
                  "/api/sessions/stats", "/api/config", "/api/model/info",
                  "/api/model/options", "/api/model/moa", "/api/model/auxiliary",
                  "/api/profiles", "/api/profiles/active",
