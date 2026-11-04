@@ -218,7 +218,7 @@ def test_cmd_wrapper_points_at_the_qubit_entry():
     text = CMD.read_text(encoding="utf-8")
     assert "install.ps1" in text
     assert "Qubit" in text
-    assert "cgraph-dev/Qubit-AIO" in text
+    assert "cgraph-dev/Qubit" in text
     assert "Hermes Agent Installer" not in text
     assert "NousResearch" not in text
     assert "%*" in text, "the CMD wrapper must forward installer flags"
@@ -231,7 +231,7 @@ def test_runtime_cmd_wrapper_is_qubit_owned():
     text = RUNTIME_CMD.read_text(encoding="utf-8")
     assert "Hermes Agent Installer" not in text
     assert "Qubit" in text
-    assert "cgraph-dev/Qubit-AIO" in text
+    assert "cgraph-dev/Qubit" in text
     assert "scripts\\install.ps1" in text or "scripts/install.ps1" in text
 
 

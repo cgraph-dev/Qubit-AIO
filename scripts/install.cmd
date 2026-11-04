@@ -12,7 +12,7 @@ REM   scripts\install.cmd -DryRun
 REM   scripts\install.cmd -QubitHome "%%LOCALAPPDATA%%\qubit" -Channel stable
 REM
 REM Fetched form:
-REM   powershell -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit-AIO/raw/main/scripts/install.ps1)"
+REM   powershell -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/install.ps1)"
 REM ============================================================================
 
 setlocal EnableDelayedExpansion
@@ -28,12 +28,12 @@ echo.
 echo  Qubit Agent installer
 echo  No local scripts\install.ps1 found; fetching the Qubit installer...
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit-AIO/raw/main/scripts/install.ps1)"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/install.ps1)"
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo  Installation failed. Try running PowerShell directly:
-    echo    powershell -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit-AIO/raw/main/scripts/install.ps1)"
+    echo    powershell -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/install.ps1)"
     echo.
     exit /b 1
 )

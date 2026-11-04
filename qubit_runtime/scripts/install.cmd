@@ -7,10 +7,10 @@ REM running CMD. It never downloads or installs the upstream Hermes/OpenClaw
 REM tree; the source is always the Qubit repository.
 REM
 REM Usage:
-REM   curl -fsSL https://raw.githubusercontent.com/cgraph-dev/Qubit-AIO/main/scripts/install.cmd -o install.cmd && install.cmd && del install.cmd
+REM   curl -fsSL https://raw.githubusercontent.com/cgraph-dev/Qubit/production/scripts/install.cmd -o install.cmd && install.cmd && del install.cmd
 REM
 REM Or if you're already in PowerShell, use the direct command instead:
-REM   iex (irm https://github.com/cgraph-dev/Qubit-AIO/raw/main/scripts/install.ps1)
+REM   iex (irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/install.ps1)
 REM ============================================================================
 
 setlocal EnableDelayedExpansion
@@ -28,12 +28,12 @@ if exist "%ROOT_INSTALL%" (
     exit /b !ERRORLEVEL!
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit-AIO/raw/main/scripts/install.ps1)"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/install.ps1)"
 
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo  Installation failed. Please try running PowerShell directly:
-    echo    powershell -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit-AIO/raw/main/scripts/install.ps1)"
+    echo    powershell -ExecutionPolicy Bypass -Command "iex (irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/install.ps1)"
     echo.
     pause
     exit /b 1

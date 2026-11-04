@@ -17,7 +17,7 @@
 #   powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1
 #
 # Fetched form:
-#   iex (irm https://github.com/cgraph-dev/Qubit-AIO/raw/main/scripts/install.ps1)
+#   iex (irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/install.ps1)
 #
 # Compatibility aliases are kept for wrappers written against older spellings:
 #   -WithoutModels / -SkipModels     = -NoModels
@@ -68,7 +68,7 @@ param(
     [string]$InstallDir = '',
 
     # Qubit-owned source only. Override with QUBIT_REPO_URL for a mirror/fork.
-    [string]$RepoUrl = $(if ($env:QUBIT_REPO_URL) { $env:QUBIT_REPO_URL } else { 'https://github.com/cgraph-dev/Qubit-AIO.git' }),
+    [string]$RepoUrl = $(if ($env:QUBIT_REPO_URL) { $env:QUBIT_REPO_URL } else { 'https://github.com/cgraph-dev/Qubit.git' }),
 
     [Parameter(ValueFromRemainingArguments = $true)]
     [string[]]$Remaining = @()

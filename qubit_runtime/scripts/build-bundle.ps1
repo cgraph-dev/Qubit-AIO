@@ -81,7 +81,7 @@ function Get-ClaimVersion {
     $version = [version]$Matches[1]
     if ($null -eq $latest -or $version -gt $latest) { $latest = $version }
   }
-  if ($null -eq $latest) { Fail "no stable release tag found on remote '$Remote' ($(git remote get-url $Remote)). Pass -Remote with the remote that points at cgraph-dev/Qubit-AIO." }
+  if ($null -eq $latest) { Fail "no stable release tag found on remote '$Remote' ($(git remote get-url $Remote)). Pass -Remote with the remote that points at cgraph-dev/Qubit." }
   return "$($latest.Major).$($latest.Minor).$($latest.Build + 1)"
 }
 
