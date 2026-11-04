@@ -437,8 +437,11 @@ DEFAULTS: Dict[str, Any] = {
         "enabled": True,            # gate barge-in on voice-ID when enrolled
                                     # (service monitor + desktop helper); no
                                     # enrollment = old behavior (any speech
-                                    # barges). Wake commands and spoken
-                                    # confirmations are NOT voice-gated.
+                                    # barges).
+        "require_commands": True,   # also gate hands-free wake activation and
+                                    # spoken confirmations on the enrolled
+                                    # voice. Only active when a profile is
+                                    # enrolled; false = barge-in gate only.
         "name": "user",
         "threshold": 0.65,          # cosine similarity; eres2net: self 0.7-0.96 / cross ~0.3
         "window_s": 2.0,            # analysis window for barge verification
