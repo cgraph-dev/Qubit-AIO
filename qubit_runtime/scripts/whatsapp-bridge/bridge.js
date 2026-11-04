@@ -34,6 +34,13 @@ import { matchesAllowedSender, matchesAllowedUser, matchesInboundWhatsAppGroup, 
 import { createOutboundIdTracker } from './outbound_ids.js';
 import { classifyOwnerMessageGate } from './owner_message_gate.js';
 import {
+  BRIDGE_TOKEN_HEADER,
+  loadOrCreateBridgeToken,
+  parseMediaRoots,
+  resolveMediaPath,
+  bridgeTokenMatches,
+} from './bridge_security.js';
+import {
   addMentions,
   buildPollPayload,
   createReconnectScheduler,
@@ -104,6 +111,8 @@ const DOCUMENT_CACHE_DIR = process.env.HERMES_DOCUMENT_CACHE_DIR
   || path.join(process.env.HOME || '~', '.hermes', 'document_cache');
 const AUDIO_CACHE_DIR = process.env.HERMES_AUDIO_CACHE_DIR
   || path.join(process.env.HOME || '~', '.hermes', 'audio_cache');
+const VIDEO_CACHE_DIR = process.env.HERMES_VIDEO_CACHE_DIR
+  || path.join(process.env.HOME || '~', '.hermes', 'video_cache');
 
 // Self-hash of this script file.  Reported in /health so the Python gateway
 // can detect a running bridge that predates the current bridge.js and
@@ -119,6 +128,23 @@ try {
 } catch {}
 const PAIR_ONLY = args.includes('--pair-only');
 const PAIR_JSON = args.includes('--pair-json');
+let BRIDGE_TOKEN = '';
+let MEDIA_ROOTS = [];
+if (!PAIR_ONLY) {
+  try {
+    BRIDGE_TOKEN = loadOrCreateBridgeToken(SESSION_DIR, process.env);
+  } catch (err) {
+    console.error(`WhatsApp bridge: cannot establish local authentication: ${err?.message || err}`);
+    process.exit(1);
+  }
+  MEDIA_ROOTS = parseMediaRoots(process.env.WHATSAPP_MEDIA_ROOTS, [
+    IMAGE_CACHE_DIR,
+    DOCUMENT_CACHE_DIR,
+    AUDIO_CACHE_DIR,
+    VIDEO_CACHE_DIR,
+    tmpdir(),
+  ]);
+}
 const WHATSAPP_MODE = getArg('mode', process.env.WHATSAPP_MODE || 'self-chat'); // "bot" or "self-chat"
 const WHATSAPP_DM_POLICY = String(process.env.WHATSAPP_DM_POLICY || 'open').trim().toLowerCase();
 const WHATSAPP_GROUP_POLICY = String(process.env.WHATSAPP_GROUP_POLICY || 'pairing').trim().toLowerCase();
@@ -798,7 +824,6 @@ async function startSocket() {
 
 // HTTP server
 const app = express();
-app.use(express.json());
 
 // Host-header validation — defends against DNS rebinding.
 // The bridge binds loopback-only (127.0.0.1) but a victim browser on
@@ -830,6 +855,26 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// Local authentication. The bridge listens on loopback, but loopback is not an
+// authentication boundary: any process on the machine (or a browser request
+// that reaches 127.0.0.1) can connect. Every endpoint except /health requires
+// the token the launching gateway wrote beside the session (0600). /health
+// stays readable because ownership probes use it without a credential and it
+// carries no message data.
+app.use((req, res, next) => {
+  if (req.path === '/health') return next();
+  const provided = req.get(BRIDGE_TOKEN_HEADER) || '';
+  if (!bridgeTokenMatches(provided, BRIDGE_TOKEN)) {
+    return res.status(401).json({
+      error: 'bridge authentication required',
+      code: 'BRIDGE_UNAUTHORIZED',
+    });
+  }
+  next();
+});
+
+app.use(express.json());
 
 // Poll for new messages (long-poll style)
 app.get('/messages', (req, res) => {
@@ -922,13 +967,22 @@ app.post('/send-media', async (req, res) => {
     return res.status(400).json({ error: 'chatId and filePath are required' });
   }
 
+  const mediaPath = resolveMediaPath(filePath, MEDIA_ROOTS);
+  if (!mediaPath.ok) {
+    return res.status(403).json({
+      error: `Media file is not allowed: ${mediaPath.reason}`,
+      code: 'MEDIA_OUTSIDE_ROOTS',
+    });
+  }
+  const safeFilePath = mediaPath.path;
+
   try {
-    if (!existsSync(filePath)) {
-      return res.status(404).json({ error: `File not found: ${filePath}` });
+    if (!existsSync(safeFilePath)) {
+      return res.status(404).json({ error: 'File not found' });
     }
 
-    const buffer = readFileSync(filePath);
-    const ext = filePath.toLowerCase().split('.').pop();
+    const buffer = readFileSync(safeFilePath);
+    const ext = safeFilePath.toLowerCase().split('.').pop();
     const type = mediaType || inferMediaType(ext);
     let msgPayload;
 
@@ -944,7 +998,7 @@ app.post('/send-media', async (req, res) => {
             tmpGifMp4 = path.join(tmpdir(), `hermes_gif_${randomBytes(6).toString('hex')}.mp4`);
             execFileSync(
               'ffmpeg',
-              ['-y', '-i', filePath, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', tmpGifMp4],
+              ['-y', '-i', safeFilePath, '-movflags', 'faststart', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2', tmpGifMp4],
               { timeout: 30000, stdio: 'pipe' }
             );
             msgPayload = {
@@ -955,16 +1009,16 @@ app.post('/send-media', async (req, res) => {
             };
           } catch (gifErr) {
             console.warn('[bridge] gif conversion failed, sending as image/gif:', gifErr.message);
-            msgPayload = mediaPayloadForFile({ buffer, filePath, mediaType: type, caption, fileName });
+            msgPayload = mediaPayloadForFile({ buffer, filePath: safeFilePath, mediaType: type, caption, fileName });
           } finally {
             try { if (tmpGifMp4 && existsSync(tmpGifMp4)) unlinkSync(tmpGifMp4); } catch (_) {}
           }
         } else {
-          msgPayload = mediaPayloadForFile({ buffer, filePath, mediaType: type, caption, fileName });
+          msgPayload = mediaPayloadForFile({ buffer, filePath: safeFilePath, mediaType: type, caption, fileName });
         }
         break;
       case 'video':
-        msgPayload = mediaPayloadForFile({ buffer, filePath, mediaType: type, caption, fileName });
+        msgPayload = mediaPayloadForFile({ buffer, filePath: safeFilePath, mediaType: type, caption, fileName });
         break;
       case 'audio': {
         // WhatsApp only renders a native voice bubble (ptt) when the file is ogg/opus.
@@ -979,7 +1033,7 @@ app.post('/send-media', async (req, res) => {
           try {
             execFileSync(
               'ffmpeg',
-              ['-y', '-i', filePath, '-ar', '48000', '-ac', '1', '-c:a', 'libopus', tmpPath],
+              ['-y', '-i', safeFilePath, '-ar', '48000', '-ac', '1', '-c:a', 'libopus', tmpPath],
               { timeout: 30000, stdio: 'pipe' }
             );
             audioBuffer = readFileSync(tmpPath);
@@ -997,7 +1051,7 @@ app.post('/send-media', async (req, res) => {
       }
       case 'document':
       default:
-        msgPayload = mediaPayloadForFile({ buffer, filePath, mediaType: 'document', caption, fileName });
+        msgPayload = mediaPayloadForFile({ buffer, filePath: safeFilePath, mediaType: 'document', caption, fileName });
         break;
     }
 
@@ -1132,6 +1186,7 @@ app.get('/health', (req, res) => {
     uptime: process.uptime(),
     scriptHash: SCRIPT_HASH,
     sendReadReceipts: SEND_READ_RECEIPTS,
+    authRequired: true,
     capabilities: { outboundMentions: true },
   });
 });
