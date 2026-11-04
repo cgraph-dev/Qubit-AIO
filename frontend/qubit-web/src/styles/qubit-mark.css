@@ -43,25 +43,51 @@
   fill: none;
   stroke-width: 1.1;
   vector-effect: non-scaling-stroke;
+}
+
+/* ---------- The 3D projection ----------
+ *
+ * Each ring is a <circle>; its plane is turned through 3D by scaling y with
+ * cos(theta). Face-on the circle is whole, edge-on it collapses to a line, and
+ * it passes back through face-on mirrored. That IS the projection an orbit makes
+ * when it turns — the ring genuinely opens and closes, which a screen-plane
+ * rotate() can never do.
+ *
+ * The small x-term counter-scales so the ring does not visibly gain width as it
+ * closes: without it the mark pumps in size twice per turn.
+ *
+ * The beads sit inside this same wrapper, so their depth comes from the same
+ * transform and needs no faked scale.
+ */
+.qubit-mark__plane {
   transform-box: view-box;
   transform-origin: 20px 20px;
-  animation-name: qubit-mark-ring-turn;
+  animation-name: qubit-mark-plane-turn;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
-  animation-direction: var(--ring-direction, normal);
   will-change: transform;
 }
 
-@keyframes qubit-mark-ring-turn {
-  to {
-    transform: rotate(360deg);
+@keyframes qubit-mark-plane-turn {
+  0% {
+    transform: scale(1, 1);
+  }
+  25% {
+    transform: scale(1.02, 0);
+  }
+  50% {
+    transform: scale(1, -1);
+  }
+  75% {
+    transform: scale(1.02, 0);
+  }
+  100% {
+    transform: scale(1, 1);
   }
 }
 
-/* Periods are set inline per orbit (21s / 31s reversed / 43s) so the three
- * rings never travel together and the lattice never visibly loops. */
 /* The near ring keeps the mark's own colour (currentColor from the caller);
- * the far ring is dimmer so the two fields read as depth. */
+ * the far ring is dimmer so the fields read as depth. */
 /* Low base opacity: the chromatic copies below are the visible line, so a
  * solid stroke here would bury them. */
 .qubit-mark__ring--near {
@@ -71,13 +97,13 @@
 
 .qubit-mark__ring--far {
   stroke: currentColor;
-  stroke-opacity: 0.2;
+  stroke-opacity: 0.22;
 }
 
 /* Deepest line stays the faintest — it is a depth cue, not a third feature. */
 .qubit-mark__ring--deep {
   stroke: currentColor;
-  stroke-opacity: 0.13;
+  stroke-opacity: 0.18;
 }
 
 /* RGB fringe.
@@ -85,9 +111,9 @@
  * The base stroke is the SAME hairline drawn three times, once per channel,
  * offset in opposite directions. Painting a solid currentColor stroke on top
  * would bury the fringe (that is why the first attempt showed only a blue
- * hint) — so the near ring's own stroke is kept low-opacity and the three
- * chromatic copies carry the visible line. Overlap reads near-white; edges
- * split into red/blue. */
+ * hint) — so the ring's own stroke is kept low-opacity and the three chromatic
+ * copies carry the visible line. Overlap reads near-white; edges split into
+ * red/blue. */
 .qubit-mark__ring--near,
 .qubit-mark__ring--far,
 .qubit-mark__ring--deep {
@@ -99,47 +125,10 @@
 
 /* ---------- Particles ---------- */
 
+/* Beads are plain filled dots: the plane wrapper provides their depth, so no
+ * scale/opacity beat is layered on top of a transform that already moves them. */
 .qubit-mark__bead {
   fill: currentColor;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation-name: qubit-mark-depth;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-}
-
-/* Depth: a particle on a tilted ellipse is nearest the viewer at orbital angle
- * 0 and farthest at 180deg. Scaling + brightening on that beat is the
- * perspective cue — without it particles slide flat across the ring. */
-@keyframes qubit-mark-depth {
-  0% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-  50% {
-    opacity: 0.3;
-    transform: scale(0.7);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1.2);
-  }
-}
-
-/* Each particle spins about the nucleus at its own duration (set inline). */
-.qubit-mark__spin {
-  transform-box: view-box;
-  transform-origin: 20px 20px;
-  animation-name: qubit-mark-revolve;
-  animation-timing-function: linear;
-  animation-iteration-count: infinite;
-  will-change: transform;
-}
-
-@keyframes qubit-mark-revolve {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ---------- Nucleus ---------- */
@@ -212,12 +201,11 @@
   stroke-opacity: 0.7;
 }
 
-.qagent-sidebar__brand-row:hover .qubit-mark__spin {
-  animation-duration: 4.4s;
-}
-
-.qubit-mark__spin {
-  transition: animation-duration 320ms ease;
+/* Hover speeds every plane up, so the mark visibly responds to contact without
+ * adding any glow (the mark is an outline; glowing would undo the look). */
+.qagent-sidebar__brand-row:hover .qubit-mark__plane,
+.qagent-sidebar__brand-row:focus-within .qubit-mark__plane {
+  animation-duration: 7.5s !important;
 }
 
 /* ---------- Wordmark ----------
@@ -517,7 +505,7 @@
 /* ---------- Reduced motion: everything rests ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .qubit-mark__spin,
+  .qubit-mark__plane,
   .qubit-mark__ring,
   .qubit-mark__nucleus,
   .qubit-mark__bead,
@@ -530,6 +518,18 @@
   }
   .qbrand-sparks {
     display: none;
+  }
+  /* Frozen at a static 3D pose: each plane is left at a different opening angle
+   * so the mark still reads as an atom, just still. scaleY here replaces the
+   * animation's face-on 0% frame, which would flatten all three rings. */
+  .qubit-mark__plane {
+    transform: scale(1, 0.78);
+  }
+  .qubit-mark__field--far .qubit-mark__plane {
+    transform: scale(1, 0.42);
+  }
+  .qubit-mark__field--deep .qubit-mark__plane {
+    transform: scale(1, 0.9);
   }
   .qubit-mark__bead {
     opacity: 0.9;
