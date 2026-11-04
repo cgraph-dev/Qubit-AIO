@@ -1689,6 +1689,16 @@ class VoiceOrchestrator:
                                    "error": str(exc)[:160]}
             log_event("mic.selfcheck", state="UNAVAILABLE",
                       error=str(exc)[:160])
+        # Voice-ID: the configured verifier gates barge-in (only the enrolled
+        # voice can interrupt a reply). This load used to be missing after a
+        # refactor, so ``speaker_verify.enabled: true`` silently behaved like
+        # "any voice barges". Fail-open when disabled/unenrolled/unavailable.
+        try:
+            from .voice_id import load_verifier
+            self._speaker = load_verifier(self.cfg)
+        except Exception as exc:  # noqa: BLE001 - never block startup
+            self._speaker = None
+            log_event("speaker.verify.unavailable", error=str(exc)[:160])
         if self.cfg.get("vad", "barge_in", default=True):
             self._start_barge_stream(mic_cfg)
 
@@ -1890,20 +1900,11 @@ class VoiceOrchestrator:
         def _barge_allowed(buf: bytearray) -> bool:
             """True = honor the barge (stop talking). If voice-ID is armed,
             only the ENROLLED voice passes; without it, old behavior (any
-            speech barges). Too-short buffers (<1s) default to allowed."""
-            if self._speaker is None or not self._speaker.ready:
-                return True
-            import numpy as np
-            samples = np.frombuffer(bytes(buf), dtype=np.int16).astype(np.float32) / 32768.0
-            if len(samples) < 16000:  # <1s: can't embed reliably -> don't block
-                return True
-            try:
-                accepted, score = self._speaker.verify(samples, 16000)
-            except Exception as exc:
-                log_event("barge.verify.error", error=str(exc)[:120])
-                return True
-            log_event("barge.verify", accepted=bool(accepted), score=round(score, 3))
-            return bool(accepted)
+            speech barges). Too-short buffers (<1s) default to allowed.
+            Shared with the desktop helper so both surfaces enforce one rule.
+            """
+            from .voice_id import allows_pcm
+            return allows_pcm(self._speaker, bytes(buf), 16000, via="service")
 
         def _monitor():
             from .audio.vad import FRAME_RATE, resample_linear

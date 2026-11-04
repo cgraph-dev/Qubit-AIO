@@ -397,12 +397,16 @@ PALETTE_HUES: Tuple[float, ...] = (0.54, 0.60)
 
 # ------------------------------------------------------------------ helpers
 def _finite(value: Any, default: float = 0.0) -> float:
-    # Fast path: callers hand us floats almost every time; skip float()/try.
-    # ``isfinite`` is NOT optional: the tests feed NaN/inf knowingly and expect
-    # the default back ("cannot convert float NaN to integer" if it is dropped),
-    # so this guard is load-bearing, not defensive padding.
-    if type(value) is float:
+    # Fast path: callers hand us floats/ints almost every time; skip
+    # float()/try. ``isfinite`` is NOT optional for floats: the tests feed
+    # NaN/inf knowingly and expect the default back ("cannot convert float NaN
+    # to integer" if it is dropped), so this guard is load-bearing, not
+    # defensive padding.
+    kind = type(value)
+    if kind is float:
         return value if math.isfinite(value) else default
+    if kind is int:
+        return float(value)
     try:
         out = float(value)
     except (TypeError, ValueError):
@@ -430,6 +434,13 @@ def hue_to_rgb(h: Any, s: Any = 1.0, v: Any = 1.0) -> Tuple[float, float, float]
             (p, q, val), (u, p, val), (val, p, q))[i % 6]
 
 
+#: Memo for ``palette_hue``. A body's hue depends only on its index and the
+#: layer salt, never on the clock, yet the renderers ask for it every frame.
+#: Caching the resolved float removes the repeated ``_finite``/``hash01`` work
+#: while returning the exact same value.
+_PALETTE_HUE_CACHE: Dict[Any, float] = {}
+
+
 def palette_hue(index: Any, salt: float = 0.0) -> float:
     """One of :data:`PALETTE_HUES`, chosen deterministically for ``index``.
 
@@ -438,15 +449,25 @@ def palette_hue(index: Any, salt: float = 0.0) -> float:
     entries) picks the palette slot. Junk-safe like every field helper — a bad
     index or salt still returns a real palette hue, never raises.
     """
+    i = int(_finite(index))
+    s = _finite(salt)
+    key = (i, s)
+    got = _PALETTE_HUE_CACHE.get(key)
+    if got is not None:
+        return got
     n = len(PALETTE_HUES)
     if n <= 0:
         return 0.0
-    pick = int(hash01(int(_finite(index)) + 1, 7.7 + _finite(salt)) * n)
+    pick = int(hash01(i + 1, 7.7 + s) * n)
     if pick < 0:
         pick = 0
     elif pick >= n:
         pick = n - 1
-    return PALETTE_HUES[pick]
+    got = PALETTE_HUES[pick]
+    if len(_PALETTE_HUE_CACHE) > 16384:
+        _PALETTE_HUE_CACHE.clear()
+    _PALETTE_HUE_CACHE[key] = got
+    return got
 
 
 def _hue_for(index: Any, seed: float = 0.0) -> float:
@@ -522,6 +543,13 @@ VOLUME_SWAY_SPAN = 0.052
 VOLUME_SWAY_PHASE = 0.7
 
 
+#: Per-body constants for ``_volume_axes`` (the hashed home split and the sway
+#: phase). They do not depend on the clock, so the two ``hash01`` calls ran
+#: thousands of times a frame for the same answer. The time-dependent sway is
+#: still evaluated every call.
+_VOLUME_HOME_CACHE: Dict[Any, Tuple[float, float, float]] = {}
+
+
 def _volume_axes(t: Any, index: Any, salt: float = 0.0) -> Tuple[float, float]:
     """Time-varying ``(z, z2)``: :func:`depth_axes` plus a gentle parallax sway.
 
@@ -532,9 +560,19 @@ def _volume_axes(t: Any, index: Any, salt: float = 0.0) -> Tuple[float, float]:
     steps between frames.
     """
     i = int(_finite(index))
-    z, z2 = depth_axes(i, salt)
+    s = _finite(salt)
+    key = (i, s)
+    home = _VOLUME_HOME_CACHE.get(key)
+    if home is None:
+        z0, z20 = depth_axes(i, s)
+        seed0 = hash01(i + 1, 907.3 + s) * 2.0 * math.pi
+        home = (z0, z20, seed0)
+        if len(_VOLUME_HOME_CACHE) > 16384:
+            _VOLUME_HOME_CACHE.clear()
+        _VOLUME_HOME_CACHE[key] = home
+    z, z2 = home[0], home[1]
     tt = _finite(t)
-    seed = hash01(i + 1, 907.3 + _finite(salt)) * 2.0 * math.pi
+    seed = home[2]
     z += VOLUME_SWAY_SPAN * math.sin(
         2.0 * math.pi * tt / VOLUME_SWAY_PERIOD_A + seed)
     z2 += VOLUME_SWAY_SPAN * math.sin(

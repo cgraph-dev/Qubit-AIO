@@ -719,7 +719,8 @@ def h_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             fp = state_dir / name
             if not fp.exists():
                 continue
-            lines = fp.read_text(errors="replace").splitlines()[-100:]
+            from .journal_io import tail_lines
+            lines = tail_lines(fp, max_bytes=1_000_000, limit=100)
             for line in lines:
                 try:
                     ev = json.loads(line)

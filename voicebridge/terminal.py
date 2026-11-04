@@ -147,7 +147,8 @@ def _health_text(cfg, since_s: float = 3600.0) -> str:
     last_event = ""
     if state.exists():
         try:
-            for line in state.read_text(errors="replace").splitlines():
+            from .journal_io import tail_lines
+            for line in tail_lines(state, max_bytes=4_000_000):
                 try:
                     ev = json.loads(line)
                 except Exception:
@@ -213,7 +214,9 @@ def _activity_items(cfg, limit: int = 20, query: str = ""):
         p = cfg.state_dir() / "events.jsonl"
         if not p.exists():
             return []
-        lines = p.read_text(errors="replace").splitlines()[-max(limit * 6, 4000):]
+        from voicebridge.journal_io import tail_lines
+        lines = tail_lines(p, max_bytes=2_000_000,
+                           limit=max(limit * 6, 4000))
         out = []
         for l in lines:
             try:
@@ -236,7 +239,8 @@ def _logs_items(cfg, limit: int = 50, query: str = ""):
     p = cfg.state_dir() / "events.jsonl"
     if not p.exists():
         return []
-    lines = p.read_text(errors="replace").splitlines()[-max(limit * 4, 8000):]
+    from voicebridge.journal_io import tail_lines
+    lines = tail_lines(p, max_bytes=2_000_000, limit=max(limit * 4, 8000))
     out = []
     q = query.lower() if query else ""
     for l in lines:

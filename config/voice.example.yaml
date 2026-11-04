@@ -44,8 +44,11 @@ vad:
   rms_gate: 0.0015        # frame RMS floor for "voiced" (after gain) — stops hiss triggering VAD
   barge_in: true          # speech while TTS speaks -> cancel output (interrupt)
 
-# Speaker verification (voice-ID): only the ENROLLED voice can barge in.
-# Enrolled: `voicebridge enroll` (records 5s of YOUR voice).
+# Speaker verification (voice-ID): when enrolled, only the ENROLLED voice can
+# barge in (both the service barge monitor and the desktop helper's wake-phrase
+# gate). Hands-free wake commands and spoken confirmations are NOT voice-gated:
+# any voice the microphone hears can still issue them.
+# Enrolled: `qubit voice enroll` / `voicebridge enroll` (records 5s of YOUR voice).
 speaker_verify:
   enabled: true           # no enrollment = old behavior (any speech barges)
   name: user

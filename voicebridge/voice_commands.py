@@ -2097,10 +2097,8 @@ def _b_flags(ctx, args):
 
 def _b_logs(ctx, args):
     path = Path(ctx.cfg.state_dir()) / "events.jsonl"
-    try:
-        lines = path.read_text(errors="replace").splitlines()[-5:]
-    except OSError:
-        lines = []
+    from .journal_io import tail_lines
+    lines = tail_lines(path, max_bytes=64_000, limit=5)
     return {"logs": [_redact(line)[:160] for line in lines]}
 
 
@@ -2853,10 +2851,8 @@ def _b_curator(ctx, args):
     except Exception:
         by_status = {}
     path = Path(ctx.cfg.state_dir()) / "events.jsonl"
-    try:
-        audit_tail = len(path.read_text(errors="replace").splitlines())
-    except OSError:
-        audit_tail = 0
+    from .journal_io import count_lines
+    audit_tail = count_lines(path)
     return {"curator": {"verified": stats if isinstance(stats, dict) else {},
                         "by_status": by_status,
                         "audit_events": audit_tail}}
