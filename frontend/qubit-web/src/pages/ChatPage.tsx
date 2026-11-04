@@ -2035,6 +2035,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     setInput((current) => current.trim() ? `${current}\n\n${prompt}` : prompt);
   }, []);
   const modelToolsLabel = `${t.app.modelToolsSheetTitle} ${t.app.modelToolsSheetSubtitle}`;
+  const toolsModuleLabel =
+    t.common?.tools || t.app.modelToolsSheetSubtitle.replace(/^&\s*/, "");
 
   return (
     <div className="qchat qplate flex min-h-0 flex-1 flex-col gap-2">
@@ -3088,7 +3090,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               <PlateModuleHead
                 id="qchat-module-tools"
                 index="02"
-                label={t.app.modelToolsSheetSubtitle}
+                label={toolsModuleLabel}
               />
               <ChatToolsSummary
                 profile={scopedProfile}

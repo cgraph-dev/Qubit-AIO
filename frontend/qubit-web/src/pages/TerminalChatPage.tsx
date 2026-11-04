@@ -1402,6 +1402,8 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   }, [copyState]);
 
   const modelToolsLabel = `${t.app.modelToolsSheetTitle} ${t.app.modelToolsSheetSubtitle}`;
+  const toolsModuleLabel =
+    t.common?.tools || t.app.modelToolsSheetSubtitle.replace(/^&\s*/, "");
   // Wait notice only while a resumed chat is still blank; reconnect/closed
   // states keep their own copy and must not stack it.
   const showResumeLoadingOverlay = shouldShowResumeLoadingOverlay({
@@ -1610,7 +1612,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
               <PlateModuleHead
                 id="terminal-module-tools"
                 index="02"
-                label={t.app.modelToolsSheetSubtitle}
+                label={toolsModuleLabel}
               />
               <ChatToolsSummary profile={scopedProfile} />
             </section>

@@ -365,6 +365,11 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(el.getAttribute("role")).toBe("complementary");
     // aria-label is the shared ChatPage "Model & tools" landmark label.
     expect(el.getAttribute("aria-label")).toBe("Model & tools");
+    // The tools module is its own head ("02 TOOLS"), not the "& tools"
+    // fragment intended for the combined landmark label.
+    const toolsHead = el.querySelector("#terminal-module-tools");
+    expect(toolsHead?.textContent).toContain("tools");
+    expect(toolsHead?.textContent).not.toContain("&");
     // Parity with the reference: model switching lives in the MODEL card, not a
     // separate "Chat terminal model / Set default" card.
     expect(el.querySelector('[data-testid="terminal-model-card"]')).toBeNull();

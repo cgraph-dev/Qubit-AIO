@@ -318,6 +318,9 @@ describe("Qubit ChatPage", () => {
     expect(panel).not.toBeNull();
     expect(panel?.getAttribute("aria-label")).toBe("Model & tools");
     expect(container.querySelectorAll('[role="complementary"]').length).toBe(1);
+    const toolsHead = container.querySelector("#qchat-module-tools");
+    expect(toolsHead?.textContent).toContain("tools");
+    expect(toolsHead?.textContent).not.toContain("&");
     expect(
       container.querySelector('button[aria-label="Collapse chat side panel"]'),
     ).not.toBeNull();
