@@ -28,10 +28,12 @@ vad:
   max_utterance_s: 30.0
   rms_gate: 0.004
   barge_in: true
-# Voice-ID gates BARGE-IN only (service + desktop helper). Wake commands and
-# spoken confirmations are not speaker-gated. No enrollment = any voice barges.
+# Voice-ID gates barge-in (service + desktop helper) and, with
+# require_commands, wake commands + spoken confirmations. No enrollment (or
+# enabled: false) = any voice; require_commands: false = barge-in gating only.
 speaker_verify:
   enabled: true
+  require_commands: true
   name: user
   threshold: 0.65
   window_s: 2.0

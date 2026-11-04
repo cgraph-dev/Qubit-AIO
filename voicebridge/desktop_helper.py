@@ -1677,7 +1677,12 @@ class DesktopHelper:
                 # command to a target session/agent and carry it to the turn
                 # (see on_wake_command_routed). Absent/malformed route falls
                 # back to the plain single-arg path.
-                on_command_route=self.on_wake_command_routed)
+                on_command_route=self.on_wake_command_routed,
+                # Voice-ID for actions (wake activation + spoken
+                # confirmations). Shares this helper's lazy verifier; an
+                # unverified speaker cannot arm or execute while an owner
+                # profile is required.
+                speaker_check=self._wake_speaker_check)
             if self._wake.enabled():
                 self._wake.start()
         except Exception:
@@ -3987,6 +3992,23 @@ class DesktopHelper:
                               16000, via="helper")
         except Exception:
             return True
+
+    def _wake_speaker_check(self, pcm: bytes) -> "tuple[bool, str]":
+        """Identity policy for hands-free wake and spoken confirmations.
+
+        Uses the SAME lazily-loaded verifier as barge-in, but applies the
+        stricter action policy (:func:`voicebridge.voice_id.check_command_audio`):
+        when an owner profile is required an unverified speaker cannot arm the
+        listener, settle a staged confirmation, or execute a command. With no
+        enrollment (or ``speaker_verify.require_commands: false``) this allows
+        every speaker, exactly as before. Never raises.
+        """
+        try:
+            from .voice_id import check_command_audio
+            return check_command_audio(self.cfg, self._speaker_verifier(),
+                                       bytes(pcm or b""), 16000, via="wake")
+        except Exception:
+            return False, "verify_error"
 
     def _barge_in_wake_command(self, pcm: bytes) -> Optional[str]:
         """Return the command spoken after the wake phrase, or None.

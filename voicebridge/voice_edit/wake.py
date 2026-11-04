@@ -975,6 +975,7 @@ class WakeMonitor:
                  on_hint: Optional[Callable[[str], None]] = None,
                  on_command_route: Optional[Callable[[str, Any], None]] = None,
                  on_wake_armed: Optional[Callable[[], None]] = None,
+                 speaker_check: Optional[Callable[[bytes], Any]] = None,
                  ) -> None:
         self.cfg = cfg
         self.on_command = on_command
@@ -992,6 +993,13 @@ class WakeMonitor:
         self._mic_factory = mic_factory
         self._transcribe = transcribe
         self._segmenter_factory = segmenter_factory
+        # Voice-ID for ACTIONS. One injected callable ``(pcm) -> (allowed,
+        # reason)`` keeps this module independent of the verifier; the desktop
+        # helper binds it to the SAME lazy verifier it uses for barge-in, so
+        # only one model copy is loaded. Left None, the monitor builds the
+        # configured verifier on the first segment (see
+        # :meth:`_command_speaker_allows`).
+        self._speaker_check = speaker_check
         # Lane 1 (2026-10-03): read-only probe for a live unexpired
         # helper-staged confirmation (service.task-mode staging, e.g. the
         # timer — in-process state the journal cannot see). The helper wires
@@ -1687,9 +1695,54 @@ class WakeMonitor:
         except Exception:
             return False
 
+    def _command_speaker_allows(self, pcm: bytes) -> tuple[bool, str]:
+        """Identity policy for a wake/confirmation utterance.
+
+        Returns ``(allowed, reason)``. When an owner voice profile is required
+        an unverified speaker (or audio that cannot be verified) is refused
+        with a typed reason -- it never arms the listener, settles a pending
+        confirmation, or executes a command. With no enrolled profile or an
+        explicit opt-out this is a no-op allow, so normal wake is unchanged.
+        Never raises.
+        """
+        check = self._speaker_check
+        if check is None:
+            try:
+                from ..voice_id import check_command_audio, load_verifier
+                verifier = load_verifier(self.cfg)
+                self._speaker_verifier = verifier
+                self._speaker_check = lambda data: check_command_audio(
+                    self.cfg, verifier, data, 16000, via="wake")
+                check = self._speaker_check
+            except Exception:
+                return True, "policy_inactive"
+        try:
+            result = check(bytes(pcm))
+        except Exception:
+            # A broken gate must not silently become "any speaker" when a
+            # profile is required; the policy helper already fails closed,
+            # so only a genuinely faulty injected callable lands here.
+            return False, "verify_error"
+        try:
+            if isinstance(result, tuple) and len(result) == 2:
+                return bool(result[0]), str(result[1])
+            ok = bool(result)
+        except Exception:
+            return False, "verify_error"
+        return ok, ("verified" if ok else "unverified")
+
     def _handle_segment(self, pcm: bytes, *, forced: bool = False) -> None:
         if len(pcm) < 4800:
             _trace("segment_too_short", bytes=len(pcm))
+            return
+        allowed, identity_reason = self._command_speaker_allows(pcm)
+        if not allowed:
+            # Typed refusal, never a silent downgrade: the segment is not
+            # transcribed, armed, or routed. An already-staged confirmation
+            # is left untouched (an impostor cannot clear or run it).
+            self.last_error = f"voice_id:{identity_reason}"
+            _trace("voice_id_refused", reason=identity_reason,
+                   bytes=len(pcm), forced=forced, engine=self.engine)
             return
         _trace("segment", bytes=len(pcm), forced=forced,
                engine=self.engine, capped=_segment_capped(self.cfg, len(pcm)))

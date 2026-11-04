@@ -2,8 +2,9 @@
 
 Enrolls one speaker (the user) from a few seconds of their voice and answers
 `verify(samples) -> (accepted, score)` in ~50ms on CPU. Used by the bridge to
-gate barge-in: only the ENROLLED voice can interrupt the assistant (TV,
-roommates, videos can't). Also the future foundation for hands-free mode.
+gate barge-in (only the ENROLLED voice can interrupt the assistant) and, via
+:func:`check_command_audio`, to gate hands-free wake/confirmation actions when
+an owner profile is enrolled (TV, roommates, videos can't arm or confirm).
 
 Model: <model_dir>/3dspeaker_speech_eres2net_sv_en_voxceleb_16k.onnx (26 MB, CPU)
        from the k2-fsa/sherpa-onnx `speaker-recongition-models` release.
@@ -215,6 +216,113 @@ def load_verifier(cfg: Any, *, default_enabled: bool = True) -> Optional[Speaker
     except Exception as exc:  # noqa: BLE001 - voice-ID is fail-open
         log_event("speaker.verify.unavailable", error=str(exc)[:160])
     return None
+
+
+#: Identity policy for ACTIONS (wake activation + spoken confirmations).
+#: ``off``      -- owner explicitly disabled voice-ID (or command gating).
+#: ``inactive`` -- enabled, but no enrolled voice/model is available, so no
+#:                 identity profile exists (historical "any voice" behaviour).
+#: ``required`` -- an owner profile exists; only the enrolled voice may act.
+POLICY_OFF = "off"
+POLICY_INACTIVE = "inactive"
+POLICY_REQUIRED = "required"
+
+REASON_POLICY_OFF = "policy_off"
+REASON_NO_PROFILE = "no_profile"
+REASON_VERIFIED = "verified"
+REASON_UNVERIFIED = "unverified"
+REASON_INSUFFICIENT_AUDIO = "insufficient_audio"
+REASON_VERIFY_ERROR = "verify_error"
+
+
+def _cfg_value(cfg: Any, section: str, key: str, default: Any) -> Any:
+    try:
+        return cfg.get(section, key, default=default)
+    except Exception:
+        return default
+
+
+def _enrolled_profile_present(cfg: Any,
+                              verifier: Optional[SpeakerVerifier]) -> bool:
+    """True when an enrollment file exists for the configured owner name.
+
+    Used to distinguish "no profile enrolled" (normal wake) from "a profile is
+    enrolled but the verifier failed to load" (must fail closed rather than
+    silently downgrade to any-voice). Never raises.
+    """
+    if verifier is not None and getattr(verifier, "ready", False):
+        return True
+    try:
+        name = str(_cfg_value(cfg, "speaker_verify", "name", "user") or "user")
+        return (Path(cfg.state_dir()) / "speakers" / f"{name}.npy").is_file()
+    except Exception:
+        return False
+
+
+def command_identity_policy(cfg: Any,
+                            verifier: Optional[SpeakerVerifier]) -> str:
+    """Return the voice-ID policy for wake/confirmation ACTIONS.
+
+    Unlike barge-in (which is deliberately fail-open and only active when a
+    verifier is ready), command gating distinguishes three states so a
+    missing enrollment is not confused with an explicit opt-out:
+
+    * ``speaker_verify.enabled: false`` -> :data:`POLICY_OFF` (explicit opt-out).
+    * ``speaker_verify.require_commands: false`` -> :data:`POLICY_OFF`
+      (owner wants barge-in gating only).
+    * enabled + ``require_commands`` (default) + no enrolled profile ->
+      :data:`POLICY_INACTIVE` (normal behaviour).
+    * enabled + ``require_commands`` + an enrolled profile or ready verifier
+      -> :data:`POLICY_REQUIRED` (a stored enrollment whose model failed to
+      load is still REQUIRED, so verification fails closed instead of
+      downgrading).
+    """
+    if not bool(_cfg_value(cfg, "speaker_verify", "enabled", True)):
+        return POLICY_OFF
+    if not bool(_cfg_value(cfg, "speaker_verify", "require_commands", True)):
+        return POLICY_OFF
+    if not _enrolled_profile_present(cfg, verifier):
+        return POLICY_INACTIVE
+    return POLICY_REQUIRED
+
+
+def check_command_audio(cfg: Any, verifier: Optional[SpeakerVerifier],
+                        pcm: bytes, sample_rate: int = 16000, *,
+                        via: str = "") -> tuple[bool, str]:
+    """``(allowed, reason)`` for a wake/confirmation utterance.
+
+    Enforces :func:`command_identity_policy`. When a profile is REQUIRED the
+    check fails **closed**: an unverified speaker, too-short audio, or any
+    embedding error refuses the action with a typed reason instead of silently
+    downgrading to the old any-voice behaviour. No verifier/enrollment or an
+    explicit opt-out keeps the historical allow path.
+
+    Never raises.
+    """
+    policy = command_identity_policy(cfg, verifier)
+    if policy == POLICY_OFF:
+        return True, REASON_POLICY_OFF
+    if policy == POLICY_INACTIVE:
+        return True, REASON_NO_PROFILE
+    try:
+        samples = (np.frombuffer(bytes(pcm), dtype="<i2").astype(np.float32)
+                   / 32768.0)
+        accepted, score = verifier.verify(samples, int(sample_rate))
+    except SpeakerUnavailable as exc:
+        log_event("speaker.command_gate", accepted=False,
+                  reason=REASON_INSUFFICIENT_AUDIO, via=via or None,
+                  error=str(exc)[:120])
+        return False, REASON_INSUFFICIENT_AUDIO
+    except Exception as exc:  # noqa: BLE001 - fail CLOSED for actions
+        log_event("speaker.command_gate", accepted=False,
+                  reason=REASON_VERIFY_ERROR, via=via or None,
+                  error=str(exc)[:120])
+        return False, REASON_VERIFY_ERROR
+    ok = bool(accepted)
+    log_event("speaker.command_gate", accepted=ok,
+              score=round(float(score), 3), via=via or None,
+              reason=REASON_VERIFIED if ok else REASON_UNVERIFIED)
+    return ok, (REASON_VERIFIED if ok else REASON_UNVERIFIED)
 
 
 def allows_pcm(verifier: Optional[SpeakerVerifier], pcm: bytes,
