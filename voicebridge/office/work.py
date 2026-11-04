@@ -26,6 +26,7 @@ from typing import Any, Dict, List, Optional
 
 from . import store
 from .errors import BAD_INPUT_CODE, BAD_STATE_CODE, NOT_FOUND_CODE, OfficeError
+from .exit_check import EXIT_CHECK_UNSAFE_CODE, validate_exit_check
 
 OPEN_STATES = ("open", "running", "review", "fixing")
 CLOSED_STATES = ("accepted", "rejected", "abandoned")
@@ -86,6 +87,14 @@ def create(cfg: Any, title: str, *, brief: str = "", exit_check: str = "",
             "'Done' is never the model's own verdict (C17); a task whose "
             "completion only the assignee can judge is a task that will always "
             "succeed.")
+    unsafe = validate_exit_check(check)
+    if unsafe:
+        raise OfficeError(
+            EXIT_CHECK_UNSAFE_CODE,
+            f"refused: the exit check is not in the safe verification grammar "
+            f"({unsafe}). An exit check is a completion proof, not a command "
+            f"runner; use true/false, test, read-only grep, or a read-only "
+            f"sqlite3 SELECT.")
     if int(turn_budget) < 1:
         raise OfficeError(BAD_INPUT_CODE, "turn_budget must be >= 1")
 

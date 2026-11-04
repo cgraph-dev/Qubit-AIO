@@ -29,10 +29,14 @@ Tables: `office_task`, `office_task_event`, `office_turn_budget`.
 
 **1. A task without a machine-checkable exit condition cannot exist (C17).**
 `work.create()` refuses with `OFFICE_TASK_NEEDS_EXIT_CHECK` unless
-`exit_check` is a non-empty shell command. "Done" is never the model's own
-verdict: the command is written by *whoever created the task*, run against real
-state, and its exit code alone decides completion. An agent asked to judge its
-own completion always complies, which is why it is never asked.
+`exit_check` is a non-empty command in a small, shell-free verification
+grammar (`true`/`false`, `test`/`[`, read-only `grep`, and a read-only
+`sqlite3` SELECT optionally piped through `grep`). Anything else is refused
+with `OFFICE_EXIT_CHECK_UNSAFE`; the command is never passed to a shell.
+"Done" is never the model's own verdict: the command is written by *whoever
+created the task*, run against real state, and its exit code alone decides
+completion. An agent asked to judge its own completion always complies, which
+is why it is never asked.
 
 **2. A rejection is an instruction, not a restart.** `work.review(reject)`
 requires a non-empty note and refuses without one — *"a rejection without an
@@ -101,8 +105,9 @@ free: **a check that passed, not a charge that was skipped.**
 ## Proof
 
 `tests/test_office_work_loop.py` — 20 tests, all against a stubbed executor, so
-the whole loop is provable without a provider call. `exit_check` is a real shell
-command against real files, which is what makes completion machine-checkable.
+the whole loop is provable without a provider call. `exit_check` is a real
+verification command against real files, run without a shell, which is what
+makes completion machine-checkable.
 Hermetic: tmp `XDG_*` only, no network, no live service.
 
 **Live proof (2026-10-12).** Task #1, *"Pin the tower walk model with tests"*,

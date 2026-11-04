@@ -55,6 +55,7 @@ from . import store
 from . import work as W
 from .errors import (BAD_INPUT_CODE, BAD_STATE_CODE, NOT_FOUND_CODE,
                      OfficeError)
+from .exit_check import EXIT_CHECK_UNSAFE_CODE, validate_exit_check
 
 #: Pending-proposal caps. Unbounded proposal intake is an org that manufactures
 #: backlog instead of work, so the cap is part of the design, not a nicety.
@@ -203,6 +204,15 @@ def propose(cfg: Any, proposer_id: int, title: str, brief: str = "",
             BAD_INPUT_CODE,
             "a proposal needs a rationale: the level above cannot approve a "
             "wish. Say what the work is for and why now.")
+    check = str(exit_check or "").strip()
+    if check:
+        unsafe = validate_exit_check(check)
+        if unsafe:
+            raise OfficeError(
+                EXIT_CHECK_UNSAFE_CODE,
+                f"refused: the proposed exit check is not in the safe "
+                f"verification grammar ({unsafe}). An exit check is a "
+                f"completion proof, not a command runner.")
 
     conn = store.connect(cfg)
     try:
