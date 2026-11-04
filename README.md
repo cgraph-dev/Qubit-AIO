@@ -22,11 +22,12 @@ and optional voice.
 | Platform | Status |
 |---|---|
 | Linux (Ubuntu x86_64) | Supported |
-| macOS | Not supported in this release (future target) |
-| Windows | Not supported in this release (future target) |
+| macOS | Core install supported; voice bridge/orb/typing not yet supported |
+| Windows | Installer provided; Windows release validation is still pending |
 
-The installer, service integration, and voice/audio path are Linux-first. Do not
-expect macOS or Windows to work in this release.
+Linux is the reference platform. macOS installs the core runtime, CLI, dashboard,
+and launchd gateway; voice/audio is not supported there yet. Windows has a
+PowerShell installer but has not been validated on a Windows release runner.
 
 ## Install
 
@@ -38,6 +39,17 @@ git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scrip
 
 Use the Qubit download URL if it differs from the repository above. For options,
 prerequisites, profiles, and offline notes, see [INSTALL.md](INSTALL.md).
+
+Windows entry (Qubit-owned; never clones the upstream tree):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Help
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -DryRun
+powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -QubitHome "%LOCALAPPDATA%\qubit" -Channel stable
+```
+
+Flags: `-QubitHome DIR`, `-Channel stable|main`, `-NoModels`, `-NoDashboard`.
+`scripts\install.cmd` is the CMD wrapper for the same entry.
 
 ## Quickstart
 

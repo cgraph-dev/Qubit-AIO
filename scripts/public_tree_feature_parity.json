@@ -329,12 +329,6 @@
   },
   "deliberate_omissions": [
     {
-      "kind": "export_file",
-      "path": "voicebridge/cdp_supervisor.py",
-      "reason": "HEAD content contains the operator home marker /home/trick (its default Chromium profile path), so scripts/export_public_tree.py classifies it personal_path and reports it instead of publishing it. The file remains tracked; a portable default would remove this omission.",
-      "source": "voicebridge/cdp_supervisor.py:157"
-    },
-    {
       "kind": "internal_docs",
       "reason": "Measured reports, audits, session handoffs, plans, and status ledgers are filtered by INTERNAL_DOC_NAMES/INTERNAL_DOC_SUBSTRINGS; only the user-facing docs listed under groups.public_docs are required.",
       "source": "scripts/export_public_tree.py:122"
