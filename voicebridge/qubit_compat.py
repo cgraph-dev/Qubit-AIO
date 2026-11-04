@@ -4342,26 +4342,71 @@ def _live_gateway_platform_state(platform_id: str) -> Optional[str]:
     file; reporting it is first-party evidence). ``None`` when the runtime is
     absent/unreadable or the platform is unlisted — never a fabricated state.
     """
+    return _live_platform_state(
+        _live_gateway_platforms().get(str(platform_id), {}))
+
+
+def _live_gateway_platforms() -> Dict[str, Dict[str, Any]]:
+    """The daemon's own per-platform records, keyed by runtime adapter id.
+
+    ``gateway_state.json`` lives in the gateway home and outlives its writer,
+    so callers must only consult this when the gateway is verified running
+    (``_platform_rows`` does). A missing/unreadable record is honestly empty.
+    """
     try:
         from . import gateway_supervisor as GS
         record = GS.daemon_runtime_status()
-    except Exception:
-        return None
+    except Exception:  # noqa: BLE001 - a read failure is not a fabricated state
+        return {}
     if not isinstance(record, dict):
-        return None
+        return {}
     platforms_map = record.get("platforms_map")
     if not isinstance(platforms_map, dict):
-        return None
-    entry = platforms_map.get(str(platform_id))
+        return {}
+    return {str(k): v for k, v in platforms_map.items()
+            if isinstance(v, dict)}
+
+
+def _live_platform_state(entry: Dict[str, Any]) -> Optional[str]:
     if not isinstance(entry, dict):
         return None
     state = str(entry.get("state") or entry.get("status") or "").strip().lower()
     return state or None
 
 
+def _gateway_env_keys() -> set:
+    """Names with a non-empty value in the daemon's runtime ``.env``.
+
+    This is the gateway's real credential store (the one
+    ``messaging.bridge_platform_to_gateway`` writes). Only key NAMES are
+    returned; secret values are never read into the caller, logged, or served.
+    Best-effort: an absent/unreadable file is an empty set.
+    """
+    try:
+        from .gateway_supervisor import _daemon_home
+        env_path = _daemon_home(None) / ".env"
+        text = env_path.read_text(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001 - no store -> no extra credential evidence
+        return set()
+    keys = set()
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        if stripped.startswith("export "):
+            stripped = stripped[len("export "):].strip()
+        found, _, value = stripped.partition("=")
+        name = found.strip()
+        if name and value.strip().strip("\"'").strip():
+            keys.add(name)
+    return keys
+
+
 def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
-                       accounts: List[Dict[Any, Any]], gateway_running: bool
-                       ) -> Dict[str, Any]:
+                      accounts: List[Dict[Any, Any]], gateway_running: bool,
+                      live_platform: Optional[Dict[str, Any]] = None,
+                      gateway_env_keys: Optional[set] = None
+                      ) -> Dict[str, Any]:
     pub = _platform_public_entry(entry)
     pid = pub["id"]
     required = pub["required_env"]
@@ -4373,8 +4418,16 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
         "NO_ACCOUNT", "NO_CREDENTIAL", "")
     ref_complete = (all(refs.get(k) for k in required) if required
                     else bool(refs))
-    configured = bool(ref_complete or account_ok)
-    if gateway_running and not str(link.get("state", "") or ""):
+    # The gateway `.env` is a real credential store too: a platform enabled
+    # from the Channels panel keeps only the `env:KEY` marker in the dashboard
+    # store, and a CLI/QR setup writes the value straight to `.env`. Reading
+    # key names (never values) keeps `configured` honest with both.
+    env_complete = (all(k in (gateway_env_keys or set()) for k in required)
+                    if required else False)
+    live_state = _live_platform_state(live_platform or {})
+    configured = bool(ref_complete or account_ok or env_complete)
+    if gateway_running and live_state == "connected" and \
+            str(link.get("state", "")) not in ("LINKED", "DEGRADED"):
         # Gateway-owned transports (WhatsApp QR bridge, bot platforms) prove
         # themselves in the daemon's own gateway_state.json. The overlay store
         # only knows credential *references* saved via CONFIGURE, so a channel
@@ -4388,10 +4441,9 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
         # Telegram) would otherwise be reported UNAVAILABLE with
         # MSG_TRANSPORT_UNAVAILABLE even while the daemon serves it as
         # `connected` — a typed refusal standing in for a working channel.
-        if _live_gateway_platform_state(pid) == "connected":
-            configured = True
-            link = {"state": "LINKED", "platform": pid,
-                    "detail": "live gateway reports connected"}
+        configured = True
+        link = {"state": "LINKED", "platform": pid,
+                "detail": "live gateway reports connected"}
     store_enabled = rec.get("enabled")
     if isinstance(store_enabled, bool):
         enabled = store_enabled
@@ -4408,6 +4460,11 @@ def _platform_payload(cfg: Any, entry: Dict[str, Any], rec: Dict[str, Any],
         "state": state, "error_code": error_code,
         "error_message": error_message, "updated_at": rec.get("updated_at"),
         "home_channel": None,
+        # Reference parity: only the live daemon's own runtime record carries
+        # the multiplex shared-listener callback URL; a stopped gateway's
+        # retained record is history, not a current ingress.
+        "ingress_url": (live_platform or {}).get("ingress_url")
+        if gateway_running else None,
         "env_vars": _platform_env_payload(entry, refs, required, account_ok),
     }
     if pid == "whatsapp":
@@ -4488,6 +4545,7 @@ def _account_platform_payload(cfg: Any, account: Dict[str, Any],
         "gateway_running": gateway_running, "state": st, "error_code": code,
         "error_message": (str(msg)[:160] if msg else None),
         "updated_at": rec.get("updated_at"), "home_channel": None,
+        "ingress_url": None,
         "whatsapp_setup": None, "env_vars": [],
     }
 
@@ -4520,11 +4578,15 @@ def _platform_rows(cfg: Any) -> List[Dict[str, Any]]:
         gateway_running = bool(GS.status(cfg).get("running"))
     except Exception:
         gateway_running = False
+    live_platforms = _live_gateway_platforms() if gateway_running else {}
+    gateway_env_keys = _gateway_env_keys()
     rows = [
         _platform_payload(cfg, entry,
                           _platform_record(store, str(entry.get("id", ""))),
                           by_platform.get(str(entry.get("id", "")), []),
-                          gateway_running)
+                          gateway_running,
+                          live_platforms.get(str(entry.get("id", ""))),
+                          gateway_env_keys)
         for entry in entries
     ]
     for account in extra:
