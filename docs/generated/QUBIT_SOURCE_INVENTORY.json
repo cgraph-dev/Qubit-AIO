@@ -45957,7 +45957,7 @@
     "upstream_path": "scripts/desktop-update/posix.sh",
     "upstream_blob": "7c3b4560dcc5f338f074db1d11c3eec67bf31cab",
     "upstream_sha256": "e633b7a37cb45fe1d0a0517be36ac4cb0fcb358348ab27e7ab502e00e0ff9041",
-    "local_sha256": "c83641c7de013c403bfea3c3aa08ee0c8ef9f85126000e50aaf9b36879030270"
+    "local_sha256": "9c55ccfec3e9ca4131b9fb978cbc43a67fffa1336fed66816c2e9b349d35df18"
    },
    {
     "path": "scripts/desktop-update/repro.sh",
@@ -68833,7 +68833,7 @@
     "upstream_path": "tests/scripts/test_desktop_update_target.py",
     "upstream_blob": "38b42c47ffdf92b99d9bb6ec171be8585fa8afc1",
     "upstream_sha256": "c0176c830cd98722ab17a7ca3f359926eb33d15d24eea69c29de1161673054a7",
-    "local_sha256": "046cfa65baa94d94b9614fefeff9b02b0396c0e31d70374f68af341209cc1ff4"
+    "local_sha256": "657b174f4585f050ed453d8d42fb05f66122d018c48135746a7dec24861c9d6b"
    },
    {
     "path": "tests/scripts/test_dev_sandbox.py",
