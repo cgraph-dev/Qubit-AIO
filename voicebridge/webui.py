@@ -964,6 +964,9 @@ QUBIT_READ_AUTHORITY: tuple = (
     # The office tower is the Qubit office store authority; never read the
     # upstream Habblaud backend's unrelated organization.
     "/api/office/tower",
+    # Public liveness for port/health checks and the reference dashboard's
+    # ``GET /api/health`` contract. The compat handler is the authority.
+    "/api/health",
     "/api/cron/jobs",
     "/api/skills",
     "/api/tools/toolsets",
@@ -3717,6 +3720,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
                             "detail": "user guide is not in this install; "
                                       "see the repository docs/"},
                            503)
+        elif path == "/api/health":
+            # Unauthenticated liveness (same public contract as the reference
+            # dashboard). The payload carries no secrets; the compat handler is
+            # the single health authority shared with /agent/api/health.
+            from . import qubit_compat as _HC
+            code, out = _HC.h_health(self.app.orch.cfg,
+                                     query_params(self.path), {}, {})
+            self._json(out, code)
         elif path == "/api/status" and self._office_client_read_ok():
             # The vendored office client asks for its own status document at
             # this literal path. Only a request carrying the office nonce
