@@ -16,8 +16,13 @@ No network, no Windows host, no service is touched.
 """
 from __future__ import annotations
 
+import os
 import re
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 PS1 = REPO / "scripts" / "install.ps1"
@@ -231,3 +236,250 @@ def test_readme_documents_the_windows_entry_briefly():
     assert "-Channel" in text
     assert "%LOCALAPPDATA%\\qubit" in text
     assert "install.cmd" in text
+
+
+# ---------------------------------------------------------------------------
+# Contract additions: flags drive the resolved paths, stable resolves Qubit
+# tags, and the VoiceBridge tree is the documented new-install layout.
+# ---------------------------------------------------------------------------
+
+def test_qubit_home_drives_install_dir():
+    src = _ps1()
+    assert "$homePath = Convert-ToFullPath $QubitHome" in src
+    assert "if ([string]::IsNullOrWhiteSpace($installPath)) {" in src
+    assert "$installPath = Join-Path $homePath 'qubit'" in src
+    # An explicit -InstallDir still wins; -QubitHome is the default driver.
+    assert "if (-not [string]::IsNullOrWhiteSpace($InstallDir)) {" in src
+    assert "return (Initialize-Checkout (Convert-ToFullPath $InstallDir))" in src
+
+
+def test_stable_channel_resolves_qubit_release_tags_only():
+    src = _ps1()
+    assert "$tag = Get-LatestStableTag $RepoUrl" in src
+    assert "git ls-remote --tags --refs $Origin" in src
+    assert r"^v?(\d+)\.(\d+)\.(\d+)$" in src
+    assert "QUBIT_INSTALL_RELEASE_UNAVAILABLE" in src
+    # The root installer must not inherit the legacy upstream override.
+    assert "HERMES_REPO_URL" not in src
+    assert "hermes-agent" not in src
+    assert "Assert-QubitSource $RepoUrl" in src
+
+
+def test_release_tag_rerun_does_not_pull_a_detached_head():
+    src = _ps1()
+    assert "function Test-ReleaseTag" in src
+    assert "merge-base --is-ancestor $ref HEAD" in src
+    # `git pull` is only for branch refs; a detached tag checkout would fail.
+    assert "if (-not $isRelease) {" in src
+    branch_guard = src[src.index("if (-not $isRelease) {"):]
+    branch_guard = branch_guard[:branch_guard.index("return $Target")]
+    assert "pull --ff-only" in branch_guard
+
+
+def test_runtime_config_example_falls_back_to_the_vendored_tree():
+    src = _ps1()
+    assert "Join-Path $script:SourceDir 'cli-config.yaml.example'" in src
+    assert "Join-Path $script:SourceDir 'qubit_runtime/cli-config.yaml.example'" in src
+
+
+def test_qubit_home_contains_the_new_voice_tree():
+    src = _ps1()
+    assert "$newRoot = Join-Path $HomePath 'voice'" in src
+    assert "Join-Path $newRoot 'config'" in src
+    assert "Join-Path $newRoot 'data'" in src
+    assert "Join-Path $newRoot 'state'" in src
+    assert "Join-Path $newRoot 'cache'" in src
+    assert "Join-Path $newRoot 'models'" in src
+    assert "VoiceLayout = $voice.Mode" in src
+    assert "'read-old'" in src
+    # The launcher exports the resolved roots, not the old fixed names.
+    assert "$($script:Layout.XdgConfig)" in src
+    assert "$($script:Layout.XdgData)" in src
+
+
+# ---------------------------------------------------------------------------
+# Executed checks. These skip on hosts without a PowerShell parser; the
+# Windows installer workflow always has one.
+# ---------------------------------------------------------------------------
+
+def _powershell_host() -> str | None:
+    return shutil.which("pwsh") or shutil.which("powershell")
+
+
+def test_install_ps1_parses_with_the_real_powershell_parser(tmp_path: Path):
+    host = _powershell_host()
+    if not host:
+        pytest.skip("no PowerShell host (pwsh/powershell) on this runner")
+    harness = tmp_path / "parse-root-installer.ps1"
+    harness.write_text(
+        "param([string]$Path)\n"
+        "$tokens = $null\n"
+        "$errors = $null\n"
+        "[System.Management.Automation.Language.Parser]::ParseFile("
+        "$Path, [ref]$tokens, [ref]$errors) | Out-Null\n"
+        "if ($errors.Count) {\n"
+        "  $errors | Select-Object -First 8 | ForEach-Object {\n"
+        "    Write-Output ('  {0}: {1}' -f $_.Extent.StartLineNumber, $_.Message)\n"
+        "  }\n"
+        "  exit 1\n"
+        "}\n"
+        "Write-Output 'PS SYNTAX OK'\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        [host, "-NoProfile", "-ExecutionPolicy", "Bypass",
+         "-File", str(harness), str(PS1)],
+        capture_output=True, text=True, timeout=120,
+        stdin=subprocess.DEVNULL,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "PS SYNTAX OK" in result.stdout
+
+
+def _git(cwd: Path, *args: str) -> str:
+    return subprocess.run(
+        ["git", "-c", "user.name=Fixture",
+         "-c", "user.email=fixture@example.invalid",
+         "-c", "commit.gpgsign=false", *args],
+        cwd=cwd, check=True, capture_output=True, text=True,
+        stdin=subprocess.DEVNULL,
+    ).stdout.strip()
+
+
+def _run_ps_file(host: str, script: Path, timeout: int = 300):
+    return subprocess.run(
+        [host, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+         "-File", str(script)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        stdin=subprocess.DEVNULL, timeout=timeout,
+    )
+
+
+def test_stable_channel_resolves_the_tag_and_reruns_cleanly(tmp_path: Path):
+    host = _powershell_host()
+    if not host:
+        pytest.skip("no PowerShell host (pwsh/powershell) on this runner")
+    if not shutil.which("git"):
+        pytest.skip("git is required for the checkout fixture")
+
+    origin = tmp_path / "origin"
+    home = tmp_path / "home"
+    origin.mkdir()
+    home.mkdir()
+    _git(origin, "init", "-q", "-b", "main")
+    _git(origin, "commit", "-q", "--allow-empty", "-m", "before")
+    _git(origin, "tag", "-a", "v1.2.3", "-m", "release")
+    release = _git(origin, "rev-parse", "HEAD")
+    _git(origin, "commit", "-q", "--allow-empty", "-m", "newer")
+    tip = _git(origin, "rev-parse", "HEAD")
+
+    def _wrapper(name: str) -> Path:
+        script = tmp_path / name
+        script.write_text(
+            f". '{PS1}' -QubitHome '{home}' -Channel stable -RepoUrl '{origin.as_uri()}'\n"
+            "function Get-LatestStableTag { param([string]$Origin) return 'v1.2.3' }\n"
+            "Resolve-Layout | Out-Null\n"
+            "Initialize-Checkout $script:Layout.InstallDir | Out-Null\n"
+            "Write-Output (& git -C $script:Layout.InstallDir rev-parse HEAD)\n",
+            encoding="utf-8",
+        )
+        return script
+
+    first = _run_ps_file(host, _wrapper("install-first.ps1"))
+    assert first.returncode == 0, first.stdout + first.stderr
+    install = home / "qubit"
+    assert _git(install, "rev-parse", "HEAD") == release
+
+    # A checkout already past the release must not be moved backwards, and a
+    # detached tag checkout must not be `git pull`ed on a rerun.
+    _git(install, "checkout", "-q", "-B", "main", "origin/main")
+    assert _git(install, "rev-parse", "HEAD") == tip
+    second = _run_ps_file(host, _wrapper("install-second.ps1"))
+    assert second.returncode == 0, second.stdout + second.stderr
+    assert _git(install, "rev-parse", "HEAD") == tip
+    assert _git(install, "status", "--porcelain") == ""
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell 5.1 installer host")
+def test_help_and_dry_run_make_no_changes(tmp_path: Path):
+    host = _powershell_host()
+    if not host:
+        pytest.skip("no PowerShell host (pwsh/powershell) on this runner")
+    if not shutil.which("uv"):
+        pytest.skip("the -DryRun preflight requires uv on PATH")
+
+    home = tmp_path / "qubit-home"
+    help_result = subprocess.run(
+        [host, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(PS1), "-Help"],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        stdin=subprocess.DEVNULL, timeout=120,
+    )
+    assert help_result.returncode == 0, help_result.stdout + help_result.stderr
+    assert "Qubit Agent installer (Windows)" in help_result.stdout
+    assert not home.exists()
+
+    dry = subprocess.run(
+        [host, "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(PS1),
+         "-DryRun", "-NoModels", "-NoDashboard", "-NonInteractive",
+         "-QubitHome", str(home)],
+        capture_output=True, text=True, encoding="utf-8", errors="replace",
+        stdin=subprocess.DEVNULL, timeout=120,
+    )
+    assert dry.returncode == 0, dry.stdout + dry.stderr
+    assert "dry-run complete: no changes were made." in dry.stdout
+    assert not home.exists(), f"-DryRun created {home}"
+
+
+def test_install_config_initializes_the_new_voice_tree(tmp_path: Path):
+    host = _powershell_host()
+    if not host:
+        pytest.skip("no PowerShell host (pwsh/powershell) on this runner")
+    home = tmp_path / "home"
+    wrapper = tmp_path / "config.ps1"
+    wrapper.write_text(
+        f". '{PS1}' -QubitHome '{home}'\n"
+        "Resolve-Layout | Out-Null\n"
+        f"$script:SourceDir = '{REPO}'\n"
+        "Install-Config\n"
+        "Write-Output $script:Layout.VoiceLayout\n",
+        encoding="utf-8",
+    )
+    result = _run_ps_file(host, wrapper, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "new" in result.stdout.splitlines()
+
+    for rel in (
+        "voice/config/voice.yaml",
+        "voice/data",
+        "voice/state",
+        "voice/cache",
+        "voice/models",
+        ".env",
+        "config.yaml",
+    ):
+        assert (home / rel).exists(), f"Install-Config did not create {rel}"
+
+
+def test_get_latest_stable_tag_selects_the_latest_semver(tmp_path: Path):
+    host = _powershell_host()
+    if not host:
+        pytest.skip("no PowerShell host (pwsh/powershell) on this runner")
+    if not shutil.which("git"):
+        pytest.skip("git is required for the tag fixture")
+    origin = tmp_path / "origin"
+    origin.mkdir()
+    _git(origin, "init", "-q", "-b", "main")
+    _git(origin, "commit", "-q", "--allow-empty", "-m", "release")
+    for tag in ("v1.2.3", "1.3.0", "v1.10.0", "v2.0.0-rc1", "nightly"):
+        _git(origin, "tag", "-a", tag, "-m", tag)
+
+    home = tmp_path / "home"
+    wrapper = tmp_path / "tag.ps1"
+    wrapper.write_text(
+        f". '{PS1}' -QubitHome '{home}'\n"
+        f"Write-Output (Get-LatestStableTag '{origin.as_uri()}')\n",
+        encoding="utf-8",
+    )
+    result = _run_ps_file(host, wrapper, timeout=120)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.stdout.strip().splitlines()[-1] == "v1.10.0", result.stdout

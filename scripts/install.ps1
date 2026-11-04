@@ -5,7 +5,9 @@
 # keeps every path under the Qubit-owned root:
 #
 #   QUBIT_HOME  = %LOCALAPPDATA%\qubit by default
-#   data/config/state/cache/bin/venv all live below that root
+#   data/config/state/cache/bin/venv all live below that root, and a fresh
+#   VoiceBridge tree is initialized at <QUBIT_HOME>\voice\{config,data,...}
+#   (an existing XDG-style qubit-voicebridge tree is preserved read-old).
 #
 # It never clones, installs, or points at the upstream Hermes/OpenClaw tree.
 #
@@ -108,7 +110,8 @@ Options:
   -Help                     show this help without changing the machine
   -DryRun                   run preflight and print the resolved layout; make no changes
   -QubitHome DIR            Qubit-owned root for data/config/state/bin/venv
-                            (default: %LOCALAPPDATA%\qubit, or QUBIT_HOME)
+                            and the voice tree (default: %LOCALAPPDATA%\qubit,
+                            or QUBIT_HOME); also drives -InstallDir
   -Channel stable|main      source channel when this installer must clone:
                             stable = latest published release (default),
                             main   = main branch tip
@@ -173,32 +176,123 @@ function Convert-ToFullPath {
     return [IO.Path]::GetFullPath($expanded)
 }
 
+function Resolve-VoiceLayout {
+    param([string]$HomePath)
+    # Mirrors voicebridge/paths.py. A fresh install gets $QUBIT_HOME\voice;
+    # a checkout that still carries the previous Windows XDG-style tree is
+    # preserved read-old (never migrated, copied, or deleted).
+    $newRoot = Join-Path $HomePath 'voice'
+    $new = [pscustomobject]@{
+        Root   = $newRoot
+        Config = Join-Path $newRoot 'config'
+        Data   = Join-Path $newRoot 'data'
+        State  = Join-Path $newRoot 'state'
+        Cache  = Join-Path $newRoot 'cache'
+        Models = Join-Path $newRoot 'models'
+    }
+
+    $bases = [ordered]@{
+        Config = (Join-Path $HomePath 'config')
+        Data   = (Join-Path $HomePath 'data')
+        State  = (Join-Path $HomePath 'state')
+        Cache  = (Join-Path $HomePath 'cache')
+    }
+    foreach ($entry in @(
+            @('Config', 'XDG_CONFIG_HOME'),
+            @('Data', 'XDG_DATA_HOME'),
+            @('State', 'XDG_STATE_HOME'),
+            @('Cache', 'XDG_CACHE_HOME'))) {
+        $value = [Environment]::GetEnvironmentVariable($entry[1])
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            $bases[$entry[0]] = $value
+        }
+    }
+    $legacyName = 'qubit-voicebridge'
+    $legacy = [pscustomobject]@{
+        Root   = (Join-Path $bases.Config $legacyName)
+        Config = (Join-Path $bases.Config $legacyName)
+        Data   = (Join-Path $bases.Data $legacyName)
+        State  = (Join-Path $bases.State $legacyName)
+        Cache  = (Join-Path $bases.Cache $legacyName)
+        Models = (Join-Path (Join-Path $bases.Data $legacyName) 'models')
+    }
+
+    $newReady = Test-Path -LiteralPath $newRoot
+    foreach ($path in @($new.Config, $new.Data, $new.State, $new.Cache, $new.Models)) {
+        if ($newReady) { break }
+        $newReady = Test-Path -LiteralPath $path
+    }
+    $legacyReady = $false
+    foreach ($path in @($legacy.Config, $legacy.Data, $legacy.State, $legacy.Cache)) {
+        if ($legacyReady) { break }
+        $legacyReady = Test-Path -LiteralPath $path
+    }
+
+    if ($legacyReady -and -not $newReady) {
+        $mode = 'read-old'
+        $chosen = $legacy
+        $xdg = @{
+            Config = $bases.Config
+            Data   = $bases.Data
+            State  = $bases.State
+            Cache  = $bases.Cache
+        }
+    } else {
+        $mode = 'new'
+        $chosen = $new
+        $xdg = @{
+            Config = $new.Config
+            Data   = $new.Data
+            State  = $new.State
+            Cache  = $new.Cache
+        }
+    }
+    return [pscustomobject]@{
+        Mode      = $mode
+        Root      = $chosen.Root
+        Config    = $chosen.Config
+        Data      = $chosen.Data
+        State     = $chosen.State
+        Cache     = $chosen.Cache
+        Models    = $chosen.Models
+        XdgConfig = $xdg.Config
+        XdgData   = $xdg.Data
+        XdgState  = $xdg.State
+        XdgCache  = $xdg.Cache
+    }
+}
+
 function Resolve-Layout {
     $homePath = Convert-ToFullPath $QubitHome
+    # -QubitHome drives InstallDir unless the caller explicitly names a
+    # checkout with -InstallDir.
     $installPath = $InstallDir
     if ([string]::IsNullOrWhiteSpace($installPath)) {
         $installPath = Join-Path $homePath 'qubit'
     } else {
         $installPath = Convert-ToFullPath $installPath
     }
-    $data = Join-Path $homePath 'data'
-    $config = Join-Path $homePath 'config'
-    $state = Join-Path $homePath 'state'
-    $cache = Join-Path $homePath 'cache'
     $bin = Join-Path $homePath 'bin'
     $venv = Join-Path $homePath 'venv'
+    $voice = Resolve-VoiceLayout $homePath
     $script:Layout = [pscustomobject]@{
-        QubitHome  = $homePath
-        InstallDir = $installPath
-        DataDir    = $data
-        ConfigDir  = $config
-        StateDir   = $state
-        CacheDir   = $cache
-        BinDir     = $bin
-        VenvDir    = $venv
-        # voicebridge resolves <XDG_DATA_HOME>/qubit-voicebridge/models.
-        ModelsDir  = (Join-Path (Join-Path $data 'qubit-voicebridge') 'models')
-        VoiceDir   = (Join-Path $config 'qubit-voicebridge')
+        QubitHome   = $homePath
+        InstallDir  = $installPath
+        SourceDir   = ''
+        DataDir     = $voice.Data
+        ConfigDir   = $voice.Config
+        StateDir    = $voice.State
+        CacheDir    = $voice.Cache
+        BinDir      = $bin
+        VenvDir     = $venv
+        ModelsDir   = $voice.Models
+        VoiceDir    = $voice.Config
+        VoiceRoot   = $voice.Root
+        VoiceLayout = $voice.Mode
+        XdgConfig   = $voice.XdgConfig
+        XdgData     = $voice.XdgData
+        XdgState    = $voice.XdgState
+        XdgCache    = $voice.XdgCache
     }
     return $script:Layout
 }
@@ -274,20 +368,30 @@ function Get-LatestStableTag {
     return $best.Tag
 }
 
+function Test-ReleaseTag {
+    param([string]$Ref)
+    return [regex]::IsMatch($Ref, '^v?\d+\.\d+\.\d+$')
+}
+
 function Initialize-Checkout {
     param([string]$Target)
+    # Defence in depth: a dot-sourced embedding host reaches this directly,
+    # not only through Invoke-QubitInstall's assertion.
+    Assert-QubitSource $RepoUrl
     if (Test-Checkout $Target) { return $Target }
     $git = Get-CommandPath 'git'
     if (-not $git) {
         Fail-Prerequisite 'GIT' 'git is required to bootstrap the Qubit runtime when no checkout is present'
     }
     $ref = $GitBranch
+    $isRelease = $false
     if ($Channel -eq 'stable') {
         $tag = Get-LatestStableTag $RepoUrl
         if (-not $tag) {
             Fail-Typed 1 'QUBIT_INSTALL_RELEASE_UNAVAILABLE' "no stable release tag could be resolved from $RepoUrl; rerun with -Channel main"
         }
         $ref = $tag
+        $isRelease = $true
         Write-Step "Installing the latest stable release ($ref)"
     } else {
         Write-Step "Installing from branch $ref"
@@ -298,13 +402,25 @@ function Initialize-Checkout {
         if ($LASTEXITCODE -ne 0) {
             Fail-Typed 1 'QUBIT_INSTALL_GIT_FETCH_FAILED' "git fetch failed in $Target"
         }
+        if ($isRelease) {
+            # A rerun must never move a checkout backwards past the release it
+            # already contains, and a tag checkout is detached: `git pull`
+            # there would fail ("not currently on a branch").
+            & $git -C $Target merge-base --is-ancestor $ref HEAD 2>$null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Step "Already at or past $ref; keeping $Target"
+                return $Target
+            }
+        }
         & $git -C $Target checkout $ref
         if ($LASTEXITCODE -ne 0) {
             Fail-Typed 1 'QUBIT_INSTALL_GIT_CHECKOUT_FAILED' "git checkout $ref failed in $Target"
         }
-        & $git -C $Target pull --ff-only
-        if ($LASTEXITCODE -ne 0) {
-            Fail-Typed 1 'QUBIT_INSTALL_GIT_FETCH_FAILED' "could not fast-forward $Target to $ref"
+        if (-not $isRelease) {
+            & $git -C $Target pull --ff-only
+            if ($LASTEXITCODE -ne 0) {
+                Fail-Typed 1 'QUBIT_INSTALL_GIT_FETCH_FAILED' "could not fast-forward $Target to $ref"
+            }
         }
         return $Target
     }
@@ -550,6 +666,13 @@ function Install-Config {
     foreach ($dir in @('cron', 'sessions', 'logs', 'pairing', 'hooks', 'image_cache', 'audio_cache', 'memories', 'skills')) {
         New-Item -ItemType Directory -Force -Path (Join-Path $homePath $dir) | Out-Null
     }
+    # Initialize the VoiceBridge tree the runtime actually reads. A fresh
+    # install gets $QUBIT_HOME\voice; a read-old tree is preserved in place.
+    foreach ($dir in @($script:Layout.VoiceRoot, $script:Layout.VoiceDir,
+            $script:Layout.DataDir, $script:Layout.StateDir,
+            $script:Layout.CacheDir, $script:Layout.ModelsDir)) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    }
     $envFile = Join-Path $homePath '.env'
     if (-not (Test-Path -LiteralPath $envFile -PathType Leaf)) {
         $example = Join-Path $script:SourceDir '.env.example'
@@ -560,7 +683,12 @@ function Install-Config {
         }
     }
     $runtimeConfig = Join-Path $homePath 'config.yaml'
+    # The example lives inside the vendored runtime tree in a source checkout;
+    # accept a root-level copy too (release layouts may hoist it).
     $runtimeExample = Join-Path $script:SourceDir 'cli-config.yaml.example'
+    if (-not (Test-Path -LiteralPath $runtimeExample -PathType Leaf)) {
+        $runtimeExample = Join-Path $script:SourceDir 'qubit_runtime/cli-config.yaml.example'
+    }
     if (-not (Test-Path -LiteralPath $runtimeConfig -PathType Leaf) -and
         (Test-Path -LiteralPath $runtimeExample -PathType Leaf)) {
         Copy-Item -LiteralPath $runtimeExample -Destination $runtimeConfig
@@ -600,10 +728,10 @@ function Write-Launcher {
         '@echo off',
         'setlocal',
         "set `"QUBIT_HOME=$($script:Layout.QubitHome)`"",
-        "set `"XDG_CONFIG_HOME=$($script:Layout.ConfigDir)`"",
-        "set `"XDG_DATA_HOME=$($script:Layout.DataDir)`"",
-        "set `"XDG_STATE_HOME=$($script:Layout.StateDir)`"",
-        "set `"XDG_CACHE_HOME=$($script:Layout.CacheDir)`"",
+        "set `"XDG_CONFIG_HOME=$($script:Layout.XdgConfig)`"",
+        "set `"XDG_DATA_HOME=$($script:Layout.XdgData)`"",
+        "set `"XDG_STATE_HOME=$($script:Layout.XdgState)`"",
+        "set `"XDG_CACHE_HOME=$($script:Layout.XdgCache)`"",
         "`"$exe`" %*"
     )
     $text = ($lines -join "`r`n") + "`r`n"
@@ -639,6 +767,10 @@ function Write-Layout {
     Write-Step 'Qubit Agent install layout'
     Write-Host ("    QUBIT_HOME : {0}" -f $script:Layout.QubitHome)
     Write-Host ("    checkout   : {0}" -f $script:Layout.InstallDir)
+    if ($script:Layout.SourceDir) {
+        Write-Host ("    source     : {0}" -f $script:Layout.SourceDir)
+    }
+    Write-Host ("    layout     : {0} ({1})" -f $script:Layout.VoiceLayout, $script:Layout.VoiceRoot)
     Write-Host ("    data       : {0}" -f $script:Layout.DataDir)
     Write-Host ("    models     : {0}" -f $script:Layout.ModelsDir)
     Write-Host ("    config     : {0}" -f (Join-Path $script:Layout.VoiceDir 'voice.yaml'))
@@ -683,6 +815,7 @@ function Invoke-QubitInstall {
                 Write-Step "[dry-run] would clone $RepoUrl ($GitBranch) into $($layout.InstallDir)"
             }
         }
+        $layout.SourceDir = $source
         Write-Layout 'dry-run (no changes)'
         Write-Step "[dry-run] would install the Qubit package into $($layout.VenvDir)"
         if (-not $NoDashboard) {
@@ -700,6 +833,7 @@ function Invoke-QubitInstall {
 
     Test-Prerequisite
     $script:SourceDir = Resolve-Source (Get-ProjectDir)
+    $script:Layout.SourceDir = $script:SourceDir
     Write-Layout 'install'
 
     Install-Venv

@@ -54,7 +54,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -QubitHome "%LOCA
 ```
 
 Flags: `-QubitHome DIR`, `-Channel stable|main`, `-NoModels`, `-NoDashboard`.
-`scripts\install.cmd` is the CMD wrapper for the same entry.
+`scripts\install.cmd` is the CMD wrapper for the same entry. Windows CI
+(`.github/workflows/windows-installer.yml`) parses the installer, runs
+`-Help`/`-DryRun`, and performs a no-model/no-dashboard checkout install; the
+pinned model downloads, dashboard build, and update/uninstall paths remain
+unverified on Windows.
 
 ## Quickstart
 
