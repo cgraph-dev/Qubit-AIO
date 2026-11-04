@@ -1,0 +1,348 @@
+{
+  "schema": "qubit.public_tree_feature_parity.v1",
+  "description": "Static feature/page parity contract for the public source export. Every route, plugin manifest, backend handler, and asset named here must survive scripts/export_public_tree.py. The gate never starts a server.",
+  "sources": {
+    "app_routes": "frontend/qubit-web/src/App.tsx",
+    "spa_routes": "voicebridge/webui.py",
+    "plugin_root": "frontend/qubit-app/plugins",
+    "fleet_manifest": "frontend/qubit-web/public/plugins/fleet.json",
+    "backend_routes": "voicebridge/qubit_compat.py",
+    "dashboard_server": "qubit_runtime/qubit_cli/web_server.py",
+    "exporter": "scripts/export_public_tree.py"
+  },
+  "global_checks": [
+    {
+      "path": "qubit_runtime/qubit_cli/web_server.py",
+      "needles": [
+        "mount_spa",
+        "_mount_plugin_api_routes",
+        "_discover_dashboard_plugins"
+      ],
+      "reason": "the dashboard process must mount the SPA plus the plugin API/discovery surfaces"
+    }
+  ],
+  "pages": [
+    {
+      "id": "office",
+      "label": "Qubit Office",
+      "routes": ["/qubit-office"],
+      "app_routes": ["/qubit-office"],
+      "plugin": "qubit-office",
+      "plugin_tab": "/qubit-office",
+      "plugin_hidden": true,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-office"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/office/tower", "h_office_habblaud_snapshot"]
+        },
+        {
+          "path": "voicebridge/webui.py",
+          "needles": ["_serve_office_stream", "_serve_office_client_api", "_office_nonce_ok"]
+        },
+        {
+          "path": "voicebridge/office/tower.py",
+          "needles": ["def state(", "def floorplan("]
+        },
+        {
+          "path": "voicebridge/office/store.py",
+          "needles": ["def connect("]
+        },
+        {
+          "path": "voicebridge/office_stream.py",
+          "needles": ["def to_snapshot("]
+        }
+      ]
+    },
+    {
+      "id": "office2",
+      "label": "Agent Quest",
+      "routes": ["/qubit-office2"],
+      "app_routes": ["/qubit-office2"],
+      "plugin": "qubit-office2",
+      "plugin_tab": "/qubit-office2",
+      "plugin_hidden": true,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-office2"],
+      "backend": [],
+      "deliberate_backend_omission": "frontend/qubit-app/plugins/qubit-office2/qubit-office2.js is an authored static placeholder; it makes no network request and labels every value placeholder."
+    },
+    {
+      "id": "office3",
+      "label": "Voice Chat",
+      "routes": ["/qubit-office3"],
+      "app_routes": ["/qubit-office3"],
+      "plugin": "qubit-office3",
+      "plugin_tab": "/qubit-office3",
+      "plugin_hidden": true,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-office3"],
+      "backend": [
+        {
+          "path": "voicebridge/webui.py",
+          "needles": ["/api/talk", "submit_talk", "/api/interrupt"]
+        }
+      ]
+    },
+    {
+      "id": "tv",
+      "label": "Qubit TV",
+      "routes": ["/qubit-tv"],
+      "app_routes": ["/qubit-tv"],
+      "files": ["frontend/qubit-web/src/pages/QubitTvPage.tsx"],
+      "backend": [],
+      "deliberate_backend_omission": "frontend/qubit-web/src/pages/QubitTvPage.tsx is a browser launcher for external services; it needs no Qubit backend route."
+    },
+    {
+      "id": "achievements",
+      "label": "Achievements",
+      "routes": ["/achievements"],
+      "app_routes": [],
+      "fleet": {"name": "qubit-achievements"},
+      "dirs": [
+        "frontend/qubit-web/public/plugins/qubit-achievements",
+        "qubit_runtime/plugins/qubit-achievements"
+      ],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/plugins/qubit-achievements/achievements", "h_plugin_kanban_events"]
+        },
+        {
+          "path": "qubit_runtime/plugins/qubit-achievements/dashboard/plugin_api.py",
+          "needles": ["@router.get(\"/achievements\")", "def evaluate_tiered"]
+        }
+      ]
+    },
+    {
+      "id": "boards",
+      "label": "Boards",
+      "routes": ["/qubit-boards"],
+      "app_routes": [],
+      "plugin": "qubit-boards",
+      "plugin_tab": "/qubit-boards",
+      "plugin_hidden": false,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-boards"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/plugins/kanban/boards", "h_plugin_kanban_boards"]
+        },
+        {
+          "path": "voicebridge/kanban.py",
+          "needles": ["def boards_list(", "def board_open("]
+        }
+      ]
+    },
+    {
+      "id": "reports",
+      "label": "Reports",
+      "routes": ["/reports"],
+      "app_routes": [],
+      "plugin": "qubit-reports",
+      "plugin_tab": "/reports",
+      "plugin_hidden": false,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-reports"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/analytics", "h_analytics", "/api/logs", "h_logs"]
+        },
+        {
+          "path": "voicebridge/communications/reports.py",
+          "needles": ["def detail(", "def asset("]
+        }
+      ]
+    },
+    {
+      "id": "operations",
+      "label": "Operations",
+      "routes": ["/operations"],
+      "app_routes": [],
+      "plugin": "qubit-ops",
+      "plugin_tab": "/operations",
+      "plugin_hidden": false,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-ops"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/ops", "h_ops_catalog", "h_ops_run", "h_ops_confirm"]
+        },
+        {
+          "path": "voicebridge/dashboard_ops.py",
+          "needles": ["def model_op(", "def _dashboard_ctx("]
+        }
+      ]
+    },
+    {
+      "id": "runtime",
+      "label": "Runtime",
+      "routes": ["/qubit-runtime"],
+      "app_routes": [],
+      "plugin": "qubit-runtime",
+      "plugin_tab": "/qubit-runtime",
+      "plugin_hidden": false,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-runtime"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/runtime", "h_runtime"]
+        },
+        {
+          "path": "voicebridge/runtime_images.py",
+          "needles": ["def update_report("]
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "label": "Gateway",
+      "routes": ["/qubit-gateway"],
+      "app_routes": [],
+      "plugin": "qubit-gateway",
+      "plugin_tab": "/qubit-gateway",
+      "plugin_hidden": false,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-gateway"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/gateway", "h_gateway", "h_gateway_restart"]
+        },
+        {
+          "path": "voicebridge/gateway_peers.py",
+          "needles": ["def _approval_authorizes("]
+        }
+      ]
+    },
+    {
+      "id": "approvals",
+      "label": "Approvals",
+      "routes": ["/qubit-approvals"],
+      "app_routes": [],
+      "plugin": "qubit-approvals",
+      "plugin_tab": "/qubit-approvals",
+      "plugin_hidden": true,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-approvals"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/ops/approvals", "h_approvals_list"]
+        },
+        {
+          "path": "voicebridge/approvals.py",
+          "needles": ["def "]
+        }
+      ]
+    },
+    {
+      "id": "memory",
+      "label": "Memory",
+      "routes": ["/memory", "/qubit-memory"],
+      "app_routes": ["/qubit-memory"],
+      "plugin": "qubit-memory",
+      "plugin_tab": "/memory",
+      "plugin_hidden": false,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-memory"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/memory", "h_memory", "/api/curator", "h_curator"]
+        },
+        {
+          "path": "voicebridge/active_memory.py",
+          "needles": ["def "]
+        }
+      ]
+    },
+    {
+      "id": "models",
+      "label": "Models & Providers",
+      "routes": ["/qubit-models", "/models"],
+      "app_routes": ["/models"],
+      "plugin": "qubit-models",
+      "plugin_tab": "/qubit-models",
+      "plugin_hidden": false,
+      "plugin_has_api": true,
+      "dirs": ["frontend/qubit-app/plugins/qubit-models"],
+      "backend": [
+        {
+          "path": "voicebridge/qubit_compat.py",
+          "needles": ["/api/model/options", "h_model_options", "/api/model/set", "h_model_set"]
+        },
+        {
+          "path": "voicebridge/dashboard_ops.py",
+          "needles": ["list_model_profiles", "select_session_model"]
+        }
+      ]
+    }
+  ],
+  "groups": {
+    "tui_dist": {
+      "description": "Committed Ink TUI build required to launch `qubit`/the dashboard terminal.",
+      "dirs": ["qubit_runtime/ui-tui/dist"]
+    },
+    "voicebridge": {
+      "description": "The voice/dashboard control surface package.",
+      "dirs": ["voicebridge"],
+      "min_files": 100
+    },
+    "plugin_catalog": {
+      "description": "Source plugin catalog plus the published JSON served to clients.",
+      "dirs": ["qubit_runtime/plugin-catalog"],
+      "files": ["qubit_runtime/website/static/api/plugin-catalog.json"]
+    },
+    "systemd": {
+      "description": "User units installed by the product.",
+      "dirs": ["systemd"]
+    },
+    "public_docs": {
+      "description": "User-facing docs and legal/provenance files that must survive the internal-doc filter.",
+      "files": [
+        "README.md",
+        "LICENSE",
+        "SECURITY.md",
+        "PRODUCT.md",
+        "THIRD_PARTY_NOTICES.md",
+        "docs/README.md",
+        "docs/IDENTITY.md",
+        "docs/ARCHITECTURE.md",
+        "docs/BRAND.md",
+        "docs/PARITY.md",
+        "docs/MIGRATION.md",
+        "docs/QUBIT-TV.md",
+        "docs/OFFICE-DEPLOYMENT-CONTRACT.md",
+        "docs/OFFICE-CLI-COMPLETENESS.md",
+        "docs/OFFICE-ANIMATION-REACHABILITY.md",
+        "docs/ORB_FX_SPEC.md",
+        "docs/OPENJARVIS-8-AGENT-ABSORPTION.md",
+        "docs/ELECTRON-44-MIGRATION.md"
+      ]
+    }
+  },
+  "deliberate_omissions": [
+    {
+      "kind": "export_file",
+      "path": "voicebridge/cdp_supervisor.py",
+      "reason": "HEAD content contains the operator home marker /home/trick (its default Chromium profile path), so scripts/export_public_tree.py classifies it personal_path and reports it instead of publishing it. The file remains tracked; a portable default would remove this omission.",
+      "source": "voicebridge/cdp_supervisor.py:157"
+    },
+    {
+      "kind": "internal_docs",
+      "reason": "Measured reports, audits, session handoffs, plans, and status ledgers are filtered by INTERNAL_DOC_NAMES/INTERNAL_DOC_SUBSTRINGS; only the user-facing docs listed under groups.public_docs are required.",
+      "source": "scripts/export_public_tree.py:122"
+    },
+    {
+      "kind": "nav",
+      "reason": "/qubit-office2 (Agent Quest) and /qubit-office3 (Voice Chat) are intentionally hidden URL-reachable pages, not sidebar rows; their manifests declare tab.hidden=true.",
+      "source": "frontend/qubit-web/src/App.tsx:513"
+    }
+  ]
+}

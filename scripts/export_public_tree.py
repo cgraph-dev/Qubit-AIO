@@ -83,6 +83,18 @@ ALLOWED_ROOT_FILES = frozenset({
     "pytest.ini",
 })
 
+#: Tracked product build output that MUST ship even though it lives under a
+#: ``dist`` segment.  These are vendored/committed runtime assets the product
+#: serves (the Ink TUI entry, the pinned dashboard plugin bundles), not
+#: regenerable local build output.  ``dist`` stays excluded everywhere else.
+PRODUCT_DIST_SUBTREES = frozenset({
+    "frontend/qubit-web/public/plugins/qubit-achievements/dist",
+    "frontend/qubit-web/public/plugins/kanban/dist",
+    "qubit_runtime/plugins/qubit-achievements/dashboard/dist",
+    "qubit_runtime/plugins/kanban/dashboard/dist",
+    "qubit_runtime/ui-tui/dist",
+})
+
 #: Directory names that are build output, runtime state, local dependencies,
 #: editor/agent state, or transient capture output.  Matching any path segment
 #: excludes the whole subtree.
@@ -355,6 +367,14 @@ def _docs_excluded(path: str) -> bool:
     return False
 
 
+def _is_product_dist(path: str) -> bool:
+    """True for a committed product build asset (see PRODUCT_DIST_SUBTREES)."""
+    return any(
+        path == subtree or path.startswith(subtree + "/")
+        for subtree in PRODUCT_DIST_SUBTREES
+    )
+
+
 def _classify(path: str) -> tuple[bool, str]:
     """Return ``(allowed, reason)`` for a tracked path."""
     parts = PurePosixPath(path).parts
@@ -370,7 +390,11 @@ def _classify(path: str) -> tuple[bool, str]:
         if top not in ALLOWED_TOP_LEVEL_DIRS:
             return False, "not_allowlisted"
 
-    if any(part in EXCLUDED_DIR_SEGMENTS for part in parts[1:]):
+    for segment in parts[1:]:
+        if segment not in EXCLUDED_DIR_SEGMENTS:
+            continue
+        if segment == "dist" and _is_product_dist(path):
+            continue
         return False, "excluded_dir"
 
     if top == "config" and not _config_allowed(path):
@@ -441,6 +465,21 @@ def _select(
             excluded.setdefault(reason, []).append(path)
             counts[reason] = counts.get(reason, 0) + 1
     return included, excluded, counts
+
+
+def selected_paths(
+    repo: Path,
+) -> tuple[list[str], list[str], dict[str, list[str]], dict[str, int], set[str]]:
+    """Return ``(tracked, included, excluded, counts, personal)``.
+
+    Public seam for the feature-parity gate: it must assert against the same
+    rules ``--check``/``--dest`` use, not a second hand-copied allowlist.
+    """
+    tracked = _tracked_paths(repo)
+    personal = _personal_path_files(repo)
+    symlinks = _symlink_targets(repo)
+    included, excluded, counts = _select(tracked, personal, symlinks)
+    return tracked, included, excluded, counts, personal
 
 
 def _build_report(
