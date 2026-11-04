@@ -305,3 +305,31 @@ def test_treeless_checkout_still_outranks_a_doc_fetched_before_the_bump(tmp_path
         os.utime(p, (0, 0))
     monkeypatch.setattr(pc, "_in_tree_catalog_time", -1.0)
     assert {e.name: e.sha for e in pc.load_catalog_live()}["shared"] == old
+
+
+def test_live_catalog_url_targets_the_runtime_website_assets(monkeypatch):
+    """The published catalog lives under ``qubit_runtime/website/static/api``.
+
+    ``website/static/api/plugin-catalog.json`` is a 404 at the repository root
+    (the website is vendored inside the runtime package), so every install
+    silently fell back to the in-tree copy instead of refreshing live.
+    """
+    from pathlib import Path
+
+    from qubit_cli import install_source
+
+    assert pc.LIVE_CATALOG_PATH == (
+        "qubit_runtime/website/static/api/plugin-catalog.json")
+    assert pc.LIVE_CATALOG_URL.endswith(
+        "/qubit_runtime/website/static/api/plugin-catalog.json")
+    # The old root-relative path is the defect this pins against.
+    assert "/main/website/static/api/plugin-catalog.json" not in pc.LIVE_CATALOG_URL
+
+    # The resolver honours its override and keeps the corrected path.
+    monkeypatch.setenv("QUBIT_RAW_ASSET_BASE_URL", "https://raw.example/")
+    assert install_source.raw_asset_url(pc.LIVE_CATALOG_PATH) == (
+        "https://raw.example/qubit_runtime/website/static/api/plugin-catalog.json")
+
+    # The directory the URL names exists in this checkout.
+    assert (Path(pc.__file__).resolve().parents[1]
+            / "website" / "static" / "api").is_dir()

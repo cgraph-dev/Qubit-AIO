@@ -434,67 +434,203 @@ def _public(rec: Dict[str, Any],
         "invocation_code": INVOKE_READY_CODE if ready else INVOKE_OPERATOR_CODE,
         "status": ("connected" if connected else "configured-not-connected"),
         "source": "qubit-registry",
+        "error": None,
     }
 
 
-def config_server_names(cfg: Any) -> List[str]:
-    """Operator-declared MCP server names from the Qubit config (read-only).
-
-    The MCP CLIENT reads the top-level ``mcp_servers`` key
-    (``qubit_runtime/tools/mcp_tool_config.py::_load_mcp_config``); this reader
-    must agree or the dashboard lists a *different* set of servers than the one
-    that actually connects — config-declared servers then render as invisible
-    even though they are live. The legacy nested ``mcp.servers`` shape is still
-    accepted so a pre-existing declaration stays visible. PRB-01: read-only,
-    merged into the canonical registry view; never written, never a second
-    authority.
-    """
-    # ``cfg`` may be a plain dict (config.yaml) or a config object exposing
-    # ``.get``. ``dict.get`` takes ``default`` POSITIONALLY only, so normalise
-    # through an explicit helper rather than passing it as a keyword (which
-    # raises TypeError on a dict and hid every config-declared server).
-    def get(*path: str, default: Any = None) -> Any:
-        if isinstance(cfg, dict):
-            cur: Any = cfg
-            for key in path:
-                if not isinstance(cur, dict) or key not in cur:
-                    return default
-                cur = cur[key]
-            return cur
-        getter = getattr(cfg, "get", None)
-        if callable(getter):
-            try:
-                return getter(*path, default=default)
-            except TypeError:
-                try:
-                    return getter(*path)
-                except Exception:
-                    return default
+def _boolish(value: Any, default: bool = True) -> bool:
+    """Parse the runtime's bool-ish ``enabled`` value (absent/null = on)."""
+    if value is None:
         return default
+    if isinstance(value, (bool, int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in ("true", "1", "yes", "on"):
+            return True
+        if lowered in ("false", "0", "no", "off"):
+            return False
+    return default
 
-    def _names(raw: Any) -> List[str]:
-        if isinstance(raw, dict):
-            return [str(k) for k in raw.keys()]
-        if isinstance(raw, list):
-            return [str(x if isinstance(x, str) else x.get("name", ""))
-                    for x in raw if isinstance(x, (str, dict))]
-        return []
 
-    # Primary: the top-level key the MCP client actually loads.
-    names = _names(get("mcp_servers", default={}))
-    # Legacy/alternate: the nested ``mcp.servers`` shape.
-    if not names:
-        names = _names(get("mcp", "servers", default=[]))
-    return sorted(n for n in names if n)
+def _runtime_config_path(cfg: Any) -> Optional[Path]:
+    """``<QUBIT_HOME>/config.yaml`` for this cfg, or None when unresolvable.
+
+    The MCP client reads the runtime home's own config.yaml; reading the
+    voicebridge ``voice.yaml`` here is what hid live servers before. The
+    resolver only publishes the home into the environment (no file writes).
+    """
+    try:
+        from . import qubit_runtime as QR
+
+        return Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
+    except Exception:  # noqa: BLE001 - inventory is best-effort
+        return None
+
+
+def _runtime_config_servers(cfg: Any) -> Dict[str, Dict[str, Any]]:
+    """Top-level ``mcp_servers`` from the runtime config.yaml, normalised.
+
+    Read-only: the file is parsed, never written. Only connectivity metadata is
+    carried; raw ``env`` values are deliberately dropped (a config may hold a
+    literal credential — the dashboard never returns one).
+    """
+    path = _runtime_config_path(cfg)
+    if path is None or not path.is_file():
+        return {}
+    try:
+        import yaml
+
+        raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except (OSError, ValueError, TypeError):
+        return {}
+    servers = raw.get("mcp_servers") if isinstance(raw, dict) else None
+    if not isinstance(servers, dict):
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    for name, entry in servers.items():
+        name = str(name or "").strip()
+        if not name:
+            continue
+        entry = entry if isinstance(entry, dict) else {}
+        url = str(entry.get("url") or "").strip()
+        command = str(entry.get("command") or "").strip()
+        args = entry.get("args")
+        auth = str(entry.get("auth") or "none").strip().lower()
+        out[name] = {
+            "name": name,
+            "transport": "http" if url else "stdio",
+            "auth": auth if auth in _AUTHS else "none",
+            "command": command or None,
+            "args": [str(a) for a in args] if isinstance(args, (list, tuple)) else [],
+            "url": url or None,
+            "enabled": _boolish(entry.get("enabled"), default=True),
+            # Raw env values stay unread by the served surface.
+            "env": {},
+            "capabilities": [],
+            "source": "qubit-config",
+        }
+    return out
+
+
+def _config_get(cfg: Any, *path: str, default: Any = None) -> Any:
+    """Read a dotted path from a dict or config object (kwargs-safe)."""
+    if isinstance(cfg, dict):
+        cur: Any = cfg
+        for key in path:
+            if not isinstance(cur, dict) or key not in cur:
+                return default
+            cur = cur[key]
+        return cur
+    getter = getattr(cfg, "get", None)
+    if callable(getter):
+        try:
+            return getter(*path, default=default)
+        except TypeError:
+            try:
+                return getter(*path)
+            except Exception:
+                return default
+        except Exception:
+            return default
+    return default
+
+
+def config_server_records(cfg: Any) -> Dict[str, Dict[str, Any]]:
+    """Operator-declared MCP servers with their real transport + enabled state.
+
+    The MCP CLIENT reads the runtime home's top-level ``mcp_servers`` key
+    (``qubit_runtime/tools/mcp_tool_config.py::_load_mcp_config``); this reader
+    must agree or the dashboard lists a different set of servers than the one
+    that actually connects. Before this, live servers (``rea``, ``memelord``)
+    were listed as ``enabled: false`` with no transport because only the
+    voicebridge ``voice.yaml`` was consulted. The legacy nested ``mcp.servers``
+    shape is still accepted so a pre-existing declaration stays visible, but it
+    remains inventory-only (the runtime client does not load it). PRB-01:
+    read-only; never written, never a second authority.
+    """
+    records = _runtime_config_servers(cfg)
+    legacy = _config_get(cfg, "mcp", "servers", default=None)
+    if isinstance(legacy, dict):
+        for name, entry in legacy.items():
+            name = str(name or "").strip()
+            if not name or name in records:
+                continue
+            entry = entry if isinstance(entry, dict) else {}
+            url = str(entry.get("url") or "").strip()
+            command = str(entry.get("command") or "").strip()
+            args = entry.get("args")
+            auth = str(entry.get("auth") or "none").strip().lower()
+            records[name] = {
+                "name": name,
+                "transport": "http" if url else "stdio",
+                "auth": auth if auth in _AUTHS else "none",
+                "command": command or None,
+                "args": [str(a) for a in args] if isinstance(args, (list, tuple)) else [],
+                "url": url or None,
+                # The runtime client never loads this shape: inventory-only.
+                "enabled": False,
+                "env": {},
+                "capabilities": [],
+                "source": "qubit-config",
+            }
+    elif isinstance(legacy, list):
+        for item in legacy:
+            name = str(item if isinstance(item, str)
+                       else item.get("name", "") if isinstance(item, dict) else "")
+            name = name.strip()
+            if name and name not in records:
+                records[name] = {
+                    "name": name, "transport": "stdio", "auth": "none",
+                    "command": None, "args": [], "url": None,
+                    "enabled": False, "env": {}, "capabilities": [],
+                    "source": "qubit-config",
+                }
+    return records
+
+
+def config_server_names(cfg: Any) -> List[str]:
+    """Operator-declared MCP server names from the runtime config (read-only)."""
+    return sorted(config_server_records(cfg))
+
+
+def _cached_runtime_status(configured: Dict[str, Dict[str, Any]]
+                           ) -> Dict[str, Dict[str, Any]]:
+    """Per-server runtime status from the agent's cached state (never connects).
+
+    The vendored ``get_mcp_status`` only reads already-cached runtime state, so
+    a parked/failed/connecting server becomes visible without a probe, a
+    reconnect, or a retry storm. It is process-local: a separate dashboard
+    process has no agent connections and returns nothing, which is honest —
+    callers then keep the discovery-cache-derived state.
+    """
+    try:
+        from . import qubit_runtime as QR
+
+        QR.ensure_path()
+        from tools.mcp_tool_discovery import get_mcp_status  # type: ignore
+
+        rows = get_mcp_status(dict(configured), include_runtime=True)
+    except Exception:  # noqa: BLE001 - status is best-effort, never a gate
+        return {}
+    out: Dict[str, Dict[str, Any]] = {}
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or "").strip()
+        if name:
+            out[name] = row
+    return out
 
 
 def list_servers(cfg: Any) -> Dict[str, Any]:
-    """Configured MCP servers (canonical registry + read-only config names).
+    """Configured MCP servers (canonical registry + read-only config records).
 
     PRB-01: this is the ONE MCP read authority. Dashboard GET, CLI
     ``qubit mcp status``, voice ``mcp``, and ``integration_status.mcp_status``
-    all resolve here; ``config_server_names`` is a read-only inventory that is
-    merged so a pre-existing operator declaration stays visible.
+    all resolve here; ``config_server_records`` is a read-only inventory that is
+    merged so a pre-existing operator declaration keeps its real transport and
+    enabled state instead of rendering as a disabled empty row.
     """
     data = _load(cfg)
     rows: List[Dict[str, Any]] = []
@@ -503,21 +639,38 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
     # connection per row; a server whose live tools/list was recorded reads
     # connected, everything else stays honestly disconnected).
     discovered = _discovered_servers()
+    config_records = config_server_records(cfg)
     for name, rec in sorted(data["servers"].items()):
         if not isinstance(rec, dict):
             continue
         rows.append(_public(rec, connected=name in discovered))
         seen.add(name)
-    for name in config_server_names(cfg):
-        if name not in seen:
-            rows.append({"name": name, "transport": "stdio",
-                         "auth": "none", "command": None, "args": [],
-                         "url": None, "env": {}, "enabled": False,
-                         "connected": False, "invocable": False,
-                         "invocation_code": INVOKE_OPERATOR_CODE,
-                         "status": "configured-not-connected",
-                         "source": "qubit-config"})
-            seen.add(name)
+    for name, rec in sorted(config_records.items()):
+        if name in seen:
+            continue
+        row = _public(rec, connected=name in discovered)
+        row["source"] = "qubit-config"
+        rows.append(row)
+        seen.add(name)
+    # Merge cached runtime state (parked/failed/connecting/lazy) without ever
+    # opening a connection. Only fields the served row already has are changed.
+    runtime = _cached_runtime_status(
+        {name: rec for name, rec in config_records.items()}
+        | {name: rec for name, rec in data["servers"].items()
+           if isinstance(rec, dict) and name not in config_records})
+    if runtime:
+        for row in rows:
+            status_row = runtime.get(str(row.get("name")))
+            if not status_row:
+                continue
+            status = str(status_row.get("status") or "")
+            if status and status != "configured":
+                row["status"] = status
+            if status_row.get("connected"):
+                row["connected"] = True
+            error = status_row.get("error")
+            if error:
+                row["error"] = str(error)[:240]
     return {"schema": SCHEMA, "servers": rows, "total": len(rows)}
 
 
