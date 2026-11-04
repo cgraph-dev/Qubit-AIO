@@ -865,7 +865,11 @@ class KawaiiSpinner:
         'pulse': list('◜◠◝◞◡◟'), 'brain': list('🧠💭💡✨💫🌟💡💭'), 'sparkle': list('⁺˚*✧✦✧*˚'),
     }
     KAWAII_WAITING = [
-        "(｡◕‿◕｡)", "(◕‿◕✿)", "٩(◕‿◕｡)۶", "(✿◠‿◠)", "( ˘▽˘)っ", "♪(´ε` )", "(◕ᴗ◕✿)", "ヾ(＾∇＾)", "(≧◡≦)", "(★ω★)",
+        # Idle / waiting-for-you. Same register as the thinking faces below —
+        # netrunner and machine, not the old kawaii set: the face sits beside the
+        # verb, so mixing "cute" faces with "puking bytes" reads as two fonts.
+        "[ ▓▓▓░░ ]", "(¬_¬)旦", "⌗⌗⌗", "( •_•)>⌐■-■", "⟦◉⟧", "▚▞▚▞", "( ͠° ͟ʖ ͡°)",
+        "(⌐■_■)", "Ψ(｀▽´)Ψ", "⌁⌁⌁", "(́•_•`)", "ᕦ(ò_óˇ)ᕤ",
     ]
     KAWAII_THINKING = [
         # Netrunner — hooded, wired, staring through you.

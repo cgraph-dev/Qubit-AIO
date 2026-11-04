@@ -42,7 +42,11 @@
  * <g transform="rotate(...)">, so the animation never fights the tilt. */
 .qubit-mark__ring {
   fill: none;
-  stroke-width: 1.1;
+  /* Thinned from 1.1: at 56px five 1.1px wires read as the whole logo and the
+   * particles become decoration on them. At 0.8 the rings are still legible as
+   * orbits but the eye follows the beads first, which is what makes the mark
+   * read as a particle system rather than a wireframe. */
+  stroke-width: 0.8;
   vector-effect: non-scaling-stroke;
 }
 
@@ -93,18 +97,18 @@
  * solid stroke here would bury them. */
 .qubit-mark__ring--near {
   stroke: currentColor;
-  stroke-opacity: 0.62;
+  stroke-opacity: 0.42;
 }
 
 .qubit-mark__ring--far {
   stroke: currentColor;
-  stroke-opacity: 0.34;
+  stroke-opacity: 0.17;
 }
 
 /* Deepest line stays the faintest — it is a depth cue, not a feature. */
 .qubit-mark__ring--deep {
   stroke: currentColor;
-  stroke-opacity: 0.26;
+  stroke-opacity: 0.18;
 }
 
 /* The two innermost planes. Lower opacity keeps five rings from reading as
@@ -117,7 +121,7 @@
 
 .qubit-mark__ring--closest {
   stroke: currentColor;
-  stroke-opacity: 0.5;
+  stroke-opacity: 0.34;
 }
 
 /* RGB fringe.
@@ -145,6 +149,10 @@
 .qubit-mark__bead {
   fill: currentColor;
   fill-opacity: 0.92;
+  /* A faint per-particle dim so the beads read at different depths instead of
+   * one flat sheet of identical dots. Beads on the deep/outer planes inherit the
+   * field opacity, which already varies; this adds the rest. */
+  opacity: var(--bead-dim, 1);
 }
 
 /* Free motes — dust drifting through the lattice. A slow vertical drift plus an
@@ -153,7 +161,9 @@
  * per-mote amplitude so the keyframes stay one shared rule. */
 .qubit-mark__mote {
   fill: currentColor;
-  fill-opacity: 0.55;
+  /* Dust, not beads: low base alpha so a mote never competes with a real
+   * particle, but high enough to register at 56px. */
+  fill-opacity: 0.62;
   animation-name: qubit-mark-mote-drift;
   animation-timing-function: ease-in-out;
   animation-iteration-count: infinite;
@@ -163,12 +173,20 @@
 
 @keyframes qubit-mark-mote-drift {
   from {
-    transform: translateY(calc(var(--mote-drift, 1.5) * -1px)) scale(0.75);
-    opacity: 0.2;
+    transform: translate(
+        calc(var(--mote-drift, 1.5) * -0.7px),
+        calc(var(--mote-drift, 1.5) * -1px)
+      )
+      scale(0.7);
+    opacity: 0.18;
   }
   to {
-    transform: translateY(calc(var(--mote-drift, 1.5) * 1px)) scale(1.15);
-    opacity: 0.75;
+    transform: translate(
+        calc(var(--mote-drift, 1.5) * 0.7px),
+        calc(var(--mote-drift, 1.5) * 1px)
+      )
+      scale(1.2);
+    opacity: 0.78;
   }
 }
 

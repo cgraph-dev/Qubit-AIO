@@ -970,6 +970,23 @@ export default function App() {
               collapsed && "lg:w-14",
             )}
           >
+            {/* Rail backdrop clip — this rail only. Sits at z-index:-2 behind the
+                engineering ruling (::before, z-index:-1) and every nav row.
+                Muted at the source by the stylesheet, then scrimmed, so 13px
+                labels keep their contrast on any theme. */}
+            <div className="qagent-sidebar__backdrop" aria-hidden="true">
+              <video
+                autoPlay
+                disablePictureInPicture
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                poster="/media/sidebar-backdrop-poster.jpg"
+                src="/media/sidebar-backdrop.mp4"
+              />
+              <div className="qagent-sidebar__backdrop-scrim" />
+            </div>
             <div
               className={cn(
                 "qagent-sidebar__brand-row",

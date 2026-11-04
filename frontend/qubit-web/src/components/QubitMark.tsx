@@ -36,6 +36,8 @@
  * at a static, well-spread 3D pose.
  */
 
+import type { CSSProperties } from "react";
+
 type OrbitName = "a" | "b" | "c" | "d" | "e";
 
 interface OrbitSpec {
@@ -70,6 +72,9 @@ interface Particle {
   seed: number;
   /** Bead radius in viewBox units. */
   r: number;
+  /** Per-bead brightness. Deep-plane beads dim toward the back so the cloud has
+   *  depth instead of reading as one flat sheet of identical dots. */
+  dim?: number;
 }
 
 /**
@@ -81,35 +86,35 @@ interface Particle {
  */
 const PARTICLES: Particle[] = [
   // a — outer ring.
-  { orbit: "a", seed: 12, r: 1.2 },
-  { orbit: "a", seed: 74, r: 0.85 },
-  { orbit: "a", seed: 132, r: 1.05 },
-  { orbit: "a", seed: 196, r: 0.75 },
-  { orbit: "a", seed: 258, r: 1.1 },
-  { orbit: "a", seed: 316, r: 0.9 },
+  { orbit: "a", seed: 12, r: 1.2, dim: 1.0 },
+  { orbit: "a", seed: 74, r: 0.85, dim: 1.0 },
+  { orbit: "a", seed: 132, r: 1.05, dim: 1.0 },
+  { orbit: "a", seed: 196, r: 0.75, dim: 1.0 },
+  { orbit: "a", seed: 258, r: 1.1, dim: 1.0 },
+  { orbit: "a", seed: 316, r: 0.9, dim: 1.0 },
   // b — second plane.
-  { orbit: "b", seed: 28, r: 1.0 },
-  { orbit: "b", seed: 92, r: 0.8 },
-  { orbit: "b", seed: 158, r: 1.05 },
-  { orbit: "b", seed: 224, r: 0.7 },
-  { orbit: "b", seed: 288, r: 0.95 },
+  { orbit: "b", seed: 28, r: 1.0, dim: 0.88 },
+  { orbit: "b", seed: 92, r: 0.8, dim: 0.88 },
+  { orbit: "b", seed: 158, r: 1.05, dim: 0.88 },
+  { orbit: "b", seed: 224, r: 0.7, dim: 0.88 },
+  { orbit: "b", seed: 288, r: 0.95, dim: 0.88 },
   // c — third plane, the lattice's spine.
-  { orbit: "c", seed: 44, r: 0.95 },
-  { orbit: "c", seed: 118, r: 0.75 },
-  { orbit: "c", seed: 186, r: 0.9 },
-  { orbit: "c", seed: 252, r: 0.7 },
-  { orbit: "c", seed: 324, r: 0.85 },
+  { orbit: "c", seed: 44, r: 0.95, dim: 0.78 },
+  { orbit: "c", seed: 118, r: 0.75, dim: 0.78 },
+  { orbit: "c", seed: 186, r: 0.9, dim: 0.78 },
+  { orbit: "c", seed: 252, r: 0.7, dim: 0.78 },
+  { orbit: "c", seed: 324, r: 0.85, dim: 0.78 },
   // d — inner plane.
-  { orbit: "d", seed: 18, r: 0.85 },
-  { orbit: "d", seed: 96, r: 0.7 },
-  { orbit: "d", seed: 174, r: 0.8 },
-  { orbit: "d", seed: 250, r: 0.65 },
-  { orbit: "d", seed: 330, r: 0.75 },
+  { orbit: "d", seed: 18, r: 0.85, dim: 0.7 },
+  { orbit: "d", seed: 96, r: 0.7, dim: 0.7 },
+  { orbit: "d", seed: 174, r: 0.8, dim: 0.7 },
+  { orbit: "d", seed: 250, r: 0.65, dim: 0.7 },
+  { orbit: "d", seed: 330, r: 0.75, dim: 0.7 },
   // e — innermost plane, smallest beads so the centre stays readable.
-  { orbit: "e", seed: 62, r: 0.7 },
-  { orbit: "e", seed: 142, r: 0.6 },
-  { orbit: "e", seed: 222, r: 0.72 },
-  { orbit: "e", seed: 302, r: 0.58 },
+  { orbit: "e", seed: 62, r: 0.7, dim: 0.62 },
+  { orbit: "e", seed: 142, r: 0.6, dim: 0.62 },
+  { orbit: "e", seed: 222, r: 0.72, dim: 0.62 },
+  { orbit: "e", seed: 302, r: 0.58, dim: 0.62 },
 ];
 
 /** Free-floating motes: they do not ride an orbit, they drift in the mark's own
@@ -130,14 +135,28 @@ interface Mote {
 }
 
 const MOTES: Mote[] = [
-  { cx: 9.4, cy: 25.2, r: 0.4, drift: 1.6, dur: 17.3, phase: 0.05 },
-  { cx: 30.8, cy: 13.6, r: 0.34, drift: 1.9, dur: 23.1, phase: 0.31 },
-  { cx: 14.2, cy: 11.8, r: 0.46, drift: 1.3, dur: 29.7, phase: 0.62 },
-  { cx: 26.4, cy: 28.6, r: 0.32, drift: 2.1, dur: 19.4, phase: 0.18 },
-  { cx: 6.2, cy: 16.4, r: 0.3, drift: 1.5, dur: 26.5, phase: 0.77 },
-  { cx: 33.6, cy: 22.8, r: 0.42, drift: 1.7, dur: 21.8, phase: 0.44 },
-  { cx: 18.6, cy: 32.2, r: 0.28, drift: 1.2, dur: 31.2, phase: 0.9 },
-  { cx: 22.2, cy: 7.4, r: 0.36, drift: 1.8, dur: 25.3, phase: 0.12 },
+  // Scattered through the whole 40-unit box, deliberately NOT on any orbit —
+  // that is the point. Beads prove the rings turn; motes fill the volume between
+  // them so the mark reads as a cloud with structure inside it, not as five
+  // wires. Radii stay under 0.5 units: dust, never a bead.
+  { cx: 9.4, cy: 25.2, r: 0.42, drift: 1.6, dur: 17.3, phase: 0.05 },
+  { cx: 30.8, cy: 13.6, r: 0.36, drift: 1.9, dur: 23.1, phase: 0.31 },
+  { cx: 14.2, cy: 11.8, r: 0.48, drift: 1.3, dur: 29.7, phase: 0.62 },
+  { cx: 26.4, cy: 28.6, r: 0.34, drift: 2.1, dur: 19.4, phase: 0.18 },
+  { cx: 6.2, cy: 16.4, r: 0.32, drift: 1.5, dur: 26.5, phase: 0.77 },
+  { cx: 33.6, cy: 22.8, r: 0.44, drift: 1.7, dur: 21.8, phase: 0.44 },
+  { cx: 18.6, cy: 32.2, r: 0.3, drift: 1.2, dur: 31.2, phase: 0.9 },
+  { cx: 22.2, cy: 7.4, r: 0.38, drift: 1.8, dur: 25.3, phase: 0.12 },
+  { cx: 11.8, cy: 20.4, r: 0.28, drift: 1.4, dur: 33.7, phase: 0.25 },
+  { cx: 29.2, cy: 18.2, r: 0.26, drift: 1.6, dur: 28.4, phase: 0.53 },
+  { cx: 16.4, cy: 27.6, r: 0.3, drift: 2.0, dur: 22.9, phase: 0.68 },
+  { cx: 24.8, cy: 10.4, r: 0.24, drift: 1.1, dur: 35.1, phase: 0.37 },
+  { cx: 7.8, cy: 30.6, r: 0.34, drift: 1.9, dur: 24.6, phase: 0.81 },
+  { cx: 32.4, cy: 8.2, r: 0.28, drift: 1.3, dur: 27.8, phase: 0.09 },
+  { cx: 20.6, cy: 36.4, r: 0.22, drift: 1.5, dur: 38.2, phase: 0.72 },
+  { cx: 20.4, cy: 3.6, r: 0.26, drift: 1.7, dur: 30.5, phase: 0.15 },
+  { cx: 4.6, cy: 22.2, r: 0.24, drift: 1.2, dur: 32.8, phase: 0.58 },
+  { cx: 35.4, cy: 27.4, r: 0.3, drift: 1.8, dur: 20.7, phase: 0.94 },
 ];
 
 const CENTRE = 20;
@@ -179,6 +198,11 @@ export function QubitMark({ className }: { className?: string }) {
                   cx={CENTRE + spec.r}
                   cy={CENTRE}
                   r={p.r}
+                  style={
+                    p.dim === undefined
+                      ? undefined
+                      : ({ ["--bead-dim" as string]: `${p.dim}` } as CSSProperties)
+                  }
                 />
               </g>
             ))}
