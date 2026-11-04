@@ -1265,8 +1265,8 @@ def _timer_state_dir() -> Path:
         sd.mkdir(parents=True, exist_ok=True)
         return sd
     except Exception:
-        from ..config import canonical_state_dir
-        sd = Path(canonical_state_dir())
+        from ..config import preferred_state_dir
+        sd = Path(preferred_state_dir())
         sd.mkdir(parents=True, exist_ok=True)
         return sd
 

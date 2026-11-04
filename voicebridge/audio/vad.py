@@ -145,9 +145,9 @@ def _make_vad_gate(backend: str, aggressiveness: int,
 
 
 def _default_silero_model() -> Path:
-    from ..config import canonical_data_dir
+    from ..config import preferred_models_dir
     candidates = [
-        canonical_data_dir() / "models" / "silero_vad_v5.onnx",
+        preferred_models_dir() / "silero_vad_v5.onnx",
         Path.home() / ".local/share/qubit-voice-agent/models/silero_vad_v5.onnx",
         Path.home() / ".local/share/openclaw-voice-bridge/models/silero_vad_v5.onnx",
     ]

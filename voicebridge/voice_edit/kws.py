@@ -103,8 +103,8 @@ def condition_samples(samples: Any, *, gain: float = 1.0,
 
 def models_root() -> Path:
     try:
-        from ..config import canonical_data_dir
-        return Path(canonical_data_dir()) / "models"
+        from ..config import preferred_models_dir
+        return Path(preferred_models_dir())
     except Exception:
         return Path(os.path.expanduser("~/.local/share/qubit-voicebridge/models"))
 

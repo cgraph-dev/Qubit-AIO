@@ -214,10 +214,21 @@ def default_home() -> Path:
     """Qubit-owned runtime home for the vendored fork.
 
     The ONE home shared by ``run()`` (CLI / forwarded reads), the dashboard
-    ASGI bridge (:mod:`voicebridge.qubit_asgi`), and voice. Derived from the
-    XDG state root (the same base :mod:`voicebridge.config` uses), never the
-    operator's external ``~/.hermes``.
+    ASGI bridge (:mod:`voicebridge.qubit_asgi`), and voice.
+
+    A new-layout install uses ``$QUBIT_HOME`` itself (the runtime lives at the
+    root of the Qubit home; VoiceBridge state lives under
+    ``$QUBIT_HOME/voice/state``). An existing XDG install keeps the historical
+    ``<state>/qubit-voicebridge/runtime``. Never the operator's external
+    ``~/.hermes``.
     """
+    try:
+        from .config import voice_layout
+        layout = voice_layout()
+        if layout.mode == "new":
+            return layout.qubit_home
+    except Exception:  # pragma: no cover - layout must never block startup
+        pass
     base = os.environ.get("XDG_STATE_HOME") or os.path.join(
         os.path.expanduser("~"), ".local", "state")
     return Path(base) / "qubit-voicebridge" / "runtime"
@@ -368,10 +379,11 @@ def runtime_home_for_cfg(cfg: Any = None) -> Path:
     """Resolve the runtime home for a specific ``Config`` (PRB-03).
 
     The canonical runtime home is the configured state directory's ``runtime``
-    child. ``voicebridge.config.canonical_state_dir()`` uses the same XDG base,
-    so this equals :func:`default_home` for the default profile and follows
-    ``logging.jsonl_path`` for a custom one. A caller with no config keeps the
-    process default. The store, the bridge, the PTY/TUI, and the CLI all resolve
+    child. ``voicebridge.config.preferred_state_dir()`` uses the same layout
+    resolver as the rest of the product (new ``$QUBIT_HOME/voice/state`` or a
+    read-old XDG install), so this equals :func:`default_home` for the default
+    profile and follows ``logging.jsonl_path`` for a custom one. A caller with
+    no config keeps the process default. The store, the bridge, the PTY/TUI, and the CLI all resolve
     through here so they read and write ONE ``state.db``.
 
     The resolved home is also published into ``QUBIT_HOME`` (unless the caller
