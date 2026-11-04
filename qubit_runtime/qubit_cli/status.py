@@ -407,7 +407,7 @@ def _render_summary(ctx):
         _kv("Gateway:", "unknown")
     _summary_row("Platforms:", _connected_platform_labels, "none configured")
     _kv("Jobs:", _cron_summary())
-    _banner(("  Run 'qubit status --full' for every section",), Colors.DIM)
+    _banner(("  Run 'qubit agent status --full' for every section",), Colors.DIM)
     print()
 
 

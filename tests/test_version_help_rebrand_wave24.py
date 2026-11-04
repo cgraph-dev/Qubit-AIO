@@ -46,9 +46,21 @@ def _load_toml(path: Path) -> dict:
 
 
 def _import_runtime_module(name: str):
-    """Import a module from the vendored ``qubit_runtime`` tree."""
+    """Import a module from the vendored ``qubit_runtime`` tree.
+
+    The installed editable package data root can point at another checkout, so
+    drop any already-imported copy of this top-level package that came from
+    outside the worktree before importing.
+    """
     if str(RUNTIME) not in sys.path:
         sys.path.insert(0, str(RUNTIME))
+    top = name.split(".", 1)[0]
+    for mod_name in list(sys.modules):
+        if mod_name != top and not mod_name.startswith(top + "."):
+            continue
+        mod_file = getattr(sys.modules[mod_name], "__file__", "") or ""
+        if not mod_file.startswith(str(RUNTIME)):
+            sys.modules.pop(mod_name, None)
     return __import__(name, fromlist=["*"])
 
 
@@ -111,7 +123,7 @@ def test_rebrand_epilogue_over_the_real_vendored_epilogue():
     assert out is not None
     for broken in _BROKEN_TOKENS:
         assert broken not in out
-    for good in ("qubit chat", "qubit --tui", "qubit setup", "qubit gateway install"):
+    for good in ("qubit chat", "qubit agent --tui", "qubit setup", "qubit gateway install"):
         assert good in out
 
 

@@ -103,8 +103,8 @@ class TestTuiExitSummaryResumeHint:
         ):
             _print_tui_exit_summary("20260524_000001_abc123")
         out = capsys.readouterr().out
-        assert "qubit --tui --resume 20260524_000001_abc123 -p dev" in out
-        assert 'qubit --tui -c "My TUI Session" -p dev' in out
+        assert "qubit agent --tui --resume 20260524_000001_abc123 -p dev" in out
+        assert 'qubit agent --tui -c "My TUI Session" -p dev' in out
 
     def test_tui_hints_no_profile_flag_on_default(self, capsys):
         with patch("qubit_state.SessionDB", _tui_session_db), patch(
@@ -112,5 +112,5 @@ class TestTuiExitSummaryResumeHint:
         ):
             _print_tui_exit_summary("20260524_000001_abc123")
         out = capsys.readouterr().out
-        assert "qubit --tui --resume 20260524_000001_abc123" in out
+        assert "qubit agent --tui --resume 20260524_000001_abc123" in out
         assert " -p " not in out

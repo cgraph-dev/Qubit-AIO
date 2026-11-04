@@ -12497,12 +12497,15 @@ _CLI_GUARDS: Dict[str, Tuple[str, str]] = {
     "checkpoints clear-legacy": ("clearing legacy checkpoint records; run `qubit "
                                  "checkpoints clear-legacy` in a terminal",
                                  "VOICE_TERMINAL_ONLY"),
-    "claw": ("legacy-assistant migration tooling; run `qubit claw` in a terminal",
+    "claw": ("legacy-assistant migration is install-gated: run `qubit plugins "
+             "install agent-importers`, then `qubit claw` in a terminal",
              "VOICE_TERMINAL_ONLY"),
-    "claw cleanup": ("legacy-assistant migration tooling; run `qubit claw "
+    "claw cleanup": ("legacy-assistant migration is install-gated: run `qubit "
+                     "plugins install agent-importers`, then `qubit claw "
                      "cleanup` in a terminal", "VOICE_TERMINAL_ONLY"),
-    "claw migrate": ("legacy-assistant migration; run `qubit claw migrate` in a "
-                     "terminal (dry-run by default)",
+    "claw migrate": ("legacy-assistant migration is install-gated: run `qubit "
+                     "plugins install agent-importers`, then `qubit claw "
+                     "migrate` in a terminal (dry-run by default)",
                      "VOICE_TERMINAL_ONLY"),
     "computer-use": ("computer-use control session; use the dashboard Control UI "
                      "or `qubit computer-use` in a terminal",

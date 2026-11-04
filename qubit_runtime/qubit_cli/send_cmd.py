@@ -108,9 +108,10 @@ def _list_targets(platform_filter: Optional[str], *, json_mode: bool) -> int:
         key = platform_filter.strip().lower()
         filtered = {k: v for k, v in platforms.items() if k.lower() == key}
         if not filtered:
-            return _fail(
+            _fail(
                 f"qubit send: no targets found for platform '{platform_filter}'. "
                 f"Configured: {', '.join(sorted(platforms)) or '(none)'}")
+            return _USAGE_EXIT
         platforms = filtered
     if json_mode:
         print(json.dumps({"platforms": platforms}, indent=2, default=str))
@@ -279,14 +280,14 @@ def register_send_subparser(subparsers) -> argparse.ArgumentParser:
         ),
         epilog=(
             "Examples:\n"
-            "  qubit send --to telegram \"deploy finished\"\n"
-            "  echo \"RAM 92%\" | qubit send --to telegram:-1001234567890\n"
-            "  qubit send --to discord:#ops --file ./report.md\n"
-            "  qubit send --to slack:#eng --subject \"[CI]\" --file build.log\n"
-            "  qubit send --to whatsapp:GROUP@g.us --mention 15551234567 \"@15551234567 hello\"\n"
-            "  qubit send --to telegram \"MEDIA:./chart.png\"   # send a media attachment\n"
-            "  qubit send --list                  # all platforms\n"
-            "  qubit send --list telegram         # filter by platform\n"
+            "  qubit agent send --to telegram \"deploy finished\"\n"
+            "  echo \"RAM 92%\" | qubit agent send --to telegram:-1001234567890\n"
+            "  qubit agent send --to discord:#ops --file ./report.md\n"
+            "  qubit agent send --to slack:#eng --subject \"[CI]\" --file build.log\n"
+            "  qubit agent send --to whatsapp:GROUP@g.us --mention 15551234567 \"@15551234567 hello\"\n"
+            "  qubit agent send --to telegram \"MEDIA:./chart.png\"   # send a media attachment\n"
+            "  qubit agent send --list                  # all platforms\n"
+            "  qubit agent send --list telegram         # filter by platform\n"
             "\n"
             "Exit codes: 0 ok, 1 delivery/backend error, 2 usage error."
         ),

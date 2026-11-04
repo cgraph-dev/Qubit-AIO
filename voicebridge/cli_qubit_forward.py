@@ -143,8 +143,6 @@ FAMILY_FORWARD = {
                    frozenset({"connect", "rename", "disconnect"})),
     "bundles": ("bundles", frozenset({"list", "show", ""}),
                 frozenset({"create", "delete", "reload"})),
-    "claw": ("claw", frozenset({""}),
-             frozenset({"migrate", "cleanup", "clean"})),
     "console": ("console", frozenset(), frozenset({ANY})),
     "debug": ("debug", frozenset({""}), frozenset({"share", "delete"})),
     "desktop": ("desktop", frozenset(), frozenset({ANY})),
@@ -276,6 +274,11 @@ NATIVE_REFUSALS = {
     "send": ("QUBIT_NATIVE_SEND",
              "qubit send reuses gateway credentials and is not forwarded: use "
              "`qubit msg send`"),
+    "claw": ("QUBIT_CLAW_PLUGIN_REQUIRED",
+             "qubit claw moved out of core into the `agent-importers` plugin, "
+             "which is not installed. Install it with `qubit plugins install "
+             "agent-importers`, then re-run `qubit claw ...`; `qubit "
+             "import-agent` remains the native importer"),
     "whatsapp": ("QUBIT_NATIVE_WHATSAPP",
                  "qubit whatsapp is an interactive pairing flow and is not "
                  "forwarded: configure it through `qubit channels`"),
