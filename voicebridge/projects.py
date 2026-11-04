@@ -372,6 +372,32 @@ def show(cfg: Any, slug: str) -> Dict[str, Any]:
             "project": _public(rec, state.get("active_slug") == rec["slug"])}
 
 
+def active_folder(cfg: Any) -> str:
+    """First recorded folder of the active project that still exists.
+
+    A folder is validated at registration time but can later be deleted or
+    moved. Consumers (files, git, agent workspace) previously took the first
+    recorded path verbatim, so a stale pointer made every read fail instead of
+    falling back to a folder the project still owns. Return the first folder
+    that is still a directory; ``""`` when the project is unset or none of its
+    folders remain.
+    """
+    try:
+        state = _load(cfg)
+    except ProjectError:
+        return ""
+    slug = state.get("active_slug")
+    rec = state["projects"].get(slug) if slug else None
+    for folder in (rec.get("folders", []) if rec else []) or []:
+        try:
+            path = Path(str(folder)).expanduser()
+            if path.is_dir():
+                return str(path)
+        except OSError:
+            continue
+    return ""
+
+
 def active_project(cfg: Any) -> Dict[str, Any]:
     """Resolve "my active project": the workspace the active-project
     pointer selects, with its details (read-only).

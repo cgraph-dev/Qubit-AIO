@@ -431,7 +431,7 @@ html[dir="rtl"] {
   --scan-faint: var(--qplate-faint, #55677f);
   --scan-hairline: rgb(127 212 255 / 16%);
   --scan-hairline-strong: rgb(127 212 255 / 38%);
-  --scan-canvas: #04070d;
+  --scan-canvas: var(--background-base, #04070d);
   --scan-panel: #0a111c;
   --scan-panel-raised: #101a2a;
   --scan-glow: 0 0 0 1px rgb(127 212 255 / 10%), 0 18px 44px rgb(0 0 0 / 46%);

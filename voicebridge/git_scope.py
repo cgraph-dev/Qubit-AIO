@@ -74,16 +74,19 @@ def resolve_root(cfg: Any, root: str = "") -> Path:
     if not text:
         from . import projects as PJ
 
-        active = PJ.active_project(cfg)
-        if active.get("state") != "OK" or not active.get("project"):
-            raise GitError(INPUT_CODE,
-                           "no root given and no active project; pass "
-                           "--root <folder> or set one with "
-                           "`qubit project use <slug> --confirm`")
-        folders = active["project"].get("folders", []) or []
-        if not folders:
+        # Prefer a folder that still exists; a stale active-project path used
+        # to make every worktree/branch read answer a scope refusal. When all
+        # recorded folders are gone, files.active_root() falls back to the
+        # backend cwd (the install checkout) so the Worktrees page stays usable.
+        text = FI.active_root(cfg)
+        if not text:
+            active = PJ.active_project(cfg)
+            if active.get("state") != "OK" or not active.get("project"):
+                raise GitError(INPUT_CODE,
+                               "no root given and no active project; pass "
+                               "--root <folder> or set one with "
+                               "`qubit project use <slug> --confirm`")
             raise GitError(INPUT_CODE, "the active project has no folders")
-        text = str(folders[0])
     if len(text) > 4096 or "\x00" in text:
         raise GitError(INPUT_CODE, "bad root path")
     candidate = Path(text).expanduser()
@@ -93,7 +96,7 @@ def resolve_root(cfg: Any, root: str = "") -> Path:
         resolved = candidate.resolve()
     except (OSError, RuntimeError) as exc:
         raise GitError(INPUT_CODE, f"cannot resolve root ({exc})")
-    for approved in FI.approved_roots(cfg):
+    for approved in FI.read_roots(cfg):
         try:
             resolved.relative_to(approved)
             return resolved

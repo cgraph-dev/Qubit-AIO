@@ -538,11 +538,25 @@ function resolveIcon(name: string): ComponentType<{ className?: string }> {
   return ICON_MAP[name] ?? Puzzle;
 }
 
+/** Every path a nav tree owns, including group children. */
+function collectNavPaths(items: readonly NavItem[]): Set<string> {
+  const paths = new Set<string>();
+  const add = (item: NavItem) => {
+    paths.add(item.path);
+    for (const child of item.children ?? []) add(child);
+  };
+  for (const item of items) add(item);
+  return paths;
+}
+
 function buildNavItems(
   builtIn: NavItem[],
   manifests: PluginManifest[],
 ): NavItem[] {
   const items = [...builtIn];
+  // Include nested group children: /devices (a Workspace child) also ships a
+  // plugin manifest, so a top-level-only check added a second Devices row.
+  const ownedPaths = collectNavPaths(items);
 
   for (const manifest of manifests) {
     if (manifest.tab.override) continue;
@@ -553,7 +567,7 @@ function buildNavItems(
     // it again puts two items with the same `path` into the sidebar list, which
     // React keys collide on (`key={item.path}`) and the menu shows the entry
     // twice. Skip it — the built-in entry wins.
-    if (items.some((i) => i.path === manifest.tab.path)) continue;
+    if (ownedPaths.has(manifest.tab.path)) continue;
 
     const pluginItem: NavItem = {
       path: manifest.tab.path,
@@ -575,6 +589,7 @@ function buildNavItems(
     } else {
       items.push(pluginItem);
     }
+    ownedPaths.add(pluginItem.path);
   }
 
   return items;
@@ -926,6 +941,8 @@ export default function App() {
             ref={chromeRef}
             data-collapsed={isDesktopCollapsed}
             aria-label={t.app.navigation}
+            aria-hidden={isMobile && !mobileOpen ? true : undefined}
+            inert={isMobile && !mobileOpen ? true : undefined}
             className={cn(
               "qagent-sidebar",
               "qplate",
@@ -1190,15 +1207,17 @@ export default function App() {
                       )}
                       aria-hidden={!isNativeChatRoute}
                     >
-                      <Suspense
-                        fallback={
-                          isNativeChatRoute ? (
-                            <RouteFallback label="Loading chat…" />
-                          ) : null
-                        }
-                      >
-                        <ChatPage isActive={isNativeChatRoute} />
-                      </Suspense>
+                      <PageErrorBoundary label="Chat">
+                        <Suspense
+                          fallback={
+                            isNativeChatRoute ? (
+                              <RouteFallback label="Loading chat…" />
+                            ) : null
+                          }
+                        >
+                          <ChatPage isActive={isNativeChatRoute} />
+                        </Suspense>
+                      </PageErrorBoundary>
                     </div>
                   ) : isNativeChatRoute ? (
                     <RouteFallback label="Loading chat…" />

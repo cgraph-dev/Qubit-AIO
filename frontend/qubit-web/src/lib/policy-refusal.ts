@@ -77,5 +77,13 @@ export function policyRefusalMessage(refusal: PolicyRefusal): string {
  */
 export function refusalOrError(error: unknown, fallback: string): string {
   const refusal = parsePolicyRefusal(error);
-  return refusal ? policyRefusalMessage(refusal) : fallback;
+  if (refusal) return policyRefusalMessage(refusal);
+  // `fetchJSON` throws `"<status>: <body>"`. When the body is plain text (a
+  // FastAPI `detail`, a proxy error) the status prefix is noise on the page —
+  // strip it so the operator reads the reason, not a raw `400:`. A genuinely
+  // opaque error still falls back to the caller's sentence.
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const stripped = message.replace(/^\s*\d{3}\s*:\s*/, "").trim();
+  if (stripped && stripped !== message.trim()) return stripped;
+  return fallback;
 }

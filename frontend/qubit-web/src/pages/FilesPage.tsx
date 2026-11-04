@@ -147,7 +147,7 @@ export default function FilesPage() {
         // perpetual "Loading".
         setEmptyDetail(result.detail ?? null);
       } catch (e) {
-        setError(String(e));
+        setError(refusalOrError(e, "Could not list this folder."));
         setEmptyDetail(null);
       } finally {
         setLoading(false);
@@ -233,7 +233,10 @@ export default function FilesPage() {
       if (e instanceof ConfirmRequiredError) {
         showToast("Folder creation cancelled", "error");
       } else {
-        showToast(`Create failed: ${refusalOrError(e, String(e))}`, "error");
+        showToast(
+          `Create failed: ${refusalOrError(e, "Could not create the folder.")}`,
+          "error",
+        );
       }
     } finally {
       setCreating(false);
@@ -261,7 +264,10 @@ export default function FilesPage() {
       if (e instanceof ConfirmRequiredError) {
         showToast("Upload cancelled", "error");
       } else {
-        showToast(`Upload failed: ${refusalOrError(e, String(e))}`, "error");
+        showToast(
+          `Upload failed: ${refusalOrError(e, "Could not upload the file.")}`,
+          "error",
+        );
       }
     } finally {
       setUploading(false);
@@ -315,7 +321,10 @@ export default function FilesPage() {
       const file = await api.readFile(target);
       downloadDataUrl(file.data_url, file.name);
     } catch (e) {
-      showToast(`Download failed: ${e}`, "error");
+      showToast(
+        `Download failed: ${refusalOrError(e, "Could not read this file.")}`,
+        "error",
+      );
     }
   };
 
@@ -336,7 +345,7 @@ export default function FilesPage() {
       await load();
     } catch (e) {
       showToast(
-        `Delete failed: ${refusalOrError(e, String(e))}`,
+        `Delete failed: ${refusalOrError(e, "Could not delete this entry.")}`,
         "error",
       );
     } finally {

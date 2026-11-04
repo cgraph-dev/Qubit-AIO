@@ -7896,14 +7896,31 @@ _FS_MIME_BY_EXT = {
 
 
 def _active_folder(cfg: Any) -> str:
-    """First folder of the active Qubit project (the scoped read root)."""
+    """First live folder of the active project (the scoped read root).
+
+    Recorded folders can disappear after registration. Walk the project's
+    folder list for one that still exists, then fall back to the shared
+    stale-project cwd root so Files/Agent Workspace/Worktrees keep a usable
+    listing instead of answering a scope error for a path that no longer is.
+    """
     try:
         from . import projects as PJ
         active = PJ.active_project(cfg)
         if active.get("state") == "OK" and active.get("project"):
             folders = active["project"].get("folders", []) or []
-            if folders:
-                return str(folders[0])
+            for folder in folders:
+                try:
+                    if Path(str(folder)).expanduser().is_dir():
+                        return str(folder)
+                except OSError:
+                    continue
+    except Exception:
+        pass
+    try:
+        from . import files as FI
+        fallback = FI._fallback_root(cfg)
+        if fallback is not None:
+            return str(fallback)
     except Exception:
         pass
     return ""

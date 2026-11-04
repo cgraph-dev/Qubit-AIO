@@ -354,6 +354,7 @@ export default function ProfileBuilderPage() {
               </p>
               <Input
                 placeholder="Filter models…"
+                aria-label="Filter models"
                 value={modelFilter}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setModelFilter(e.target.value)
@@ -411,6 +412,7 @@ export default function ProfileBuilderPage() {
                   </p>
                   <Input
                     placeholder="Filter skills…"
+                    aria-label="Filter skills"
                     value={skillFilter}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setSkillFilter(e.target.value)
@@ -457,6 +459,7 @@ export default function ProfileBuilderPage() {
                 <div className="flex gap-2">
                   <Input
                     placeholder="Search the hub (e.g. linear, hyperliquid)…"
+                    aria-label="Search the skills hub"
                     value={hubQuery}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                       setHubQuery(e.target.value)

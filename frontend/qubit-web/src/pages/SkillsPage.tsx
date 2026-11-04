@@ -351,6 +351,7 @@ export default function SkillsPage() {
         <Input
           className="h-8 rounded-none pl-8 pr-7 text-xs"
           placeholder={t.common.search}
+          aria-label={t.common.search}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -715,6 +716,7 @@ export default function SkillsPage() {
                 Local file or directory
               </label>
               <Input
+                aria-label="Local file or directory to learn from"
                 placeholder="~/projects/some-sdk  (read with read_file / search_files)"
                 value={learnDir}
                 onChange={(e) => setLearnDir(e.target.value)}
@@ -1051,6 +1053,7 @@ function HubBrowser({
               <Input
                 className="h-8 pl-8 text-sm"
                 placeholder="Search the skill hub (GitHub, official, community)…"
+                aria-label="Search the skill hub"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 onKeyDown={(e) => {
