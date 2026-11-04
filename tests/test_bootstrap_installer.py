@@ -1,15 +1,19 @@
 """Hermetic tests for ``scripts/bootstrap.sh`` (release one-line installer).
 
-Every test uses a local ``file://`` or directory release base. No network is
-touched. The downloaded artifact is a fake ``install.sh`` that records how it
-was invoked, so the tests prove that only the verified copy runs.
+Every test uses a local ``file://``, directory, or loopback-HTTP release base.
+No external network is touched. The downloaded artifact is a fake ``install.sh``
+that records how it was invoked, so the tests prove that only the verified copy
+runs.
 """
 from __future__ import annotations
 
+import functools
 import hashlib
+import http.server
 import os
 import shutil
 import subprocess
+import threading
 from pathlib import Path
 
 import pytest
@@ -26,6 +30,16 @@ set -euo pipefail
   echo "args=$*"
 } > "${BOOTSTRAP_TEST_MARKER:?}"
 exit "${BOOTSTRAP_TEST_EXIT:-0}"
+"""
+
+_FAKE_SELF_REPORTING_INSTALLER = """#!/usr/bin/env bash
+set -euo pipefail
+cp -- "$0" "${BOOTSTRAP_TEST_SELF_COPY:?}"
+{
+  echo "self=$0"
+  echo "profile=${QUBIT_PROFILE:-}"
+  echo "args=$*"
+} > "${BOOTSTRAP_TEST_MARKER:?}"
 """
 
 _CLEARED_ENV = ("QUBIT_HOME", "QUBIT_PREFIX", "QUBIT_PROFILE")
@@ -72,6 +86,27 @@ def _release(tmp_path: Path, installer: str = _FAKE_INSTALLER) -> Path:
 
 def _marker(tmp_path: Path) -> Path:
     return tmp_path / "invocation.txt"
+
+
+class _QuietHandler(http.server.SimpleHTTPRequestHandler):
+    def log_message(self, _format: str, *args: object) -> None:
+        pass
+
+
+@pytest.fixture
+def http_release(tmp_path: Path):
+    """Serve a local release over loopback HTTP (no external network)."""
+    release = _release(tmp_path)
+    handler = functools.partial(_QuietHandler, directory=str(release))
+    server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=10)
 
 
 def test_bootstrap_is_syntax_clean():
@@ -325,3 +360,118 @@ def test_missing_curl_for_remote_base_fails_typed(tmp_path: Path):
     assert r.returncode == 4
     assert "BOOTSTRAP_MISSING_TOOL" in r.stderr
     assert "curl" in r.stderr
+
+
+def test_end_to_end_executes_only_a_temp_verified_copy(tmp_path: Path):
+    """The full path: copy, verify, run a temp copy, clean up, don't install."""
+    release = _release(tmp_path, _FAKE_SELF_REPORTING_INSTALLER)
+    asset = release / "install.sh"
+    home = tmp_path / "home"
+    home.mkdir()
+    marker = _marker(tmp_path)
+    self_copy = tmp_path / "executed-install.sh"
+    prefix = tmp_path / "opt"
+    r = _run(
+        ["--profile", "release", "--prefix", str(prefix), str(release)],
+        _env(
+            home,
+            {
+                "BOOTSTRAP_TEST_MARKER": str(marker),
+                "BOOTSTRAP_TEST_SELF_COPY": str(self_copy),
+            },
+        ),
+        tmp_path,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert "verified install.sh sha256=" in r.stdout
+    assert not prefix.exists(), "bootstrap itself must not install anything"
+
+    body = marker.read_text(encoding="utf-8")
+    self_line = next(l for l in body.splitlines() if l.startswith("self="))
+    executed = Path(self_line.split("=", 1)[1])
+    assert executed != asset, "the release asset itself must never be executed"
+    assert executed.name == "install.sh"
+    assert home in executed.parents, f"temporary copy not under TMPDIR: {executed}"
+    assert not executed.exists(), "the bootstrap temp dir must be cleaned up"
+    assert "profile=release" in body
+    assert f"args=--prefix {prefix}" in body
+
+    assert self_copy.is_file()
+    assert hashlib.sha256(self_copy.read_bytes()).hexdigest() == hashlib.sha256(
+        asset.read_bytes()
+    ).hexdigest(), "the executed copy must be byte-identical to the verified asset"
+    assert asset.is_file(), "the release asset must be left untouched"
+
+
+@pytest.mark.skipif(
+    shutil.which("curl") is None, reason="curl is required for the download path"
+)
+def test_loopback_http_release_is_downloaded_then_executed(
+    tmp_path: Path, http_release: str
+):
+    """Exercise the remote/curl branch against a loopback HTTP server."""
+    home = tmp_path / "home"
+    home.mkdir()
+    marker = _marker(tmp_path)
+    r = _run(
+        [http_release],
+        _env(home, {"BOOTSTRAP_TEST_MARKER": str(marker)}),
+        tmp_path,
+    )
+    assert r.returncode == 0, (r.stdout, r.stderr)
+    assert f"downloading install.sh from {http_release}" in r.stdout
+    assert "verified install.sh sha256=" in r.stdout
+    assert marker.is_file(), "the downloaded and verified installer did not run"
+
+
+def test_installer_failure_exit_status_is_propagated(tmp_path: Path):
+    release = _release(tmp_path)
+    home = tmp_path / "home"
+    home.mkdir()
+    marker = _marker(tmp_path)
+    r = _run(
+        [str(release)],
+        _env(
+            home,
+            {
+                "BOOTSTRAP_TEST_MARKER": str(marker),
+                "BOOTSTRAP_TEST_EXIT": "9",
+            },
+        ),
+        tmp_path,
+    )
+    assert r.returncode == 9
+    assert marker.is_file(), "the installer must run before its status propagates"
+
+
+def test_checksum_naming_another_asset_is_rejected(tmp_path: Path):
+    release = _release(tmp_path)
+    digest = hashlib.sha256((release / "install.sh").read_bytes()).hexdigest()
+    (release / "SHA256SUMS").write_text(f"{digest}  other.sh\n", encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+    marker = _marker(tmp_path)
+    r = _run(
+        [str(release)],
+        _env(home, {"BOOTSTRAP_TEST_MARKER": str(marker)}),
+        tmp_path,
+    )
+    assert r.returncode == 7
+    assert "BOOTSTRAP_CHECKSUM_INVALID" in r.stderr
+    assert not marker.exists()
+
+
+def test_dry_run_missing_asset_fails_closed(tmp_path: Path):
+    release = _release(tmp_path)
+    (release / "install.sh").unlink()
+    home = tmp_path / "home"
+    home.mkdir()
+    marker = _marker(tmp_path)
+    r = _run(
+        ["--dry-run", str(release)],
+        _env(home, {"BOOTSTRAP_TEST_MARKER": str(marker)}),
+        tmp_path,
+    )
+    assert r.returncode == 5
+    assert "BOOTSTRAP_DOWNLOAD_FAILED" in r.stderr
+    assert not marker.exists()
