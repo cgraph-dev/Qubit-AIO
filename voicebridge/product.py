@@ -61,7 +61,7 @@ from .config import (LEGACY_NAME, LEGACY_NAME_7D, LEGACY_NAMES, PRODUCT_NAME,
 
 # Canonical public identity (Packet 8S) — single-sourced from
 # voicebridge.config (the centralized XDG-aware path resolver).
-PRODUCT_VERSION = "0.0.1"
+PRODUCT_VERSION = "0.0.2"
 
 # Typed result states.
 READY, DEGRADED, MISSING, UNAVAILABLE, BLOCKED, FAILED = (

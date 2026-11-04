@@ -540,9 +540,9 @@ def h_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         state_dir = ""
     try:
         from . import distribution as D
-        version = str(getattr(D, "PACKAGE_VERSION", "0.0.1"))
+        version = str(getattr(D, "PACKAGE_VERSION", "0.0.2"))
     except Exception:
-        version = "0.0.1"
+        version = "0.0.2"
     sessions_count = 0
     try:
         from .auth_status import recent_sessions as _rs
@@ -3242,9 +3242,9 @@ def h_system_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     import platform as _pl
     try:
         from . import distribution as D
-        qv = str(getattr(D, "PACKAGE_VERSION", "0.0.1"))
+        qv = str(getattr(D, "PACKAGE_VERSION", "0.0.2"))
     except Exception:
-        qv = "0.0.1"
+        qv = "0.0.2"
     # SystemStats wire shape; hermes_version carries the Qubit product
     # version (wire-compat label, honest value + provenance in detail).
     # psutil enriches CPU / memory / disk / uptime / load / process when it is

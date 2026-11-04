@@ -78,6 +78,7 @@ ALLOWED_ROOT_FILES = frozenset({
     "TROUBLESHOOTING.md",
     "pyproject.toml",
     "pytest.ini",
+    "VERSION",
 })
 
 #: The complete public docs set under ``docs/``: agreed feature docs only.

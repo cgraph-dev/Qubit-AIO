@@ -33,6 +33,7 @@ NEW_MANAGED = {
     "install-e2e.yml",
     "lazy-deps-guard.yml",
     "osv-scanner.yml",
+    "promote-release.yml",
 }
 
 
@@ -178,3 +179,35 @@ def test_release_install_never_reads_the_checkout():
     assert "actions/checkout" not in text
     assert "gh release download" in text
     assert "sha256sum -c SHA256SUMS" in text
+
+
+def test_promote_workflow_is_dispatch_only_draft_and_never_creates_a_tag():
+    text = (WORKFLOWS / "promote-release.yml").read_text(encoding="utf-8")
+    assert "workflow_dispatch" in text
+    assert "gh release create" in text
+    assert "--draft" in text
+    assert "--verify-tag" in text
+    assert "environment: release" in text
+    for forbidden in ("twine upload", "npm publish", "--draft=false",
+                      "git tag", "git push --tags"):
+        assert forbidden not in text
+
+
+def test_policy_rejects_a_promote_workflow_that_could_create_a_tag():
+    doc = POLICY_MODULE.load(WORKFLOWS / "promote-release.yml")
+    errors: list[str] = []
+    POLICY_MODULE.check_promote_shape(doc, WORKFLOWS / "promote-release.yml", errors)
+    assert not errors, errors
+
+    unsafe = {
+        "on": {"workflow_dispatch": None},
+        "jobs": {
+            "draft": {
+                "environment": "release",
+                "steps": [{"run": "gh release create v1.0.0 --draft"}],
+            }
+        },
+    }
+    errors = []
+    POLICY_MODULE.check_promote_shape(unsafe, Path("promote-release.yml"), errors)
+    assert any("--verify-tag" in error for error in errors), errors

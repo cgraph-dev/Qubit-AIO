@@ -173,6 +173,35 @@ def check_release_shape(doc: dict, path: Path, errors: list[str]) -> None:
             errors.append(f"{path.name}: publishing verb is forbidden: {verb}")
 
 
+PROMOTE_WORKFLOWS = {"promote-release.yml"}
+
+
+def check_promote_shape(doc: dict, path: Path, errors: list[str]) -> None:
+    """The operator promote workflow is draft-only and must not create tags."""
+    if path.name not in PROMOTE_WORKFLOWS:
+        return
+    triggers = trigger_names(doc)
+    if "workflow_dispatch" not in triggers:
+        errors.append(f"{path.name}: promote workflow must be workflow_dispatch only")
+    text = "\n".join(all_strings(doc))
+    if "gh release create" in text and "--draft" not in text:
+        errors.append(f"{path.name}: `gh release create` must pass `--draft`")
+    if "gh release create" in text and "--verify-tag" not in text:
+        errors.append(
+            f"{path.name}: `gh release create` must pass `--verify-tag` so it "
+            "cannot create a tag"
+        )
+    for verb in ("twine upload", "npm publish", "gh release edit --draft=false",
+                 "git push --tags", "git tag"):
+        if verb in text:
+            errors.append(f"{path.name}: publishing/tag verb is forbidden: {verb}")
+    if not any(
+        isinstance(job, dict) and job.get("environment") == "release"
+        for job in (doc.get("jobs") or {}).values()
+    ):
+        errors.append(f"{path.name}: must gate the draft step on the `release` environment")
+
+
 def main() -> int:
     errors: list[str] = []
     checked: list[str] = []
@@ -191,6 +220,7 @@ def main() -> int:
         check_secrets(doc, path, errors)
         check_pull_request(doc, path, errors)
         check_release_shape(doc, path, errors)
+        check_promote_shape(doc, path, errors)
 
     if not checked:
         print("workflow-security: no managed workflows found", file=sys.stderr)

@@ -49,6 +49,7 @@ def sample_repo(tmp_path: Path) -> Path:
         ".env.example": "DEEPSEEK_API_KEY=\n",
         "pyproject.toml": "[project]\nname = 'x'\n",
         "pytest.ini": "[pytest]\n",
+        "VERSION": "0.0.2\n",
         "qubit_runtime/app.py": "print('runtime')\n",
         "qubit_runtime/plugins/foo/manifest.json": "{}\n",
         "qubit_runtime/ui-tui/dist/entry.js": "x\n",
@@ -183,6 +184,7 @@ def test_check_reports_allowlist_and_exclusions(sample_repo: Path) -> None:
         "systemd/foo.service",
         "docs/QUBIT-TV.md",
         "Modelfile.qubit.example",
+        "VERSION",
         "scripts/ok.py",
     ):
         assert rel in included, rel
@@ -284,6 +286,7 @@ def test_export_manifest_summarizes_docs_and_surfaces(
     assert "`docs/QUBIT-TV.md`" in manifest
     assert "## Root files" in manifest
     assert "- `README.md`" in manifest
+    assert "- `VERSION`" in manifest
     assert "- `DESIGN.md`" not in manifest
     assert "- `PRODUCT.md`" not in manifest
     assert "## Product surfaces" in manifest
