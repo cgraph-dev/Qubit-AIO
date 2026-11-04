@@ -1,0 +1,97 @@
+name: bootstrap-installer
+
+# Adapted from upstream bootstrap-installer. Proves the checkout-free entry
+# point (scripts/bootstrap.sh) fails closed: only a release asset whose SHA-256
+# matches the published checksum is executed. No network is used; every base is
+# a local directory or file:// URL.
+on:
+  pull_request:
+    paths:
+      - "scripts/bootstrap.sh"
+      - "tests/test_bootstrap_installer.py"
+      - ".github/workflows/bootstrap-installer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/bootstrap.sh"
+      - "tests/test_bootstrap_installer.py"
+      - ".github/workflows/bootstrap-installer.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bootstrap-installer-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  bootstrap-installer:
+    name: Bootstrap installer protocol and checksum gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python -m pip install --disable-pip-version-check pytest
+      - name: Shell syntax
+        run: bash -n scripts/bootstrap.sh
+      - name: Hermetic bootstrap tests
+        run: python -m pytest -q tests/test_bootstrap_installer.py
+      - name: Verified release asset is the only thing executed
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/bootstrap-release"
+          rm -rf "$work"
+          mkdir -p "$work/release"
+          cat > "$work/release/install.sh" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          printf 'profile=%s\nargs=%s\n' "${QUBIT_PROFILE:-}" "$*" \
+            > "${QUBIT_BOOTSTRAP_MARKER:?}"
+          SH
+          chmod +x "$work/release/install.sh"
+          (cd "$work/release" && sha256sum install.sh > SHA256SUMS)
+
+          export QUBIT_BOOTSTRAP_MARKER="$work/invocation.txt"
+          bash scripts/bootstrap.sh --profile ci --prefix "$work/prefix" "$work/release"
+          test -f "$work/invocation.txt"
+          grep -q '^profile=ci$' "$work/invocation.txt"
+          grep -q 'args=--prefix ' "$work/invocation.txt"
+          test ! -e "$work/.hermes"
+
+          rm -f "$work/invocation.txt"
+          bash scripts/bootstrap.sh --dry-run --prefix "$work/dry-prefix" "$work/release"
+          test ! -e "$work/dry-prefix"
+          test ! -e "$work/invocation.txt"
+      - name: A checksum mismatch refuses to execute
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/bootstrap-mismatch"
+          rm -rf "$work"
+          mkdir -p "$work/release"
+          cp "$RUNNER_TEMP/bootstrap-release/release/SHA256SUMS" "$work/release/SHA256SUMS"
+          cat > "$work/release/install.sh" <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          echo executed > "${QUBIT_BOOTSTRAP_MARKER:?}"
+          SH
+          chmod +x "$work/release/install.sh"
+
+          export QUBIT_BOOTSTRAP_MARKER="$work/invocation.txt"
+          set +e
+          bash scripts/bootstrap.sh "$work/release" >"$work/stdout.txt" 2>&1
+          status=$?
+          set -e
+          if [ "$status" -ne 6 ]; then
+            cat "$work/stdout.txt"
+            echo "expected checksum mismatch exit 6, got $status" >&2
+            exit 1
+          fi
+          grep -q 'BOOTSTRAP_CHECKSUM_MISMATCH' "$work/stdout.txt"
+          test ! -e "$work/invocation.txt"

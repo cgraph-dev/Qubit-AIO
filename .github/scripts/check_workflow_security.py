@@ -13,10 +13,11 @@ security properties that YAML syntax cannot express:
   action pinned to a sha256 digest (local `./` actions are allowed);
 * a `v*`-tag release workflow creates drafts only (`gh release create --draft`).
 
-The seven pre-existing upstream-derived workflows are listed as legacy and are
-intentionally not rewritten here (they still use self-hosted runners and tag
-pushes). The allowlist is explicit so a *new* workflow cannot inherit those
-exemptions silently.
+The three remaining upstream-derived workflows are listed as legacy and are
+intentionally not rewritten here (they still use self-hosted runners, unpinned
+actions, or tag pushes). The allowlist is explicit so a *new* workflow cannot
+inherit those exemptions silently. Every other workflow is managed and must
+satisfy the full policy.
 """
 from __future__ import annotations
 
@@ -30,10 +31,6 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
 LEGACY_WORKFLOWS = {
-    "blob-size-check.yml",
-    "case-collision-check.yml",
-    "docs-site-checks.yml",
-    "lazy-deps-guard.yml",
     "qubit-ci.yml",
     "windows-ci.yml",
     "windows-install-update-e2e.yml",

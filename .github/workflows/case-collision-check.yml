@@ -1,40 +1,28 @@
 name: Case Collision Check
 
-# Rejects PRs that track two files whose paths differ only by case
-# (README.md vs readme.md, src/Foo.py vs SRC/foo.py).
-#
-# Linux is case-sensitive; Windows and macOS (default) are not. A
-# case-colliding pair lives fine in a Linux checkout and silently breaks
-# every clone on a case-insensitive host — the filesystem can hold only
-# one of them, so checkout fails or whichever wins overwrites the other.
-# Git won't prevent the pair from landing (it only warns at checkout time,
-# on a case-insensitive FS, for the client doing the checkout), so the only
-# enforcement point is CI, on Linux, against the index.
-#
-# Runs unconditionally (no change-classifier gate): a collision can ship in
-# any kind of PR — docs, JS, config, not just Python — so gating on a
-# language lane would be the same "passive rule that cannot enforce a
-# policy" trap the infographic check exists to close.
-
+# Rejects tracked paths that differ only by case (README.md vs readme.md).
+# Linux is case-sensitive; Windows and macOS (default) are not, so a
+# case-colliding pair breaks every clone on a case-insensitive host.
 on:
-  workflow_call:
-    inputs:
-      commit:
-        description: Commit to test and build. Empty keeps the triggering commit.
-        type: string
-        default: ''
+  pull_request:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: case-collision-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check-case-collisions:
-    runs-on: [self-hosted, linux, x64]
+    name: Reject case-colliding paths
+    runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.commit }}
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Run case-collision checker
         run: python3 qubit_runtime/scripts/check-case-collisions.py

@@ -39,6 +39,54 @@ jobs:
       - name: Workflow security policy
         run: python3 .github/scripts/check_workflow_security.py
 
+  lockfiles:
+    name: npm lockfile integrity
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+      - name: Pin the npm version the workspace lockfiles were generated with
+        run: npm install -g npm@10.9.8 --no-audit --no-fund
+      - name: Lockfiles served by npm 10.9.8
+        # --dry-run resolves the lockfile without writing node_modules, so a
+        # stale lockfile fails here instead of in a later build lane.
+        # --ignore-scripts keeps native postinstalls out of the check.
+        run: |
+          set -euo pipefail
+          for dir in \
+            frontend/qubit-web \
+            qubit_runtime \
+            qubit_runtime/scripts/whatsapp-bridge; do
+            if [ ! -f "$dir/package-lock.json" ]; then
+              echo "::error::$dir/package-lock.json is missing"
+              exit 1
+            fi
+            echo "::group::npm ci --dry-run $dir"
+            (cd "$dir" && npm ci --ignore-scripts --no-audit --no-fund --dry-run)
+            echo "::endgroup::"
+          done
+      - name: Pin the npm version required by the website engine
+        # website/package.json declares npm >=11.17.0 and its .npmrc sets
+        # engine-strict=true, so the runner's bundled npm is too old there.
+        # The other lockfiles are validated above with the bundled npm because
+        # 11.17 is stricter about optional platform bindings in their
+        # lockfiles.
+        run: npm install -g npm@11.17.0 --no-audit --no-fund
+      - name: Website lockfile matches package.json
+        run: |
+          set -euo pipefail
+          if [ ! -f qubit_runtime/website/package-lock.json ]; then
+            echo "::error::qubit_runtime/website/package-lock.json is missing"
+            exit 1
+          fi
+          cd qubit_runtime/website
+          npm ci --ignore-scripts --no-audit --no-fund --dry-run
+
   runtime-smoke:
     name: Runtime compile and smoke
     runs-on: ubuntu-latest

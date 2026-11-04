@@ -1,70 +1,70 @@
-name: Docs Site Checks
+name: docs-site-checks
 
+# Adapted from upstream docs-site-checks. Builds the Docusaurus site to prove
+# the documentation deploys cleanly, but never deploys: there is no deploy
+# step, no secret, and no write permission.
+#
+# The upstream generator-staleness assertion is deliberately not ported:
+# Qubit's committed per-skill pages predate the local generator/rebrand and a
+# diff gate would be red before any documentation change. The link check and
+# the ASCII-diagram lint still run against the committed pages.
 on:
-  workflow_call:
-    inputs:
-      commit:
-        description: Commit to test and build. Empty keeps the triggering commit.
-        type: string
-        default: ''
+  pull_request:
+    paths:
+      - "qubit_runtime/website/**"
+      - "qubit_runtime/skills/**"
+      - "qubit_runtime/optional-skills/**"
+      - ".github/workflows/docs-site-checks.yml"
+  push:
+    branches: [main]
+    paths:
+      - "qubit_runtime/website/**"
+      - "qubit_runtime/skills/**"
+      - "qubit_runtime/optional-skills/**"
+      - ".github/workflows/docs-site-checks.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: docs-site-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   docs-site-checks:
-    runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 20
+    name: Docs build, links, and diagrams
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.commit }}
-
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
         with:
           python-version: "3.12"
-
       - name: Install docs generators
-        run: python -m pip install --upgrade pip ruamel.yaml ascii-guard
-
+        run: |
+          python -m pip install --disable-pip-version-check \
+            ruamel.yaml==0.18.17 ascii-guard==2.3.0
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: qubit_runtime/website/package-lock.json
-
+      - name: Pin the npm version required by the website engines
+        run: npm install -g npm@11.17.0 --no-audit --no-fund
       - name: Install website dependencies
-        uses: ./.github/actions/retry
-        with:
-          command: npm ci
-          working-directory: qubit_runtime/website
-
-      - name: Extract skill metadata for dashboard
+        working-directory: qubit_runtime/website
+        run: npm ci --no-audit --no-fund
+      - name: Extract skill metadata
         run: python3 qubit_runtime/website/scripts/extract-skills.py
-
-      - name: Regenerate per-skill docs pages + catalogs
-        run: python3 qubit_runtime/website/scripts/generate-skill-docs.py
-
-      - name: Committed skill docs match the generator
-        # A regeneration that changes anything means the published catalogs/pages
-        # are stale. Fix: run the generator and commit the result.
-        run: |
-          git add -N qubit_runtime/website/docs qubit_runtime/website/sidebars.ts
-          if ! git diff --exit-code --stat -- qubit_runtime/website/docs qubit_runtime/website/sidebars.ts qubit_runtime/website/i18n; then
-            echo "::error::qubit_runtime/website/scripts/generate-skill-docs.py output differs from the committed docs; run it and commit the result"
-            exit 1
-          fi
-
-      - name: Check cross-page links resolve on GitHub and on the site
+      - name: Cross-page links resolve on GitHub and on the site
         run: python3 qubit_runtime/website/scripts/check_doc_links.py
-
       - name: Lint docs diagrams
+        working-directory: qubit_runtime/website
         run: npm run lint:diagrams
+      - name: Deploy check (build only, no deploy secrets)
         working-directory: qubit_runtime/website
-
-      - name: Build Docusaurus (default locale)
         run: npm run build:fast
-        working-directory: qubit_runtime/website

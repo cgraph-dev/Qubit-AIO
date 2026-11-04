@@ -1,0 +1,35 @@
+name: OSV-Scanner
+
+# Weekly detection-only scan of the npm lockfiles Qubit ships. Findings land in
+# the Security tab; this workflow never modifies pins and never fails a merge on
+# a pre-existing CVE in a pinned dependency.
+#
+# Qubit does not ship a uv.lock, so the upstream uv.lock input is intentionally
+# absent. The remaining lockfiles are the product surfaces:
+# dashboard, docs site, runtime workspace, and the WhatsApp bridge.
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+
+concurrency:
+  group: osv-scanner
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    name: Scan npm lockfiles
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@9a498708959aeaef5ef730655706c5a1df1edbc2 # v2.3.8
+    with:
+      scan-args: |-
+        --lockfile=frontend/qubit-web/package-lock.json
+        --lockfile=qubit_runtime/package-lock.json
+        --lockfile=qubit_runtime/website/package-lock.json
+        --lockfile=qubit_runtime/scripts/whatsapp-bridge/package-lock.json
+      results-file-name: osv-results.sarif
+      fail-on-vuln: false

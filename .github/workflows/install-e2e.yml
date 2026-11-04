@@ -1,0 +1,112 @@
+name: install-e2e
+
+# Adapted from upstream Hermes install-e2e (Linux). The checkout only builds
+# the release artifact; the gate installs that wheel into a throwaway venv and
+# HOME, then probes the installed package with no checkout on sys.path. A
+# package that secretly needs the source tree fails here.
+#
+# The published-release variant lives in release-install.yml (no checkout at
+# all). This lane covers the artifact built from the commit under test.
+on:
+  pull_request:
+    paths:
+      - "pyproject.toml"
+      - "install.sh"
+      - "scripts/artifact_install_e2e.py"
+      - "scripts/clean_install_rehearsal.py"
+      - "scripts/build_dashboard.sh"
+      - "scripts/release_qualify.py"
+      - "voicebridge/**"
+      - "qubit_runtime/**"
+      - "frontend/**"
+      - ".github/workflows/install-e2e.yml"
+  push:
+    branches: [main]
+    paths:
+      - "pyproject.toml"
+      - "install.sh"
+      - "scripts/artifact_install_e2e.py"
+      - "scripts/clean_install_rehearsal.py"
+      - "scripts/build_dashboard.sh"
+      - "scripts/release_qualify.py"
+      - "voicebridge/**"
+      - "qubit_runtime/**"
+      - "frontend/**"
+      - ".github/workflows/install-e2e.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: install-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  artifact-install-linux:
+    name: Artifact install E2E (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/qubit-web/package-lock.json
+      - name: Build the dashboard bundle
+        # The wheel must ship frontend/qubit-dist; the bundle is git-ignored,
+        # so a clean runner has to build it before the artifact is created.
+        run: bash scripts/build_dashboard.sh
+      - name: Install uv
+        run: python -m pip install --disable-pip-version-check uv
+      - name: Build and install the wheel in an isolated home
+        run: |
+          set -o pipefail
+          mkdir -p dist
+          python scripts/artifact_install_e2e.py --build --require-network \
+            --report dist/artifact-install-e2e.json \
+            | tee dist/artifact-install-e2e.log
+      - name: Report the artifact-install verdict
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          path = pathlib.Path("dist/artifact-install-e2e.json")
+          if not path.is_file():
+              print("no artifact-install report produced")
+              raise SystemExit(1)
+          report = json.loads(path.read_text())
+          lines = [
+              f"verdict: {report.get('verdict')}",
+              f"state: {report.get('state')}",
+              f"wheel: {report.get('wheel')}",
+              f"wheel_source: {report.get('wheel_source')}",
+              f"dashboard: {report.get('artifact_dashboard')}",
+          ]
+          text = "\n".join(lines)
+          print(text)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("```\n" + text + "\n```\n")
+          PY
+      - name: Upload the artifact-install report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: artifact-install-e2e
+          path: |
+            dist/artifact-install-e2e.json
+            dist/artifact-install-e2e.log
+          if-no-files-found: warn
+          retention-days: 14
