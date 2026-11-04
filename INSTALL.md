@@ -30,8 +30,11 @@ Optional:
 - `tar` plus `sha256sum`, `shasum`, or `openssl` when model assets are
   downloaded; the installer verifies pinned checksums. These assets are
   Linux-only: macOS never downloads the voice models.
-- Node.js **22 or newer** and `npm` when the dashboard bundle
-  (`frontend/qubit-dist`) is absent and must be built.
+- Node.js **20.19+ or 22.12+** (the pinned Vite 8 engine range; Node 22 LTS is
+  recommended) and `npm` when the dashboard bundle (`frontend/qubit-dist`) is
+  absent and must be built. Node 18 (e.g. Ubuntu 24.04's `nodejs` package) is
+  below that range: the build fails and the installer exits with the typed
+  `DASHBOARD_UNAVAILABLE` (exit 4).
 
 ## Install
 
@@ -125,9 +128,14 @@ On macOS the core install writes `~/Library/LaunchAgents/ai.qubit.gateway.plist`
 are read-old and never deleted by the installer.
 
 With `--prefix DIR`, `QUBIT_HOME` defaults to `DIR`: the voice tree is
-`DIR/voice`, and the launcher is `DIR/bin/qubit`. If `QUBIT_HOME` is also set
-explicitly, runtime state stays at that path even when it differs from the
-prefix; `--dry-run` prints the exact resolved layout before anything changes.
+`DIR/voice`, and the launcher is `DIR/bin/qubit`. The installed launcher pins
+that resolved `QUBIT_HOME` (as it does for an explicitly set `QUBIT_HOME`), so
+running `DIR/bin/qubit` uses `DIR` rather than the real HOME's `~/.qubit`; an
+explicit `QUBIT_HOME` at run time still wins. A default (no `--prefix`, no
+explicit `QUBIT_HOME`) install leaves the launcher unpinned so it keeps
+resolving `~/.qubit`. If `QUBIT_HOME` is also set explicitly, runtime state
+stays at that path even when it differs from the prefix; `--dry-run` prints the
+exact resolved layout before anything changes.
 
 ## Offline note
 
