@@ -170,6 +170,12 @@ def panel_rows(options: Any) -> List[Dict[str, Any]]:
     """
     opts = _options.clamp_options(options)
     rows: List[Dict[str, Any]] = [
+        # Local-brain controls live beside the appearance controls: the same
+        # action the voice command and tray use, without leaving settings.
+        {"id": "brain_unload", "kind": "action",
+         "label": "Unload local brain (free VRAM)"},
+        {"id": "brain_warm", "kind": "action",
+         "label": "Load local brain"},
         {"id": "size_px", "kind": "slider", "label": "Orb size",
          "min": SIZE_MIN, "max": SIZE_MAX, "value": int(opts.size_px)},
         {"id": "opacity", "kind": "slider", "label": "Opacity",
@@ -270,11 +276,13 @@ if QWidget is not None:
         def __init__(self, options: Any = None, *,
                      on_change: Optional[Callable[[OrbOptions], Any]] = None,
                      on_test: Optional[Callable[[str], Any]] = None,
+                     on_action: Optional[Callable[[str], Any]] = None,
                      parent: Any = None) -> None:
             super().__init__(parent)
             self.setWindowTitle("Qubit Voice Orb")
             self._on_change = on_change
             self._on_test = on_test
+            self._on_action = on_action
             #: Guards the edit callbacks while ``set_options`` pushes
             #: values in (a programmatic change must not self-report).
             self._loading = False
@@ -350,6 +358,11 @@ if QWidget is not None:
                     btn.clicked.connect(
                         lambda _checked=False, s=state: self._emit_test(s))
                     layout.addWidget(btn)
+                elif kind == "action":
+                    btn = QPushButton(str(row["label"]), self)
+                    btn.clicked.connect(
+                        lambda _checked=False, a=rid: self._emit_action(a))
+                    layout.addWidget(btn)
 
         # -- callbacks (never raise) -------------------------------------
         def _on_edit(self, *_args: Any) -> None:
@@ -369,6 +382,14 @@ if QWidget is not None:
                 cb = self._on_test
                 if callable(cb):
                     cb(str(state))
+            except Exception:
+                pass
+
+        def _emit_action(self, action: str) -> None:
+            try:
+                cb = self._on_action
+                if callable(cb):
+                    cb(str(action))
             except Exception:
                 pass
 
