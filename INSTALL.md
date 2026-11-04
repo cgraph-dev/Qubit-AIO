@@ -91,7 +91,10 @@ paths or `..` traversal are rejected, and extraction never writes outside the
 temporary directory.
 
 `--profile NAME` is exported to the verified installer as `QUBIT_PROFILE`;
-`--prefix DIR` is forwarded as `--prefix DIR`.
+`--prefix DIR` is forwarded as `--prefix DIR`. `--without-models`,
+`--without-dashboard`, and `--yes` are forwarded too. A bootstrapped install
+puts its venv under the persistent `$QUBIT_HOME`, so the launcher remains valid
+after the temporary extraction is removed.
 
 The bootstrap fails closed on a missing installer, missing archive,
 missing/invalid checksum, archive mismatch, extracted-installer mismatch, or an

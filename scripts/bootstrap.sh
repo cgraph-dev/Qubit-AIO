@@ -27,6 +27,9 @@ DRY_RUN=0
 PROFILE=""
 PREFIX=""
 CHECKSUM_FILE=""
+WITHOUT_MODELS=0
+WITHOUT_DASHBOARD=0
+ASSUME_YES=0
 BASE=""
 
 usage() {
@@ -47,6 +50,10 @@ Options:
   --profile NAME     install profile, exported to the verified installer as
                      QUBIT_PROFILE
   --prefix DIR       portable install prefix, forwarded as --prefix DIR
+  --without-models   skip model downloads (forwarded to the installer)
+  --without-dashboard
+                     skip the dashboard build (forwarded to the installer)
+  --yes              non-interactive install (forwarded to the installer)
   --archive NAME     release source archive file name under <release-base>
                      (default: qubit-release.tar.gz)
   --checksum FILE    use FILE instead of <release-base>/SHA256SUMS
@@ -127,6 +134,15 @@ while [ "$#" -gt 0 ]; do
     --checksum=*)
       CHECKSUM_FILE="${1#*=}"
       [ -n "$CHECKSUM_FILE" ] || die 2 "option --checksum requires a file"
+      ;;
+    --without-models)
+      WITHOUT_MODELS=1
+      ;;
+    --without-dashboard)
+      WITHOUT_DASHBOARD=1
+      ;;
+    --yes|-y)
+      ASSUME_YES=1
       ;;
     --)
       shift
@@ -385,6 +401,8 @@ print_plan() {
   else
     printf '  prefix     : (default)\n'
   fi
+  [ "$WITHOUT_MODELS" = "1" ] && printf '  models     : skipped (--without-models)\n'
+  [ "$WITHOUT_DASHBOARD" = "1" ] && printf '  dashboard  : skipped (--without-dashboard)\n'
   printf '  QUBIT_HOME : untouched (dry-run)\n'
   printf '  steps      : download %s + %s -> verify sha256 -> extract -> run the extracted scripts/install.sh\n' \
     "$ASSET_NAME" "$ARCHIVE_NAME"
@@ -506,9 +524,15 @@ INSTALL_ARGS=()
 if [ -n "$PREFIX" ]; then
   INSTALL_ARGS+=("--prefix" "$PREFIX")
 fi
+[ "$WITHOUT_MODELS" = "1" ] && INSTALL_ARGS+=("--without-models")
+[ "$WITHOUT_DASHBOARD" = "1" ] && INSTALL_ARGS+=("--without-dashboard")
+[ "$ASSUME_YES" = "1" ] && INSTALL_ARGS+=("--yes")
 if [ -n "$PROFILE" ]; then
   export QUBIT_PROFILE="$PROFILE"
 fi
+# The installer runs from a temporary extraction; keep its venv and launcher
+# target under the persistent QUBIT_HOME.
+export QUBIT_BOOTSTRAP=1
 
 set +e
 bash "$EXTRACTED_INSTALL" "${INSTALL_ARGS[@]}"
