@@ -159,30 +159,43 @@ def _desktop_packaged_executable_in(release_dir: Path) -> Optional[Path]:
     """The unpacked Electron app executable under *release_dir* (live ``release`` or a staging dir).
 
     *release_dir* is electron-builder's ``directories.output`` — the live ``apps/desktop/release`` or a
-    stage-and-swap staging dir (#86443).
+    stage-and-swap staging dir (#86443). The current package is ``Qubit`` (electron-builder's
+    ``productName``/``executableName``); a pre-rebrand ``Hermes`` bundle is still accepted read-old.
+    Candidate groups are ordered canonical-first so a stale legacy tree can never win over the
+    current one just because its mtime is newer.
     """
     if sys.platform == "darwin":
-        candidates = list(release_dir.glob("mac*/Hermes.app/Contents/MacOS/Qubit"))
+        groups = [
+            list(release_dir.glob("mac*/Qubit.app/Contents/MacOS/Qubit")),
+            list(release_dir.glob("mac*/Qubit.app/Contents/MacOS/Hermes")),
+            list(release_dir.glob("mac*/Hermes.app/Contents/MacOS/Qubit")),
+            list(release_dir.glob("mac*/Hermes.app/Contents/MacOS/Hermes")),
+        ]
     elif sys.platform == "win32":
-        candidates = [
-            release_dir / d / "Hermes.exe" for d in ("win-unpacked", "win-ia32-unpacked", "win-arm64-unpacked")
+        groups = [
+            [release_dir / d / name for d in ("win-unpacked", "win-ia32-unpacked", "win-arm64-unpacked")]
+            for name in ("Qubit.exe", "Hermes.exe")
         ]
     else:
-        candidates = [
-            release_dir / d / n for d in ("linux-unpacked", "linux-arm64-unpacked")
-            for n in ("hermes", "qubit", "Qubit")
+        groups = [
+            [release_dir / d / name for d in ("linux-unpacked", "linux-arm64-unpacked")]
+            for name in ("Qubit", "qubit", "hermes")
         ]
 
-    existing = [p for p in candidates if p.exists()]
+    existing: list[Path] = []
+    for group in groups:
+        existing = [p for p in group if p.exists()]
+        if existing:
+            break
     if not existing:
         return None
     if sys.platform == "win32" and len(existing) > 1:
         # A stale win-arm64-unpacked next to the real win-unpacked: picking by
-        # mtime can hand a wrong-architecture Hermes.exe to the launcher. Prefer
+        # mtime can hand a wrong-architecture executable to the launcher. Prefer
         # candidates whose PE machine matches the host; mtime when none parse.
         # Multiple unpacked trees can coexist (e.g. a stale win-arm64-unpacked left behind by a cross-arch
         # experiment next to the real win-unpacked). Picking purely by mtime can then hand a
-        # wrong-architecture Hermes.exe to the launcher, which Windows rejects with "This app can't run on
+        # wrong-architecture executable to the launcher, which Windows rejects with "This app can't run on
         # your computer" (#69179).
         expected = _expected_windows_pe_machines()
         matching = [p for p in existing if _pe_machine_or_none(p) in expected]
@@ -1092,10 +1105,21 @@ def _installed_desktop_apps() -> list[Path]:
     return [app for app in candidates if str(app) in recorded and not app.exists()]
 
 
+def _macos_bundle_executable(app: Path) -> Path:
+    """The executable inside a macOS ``.app``; the current ``Qubit`` name wins over the read-old
+    ``Hermes`` one, so a half-renamed bundle still launches something real."""
+    macos = app / "Contents" / "MacOS"
+    for name in ("Qubit", "Hermes"):
+        candidate = macos / name
+        if candidate.is_file():
+            return candidate
+    return macos / "Qubit"
+
+
 def _installed_desktop_launch_target(desktop_dir: Path, packaged_executable: Path) -> Path:
     """The executable ``qubit desktop`` launches: the installed app once it IS the checkout build.
 
-    Finder, the Dock and Spotlight open the installed ``Hermes.app``; launching the ``release/``
+    Finder, the Dock and Spotlight open the installed ``Qubit.app``; launching the ``release/``
     bundle beside it ran the same app from a second path while the installed copy went stale
     (#52339). Refresh the installed copies, then launch the first one that matches the checkout
     build. The checkout bundle stays the fallback: nothing installed, or a copy that is running
@@ -1107,7 +1131,7 @@ def _installed_desktop_launch_target(desktop_dir: Path, packaged_executable: Pat
     rebuilt_hash = _app_asar_hash(packaged_executable.parents[2])
     for app in _installed_desktop_apps():
         if rebuilt_hash is not None and _app_asar_hash(app) == rebuilt_hash:
-            return app / "Contents" / "MacOS" / "Hermes"
+            return _macos_bundle_executable(app)
     return packaged_executable
 
 
@@ -1666,21 +1690,31 @@ def _site_packages_install_kind(project_root: Path) -> Optional[str]:
 
 
 def _launch_installed_macos_desktop_app() -> bool:
-    """Launch a separately installed ``/Applications/Hermes.app``, if present.
+    """Launch a separately installed ``Qubit.app``, if present.
 
-    Returns True only when the app bundle exists and a detached launch was
-    started — the caller then exits without touching the build ladder.
+    The pre-rebrand ``Hermes.app`` bundle stays a read-old fallback. Returns True
+    only when an app bundle exists and a detached launch was started — the
+    caller then exits without touching the build ladder.
     """
     if sys.platform != "darwin":
         return False
-    executable = Path("/Applications/Hermes.app/Contents/MacOS/Hermes")
-    if not executable.is_file():
-        return False
-    from qubit_cli.bundled_app import launch_detached
+    home = Path.home()
+    candidates = [
+        home / "Applications" / "Qubit.app",
+        Path("/Applications/Qubit.app"),
+        home / "Applications" / "Hermes.app",
+        Path("/Applications/Hermes.app"),
+    ]
+    for app in candidates:
+        executable = _macos_bundle_executable(app)
+        if not executable.is_file():
+            continue
+        from qubit_cli.bundled_app import launch_detached
 
-    pid = launch_detached([str(executable)], cwd=executable.parent)
-    print(f"→ Launched the installed Hermes Desktop app: {executable} (pid {pid})")
-    return True
+        pid = launch_detached([str(executable)], cwd=executable.parent)
+        print(f"→ Launched the installed Qubit Desktop app: {executable} (pid {pid})")
+        return True
+    return False
 
 
 def _run_desktop_one_shot(args: argparse.Namespace, desktop_dir: Path, *, bundled: bool) -> None:
