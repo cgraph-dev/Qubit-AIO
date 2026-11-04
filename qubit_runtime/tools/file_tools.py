@@ -1145,8 +1145,21 @@ from tools.registry import registry, tool_error
 
 
 def _check_file_reqs():
-    """Lazy wrapper to avoid circular import with tools/__init__.py."""
-    from tools import check_file_requirements
+    """Lazy wrapper to avoid circular import with tools/__init__.py.
+
+    Import through the package's defining module rather than the package
+    attribute: when the repository root is on ``sys.path`` ahead of the
+    runtime, its own ``tools/`` directory turns ``tools`` into a namespace
+    package, so ``from tools import check_file_requirements`` raises
+    ``ImportError`` and every file tool loses its ``check_fn``. The relative
+    import resolves ``tools.terminal_tool`` through the same namespace path
+    and keeps them registered in both layouts.
+    """
+    try:
+        from . import check_file_requirements
+    except ImportError:
+        from .terminal_tool import check_terminal_requirements
+        return check_terminal_requirements()
     return check_file_requirements()
 
 READ_FILE_SCHEMA = {
