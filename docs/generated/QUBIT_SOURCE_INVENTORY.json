@@ -17835,7 +17835,7 @@
    },
    {
     "path": "tests/qubit_cli/test_tui_exit_summary_short_id.py",
-    "local_sha256": "9f284efbbc035f31eb609c9d36432767f75a33e6834d7c0392e9ec0344adbe9b"
+    "local_sha256": "02aa090e4f5cb10f9f070525e90fff84a78528519d8212af64c720f5368821cd"
    },
    {
     "path": "tests/qubit_cli/test_tui_first_run_routing.py",
@@ -33294,14 +33294,14 @@
     "upstream_path": "apps/shared/src/gateway-contract.generated.ts",
     "upstream_blob": "6fe6ef149df27013d5bbca70a3e49d71c26109b0",
     "upstream_sha256": "bea488c27ddd88ed2d949fb27b883f3a779ec3a96d5b32f05135916738fca9eb",
-    "local_sha256": "7007f9c701f906d76181045584b41aecba9faa45120b2ccd184d61ec0c902609"
+    "local_sha256": "a9f46bce0cfb95d9f9a0930bd1a2a645c46b6f1bdac12d9134ac08a75f3717d7"
    },
    {
     "path": "apps/shared/src/gateway-contract.openrpc.json",
     "upstream_path": "apps/shared/src/gateway-contract.openrpc.json",
     "upstream_blob": "96816140d38e036b0e22f0036a19959ea868b72f",
     "upstream_sha256": "432f7c0448a3dcf5cf43b5d881252b80e473a71b7a3025d15ca4505ebe10cbdf",
-    "local_sha256": "caf4ff19a6e322c1b7ae06148eae7f31167c80ac291fb00a864daa451b67a185"
+    "local_sha256": "a137511d3facc9bed92982e560b41a65596b4dad7decb285f710cbf89fa886d7"
    },
    {
     "path": "apps/shared/src/i18n.test.ts",
@@ -41554,7 +41554,7 @@
     "upstream_path": "hermes_cli/banner.py",
     "upstream_blob": "8466f2e56fb35a26ab796efc3dd3afae16234597",
     "upstream_sha256": "7e3237c392292e1dcc82eaf4ebc15b5c2251def6b1fbf9fd09cdf40a26a2e3d2",
-    "local_sha256": "a6b1c103022cefbe0603611104c556871ec0e5f79c8e6bf38abb69d5e2231dcb"
+    "local_sha256": "c5e95ada69d16d31bc4efbb2ec9fde00168463d6b51ab0a01a04690eba08c2d9"
    },
    {
     "path": "qubit_cli/blueprint_cmd.py",
@@ -44004,7 +44004,7 @@
     "upstream_path": "hermes_cli/skin_engine.py",
     "upstream_blob": "60810455dde2ec604cbe69629e00804ccea2b085",
     "upstream_sha256": "98ebff077d1bfc3bc1c580c73a210772feae5c65127a5579a38cac21df91e245",
-    "local_sha256": "3e8710655cab386e76289b54bf79096ae91bd497416be7e31e7336ac2748b1cd"
+    "local_sha256": "6129eaf2f35b6d181f050d12613cd57ab7faccd058ed62505c170984a63bb287"
    },
    {
     "path": "qubit_cli/slack_cli.py",
@@ -44921,7 +44921,7 @@
     "upstream_path": "hermes_cli/version_info.py",
     "upstream_blob": "c31256c665f1c4b9650502e8b2499b2af96a17eb",
     "upstream_sha256": "47a0f1329da585e39662df83cc109002ff9c4ebef43fe6e0e924dee076f49a65",
-    "local_sha256": "c553eba03aec257f02c13034e5ce1106054c03a401ee56f74774496d5b4635ea"
+    "local_sha256": "49e0b747b1f3f56130044a876dd19a45c8a25065d143220efe5a30cc6fabd703"
    },
    {
     "path": "qubit_cli/voice.py",
@@ -65053,7 +65053,7 @@
     "upstream_path": "tests/hermes_cli/test_send_cmd.py",
     "upstream_blob": "f20123651d4c9d084fd7683b804d1c705d09fbd2",
     "upstream_sha256": "ef5147ff57352bd5e2fb9db07d092d91e0d22e91019ecf3b8f533dc62a61f9b8",
-    "local_sha256": "0843bbf970dce36623ea46877fa27d1febdba528dc3be6f713c0f877ece3f9ad"
+    "local_sha256": "b08bbbe56855670b229bbfd0698bb0b1e10717000389879f341ae164337f11ef"
    },
    {
     "path": "tests/qubit_cli/test_serve_command.py",
@@ -65725,7 +65725,7 @@
     "upstream_path": "tests/hermes_cli/test_skin_palettes.py",
     "upstream_blob": "f69846ed4d462abac1235b39ef3a0a26c203dfc4",
     "upstream_sha256": "a3421c1c00e82617917acfa96418abf560899386cf80b224bb047a7e281a8d04",
-    "local_sha256": "9ada36f12198dc0081045745cfb695a53049728949a503f4b8f95840444e64ce"
+    "local_sha256": "9046b575a69f6ddcc20a2821728c5cffbe59ed267ef2c3c38cb87458b9df013c"
    },
    {
     "path": "tests/qubit_cli/test_slack_cli.py",
@@ -73215,7 +73215,7 @@
     "upstream_path": "tests/tui_gateway/test_runtime_identity.py",
     "upstream_blob": "fe10c5be4d5344e4ea7ea273e693085d9a2c0417",
     "upstream_sha256": "a4e8de2de303c37429828f1acae0426d0b4cc7f4c9fb98ed3c5307a3a22fcc4f",
-    "local_sha256": "79ed3249a78975a897f5226f410eadfc7eec7b8f08aa7ba2f11da9397b58d1b9"
+    "local_sha256": "d18c4cb8655178552804f4443f05c2ade72a81bf95a8fccea029ee46996721e9"
    },
    {
     "path": "tests/tui_gateway/test_secondary_profile_model_and_key.py",
@@ -74426,7 +74426,7 @@
     "upstream_path": "tools/environments/local.py",
     "upstream_blob": "df94391845e919f4f68145426dcb7a473e4b2e00",
     "upstream_sha256": "8f16126c36cf0209646007142de11e9e93c5e76d63f371bfa1d0e3892a3e0396",
-    "local_sha256": "a7e20bb7cc4770811555a400a46e1d54619daf6d9575e66232f369dc55df3603"
+    "local_sha256": "52935bdc0a64672fc539b99baeec533cd6a575428bf32477b67311ba94c34419"
    },
    {
     "path": "tools/environments/local_env_policy.py",
