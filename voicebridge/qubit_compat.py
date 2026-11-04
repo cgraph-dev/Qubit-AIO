@@ -2864,6 +2864,10 @@ def h_toolsets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             row["description"] = m["description"]
         if key in enabled:
             row["enabled"] = enabled[key]
+        # Parity with the vendored handler (``web_routers/tools.py``): the wire
+        # row carries ``available`` alongside ``enabled``. The dashboard picker
+        # and every row consumer read the same boolean the route computes.
+        row["available"] = bool(row.get("enabled"))
         if resolve is not None:
             try:
                 row["tools"] = sorted(set(resolve(key)))

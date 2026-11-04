@@ -79,3 +79,46 @@ def test_catalog_home_never_falls_back_when_home_creation_fails(tmp_path, monkey
     assert home, "the catalog must publish a QUBIT_HOME even when mkdir fails"
     assert not home.rstrip("/").endswith("/.hermes")
     assert str(tmp_path) in home
+
+
+def test_h_toolsets_rows_carry_available_matching_enabled(tmp_path):
+    """Parity with the vendored handler: every wire row carries ``available``
+    and it agrees with ``enabled`` (the reference computes one from the other)."""
+    _code, rows = QC.h_toolsets(_Cfg(tmp_path), {}, {}, {})
+    assert rows
+    for row in rows:
+        assert isinstance(row.get("available"), bool), row
+        assert row["available"] is row["enabled"], row
+
+
+def test_h_toolsets_available_tracks_persisted_disable(tmp_path):
+    """A persisted dashboard disable flips BOTH fields (a stale ``available``
+    would render a disabled toolset as usable)."""
+    from voicebridge import toolsets as TS
+
+    cfg = _Cfg(tmp_path)
+    TS.apply_toolset_mutation(cfg, "web", False, actor="dashboard:user")
+    _code, rows = QC.h_toolsets(cfg, {}, {}, {})
+    web = {row["name"]: row for row in rows}["web"]
+    assert web["enabled"] is False
+    assert web["available"] is False
+
+
+def test_pinned_toolset_rows_carry_available_matching_enabled(tmp_path, monkeypatch):
+    """The pinned gateway catalog (``tools.catalog`` / ``tools.effective``)
+    carries the same ``available`` parity field as the dashboard read path."""
+    from voicebridge import toolsets as TS
+    from voicebridge.gateway import rpc
+
+    monkeypatch.setattr(TS, "platform_toolset_states",
+                        lambda cfg: {"web": True, "terminal": False})
+    monkeypatch.setattr(TS, "toolset_states", lambda cfg: {})
+    monkeypatch.setattr(TS, "effective_toolset_enabled",
+                        lambda cfg, name: name == "web")
+
+    rows = {row["name"]: row for row in rpc._pin_toolset_rows(_Cfg(tmp_path))}
+    assert rows["web"]["enabled"] is True and rows["web"]["available"] is True
+    assert rows["terminal"]["enabled"] is False
+    assert rows["terminal"]["available"] is False
+    for row in rows.values():
+        assert row["available"] is row["enabled"], row
