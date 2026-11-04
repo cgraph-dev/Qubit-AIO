@@ -45,8 +45,8 @@ SHOWN_FIELDS = (
 
 def _journal_path() -> Path:
     try:
-        from ..config import canonical_state_dir
-        return Path(canonical_state_dir()) / "events.jsonl"
+        from ..config import preferred_state_dir
+        return Path(preferred_state_dir()) / "events.jsonl"
     except Exception:
         import os
         return Path(os.path.expanduser(

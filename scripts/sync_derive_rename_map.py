@@ -12,13 +12,15 @@ Qubit's vendored tree. This derives it from evidence rather than guessing:
 Read-only. Emits JSON to stdout.
 """
 from __future__ import annotations
+import os
 
 import json
 import re
 import subprocess
 from pathlib import Path
 
-PIN = Path("/home/trick/.cache/qubit-pins/hermes-agent")
+PIN = Path(os.environ.get("QUBIT_PINNED_HERMES",
+                str(Path.home() / ".cache" / "qubit-pins" / "hermes-agent")))
 QR = Path(__file__).resolve().parents[1] / "qubit_runtime"
 PIN_SHA = "69948c0057"
 BASE_SHA = "bd0affe5"

@@ -54,11 +54,17 @@ export XDG_DATA_HOME="$HOME_DIR/.local/share"
 export XDG_STATE_HOME="$HOME_DIR/.local/state"
 export XDG_CACHE_HOME="$HOME_DIR/.cache"
 unset PYTHONPATH || true
+unset QUBIT_HOME HERMES_HOME VIRTUAL_ENV || true
 
 degrade() { echo "DEGRADED: $*" >&2; exit 4; }
 fail() { echo "FAIL: $*" >&2; exit 2; }
 
 SYS_PY="${PYTHON:-python3}"
+# Resolve to an absolute interpreter path: `uv venv --python python3` can pick
+# a different (older) interpreter from its own discovery order.
+if command -v "$SYS_PY" >/dev/null 2>&1; then
+  SYS_PY="$(command -v "$SYS_PY")"
+fi
 
 # ------------------------------------------------- dashboard reproducibility
 # frontend/qubit-dist is a git-ignored build artifact: a clean clone cannot
@@ -82,7 +88,7 @@ VENV_CMD=()
 PIP_CMD=()
 if command -v uv >/dev/null 2>&1; then
   BUILD_CMD=(uv build --wheel --out-dir "$DIST")
-  VENV_CMD=(uv venv --quiet "$VENV")
+  VENV_CMD=(uv venv --quiet --python "$SYS_PY" "$VENV")
   PIP_CMD=(uv pip install --python "$VENV/bin/python")
   TOOLCHAIN="uv"
 else
@@ -150,6 +156,12 @@ for exe in qubit voicebridge qubit-dev qubit-agent; do
   fi
   echo "  ok: $exe --help"
 done
+if ! "$VENV/bin/qubit" --version >"$WORK/qubit-version.out" 2>&1; then
+  fail "entry point 'qubit --version' failed: $(tail -c 300 "$WORK/qubit-version.out" | tr '\n' ' ')"
+fi
+grep -qi '^qubit ' "$WORK/qubit-version.out" \
+  || fail "qubit --version did not print the product identity"
+echo "  ok: qubit --version ($(head -1 "$WORK/qubit-version.out"))"
 
 # ---------------------------------------------------------------- probe
 echo "== installed dashboard + runtime probe =="
@@ -224,15 +236,19 @@ def raw(path, headers=None):
 
 try:
     st, loc, _ = raw("/")
-    assert (st, loc) == (302, "/sessions"), (st, loc)
-    st, _, body = raw("/sessions")
+    assert st == 302 and loc in ("/chat", "/sessions"), (st, loc)
+    st, _, hb = raw("/api/health")
+    health = json.loads(hb)
+    assert st == 200 and health.get("ok") is True, (st, health)
+    assert str(health.get("version", "")).startswith("qubit"), health
+    st, _, body = raw("/chat")
     assert st == 200 and b"__QUBIT_BASE_PATH__" in body, st
     assert b'__QUBIT_BASE_PATH__=""' in body, "base path not root"
     asset = re.search(rb"/(assets/[^\"]+\.js)", body).group(1).decode()
     st, _, ab = raw("/" + asset)
     assert st == 200 and len(ab) > 1000, (asset, st, len(ab))
     st, _, pb = raw("/agent/api/dashboard/plugins",
-                    {"X-Hermes-Session-Token": "probe-token"})
+                    {"X-Qubit-Session-Token": "probe-token"})
     names = [m["name"] for m in json.loads(pb)]
     for want in ("qubit-ops", "qubit-devices", "qubit-memory",
                  "qubit-reports", "qubit-approvals"):

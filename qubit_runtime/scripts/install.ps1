@@ -71,7 +71,7 @@ $script:BoundParams = $PSBoundParameters
 # Under iex, script scope is the caller's session and outlives a run; start
 # each run without the previous run's answer (see Set-LauncherUserPath).
 $script:BinDirOnCallerPath = $null
-$RepoUrl = if ($env:HERMES_REPO_URL) { $env:HERMES_REPO_URL } else { "https://github.com/NousResearch/hermes-agent.git" }
+$RepoUrl = if ($env:QUBIT_REPO_URL) { $env:QUBIT_REPO_URL } elseif ($env:HERMES_REPO_URL) { $env:HERMES_REPO_URL } else { "https://github.com/cgraph-dev/Qubit.git" }
 
 # --- BEGIN GENERATED: bootstrap pins (scripts/gen-bootstrap-pins.py) ---
 # Derived from pm/lock.json. DO NOT EDIT BY HAND:
@@ -602,7 +602,7 @@ function Write-Banner {
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host "|             * Qubit Agent Installer                    |" -ForegroundColor Magenta
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
-    Write-Host "|  An open source AI agent by Nous Research.              |" -ForegroundColor Magenta
+    Write-Host "|  An open source personal AI agent.                      |" -ForegroundColor Magenta
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host ""
 }
@@ -768,9 +768,9 @@ function Stage-Repository {
     }
     if (Test-Path (Join-Path $InstallDir ".git")) {
         Log "Updating $InstallDir ($Branch)"
-        # An explicit HERMES_REPO_URL names the source for reruns too, not
-        # just the first clone.
-        if ($env:HERMES_REPO_URL) {
+        # An explicit QUBIT_REPO_URL (or the legacy HERMES_REPO_URL) names the
+        # source for reruns too, not just the first clone.
+        if ($env:QUBIT_REPO_URL -or $env:HERMES_REPO_URL) {
             Invoke-Native { git -C $InstallDir remote set-url origin $RepoUrl }
             if ($LASTEXITCODE) { Fail "cannot point origin at $RepoUrl" git_fetch_failed }
         }

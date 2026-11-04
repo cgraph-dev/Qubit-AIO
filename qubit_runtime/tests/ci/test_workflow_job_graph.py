@@ -57,14 +57,18 @@ def test_jobs_only_read_declared_dependencies():
 
 
 def test_no_workflow_runs_from_a_tag_push():
+    # Intentional tag-triggered release workflows. `release.yml` builds and
+    # verifies artifacts for a v* tag and creates a DRAFT release only; it never
+    # publishes. Everything else, including the nightly spend-capped canary,
+    # keeps the upstream rule of no incidental tag runs.
+    allowed = {"live-providers.yml", "release.yml"}
     violations = []
     for filename, workflow in _loaded().items():
         triggers = (workflow or {}).get("on") or {}
         if not isinstance(triggers, dict) or "push" not in triggers:
             continue
         push = triggers["push"]
-        # This nightly canary also gates releases with dedicated spend-capped keys.
-        if filename == "live-providers.yml" and push == {"tags": ["v*"]}:
+        if filename in allowed and push == {"tags": ["v*"]}:
             continue
         if not isinstance(push, dict) or not ({"branches", "branches-ignore"} & set(push)):
             violations.append(filename)

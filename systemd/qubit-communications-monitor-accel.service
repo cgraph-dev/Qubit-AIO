@@ -15,7 +15,7 @@ Wants=network.target
 Type=oneshot
 WorkingDirectory=__PROJECT_DIR__
 # Runs the hermetic accelerated qualification (no browser, isolated state).
-ExecStart=__PROJECT_DIR__/.venv/bin/python scripts/timer_qualify.py --accelerated
+ExecStart="__PROJECT_DIR__/.venv/bin/python" "scripts/timer_qualify.py" --accelerated
 # Bounded resources: the accelerated suite must stay inside the same envelope
 # as the real oneshot.
 MemoryHigh=300M

@@ -23,13 +23,22 @@ function normalizeHermesHomeRoot(hermesHome, pathModule) {
   return resolved
 }
 
-export function platformDefaultHermesHome(home, env = process.env, platform = process.platform) {
+function platformDefaultNamedHome(name, home, env, platform) {
   const suffix = env.HERMES_DATA_DIR_SUFFIX || ''
   if (platform === 'win32') {
     const base = (env.LOCALAPPDATA || '').trim() || path.win32.join(home, 'AppData', 'Local')
-    return path.win32.join(base, 'hermes') + suffix
+    return path.win32.join(base, name) + suffix
   }
-  return path.posix.join(home, '.hermes') + suffix
+  return path.posix.join(home, `.${name}`) + suffix
+}
+
+export function platformDefaultHermesHome(home, env = process.env, platform = process.platform) {
+  return platformDefaultNamedHome('qubit', home, env, platform)
+}
+
+/** The pre-rebrand default root, read-old only. Nothing writes here. */
+function platformDefaultLegacyHome(home, env = process.env, platform = process.platform) {
+  return platformDefaultNamedHome('hermes', home, env, platform)
 }
 
 export function resolveDesktopUserData(defaultPath, env = process.env) {
@@ -55,9 +64,11 @@ export function resolveDesktopHermesHome({ home, env = process.env, platform = p
     }
   }
   const defaultHome = platformDefaultHermesHome(home, env, platform)
-  // Keep the legacy migration for ordinary installs, not isolated suffix runs.
-  if (platform === 'win32' && !env.HERMES_DATA_DIR_SUFFIX) {
-    const legacy = paths.join(home, '.hermes')
+  // Read-old only: an ordinary install whose data still lives under the
+  // pre-rebrand root keeps resolving there until it is migrated deliberately.
+  // Isolated suffix runs never adopt legacy state.
+  if (!env.HERMES_DATA_DIR_SUFFIX) {
+    const legacy = platformDefaultLegacyHome(home, env, platform)
     if (!directoryExists(defaultHome) && directoryExists(legacy)) {
       return legacy
     }

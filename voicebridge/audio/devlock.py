@@ -17,8 +17,8 @@ _OWNER_ENV = "QUBIT_AUDIO_OWNER"
 
 def _lock_path() -> Path:
     try:
-        from ..config import canonical_state_dir
-        base = Path(canonical_state_dir())
+        from ..config import preferred_state_dir
+        base = Path(preferred_state_dir())
     except Exception:
         base = Path(os.path.expanduser("~/.local/state/qubit-voicebridge"))
     p = base / "audio-owner.lock"

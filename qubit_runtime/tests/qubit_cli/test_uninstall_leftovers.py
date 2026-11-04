@@ -49,8 +49,9 @@ def test_remove_launchd_gateway_sweeps_both_label_patterns(launch_agents, monkey
     current = launch_agents / "ai.qubit.gateway.plist"
     profiled = launch_agents / "ai.qubit.gateway-work.plist"
     legacy = launch_agents / "io.nousresearch.qubit.gateway.plist"
+    pre_rebrand = launch_agents / "ai.hermes.gateway.plist"
     unrelated = launch_agents / "com.other.agent.plist"
-    for p in (current, profiled, legacy, unrelated):
+    for p in (current, profiled, legacy, pre_rebrand, unrelated):
         p.write_text("<plist/>", encoding="utf-8")
 
     calls: list[list[str]] = []
@@ -58,10 +59,11 @@ def test_remove_launchd_gateway_sweeps_both_label_patterns(launch_agents, monkey
 
     assert uninstall._remove_launchd_gateway() is True
     assert not current.exists() and not profiled.exists() and not legacy.exists()
+    assert not pre_rebrand.exists()
     assert unrelated.exists()  # never touch another app's agent
     labels = {c[-1].rsplit("/", 1)[-1] for c in calls if c[1] == "bootout"}
     assert labels == {"ai.qubit.gateway", "ai.qubit.gateway-work",
-                      "io.nousresearch.qubit.gateway"}
+                      "ai.hermes.gateway", "io.nousresearch.qubit.gateway"}
     assert all(c[1] == "unload" for c in calls if c[1] == "unload")
 
 

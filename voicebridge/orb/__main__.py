@@ -227,9 +227,9 @@ def cmd_run(hidden: bool, quit_after: float,
         # helper): without this the orb's transition rows are silently
         # dropped (_EVENT_FILE stays None) and stuck-state reports are
         # undecidable (2026-10-04).
-        from ..config import canonical_state_dir
+        from ..config import preferred_state_dir
         from ..logging_setup import setup as _setup_logging
-        _setup_logging(state_dir=canonical_state_dir())
+        _setup_logging(state_dir=preferred_state_dir())
     except Exception:
         pass
     if not os.environ.get("DISPLAY"):

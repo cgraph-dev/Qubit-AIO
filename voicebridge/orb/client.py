@@ -124,8 +124,8 @@ HELPER_SPEAK_MAX_CHARS = 400
 def _helper_speak_request_path() -> Path:
     """Canonical state-dir request file (never raises)."""
     try:
-        from voicebridge.config import canonical_state_dir
-        return Path(canonical_state_dir()) / HELPER_SPEAK_REQUEST_NAME
+        from voicebridge.config import preferred_state_dir
+        return Path(preferred_state_dir()) / HELPER_SPEAK_REQUEST_NAME
     except Exception:  # noqa: BLE001
         return (Path.home() / ".local" / "state" / "qubit-voicebridge"
                 / HELPER_SPEAK_REQUEST_NAME)

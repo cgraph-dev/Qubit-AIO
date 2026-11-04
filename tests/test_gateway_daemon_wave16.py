@@ -59,7 +59,7 @@ def test_unit_renders_and_is_brand_clean():
     # No legacy brand token on a shipped product surface (legal aside).
     for token in ("hermes", "Hermes", "Nous", "openclaw", "OpenClaw"):
         assert token not in text, token
-    assert "__PROJECT_DIR__/.venv/bin/python -m voicebridge.gateway_daemon" in text
+    assert '"__PROJECT_DIR__/.venv/bin/python" -m voicebridge.gateway_daemon' in text
     assert "ExecReload=/bin/kill -USR1 $MAINPID" in text
     assert "KillMode=mixed" in text
     assert "Restart=always" in text

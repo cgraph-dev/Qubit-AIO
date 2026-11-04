@@ -885,7 +885,10 @@ SPA_ROUTE_PATHS = (
     "/chat", "/sessions", "/files", "/models", "/analytics", "/logs",
     "/cron", "/skills", "/plugins", "/mcp", "/channels", "/webhooks",
     "/pairing", "/profiles", "/config", "/env", "/system", "/docs",
-    "/agents", "/voice-edit",
+    "/agents", "/voice-edit", "/qubit-tv", "/qubit-memory",
+    # Bundled fleet plugin tabs (real client routes; catch-all also serves
+    # unknown SPA paths, but these are explicit so the allowlist cannot drift)
+    "/achievements", "/kanban",
     # Qubit overlay plugin tabs (real client routes)
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",

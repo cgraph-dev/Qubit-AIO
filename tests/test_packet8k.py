@@ -20,6 +20,13 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
+
+def _project_version() -> str:
+    import tomllib
+    data = tomllib.loads((REPO / "pyproject.toml").read_text(encoding="utf-8"))
+    return data["project"]["version"]
+
+
 from voicebridge import release as R  # noqa: E402
 
 
@@ -28,7 +35,7 @@ from voicebridge import release as R  # noqa: E402
 # ========================================================================
 def test_git_provenance_records_commit_and_bounded_dirty():
     rec = R.git_provenance(REPO)
-    assert rec["version"] == "1.0.0"
+    assert rec["version"] == _project_version()
     assert rec["commit"]
     assert isinstance(rec["dirty"], bool)
     assert isinstance(rec["dirty_files"], list)
@@ -341,10 +348,14 @@ def test_resource_ceilings_recorded():
     assert c["monitor_oneshot_timeout_s"] == 300
 
 
-def test_operator_runbook_check_includes_8k():
+def test_operator_runbook_check_includes_live_docs():
     results = {c["name"]: c for c in R.operator_runbook_check(REPO)}
-    assert results["docs.docs/archive/2026-09-21/OPERATIONS_8K.md"]["state"] == "OK"
-    assert results["docs.docs/archive/2026-09-21/MIGRATIONS.md"]["state"] == "OK"
+    # The 2026-09-21 archive markdown was purged; the live authoritative docs
+    # are what the runbook gate must require now.
+    assert results["docs.docs/README.md"]["state"] == "OK"
+    assert results["docs.docs/ARCHITECTURE.md"]["state"] == "OK"
+    assert results["docs.docs/MIGRATION.md"]["state"] == "OK"
+    assert results["docs.docs/VOICE-BRIDGE-AUDIT.md"]["state"] == "OK"
 
 
 def test_backup_migration_check_passes():
@@ -467,7 +478,7 @@ def test_synthetic_prior_artifact_upgrade_contract(tmp_path):
 def test_certify_passes_and_records_personalization():
     report = R.certify(REPO)
     assert R.report_pass(report) is True
-    assert report["provenance"]["version"] == "1.0.0"
+    assert report["provenance"]["version"] == _project_version()
     assert report["machine_paths"]["core"] == {}
     assert report["secrets"] == {}
     assert report["units"]["all_ok"] is True

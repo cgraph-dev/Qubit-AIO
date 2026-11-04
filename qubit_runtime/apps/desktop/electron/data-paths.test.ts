@@ -24,7 +24,7 @@ test('default data roots append the suffix literally on each platform', (): void
     const home: string = platform === 'win32' ? 'C:\\Users\\test' : '/home/test'
     const local: string = paths.join(home, 'AppData', 'Local')
     const userData: string = paths.join(home, 'app-data', 'Hermes')
-    const base: string = platform === 'win32' ? paths.join(local, 'hermes') : paths.join(home, '.hermes')
+    const base: string = platform === 'win32' ? paths.join(local, 'qubit') : paths.join(home, '.qubit')
 
     for (const suffix of ['', '-asdfasdf', 'magic-test', ' spaced ']) {
       const env: NodeJS.ProcessEnv = { LOCALAPPDATA: local, HERMES_DATA_DIR_SUFFIX: suffix }
@@ -55,7 +55,7 @@ test('explicit homes and userData retain precedence, and suffixed Windows homes 
 
   const windowsHome: string = 'C:\\Users\\test'
   const windowsEnv: NodeJS.ProcessEnv = { HERMES_DATA_DIR_SUFFIX: 'magic-test' }
-  const expected: string = path.win32.join(windowsHome, 'AppData', 'Local', 'hermesmagic-test')
+  const expected: string = path.win32.join(windowsHome, 'AppData', 'Local', 'qubitmagic-test')
 
   assert.equal(
     resolveDesktopHermesHome({
@@ -74,5 +74,60 @@ test('explicit homes and userData retain precedence, and suffixed Windows homes 
       readWindowsHome: (): string => 'C:\\custom'
     }),
     'C:\\custom'
+  )
+})
+
+test('a pre-rebrand home is read-old only when the canonical root is absent', (): void => {
+  const home: string = '/home/test'
+  const legacy: string = path.join(home, '.hermes')
+
+  assert.equal(
+    resolveDesktopHermesHome({
+      home,
+      env: {},
+      platform: 'linux',
+      directoryExists: (directory: string): boolean => directory === legacy
+    }),
+    legacy
+  )
+  assert.equal(
+    resolveDesktopHermesHome({
+      home,
+      env: {},
+      platform: 'linux',
+      directoryExists: (): boolean => true
+    }),
+    path.join(home, '.qubit')
+  )
+})
+
+test('Windows reads a legacy LOCALAPPDATA\\hermes root without writing to it', (): void => {
+  const home: string = 'C:\\Users\\test'
+  const local: string = 'C:\\Users\\test\\AppData\\Local'
+  const legacy: string = path.win32.join(local, 'hermes')
+
+  assert.equal(
+    resolveDesktopHermesHome({
+      home,
+      env: { LOCALAPPDATA: local },
+      platform: 'win32',
+      directoryExists: (directory: string): boolean => directory === legacy
+    }),
+    legacy
+  )
+})
+
+test('suffixed runs never adopt legacy state', (): void => {
+  const home: string = '/home/test'
+  const legacy: string = path.join(home, '.hermesmagic-test')
+
+  assert.equal(
+    resolveDesktopHermesHome({
+      home,
+      env: { HERMES_DATA_DIR_SUFFIX: 'magic-test' },
+      platform: 'linux',
+      directoryExists: (directory: string): boolean => directory === legacy
+    }),
+    path.join(home, '.qubitmagic-test')
   )
 })

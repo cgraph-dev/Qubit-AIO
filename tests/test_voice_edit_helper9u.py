@@ -752,7 +752,7 @@ def test_wake_busy_clears_after_journaled_playback_stop(tmp_path, monkeypatch):
 
     fixed = _t.time()
     monkeypatch.setattr(dh.time, "time", lambda: fixed)
-    monkeypatch.setattr(config_mod, "canonical_state_dir", lambda: tmp_path)
+    monkeypatch.setattr(config_mod, "preferred_state_dir", lambda: tmp_path)
     p = tmp_path / "events.jsonl"
     p.write_text("".join(_json.dumps(e) + "\n" for e in (
         {"event": "voice_edit.helper.speak", "ts": fixed - 4.0},

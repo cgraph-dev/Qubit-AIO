@@ -1,0 +1,162 @@
+name: release
+
+# Tag-driven release build. This workflow builds and verifies the artifacts and
+# creates a DRAFT GitHub release only. It never publishes, never uploads to a
+# package registry, and never uses repository secrets. A human must approve the
+# `release` environment (draft step) and publish the release manually.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify release artifacts
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          fetch-depth: 0
+      - name: Resolve the release tag
+        id: tag
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            v*) ;;
+            *) echo "::error::not a v* release tag: $TAG"; exit 1 ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Set up Node
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/qubit-web/package-lock.json
+      - name: Build the dashboard bundle
+        # The custom hatch build hook packages frontend/qubit-dist; a release
+        # artifact without it is rejected by release_qualify.py. Use the
+        # canonical builder so a clean tag checkout can produce the bundle.
+        run: bash scripts/build_dashboard.sh
+      - name: Install build tooling
+        run: python -m pip install --upgrade pip build
+      - name: Build, install, and reproduce artifacts
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -o pipefail
+          python scripts/release_qualify.py \
+            --build --install --reproduce --unsigned-ok --json \
+            --tag "$TAG" --out dist/release \
+            | tee dist/release-report.json
+      - name: Report the release verdict
+        if: always()
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          path = pathlib.Path("dist/release-report.json")
+          if not path.is_file():
+              print("no release report produced")
+              raise SystemExit(1)
+          report = json.loads(path.read_text())
+          version = report.get("version_identity", {})
+          lines = [
+              f"verdict: {report.get('verdict')}",
+              f"tree: {report.get('tree', {}).get('state')}",
+              "version: tag={tag} pyproject={pyproject} package={package} "
+              "state={state}".format(
+                  tag=version.get("tag"),
+                  pyproject=version.get("pyproject_version"),
+                  package=version.get("package_version"),
+                  state=version.get("state"),
+              ),
+          ]
+          for name, step in report.get("steps", {}).items():
+              lines.append(f"{name}: {step.get('state', '?')}")
+          text = "\n".join(lines)
+          print(text)
+          summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary:
+              with open(summary, "a", encoding="utf-8") as fh:
+                  fh.write("```\n" + text + "\n```\n")
+          PY
+      - name: Write SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd dist/release/build1
+          sha256sum ./*.whl ./*.tar.gz > ../../SHA256SUMS
+          cat ../../SHA256SUMS
+      - name: Upload verified artifacts
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: release-dist
+          path: |
+            dist/release/build1/*.whl
+            dist/release/build1/*.tar.gz
+            dist/SHA256SUMS
+            dist/release-report.json
+          if-no-files-found: error
+          retention-days: 30
+
+  draft:
+    name: Create draft release (never publishes)
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Manual approval gate. Do not add secrets here. Publishing is intentionally
+    # absent: the only write is creating/updating a draft release.
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - name: Download verified artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          name: release-dist
+          path: release-dist
+      - name: Create or update the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build.outputs.tag }}
+        run: |
+          set -euo pipefail
+          test -n "$TAG"
+          case "$TAG" in
+            v*) ;;
+            *) echo "::error::invalid release tag: $TAG"; exit 1 ;;
+          esac
+          shopt -s nullglob
+          assets=(release-dist/*.whl release-dist/*.tar.gz release-dist/SHA256SUMS)
+          test "${#assets[@]}" -ge 3
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
+            echo "updated existing draft/release $TAG with verified assets"
+          else
+            gh release create "$TAG" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" \
+              --draft \
+              --title "Qubit ${TAG#v}" \
+              --notes "Draft release built from ${GITHUB_SHA}. Publishing requires a manual, approved release step; this workflow never publishes."
+            echo "created draft release $TAG"
+          fi

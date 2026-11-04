@@ -50,7 +50,12 @@ def packaged_gui_app_paths() -> "list[Path]":
     electron-builder output locations for the "Qubit" product."""
     home = Path.home()
     if sys.platform == "darwin":
-        return [Path("/Applications/Hermes.app"), home / "Applications" / "Hermes.app"]
+        # Current product name first; the pre-rebrand bundle is kept as a
+        # read-old cleanup/launch fallback.
+        return [
+            Path("/Applications/Qubit.app"), home / "Applications" / "Qubit.app",
+            Path("/Applications/Hermes.app"), home / "Applications" / "Hermes.app",
+        ]
     if sys.platform == "win32":
         local_base = _env_dir("LOCALAPPDATA", home / "AppData" / "Local")
         # NSIS per-user install (perMachine=false), an older/alternate layout, NSIS per-machine (needs admin).

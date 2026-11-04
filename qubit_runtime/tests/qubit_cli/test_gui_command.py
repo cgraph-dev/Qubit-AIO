@@ -100,9 +100,9 @@ def _make_packaged_executable(root: Path, monkeypatch) -> Path:
     """
     desktop_dir = root / "apps" / "desktop"
     if sys.platform == "darwin":
-        exe = desktop_dir / "release" / "mac-arm64" / "Hermes.app" / "Contents" / "MacOS" / "Qubit"
+        exe = desktop_dir / "release" / "mac-arm64" / "Qubit.app" / "Contents" / "MacOS" / "Qubit"
     elif sys.platform == "win32":
-        exe = desktop_dir / "release" / "win-unpacked" / "Hermes.exe"
+        exe = desktop_dir / "release" / "win-unpacked" / "Qubit.exe"
     else:
         exe = desktop_dir / "release" / "linux-unpacked" / "Qubit"
     exe.parent.mkdir(parents=True, exist_ok=True)
@@ -124,9 +124,9 @@ def _staging_dir_from(cmd) -> Path:
 def _packaged_exe_rel() -> Path:
     """Packaged-exe path relative to electron-builder's output dir on THIS host."""
     if sys.platform == "darwin":
-        return Path("mac-arm64") / "Hermes.app" / "Contents" / "MacOS" / "Qubit"
+        return Path("mac-arm64") / "Qubit.app" / "Contents" / "MacOS" / "Qubit"
     if sys.platform == "win32":
-        return Path("win-unpacked") / "Hermes.exe"
+        return Path("win-unpacked") / "Qubit.exe"
     return Path("linux-unpacked") / "Qubit"
 
 
@@ -179,7 +179,7 @@ def test_source_launch_reads_bom_electron_path_without_provisioning(tmp_path, mo
 
 def _stamped_macos_bundle(app: Path, asar: bytes) -> Path:
     (app / "Contents" / "MacOS").mkdir(parents=True)
-    (app / "Contents" / "MacOS" / "Hermes").write_bytes(b"\xcf\xfa\xed\xfe")
+    (app / "Contents" / "MacOS" / app.stem.removesuffix(".app")).write_bytes(b"\xcf\xfa\xed\xfe")
     (app / "Contents" / "Resources").mkdir()
     (app / "Contents" / "Resources" / "app.asar").write_bytes(asar)
     (app / "Contents" / "Resources" / "install-stamp.json").write_text('{"updateMechanism": "self"}')
@@ -188,13 +188,13 @@ def _stamped_macos_bundle(app: Path, asar: bytes) -> Path:
 
 @pytest.mark.platforms("macos")
 def test_packaged_launch_opens_the_refreshed_installed_app(tmp_path, monkeypatch):
-    """#52339: Finder and the Dock open the installed Hermes.app, so ``qubit desktop`` must launch
+    """#52339: Finder and the Dock open the installed Qubit.app, so ``qubit desktop`` must launch
     that copy (brought up to the checkout build) instead of a second bundle under release/."""
     import shutil
 
     root = _make_desktop_tree(tmp_path)
-    _stamped_macos_bundle(root / "apps" / "desktop" / "release" / "mac-arm64" / "Hermes.app", b"checkout build")
-    installed = _stamped_macos_bundle(tmp_path / "Applications" / "Hermes.app", b"stale build")
+    _stamped_macos_bundle(root / "apps" / "desktop" / "release" / "mac-arm64" / "Qubit.app", b"checkout build")
+    installed = _stamped_macos_bundle(tmp_path / "Applications" / "Qubit.app", b"stale build")
     monkeypatch.setattr("qubit_cli.gui_uninstall.packaged_gui_app_paths", lambda: [installed])
     monkeypatch.setattr("qubit_constants.get_default_qubit_root", lambda **kw: tmp_path)  # root is its qubit
     monkeypatch.setattr(main_desktop, "_stage_macos_bundle_copy", lambda src, dst: shutil.copytree(src, dst, symlinks=True))
@@ -211,7 +211,7 @@ def test_packaged_launch_opens_the_refreshed_installed_app(tmp_path, monkeypatch
         main_desktop.cmd_gui(_ns(skip_build=True))
 
     assert exit_info.value.code == 0
-    assert calls == [[str(installed / "Contents" / "MacOS" / "Hermes")]]
+    assert calls == [[str(installed / "Contents" / "MacOS" / "Qubit")]]
     assert (installed / "Contents" / "Resources" / "app.asar").read_bytes() == b"checkout build"
 
 
@@ -333,8 +333,9 @@ def test_gui_close_preview_flag_forwards_to_packaged_exe(tmp_path, monkeypatch):
 @pytest.mark.parametrize("exists,platform", [(True, "darwin"), (False, "darwin"), (True, "linux")])
 def test_launch_installed_macos_desktop_app_gates_on_bundle_and_platform(tmp_path, monkeypatch, exists, platform):
     monkeypatch.setattr(main_desktop.sys, "platform", platform)
-    exe = Path("/Applications/Hermes.app/Contents/MacOS/Hermes")
-    monkeypatch.setattr(main_desktop.Path, "is_file", lambda self: exists if self == exe else Path.is_file(self))
+    exe = Path("/Applications/Qubit.app/Contents/MacOS/Qubit")
+    real_is_file = Path.is_file
+    monkeypatch.setattr(main_desktop.Path, "is_file", lambda self: exists if self == exe else real_is_file(self))
     calls = []
     if exists and platform == "darwin":
         import qubit_cli.bundled_app as bundled_app
@@ -343,6 +344,19 @@ def test_launch_installed_macos_desktop_app_gates_on_bundle_and_platform(tmp_pat
     assert main_desktop._launch_installed_macos_desktop_app() is (exists and platform == "darwin")
     if exists and platform == "darwin":
         assert calls == [[str(exe)]]
+
+
+@pytest.mark.platforms("macos")
+def test_launch_installed_macos_desktop_app_reads_old_hermes_bundle(tmp_path, monkeypatch):
+    exe = Path("/Applications/Hermes.app/Contents/MacOS/Hermes")
+    real_is_file = Path.is_file
+    monkeypatch.setattr(main_desktop.Path, "is_file", lambda self: self == exe or real_is_file(self))
+    calls = []
+    import qubit_cli.bundled_app as bundled_app
+    monkeypatch.setattr(bundled_app, "launch_detached", lambda argv, **kw: calls.append(argv) or 4321)
+
+    assert main_desktop._launch_installed_macos_desktop_app() is True
+    assert calls == [[str(exe)]]
 
 
 # ── Content-hash stamp tests ──────────────────────────────────────────

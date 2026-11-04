@@ -1,8 +1,8 @@
 """An installer rerun keeps a checkout on the update channel it chose (#137714).
 
-Hermes-Setup reruns install.sh with its baked ``--branch main``. A checkout whose
-config.yaml record (written by Hermes itself) names ``stable`` must stay where
-``hermes update`` put it; a ``main`` record still follows the branch.
+Qubit-Setup reruns install.sh with its baked ``--branch main``. A checkout whose
+config.yaml record (written by Qubit itself) names ``stable`` must stay where
+``qubit update`` put it; a ``main`` record still follows the branch.
 """
 from pathlib import Path
 import os
@@ -31,7 +31,7 @@ def test_rerun_keeps_a_chosen_channel_checkout(tmp_path, monkeypatch, channel, m
     from qubit_cli.update_channel import set_install_channel
 
     origin, home = tmp_path / "origin", tmp_path / "home"
-    install = home / "hermes-agent"
+    install = home / "qubit"
     origin.mkdir()
     home.mkdir()
     _git(origin, "init", "-b", "main")
@@ -45,7 +45,7 @@ def test_rerun_keeps_a_chosen_channel_checkout(tmp_path, monkeypatch, channel, m
 
     result = subprocess.run(
         ["bash", str(ROOT / "scripts" / "install.sh"), "--stage", "repository",
-         "--branch", "main", "--dir", str(install), "--hermes-home", str(home), "--non-interactive"],
+         "--branch", "main", "--dir", str(install), "-QubitHome", str(home), "--non-interactive"],
         check=False, capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=120,
         env={"PATH": os.environ["PATH"], "HOME": str(tmp_path), "NO_COLOR": "1"},
     )

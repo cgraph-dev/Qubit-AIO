@@ -1,6 +1,6 @@
-"""install.ps1 reads the update channel a checkout chose, as Hermes wrote it (#137714).
+"""install.ps1 reads the update channel a checkout chose, as Qubit wrote it (#137714).
 
-The Windows twin of test_install_sh_chosen_channel: the record comes from Hermes's
+The Windows twin of test_install_sh_chosen_channel: the record comes from Qubit's
 own writer, and the installer's pre-Python reader must find it by this install's id.
 """
 from pathlib import Path
@@ -22,7 +22,7 @@ def test_installer_reads_the_channel_qubit_recorded(tmp_path, monkeypatch, chann
     if not powershell:
         pytest.skip("Windows PowerShell is required")
     home = tmp_path / "home"
-    install = home / "hermes-agent"
+    install = home / "qubit"
     install.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
     set_install_channel(channel, install)

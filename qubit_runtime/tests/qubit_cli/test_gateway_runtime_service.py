@@ -366,7 +366,7 @@ def test_native_launchd_checks_loaded_job_before_disk(case, reason, tmp_path, mo
     home.mkdir(mode=0o700)
     monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.setattr(pwd, 'getpwuid', lambda uid: SimpleNamespace(pw_dir=str(tmp_path), pw_name="owner"))
-    label = 'ai.hermes.gateway' + ('-' + service.service_suffix(home) if service.service_suffix(home) else '')
+    label = 'ai.qubit.gateway' + ('-' + service.service_suffix(home) if service.service_suffix(home) else '')
     plist = tmp_path / 'Library/LaunchAgents' / (label + '.plist')
     plist.parent.mkdir(parents=True)
     argv = [sys.executable, '-m', 'qubit_cli.main', 'gateway', 'run']

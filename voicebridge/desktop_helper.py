@@ -153,8 +153,8 @@ def helper_speak_enabled(environ: Optional[Dict[str, str]] = None) -> bool:
 def helper_speak_request_path() -> Path:
     """The canonical request file (read-only resolution; never raises)."""
     try:
-        from .config import canonical_state_dir
-        return Path(canonical_state_dir()) / HELPER_SPEAK_REQUEST_NAME
+        from .config import preferred_state_dir
+        return Path(preferred_state_dir()) / HELPER_SPEAK_REQUEST_NAME
     except Exception:  # noqa: BLE001
         return (Path.home() / ".local" / "state" / "qubit-voicebridge"
                 / HELPER_SPEAK_REQUEST_NAME)
@@ -1588,8 +1588,8 @@ class DesktopHelper:
         if getattr(self, "_barge_interrupted", False):
             window_s = min(float(window_s), 1.0)
         try:
-            from .config import canonical_state_dir
-            events = canonical_state_dir() / "events.jsonl"
+            from .config import preferred_state_dir
+            events = preferred_state_dir() / "events.jsonl"
             busy = recent_tts_speak(events, window_s=window_s)
             if not busy:
                 # The helper's own playback is covered by ``_speaking`` while
@@ -4819,9 +4819,9 @@ def main(argv: Optional[list] = None) -> int:
     args = parser.parse_args(argv)
     try:
         # Share the one Qubit event journal so helper diagnostics are auditable.
-        from .config import canonical_state_dir
+        from .config import preferred_state_dir
         from .logging_setup import setup as _setup_logging
-        _setup_logging(state_dir=canonical_state_dir())
+        _setup_logging(state_dir=preferred_state_dir())
     except Exception:
         pass
     cfg = build_cfg()
@@ -4829,7 +4829,7 @@ def main(argv: Optional[list] = None) -> int:
         # Apply the journal bounds and the verbose-transcript gate from the
         # owner's config (the early setup above only fixes the path).
         _setup_logging(
-            state_dir=canonical_state_dir(),
+            state_dir=preferred_state_dir(),
             max_bytes=_read_cfg(cfg, "logging", "jsonl_max_bytes",
                                 default=32 * 1024 * 1024),
             backups=_read_cfg(cfg, "logging", "jsonl_backups", default=3),

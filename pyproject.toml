@@ -444,6 +444,29 @@ exclude = [
   # internal dev change reports carry machine-specific history; not needed to
   # build, run, or test the release
   "docs/CHANGE_REPORTS",
+  # Developer-only scratch probes, session ledgers and audit output. They are
+  # tracked for history and legitimately record the developer's home path, but
+  # they are NOT product surfaces: they must not enter a release artifact.
+  # release_qualify.py::is_dev_only_path mirrors this list for the artifact
+  # scan, so a real user path in product code still fails.
+  "tmp",
+  "errs",
+  "HANDOFF.md",
+  "INDEPENDENCE_VERDICT.md",
+  "PLATFORM_SMOKE.md",
+  "PORT-METHOD.md",
+  "PORTED-chunk-10.json",
+  "REPORT-*",
+  "baseline_errs.json",
+  "chain_probe.py",
+  "deletion_probe.py",
+  "deletion_test.sh",
+  "harness_run.txt",
+  "lane-baseline.txt",
+  "pf.sh",
+  "resolve_probe.py",
+  "run_failing.sh",
+  "run_lane.sh",
   # the 2026-09-22 docs reset archived the pre-reset docs here; they are
   # internal history (some carry a developer home path) and must not ship.
   "docs/archive/2026-09-22-pre-reset",

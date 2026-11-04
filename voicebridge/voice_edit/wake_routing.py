@@ -37,8 +37,8 @@ _MODE_CURRENT = "current"
 def state_dir() -> Path:
     """Canonical Qubit state dir (never the repo); fallback never raises."""
     try:
-        from voicebridge.config import canonical_state_dir
-        return Path(canonical_state_dir())
+        from voicebridge.config import preferred_state_dir
+        return Path(preferred_state_dir())
     except Exception:
         return Path(os.path.expanduser("~/.local/state/qubit-voicebridge"))
 

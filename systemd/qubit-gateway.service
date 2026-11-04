@@ -14,7 +14,7 @@ StartLimitBurst=5
 [Service]
 Type=simple
 # __PROJECT_DIR__ is replaced with the actual path by scripts/install_systemd_unit.sh
-ExecStart=__PROJECT_DIR__/.venv/bin/python -m voicebridge.gateway_daemon
+ExecStart="__PROJECT_DIR__/.venv/bin/python" -m voicebridge.gateway_daemon
 WorkingDirectory=__PROJECT_DIR__
 # SIGUSR1 is the vendored gateway's in-process restart signal (restart without a
 # process replacement). SIGTERM/SIGINT drive its graceful drain/teardown.

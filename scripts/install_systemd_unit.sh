@@ -9,15 +9,31 @@
 #     restoring that backup is the documented rollback.
 #
 # Usage: install_systemd_unit.sh <repo-root>
-# Env:   HOME, INSTALL_FORCE_UNIT(=1 to force), SYSTEMD_UNIT_NAME (default
-#        qubit-voicebridge.service; prior install names remain readable via
-#        the Packet 8S compat-alias migration), SYSTEMD_UNIT_DIR (default
-#        $HOME/.config/systemd/user; override for hermetic tests/deploys)
+# Env:   HOME, XDG_CONFIG_HOME, INSTALL_FORCE_UNIT(=1 to force),
+#        SYSTEMD_UNIT_NAME (default qubit-voicebridge.service; prior install
+#        names remain readable via the Packet 8S compat-alias migration),
+#        SYSTEMD_UNIT_DIR (default $XDG_CONFIG_HOME/systemd/user, falling back
+#        to $HOME/.config/systemd/user; override for hermetic tests/deploys)
 set -eu
+
+HOST_SYSTEM="$(uname -s 2>/dev/null || echo unknown)"
+if [ "$HOST_SYSTEM" = "Darwin" ]; then
+    echo "UNSUPPORTED_PLATFORM: systemd user units are Linux-only." >&2
+    echo "  macOS uses the gateway LaunchAgent: scripts/install_launchd_unit.sh" >&2
+    exit 2
+fi
 
 REPO="${1:?usage: install_systemd_unit.sh <repo-root>}"
 UNIT_NAME="${SYSTEMD_UNIT_NAME:-qubit-voicebridge.service}"
-UNIT_DIR="${SYSTEMD_UNIT_DIR:-$HOME/.config/systemd/user}"
+
+# XDG_CONFIG_HOME is authoritative when absolute (the spec's own rule); an
+# empty or relative value falls back to the documented $HOME/.config default.
+CONFIG_HOME="${XDG_CONFIG_HOME:-}"
+case "$CONFIG_HOME" in
+    /*) ;;
+    *) CONFIG_HOME="$HOME/.config" ;;
+esac
+UNIT_DIR="${SYSTEMD_UNIT_DIR:-$CONFIG_HOME/systemd/user}"
 UNIT="$UNIT_DIR/$UNIT_NAME"
 TEMPLATE="$REPO/systemd/$UNIT_NAME"
 
