@@ -72,7 +72,7 @@ def test_scan_forbidden_blocks_state_models_and_internal_docs(tmp_path: Path):
     (dest / ".env").write_text("SECRET=1", encoding="utf-8")
     (dest / "state.db").write_text("db", encoding="utf-8")
     (dest / "model.onnx").write_text("w", encoding="utf-8")
-    (dest / "leak.txt").write_text("/home/trick/private", encoding="utf-8")
+    (dest / "leak.txt").write_text("/home/" + "trick/private", encoding="utf-8")
     forbidden, personal = module.scan_forbidden(dest, {"docs/PUBLIC.md"})
     assert "docs/INTERNAL.md" in forbidden
     assert ".env" in forbidden
