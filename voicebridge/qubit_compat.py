@@ -25,11 +25,15 @@ import json
 import os
 import re
 import secrets
+import socket
 import tempfile
 import threading
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterator, List, Optional, Tuple
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin, urlparse
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 # Overlay (theme + plugins) resolution: package data first (clean wheel
@@ -2197,8 +2201,9 @@ def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                reference_temperature=0.0, aggregator_temperature=0.0,
                reference_timeout=None, degraded_reference_policy="loud",
                enabled=False,
-               detail="MoA fan-out is not shipped; ordered provider fallback "
-                      "(8Q gateway) is the Qubit counterpart")
+               detail="MoA fan-out is not routed by Qubit's canonical model "
+                      "resolver; ordered provider fallback (8Q gateway) is "
+                      "the Qubit counterpart")
 
 
 def _publish_model_changed(cfg: Any, provider: str, model: str,
@@ -4798,6 +4803,240 @@ def h_analytics(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     } for m in usage["by_model"]]
     return _ok(daily=usage["daily"], by_model=by_model, totals=totals,
                skills=empty_skills)
+
+
+# ---------------------------------------------------------------------------
+# Remote media proxy (reference ``GET /api/media/proxy``)
+# ---------------------------------------------------------------------------
+# The reference dashboard fetches an agent-generated image from the CDN
+# server-side when the client cannot reach it, returning the same ``data_url``
+# shape as ``GET /api/media`` (#74564). Qubit serves the route but NOT as an
+# open forwarder:
+#   * scheme and host are allowlisted to the generated-media CDNs the runtime
+#     actually writes to (never arbitrary hosts);
+#   * every redirect hop is re-validated against the same allowlist AND the
+#     canonical SSRF policy (private/loopback/link-local/metadata refused), so
+#     a CDN redirect cannot bounce the proxy into the local network;
+#   * the body is size-capped and must be an image content type;
+#   * no cookies, credentials or Authorization header are attached;
+#   * every failure is a typed, redacted refusal (never an untyped traceback
+#     or a reflected URL).
+_MEDIA_PROXY_ALLOWED_HOSTS = (
+    "fal.media", "fal.run", "v3.fal.media", "storage.googleapis.com",
+    "*.fal.media", "*.fal.run",
+)
+_MEDIA_PROXY_EXTENSIONS = frozenset({
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".bmp", ".ico",
+})
+_MEDIA_PROXY_CONTENT_TYPES = frozenset({
+    "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml",
+    "image/bmp", "image/x-icon",
+})
+_MEDIA_PROXY_MAX_BYTES = 25 * 1024 * 1024
+_MEDIA_PROXY_TIMEOUT_S = 20.0
+_MEDIA_PROXY_MAX_REDIRECTS = 3
+_MEDIA_PROXY_REDIRECT_CODES = frozenset({301, 302, 303, 307, 308})
+_MEDIA_PROXY_USER_AGENT = "QubitMediaProxy/1.0 (allowlisted, bounded)"
+
+
+def _media_proxy_host_allowed(host: str) -> bool:
+    """True only for the reference's generated-media CDN allowlist."""
+    host = (host or "").lower().rstrip(".")
+    if not host:
+        return False
+    for allowed in _MEDIA_PROXY_ALLOWED_HOSTS:
+        bare = allowed[2:] if allowed.startswith("*.") else allowed
+        if host == bare:
+            return True
+        if allowed.startswith("*.") and host.endswith("." + bare):
+            return True
+    return False
+
+
+def _media_proxy_validate(raw: str) -> str:
+    """Validate one media URL (initial or redirect hop); return it unchanged.
+
+    Raises ``ValueError`` for a malformed/unsupported URL and ``PermissionError``
+    for a host that is not allowed or resolves into a private network. The
+    canonical ``voicebridge.websites`` SSRF policy is reused rather than a
+    second blocklist; an unreadable policy fails closed.
+    """
+    text = str(raw or "").strip()
+    if not text or len(text) > 2048:
+        raise ValueError("a remote image URL is required")
+    parsed = urlparse(text)
+    if parsed.scheme.lower() not in ("http", "https") or not parsed.hostname:
+        raise ValueError("a remote image URL is required")
+    if parsed.username or parsed.password:
+        raise PermissionError("credential-bearing URLs are rejected")
+    try:
+        parsed.port  # validates an out-of-range/invalid port
+    except ValueError as exc:
+        raise ValueError("invalid URL port") from exc
+    host = parsed.hostname.lower().rstrip(".")
+    if not _media_proxy_host_allowed(host):
+        raise PermissionError("image host not allowed")
+    try:
+        from .websites import blocked_host_reason
+
+        if blocked_host_reason(host, resolve=True):
+            raise PermissionError("image host is not a public network target")
+    except PermissionError:
+        raise
+    except Exception:  # noqa: BLE001 - an unreadable policy fails closed
+        raise PermissionError("image host policy unavailable") from None
+    suffix = Path(parsed.path).suffix.lower()
+    if suffix and suffix not in _MEDIA_PROXY_EXTENSIONS:
+        raise ValueError("unsupported media type")
+    return text
+
+
+class _MediaProxyNoRedirect(HTTPRedirectHandler):
+    """Refuse transparent redirects so every hop is policy-checked here."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        raise HTTPError(req.full_url, code, msg, headers, fp)
+
+
+def _media_proxy_open(req: Request, timeout: float):
+    """One bounded GET through the no-auto-redirect opener (test seam)."""
+    opener = build_opener(_MediaProxyNoRedirect())
+    return opener.open(req, timeout=timeout)
+
+
+def _media_proxy_refusal(status: int, code: str, detail: str
+                         ) -> Tuple[int, Dict[str, Any]]:
+    return status, {"ok": False, "state": "UNAVAILABLE", "code": code,
+                    "detail": _redact(detail)[:300]}
+
+
+def h_media_proxy(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/media/proxy -> allowlisted remote image as a data URL.
+
+    Reference-compatible body shape (``{"data_url": ...}``) with Qubit's
+    stricter hop-by-hop SSRF validation. Typed refusals for every failure;
+    never an open proxy and never a credential-forwarding fetch.
+    """
+    import base64
+
+    raw = str(q.get("url") or "").strip()
+    try:
+        current = _media_proxy_validate(raw)
+    except PermissionError as exc:
+        return _media_proxy_refusal(403, "MEDIA_PROXY_HOST_NOT_ALLOWED",
+                                    str(exc))
+    except (ValueError, OSError) as exc:
+        code = ("MEDIA_PROXY_UNSUPPORTED_TYPE"
+                if "unsupported media type" in str(exc)
+                else "MEDIA_PROXY_BAD_URL")
+        status = 415 if code == "MEDIA_PROXY_UNSUPPORTED_TYPE" else 400
+        return _media_proxy_refusal(status, code, str(exc))
+
+    started = time.monotonic()
+    redirects = 0
+    while True:
+        if time.monotonic() - started > _MEDIA_PROXY_TIMEOUT_S:
+            return _media_proxy_refusal(
+                504, "MEDIA_PROXY_TIMEOUT",
+                f"image fetch exceeded {_MEDIA_PROXY_TIMEOUT_S:g}s")
+        try:
+            resp = _media_proxy_open(
+                Request(current, method="GET",
+                        headers={"User-Agent": _MEDIA_PROXY_USER_AGENT,
+                                 "Accept": "image/*"}),
+                _MEDIA_PROXY_TIMEOUT_S)
+        except HTTPError as exc:
+            status_code = int(getattr(exc, "code", 0) or 0)
+            location = ""
+            try:
+                location = str(exc.headers.get("Location", "") or "")
+            except Exception:  # noqa: BLE001 - a broken header is a failed hop
+                location = ""
+            try:
+                exc.close()
+            except Exception:  # noqa: BLE001
+                pass
+            if status_code in _MEDIA_PROXY_REDIRECT_CODES:
+                if not location:
+                    return _media_proxy_refusal(
+                        502, "MEDIA_PROXY_REDIRECT_BLOCKED",
+                        "redirect response without a Location header")
+                if redirects >= _MEDIA_PROXY_MAX_REDIRECTS:
+                    return _media_proxy_refusal(
+                        502, "MEDIA_PROXY_TOO_MANY_REDIRECTS",
+                        f"redirect limit ({_MEDIA_PROXY_MAX_REDIRECTS}) "
+                        "exceeded")
+                nxt = urljoin(current, location)
+                try:
+                    current = _media_proxy_validate(nxt)
+                except (PermissionError, ValueError, OSError) as exc:
+                    return _media_proxy_refusal(
+                        403, "MEDIA_PROXY_REDIRECT_BLOCKED",
+                        f"redirect target refused: {exc}")
+                redirects += 1
+                continue
+            return _media_proxy_refusal(
+                502, "MEDIA_PROXY_HTTP_ERROR",
+                f"image fetch returned HTTP {status_code}")
+        except (TimeoutError, socket.timeout):
+            return _media_proxy_refusal(
+                504, "MEDIA_PROXY_TIMEOUT",
+                f"image fetch timed out after {_MEDIA_PROXY_TIMEOUT_S:g}s")
+        except URLError as exc:
+            reason = getattr(exc, "reason", None)
+            if isinstance(reason, (TimeoutError, socket.timeout)):
+                return _media_proxy_refusal(
+                    504, "MEDIA_PROXY_TIMEOUT",
+                    f"image fetch timed out after {_MEDIA_PROXY_TIMEOUT_S:g}s")
+            return _media_proxy_refusal(502, "MEDIA_PROXY_FETCH_FAILED",
+                                        "image host is unreachable")
+        except OSError:
+            return _media_proxy_refusal(502, "MEDIA_PROXY_FETCH_FAILED",
+                                        "image host is unreachable")
+
+        with resp:
+            status_code = int(resp.getcode() or 0)
+            ctype = str(resp.headers.get("Content-Type", "") or "")
+            ctype = ctype.split(";", 1)[0].strip().lower()
+            if status_code in _MEDIA_PROXY_REDIRECT_CODES:
+                location = str(resp.headers.get("Location", "") or "")
+                if not location:
+                    return _media_proxy_refusal(
+                        502, "MEDIA_PROXY_REDIRECT_BLOCKED",
+                        "redirect response without a Location header")
+                if redirects >= _MEDIA_PROXY_MAX_REDIRECTS:
+                    return _media_proxy_refusal(
+                        502, "MEDIA_PROXY_TOO_MANY_REDIRECTS",
+                        f"redirect limit ({_MEDIA_PROXY_MAX_REDIRECTS}) "
+                        "exceeded")
+                nxt = urljoin(current, location)
+                try:
+                    current = _media_proxy_validate(nxt)
+                except (PermissionError, ValueError, OSError) as exc:
+                    return _media_proxy_refusal(
+                        403, "MEDIA_PROXY_REDIRECT_BLOCKED",
+                        f"redirect target refused: {exc}")
+                redirects += 1
+                continue
+            if status_code != 200:
+                return _media_proxy_refusal(
+                    502, "MEDIA_PROXY_HTTP_ERROR",
+                    f"image fetch returned HTTP {status_code}")
+            if ctype not in _MEDIA_PROXY_CONTENT_TYPES:
+                return _media_proxy_refusal(
+                    415, "MEDIA_PROXY_UNSUPPORTED_TYPE",
+                    "unsupported media type (image content required)")
+            body = resp.read(_MEDIA_PROXY_MAX_BYTES + 1)
+            if body is None:
+                body = b""
+            if len(body) > _MEDIA_PROXY_MAX_BYTES:
+                return _media_proxy_refusal(
+                    413, "MEDIA_PROXY_OVERSIZED",
+                    f"image exceeds the {_MEDIA_PROXY_MAX_BYTES}-byte cap")
+            encoded = base64.b64encode(body).decode("ascii")
+            return 200, {"ok": True,
+                         "data_url": f"data:{ctype};base64,{encoded}"}
 
 
 def _files_root(cfg: Any) -> str:
@@ -10919,6 +11158,11 @@ _r("GET", r"/api/analytics/usage", "h_analytics")
 _r("GET", r"/api/analytics/models", "h_analytics_models")
 _r("GET", r"/api/files", "h_files")
 _r("GET", r"/api/files/read", "h_files_read")
+# Reference ``GET /api/media/proxy`` (#74564): an allowlisted, bounded image
+# fetch for a client that cannot reach the generated-media CDN itself. Not an
+# open proxy — see ``h_media_proxy``. ``GET /api/media`` (local file read)
+# remains a typed gate above.
+_r("GET", r"/api/media/proxy", "h_media_proxy")
 _r("DELETE", r"/api/files", "files_delete")
 _r("GET", r"/api/gateway", "h_gateway")
 # Read-only method-symmetric alias: the SPA reads ``/api/gateway``; a
@@ -19395,6 +19639,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_model_recommended_default": h_model_recommended_default,
     "h_model_options": h_model_options, "h_model_moa": h_model_moa,
     "h_model_auxiliary": h_model_auxiliary, "h_model_set": h_model_set,
+    "h_media_proxy": h_media_proxy,
     "h_profiles": h_profiles, "h_skills": h_skills,
     "h_skills_toggle": h_skills_toggle, "h_toolsets": h_toolsets,
     "h_cron_jobs": h_cron_jobs, "h_cron_job_show": h_cron_job_show,
