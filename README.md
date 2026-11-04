@@ -40,6 +40,12 @@ git clone https://github.com/cgraph-dev/Qubit-AIO.git && cd Qubit-AIO && ./scrip
 Use the Qubit download URL if it differs from the repository above. For options,
 prerequisites, profiles, and offline notes, see [INSTALL.md](INSTALL.md).
 
+New installs keep runtime state and voice under `$QUBIT_HOME`
+(`~/.qubit` on Linux/macOS, `%LOCALAPPDATA%\qubit` on Windows), with voice
+config, data, state, cache and models under `$QUBIT_HOME/voice`. An existing
+`qubit-voicebridge` XDG install is read in place and is never migrated,
+moved, or deleted by the installer.
+
 Windows entry (Qubit-owned; never clones the upstream tree):
 
 ```powershell

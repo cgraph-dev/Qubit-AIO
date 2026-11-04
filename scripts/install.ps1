@@ -187,6 +187,12 @@ function Resolve-Layout {
     $cache = Join-Path $homePath 'cache'
     $bin = Join-Path $homePath 'bin'
     $venv = Join-Path $homePath 'venv'
+    # New installs keep VoiceBridge under $QUBIT_HOME\voice, the same layout
+    # scripts/install.sh and voicebridge.paths resolve. The $data/$config/
+    # $state/$cache roots remain the launcher's XDG view so a pre-existing
+    # (read-old) install under <root>\{config,data,state}\qubit-voicebridge is
+    # still found; nothing new is written there.
+    $voiceRoot = Join-Path $homePath 'voice'
     $script:Layout = [pscustomobject]@{
         QubitHome  = $homePath
         InstallDir = $installPath
@@ -196,9 +202,9 @@ function Resolve-Layout {
         CacheDir   = $cache
         BinDir     = $bin
         VenvDir    = $venv
-        # voicebridge resolves <XDG_DATA_HOME>/qubit-voicebridge/models.
-        ModelsDir  = (Join-Path (Join-Path $data 'qubit-voicebridge') 'models')
-        VoiceDir   = (Join-Path $config 'qubit-voicebridge')
+        VoiceRoot  = $voiceRoot
+        ModelsDir  = (Join-Path $voiceRoot 'models')
+        VoiceDir   = (Join-Path $voiceRoot 'config')
     }
     return $script:Layout
 }
@@ -567,7 +573,12 @@ function Install-Config {
     }
 
     $voiceDir = $script:Layout.VoiceDir
-    New-Item -ItemType Directory -Force -Path $voiceDir | Out-Null
+    # Initialize the whole $QUBIT_HOME\voice tree (matching scripts/install.sh).
+    foreach ($dir in @($script:Layout.VoiceDir, (Join-Path $script:Layout.VoiceRoot 'data'),
+            (Join-Path $script:Layout.VoiceRoot 'state'), (Join-Path $script:Layout.VoiceRoot 'cache'),
+            $script:Layout.ModelsDir)) {
+        New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    }
     $voiceConfig = Join-Path $voiceDir 'voice.yaml'
     $voiceExample = Join-Path $script:SourceDir 'config/voice.example.yaml'
     if (-not (Test-Path -LiteralPath $voiceConfig -PathType Leaf) -and

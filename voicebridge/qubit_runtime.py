@@ -216,16 +216,17 @@ def default_home() -> Path:
     The ONE home shared by ``run()`` (CLI / forwarded reads), the dashboard
     ASGI bridge (:mod:`voicebridge.qubit_asgi`), and voice.
 
-    A new-layout install uses ``$QUBIT_HOME`` itself (the runtime lives at the
-    root of the Qubit home; VoiceBridge state lives under
-    ``$QUBIT_HOME/voice/state``). An existing XDG install keeps the historical
+    A new-layout install (including an uninitialized machine, which is a new
+    install) uses ``$QUBIT_HOME`` itself (the runtime lives at the root of the
+    Qubit home; VoiceBridge state lives under ``$QUBIT_HOME/voice/state``). An
+    existing XDG install keeps the historical
     ``<state>/qubit-voicebridge/runtime``. Never the operator's external
     ``~/.hermes``.
     """
     try:
         from .config import voice_layout
         layout = voice_layout()
-        if layout.mode == "new":
+        if layout.install_mode == "new":
             return layout.qubit_home
     except Exception:  # pragma: no cover - layout must never block startup
         pass
@@ -378,13 +379,13 @@ def pin_qubit_home() -> Path:
 def runtime_home_for_cfg(cfg: Any = None) -> Path:
     """Resolve the runtime home for a specific ``Config`` (PRB-03).
 
-    The canonical runtime home is the configured state directory's ``runtime``
-    child. ``voicebridge.config.preferred_state_dir()`` uses the same layout
-    resolver as the rest of the product (new ``$QUBIT_HOME/voice/state`` or a
-    read-old XDG install), so this equals :func:`default_home` for the default
-    profile and follows ``logging.jsonl_path`` for a custom one. A caller with
-    no config keeps the process default. The store, the bridge, the PTY/TUI, and the CLI all resolve
-    through here so they read and write ONE ``state.db``.
+    The canonical runtime home is the one layout resolver's runtime home:
+    ``$QUBIT_HOME`` for a new install (including an uninitialized machine) and
+    the read-old ``<state>/qubit-voicebridge/runtime`` for an existing XDG
+    install. A customized ``logging.jsonl_path`` follows its own state dir. A
+    caller with no config keeps the process default. The store, the bridge, the
+    PTY/TUI, and the CLI all resolve through here so they read and write ONE
+    ``state.db``.
 
     The resolved home is also published into ``QUBIT_HOME`` (unless the caller
     supplied an explicit non-external home) so a subsequent vendored import can
@@ -404,6 +405,16 @@ def runtime_home_for_cfg(cfg: Any = None) -> Path:
             pass
     if cfg is not None and hasattr(cfg, "state_dir"):
         try:
+            custom_logging = False
+            getter = getattr(cfg, "get", None)
+            if callable(getter):
+                custom_logging = (bool(getter("logging", "jsonl_path"))
+                                  and bool(getter("logging", "jsonl")))
+            if not custom_logging:
+                from .config import canonical_runtime_home
+                home = canonical_runtime_home()
+                _publish_qubit_home(home)
+                return home
             base = Path(cfg.state_dir())
             if str(base):
                 home = base / "runtime"

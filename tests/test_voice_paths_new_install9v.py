@@ -11,6 +11,8 @@ service, no network, no live data.
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -26,7 +28,7 @@ def _isolated(tmp_path, monkeypatch):
     home.mkdir()
     monkeypatch.setenv("HOME", str(home))
     for var in ("XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME",
-                "XDG_CACHE_HOME"):
+                "XDG_CACHE_HOME", "LOCALAPPDATA"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("QUBIT_HOME", str(home / ".qubit"))
     monkeypatch.delenv("VOICE_BRIDGE_CONFIG", raising=False)
@@ -53,9 +55,159 @@ def test_fresh_machine_resolves_new_install_paths(_isolated):
     assert layout.voice_root == home / ".qubit" / "voice"
     for kind in KINDS:
         assert layout.new[kind] == home / ".qubit" / "voice" / kind
-    # Until the installer initializes the new tree, runtime keeps the old XDG
-    # paths so a pre-existing process does not write a new tree unasked.
-    assert layout.effective["config"] == home / ".config" / "qubit-voicebridge"
+    # Uninitialized means "no old data": it is a new install, so the runtime
+    # must write the new tree — never an XDG tree that a later run would
+    # misread as an existing/read-old install.
+    for kind in KINDS:
+        assert layout.effective[kind] == home / ".qubit" / "voice" / kind
+
+
+def test_uninitialized_runtime_creates_only_the_new_tree(_isolated):
+    """A new install that runs before the installer writes $QUBIT_HOME/voice.
+
+    This is the regression guard for the old behavior: an uninitialized runtime
+    used the XDG paths, so it materialized ``~/.config|data|state/qubit-voicebridge``
+    and every later resolution flipped to read-old.
+    """
+    C = _cfg_module()
+    home = _isolated
+
+    cfg = C.Config.load()
+
+    assert cfg.path is None
+    assert cfg.state_dir() == home / ".qubit" / "voice" / "state"
+    assert cfg.data_dir() == home / ".qubit" / "voice" / "data"
+    assert cfg.model_dir() == home / ".qubit" / "voice" / "models"
+    assert (home / ".qubit" / "voice" / "state").is_dir()
+    assert (home / ".qubit" / "voice" / "data").is_dir()
+    assert (home / ".qubit" / "voice" / "models").is_dir()
+    # No new XDG voice tree is created for a new install.
+    assert not (home / ".config").exists()
+    assert not (home / ".local").exists()
+
+
+def test_uninitialized_runtime_home_is_the_qubit_home(_isolated):
+    from voicebridge import config as C
+    from voicebridge import qubit_runtime as QR
+
+    home = _isolated
+    assert C.voice_layout().mode == "uninitialized"
+    assert QR.default_home() == home / ".qubit"
+    assert C.canonical_runtime_home() == home / ".qubit"
+    assert C.canonical_runtime_env_path() == (
+        home / ".qubit" / "voice" / "config" / ".env")
+
+
+def test_uninitialized_config_rewrites_xdg_defaults_to_the_new_tree(_isolated):
+    C = _cfg_module()
+    home = _isolated
+
+    cfg = C.Config.load()
+
+    assert cfg.get("tts", "openai", "key_env") == str(
+        home / ".qubit" / "voice" / "config" / ".env")
+    assert cfg.get("intent", "templates_path") == str(
+        home / ".qubit" / "voice" / "config" / "task-templates.yaml")
+
+
+def test_full_runtime_path_set_never_creates_xdg_for_a_new_install(_isolated):
+    """Run the real path consumers in a clean interpreter.
+
+    ``Config`` and the module-level feature-flag state are representative of
+    every ``preferred_*_dir`` caller; all of them must land under
+    ``$QUBIT_HOME/voice`` when the machine has no existing install.
+    """
+    home = _isolated
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO)
+    code = (
+        "from voicebridge import config as C, feature_flags as F\n"
+        "cfg = C.Config.load()\n"
+        "print(cfg.state_dir())\n"
+        "print(cfg.data_dir())\n"
+        "print(cfg.model_dir())\n"
+        "print(C.canonical_runtime_home())\n"
+        "print(C.canonical_runtime_env_path())\n"
+        "print(F.DEFAULT_FLAG_STATE)\n"
+    )
+    r = subprocess.run([sys.executable, "-c", code], env=env,
+                       capture_output=True, text=True, timeout=60)
+    assert r.returncode == 0, r.stderr
+    lines = [Path(line) for line in r.stdout.splitlines()]
+    assert len(lines) == 6
+    for path in lines:
+        assert path == home / ".qubit" or path.is_relative_to(home / ".qubit"), path
+    assert not (home / ".config").exists()
+    assert not (home / ".local").exists()
+
+
+# ---------------------------------------------------------------------------
+# Platform path shapes
+# ---------------------------------------------------------------------------
+def test_linux_and_macos_default_home_is_dot_qubit(monkeypatch, tmp_path):
+    P = _layout_module()
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    monkeypatch.delenv("QUBIT_HOME", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.setenv("HOME", str(home))
+
+    for platform in ("linux", "darwin"):
+        monkeypatch.setattr(P.sys, "platform", platform)
+        assert P.qubit_home() == home / ".qubit"
+        assert P.voice_home() == home / ".qubit" / "voice"
+
+
+def test_windows_default_home_is_localappdata_qubit(monkeypatch, tmp_path):
+    P = _layout_module()
+    local = tmp_path / "AppData" / "Local"
+    monkeypatch.delenv("QUBIT_HOME", raising=False)
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    monkeypatch.setattr(P.sys, "platform", "win32")
+
+    assert P.qubit_home() == local / "qubit"
+    assert P.voice_home() == local / "qubit" / "voice"
+    assert P.voice_layout().new["models"] == local / "qubit" / "voice" / "models"
+
+
+def test_windows_falls_back_to_userprofile_appdata_without_localappdata(
+        monkeypatch, tmp_path):
+    P = _layout_module()
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    monkeypatch.delenv("QUBIT_HOME", raising=False)
+    monkeypatch.delenv("LOCALAPPDATA", raising=False)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(P.sys, "platform", "win32")
+
+    assert P.qubit_home() == home / "AppData" / "Local" / "qubit"
+
+
+def test_explicit_qubit_home_wins_on_every_platform(monkeypatch, tmp_path):
+    P = _layout_module()
+    explicit = tmp_path / "custom-home"
+    monkeypatch.setenv("QUBIT_HOME", str(explicit))
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path / "AppData" / "Local"))
+
+    for platform in ("linux", "darwin", "win32"):
+        monkeypatch.setattr(P.sys, "platform", platform)
+        assert P.qubit_home() == explicit
+        assert P.voice_home() == explicit / "voice"
+
+
+def test_external_qubit_home_falls_back_to_the_canonical_default(
+        monkeypatch, tmp_path):
+    P = _layout_module()
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(P.sys, "platform", "linux")
+    monkeypatch.setenv("QUBIT_HOME", str(home / ".hermes"))
+
+    # ``~/.hermes`` is the read-old external home; writing $QUBIT_HOME/voice
+    # there would create a new tree inside it.
+    assert P.qubit_home() == home / ".qubit"
+    assert P.voice_home() == home / ".qubit" / "voice"
 
 
 def test_initialized_new_tree_wins_and_uses_all_five_dirs(_isolated):
@@ -183,6 +335,7 @@ def test_runtime_home_follows_the_layout(_isolated):
 
     home = _isolated
     # Existing XDG install keeps the historical runtime home.
+    (home / ".local" / "state" / "qubit-voicebridge").mkdir(parents=True)
     assert QR.default_home() == (
         home / ".local" / "state" / "qubit-voicebridge" / "runtime")
     assert C.canonical_runtime_home() == QR.default_home()
@@ -194,6 +347,32 @@ def test_runtime_home_follows_the_layout(_isolated):
     assert C.canonical_runtime_home() == home / ".qubit"
     assert C.canonical_runtime_env_path() == (
         home / ".qubit" / "voice" / "config" / ".env")
+
+
+def test_runtime_home_for_cfg_matches_the_layout(_isolated, monkeypatch):
+    """The cfg-based resolver agrees with default_home/canonical_runtime_home.
+
+    With no ambient QUBIT_HOME, a new install's runtime home is the Qubit home
+    itself (not ``$QUBIT_HOME/voice/state/runtime``), so the bridge, store and
+    CLI share one ``state.db``.
+    """
+    from voicebridge import config as C
+    from voicebridge import qubit_runtime as QR
+
+    home = _isolated
+    cfg = C.Config.load()
+    monkeypatch.delenv("QUBIT_HOME", raising=False)
+    monkeypatch.setattr(QR, "_PINNED_QUBIT_HOME", None, raising=False)
+
+    assert QR.runtime_home_for_cfg(cfg) == home / ".qubit"
+
+    # A custom jsonl path still owns its own runtime child.
+    custom = home / "custom-state"
+    cfg.data.setdefault("logging", {})["jsonl"] = True
+    cfg.data["logging"]["jsonl_path"] = str(custom)
+    monkeypatch.setattr(QR, "_PINNED_QUBIT_HOME", None, raising=False)
+    monkeypatch.delenv("QUBIT_HOME", raising=False)
+    assert QR.runtime_home_for_cfg(cfg) == custom / "runtime"
 
 
 def test_legacy_identity_models_remain_read_only_fallbacks(_isolated):

@@ -80,10 +80,10 @@ def canonical_models_dir() -> Path:
 def preferred_voice_dirs() -> Dict[str, Path]:
     """Effective config/data/state/cache/models for this process.
 
-    ``new`` when the root installer initialized ``$QUBIT_HOME/voice``,
-    ``read-old`` XDG paths when an existing install is present, and the
-    historical XDG paths while neither exists (a runtime must not create a
-    new tree before the installer says which layout this machine uses).
+    The new ``$QUBIT_HOME/voice`` tree for a new or uninitialized install, and
+    the read-old XDG paths only when an existing install is present. An
+    uninitialized machine is a new install: it must not create an XDG voice
+    tree that a later resolution would mistake for a legacy install.
     """
     return voice_layout().effective
 
@@ -116,15 +116,16 @@ def preferred_cache_dir() -> Path:
 def canonical_runtime_home() -> Path:
     """Qubit runtime (fork) home.
 
-    A new-layout install uses ``$QUBIT_HOME`` itself (VoiceBridge state lives
-    under ``$QUBIT_HOME/voice/state``); an existing XDG install keeps
+    A new-layout install (including an uninitialized machine, which is a new
+    install) uses ``$QUBIT_HOME`` itself (VoiceBridge state lives under
+    ``$QUBIT_HOME/voice/state``); an existing XDG install keeps
     ``<state_dir>/runtime``. Matches
     ``voicebridge.qubit_runtime.default_home()`` — the one directory the
     vendored runtime, the session store, and the PTY/TUI share. Never the
     operator's external ``~/.hermes``.
     """
     layout = voice_layout()
-    if layout.mode == "new":
+    if layout.install_mode == "new":
         return layout.qubit_home
     return canonical_state_dir() / "runtime"
 
@@ -140,7 +141,7 @@ def canonical_runtime_env_path() -> Path:
     printed, or echoed to any surface.
     """
     layout = voice_layout()
-    if layout.mode == "new":
+    if layout.install_mode == "new":
         return layout.new["config"] / ".env"
     return canonical_runtime_home() / ".env"
 
@@ -153,8 +154,8 @@ def preferred_config_path() -> Path:
     """Config file for the layout this process/install actually uses.
 
     ``$QUBIT_HOME/voice/config/voice.yaml`` once the new install tree exists,
-    the legacy XDG file for an existing install, and the historical XDG
-    default while neither layout has been initialized.
+    the legacy XDG file for an existing install, and the new tree while the
+    machine is still uninitialized (that is also a new install).
     """
     return voice_layout().effective["config"] / "voice.yaml"
 
@@ -809,13 +810,14 @@ def deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]
 def _rewrite_path_value(value: Any, layout: Any) -> Any:
     """Rewrite a default path string from the XDG tree to the new tree.
 
-    Only applied to a *new* install (``layout.mode == "new"``) and only when
-    the value is the legacy directory itself or lives under it. The shipped
-    example config still names ``~/.config/qubit-voicebridge/...``; a new
-    install copies those defaults verbatim, so without this rewrite its key
-    files, templates, workspace, and L1.5 model would keep pointing at a tree
-    the new install never created. User paths that are not under the legacy
-    product roots are left byte-identical.
+    Only applied to a new install (``layout.install_mode == "new"``, which
+    covers an uninitialized machine) and only when the value is the legacy
+    directory itself or lives under it. The shipped example config still names
+    ``~/.config/qubit-voicebridge/...``; a new install copies those defaults
+    verbatim, so without this rewrite its key files, templates, workspace, and
+    L1.5 model would keep pointing at a tree the new install never created.
+    User paths that are not under the legacy product roots are left
+    byte-identical.
     """
     if not isinstance(value, str) or not value.strip():
         return value
@@ -847,7 +849,7 @@ def _rewrite_path_value(value: Any, layout: Any) -> Any:
 def _apply_voice_layout_defaults(data: Any) -> Any:
     """Recursively rewrite legacy default paths for a new-layout install."""
     layout = voice_layout()
-    if layout.mode != "new":
+    if layout.install_mode != "new":
         return data
     if isinstance(data, dict):
         return {k: _apply_voice_layout_defaults(v) for k, v in data.items()}

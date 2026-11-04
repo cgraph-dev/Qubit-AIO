@@ -232,10 +232,14 @@ for kind, path in lay.read_old.items():
     VOICE_LAYOUT_MODE="new"
     VOICE_INSTALL_MODE="new"
   elif [ -d "$VOICE_OLD_CONFIG" ] || [ -d "$VOICE_OLD_DATA" ] \
-       || [ -d "$VOICE_OLD_STATE" ]; then
+       || [ -d "$VOICE_OLD_STATE" ] || [ -d "$VOICE_OLD_CACHE" ] \
+       || [ -d "$VOICE_OLD_MODELS" ]; then
     VOICE_LAYOUT_MODE="read-old"
     VOICE_INSTALL_MODE="read-old"
   else
+    # No old data: this is a new install. Both the installer and the runtime
+    # write ``$QUBIT_HOME/voice``; neither creates a fresh XDG tree that a
+    # later run would misread as an existing install.
     VOICE_LAYOUT_MODE="uninitialized"
     VOICE_INSTALL_MODE="new"
   fi
@@ -898,12 +902,20 @@ EOF
 # that is the same as "the service is installed". After rendering, enable and
 # start the units explicitly (with confirmation when interactive).
 install_systemd_units() {
+  # Units started here; the layout drop-ins cover every shipped voice unit that
+  # pins a runtime home, including the hotkey helper (installed separately by
+  # the voice setup) so a new-layout host never falls back to the read-old home.
   local units=(qubit-voicebridge.service qubit-gateway.service)
+  local layout_units=(qubit-voicebridge.service qubit-gateway.service qubit-voice-typing.service)
   local unit_dir="${SYSTEMD_UNIT_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user}"
   if [ "$DRY_RUN" = "1" ]; then
     echo "==> [dry-run] would install user units: ${units[*]}"
     if [ "$VOICE_INSTALL_MODE" = "new" ]; then
-      echo "==> [dry-run] would install layout drop-ins: $unit_dir/<unit>.d/10-qubit-home.conf"
+      echo "==> [dry-run] would install layout drop-ins:"
+      local unit
+      for unit in "${layout_units[@]}"; do
+        echo "    $unit_dir/$unit.d/10-qubit-home.conf"
+      done
     fi
     echo "==> [dry-run] would run: systemctl --user enable --now ${units[*]}"
     return 0
@@ -919,7 +931,7 @@ install_systemd_units() {
   # drop-in so the templates (and every existing tuned unit) stay untouched.
   if [ "$VOICE_INSTALL_MODE" = "new" ]; then
     local unit drop
-    for unit in "${units[@]}"; do
+    for unit in "${layout_units[@]}"; do
       drop="$unit_dir/$unit.d"
       mkdir -p "$drop"
       cat > "$drop/10-qubit-home.conf" <<EOF

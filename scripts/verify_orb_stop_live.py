@@ -696,11 +696,10 @@ def live_check(*, allow_signal: bool = False,
     }
     if journal is None:
         try:
-            from voicebridge.config import canonical_state_dir
-            journal = canonical_state_dir() / "events.jsonl"
+            from voicebridge.config import preferred_state_dir
+            journal = preferred_state_dir() / "events.jsonl"
         except Exception:  # noqa: BLE001
-            journal = (Path.home() / ".local" / "state" / "qubit-voicebridge"
-                       / "events.jsonl")
+            journal = Path.home() / ".qubit" / "voice" / "state" / "events.jsonl"
         result["journal"] = str(journal)
 
     helper = resolve_live_helper(proc_root=proc_root, live_fn=live_fn,
@@ -1577,11 +1576,10 @@ def run_speak_test(*, text: str = "Qubit live stop test.",
 
     if journal is None:
         try:
-            from voicebridge.config import canonical_state_dir
-            journal = canonical_state_dir() / "events.jsonl"
+            from voicebridge.config import preferred_state_dir
+            journal = preferred_state_dir() / "events.jsonl"
         except Exception:  # noqa: BLE001
-            journal = (Path.home() / ".local" / "state" / "qubit-voicebridge"
-                       / "events.jsonl")
+            journal = Path.home() / ".qubit" / "voice" / "state" / "events.jsonl"
     result["journal"] = str(journal)
     hb = helper.get("heartbeat") or {}
     state = str(hb.get("state") or "") if isinstance(hb, dict) else ""
@@ -2021,11 +2019,10 @@ def run_helper_speak(*, text: str = "Qubit helper live stop test.",
                              if helper.get("ok") and pid else None)
     if journal is None:
         try:
-            from voicebridge.config import canonical_state_dir
-            journal = canonical_state_dir() / "events.jsonl"
+            from voicebridge.config import preferred_state_dir
+            journal = preferred_state_dir() / "events.jsonl"
         except Exception:  # noqa: BLE001
-            journal = (Path.home() / ".local" / "state" / "qubit-voicebridge"
-                       / "events.jsonl")
+            journal = Path.home() / ".qubit" / "voice" / "state" / "events.jsonl"
     result["journal"] = str(journal)
     if not helper.get("ok"):
         result["reason"] = str(helper.get("reason") or "no live helper")

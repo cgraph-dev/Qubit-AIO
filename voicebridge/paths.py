@@ -38,14 +38,21 @@ Resolution rules:
 * ``layout.install_mode`` is ``"new"`` for both ``"new"`` and
   ``"uninitialized"`` (a fresh install gets the new tree) and ``"read-old"``
   only when an existing install must be preserved.
-* ``layout.effective`` is the runtime preference: new tree in ``"new"`` mode,
-  XDG paths in ``"read-old"``, and the historical XDG paths while
-  uninitialized (so a process that predates the installer does not start
-  writing a new tree behind the user's back).
+* ``layout.effective`` is the runtime preference: the new tree for every
+  install that is not read-old (``"new"`` and ``"uninitialized"``), and the
+  XDG paths only in ``"read-old"``. An uninitialized machine has no existing
+  data to preserve, so a runtime that starts before the installer still
+  writes ``$QUBIT_HOME/voice`` — never a fresh XDG tree that would then be
+  mistaken for a legacy install.
+
+``QUBIT_HOME`` itself defaults to ``~/.qubit`` on Linux/macOS and to
+``%LOCALAPPDATA%\\qubit`` on Windows, matching the vendored runtime and the
+Windows installer.
 """
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional
@@ -64,6 +71,7 @@ LEGACY_NAMES = (LEGACY_NAME, LEGACY_NAME_7D)
 VOICE_KINDS = ("config", "data", "state", "cache", "models")
 VOICE_SUBDIR = "voice"
 DEFAULT_QUBIT_HOME_DIR = ".qubit"
+DEFAULT_WINDOWS_QUBIT_HOME_DIR = "qubit"
 
 # Snap-confinement redirects are LOUD, never silent: every decision is
 # recorded here and surfaced via xdg_report() (product paths diagnostic,
@@ -139,14 +147,49 @@ def xdg_report() -> list[dict[str, Any]]:
 def qubit_home(environ: Optional[Mapping[str, str]] = None) -> Path:
     """Runtime home used to place the new ``voice/`` tree.
 
-    ``QUBIT_HOME`` (expanded) wins; otherwise the platform default
-    ``~/.qubit`` — the same default the vendored runtime uses. No vendored
-    import is involved so this stays usable before the runtime is installed.
+    ``QUBIT_HOME`` (expanded) wins; otherwise the platform default — the same
+    one the vendored runtime uses: ``~/.qubit`` on Linux/macOS and
+    ``%LOCALAPPDATA%\\qubit`` on Windows. No vendored import is involved so
+    this stays usable before the runtime is installed.
+
+    The pre-rebrand external home (``~/.hermes`` / ``%LOCALAPPDATA%\\hermes``)
+    is never accepted as the Qubit home: choosing it would create a new voice
+    tree inside a read-old external install. It falls back to the canonical
+    platform default, matching ``voicebridge.qubit_runtime.default_home()``.
     """
-    raw = str(_environ(environ).get("QUBIT_HOME", "") or "").strip()
+    source = _environ(environ)
+    raw = str(source.get("QUBIT_HOME", "") or "").strip()
     if raw:
-        return Path(raw).expanduser()
+        candidate = Path(raw).expanduser()
+        if not _is_legacy_external_home(candidate, source):
+            return candidate
+    if sys.platform == "win32":
+        local_appdata = str(source.get("LOCALAPPDATA", "") or "").strip()
+        base = Path(local_appdata) if local_appdata \
+            else Path("~").expanduser() / "AppData" / "Local"
+        return base / DEFAULT_WINDOWS_QUBIT_HOME_DIR
     return Path("~").expanduser() / DEFAULT_QUBIT_HOME_DIR
+
+
+def _is_legacy_external_home(path: Path,
+                              environ: Optional[Mapping[str, str]] = None) -> bool:
+    """True for the pre-rebrand external home, which is read-old only."""
+    candidates = [Path("~").expanduser() / ".hermes"]
+    if sys.platform == "win32":
+        local_appdata = str(_environ(environ).get("LOCALAPPDATA", "") or "").strip()
+        if local_appdata:
+            candidates.append(Path(local_appdata) / "hermes")
+    try:
+        resolved = path.resolve(strict=False)
+    except OSError:
+        resolved = path
+    for candidate in candidates:
+        try:
+            if resolved == candidate.resolve(strict=False):
+                return True
+        except OSError:
+            continue
+    return False
 
 
 def voice_home(environ: Optional[Mapping[str, str]] = None) -> Path:
@@ -241,17 +284,16 @@ def voice_layout(environ: Optional[Mapping[str, str]] = None) -> VoiceLayout:
     else:
         mode = "uninitialized"
 
-    if mode == "new":
-        install_mode = "new"
-        effective = dict(new)
-    elif mode == "read-old":
+    if mode == "read-old":
         install_mode = "read-old"
         effective = dict(old)
     else:
-        # No install initialized either layout yet. Runtime keeps the
-        # historical XDG paths until the installer creates the new tree.
+        # ``new`` and ``uninitialized`` both install into the QUBIT_HOME tree.
+        # An uninitialized machine has no existing data to preserve, so the
+        # runtime writes the new tree instead of materializing an XDG tree that
+        # the next resolution would misread as a legacy install.
         install_mode = "new"
-        effective = dict(old)
+        effective = dict(new)
 
     return VoiceLayout(
         qubit_home=qubit_home(environ),
