@@ -201,3 +201,53 @@ def test_resolved_model_shape_when_profile_persisted(tmp_path, monkeypatch):
     assert eff.get("provider") == "opencode-go"
     assert eff.get("model") == "deepseek-v4-flash"
     assert int(eff.get("context_tokens") or 0) >= 65536
+
+
+def test_options_forwards_the_reference_usage_shape(cfg, monkeypatch):
+    """The reference ``usage`` field survives the Qubit compat boundary.
+
+    The vendored builder attaches subscription usage (``usage.windows`` for a
+    single account, ``usage.accounts`` for a credential pool) only for
+    providers that can report it. Qubit must forward that field verbatim —
+    never invent a value for a provider that has no snapshot, never drop the
+    one the builder did expose.
+    """
+    from voicebridge import qubit_compat as QC
+    from voicebridge import qubit_runtime as QR
+
+    QR.ensure_path()
+    import qubit_cli.inventory as inv
+
+    windows_row = {
+        "slug": "alpha", "name": "Alpha", "models": ["a-1"],
+        "total_models": 1, "authenticated": True, "is_current": False,
+        "usage": {"windows": [{"label": "5h", "used_percent": 42.0,
+                               "resets_at": "2026-11-04T12:00:00+00:00",
+                               "scope": "account"}]},
+    }
+    accounts_row = {
+        "slug": "beta", "name": "Beta", "models": ["b-1", "b-2"],
+        "total_models": 2, "authenticated": True, "is_current": False,
+        "usage": {"accounts": [{"id": "acc-1", "label": "work",
+                                "windows": [], "state": "ok",
+                                "resets_at": None}]},
+    }
+    plain_row = {
+        "slug": "gamma", "name": "Gamma", "models": ["g-1"],
+        "total_models": 1, "authenticated": True, "is_current": False,
+    }
+    payload = {"providers": [windows_row, accounts_row, plain_row],
+               "model": "a-1", "provider": "alpha"}
+
+    monkeypatch.setattr(QC, "_vendored_runtime", lambda _cfg: None)
+    monkeypatch.setattr(inv, "load_picker_context", lambda: {})
+    monkeypatch.setattr(inv, "build_model_options_payload",
+                        lambda *_a, **_k: payload)
+
+    status, body = QC.h_model_options(cfg, {}, {}, {})
+    assert status == 200 and body.get("ok") is True
+    rows = {row["slug"]: row for row in body["providers"]}
+    assert rows["alpha"]["usage"] == windows_row["usage"]
+    assert rows["beta"]["usage"] == accounts_row["usage"]
+    assert "usage" not in rows["gamma"]
+    assert rows["alpha"]["total_models"] == 1

@@ -976,6 +976,11 @@ QUBIT_READ_AUTHORITY: tuple = (
     # blank model to /chat and /qubit-chat, so the model line renders "—".
     "/api/model/info",
     "/api/model/options",
+    # Remote media proxy (reference ``GET /api/media/proxy``): the Qubit compat
+    # handler is the authority because it enforces the allowlist + per-hop SSRF
+    # checks. Proxying it to the vendored route would (a) answer 401 for the
+    # tokenless in-process call and (b) bypass the Qubit fetch policy.
+    "/api/media/proxy",
     # MoA: after the v0.21.5 1:1 pin rebase the vendored ``GET /api/model/moa``
     # serves the upstream curation defaults (``openai-codex``/``openrouter``)
     # that Qubit does not ship. The proxy would fabricate providers on the
@@ -3727,6 +3732,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
             from . import qubit_compat as _HC
             code, out = _HC.h_health(self.app.orch.cfg,
                                      query_params(self.path), {}, {})
+            self._json(out, code)
+        elif path == "/api/media/proxy":
+            # The reference dashboard calls the literal `/api/media/proxy`;
+            # the SPA reaches the same handler through `/agent/api`. Auth is
+            # the Qubit session token (or X-Api-Token), never a query token.
+            # The handler itself is an allowlisted, per-hop-SSRF-checked,
+            # size-capped image fetch — not an open proxy.
+            if not self._qubit_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import qubit_compat as _HC
+            code, out = _HC.h_media_proxy(self.app.orch.cfg,
+                                          query_params(self.path), {}, {})
             self._json(out, code)
         elif path == "/api/status" and self._office_client_read_ok():
             # The vendored office client asks for its own status document at

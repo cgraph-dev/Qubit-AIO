@@ -44,6 +44,11 @@ interface ModelOptionProvider {
   total_models?: number;
   is_current?: boolean;
   warning?: string;
+  // Reference picker shape (forwarded by the backend when the vendored
+  // builder exposes it; optional because most providers report no snapshot).
+  plan_usage?: Record<string, unknown> | null;
+  usage_levels?: Record<string, string> | null;
+  usage?: { windows?: unknown[]; accounts?: unknown[] } | null;
 }
 
 interface ModelOptionsResponse {
