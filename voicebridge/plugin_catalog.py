@@ -260,6 +260,9 @@ def _base_row(**kw: Any) -> Dict[str, Any]:
         "loadable": False, "load_state": "", "has_dashboard_manifest": False,
         "dashboard": None,
         "provides": {"tools": [], "hooks": [], "skills": [],
+                     "commands": [], "cli_commands": [],
+                     "memory_providers": [], "context_engines": [],
+                     "unsupported": [], "dashboard": None,
                      "web_providers": [], "browser_providers": [],
                      "requires_env": [], "optional_env": []},
         "provenance": {},
@@ -953,11 +956,18 @@ def local_catalog(cfg: Any, *, query: str = "", source: str = "",
             runtime_status="enabled" if enabled else "disabled",
             loadable=installed,
             load_state=str(r.get("load_state") or ""),
-            provides={"tools": list((r.get("provides") or {}).get("tools", [])),
-                      "hooks": list((r.get("provides") or {}).get("hooks", [])),
-                      "skills": list((r.get("provides") or {}).get("skills", [])),
-                      "web_providers": [], "browser_providers": [],
-                      "requires_env": [], "optional_env": []},
+            # Carry the runtime record's full ``provides`` map: dropping
+            # commands/CLI commands/memory/context/dashboard here made the same
+            # plugin advertise different capabilities on the hub and catalog.
+            provides={key: (list(value) if isinstance(value, list) else value)
+                      for key, value in {
+                          "tools": [], "hooks": [], "skills": [],
+                          "commands": [], "cli_commands": [],
+                          "memory_providers": [], "context_engines": [],
+                          "unsupported": [], "dashboard": None,
+                          "web_providers": [], "browser_providers": [],
+                          "requires_env": [], "optional_env": [],
+                          **(r.get("provides") or {})}.items()},
             provenance={
                 "loader": "voicebridge.plugin_runtime.plugin_catalog",
                 "registry": "QUBIT_HOME plugin store",

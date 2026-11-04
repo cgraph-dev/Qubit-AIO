@@ -345,17 +345,20 @@ class A2AAdapter(BasePlatformAdapter):
             return False
         self._httpd.daemon_threads = True
         self._httpd.adapter = self  # type: ignore[attr-defined]
+        # Wire plugin-registered native handlers BEFORE the listener starts accepting: a peer that
+        # connects the instant the socket is listening must never observe an adapter whose plugin
+        # handlers have not been registered yet (the pre-registration race).
+        self._wire_plugin_handlers(None)  # plugin-registered native handlers
+        self._mark_connected()
         self._server_thread = _daemon_thread(self._httpd.serve_forever, "a2a-http")
         self._watchdog_stop.clear()  # disconnect sets it; reset for reconnection
         self._watchdog_thread = _daemon_thread(self._watchdog_loop, "a2a-watchdog")
-        self._mark_connected()
         logger.info("A2A: serving Agent Card + JSON-RPC on http://%s:%s (%s) as %r; %d routed agent(s)", self.host, self.port,
                     "localhost-only" if self._security_context.localhost_only() else "REMOTE (bearer auth)", self.agent_name, len(self._agents))
         sec = self._security_context
         if sec.dispatch_fails_closed():
             logger.error("A2A: exposed on non-loopback bind %s with no A2A_TRUSTED_PEERS; every dispatch will be refused (403). "
                          "Set A2A_TRUSTED_PEERS, or A2A_ALLOW_ALL_USERS=true for a trusted network.", self.host)
-        self._wire_plugin_handlers(None)  # plugin-registered native handlers
         return True
 
     async def disconnect(self) -> None:

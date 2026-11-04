@@ -34,6 +34,9 @@ def mcp_status(cfg: Any) -> Dict[str, Any]:
                 "source": str(s.get("source", "qubit-registry")),
                 "connected": bool(s.get("connected", False)),
                 "status": str(s.get("status", "")),
+                # Present only when the agent process recorded a parked/failed
+                # state; never a probe, never a retry trigger.
+                "error": s.get("error") or None,
                 # Client invocation is a typed OPERATOR_ONLY disposition until a
                 # sanctioned transport exists; every surface reads it here so
                 # none can imply a server is callable.
@@ -46,7 +49,7 @@ def mcp_status(cfg: Any) -> Dict[str, Any]:
 
         records = [{"name": name, "enabled": False, "source": "qubit-config",
                     "connected": False, "status": "configured-not-connected",
-                    "invocable": False,
+                    "error": None, "invocable": False,
                     "invocation_code": MS.INVOKE_OPERATOR_CODE}
                    for name in MS.config_server_names(cfg)]
     records.sort(key=lambda r: r["name"])

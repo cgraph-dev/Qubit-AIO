@@ -26,7 +26,7 @@ sys.path.insert(0, str(REPO_ROOT))
 EXPECTED_ROW_KEYS = {
     "name", "transport", "auth", "command", "args", "url", "env",
     "capabilities", "enabled", "connected", "invocable", "invocation_code",
-    "status", "source",
+    "status", "source", "error",
 }
 
 

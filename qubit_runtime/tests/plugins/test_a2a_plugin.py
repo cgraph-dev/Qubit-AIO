@@ -1968,3 +1968,43 @@ def test_load_conversation_skips_non_dict_lines(monkeypatch, tmp_path):
         f.write("42\n")
     convo = protocol.load_conversation("ctx-mixed")
     assert len(convo) == 1 and convo[0]["text"] == "hello"
+
+
+def test_plugin_handlers_are_wired_before_the_listener_accepts(monkeypatch):
+    """Regression: ``connect()`` started ``serve_forever`` before wiring plugin native handlers.
+
+    A peer could be accepted during that window and hit an adapter whose plugin
+    handlers were not registered yet. Wiring must happen before the listener
+    thread starts; this pins the ordering deterministically (no timing sleep).
+    """
+    from plugins.platforms.a2a import adapter as A
+
+    adapter, _ = _make_live_adapter(monkeypatch)
+    order: list[str] = []
+
+    wire = adapter._wire_plugin_handlers
+
+    def recording_wire(native=None):
+        order.append("wire")
+        return wire(native)
+
+    monkeypatch.setattr(adapter, "_wire_plugin_handlers", recording_wire)
+
+    original_thread = A._daemon_thread
+
+    def recording_thread(target, name: str):
+        order.append(f"thread:{name}")
+        return original_thread(target, name)
+
+    monkeypatch.setattr(A, "_daemon_thread", recording_thread)
+
+    async def run():
+        assert await adapter.connect() is True
+        try:
+            return list(order)
+        finally:
+            await adapter.disconnect()
+
+    seen = asyncio.run(run())
+    assert "wire" in seen and "thread:a2a-http" in seen, seen
+    assert seen.index("wire") < seen.index("thread:a2a-http"), seen

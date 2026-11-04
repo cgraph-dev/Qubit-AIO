@@ -647,7 +647,9 @@ def _catalog_row(rec: Dict[str, Any], *, installed: bool,
     return {
         "id": rec.get("id", ""),
         "identifier": identifier or rec.get("id", ""),
-        "name": label,
+        # Same meaning as every other catalog surface: ``name`` is the machine
+        # key actions address; ``label`` is the human display name.
+        "name": str(rec.get("id", "") or label),
         "label": label,
         "description": _redact(rec.get("description", ""))[:240],
         "kind": rec.get("kind", ""),
@@ -659,7 +661,9 @@ def _catalog_row(rec: Dict[str, Any], *, installed: bool,
         "source": source,
         "can_install": not installed,
         "install_capability": INSTALL_CAPABILITY,
-        "enabled": bool(rec.get("enabled", True)),
+        # An entry that is not installed cannot be enabled; the old default
+        # (``True`` for a reviewed manifest) claimed an available plugin was on.
+        "enabled": bool(installed and rec.get("enabled", True)),
         "source_kind": rec.get("source_kind", ""),
         "load_state": rec.get("load_state", ""),
         "setup_required": bool(rec.get("setup_required", False)),
