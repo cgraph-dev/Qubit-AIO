@@ -71,6 +71,9 @@ def _run_handoff(tmp_path, target, *, windows=False, inherited_home=True, modern
         "TMPDIR": str(tmp_path),
         "HERMES_INSTALL_ROOT": str(install),
         "HANDOFF_CAPTURE": str(capture),
+        # A disposable failing hand-off must not pop a real desktop notification
+        # in the operator's session while the test suite runs.
+        "QUBIT_UPDATE_NOTIFY": "0",
     }
     env.pop("PYTHONPATH", None)
     env.pop("PYTHONHOME", None)

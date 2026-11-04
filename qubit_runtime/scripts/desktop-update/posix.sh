@@ -329,6 +329,10 @@ json_escape() { # JSON string escape: \ " \n \r \t, every other control char (< 
 }
 
 notify_fallback() { # status message — renderer-free recovery surface.
+  # Test/disposable installs must never reach the operator's desktop. The
+  # updater test harness sets this explicitly; real desktop updates keep the
+  # notification path.
+  [ "${QUBIT_UPDATE_NOTIFY:-1}" = "0" ] && return 0
   # Fires only when there is no shim window. BEST-EFFORT immediate channel:
   # each rung requires EXECUTION acceptance, not existence — notify-send's
   # exit code is its acceptance (fire-and-forget), zenity/kdialog must
