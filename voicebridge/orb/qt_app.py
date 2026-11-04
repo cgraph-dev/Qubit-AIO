@@ -3321,6 +3321,8 @@ if QWidget is not None:
                 self._tray = _tray.OrbTray(
                     on_toggle=self.request_toggle,
                     on_settings=self.open_settings,
+                    on_brain_unload=lambda: self._run_brain_action("brain_unload"),
+                    on_brain_warm=lambda: self._run_brain_action("brain_warm"),
                     on_quit=self.request_quit,
                     on_test=self.set_test_state,
                     on_lock=lambda locked: self.apply_options(
