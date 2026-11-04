@@ -119,3 +119,59 @@ describe("ModelPickerDialog empty-provider recovery", () => {
     expect(navigate).toHaveBeenCalledWith("/env");
   });
 });
+
+describe("ModelPickerDialog current-model header", () => {
+  const loader = async () => ({
+    model: "muse-spark-1.3-contributor",
+    provider: "opencode-go",
+    providers: [
+      {
+        name: "OpenCode Go",
+        slug: "opencode-go",
+        models: ["deepseek-v4.1-flash", "muse-spark-1.3-contributor"],
+        is_current: true,
+      },
+    ],
+  });
+
+  it("labels an authority override as THIS CHAT by default", async () => {
+    await renderPicker(
+      <ModelPickerDialog
+        loader={loader}
+        currentOverride={{ provider: "opencode-go", model: "deepseek-v4.1-flash" }}
+        onApply={() => undefined}
+        onClose={onClose}
+      />,
+    );
+
+    await vi.waitFor(() =>
+      expect(
+        document.body.querySelector(".qmodel-picker__current-name")?.textContent,
+      ).toBe("deepseek-v4.1-flash"),
+    );
+    expect(
+      document.body.querySelector(".qmodel-picker__current-label")?.textContent,
+    ).toBe("THIS CHAT");
+  });
+
+  it("uses an explicit override label for a global slot", async () => {
+    await renderPicker(
+      <ModelPickerDialog
+        loader={loader}
+        currentOverride={{ provider: "opencode-go", model: "deepseek-v4.1-flash" }}
+        currentOverrideLabel="CURRENT MODEL"
+        onApply={() => undefined}
+        onClose={onClose}
+      />,
+    );
+
+    await vi.waitFor(() =>
+      expect(
+        document.body.querySelector(".qmodel-picker__current-name")?.textContent,
+      ).toBe("deepseek-v4.1-flash"),
+    );
+    expect(
+      document.body.querySelector(".qmodel-picker__current-label")?.textContent,
+    ).toBe("CURRENT MODEL");
+  });
+});

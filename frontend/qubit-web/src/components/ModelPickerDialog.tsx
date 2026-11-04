@@ -105,6 +105,7 @@ interface Props {
    * "this chat" instead of the payload's global "current".
    */
   currentOverride?: { provider?: string; model: string } | null;
+  currentOverrideLabel?: string;
 }
 
 export function ModelPickerDialog(props: Props) {
@@ -118,6 +119,7 @@ export function ModelPickerDialog(props: Props) {
     title = "Switch Model",
     alwaysGlobal = false,
     currentOverride = null,
+    currentOverrideLabel,
   } = props;
   const standalone = !!loader && !!onApply;
 
@@ -402,7 +404,7 @@ export function ModelPickerDialog(props: Props) {
             </div>
           </div>
           <p className="qmodel-picker__current">
-            <span className="qmodel-picker__current-label">{currentOverride ? "THIS CHAT" : "CURRENT MODEL"}</span>
+            <span className="qmodel-picker__current-label">{currentOverride ? (currentOverrideLabel ?? "THIS CHAT") : "CURRENT MODEL"}</span>
             <span className="qmodel-picker__current-name">{currentModel || "(unknown)"}</span>
             {currentProviderSlug && <span className="qmodel-picker__provider-slug">{currentProviderSlug}</span>}
           </p>

@@ -202,3 +202,64 @@ describe("ModelsPage Mixture of Agents card", () => {
     expect(apiMocks.getMoaModels).toHaveBeenCalled();
   });
 });
+
+describe("ModelsPage main-model picker authority", () => {
+  it("shows the active profile rather than a stale options payload", async () => {
+    apiMocks.getActiveTerminalProfile.mockResolvedValue(
+      PROFILE({
+        id: "opencode-go-deepseek-v4.1-flash",
+        kind: "api",
+        provider: "opencode-go",
+        model: "deepseek-v4.1-flash",
+        locality: "external",
+        meets_floor: true,
+        code: "OK",
+        has_credential: true,
+      }),
+    );
+    apiMocks.getModelOptions.mockResolvedValue({
+      model: "muse-spark-1.3-contributor",
+      provider: "opencode-go",
+      providers: [
+        {
+          name: "OpenCode Go",
+          slug: "opencode-go",
+          models: ["deepseek-v4.1-flash"],
+          is_current: true,
+        },
+      ],
+    });
+
+    await renderModels();
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("deepseek-v4.1-flash"),
+    );
+
+    const change = Array.from(
+      container.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.trim() === "Change");
+    expect(change).not.toBeUndefined();
+    await act(async () => change!.click());
+
+    await vi.waitFor(() =>
+      expect(
+        document.body.querySelector(".qmodel-picker__current-name")?.textContent,
+      ).toBe("deepseek-v4.1-flash"),
+    );
+    expect(
+      document.body.querySelector(".qmodel-picker__current-label")?.textContent,
+    ).toBe("CURRENT MODEL");
+  });
+
+  it("renders one (unset) when no main model is known", async () => {
+    apiMocks.getActiveTerminalProfile.mockResolvedValue(null);
+    apiMocks.getAuxiliaryModels.mockResolvedValue({ tasks: [], main: null });
+
+    await renderModels();
+    await vi.waitFor(() => expect(container.textContent).toContain("Main model"));
+    await vi.waitFor(() => {
+      const count = (container.textContent?.match(/\(unset\)/g) ?? []).length;
+      expect(count).toBe(1);
+    });
+  });
+});
