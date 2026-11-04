@@ -118,7 +118,12 @@ def resolve_release(repo: Path, version: str | None = None,
             "release tag %r does not match version %r" % (tag, version)
         )
 
-    # voicebridge.release is the single source of truth for identity.
+    # voicebridge.release is the single source of truth for identity. Import
+    # it from the repo being prepared, not from whatever is installed on the
+    # host.
+    repo_str = str(Path(repo).resolve())
+    if repo_str not in sys.path:
+        sys.path.insert(0, repo_str)
     from voicebridge import __version__ as package_version
     from voicebridge import release as R
 
