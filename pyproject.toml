@@ -403,13 +403,13 @@ path = "scripts/hatch_build_qubit.py"
 # manifest at the archive destination so a clean install reports
 # upstream_revision/patched/file_count.
 #
-# BLOCKED: the generated manifest is absent from this checkout and the pinned
-# upstream tree needed to regenerate it is not available. It is intentionally
-# not fabricated and the force-include below is omitted until it is recovered
-# and verified, so status() honestly reports no revision instead of a stale
-# record. Restore this mapping once a fresh manifest exists:
-#   "docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json" =
-#       "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
+# Regenerated from the real vendored-source provenance pin
+# (scripts/hermes_vendor_manifest.py::PIN, 69948c0057) rather than the newer
+# finish-line pin in scripts/frozen_target_progress.py::FROZEN_REV: they answer
+# different questions (where the vendored code came from vs. how far the port
+# has to go) and must not be conflated. The generated manifests are tracked so a
+# clean clone can build the same wheel and the provenance checks can run.
+"docs/generated/QUBIT_HERMES_VENDOR_MANIFEST.json" = "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"
 # Wave 5: ship the small, secret-free matrices/docs that install-time code
 # reads. They land under package data so the resolver can reach them with the
 # installed path preferred and the checkout as fallback. voicebridge/
