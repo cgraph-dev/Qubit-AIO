@@ -4668,6 +4668,15 @@ def _install_pty_detach_on_term() -> None:
 
 def main(argv=None) -> int:
     raw = list(sys.argv[1:] if argv is None else argv)
+    # Startup fast path: `qubit --version` is a pure identity probe. It must run
+    # before the legacy-env adapter, alias mapping and the full argparse tree
+    # (~870 sub-parsers, ~230 ms warm): none of that work can affect the
+    # output. Only the exact top-level probe is caught, so `qubit agent
+    # --version` still reaches the vendored runtime's own version output.
+    if raw == ["--version"]:
+        from .product import PRODUCT_VERSION as _PV
+        print(f"{_launcher_name()} {_PV}")
+        return 0
     # Narrow legacy migration: adopt pre-rebrand env names for this process
     # (never the external upstream home; see voicebridge.qubit_legacy).
     from . import qubit_legacy
@@ -4679,16 +4688,6 @@ def main(argv=None) -> int:
                            "hermes-migrate": "legacy-migrate",
                            "hermes-rollback": "legacy-rollback"}
     raw = [_legacy_cmd_aliases.get(tok, tok) for tok in raw]
-    # Startup fast path: `qubit --version` is a pure identity probe. Building
-    # the full argparse tree (~870 sub-parsers, ~230 ms warm) is unnecessary
-    # and dominated the measurement. Emit the exact same string the parser's
-    # ``--version`` action would (``%(prog)s <PRODUCT_VERSION>``) and exit.
-    # Only the exact top-level probe is caught, so `qubit agent --version`
-    # still reaches the vendored runtime's own version output.
-    if raw == ["--version"]:
-        from .product import PRODUCT_VERSION as _PV
-        print(f"{_launcher_name()} {_PV}")
-        return 0
     # Passthrough to the vendored Qubit Agent runtime must not be re-parsed by
     # Qubit's argparse (leading --help/--version/--flags would be swallowed).
     # `qubit agent <args…>` dispatches verbatim. `qubit` stays as an

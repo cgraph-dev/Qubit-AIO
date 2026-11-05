@@ -203,3 +203,19 @@ def test_gettext_find_cache_is_idempotent_and_keeps_help_stable():
     assert after == before
     # The original callable is retained for diagnostics/tests.
     assert callable(getattr(first, "_qubit_orig", None))
+
+
+def test_version_does_not_run_the_legacy_env_adapter(monkeypatch, capsys):
+    """The identity probe must precede the legacy-env migration and aliasing."""
+    import voicebridge.cli as CLI
+    from voicebridge import product as P
+    import voicebridge.qubit_legacy as legacy
+
+    monkeypatch.setattr(
+        legacy, "install",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("qubit_legacy.install must not run for --version")))
+    monkeypatch.setattr(sys, "argv", ["qubit"])
+
+    assert CLI.main(["--version"]) == 0
+    assert capsys.readouterr().out.strip() == f"qubit {P.PRODUCT_VERSION}"
