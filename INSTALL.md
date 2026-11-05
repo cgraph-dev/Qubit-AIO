@@ -58,6 +58,29 @@ On macOS, install the core and its gateway LaunchAgent with:
 LaunchAgent. The installer is idempotent and can be re-run to repair an
 installation.
 
+## Update an installed checkout
+
+After a source install, update the same install in place:
+
+```bash
+qubit update --check      # read-only: install method, revision, update available
+qubit update --apply      # snapshot, fast-forward, reinstall dependencies, restart
+qubit update --rollback   # restore the revision recorded by the last apply
+```
+
+With no extra flags the updater follows the checkout's own `origin` and the
+configured branch (`main`). Use `--channel stable` for the newest `vX.Y.Z`
+release tag, `--channel beta` for pre-releases, or `--tag vX.Y.Z` for one
+release. `--apply --channel NAME` persists the channel for later updates under
+`$QUBIT_HOME`.
+
+A fresh `scripts/install.sh` install is non-editable, but the updater resolves
+the checkout it was installed from, so the first update works without any
+editing step. A release-archive/bootstrap install has no git checkout: it
+reports `package` and is upgraded by re-running the bootstrap against newer
+release assets. The full command and channel reference is
+[docs/UPDATE.md](docs/UPDATE.md).
+
 ## Bootstrap installer (release assets)
 
 There are two bootstrap entry points with the same contract: a POSIX shell
