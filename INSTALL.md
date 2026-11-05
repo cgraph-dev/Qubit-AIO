@@ -1,11 +1,12 @@
 # Install Qubit
 
 Qubit installs from source on Linux and macOS, and through a PowerShell
-installer on Windows. Linux is the reference platform and includes the full
-voice stack. macOS supports the core runtime, CLI, dashboard and the
-messaging-gateway LaunchAgent; the voice bridge, hotkey, orb and voice-typing
-are Linux-only. The Windows PowerShell installer is provided but has not been
-validated on a Windows release runner.
+installer (from a checkout or a verified release ZIP) on Windows. Linux is the
+reference platform and includes the full voice stack. macOS supports the core
+runtime, CLI, dashboard and the messaging-gateway LaunchAgent; the voice
+bridge, hotkey, orb and voice-typing are Linux-only. The Windows PowerShell
+installer and bootstrap are provided but have not been validated on a real
+Windows release runner.
 
 ## Prerequisites
 
@@ -59,55 +60,83 @@ installation.
 
 ## Bootstrap installer (release assets)
 
-`scripts/bootstrap.sh` is the release-asset entry point for a published
-release. It downloads the release installer and the release **source archive**
-plus their checksums into a temporary directory, verifies the SHA-256 of both,
-extracts the archive, verifies that the extracted `scripts/install.sh` is the
-same file, and executes **that extracted copy**. It never reads a source
-checkout to install.
+There are two bootstrap entry points with the same contract: a POSIX shell
+script for Linux assets and a PowerShell script for Windows assets. Each
+downloads a release installer and a release **source archive** plus their
+checksums into a temporary directory, verifies the SHA-256 of both, extracts
+the archive, verifies that the extracted installer is the same file, and
+executes **that extracted copy**. Neither reads a source checkout to install.
 
 ```bash
+# Linux (POSIX assets)
 ./scripts/bootstrap.sh --help
 ./scripts/bootstrap.sh --dry-run --prefix "$HOME/qubit" <release-base>
 ./scripts/bootstrap.sh --prefix "$HOME/qubit" <release-base>
 ```
 
+```powershell
+# Windows (ZIP assets)
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Help
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.2
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.2
+```
+
+`scripts\bootstrap.cmd` is a CMD wrapper that forwards every flag to
+`bootstrap.ps1`.
+
 ### Release-asset contract
 
-`<release-base>` is an HTTPS URL, a `file://` URL, or a local directory. It
-must contain exactly these three assets:
+`<release-base>` is an HTTPS URL, a `file://` URL, or a local directory. Both
+bootstraps read the same `SHA256SUMS`; each requires only its own asset pair:
 
-| Asset | Meaning |
-|---|---|
-| `install.sh` | The installer asset. It is downloaded and checksum-verified; its hash must equal the `scripts/install.sh` inside the archive. |
-| `qubit-release.tar.gz` | The release source tree. It must extract to `scripts/install.sh`, either at the archive root or under exactly one top-level directory (for example `Qubit-0.0.1/scripts/install.sh`). Override the file name with `--archive NAME` (or `QUBIT_RELEASE_ARCHIVE`). |
-| `SHA256SUMS` | Standard `sha256  filename` lines naming **both** assets. `--checksum FILE` overrides discovery. |
+| Asset | Platform | Meaning |
+|---|---|---|
+| `install.sh` | POSIX | The shell installer. It is downloaded and checksum-verified; its hash must equal the `scripts/install.sh` inside the archive. |
+| `qubit-release.tar.gz` | POSIX | The release source tree. It must extract to `scripts/install.sh`, either at the archive root or under exactly one top-level directory (for example `Qubit-0.0.1/scripts/install.sh`). Override with `--archive NAME` (or `QUBIT_RELEASE_ARCHIVE`). |
+| `install.ps1` | Windows | The PowerShell installer. It is downloaded and checksum-verified; its hash must equal the `scripts/install.ps1` inside the archive. |
+| `qubit-release.zip` | Windows | The release source tree as a ZIP. It must extract to `scripts/install.ps1`, either at the archive root or under exactly one top-level directory. Override with `-Archive NAME` (or `QUBIT_RELEASE_ARCHIVE`). |
+| `SHA256SUMS` | both | Standard `sha256  filename` lines naming the assets. Each bootstrap ignores entries for the other platform. `--checksum FILE` / `-ChecksumFile FILE` overrides discovery. |
+
+The ZIP format is the Windows contract because Windows PowerShell 5.1 can
+extract it without an external `tar` program. The POSIX bootstrap keeps using
+`qubit-release.tar.gz`. The Windows ZIP omits tracked symlinks (the extractor
+refuses symlink entries; Windows would otherwise need elevated privileges), so
+the two archives are not byte-identical payloads even though they carry the
+same release tree.
 
 The archive is the install payload: its extracted tree is where `PROJECT_DIR`
 resolves, so the installer builds the venv, installs the package, builds/serves
 the dashboard, and reads `config/`, `scripts/`, and `qubit_runtime/` from the
 extracted release — not from the bootstrap directory. Archives with absolute
-paths or `..` traversal are rejected, and extraction never writes outside the
-temporary directory.
+paths, drive-qualified paths, or `..` traversal are rejected, and extraction
+never writes outside the temporary directory. The Windows extractor also
+refuses symlink entries.
 
 `--profile NAME` is exported to the verified installer as `QUBIT_PROFILE`;
-`--prefix DIR` is forwarded as `--prefix DIR`. `--without-models`,
-`--without-dashboard`, `--yes`, and `--with-systemd` are forwarded too. A bootstrapped install
-puts its venv under the persistent `$QUBIT_HOME`, so the launcher remains valid
-after the temporary extraction is removed.
+`--prefix DIR` is forwarded as `--prefix DIR` on POSIX and as `-QubitHome DIR`
+on Windows. `--without-models` / `-NoModels` and `--without-dashboard` /
+`-NoDashboard` are forwarded; `--yes` becomes `-NonInteractive` on Windows.
+`--with-systemd` is forwarded on POSIX; the Windows bootstrap refuses it with a
+typed error because Windows has no systemd/launchd equivalent. A bootstrapped
+install puts its venv under the persistent `$QUBIT_HOME`, so the launcher
+remains valid after the temporary extraction is removed.
 
-The bootstrap fails closed on a missing installer, missing archive,
+Both bootstraps fail closed on a missing installer, missing archive,
 missing/invalid checksum, archive mismatch, extracted-installer mismatch, or an
-invalid archive. `--dry-run` downloads, extracts, executes, and writes nothing;
-it validates the local assets and checksum names. Linux is supported now;
-macOS and Windows are typed refusals until their bootstrap paths exist.
+invalid archive. `--dry-run` / `-DryRun` downloads, extracts, executes, and
+writes nothing; it validates the local assets and checksum names. The POSIX
+bootstrap supports Linux and refuses macOS/Windows with a typed message; use
+`bootstrap.ps1` on Windows. The Windows bootstrap runs under Windows PowerShell
+5.1+/PowerShell 7 and the extracted `install.ps1` still enforces its own
+platform and prerequisites.
 
-**Public release base:** the Qubit release publishes `bootstrap.sh`,
-`install.sh`, `qubit-release.tar.gz`, and a `SHA256SUMS` naming the installer
-and archive. The stable base is
+**Public release base:** a release base publishes `bootstrap.sh`, `install.sh`,
+`qubit-release.tar.gz`, `bootstrap.ps1`, `install.ps1`, `qubit-release.zip`,
+and a `SHA256SUMS` naming all four payloads (`scripts/prepare_release_seed.py`
+publishes this set). The stable base is
 `https://github.com/cgraph-dev/Qubit/releases/latest/download`; use it with
-`bootstrap.sh` as shown above (download the script first rather than piping an
-unverified URL into a shell).
+the matching bootstrap as shown above (download the script first rather than
+piping an unverified URL into a shell).
 
 ## Options
 

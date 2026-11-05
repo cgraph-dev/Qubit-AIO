@@ -64,6 +64,20 @@ SHA-256 values against `SHA256SUMS`, extracts the archive, and runs the verified
 installer from that extracted tree. See
 [INSTALL.md](INSTALL.md#bootstrap-installer-release-assets).
 
+Windows has the same contract with `bootstrap.ps1` / `bootstrap.cmd`,
+`install.ps1`, and `qubit-release.zip` (ZIP so Windows PowerShell 5.1 does not
+need an external `tar`):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Help
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.2
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.2
+```
+
+`-Prefix DIR` is accepted as the same root as `-QubitHome`; `-Yes` becomes
+`-NonInteractive`. `-WithSystemd` is refused with a typed error because Windows
+has no systemd/launchd equivalent.
+
 New installs keep runtime state and voice under `$QUBIT_HOME`
 (`~/.qubit` on Linux/macOS, `%LOCALAPPDATA%\qubit` on Windows), with voice
 config, data, state, cache and models under `$QUBIT_HOME/voice`. An existing
@@ -76,6 +90,13 @@ Windows entry (Qubit-owned; never clones the upstream tree):
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -Help
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -DryRun
 powershell -ExecutionPolicy Bypass -File .\scripts\install.ps1 -QubitHome "%LOCALAPPDATA%\qubit" -Channel stable
+```
+
+To install from a published release base without a checkout, use the verified
+Windows bootstrap instead:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "%LOCALAPPDATA%\qubit" https://github.com/cgraph-dev/Qubit/releases/latest/download
 ```
 
 Flags: `-QubitHome DIR`, `-Channel stable|main`, `-NoModels`, `-NoDashboard`.

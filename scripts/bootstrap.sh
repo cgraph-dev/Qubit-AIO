@@ -16,9 +16,9 @@
 #   qubit-release.tar.gz    source tree containing scripts/install.sh
 #   SHA256SUMS              sha256 of both assets, named
 #
-# Linux is supported now. macOS and Windows are refused with a typed message
-# until their bootstrap paths exist (Windows uses scripts/install.ps1 from a
-# checkout today).
+# Linux is supported now. macOS is refused with a typed message (use
+# scripts/install.sh from a checkout). Windows uses scripts/bootstrap.ps1 with
+# a ZIP release archive; this POSIX script refuses Windows.
 set -euo pipefail
 
 ASSET_NAME="install.sh"
@@ -74,7 +74,7 @@ Release assets:
   The archive must extract to a tree with scripts/install.sh (either at the
   archive root or under exactly one top-level directory).
 
-Supported host: Linux. macOS and Windows are typed refusals for now.
+Supported host: Linux. macOS is a typed refusal; Windows uses bootstrap.ps1.
 EOF
 }
 
@@ -186,12 +186,12 @@ case "$HOST_SYSTEM" in
 Linux is supported now. On macOS, use ./scripts/install.sh from a checkout (core install only)."
     ;;
   MINGW*|MSYS*|CYGWIN*|Windows_NT)
-    die 3 "BOOTSTRAP_UNSUPPORTED_HOST: Windows is not supported by the bootstrap installer yet.
-Linux is supported now. On Windows, use scripts\\install.ps1 from a checkout."
+    die 3 "BOOTSTRAP_UNSUPPORTED_HOST: this POSIX bootstrap does not run on Windows.
+On Windows, use scripts\\bootstrap.ps1 with the ZIP release assets."
     ;;
   *)
     die 3 "BOOTSTRAP_UNSUPPORTED_HOST: $HOST_SYSTEM is not supported by the bootstrap installer.
-Linux is supported now; macOS and Windows are typed refusals until their bootstrap paths exist."
+Linux is supported now; macOS is a typed refusal. Windows uses scripts/bootstrap.ps1."
     ;;
 esac
 
