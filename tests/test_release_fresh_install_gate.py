@@ -32,6 +32,36 @@ def _write(path: Path, text: str, mode: int | None = None) -> None:
         path.chmod(mode)
 
 
+def _fixture_webui(immutable: bool = True, shell_cached: bool = False) -> str:
+    cache = (
+        '            cache_control = "public, max-age=31536000, immutable"\n'
+        if immutable else
+        '            cache_control = "public, max-age=60"\n'
+    )
+    shell_arg = ", cache_control='public, max-age=60'" if shell_cached else ""
+    return (
+        "def _gzip_cache_get(key):\n"
+        "    return None\n"
+        "def _gzip_cache_put(key, body):\n"
+        "    return None\n"
+        "class WebUIHandler:\n"
+        "    def _send(self, code, body, ctype='text/plain', extra_headers=None,\n"
+        "              cache_control='no-store'):\n"
+        "        return None\n"
+        "    def _gzip_if_wanted(self, body, path):\n"
+        "        _gzip_cache_get((body, 0, 0))\n"
+        "        return body, False\n"
+        "    def _serve_qubit_static(self, sub):\n"
+        "        rel = sub\n"
+        "        if rel.startswith('assets/'):\n"
+        "%s"
+        "        self._file(rel, cache_control=cache_control)\n"
+        "    def _serve_qubit_index(self):\n"
+        "        self._send(200, b'shell', 'text/html; charset=utf-8'%s)\n"
+        % (cache, shell_arg)
+    )
+
+
 def _fixture_repo(
     tmp_path: Path,
     *,
@@ -41,6 +71,8 @@ def _fixture_repo(
     base_url: str = "http://127.0.0.1:11434",
     install_seeds_config: bool = True,
     write_config: bool = True,
+    immutable_assets: bool = True,
+    shell_cached: bool = False,
 ) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -56,6 +88,10 @@ def _fixture_repo(
         repo / "qubit_runtime" / "cli-config.yaml.example",
         "model:\n  provider: %s\n  default: qubit-brain\n  base_url: %s\n"
         % (provider, base_url),
+    )
+    _write(
+        repo / "voicebridge" / "webui.py",
+        _fixture_webui(immutable=immutable_assets, shell_cached=shell_cached),
     )
     if dashboard:
         _write(repo / "frontend" / "qubit-dist" / "index.html", "<html></html>\n")
@@ -179,6 +215,35 @@ def test_cli_exit_codes_and_json(tmp_path: Path, capsys):
     rc = module.main(["--repo", str(repo), "--fresh-install",
                       "--require-fresh-install"])
     assert rc == module.EXIT_OK
+
+
+def test_perf_cache_contract_passes(tmp_path: Path):
+    module = _load()
+    repo = _fixture_repo(tmp_path)
+    report = module.run_gate(repo=repo)
+    by_name = {check.name: check for check in report.checks}
+    assert by_name["perf_cache_static_contract"].state == "OK"
+    assert "immutable" in by_name["perf_cache_static_contract"].detail
+
+
+def test_perf_cache_contract_requires_immutable_assets(tmp_path: Path):
+    module = _load()
+    repo = _fixture_repo(tmp_path, immutable_assets=False)
+    report = module.run_gate(repo=repo)
+    by_name = {check.name: check for check in report.checks}
+    assert by_name["perf_cache_static_contract"].state == "FAIL"
+    assert "immutable" in by_name["perf_cache_static_contract"].detail
+    assert report.verdict == "FAIL"
+
+
+def test_perf_cache_contract_rejects_cached_token_shell(tmp_path: Path):
+    module = _load()
+    repo = _fixture_repo(tmp_path, shell_cached=True)
+    report = module.run_gate(repo=repo)
+    by_name = {check.name: check for check in report.checks}
+    assert by_name["perf_cache_static_contract"].state == "FAIL"
+    assert "shell" in by_name["perf_cache_static_contract"].detail
+    assert report.verdict == "FAIL"
 
 
 def test_release_dir_requires_platform_assets(tmp_path: Path):

@@ -77,6 +77,31 @@ def _write_fixture(repo: Path, body: str = "one") -> None:
         '__version__ = "0.0.1"\n', encoding="utf-8"
     )
     (repo / "voicebridge" / "state.txt").write_text(body, encoding="utf-8")
+    (repo / "voicebridge" / "webui.py").write_text(
+        "\n".join(
+            [
+                "def _gzip_cache_get(key):",
+                "    return None",
+                "def _gzip_cache_put(key, body):",
+                "    return None",
+                "class WebUIHandler:",
+                "    def _send(self, code, body, ctype='text/plain',",
+                "              extra_headers=None, cache_control='no-store'):",
+                "        return None",
+                "    def _gzip_if_wanted(self, body, path):",
+                "        _gzip_cache_get((body, 0, 0))",
+                "        return body, False",
+                "    def _serve_qubit_static(self, sub):",
+                "        if sub.startswith('assets/'):",
+                "            cache_control = 'public, max-age=31536000, immutable'",
+                "        return None",
+                "    def _serve_qubit_index(self):",
+                "        self._send(200, b'shell', 'text/html; charset=utf-8')",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     (repo / "README.md").write_text("# Qubit fixture\n", encoding="utf-8")
     scripts = repo / "scripts"
     scripts.mkdir()
