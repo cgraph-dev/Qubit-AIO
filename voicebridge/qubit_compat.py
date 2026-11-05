@@ -673,31 +673,90 @@ def h_runtime(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ok(**inv)
 
 
+_HEALTH_STATE_CACHE: Dict[Tuple[str, str, int], Tuple[float, str]] = {}
+_HEALTH_STATE_CACHE_MAX = 8
+_HEALTH_STATE_TTL_DEFAULT_S = 10.0
+
+
+def _health_state_ttl_s() -> float:
+    raw = os.environ.get("QUBIT_HEALTH_STATE_TTL_S")
+    if raw is None:
+        return _HEALTH_STATE_TTL_DEFAULT_S
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return _HEALTH_STATE_TTL_DEFAULT_S
+
+
+def _health_state_cached(cfg: Any) -> str:
+    """Installation-health STATE for the liveness route, briefly memoised.
+
+    ``health_inventory`` probes dependencies, models, audio and CDP and costs
+    ~200 ms warm. ``GET /api/health`` is the unauthenticated liveness endpoint
+    every dashboard client polls, so it must answer in milliseconds. The STATE
+    is not secret and changes slowly; reuse a short snapshot instead of
+    recomputing the whole probe on each request. A config-file mtime change or
+    state-dir change produces a new key (never a stale cross-config answer).
+    ``QUBIT_HEALTH_STATE_TTL_S=0`` disables the cache (always fresh).
+    """
+    ttl = _health_state_ttl_s()
+    try:
+        state_dir = str(cfg.state_dir())
+    except Exception:  # noqa: BLE001 - config-less read: no stable key
+        state_dir = ""
+    cfg_path = str(getattr(cfg, "path", "") or "")
+    try:
+        mtime = os.stat(cfg_path).st_mtime_ns if cfg_path else 0
+    except OSError:
+        mtime = 0
+    key = (state_dir, cfg_path, int(mtime))
+    now = time.monotonic()
+    if ttl > 0:
+        hit = _HEALTH_STATE_CACHE.get(key)
+        if hit is not None and hit[0] > now:
+            return hit[1]
+    from .lifecycle import health_inventory
+    inv = health_inventory(cfg)
+    state = str(inv.get("state") or "READY") if isinstance(inv, dict) else "READY"
+    if ttl > 0:
+        if len(_HEALTH_STATE_CACHE) >= _HEALTH_STATE_CACHE_MAX:
+            # Drop the earliest-expiring entry; the dict is tiny, and this
+            # keeps a long-lived dashboard process from accumulating keys.
+            oldest = min(_HEALTH_STATE_CACHE, key=lambda k: _HEALTH_STATE_CACHE[k][0])
+            _HEALTH_STATE_CACHE.pop(oldest, None)
+        _HEALTH_STATE_CACHE[key] = (now + ttl, state)
+    return state
+
+
 def h_health(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    """Lightweight liveness (HealthResponse wire shape): ok/version/auth_required.
+    """Lightweight liveness (HealthResponse wire shape): ok/version/auth_required/state.
 
-    Backed by the real installation-health inventory
-    (``voicebridge.lifecycle.health_inventory``) — the same module
-    ``qubit setup health`` calls. A DEGRADED aggregate is reported verbatim;
-    liveness itself is never fabricated READY when the probe raises.
+    Deliberately does NOT build the full runtime/status inventory: the
+    unauthenticated liveness route is polled by every dashboard client and the
+    reference answers it in milliseconds. ``version`` and ``auth_required``
+    come from the same authorities ``h_status`` reads (distribution version and
+    the webui token gate), and ``state`` is the lifecycle installation-health
+    STATE through a short-TTL snapshot.
     """
-    code, status_out = h_status(cfg, q, b, p)
-    if code != 200:
-        return code, status_out
+    try:
+        from . import distribution as D
+        version = "qubit-" + str(getattr(D, "PACKAGE_VERSION", "0.0.2"))
+    except Exception:  # noqa: BLE001 - liveness must never crash
+        version = "qubit-0.0.2"
+    try:
+        auth_required = bool(_status_auth_gate(cfg).get("auth_required", False))
+    except Exception:  # noqa: BLE001
+        auth_required = False
     state = "READY"
     detail = "Qubit backend process is live"
     try:
-        from .lifecycle import health_inventory
-        inv = health_inventory(cfg)
-        if isinstance(inv, dict) and inv.get("state"):
-            state = str(inv["state"])
-    except Exception as exc:
+        state = _health_state_cached(cfg)
+    except Exception as exc:  # noqa: BLE001 - liveness must never crash
         state = "DEGRADED"
         detail = "installation-health inventory unavailable: " + \
             _redact(str(exc))[:160]
-    return _ok(version=status_out.get("version", "qubit-0.0.1"),
-               auth_required=bool(status_out.get("auth_required", False)),
+    return _ok(version=version, auth_required=auth_required,
                state=state, detail=detail)
 
 
