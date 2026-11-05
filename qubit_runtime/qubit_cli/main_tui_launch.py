@@ -140,6 +140,38 @@ def _find_bundled_tui(qubit_cli_dir: Path | None = None) -> Path | None:
     return bundled if bundled.is_file() else None
 
 
+def _tui_product_version() -> str:
+    """Product release shown by the Ink banner (``QUBIT_VERSION``).
+
+    The TUI reads ``process.env.QUBIT_VERSION`` (``ui-tui/src/config/env.ts``)
+    and otherwise renders the historical ``0.0.1`` placeholder, so a fresh
+    0.0.x install would announce the wrong release. Prefer the installed
+    product identity (the same single source as the CLI banner), then the
+    checkout ``VERSION`` file, and only then the placeholder so a stripped
+    tree still launches.
+    """
+    try:
+        from voicebridge.product import PRODUCT_VERSION
+        version = str(PRODUCT_VERSION or "").strip()
+        if version:
+            return version
+    except Exception:
+        pass
+    try:
+        from qubit_cli.main import PROJECT_ROOT
+        root = Path(PROJECT_ROOT)
+        for candidate in (root.parent / "VERSION", root / "VERSION"):
+            try:
+                version = candidate.read_text(encoding="utf-8-sig").strip()
+            except OSError:
+                continue
+            if version:
+                return version
+    except Exception:
+        pass
+    return "0.0.1"
+
+
 def _restore_tui_workspace(tui_dir: Path) -> bool:
     """Best-effort ``git restore`` of a missing ``ui-tui/`` (Windows AV/NTFS filters can delete
     tracked files after ``qubit update``); True when the directory exists afterwards.
@@ -535,6 +567,9 @@ def _launch_tui(
         env.pop("HERMES_TUI_CWD", None)
 
     _apply_tui_python_env(env)
+    # The Ink banner renders ``QUBIT_VERSION`` and falls back to a stale 0.0.1;
+    # always seed the real product release (fresh installs must announce it).
+    env["QUBIT_VERSION"] = _tui_product_version()
     # This shell's allowlisted environment, sent as each session's ``client_env`` (LC-8, T3): taken from
     # the shell before the launcher's own edits (NODE_OPTIONS heap, TUI pins) so the session gets the
     # PATH / venv / HERMES_* values the user exported.

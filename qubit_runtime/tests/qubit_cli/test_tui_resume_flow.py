@@ -208,6 +208,8 @@ def test_launch_tui_exports_model_provider_and_toolsets(monkeypatch, main_mod):
     assert active_path_during_call == active_path
     assert not active_path.exists()
     assert env["NODE_ENV"] == "production"
+    from voicebridge.product import PRODUCT_VERSION
+    assert env["QUBIT_VERSION"] == PRODUCT_VERSION
 
 
 def test_launch_tui_prefers_launch_cwd_over_inherited_qubit_cwd(monkeypatch, main_mod, tmp_path):
