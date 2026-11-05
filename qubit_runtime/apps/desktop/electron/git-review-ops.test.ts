@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
-import simpleGit from 'simple-git'
+import { simpleGit } from 'simple-git'
 import { afterEach, test, vi } from 'vitest'
 
 import {
@@ -13,9 +13,9 @@ import {
   resolveRenamePath,
   REVIEW_FILE_CAP,
   reviewCreatePr,
-  reviewList,
-  SIMPLE_GIT_UNSAFE_BINARY_WARN
+  reviewList
 } from './git-review-ops'
+import { ensureNoConsoleGitScript } from './no-console-git'
 import type * as NoConsoleGit from './no-console-git'
 
 // `runGh` shells to the `gh` CLI via execFile. Mock it so reviewCreatePr's gh
@@ -97,11 +97,13 @@ test('gitFor accepts a Windows no-console host tuple with restricted characters'
   }
 })
 
-test('gitFor suppresses only the known custom-binary warning and restores console.warn', () => {
+test('gitFor does not emit console warnings for a restricted custom binary', () => {
   const spacedBin = String.raw`C:\Program Files\Git\cmd\git.exe`
   // `windowsGitHost()` resolves nothing in this process (no configured roots, no
   // QUBIT_DESKTOP_PYTHON), so `gitBin` itself is what simple-git validates — the
-  // spaced `Program Files` path, which warns once per factory call.
+  // spaced `Program Files` path. simple-git 4 logs an allowed unsafe binary
+  // through the `debug` package instead of console.warn, so gitFor must leave
+  // console.warn untouched.
   const warnings: unknown[][] = []
   const originalWarn = console.warn
 
@@ -118,16 +120,13 @@ test('gitFor suppresses only the known custom-binary warning and restores consol
 
     assert.equal(console.warn, recordingWarn)
 
-    // The escape hatch used directly still warns: the message gitFor filters is a
-    // live emission of the installed simple-git, so the filter cannot go stale
-    // silently (an upgrade that rewords it fails this test, not production).
     simpleGit({ baseDir: process.cwd(), binary: spacedBin, unsafe: { allowUnsafeCustomBinary: true } })
     console.warn('unrelated warning')
   } finally {
     console.warn = originalWarn
   }
 
-  assert.deepEqual(warnings, [[SIMPLE_GIT_UNSAFE_BINARY_WARN], ['unrelated warning']])
+  assert.deepEqual(warnings, [['unrelated warning']])
 })
 
 test('resolveRenamePath: simple rename resolves to the new path', () => {
@@ -158,6 +157,27 @@ test('repoStatus reports an untracked directory without recursively listing its 
     status.files.map(file => file.path),
     ['generated/']
   )
+})
+
+test('gitFor runs the Windows no-console host tuple under simple-git 4 env filtering', async () => {
+  const pythonBin = process.platform === 'win32' ? 'python' : 'python3'
+
+  if (spawnSync(pythonBin, ['--version'], { stdio: 'ignore' }).status !== 0) {
+    return
+  }
+
+  const dir = makeRepo()
+  const git = gitFor(dir, 'git', {
+    isWindows: true,
+    pythonBin,
+    scriptPath: ensureNoConsoleGitScript()
+  })
+
+  // simple-git 4 rejects GIT_* keys passed through `.env()` unless named in
+  // allowEnvironment, so this rejects if gitFor forgets the allow list.
+  const status = await git.status()
+
+  assert.equal(status.files.length, 0)
 })
 
 test('reviewList reports an untracked directory without recursively listing its contents', async () => {

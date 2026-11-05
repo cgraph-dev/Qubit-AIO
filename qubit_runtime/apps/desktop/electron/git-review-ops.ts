@@ -8,7 +8,8 @@ import { execFile } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 
-import simpleGit from 'simple-git'
+import { isGitEnvKey } from '@simple-git/argv-parser'
+import { simpleGit } from 'simple-git'
 
 import { resolveRequestedPathForIpc } from './hardening'
 import { execGit, noConsoleGitEnv, simpleGitBinary, windowsGitHost } from './no-console-git'
@@ -19,17 +20,14 @@ const REVIEW_FILE_CAP = 2_000
 const UNTRACKED_LINE_COUNT_CONCURRENCY = 16
 const UNTRACKED_LINE_COUNT_MAX_BYTES = 1024 * 1024
 
-// simple-git 3.x validates a custom binary path against an ASCII whitelist —
-// `isBadArgument` in node_modules/simple-git/dist/cjs/index.js accepts only
+// simple-git validates a custom binary path against an ASCII whitelist —
+// `isBadArgument` in node_modules/simple-git/dist/index.mjs accepts only
 // `/^([a-z]:)?([a-z0-9/.\_~-]+)$/i`. Everything outside it is "restricted": a
 // space in the default `C:\Program Files\Git\...`, the parentheses in
 // `Program Files (x86)`, the accented user name in `C:\Users\João\...`. Without
-// the escape hatch simple-git THROWS on such a path; with it, it console.warns
-// this exact message — the flag only downgrades the throw. Exported so gitFor
-// and its tests share one source of truth.
-export const SIMPLE_GIT_UNSAFE_BINARY_WARN =
-  'Invalid value supplied for custom binary, restricted characters must be removed or supply the unsafe.allowUnsafeCustomBinary option'
-
+// the escape hatch simple-git THROWS on such a path; with it, v4 logs only
+// through the `debug` package (no console.warn, unlike v3), so gitFor needs no
+// warning filter.
 // GUI-launched Electron apps on macOS inherit only a minimal PATH (no
 // /opt/homebrew/bin or /usr/local/bin), so `gh` — and the `git` gh shells out
 // to — aren't found. Augment PATH with the resolved gh dir + the common
@@ -56,7 +54,7 @@ function runGh(args, cwd, ghBin): Promise<{ ok: boolean; stdout: string; stderr:
   })
 }
 
-function gitFor(cwd, gitBin) {
+function gitFor(cwd, gitBin, host = windowsGitHost()) {
   // `gitBin` is resolved inside the Electron main process from known install
   // locations or PATH — never renderer/user input, and the Windows tuple below is
   // built there too: `gitBin` is the resolved install/path and the python host is
@@ -72,9 +70,24 @@ function gitFor(cwd, gitBin) {
   // On Windows the binary tuple is [python.exe, host script]. simple-git has no
   // creationFlags slot; the script spawns the real git with CREATE_NO_WINDOW and
   // forwards argv unchanged.
-  const host = windowsGitHost()
   const binary = simpleGitBinary(gitBin, host)
   const unsafe = Boolean(gitBin) || Array.isArray(binary)
+  // The no-console host wrapper needs the parent environment (PATH, HOME,
+  // SSH_AUTH_SOCK, …) plus QUBIT_GIT_ARGV0/GIT_TERMINAL_PROMPT. simple-git 4
+  // treats git-impacting variables as unsafe unless each is allow-listed, so
+  // mirror its own ambient filtering here and pass only the wrapper's own
+  // variables plus the non-interactive credential prompt default.
+  const childEnv = Array.isArray(binary) ? noConsoleGitEnv(process.env, gitBin || 'git') : null
+
+  if (childEnv) {
+    for (const key of Object.keys(childEnv)) {
+      const normalized = key.toLowerCase().trim()
+
+      if (normalized !== 'git_terminal_prompt' && (normalized.startsWith('git_') || isGitEnvKey(normalized))) {
+        delete childEnv[key]
+      }
+    }
+  }
 
   const makeGit = () =>
     simpleGit({
@@ -82,34 +95,13 @@ function gitFor(cwd, gitBin) {
       binary,
       maxConcurrentProcesses: 4,
       trimmed: false,
+      ...(childEnv ? { allowEnvironment: ['GIT_TERMINAL_PROMPT'] } : {}),
       ...(unsafe ? { unsafe: { allowUnsafeCustomBinary: true } } : {})
     })
 
-  if (!unsafe) {
-    return makeGit()
-  }
+  const git = makeGit()
 
-  // With the escape hatch set, simple-git still console.warns that same message on
-  // every factory call — the flag only downgrades the throw to a warning. The
-  // binary was resolved by this process, never supplied by the renderer, so on
-  // Windows (where the standard git lives under a spaced "Program Files") that
-  // warning is pure console spam. Filter exactly that message, for the
-  // synchronous factory call only.
-  const originalWarn = console.warn
-
-  console.warn = (message?: unknown, ...rest: unknown[]) => {
-    if (typeof message !== 'string' || !message.startsWith(SIMPLE_GIT_UNSAFE_BINARY_WARN)) {
-      originalWarn(message, ...rest)
-    }
-  }
-
-  try {
-    const git = makeGit()
-
-    return Array.isArray(binary) ? git.env(noConsoleGitEnv(process.env, gitBin || 'git')) : git
-  } finally {
-    console.warn = originalWarn
-  }
+  return childEnv ? git.env(childEnv) : git
 }
 
 // simple-git reports renames as `old => new` (and `dir/{old => new}/f`); resolve
