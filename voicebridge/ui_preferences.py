@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 import tempfile
 import threading
 import time
@@ -55,28 +56,31 @@ def store_path(cfg: Any) -> Path:
     return Path(cfg.state_dir()) / STORE_NAME
 
 
-def _read(path: Path) -> Tuple[dict, bool, bool, int]:
+def _read(path: Path) -> Tuple[dict, bool, bool, int, str]:
     try:
         raw = path.read_text(encoding="utf-8")
     except FileNotFoundError:
-        return {}, False, False, 0
+        return {}, False, False, 0, ""
     except UnicodeDecodeError:
-        return {}, True, True, 0
+        return {}, True, True, 0, ""
     except OSError as exc:
         raise PreferencesUnavailable(
             f"preferences store is unreadable: {exc}") from exc
     try:
         doc = json.loads(raw)
     except ValueError:
-        return {}, True, True, 0
+        return {}, True, True, 0, ""
     if not isinstance(doc, dict):
-        return {}, True, True, 0
+        return {}, True, True, 0, ""
     values = doc.get("values")
     clean = ({k: v for k, v in values.items()
               if isinstance(k, str) and isinstance(v, str)}
              if isinstance(values, dict) else {})
     revision = doc.get("revision")
-    return clean, True, False, revision if isinstance(revision, int) and revision >= 0 else 0
+    generation = doc.get("generation")
+    return (clean, True, False,
+            revision if isinstance(revision, int) and revision >= 0 else 0,
+            generation if isinstance(generation, str) else "")
 
 
 def _validate_key(key: Any) -> None:
@@ -131,10 +135,13 @@ def _atomic_write(path: Path, doc: dict) -> None:
 def read(cfg: Any) -> dict:
     path = store_path(cfg)
     with _LOCK:
-        values, exists, corrupt, revision = _read(path)
+        values, exists, corrupt, revision, generation = _read(path)
     if corrupt:
         return {"exists": False, "revision": 0, "values": {}}
-    return {"exists": exists, "revision": revision, "values": values}
+    out = {"exists": exists, "revision": revision, "values": values}
+    if generation:
+        out["generation"] = generation
+    return out
 
 
 def write(cfg: Any, changes: Mapping[str, Optional[str]],
@@ -143,7 +150,7 @@ def write(cfg: Any, changes: Mapping[str, Optional[str]],
         raise PreferencesInvalid("values must be an object")
     path = store_path(cfg)
     with _LOCK:
-        current, exists, corrupt, revision = _read(path)
+        current, exists, corrupt, revision, generation = _read(path)
         values = dict(current)
         for key, value in changes.items():
             _validate_key(key)
@@ -161,13 +168,20 @@ def write(cfg: Any, changes: Mapping[str, Optional[str]],
         if sum(len(k) + len(v) for k, v in values.items()) > MAX_TOTAL_CHARS:
             raise PreferencesInvalid("preferences store is too large")
         if values == current and (exists or not values):
-            return {"exists": exists, "revision": revision, "values": values}
+            out = {"exists": exists, "revision": revision, "values": values}
+            if generation:
+                out["generation"] = generation
+            return out
         if corrupt:
             _keep_aside(path)
-        doc = {"version": 1, "revision": revision + 1, "values": values}
+        new_generation = generation if (exists and not corrupt and generation) \
+            else secrets.token_hex(8)
+        doc = {"version": 1, "generation": new_generation,
+               "revision": revision + 1, "values": values}
         try:
             _atomic_write(path, doc)
         except OSError as exc:
             raise PreferencesUnavailable(
                 f"preferences store is unwritable: {exc}") from exc
-        return {"exists": True, "revision": doc["revision"], "values": values}
+        return {"exists": True, "revision": doc["revision"], "values": values,
+                "generation": new_generation}

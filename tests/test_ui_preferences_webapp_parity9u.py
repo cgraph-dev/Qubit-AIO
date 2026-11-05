@@ -124,11 +124,14 @@ def test_get_put_patch_shape_and_persistence(tmp_path, monkeypatch):
     assert out["exists"] is True
     assert out["revision"] == 1
     assert out["values"] == {"qubit.theme": "dark", "qubit.sidebar": "wide"}
+    generation = out["generation"]
+    assert isinstance(generation, str) and generation
 
     code, out = QC.dispatch(cfg, "GET", "/api/ui-preferences")
     assert code == 200
     assert out["revision"] == 1
     assert out["values"] == {"qubit.theme": "dark", "qubit.sidebar": "wide"}
+    assert out["generation"] == generation
 
     code, out = QC.dispatch(
         cfg, "PATCH", "/api/ui-preferences", {},
@@ -136,6 +139,7 @@ def test_get_put_patch_shape_and_persistence(tmp_path, monkeypatch):
     assert code == 200, out
     assert out["revision"] == 2
     assert out["values"] == {"qubit.sidebar": "wide", "qubit.font": "mono"}
+    assert out["generation"] == generation
 
     code, out = QC.dispatch(
         cfg, "PUT", "/api/ui-preferences", {}, {"qubit.zoom": "1.1"})
@@ -148,6 +152,7 @@ def test_get_put_patch_shape_and_persistence(tmp_path, monkeypatch):
         assert path.stat().st_mode & 0o777 == 0o600
     doc = json.loads(path.read_text())
     assert doc["version"] == 1
+    assert doc["generation"] == generation
     assert doc["values"]["qubit.zoom"] == "1.1"
 
 
