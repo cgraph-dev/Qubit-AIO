@@ -1045,7 +1045,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if context.work_dir is None:
         opt_in_selected = any(name in BUILDERS and BUILDERS[name](
             context).opt_in for name in selected)
-        if opt_in_selected and args.allow_opt_in:
+        if opt_in_selected and args.allow_opt_in and not args.dry_run:
             context.work_dir = Path(
                 tempfile.mkdtemp(prefix="qubit-local-ci-"))
             # Rebuild plans now that a real artifact dir exists.
