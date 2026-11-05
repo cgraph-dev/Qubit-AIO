@@ -317,6 +317,8 @@ def _history_to_messages(history: list[dict], *, profile_home=None, image_urls: 
 
     messages = []
     tool_call_args = {}
+    # Resolve the presentation state once per projection, not once per replayed tool row.
+    display_token = _tool_preview_display_token()
     for m in history:
         if not isinstance(m, dict):
             continue
@@ -349,7 +351,7 @@ def _history_to_messages(history: list[dict], *, profile_home=None, image_urls: 
             args = tc_args or {}
             # `context` is an 80-char preview; ship args so a full-call renderer isn't truncated.
             labels = _history_tool_labels(name, args, tool_labels=tool_labels)
-            messages.append({"role": "tool", "name": name, "context": _tool_ctx(name, args),
+            messages.append({"role": "tool", "name": name, "context": _tool_ctx(name, args, display_token=display_token),
                              # Edit cards need the original result; other tool outputs
                              # remain omitted from this compact display projection.
                              **({"content": m.get("content")} if name in {"write_file", "patch", "skill_manage"} else {}),

@@ -624,6 +624,9 @@ class _Resume:
     # Mirror of the ``__init__`` default: hand-built instances (``__new__`` + fields) must
     # render data-URI image parts, matching a resume whose params omit the flag.
     inline_images = True
+    # Same mirror for friendly tool labels: a hand-built resume is a non-TUI caller, so it
+    # keeps the Desktop payload (labels on) rather than raising on the missing attribute.
+    tool_labels = True
 
     def __init__(self, rid, params: dict, target: str) -> None:
         self.rid, self.params, self.target = rid, params, target

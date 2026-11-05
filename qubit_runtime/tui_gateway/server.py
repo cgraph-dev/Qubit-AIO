@@ -1,6 +1,7 @@
 from __future__ import annotations
 import atexit
 import concurrent.futures
+from collections import OrderedDict
 import contextlib
 import contextvars
 import copy
@@ -2586,13 +2587,50 @@ def _session_info(agent, session: dict | None = None) -> dict:
     return info
 
 
-def _tool_ctx(name: str, args: dict) -> str:
+# Replayed tool previews are pure in (name, args, display language, friendly-label flag).
+# A resumed transcript re-derives the same ~2.5k previews on every reload/session switch;
+# a bounded, identity-keyed memo makes a warm resume skip the shell summariser entirely.
+# Long argument blobs (agent code blocks) are not cached so one huge call cannot pin memory.
+_TOOL_CTX_CACHE_LIMIT = 4096
+_TOOL_CTX_CACHE_MAX_KEY_CHARS = 4096
+_tool_ctx_cache: "OrderedDict[tuple, str]" = OrderedDict()
+_tool_ctx_cache_lock = threading.Lock()
+
+
+def _tool_preview_display_token() -> tuple:
+    """Presentation state a cached preview depends on; changes invalidate by key, never in place."""
+    from agent.display import friendly_tool_labels_enabled
+    from agent.i18n import get_language
+    return (get_language(), bool(friendly_tool_labels_enabled()))
+
+
+def _tool_ctx(name: str, args: dict, *, display_token: tuple | None = None) -> str:
     """Argument preview for a tool row — never a phrased label: clients own their phrasing, so
-    ``build_tool_label`` here would stutter ("Running Running …") and leak into the desktop's ``args.context``."""
+    ``build_tool_label`` here would stutter ("Running Running …") and leak into the desktop's ``args.context``.
+
+    ``display_token`` lets a batch caller (the resume transcript projection) resolve the display
+    language once instead of once per row; live callers may omit it."""
+    key = None
     with contextlib.suppress(Exception):
+        blob = json.dumps(args, sort_keys=True, default=str, ensure_ascii=False)
+        if len(blob) <= _TOOL_CTX_CACHE_MAX_KEY_CHARS:
+            key = (name, display_token if display_token is not None else _tool_preview_display_token(), blob)
+    if key is not None:
+        with _tool_ctx_cache_lock:
+            if key in _tool_ctx_cache:
+                _tool_ctx_cache.move_to_end(key)
+                return _tool_ctx_cache[key]
+    try:
         from agent.display import build_tool_preview
-        return build_tool_preview(name, args, max_len=80) or ""
-    return ""
+        value = build_tool_preview(name, args, max_len=80) or ""
+    except Exception:
+        return ""
+    if key is not None:
+        with _tool_ctx_cache_lock:
+            _tool_ctx_cache[key] = value
+            while len(_tool_ctx_cache) > _TOOL_CTX_CACHE_LIMIT:
+                _tool_ctx_cache.popitem(last=False)
+    return value
 
 
 def _emit_session_info_for_session(sid: str, session: dict) -> None:
