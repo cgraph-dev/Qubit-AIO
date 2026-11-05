@@ -31,6 +31,7 @@ import base64
 import gzip
 import hmac
 import json
+import os
 import re
 import struct
 import threading
@@ -6154,6 +6155,50 @@ class WebUI:
         log_event("webui.started", host=self.host, port=self.port)
         log.info("voice dashboard listening on http://%s:%s", self.host, self.port)
         self._prewarm_stt()
+        self._prewarm_reads()
+
+    def _prewarm_reads(self) -> None:
+        """Warm the expensive read-only dashboard inventories after boot.
+
+        The first browser load asks for skills/status/terminal profiles/model
+        options/MCP/office together. Those reads are cached for the poll
+        window, but the first call is cold and can take seconds on a large
+        profile. Prime them in the background so opening Chat (new or resumed)
+        does not pay that one-time scan. Never blocks the listener and never
+        runs under pytest.
+        """
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        if os.environ.get("QUBIT_WEBUI_PREWARM", "1").strip().lower() in {"0", "off", "false", "no"}:
+            return
+        orch = self.orch
+        if orch is None:
+            return
+        cfg = orch.cfg
+
+        def _run() -> None:
+            import time as _time
+            from . import qubit_compat as compat
+
+            checks = (
+                ("skills", compat.h_skills),
+                ("status", compat.h_status),
+                ("terminal_profiles", compat.h_terminal_profiles),
+                ("model_options", compat.h_model_options),
+                ("mcp_servers", compat.h_mcp_servers),
+                ("office_tower", compat.h_office_tower),
+            )
+            timings = {}
+            for name, handler in checks:
+                started = _time.monotonic()
+                try:
+                    handler(cfg, {}, {}, {})
+                except Exception:  # noqa: BLE001 - prewarm is best-effort
+                    log.debug("webui.prewarm.reads %s failed", name, exc_info=True)
+                timings[name] = round((_time.monotonic() - started) * 1000, 1)
+            log_event("webui.prewarm.reads", timings=timings)
+
+        threading.Thread(target=_run, daemon=True, name="read-prewarm").start()
 
     def _prewarm_stt(self) -> None:
         """Warm the configured STT engine in the background (non-blocking).
