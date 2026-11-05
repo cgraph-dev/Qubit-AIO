@@ -21,6 +21,16 @@ def _bridged_tool_labels(name: str, args: dict) -> list[dict]:
     return [label.as_payload() for label in tool_labels_for_call(name, args)]
 
 
+def _history_tool_labels(name: str, args: dict, *, tool_labels: bool) -> list[dict]:
+    """Friendly labels for a replayed tool row, unless the caller does not consume them.
+
+    The TUI transcript reducer reads only ``name``/``context`` from history (labels are used on
+    live tool events, not replay), so skipping them keeps the payload identical where it is read
+    while avoiding a second argument-preview build per shell/tool row on every resume.
+    """
+    return _bridged_tool_labels(name, args) if tool_labels else []
+
+
 def _active_image_routing_identity(agent: Any) -> tuple[str, str]:
     """Return the live provider/model, falling back before agent startup."""
     from agent.auxiliary_client import _read_main_model, _read_main_provider
@@ -182,12 +192,6 @@ def _user_image_display_text(content: Any) -> str | None:
             return None
         projected = body
 
-    import base64
-    import binascii
-    from pathlib import Path
-    from fastapi import HTTPException
-    from qubit_cli.web_routers.files import _fs_regular_file
-    from qubit_cli.web_server import _FS_DATA_URL_MAX_BYTES
     image_parts = content[1:1 + len(paths)]
     if len(image_parts) != len(paths) or len(content) not in (1 + len(paths), 2 + len(paths)):
         return None
@@ -196,6 +200,15 @@ def _user_image_display_text(content: Any) -> str | None:
         memory = content[-1]
         if not isinstance(memory, dict) or memory.get("type") != "text" or not isinstance(memory.get("text"), str) or sanitize_context(memory["text"]).strip():
             return None
+    # Only a verified native-vision image needs the data-URL helpers; importing the dashboard/file
+    # stack for every list-content user turn made a cold resume pay that import with no images to
+    # validate (the structural checks above already returned for everything else).
+    import base64
+    import binascii
+    from pathlib import Path
+    from fastapi import HTTPException
+    from qubit_cli.web_routers.files import _fs_regular_file
+    from qubit_cli.web_server import _FS_DATA_URL_MAX_BYTES
     for path, part in zip(paths, image_parts):
         if not Path(path).is_absolute() or not isinstance(part, dict) or part.get("type") != "image_url":
             return None
@@ -294,9 +307,12 @@ def _remember_tool_call_args(tool_calls: list, tool_call_args: dict) -> None:
             tool_call_args[tc_id] = (fn["name"], args)
 
 
-def _history_to_messages(history: list[dict], *, profile_home=None, image_urls: bool = True) -> list[dict]:
+def _history_to_messages(history: list[dict], *, profile_home=None, image_urls: bool = True,
+                         tool_labels: bool = True) -> list[dict]:
     """``image_urls=False`` is the ``inline_images=false`` projection (#116511): image parts render ``[image]``
-    so a remote client's history read stays kilobytes instead of re-transmitting every stored attachment."""
+    so a remote client's history read stays kilobytes instead of re-transmitting every stored attachment.
+    ``tool_labels=False`` omits the friendly ``labels`` sidecar for callers (the TUI) that never read it
+    from replayed history; ``name``/``context`` are unchanged."""
     from agent.history_commentary import project_history_commentary
 
     messages = []
@@ -332,7 +348,7 @@ def _history_to_messages(history: list[dict], *, profile_home=None, image_urls: 
             name = tc_name or m.get("tool_name") or "tool"
             args = tc_args or {}
             # `context` is an 80-char preview; ship args so a full-call renderer isn't truncated.
-            labels = _bridged_tool_labels(name, args)
+            labels = _history_tool_labels(name, args, tool_labels=tool_labels)
             messages.append({"role": "tool", "name": name, "context": _tool_ctx(name, args),
                              # Edit cards need the original result; other tool outputs
                              # remain omitted from this compact display projection.

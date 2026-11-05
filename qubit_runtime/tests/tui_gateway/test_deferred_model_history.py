@@ -34,8 +34,7 @@ def test_deferred_resume_preserves_model_history_and_db_ownership(tmp_path, monk
     _, display = db.get_resume_conversations("tip")
     prefix = db.get_ancestor_display_prefix("tip")
     display_reads = []
-    original_display = db.get_resume_conversations
-    original_prefix = db.get_ancestor_display_prefix
+    original_bundle = db.get_resume_bundle
     closed = threading.Event()
     built = threading.Event()
     events = []
@@ -45,21 +44,17 @@ def test_deferred_resume_preserves_model_history_and_db_ownership(tmp_path, monk
         original_close()
         closed.set()
 
-    def read_display(sid):
-        display_reads.append("display")
-        return original_display(sid)
-
-    def read_prefix(sid):
-        display_reads.append("prefix")
-        return original_prefix(sid)
+    def read_bundle(sid):
+        # One lineage SELECT now serves model history, display history and the ancestor prefix.
+        display_reads.append("bundle")
+        return original_bundle(sid)
 
     def acquire(db_path=None, **kwargs):
         assert db_path == home / "state.db"
         return db
 
     monkeypatch.setattr(db, "close", close)
-    monkeypatch.setattr(db, "get_resume_conversations", read_display)
-    monkeypatch.setattr(db, "get_ancestor_display_prefix", read_prefix)
+    monkeypatch.setattr(db, "get_resume_bundle", read_bundle)
     monkeypatch.setattr("qubit_state_registry.acquire", acquire)
     monkeypatch.setattr(server, "_profile_home", lambda p: home if p else None)
     monkeypatch.setattr(server, "_profile_configured_cwd", lambda _: str(tmp_path))
@@ -82,7 +77,7 @@ def test_deferred_resume_preserves_model_history_and_db_ownership(tmp_path, monk
         assert session["resume_history_ready"].wait(5)
         assert built.wait(5)
         model_only = source == "desktop" and omit_messages
-        assert display_reads == ([] if model_only else ["display", "prefix"])
+        assert display_reads == ([] if model_only else ["bundle"])
         assert session["history"] == expected
         assert session["display_history_prefix"] == ([] if model_only else prefix)
         count = stored_count if model_only else len(display)

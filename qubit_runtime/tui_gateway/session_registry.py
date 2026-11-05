@@ -573,6 +573,9 @@ def _load_resume_transcript(db, stored_id: str, *, model_history_only: bool = Fa
         except Exception:
             logger.debug("resume lineage guard failed; loading full lineage", exc_info=True)
     if prefix_fits:
+        bundle = getattr(db, "get_resume_bundle", None)
+        if callable(bundle):
+            return bundle(stored_id)
         raw_history, display_history = db.get_resume_conversations(stored_id)
         return raw_history, display_history, db.get_ancestor_display_prefix(stored_id)
     raw_history = db.get_messages_as_conversation(stored_id, repair_alternation=True, include_row_ids=True)
@@ -789,7 +792,8 @@ def _live_visible_history(session: dict, db, in_memory_fallback: list[dict]) -> 
 
 def _live_session_payload(
     sid: str, session: dict, *, cols: int | None = None, touch: bool = False,
-    transport: Transport | None = None, omit_messages: bool = False, inline_images: bool = True) -> dict:
+    transport: Transport | None = None, omit_messages: bool = False, inline_images: bool = True,
+    tool_labels: bool = True) -> dict:
     with session["history_lock"]:
         if cols is not None:
             session["cols"] = cols
@@ -812,7 +816,8 @@ def _live_session_payload(
     # message_count follows _resume_response: the stored size when messages are omitted, else the wire count
     # (a hidden seed row is in ``history`` but never on the wire).
     messages = ([] if omit_messages else
-                _history_to_messages(history, profile_home=session.get("profile_home"), image_urls=inline_images))
+                _history_to_messages(history, profile_home=session.get("profile_home"),
+                                     image_urls=inline_images, tool_labels=tool_labels))
     payload = {
         "info": _fallback_session_info(session), "message_count": len(history) if omit_messages else len(messages),
         "messages": messages,
