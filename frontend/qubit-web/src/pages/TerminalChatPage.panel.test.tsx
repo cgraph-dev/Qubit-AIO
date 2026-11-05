@@ -662,6 +662,53 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(FakeWebSocket.instances[0].url).not.toContain("resume=");
   });
 
+  it("after New chat, picking a recent session resumes that session", async () => {
+    // End-to-end pin for the right-panel actions: New chat opens a genuinely
+    // fresh PTY (no resume, fresh=1), and the NEXT row click reconnects with
+    // that row's resume id (never inheriting the fresh terminal).
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "qubit-go",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+    await renderTerminal();
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(1));
+
+    const newChat = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("New chat"),
+    );
+    expect(newChat).toBeDefined();
+    await act(async () => {
+      newChat!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(2));
+    expect(FakeWebSocket.instances[1].url).not.toContain("resume=");
+    expect(FakeWebSocket.instances[1].url).toContain("fresh=1");
+
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("Panel session"),
+    );
+    const label = Array.from(container.querySelectorAll("span")).find(
+      (el) => el.textContent?.trim() === "Panel session",
+    );
+    expect(label).toBeTruthy();
+    await act(async () => {
+      label!
+        .closest("button")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    await vi.waitFor(() => expect(FakeWebSocket.instances.length).toBe(3));
+    const picked = FakeWebSocket.instances[2].url;
+    expect(picked).toContain("resume=session-1");
+    expect(picked).not.toContain("fresh=");
+  });
+
   it("tears down the PTY socket on unmount (no leaked terminal)", async () => {
     // Regression: the prior terminal must be closed on teardown, never leaked.
     apiMocks.wsTicket.mockImplementation(async () => ({
