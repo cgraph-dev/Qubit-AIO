@@ -182,3 +182,24 @@ def test_agent_version_still_forwards_to_the_vendored_runtime(monkeypatch):
 
     assert CLI.main(["agent", "--version"]) == 0
     assert seen["argv"] == ["--version"], seen
+
+
+# ---------------------------------------------------------------------------
+# gettext lookup memoisation (argparse help construction)
+# ---------------------------------------------------------------------------
+def test_gettext_find_cache_is_idempotent_and_keeps_help_stable():
+    import gettext
+
+    import voicebridge.cli as CLI
+
+    before = CLI.build_parser().format_help()
+    CLI._install_gettext_find_cache()
+    first = gettext.find
+    assert getattr(first, "_qubit_cached", False)
+    CLI._install_gettext_find_cache()
+    assert gettext.find is first
+
+    after = CLI.build_parser().format_help()
+    assert after == before
+    # The original callable is retained for diagnostics/tests.
+    assert callable(getattr(first, "_qubit_orig", None))
