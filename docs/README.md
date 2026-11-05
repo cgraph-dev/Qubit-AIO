@@ -121,6 +121,7 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `SYNC_REMAINING.md` | SYNC_REMAINING — upstream delta `69948c0057..bd0affe5`, measured state |
 | `TEST-HONESTY-AUDIT.md` | Test Honesty Audit — a repo-wide hunt for tests that cannot fail |
 | `TEST_PORT_RECOVERY_2026-10-19.md` | Test-port recovery: lane B + lane A — honest account |
+| `UPDATE.md` | Qubit UPDATE — update channels, tags, apply/rollback, install shapes |
 | `VENDOR-ATOMIC-PUBLISH-FIX.md` | Vendor publish-order fix (scripts/vendor_habblaud.py) |
 | `VENDOR-CONCURRENCY-EVIDENCE.md` | Vendor publish concurrency — measured evidence |
 | `VENDOR-REPRODUCIBILITY.md` | Vendor reproducibility — can the vendored tree be re-produced? (A9) |

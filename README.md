@@ -133,6 +133,21 @@ For voice identity, enroll your voice once before the first voice turn:
 qubit enroll
 ```
 
+## Update
+
+A source checkout updates in place; the updater finds the checkout a fresh
+`scripts/install.sh` install was built from:
+
+```bash
+qubit update --check      # read-only status and available update
+qubit update --apply      # snapshot, fast-forward, reinstall, restart
+qubit update --rollback   # restore the previous revision
+```
+
+`--channel stable` follows the newest `vX.Y.Z` release tag; the default
+follows the configured branch (`main`). See [docs/UPDATE.md](docs/UPDATE.md)
+for channels, tags, install shapes and limitations.
+
 ## What is optional
 
 - Local model assets: skip with `--without-models`.
@@ -145,6 +160,7 @@ qubit enroll
 ## Documentation
 
 - [INSTALL.md](INSTALL.md) — install, prerequisites, options, offline notes.
+- [docs/UPDATE.md](docs/UPDATE.md) — update channels, tags, apply/rollback, install shapes.
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — dashboard, models, local brain (VRAM), audio, dependencies, uninstall.
 - [SECURITY.md](SECURITY.md) — vulnerability reporting and scope.
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development setup and pull requests.

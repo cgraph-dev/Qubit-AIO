@@ -7956,6 +7956,19 @@ def _cmd_update(cfg, args) -> int:
     backup_dir = getattr(args, "backup_dir", None) or None
     as_json = bool(getattr(args, "json", False))
 
+    # A previously selected channel keeps applying when no flag is repeated.
+    # Persisting `--apply --channel stable` used to be write-only: the next bare
+    # check/apply silently followed the branch, so a release-tag subscriber saw
+    # commits instead of releases. Read the record before resolving the source.
+    if not channel and not tag:
+        try:
+            from . import update_channel as _UC
+
+            channel = str((_UC.channel_record(cfg) or {}).get("channel")
+                          or "").strip() or None
+        except Exception:  # noqa: BLE001 — optional resolver; keep the branch path
+            channel = None
+
     # Resolve a channel/tag through the canonical update-channel backend before
     # any verb runs (check included). An absent resolver is a typed refusal.
     try:
@@ -7971,9 +7984,9 @@ def _cmd_update(cfg, args) -> int:
 
     if verb == "check":
         # Thread the selected channel/tag into the manager so the effective ref
-        # it reports is the ref `--apply` will actually fetch. Only pass them
-        # when supplied, so a bare `qubit update --check` keeps the historical
-        # configured-branch behavior (and remains call-compatible).
+        # it reports is the ref `--apply` will actually fetch. A channel is
+        # passed when supplied or previously persisted; with neither, a bare
+        # `qubit update --check` keeps the configured-branch behavior.
         check_kwargs: dict = {"source": source}
         if channel:
             check_kwargs["channel"] = channel

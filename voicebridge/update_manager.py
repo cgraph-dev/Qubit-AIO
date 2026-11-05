@@ -103,12 +103,119 @@ def _get(cfg: Any, *path: str, default: Any = None) -> Any:
         return default
 
 
+def _is_source_checkout(root: Path) -> bool:
+    """True when *root* is this Qubit git checkout (not a site-packages directory)."""
+    root = Path(root)
+    if not (root / ".git").exists():
+        return False
+    if (root / "voicebridge" / "update_manager.py").is_file():
+        return True
+    # A venv's parent can be any project's checkout. Require Qubit's own
+    # project identity before treating it as the update target.
+    try:
+        metadata = (root / "pyproject.toml").read_text(encoding="utf-8-sig")
+    except OSError:
+        return False
+    return re.search(r"(?m)^\s*name\s*=\s*[\"']qubit-voicebridge[\"']", metadata) is not None
+
+
+def _distribution_source_root() -> Optional[Path]:
+    """The local source root recorded for this install, if it is still a checkout.
+
+    ``uv pip install <checkout>`` (what ``scripts/install.sh`` runs) is a
+    non-editable install, so ``__file__`` lives in ``site-packages`` and the
+    checkout is not its parent. PEP 610 records the source directory in
+    ``direct_url.json``; reading it is what lets the public launcher find the
+    tree it was installed from. A release-archive install records a temporary
+    extraction that no longer exists, so its non-checkout path is ignored.
+    """
+    try:
+        import importlib.metadata as md
+    except Exception:  # noqa: BLE001
+        return None
+    for name in ("qubit-voicebridge", "qubit-agent"):
+        try:
+            distribution = md.distribution(name)
+            raw = distribution.read_text("direct_url.json")
+        except Exception:  # noqa: BLE001
+            continue
+        if not raw:
+            continue
+        try:
+            data = json.loads(raw)
+        except ValueError:
+            continue
+        url = data.get("url") if isinstance(data, dict) else None
+        if not isinstance(url, str) or not url.startswith("file://"):
+            continue
+        try:
+            from urllib.parse import unquote, urlsplit
+
+            path = Path(unquote(urlsplit(url).path))
+        except (ValueError, OSError):
+            continue
+        if _is_source_checkout(path):
+            return path.resolve()
+    return None
+
+
+def _pm_environment_source_root(venv: Path) -> Optional[Path]:
+    """The checkout a PM generation venv belongs to, when ``venv`` is one."""
+    if venv.parent.parent.name != "environments":
+        return None
+    state = venv.parent.parent.parent
+    try:
+        owner = Path((state / "inputs" / ".project-root").read_text(
+            encoding="utf-8-sig").strip())
+    except OSError:
+        return None
+    return owner.resolve() if _is_source_checkout(owner) else None
+
+
+def _owning_checkout(module_root: Path) -> Optional[Path]:
+    """The checkout a site-packages install came from, or None.
+
+    Checked in order: the PEP 610 source directory (survives a moved/nested
+    venv), the venv recorded by ``sys.prefix`` (a clone install keeps its venv
+    in the checkout), a ``venv``/``.venv`` ancestor of the module, and a PM
+    generation venv's recorded project root.
+    """
+    recorded = _distribution_source_root()
+    if recorded is not None:
+        return recorded
+    candidates: list[Path] = []
+    try:
+        candidates.append(Path(sys.prefix).resolve())
+    except OSError:
+        pass
+    for parent in module_root.parents:
+        if parent.name in ("venv", ".venv"):
+            candidates.append(parent)
+            break
+    for venv in candidates:
+        owner = venv.parent
+        if _is_source_checkout(owner):
+            return owner.resolve()
+        if (pm_owner := _pm_environment_source_root(venv)) is not None:
+            return pm_owner
+    return None
+
+
 def repo_root(cfg: Any) -> Path:
-    """The checkout to inspect. ``update.repo_root`` overrides the module root."""
+    """The checkout to inspect. ``update.repo_root`` overrides the module root.
+
+    A fresh source install is non-editable, so the module lives in
+    ``site-packages``; resolve the owning checkout instead of classifying the
+    install as an unupdatable package. A genuine release-archive/wheel install
+    has no checkout and keeps reporting ``package``.
+    """
     override = str(_get(cfg, "update", "repo_root", default="") or "").strip()
     if override:
         return Path(override).expanduser()
-    return Path(__file__).resolve().parents[1]
+    module_root = Path(__file__).resolve().parents[1]
+    if _is_source_checkout(module_root):
+        return module_root
+    return _owning_checkout(module_root) or module_root
 
 
 def _current_version() -> str:
@@ -1048,13 +1155,22 @@ def _is_immutable(repo: Path) -> bool:
 
 
 def _package_installed() -> bool:
-    try:
-        import importlib.metadata as md
+    """True when this process runs from an installed distribution.
 
-        md.version("qubit-agent")
-        return True
-    except Exception:  # noqa: BLE001
-        return False
+    ``qubit-voicebridge`` is the product distribution; ``qubit-agent`` is the
+    vendored runtime's name and is kept as a fallback so a runtime-only install
+    is still recognised (never the reverse: a fresh prefix install has no
+    ``qubit-agent`` metadata).
+    """
+    import importlib.metadata as md
+
+    for name in ("qubit-voicebridge", "qubit-agent"):
+        try:
+            md.version(name)
+            return True
+        except Exception:  # noqa: BLE001
+            continue
+    return False
 
 
 def detect_install_method(cfg: Any) -> Dict[str, Any]:
@@ -1136,7 +1252,11 @@ def sync_dependencies(cfg: Any, *, runner: Optional[Runner] = None,
     elif isinstance(override, (list, tuple)) and override:
         argv = [str(a) for a in override]
     elif shutil.which("uv") is not None:
-        argv = ["uv", "pip", "install", "-e", str(root), "--no-deps"]
+        # Target THIS interpreter explicitly. A bare ``uv pip install`` picks
+        # ``$VIRTUAL_ENV`` (or a cwd ``.venv``), so an update launched from a
+        # different checkout's shell can reinstall the wrong environment.
+        argv = ["uv", "pip", "install", "--python", sys.executable,
+                "-e", str(root), "--no-deps"]
     else:
         argv = [sys.executable, "-m", "pip", "install", "-e", str(root),
                 "--no-deps"]

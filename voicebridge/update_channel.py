@@ -62,6 +62,11 @@ from urllib.parse import urlsplit
 #: The intended public Qubit repository identity. Default destination only —
 #: overridable per install via ``update.remote`` / ``update.remote_url``.
 QUBIT_REPOSITORY = "cgraph-dev/Qubit-AIO"
+#: The public product repository named by README/INSTALL. Both are Qubit-owned,
+#: so a clone of either keeps updating from its own ``origin`` instead of being
+#: redirected to the other (which would fail for a public user without access).
+QUBIT_PUBLIC_REPOSITORY = "cgraph-dev/Qubit"
+QUBIT_REPOSITORIES = (QUBIT_REPOSITORY, QUBIT_PUBLIC_REPOSITORY)
 QUBIT_REPOSITORY_URL = f"https://github.com/{QUBIT_REPOSITORY}.git"
 #: The canonical public Qubit update URL. :func:`resolve_source` prefers this
 #: when no explicit Qubit source is configured, or when the configured clone's
@@ -321,13 +326,19 @@ def _legacy_token(url: Any) -> Optional[str]:
 
 
 def _points_at_qubit_repo(url: Any) -> bool:
-    """True when *url* names the Qubit repository (any git URL shape)."""
+    """True when *url* names a Qubit-owned repository (any git URL shape).
+
+    Both the private release repository and the public product repository named
+    by the README are accepted, so a fresh ``git clone`` of either updates from
+    the checkout's own ``origin`` rather than being redirected to the other.
+    """
     low = _clean(url).lower().rstrip("/")
     if not low:
         return False
     if low.endswith(".git"):
         low = low[:-4]
-    return low.rstrip("/").endswith(QUBIT_REPOSITORY.lower())
+    low = low.rstrip("/")
+    return any(low.endswith(repo.lower()) for repo in QUBIT_REPOSITORIES)
 
 
 def _git_remote_url(remote_name: Any, repo: Any = None) -> Optional[str]:
@@ -837,7 +848,8 @@ def _utc_iso() -> str:
 
 
 __all__ = [
-    "QUBIT_REPOSITORY", "QUBIT_REPOSITORY_URL", "QUBIT_UPDATE_URL",
+    "QUBIT_REPOSITORY", "QUBIT_PUBLIC_REPOSITORY", "QUBIT_REPOSITORIES",
+    "QUBIT_REPOSITORY_URL", "QUBIT_UPDATE_URL",
     "DEFAULT_REMOTE_NAME",
     "DEFAULT_BRANCH", "DEFAULT_CHANNEL", "CHANNELS",
     "LEGACY_SOURCE_URL_CODE", "INVALID_SOURCE_URL_CODE", "INVALID_CHANNEL_CODE",
