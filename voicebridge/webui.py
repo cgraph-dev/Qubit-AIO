@@ -1390,9 +1390,88 @@ def _gzip_cache_put(key: tuple[str, int, int], body: bytes) -> None:
 class WebUIHandler(BaseHTTPRequestHandler):
     server_version = "VoiceDashboard/1.0"
 
+    #: HTTP/1.1 lets a browser reuse one TCP connection for the dashboard shell,
+    #: its JSON API and every static asset instead of dialing a fresh socket per
+    #: request (the HTTP/1.0 default closes at the end of every response). This
+    #: is only safe because every response is now framed — ``_send`` /
+    #: ``_send_file_ranged`` / ``_redirect`` / OPTIONS all emit a
+    #: ``Content-Length``, and ``end_headers`` below downgrades any response that
+    #: cannot guarantee framing to ``Connection: close`` rather than leaving a
+    #: persistent client waiting for a body that will never end.
+    protocol_version = "HTTP/1.1"
+
+    #: Keep-alive turns many small request/response round-trips into one
+    #: socket. Without TCP_NODELAY, Nagle + delayed ACK adds a ~40 ms stall to
+    #: the next request on a persistent connection (measurable on loopback);
+    #: http.server enables this flag by setting TCP_NODELAY in setup().
+    disable_nagle_algorithm = True
+
     @property
     def app(self) -> "WebUI":
         return self.server.app  # type: ignore[attr-defined]
+
+    # -- HTTP/1.1 framing -------------------------------------------------
+    def setup(self) -> None:
+        super().setup()
+        conn = getattr(self, "connection", None)
+        registry = getattr(self.server, "_active_connections", None)
+        lock = getattr(self.server, "_active_lock", None)
+        if conn is not None and registry is not None and lock is not None:
+            with lock:
+                registry.add(conn)
+
+    def finish(self) -> None:
+        conn = getattr(self, "connection", None)
+        registry = getattr(self.server, "_active_connections", None)
+        lock = getattr(self.server, "_active_lock", None)
+        try:
+            super().finish()
+        finally:
+            if conn is not None and registry is not None and lock is not None:
+                with lock:
+                    registry.discard(conn)
+
+    def handle_one_request(self) -> None:
+        # A handler instance now serves several requests on a keep-alive
+        # socket. Per-request flags must be reset here: `do_HEAD` sets
+        # `_head_only` on the instance, and without this reset the next GET on
+        # the same connection would send a Content-Length with no body and
+        # hang the client.
+        self._head_only = False
+        self._response_status = None
+        super().handle_one_request()
+
+    def send_response(self, code, message=None):  # noqa: D401 - stdlib override
+        # Remember the status for the end_headers framing audit. Everything
+        # else stays exactly as BaseHTTPRequestHandler defines it.
+        self._response_status = code
+        super().send_response(code, message)
+
+    def _has_response_header(self, name: bytes) -> bool:
+        needle = name.lower() + b":"
+        for line in getattr(self, "_headers_buffer", None) or []:
+            if line.lower().startswith(needle):
+                return True
+        return False
+
+    def end_headers(self) -> None:
+        """Emit headers, refusing keep-alive when the body is not framed.
+
+        HTTP/1.1 assumes a persistent connection. A response without
+        ``Content-Length`` or ``Transfer-Encoding`` is delimited by connection
+        close, so advertising keep-alive for it would hang the next request on
+        the same socket. 1xx/204/304 have no body and are therefore framed.
+        """
+        status = int(getattr(self, "_response_status", 200) or 200)
+        bodyless = status < 200 or status in (204, 304)
+        framed = (bodyless
+                  or self._has_response_header(b"content-length")
+                  or self._has_response_header(b"transfer-encoding"))
+        if not framed:
+            self.close_connection = True
+        if self.close_connection and not self._has_response_header(b"connection"):
+            self.send_header("Connection", "close")
+        super().end_headers()
 
     # -- helpers ---------------------------------------------------------
     def _send(self, code: int, body: bytes, ctype: str = "text/plain",
@@ -1446,9 +1525,49 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def _html(self, page: str, code: int = 200) -> None:
         self._send(code, page.encode(), "text/html; charset=utf-8")
 
+    @staticmethod
+    def _file_etag(st: Any) -> str:
+        # Weak validator: the gzip and identity forms are semantically the same
+        # document and share an ETag, so a revalidation never has to know which
+        # wire encoding the browser cached.
+        return 'W/"%x-%x"' % (st.st_mtime_ns, st.st_size)
+
+    @staticmethod
+    def _http_last_modified(st: Any) -> str:
+        from email.utils import formatdate
+        return formatdate(st.st_mtime, usegmt=True)
+
+    def _request_not_modified(self, etag: str, mtime: float) -> bool:
+        """Honour the validators on a cacheable static response."""
+        headers = getattr(self, "headers", None) or {}
+        inm = str(headers.get("If-None-Match", "") or "")
+        if inm:
+            def _norm(value: str) -> str:
+                value = str(value).strip()
+                return value[2:].strip() if value[:2].lower() == "w/" else value
+            target = _norm(etag)
+            for part in inm.split(","):
+                if part.strip() == "*" or _norm(part) == target:
+                    return True
+            return False
+        ims = str(headers.get("If-Modified-Since", "") or "")
+        if ims:
+            from email.utils import parsedate_to_datetime
+            try:
+                since = parsedate_to_datetime(ims).timestamp()
+            except (TypeError, ValueError, OverflowError):
+                return False
+            return int(mtime) <= int(since)
+        return False
+
     def _file(self, path: Path, ctype: str,
               cache_control: str = "no-store") -> None:
-        if ctype.startswith(("video/", "audio/")) or path.stat().st_size > 4 * 1024 * 1024:
+        try:
+            st = path.stat()
+        except OSError:
+            self._send(404, b"not found")
+            return
+        if ctype.startswith(("video/", "audio/")) or st.st_size > 4 * 1024 * 1024:
             self._send_file_ranged(path, ctype, cache_control=cache_control)
             return
         try:
@@ -1456,13 +1575,26 @@ class WebUIHandler(BaseHTTPRequestHandler):
         except OSError:
             self._send(404, b"not found")
             return
+        cacheable = cache_control != "no-store"
+        etag = last_modified = None
+        if cacheable:
+            etag = self._file_etag(st)
+            last_modified = self._http_last_modified(st)
+            if self._request_not_modified(etag, st.st_mtime):
+                self._send(304, b"", ctype,
+                           extra_headers=[("ETag", etag),
+                                          ("Last-Modified", last_modified)],
+                           cache_control=cache_control)
+                return
         # Gzip is negotiated per request and only affects the wire form: the
         # browser decodes to the identical bytes, so the UI cannot change.
         wire, gzipped = self._gzip_if_wanted(body, path)
-        extra = None
+        extra = []
         if gzipped:
             extra = [("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")]
-        self._send(200, wire, ctype, extra_headers=extra,
+        if cacheable:
+            extra = extra + [("ETag", etag), ("Last-Modified", last_modified)]
+        self._send(200, wire, ctype, extra_headers=extra or None,
                    cache_control=cache_control)
 
     # Text assets that compress well. Images, video, audio, fonts and maps are
@@ -1530,10 +1662,22 @@ class WebUIHandler(BaseHTTPRequestHandler):
         back to the full body, which is still valid HTTP.
         """
         try:
-            size = path.stat().st_size
+            st = path.stat()
+            size = st.st_size
         except OSError:
             self._send(404, b"not found")
             return
+        cacheable = cache_control != "no-store"
+        etag = last_modified = None
+        if cacheable:
+            etag = self._file_etag(st)
+            last_modified = self._http_last_modified(st)
+            if self._request_not_modified(etag, st.st_mtime):
+                self._send(304, b"", ctype,
+                           extra_headers=[("ETag", etag),
+                                          ("Last-Modified", last_modified)],
+                           cache_control=cache_control)
+                return
         start, end = 0, size - 1
         status = 200
         match = re.fullmatch(r"bytes=(\d*)-(\d*)", (self.headers.get("Range") or "").strip())
@@ -1561,6 +1705,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
             if status == 206:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
             self.send_header("Cache-Control", cache_control)
+            if cacheable:
+                self.send_header("ETag", etag)
+                self.send_header("Last-Modified", last_modified)
             self.end_headers()
             if getattr(self, "_head_only", False):
                 return
@@ -1646,21 +1793,17 @@ class WebUIHandler(BaseHTTPRequestHandler):
             run_filter = self.path.split("run_id=")[1].split("&")[0] or None
         cursor = int(last_id) if str(last_id).isdigit() else None
 
-        # SSE over BaseHTTPRequestHandler defaults to HTTP/1.0, which has no
-        # keep-alive: a response with no Content-Length is terminated by
-        # connection close, so every idle timeout or proxy hop tears the feed
-        # down and the client re-dials in a loop (the "events feed
-        # disconnected" churn). Advertise HTTP/1.1 for THIS route only — the
-        # rest of the handler stays on 1.0 because several routes write bodies
-        # without a length and would hang a persistent client.
-        self.protocol_version = "HTTP/1.1"
+        # This SSE body has no Content-Length: it is delimited by connection
+        # close. Keep HTTP/1.1 (the handler default) for the status line and
+        # advertise `Connection: close`, so a client never mistakes the feed for
+        # a persistent response whose body is still being framed.
         self.close_connection = True  # SSE is one response per connection
 
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Accel-Buffering", "no")
-        self.send_header("Connection", "keep-alive")
+        self.send_header("Connection", "close")
         for k, v in cors_headers_for(self.app.allowed_origins,
                                      self.headers.get("Origin", "")):
             self.send_header(k, v)
@@ -3073,11 +3216,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
                                    "UNAVAILABLE" if status == 403 else "FAILED")
                 self._json(payload, status)
                 return
+            # Streaming body: no Content-Length, so the response is delimited
+            # by connection close and must never advertise keep-alive.
+            self.close_connection = True
             self.send_response(200)
             self.send_header("Content-Type",
                              "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Accel-Buffering", "no")
+            self.send_header("Connection", "close")
             for k, v in cors_headers_for(self.app.allowed_origins,
                                          self.headers.get("Origin", "")):
                 self.send_header(k, v)
@@ -3891,7 +4038,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     self.headers.get("Origin", "")):
                     self.send_header(k, v)
                 self.end_headers()
-                self.wfile.write(body)
+                if not getattr(self, "_head_only", False):
+                    self.wfile.write(body)
             except (BrokenPipeError, ConnectionResetError, OSError):
                 pass
         elif path == "/api/events/stream":
@@ -5714,6 +5862,12 @@ class WebUI:
         self._asr = None
         self._asr_lock = threading.Lock()
         self._server: Optional[ThreadingHTTPServer] = None
+        #: Accepted sockets for keep-alive connections. ThreadingHTTPServer's
+        #: handler threads are daemons, so server_close() does not join them and
+        #: an idle persistent socket would survive stop(); tracking lets
+        #: WebUI.stop() shut those sockets down and let the threads exit.
+        self._active_connections: set = set()
+        self._active_lock = threading.Lock()
         self._thread: Optional[threading.Thread] = None
         self._pending: Dict[str, Dict[str, Any]] = {}
         self._pending_lock = threading.Lock()
@@ -6041,6 +6195,23 @@ class WebUI:
 
         threading.Thread(target=_run, daemon=True, name="stt-prewarm").start()
 
+    def _close_active_connections(self) -> None:
+        """Shut down accepted sockets so keep-alive handler threads exit."""
+        import socket as _socket
+
+        with self._active_lock:
+            conns = list(self._active_connections)
+            self._active_connections.clear()
+        for conn in conns:
+            try:
+                conn.shutdown(_socket.SHUT_RDWR)
+            except OSError:
+                pass
+            try:
+                conn.close()
+            except OSError:
+                pass
+
     def stop(self) -> None:
         # Packet 8K closure: wake and close every event-stream subscriber FIRST
         # so in-flight SSE handler threads exit their drain loop instead of
@@ -6073,6 +6244,11 @@ class WebUI:
                 log.exception("webui.stop: event hub close_all failed")
         if self._server is not None:
             self._server.shutdown()
+            # Persistent (HTTP/1.1 keep-alive) handler threads block waiting for
+            # the next request on their accepted socket. They are daemons, so
+            # server_close() will not join them and the sockets would linger.
+            # Shut them down explicitly; a blocked read wakes with EOF.
+            self._close_active_connections()
             # server_close() is required to actually release the listening
             # socket; shutdown() alone leaves it open (ResourceWarning + a real
             # fd leak across start/stop cycles in a long-lived process).
