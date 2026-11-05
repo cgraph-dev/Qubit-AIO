@@ -17,6 +17,7 @@ no longer exists.
 | Capability gaps vs upstream, classified | `scripts/audit_capability_gaps.py` | re-run the script |
 | Work in flight / at risk | `docs/OPEN_THREADS.md` | update at every session end |
 | What is true, with evidence | `docs/STATUS.md` | update every session |
+| v0.0.6 fresh-install release contract | `docs/V0.0.6-RELEASE-CHECKLIST.md` | `python3 scripts/release_fresh_install_gate.py --repo . --fresh-install --require-fresh-install` |
 
 ## Pre-flight before claiming any item done
 

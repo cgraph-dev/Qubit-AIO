@@ -301,6 +301,42 @@ def _apply_push(
     )
 
 
+def _seed_release_gate(dest: Path) -> dict:
+    """Run the fresh-install contract gate against the exported seed.
+
+    The seed has no built dashboard (the public tree ships source and builds it
+    on install), so the gate runs without a dashboard requirement. A FAIL is a
+    promotion blocker; a DEGRADED result means the fresh-install probe was not
+    requested here and is covered by the production release-asset gate.
+    """
+    cmd = [
+        sys.executable,
+        str(SCRIPTS / "release_fresh_install_gate.py"),
+        "--repo", str(dest),
+        "--no-dashboard",
+        "--json",
+    ]
+    proc = _run(cmd, timeout=600)
+    try:
+        report = json.loads(proc.stdout or "")
+    except json.JSONDecodeError:
+        raise PromoteError(
+            "PROMOTE_RELEASE_GATE_FAILED: gate did not return JSON (rc=%s): %s"
+            % (proc.returncode, (proc.stderr or proc.stdout or "")[-2000:])
+        )
+    if report.get("verdict") == "FAIL":
+        failed = [
+            "%s=%s %s" % (check.get("name"), check.get("state"),
+                          check.get("detail", ""))
+            for check in report.get("checks", [])
+            if check.get("state") == "FAIL"
+        ]
+        raise PromoteError(
+            "PROMOTE_RELEASE_GATE_FAILED: " + "; ".join(failed[:10])
+        )
+    return report
+
+
 def _checks(seed_commit: str, seed_tree: str, archive: Path) -> dict:
     return {
         "seed_commit": seed_commit,
@@ -325,6 +361,7 @@ def _write_report(
     applied: bool,
     push_tag: bool,
     removed_refs: list[str],
+    release_gate: dict | None = None,
 ) -> None:
     source = report["source"]
     added = sum(1 for row in changed if row["status"].startswith("A"))
@@ -358,6 +395,7 @@ def _write_report(
         "push_tag": push_tag,
         "changed_paths": changed,
         "changed_counts": {"added": added, "modified": modified, "deleted": deleted},
+        "release_gate": release_gate,
     }
     path_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -392,6 +430,9 @@ def _write_report(
         "- Excluded files: %d" % report["excluded_files"],
         "- Public docs: %s" % (", ".join(report["public_docs"]) or "(none)"),
         "- Pruned build refs: %s" % (", ".join(removed_refs) or "(none)"),
+        "- Release gate: `%s`" % (
+            (release_gate or {}).get("verdict", "(not run)")
+        ),
         "",
         "## Remote",
         "",
@@ -514,6 +555,8 @@ def main(argv: list[str] | None = None) -> int:
         )
     checks.finish()
 
+    release_gate = _seed_release_gate(dest)
+
     archive = seed.archive_seed(dest, tag, version, work / "artifacts")
     seed_tree = _git(dest, "rev-parse", "%s^{tree}" % seed_commit).stdout.strip()
     checksums = _checks(seed_commit, seed_tree, archive)
@@ -546,6 +589,7 @@ def main(argv: list[str] | None = None) -> int:
             applied=applied,
             push_tag=args.push_tag,
             removed_refs=removed_refs,
+            release_gate=release_gate,
         )
 
     # Write the dry-run report first so a failed push still leaves the exact

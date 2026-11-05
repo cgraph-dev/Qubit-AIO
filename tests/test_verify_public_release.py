@@ -177,6 +177,36 @@ def _build_release(
     return release
 
 
+def _zip_bytes(files: dict[str, bytes], prefix: str | None) -> bytes:
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        for rel, data in sorted(files.items()):
+            name = "%s/%s" % (prefix, rel) if prefix else rel
+            info = zipfile.ZipInfo(name, date_time=(2000, 1, 1, 0, 0, 0))
+            archive.writestr(info, data)
+    return buffer.getvalue()
+
+
+def _add_platform_assets(release: Path, version: str, installer: bytes) -> None:
+    (release / "bootstrap.ps1").write_bytes(b"# windows bootstrap\n")
+    (release / "install.ps1").write_bytes(installer)
+    (release / "qubit-release.zip").write_bytes(
+        _zip_bytes(
+            {
+                "scripts/install.ps1": installer,
+                "VERSION": (version + "\n").encode("utf-8"),
+            },
+            "Qubit-%s" % version,
+        )
+    )
+    lines = []
+    for path in sorted(release.iterdir()):
+        if path.name == "SHA256SUMS":
+            continue
+        lines.append("%s  %s" % (_sha_file(path), path.name))
+    (release / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def _checks(report: dict) -> dict[str, dict]:
     return {check["name"]: check for check in report["checks"]}
 
@@ -462,3 +492,49 @@ def test_release_page_url_is_normalized_to_download_base():
         )
         == "https://github.com/acme/qubit/releases/latest/download"
     )
+
+
+def test_platform_assets_are_optional_by_default(tmp_path: Path):
+    release = _build_release(tmp_path)
+    rc, report = _verify(release)
+    assert rc == 0, report
+    assert report["verdict"] == "PASS"
+
+
+def test_platform_assets_can_be_required(tmp_path: Path):
+    release = _build_release(tmp_path)
+    rc, report = _verify(release, ["--require-platform-assets"])
+    checks = _checks(report)
+    assert rc == 1
+    assert checks["asset_bootstrap.ps1"]["ok"] is False
+    assert checks["asset_install.ps1"]["ok"] is False
+    assert checks["asset_qubit-release.zip"]["ok"] is False
+
+
+def test_platform_assets_pass_when_present_and_consistent(tmp_path: Path):
+    release = _build_release(tmp_path)
+    _add_platform_assets(release, VERSION, b"# windows installer\nexit 0\n")
+    rc, report = _verify(release, ["--require-platform-assets"])
+    checks = _checks(report)
+    assert rc == 0, report
+    assert checks["asset_bootstrap.ps1"]["ok"] is True
+    assert checks["asset_install.ps1"]["ok"] is True
+    assert checks["asset_qubit-release.zip"]["ok"] is True
+    assert checks["archive_installer_windows"]["ok"] is True
+    assert checks["archive_version_windows"]["ok"] is True
+
+
+def test_windows_archive_installer_must_match_the_asset(tmp_path: Path):
+    release = _build_release(tmp_path)
+    _add_platform_assets(release, VERSION, b"# windows installer\nexit 0\n")
+    (release / "install.ps1").write_bytes(b"# different installer\n")
+    lines = []
+    for path in sorted(release.iterdir()):
+        if path.name == "SHA256SUMS":
+            continue
+        lines.append("%s  %s" % (_sha_file(path), path.name))
+    (release / "SHA256SUMS").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    rc, report = _verify(release, ["--require-platform-assets"])
+    checks = _checks(report)
+    assert rc == 1
+    assert checks["archive_installer_windows"]["ok"] is False

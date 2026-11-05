@@ -21,7 +21,14 @@ Usage::
 ``--verify`` runs the full release qualifier (``--build --install
 --reproduce --unsigned-ok``) and fails unless it returns PASS.  Without it the
 script still builds the wheel/sdist and checks their content, but skips the
-clean-HOME install and reproducibility steps.
+qualifier's clean-HOME install and reproducibility steps.
+
+Independently of ``--verify``, the script always publishes the POSIX + Windows
+bootstrap payloads and runs ``scripts/release_fresh_install_gate.py`` with
+``--fresh-install --require-fresh-install``.  A DEGRADED or FAIL gate result
+refuses the release: a prepared release cannot exist without a throwaway fresh
+install that creates a root ``config.yaml`` with the default Ollama provider and
+without the packaged dashboard/TUI assets.
 """
 from __future__ import annotations
 
@@ -29,7 +36,6 @@ import argparse
 import gzip
 import hashlib
 import importlib.util
-import io
 import json
 import os
 import shutil
@@ -37,6 +43,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -327,6 +334,124 @@ def _add_member(tar: tarfile.TarFile, tree: Path, path: Path,
             tar.addfile(info, fh)
 
 
+def _zip_source(tree: Path, version: str, target: Path) -> None:
+    """Write the deterministic Windows ZIP release archive from the exported tree.
+
+    Windows' bootstrap expects ``qubit-release.zip`` and refuses symlink
+    entries, so tracked symlinks are omitted (the POSIX tar keeps them).
+    """
+    prefix = SOURCE_ARCHIVE_PREFIX % version
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+        for path in sorted(tree.rglob("*")):
+            if path.is_symlink() or not path.is_file():
+                continue
+            rel = path.relative_to(tree).as_posix()
+            info = zipfile.ZipInfo(prefix + rel, date_time=(2000, 1, 1, 0, 0, 0))
+            mode = 0o755 if os.access(path, os.X_OK) else 0o644
+            info.external_attr = (mode & 0xFFFF) << 16
+            info.compress_type = zipfile.ZIP_DEFLATED
+            bundle.writestr(info, path.read_bytes())
+
+
+def _build_release_payloads(repo: Path, source_tree: Path, source_archive: Path,
+                            version: str, out: Path) -> list[Path]:
+    """Publish the POSIX and Windows bootstrap asset pairs into *out*.
+
+    Both bootstraps consume a source archive whose ``scripts/install.*`` is
+    byte-identical to the published installer. The source tree used here is the
+    same sanitized export used for the source archive, so the archive and the
+    asset are guaranteed to agree.
+    """
+    payloads: list[Path] = []
+    for name in ("bootstrap.sh", "bootstrap.ps1", "install.sh", "install.ps1"):
+        source = repo / "scripts" / name
+        if not source.is_file():
+            raise ReleaseError("release asset source is missing: %s" % source)
+        target = out / name
+        shutil.copy2(source, target)
+        payloads.append(target)
+
+    posix_archive = out / "qubit-release.tar.gz"
+    shutil.copy2(source_archive, posix_archive)
+    payloads.append(posix_archive)
+
+    windows_archive = out / "qubit-release.zip"
+    _zip_source(source_tree, version, windows_archive)
+    payloads.append(windows_archive)
+
+    # The bootstrap verifies the extracted installer against the published
+    # asset before executing it; catch a mismatch at preparation time too.
+    import zipfile as _zipfile
+    import tarfile as _tarfile
+
+    with _tarfile.open(posix_archive, "r:gz") as bundle:
+        members = [m for m in bundle.getmembers()
+                   if m.name == "scripts/install.sh"
+                   or m.name.endswith("/scripts/install.sh")]
+        if not members:
+            raise ReleaseError("qubit-release.tar.gz has no scripts/install.sh")
+        member = sorted(members, key=lambda m: (len(m.name), m.name))[0]
+        handle = bundle.extractfile(member)
+        embedded = hashlib.sha256(handle.read()).hexdigest() if handle else ""
+    if embedded != sha256(out / "install.sh"):
+        raise ReleaseError("qubit-release.tar.gz installer does not match install.sh")
+
+    with _zipfile.ZipFile(windows_archive) as bundle:
+        members = [name for name in bundle.namelist()
+                   if name == "scripts/install.ps1"
+                   or name.endswith("/scripts/install.ps1")]
+        if not members:
+            raise ReleaseError("qubit-release.zip has no scripts/install.ps1")
+        member = sorted(members, key=lambda name: (len(name), name))[0]
+        embedded = hashlib.sha256(bundle.read(member)).hexdigest()
+    if embedded != sha256(out / "install.ps1"):
+        raise ReleaseError("qubit-release.zip installer does not match install.ps1")
+    return payloads
+
+
+def _run_release_gate(repo: Path, out: Path) -> dict:
+    """Run the fresh-install gate against the built release; refuse on anything but PASS."""
+    cmd = [
+        sys.executable,
+        str(repo / "scripts" / "release_fresh_install_gate.py"),
+        "--repo", str(repo),
+        "--release-dir", str(out),
+        "--fresh-install",
+        "--require-fresh-install",
+        "--json",
+    ]
+    proc = _run(cmd, timeout=7200, cwd=repo)
+    text = proc.stdout or ""
+    try:
+        report = json.loads(text)
+    except json.JSONDecodeError:
+        (out / "release-gate.raw.txt").write_text(
+            text + "\n" + (proc.stderr or ""), encoding="utf-8"
+        )
+        raise ReleaseError(
+            "release gate did not return JSON (rc=%s): %s"
+            % (proc.returncode, (proc.stderr or text)[-2000:])
+        )
+    (out / "release-gate-report.json").write_text(
+        json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    if proc.returncode != 0 or report.get("verdict") != "PASS":
+        failed = [
+            check for check in report.get("checks", [])
+            if check.get("state") != "OK"
+        ]
+        detail = "; ".join(
+            "%s=%s %s" % (check.get("name"), check.get("state"),
+                          check.get("detail", ""))
+            for check in failed[:10]
+        )
+        raise ReleaseError(
+            "release gate did not PASS: verdict=%s rc=%s %s"
+            % (report.get("verdict"), proc.returncode, detail)
+        )
+    return report
+
+
 def _component_manifest(repo: Path, release: dict, source: dict,
                         artifacts: list[dict], qualify: dict,
                         tree: dict) -> dict:
@@ -495,6 +620,9 @@ def prepare(repo: Path, out: Path, version: str | None = None,
     try:
         source_archive = out / ("Qubit-%s-source.tar.gz" % release["version"])
         _tar_source(source_tree, release["version"], source_archive)
+        release_payloads = _build_release_payloads(
+            repo, source_tree, source_archive, release["version"], out
+        )
     finally:
         shutil.rmtree(source_tree.parent, ignore_errors=True)
 
@@ -503,6 +631,13 @@ def prepare(repo: Path, out: Path, version: str | None = None,
                        ("source", source_archive)):
         manifest_artifacts.append({
             "kind": kind,
+            "name": path.name,
+            "sha256": sha256(path),
+            "size_bytes": path.stat().st_size,
+        })
+    for path in release_payloads:
+        manifest_artifacts.append({
+            "kind": "release-asset",
             "name": path.name,
             "sha256": sha256(path),
             "size_bytes": path.stat().st_size,
@@ -521,10 +656,29 @@ def prepare(repo: Path, out: Path, version: str | None = None,
         _release_notes(release, tree, manifest_artifacts), encoding="utf-8"
     )
 
+    # The gate reads SHA256SUMS and the built assets, so publish the initial
+    # manifest/checksums first, then run it. The final checksum set is rewritten
+    # afterwards to include the gate report itself.
     sums = out / "SHA256SUMS"
+    _write_sha256sums(
+        [artifacts["wheel"], artifacts["sdist"], source_archive,
+         *release_payloads, component_path, notes_path],
+        sums,
+    )
+    gate_report = _run_release_gate(repo, out)
+
+    component["verification"]["release_fresh_install_gate"] = {
+        "verdict": gate_report.get("verdict"),
+        "schema": gate_report.get("schema"),
+        "checks": gate_report.get("checks", []),
+    }
+    component_path.write_text(
+        json.dumps(component, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     records = _write_sha256sums(
         [artifacts["wheel"], artifacts["sdist"], source_archive,
-         component_path, notes_path],
+         *release_payloads, component_path, notes_path,
+         out / "release-gate-report.json"],
         sums,
     )
     _verify_sha256sums(out)
@@ -536,6 +690,7 @@ def prepare(repo: Path, out: Path, version: str | None = None,
         "tag_state": tag_state,
         "source": {"commit": tree["head"], "branch": tree["branch"]},
         "verification": {"release_qualify": qualify.get("verdict"),
+                         "release_fresh_install_gate": gate_report.get("verdict"),
                          "sha256sums": "OK"},
         "assets": records,
         "paths": {
@@ -549,7 +704,7 @@ def prepare(repo: Path, out: Path, version: str | None = None,
             "release_report": str(qualify_dir / "release-report.json"),
         },
         "next": [
-            "Review component-manifest.json and release-notes.md.",
+            "Review component-manifest.json, release-notes.md and release-gate-report.json.",
             "Owner: create/push the tag only after the release commit lands on production.",
             "Owner: dispatch .github/workflows/promote-release.yml with that tag; it "
             "creates/updates a DRAFT release only.",
