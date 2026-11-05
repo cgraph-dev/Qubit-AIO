@@ -1,42 +1,44 @@
-import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { Locale, Translations } from "./types";
 import { en } from "./en";
-import { zh } from "./zh";
-import { zhHant } from "./zh-hant";
-import { ja } from "./ja";
-import { de } from "./de";
-import { es } from "./es";
-import { fr } from "./fr";
-import { tr } from "./tr";
-import { uk } from "./uk";
-import { af } from "./af";
-import { ko } from "./ko";
-import { it } from "./it";
-import { ga } from "./ga";
-import { pt } from "./pt";
-import { ru } from "./ru";
-import { hu } from "./hu";
-import { ar } from "./ar";
 
-const TRANSLATIONS: Record<Locale, Translations> = {
-  en,
-  zh,
-  "zh-hant": zhHant,
-  ja,
-  de,
-  es,
-  fr,
-  tr,
-  uk,
-  af,
-  ko,
-  it,
-  ga,
-  pt,
-  ru,
-  hu,
-  ar,
+// Only the default dictionary is in the initial bundle. Every other locale is
+// a dynamic import, so a first load downloads ~one dictionary instead of all
+// seventeen (the previous eager map was the second-largest chunk in the
+// dashboard shell). The active locale is loaded before first paint in
+// `main.tsx`, and a switch loads the chosen dictionary before swapping it in,
+// so a user never sees a partially translated frame.
+const LOCALE_LOADERS: Record<Locale, () => Promise<Translations>> = {
+  en: async () => en,
+  zh: () => import("./zh").then((m) => m.zh),
+  "zh-hant": () => import("./zh-hant").then((m) => m.zhHant),
+  ja: () => import("./ja").then((m) => m.ja),
+  de: () => import("./de").then((m) => m.de),
+  es: () => import("./es").then((m) => m.es),
+  fr: () => import("./fr").then((m) => m.fr),
+  tr: () => import("./tr").then((m) => m.tr),
+  uk: () => import("./uk").then((m) => m.uk),
+  af: () => import("./af").then((m) => m.af),
+  ko: () => import("./ko").then((m) => m.ko),
+  it: () => import("./it").then((m) => m.it),
+  ga: () => import("./ga").then((m) => m.ga),
+  pt: () => import("./pt").then((m) => m.pt),
+  ru: () => import("./ru").then((m) => m.ru),
+  hu: () => import("./hu").then((m) => m.hu),
+  ar: () => import("./ar").then((m) => m.ar),
 };
+
+export function loadTranslations(locale: Locale): Promise<Translations> {
+  return (LOCALE_LOADERS[locale] ?? LOCALE_LOADERS.en)();
+}
 
 // Locales whose script flows right-to-left. Consumed by the provider to set the
 // document direction so Tailwind's logical utilities (ms-/me-, ps-/pe-) flip.
@@ -71,7 +73,7 @@ export const LOCALE_META: Record<Locale, { name: string }> = {
   ar: { name: "العربية" },
 };
 
-const SUPPORTED_LOCALES = Object.keys(TRANSLATIONS) as Locale[];
+const SUPPORTED_LOCALES = Object.keys(LOCALE_META) as Locale[];
 const STORAGE_KEY = "qubit-locale";
 /** Pre-rebrand key, migrated one-time on first read so existing users keep
  *  their saved locale. */
@@ -81,7 +83,7 @@ function isLocale(value: string): value is Locale {
   return (SUPPORTED_LOCALES as string[]).includes(value);
 }
 
-function getInitialLocale(): Locale {
+export function getInitialLocale(): Locale {
   try {
     let stored = localStorage.getItem(STORAGE_KEY);
     if (stored === null) {
@@ -111,28 +113,86 @@ const I18nContext = createContext<I18nContextValue>({
   t: en,
 });
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
+interface I18nProviderProps {
+  children: ReactNode;
+  /** Preloaded locale, used by `main.tsx` so the first paint is already in the
+   *  saved language instead of flashing English. */
+  initialLocale?: Locale;
+  initialTranslations?: Translations;
+}
+
+export function I18nProvider({
+  children,
+  initialLocale,
+  initialTranslations,
+}: I18nProviderProps) {
+  const [state, setState] = useState<{ locale: Locale; t: Translations }>(
+    () => ({
+      locale: initialLocale ?? getInitialLocale(),
+      t: initialTranslations ?? en,
+    }),
+  );
+  const stateRef = useRef(state);
+  stateRef.current = state;
+  const requestId = useRef(0);
+
+  // Tests and embedders may render the provider without preloading; hydrate a
+  // saved non-English locale once on mount. In the app this is a no-op because
+  // main.tsx already supplied the matching dictionary.
+  useEffect(() => {
+    if (initialTranslations) return;
+    const locale = stateRef.current.locale;
+    if (locale === "en") return;
+    const id = ++requestId.current;
+    void loadTranslations(locale)
+      .then((t) => {
+        if (requestId.current === id) setState({ locale, t });
+      })
+      .catch(() => {
+        // A failed locale chunk falls back to English rather than a blank UI.
+        if (requestId.current === id) setState({ locale: "en", t: en });
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setLocale = useCallback((l: Locale) => {
-    setLocaleState(l);
-    try {
-      localStorage.setItem(STORAGE_KEY, l);
-    } catch {
-      // ignore
+    if (l === stateRef.current.locale) return;
+    if (l === "en") {
+      requestId.current += 1;
+      setState({ locale: "en", t: en });
+      try {
+        localStorage.setItem(STORAGE_KEY, l);
+      } catch {
+        // ignore
+      }
+      return;
     }
+    const id = ++requestId.current;
+    void loadTranslations(l)
+      .then((t) => {
+        if (requestId.current !== id) return;
+        setState({ locale: l, t });
+        try {
+          localStorage.setItem(STORAGE_KEY, l);
+        } catch {
+          // ignore
+        }
+      })
+      .catch(() => {
+        // Keep the current language; do not persist a choice that cannot load.
+      });
   }, []);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
-    document.documentElement.lang = locale;
-    document.documentElement.dir = RTL_LOCALES.has(locale) ? "rtl" : "ltr";
-  }, [locale]);
+    document.documentElement.lang = state.locale;
+    document.documentElement.dir = RTL_LOCALES.has(state.locale) ? "rtl" : "ltr";
+  }, [state.locale]);
 
   const value: I18nContextValue = {
-    locale,
+    locale: state.locale,
     setLocale,
-    t: TRANSLATIONS[locale],
+    t: state.t,
   };
 
   return (
