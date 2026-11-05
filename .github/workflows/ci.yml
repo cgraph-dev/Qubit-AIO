@@ -106,7 +106,7 @@ jobs:
           qubit_runtime/tools
           qubit_runtime/agent
           qubit_runtime/tui_gateway
-          qubit_runtime/qubit_state
+          qubit_runtime/qubit_state*.py
           voicebridge
           scripts
       - name: Parse-check the runtime test tree
