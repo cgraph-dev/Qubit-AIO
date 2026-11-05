@@ -17,6 +17,7 @@ PUBLIC_DOCS = (
     "TROUBLESHOOTING.md",
     "SECURITY.md",
     "CONTRIBUTING.md",
+    "docs/UPDATE.md",
 )
 
 # Built at runtime so the operator marker never appears verbatim in the

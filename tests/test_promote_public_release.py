@@ -18,6 +18,7 @@ PUBLIC_DOCS = (
     "docs/OFFICE-DEPLOYMENT-CONTRACT.md",
     "docs/ORB_FX_SPEC.md",
     "docs/QUBIT-TV.md",
+    "docs/UPDATE.md",
 )
 
 

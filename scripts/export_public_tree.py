@@ -90,6 +90,7 @@ PUBLIC_DOC_FILES = frozenset({
     "docs/OFFICE-DEPLOYMENT-CONTRACT.md",
     "docs/ORB_FX_SPEC.md",
     "docs/QUBIT-TV.md",
+    "docs/UPDATE.md",
 })
 
 #: Tracked product build output that MUST ship even though it lives under a
