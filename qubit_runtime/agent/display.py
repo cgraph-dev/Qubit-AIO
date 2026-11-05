@@ -10,6 +10,7 @@ import sys
 import threading
 import time
 from dataclasses import dataclass, field, replace
+from functools import lru_cache
 from difflib import unified_diff
 from pathlib import Path
 from typing import Any, Iterator
@@ -152,6 +153,11 @@ def set_friendly_tool_labels(enabled: bool) -> None:
     _friendly_tool_labels = bool(enabled)
 
 
+def friendly_tool_labels_enabled() -> bool:
+    """Whether friendly labels are on (a replay-preview cache key component)."""
+    return _friendly_tool_labels
+
+
 def get_skin_tool_prefix() -> str:
     """Get tool output prefix character from active skin."""
     skin = _get_skin()
@@ -226,7 +232,15 @@ def _scan_quoted(text: str) -> Iterator[tuple[int, str, bool]]:
             yield i, ch, False
 
 
-def _split_shell_words(segment: str) -> list[str]:
+# Shell replays re-split the same segment several times per preview (pipe-tail strip,
+# redirect clean, head word, boundary echo). The splitter is pure, so a bounded memo
+# turns those repeated scans into one. Long inputs (agent code blocks) skip the cache
+# so a single huge command cannot pin memory.
+_SHELL_SPLIT_CACHE_MAX_CHARS = 2048
+_SHELL_COMPOUND_CACHE_MAX_CHARS = 4096
+
+
+def _split_shell_words_uncached(segment: str) -> list[str]:
     parts: list[list[str]] = [[]]
     for _, ch, quoted in _scan_quoted(segment):
         if not quoted and ch.isspace():
@@ -234,6 +248,17 @@ def _split_shell_words(segment: str) -> list[str]:
         else:
             parts[-1].append(ch)
     return ["".join(p) for p in parts if p]
+
+
+@lru_cache(maxsize=4096)
+def _cached_split_shell_words(segment: str) -> tuple[str, ...]:
+    return tuple(_split_shell_words_uncached(segment))
+
+
+def _split_shell_words(segment: str) -> list[str]:
+    if len(segment) > _SHELL_SPLIT_CACHE_MAX_CHARS:
+        return _split_shell_words_uncached(segment)
+    return list(_cached_split_shell_words(segment))
 
 
 def _strip_shell_pipe_tail(segment: str) -> str:
@@ -246,7 +271,7 @@ def _strip_shell_pipe_tail(segment: str) -> str:
     return " ".join(words).strip()
 
 
-def _split_shell_compound(command: str) -> list[str]:
+def _split_shell_compound_uncached(command: str) -> tuple[str, ...]:
     """Split on unquoted ``&&`` / ``||`` / ``;`` / newline, dropping pipe tails per segment."""
     raw: list[list[str]] = [[]]
     skip = False
@@ -261,7 +286,19 @@ def _split_shell_compound(command: str) -> list[str]:
         else:
             raw[-1].append(ch)
     segments = (_strip_shell_pipe_tail("".join(buf).strip()) for buf in raw)
-    return [s for s in segments if s]
+    return tuple(s for s in segments if s)
+
+
+@lru_cache(maxsize=2048)
+def _cached_split_shell_compound(command: str) -> tuple[str, ...]:
+    return _split_shell_compound_uncached(command)
+
+
+def _split_shell_compound(command: str) -> tuple[str, ...]:
+    """Split on unquoted ``&&`` / ``||`` / ``;`` / newline, dropping pipe tails per segment."""
+    if len(command) > _SHELL_COMPOUND_CACHE_MAX_CHARS:
+        return _split_shell_compound_uncached(command)
+    return _cached_split_shell_compound(command)
 
 
 def _shell_head_word(segment: str) -> str:
