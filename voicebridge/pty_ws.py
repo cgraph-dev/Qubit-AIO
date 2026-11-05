@@ -520,6 +520,13 @@ def _write_terminal_profile_config(qubit_home: Any,
         else:
             model_cfg.pop("base_url", None)
         data["model"] = model_cfg
+        # A fresh local profile has no base_url of its own, so this write can
+        # create a runtime config that names ``provider: ollama`` without an
+        # endpoint. Fill the safe local defaults (never overwriting a value the
+        # user already set) so the vendored resolver can reach the local brain.
+        from .providers.local_defaults import ensure_ollama_provider_defaults
+
+        ensure_ollama_provider_defaults(data, provider=provider)
         cfg_path.parent.mkdir(parents=True, exist_ok=True)
         from .config import secure_config_permissions
 
