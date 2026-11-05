@@ -126,7 +126,7 @@ export function ChatSessionList({
   source = "chat",
 }: ChatSessionListProps) {
   const { t } = useI18n();
-  const [, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [sessions, setSessions] = useState<ChatStoreSession[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -304,12 +304,16 @@ export function ChatSessionList({
     );
   }, [activeSessionId, orderedSessions]);
 
-  // Picking a row sets `/chat?resume=<id>`. Re-picking the row already in
-  // the terminal is a no-op (avoids a needless PTY teardown).
+  // Picking a row sets `/chat?resume=<id>`. Re-picking the row the URL already
+  // targets is a no-op (avoids a needless PTY teardown). The check is against
+  // the URL, not the `activeSessionId` PROP: the prop can be a host-only
+  // sentinel or a transient target with no `?resume=` in the address bar, and
+  // treating that as "already selected" swallowed a real click so the resume
+  // was never written (a reload then landed somewhere else).
   const pick = useCallback(
     (id: string) => {
       onPicked?.();
-      if (id === activeSessionId) return;
+      if (id === (searchParams.get("resume") ?? "")) return;
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -319,7 +323,7 @@ export function ChatSessionList({
         { replace: false },
       );
     },
-    [activeSessionId, onPicked, setSearchParams],
+    [onPicked, searchParams, setSearchParams],
   );
 
   // "New chat" prefers ChatPage's robust handler (clears resume + forces a

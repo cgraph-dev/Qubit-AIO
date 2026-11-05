@@ -479,6 +479,12 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const resumeParam = searchParams.get("resume");
+  // Read the CURRENT URL target from async callbacks (a New-chat mint can
+  // settle after the operator has already picked another session). Kept in a
+  // ref updated every render so the mint compares against what is on screen
+  // now, not the value captured when the request started.
+  const resumeParamRef = useRef<string | null>(null);
+  resumeParamRef.current = resumeParam;
   const session = useMemo(
     () => (resumeParam || storageGet(SESSION_KEY) || DEFAULT_SESSION).slice(0, 80),
     [resumeParam],
@@ -614,6 +620,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // surfacing the freshly created session immediately (its internal fetch only
   // runs on mount / manual Refresh).
   const [sessionListNonce, setSessionListNonce] = useState(0);
+  // One New-chat mint at a time. A second press while the create request is in
+  // flight used to fire another POST and mint a second empty session; the
+  // last response also won the URL, so a rapid double press left an orphan
+  // row and a highlight that could jump. The sequence number additionally
+  // fences a response that settles after the operator has picked another
+  // session (that pick must win; the unused fresh row is removed).
+  const freshMintSeqRef = useRef(0);
+  const freshMintPendingRef = useRef(false);
   // True while the surface sits on a DELIBERATE fresh chat (New chat pressed,
   // nothing resumed yet). Drives the session panel's `activeSessionId` so it
   // renders no highlight while the mint round-trips, instead of falling back to
@@ -1380,6 +1394,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // on the canonical default for continuity. A failed mint surfaces a typed
   // error and leaves the current session untouched.
   const startFresh = useCallback(() => {
+    // Rapid repeats (a double click) must mint ONE session. While the create
+    // request is in flight a second press is ignored instead of firing a
+    // second POST and stranding an empty `dashboard-*` row in the store.
+    if (freshMintPendingRef.current) return;
+    freshMintPendingRef.current = true;
+    const mintSeq = ++freshMintSeqRef.current;
+    // The URL target at press time: if the operator picks another session
+    // while this request is in flight, the pick wins.
+    const resumeAtStart = resumeParamRef.current;
     setMessages([]);
     setError(null);
     setRetryText(null);
@@ -1405,9 +1428,22 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       .createChatSession()
       .then((res) => {
         const newId = res?.session?.id;
+        if (mintSeq !== freshMintSeqRef.current) {
+          // Superseded by a newer mint: discard the row it created so a
+          // double press cannot leave an orphan conversation behind.
+          if (newId) void api.deleteChatSession(newId).catch(() => {});
+          return;
+        }
         if (!newId) {
           // No id to point at: stay fresh rather than snapping the highlight
           // back to an unrelated live session.
+          return;
+        }
+        if (resumeParamRef.current !== resumeAtStart) {
+          // A session row was picked while this mint was in flight. Keep the
+          // operator's selection on screen (a stale create response must
+          // never yank the URL back) and remove the now-unused fresh row.
+          void api.deleteChatSession(newId).catch(() => {});
           return;
         }
         // Persist first so a reload lands on the fresh session even before the
@@ -1434,6 +1470,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             err instanceof Error ? err.message : String(err)
           }`,
         );
+      })
+      .finally(() => {
+        if (mintSeq === freshMintSeqRef.current) {
+          freshMintPendingRef.current = false;
+        }
       });
   }, [setSearchParams]);
 

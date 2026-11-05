@@ -203,6 +203,28 @@ describe("ChatSessionList", () => {
     );
   });
 
+  it("persists a click on the active row when the URL has no resume", async () => {
+    // Regression: the click guard compared against the `activeSessionId`
+    // PROP, which can name the open session while the address bar carries no
+    // `?resume=` (a host-only transient target). The click was swallowed as
+    // "already selected" and the resume was never written, so a reload landed
+    // on a different session. Only the URL target may make a pick a no-op.
+    await renderList("chat-1");
+    await vi.waitFor(() =>
+      expect(container.textContent).toContain("First chat"),
+    );
+    await act(async () => {
+      container
+        .querySelector('[data-testid="session-row"]')!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await vi.waitFor(() =>
+      expect(container.querySelector('[data-testid="location"]')?.textContent).toBe(
+        "?resume=chat-1",
+      ),
+    );
+  });
+
   it("refetches on Refresh", async () => {
     await renderList();
     await vi.waitFor(() =>

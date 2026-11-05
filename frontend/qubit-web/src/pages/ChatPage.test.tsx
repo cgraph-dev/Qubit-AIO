@@ -12,7 +12,7 @@
  */
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useSearchParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const capturedSessionListProps = vi.hoisted(
@@ -63,6 +63,7 @@ const apiMocks = vi.hoisted(() => ({
     session: { id: "fresh-after-switch" },
     ok: true,
   })),
+  deleteChatSession: vi.fn(async () => ({ ok: true })),
 }));
 
 const streamChatTurn = vi.hoisted(() => vi.fn());
@@ -82,6 +83,7 @@ vi.mock("@/lib/api", () => ({
     getChatSession: apiMocks.getChatSession,
     patchChatSession: apiMocks.patchChatSession,
     createChatSession: apiMocks.createChatSession,
+    deleteChatSession: apiMocks.deleteChatSession,
   },
   // Transcript reads go through the backoff wrapper; mocked transports
   // never transiently fail, so a first-attempt passthrough matches the
@@ -228,6 +230,35 @@ async function renderChatAt(path: string) {
   );
 }
 
+/**
+ * URL probe + a "pick a recent session" control, standing in for the real
+ * `ChatSessionList` row click (which the test suite mocks out here).
+ */
+function SessionPickProbe({ pickId = "voice-picked" }: { pickId?: string }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  return (
+    <>
+      <span data-testid="location">{searchParams.toString()}</span>
+      <button
+        data-testid="pick-session"
+        onClick={() => setSearchParams({ resume: pickId })}
+      >
+        pick session
+      </button>
+    </>
+  );
+}
+
+async function renderChatWithProbe(path: string, pickId?: string) {
+  const { default: ChatPage } = await import("./ChatPage");
+  await render(
+    <MemoryRouter initialEntries={[path]}>
+      <ChatPage isActive />
+      <SessionPickProbe pickId={pickId} />
+    </MemoryRouter>,
+  );
+}
+
 function textarea(): HTMLTextAreaElement {
   return container.querySelector("textarea") as HTMLTextAreaElement;
 }
@@ -273,6 +304,13 @@ beforeEach(() => {
     message_count: 0,
     meta: {},
   } as never);
+  apiMocks.createChatSession.mockReset();
+  apiMocks.createChatSession.mockResolvedValue({
+    session: { id: "fresh-after-switch" },
+    ok: true,
+  });
+  apiMocks.deleteChatSession.mockReset();
+  apiMocks.deleteChatSession.mockResolvedValue({ ok: true });
   apiMocks.getStatus.mockReset();
   apiMocks.getStatus.mockResolvedValue({ gateway_state: "stopped" });
   apiMocks.getLogs.mockReset();
@@ -1051,5 +1089,104 @@ describe("Qubit ChatPage", () => {
       expect(last?.terminalModel?.model).toBe("newprov/newmodel");
     });
     expect(container.textContent).toContain("Start a new run.");
+  });
+});
+
+describe("ChatPage New chat mint reliability", () => {
+  it("mints exactly one session for a repeated New-chat press", async () => {
+    // Regression: every press fired `createChatSession`, so a double click
+    // minted two `dashboard-*` sessions and the panel could land on either.
+    let resolveCreate!: (value: {
+      session: { id: string };
+      ok: boolean;
+    }) => void;
+    apiMocks.createChatSession.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveCreate = resolve; }),
+    );
+
+    await renderChatWithProbe("/qubit-chat?resume=voice-old");
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector('button[aria-label="Start a new chat session"]'),
+      ).not.toBeNull(),
+    );
+
+    await act(async () => {
+      const btn = container.querySelector<HTMLButtonElement>(
+        'button[aria-label="Start a new chat session"]',
+      );
+      btn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      btn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    // The second press is coalesced while the first POST is in flight.
+    expect(apiMocks.createChatSession).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolveCreate({ session: { id: "fresh-one" }, ok: true });
+      await Promise.resolve();
+    });
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="location"]')?.textContent,
+      ).toContain("resume=fresh-one"),
+    );
+    expect(apiMocks.deleteChatSession).not.toHaveBeenCalled();
+  });
+
+  it("keeps a session picked while New chat is still minting", async () => {
+    // Regression: a slow `createChatSession` response landed after the
+    // operator had clicked another session, rewrote `?resume=` to the new
+    // empty session, and yanked the transcript off the chosen conversation.
+    let resolveCreate!: (value: {
+      session: { id: string };
+      ok: boolean;
+    }) => void;
+    apiMocks.createChatSession.mockImplementationOnce(
+      () => new Promise((resolve) => { resolveCreate = resolve; }),
+    );
+
+    await renderChatWithProbe("/qubit-chat?resume=voice-old");
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector('button[aria-label="Start a new chat session"]'),
+      ).not.toBeNull(),
+    );
+
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>(
+          'button[aria-label="Start a new chat session"]',
+        )
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    // Pick a real session before the mint settles.
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="pick-session"]')
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+    await vi.waitFor(() =>
+      expect(
+        container.querySelector('[data-testid="location"]')?.textContent,
+      ).toContain("resume=voice-picked"),
+    );
+
+    await act(async () => {
+      resolveCreate({ session: { id: "fresh-stale" }, ok: true });
+      await Promise.resolve();
+    });
+
+    // The pick still wins and the unused fresh row is cleaned up.
+    await vi.waitFor(() =>
+      expect(apiMocks.deleteChatSession).toHaveBeenCalledWith("fresh-stale"),
+    );
+    expect(
+      container.querySelector('[data-testid="location"]')?.textContent,
+    ).toContain("resume=voice-picked");
   });
 });
