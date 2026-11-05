@@ -123,6 +123,8 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `TEST_PORT_RECOVERY_2026-10-19.md` | Test-port recovery: lane B + lane A — honest account |
 | `UPDATE.md` | Qubit UPDATE — update channels, tags, apply/rollback, install shapes |
 | `V0.0.6-RELEASE-CHECKLIST.md` | v0.0.6 release checklist — the fresh-install contract and its gate |
+| `V0.0.7-RELEASE-CHECKLIST.md` | v0.0.7 release checklist — fresh-install + perf/cache contract |
+| `V0.0.8-RELEASE-CHECKLIST.md` | v0.0.8 release checklist — prewarm/warm-read cache delta and gate evidence |
 | `VENDOR-ATOMIC-PUBLISH-FIX.md` | Vendor publish-order fix (scripts/vendor_habblaud.py) |
 | `VENDOR-CONCURRENCY-EVIDENCE.md` | Vendor publish concurrency — measured evidence |
 | `VENDOR-REPRODUCIBILITY.md` | Vendor reproducibility — can the vendored tree be re-produced? (A9) |

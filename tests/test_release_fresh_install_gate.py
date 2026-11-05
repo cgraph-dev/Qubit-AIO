@@ -58,6 +58,13 @@ def _fixture_webui(immutable: bool = True, shell_cached: bool = False) -> str:
         "        self._file(rel, cache_control=cache_control)\n"
         "    def _serve_qubit_index(self):\n"
         "        self._send(200, b'shell', 'text/html; charset=utf-8'%s)\n"
+        "class WebUI:\n"
+        "    def start(self):\n"
+        "        self._prewarm_reads()\n"
+        "    def _prewarm_reads(self):\n"
+        "        os.environ.get('QUBIT_WEBUI_PREWARM', '1')\n"
+        "        return ('h_skills', 'h_status', 'h_terminal_profiles',\n"
+        "                'h_model_options', 'h_mcp_servers', 'h_office_tower')\n"
         % (cache, shell_arg)
     )
 
@@ -73,6 +80,7 @@ def _fixture_repo(
     write_config: bool = True,
     immutable_assets: bool = True,
     shell_cached: bool = False,
+    short_ttl: bool = False,
 ) -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -92,6 +100,23 @@ def _fixture_repo(
     _write(
         repo / "voicebridge" / "webui.py",
         _fixture_webui(immutable=immutable_assets, shell_cached=shell_cached),
+    )
+    office_ttl = 2.5 if short_ttl else 60.0
+    _write(
+        repo / "voicebridge" / "read_cache_ttls.py",
+        "".join(
+            "RC.put(key, out, RC.ttl_seconds(%r, %s))\n" % (name, ttl)
+            for name, ttl in (
+                ("skills", 300.0),
+                ("terminal_profiles", 300.0),
+                ("model_options", 300.0),
+                ("mcp_servers", 300.0),
+                ("office_tower", office_ttl),
+                ("device_inventory", 300.0),
+                ("marketplace", 300.0),
+                ("vision", 60.0),
+            )
+        ),
     )
     if dashboard:
         _write(repo / "frontend" / "qubit-dist" / "index.html", "<html></html>\n")
@@ -243,6 +268,25 @@ def test_perf_cache_contract_rejects_cached_token_shell(tmp_path: Path):
     by_name = {check.name: check for check in report.checks}
     assert by_name["perf_cache_static_contract"].state == "FAIL"
     assert "shell" in by_name["perf_cache_static_contract"].detail
+    assert report.verdict == "FAIL"
+
+
+def test_prewarm_cache_contract_passes(tmp_path: Path):
+    module = _load()
+    repo = _fixture_repo(tmp_path)
+    report = module.run_gate(repo=repo)
+    by_name = {check.name: check for check in report.checks}
+    assert by_name["prewarm_cache_contract"].state == "OK"
+    assert "prewarm" in by_name["prewarm_cache_contract"].detail
+
+
+def test_prewarm_cache_contract_requires_warm_ttls(tmp_path: Path):
+    module = _load()
+    repo = _fixture_repo(tmp_path, short_ttl=True)
+    report = module.run_gate(repo=repo)
+    by_name = {check.name: check for check in report.checks}
+    assert by_name["prewarm_cache_contract"].state == "FAIL"
+    assert "office_tower=2.5" in by_name["prewarm_cache_contract"].detail
     assert report.verdict == "FAIL"
 
 

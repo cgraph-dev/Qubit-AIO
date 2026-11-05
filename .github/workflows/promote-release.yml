@@ -79,6 +79,11 @@ jobs:
           path: |
             ${{ runner.temp }}/qubit-production-release/*.whl
             ${{ runner.temp }}/qubit-production-release/*.tar.gz
+            ${{ runner.temp }}/qubit-production-release/*.zip
+            ${{ runner.temp }}/qubit-production-release/bootstrap.sh
+            ${{ runner.temp }}/qubit-production-release/bootstrap.ps1
+            ${{ runner.temp }}/qubit-production-release/install.sh
+            ${{ runner.temp }}/qubit-production-release/install.ps1
             ${{ runner.temp }}/qubit-production-release/SHA256SUMS
             ${{ runner.temp }}/qubit-production-release/component-manifest.json
             ${{ runner.temp }}/qubit-production-release/release-notes.md
@@ -115,11 +120,14 @@ jobs:
           esac
           shopt -s nullglob
           assets=(release-assets/*.whl release-assets/*.tar.gz \
+                  release-assets/*.zip \
+                  release-assets/bootstrap.sh release-assets/bootstrap.ps1 \
+                  release-assets/install.sh release-assets/install.ps1 \
                   release-assets/SHA256SUMS \
                   release-assets/component-manifest.json \
                   release-assets/release-notes.md \
                   release-assets/release-summary.json)
-          test "${#assets[@]}" -ge 6
+          test "${#assets[@]}" -ge 12
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
                       --json isDraft --jq '.isDraft')"
