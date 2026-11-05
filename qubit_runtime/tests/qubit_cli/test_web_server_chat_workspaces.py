@@ -75,6 +75,9 @@ def test_resolve_chat_cwd_fails_closed_and_reaches_the_tui_env(monkeypatch, tmp_
     _argv, _cwd, env = web_server_chat._resolve_chat_argv(workspace_cwd=picked)
     assert env["HERMES_CWD"] == str(tmp_path)
     assert env["HERMES_TUI_CWD"] == str(tmp_path)
+    from voicebridge.product import PRODUCT_VERSION
+    assert env["QUBIT_VERSION"] == PRODUCT_VERSION
 
     _argv, _cwd, env = web_server_chat._resolve_chat_argv()
     assert "HERMES_TUI_CWD" not in env
+    assert env["QUBIT_VERSION"] == PRODUCT_VERSION
