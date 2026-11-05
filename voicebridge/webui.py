@@ -1114,6 +1114,11 @@ QUBIT_READ_AUTHORITY: tuple = (
     # honest local/token state (typed UNAVAILABLE) instead of a fork proxy
     # answer that would imply the reference capability exists.
     "/api/webapp-access/status",
+    # Desktop-plugin reads: the vendored routes exist but the dashboard
+    # surface's policy keeps them off, so the fork proxy always answers 404.
+    # The compat handlers call the same audited vendored helpers over the host
+    # tree (read-only; reconcile is a typed refusal).
+    "/api/desktop-plugins",
 )
 
 
