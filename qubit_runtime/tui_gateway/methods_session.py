@@ -637,6 +637,10 @@ class _Resume:
         self.omit_messages, self.eager_build = _flag(params, "omit_messages"), _flag(params, "eager_build")
         # inline_images=False renders image parts as "[image]" (#116511); default keeps data URIs.
         self.inline_images = "inline_images" not in params or _flag(params, "inline_images")
+        # Friendly tool labels are Desktop-only payload: the TUI's history replay reads only the
+        # tool name and ``context`` preview, so building labels for it is wasted work on every
+        # resumed turn (they stay on the live event path). Keep them for any non-TUI caller.
+        self.tool_labels = _resolve_session_source(_str_param(params, "source") or None) != "tui"
 
     def mint(self, prompts: bool = True) -> tuple:
         """``(runtime sid, source, cwd)`` for the live record this resume registers (+ gateway prompts on)."""
@@ -680,6 +684,20 @@ class _Resume:
         raw, display = self.read_history()
         return canonicalize_replay_history(raw), display, raw
 
+    def restore_bundle(self):
+        """``(sanitized model history, display history, ancestor prefix, raw history)``.
+
+        One lineage SELECT when the store supports :meth:`get_resume_bundle`; the standalone
+        projections remain the fallback for duck-typed DB doubles. ``omit_messages`` resumes
+        materialize the tip segment only, so they keep the narrow :meth:`read_history` path.
+        """
+        bundle = getattr(self.db, "get_resume_bundle", None)
+        if not self.omit_messages and callable(bundle):
+            raw, display, prefix = bundle(self.target)
+            return canonicalize_replay_history(raw), display, prefix, raw
+        raw, display = self.read_history()
+        return canonicalize_replay_history(raw), display, self.display_prefix(), raw
+
     def info(self, cwd: str, overrides: dict) -> dict:
         return _lazy_resume_info(cwd, model=(overrides.get("model_override") or {}).get("model") or "",
                                  provider=overrides.get("provider_override") or "", profile=self.profile)
@@ -690,7 +708,8 @@ class _Resume:
 
     def messages(self, display: list) -> list:
         return [] if self.omit_messages else _history_to_messages(
-            display, profile_home=self.profile_home, image_urls=self.inline_images)
+            display, profile_home=self.profile_home, image_urls=self.inline_images,
+            tool_labels=self.tool_labels)
 
     def read_history(self) -> tuple:
         """One lineage SELECT, two projections: model-fed copy alternation-repaired (healed once
@@ -895,7 +914,7 @@ def _resume_reuse_live_locked(ctx: _Resume, sid: str, session: dict) -> dict:
     _cancel_ws_orphan_reap(sid)  # unconditionally: the fast path must never race the reap Timer
     payload = _live_session_payload(sid, session, cols=ctx.cols, touch=True, omit_messages=ctx.omit_messages,
                                     transport=current_transport() or _stdio_transport,
-                                    inline_images=ctx.inline_images)
+                                    inline_images=ctx.inline_images, tool_labels=ctx.tool_labels)
     payload["resumed"] = ctx.target
     if ctx.defer_history:
         payload.update(messages=[], hydrating=bool(session.get("resume_hydrating")),
@@ -984,12 +1003,12 @@ def _resume_cold(ctx: _Resume) -> dict:
     prompt beats it. Unlike lazy, restores full ancestor history + persisted runtime identity."""
     sid, source, cwd = ctx.mint()
     try:
-        history, display_history, raw_history = ctx.restore()
+        history, display_history, display_history_prefix, raw_history = ctx.restore_bundle()
     except Exception as e:
         return _err(ctx.rid, 5000, resume_failed_message(e))
     with _profile_build_scope(ctx.profile_home):
         overrides = _stored_session_runtime_overrides(ctx.found)
-    record = ctx.record(source, cwd, history, overrides, display_history_prefix=ctx.display_prefix(),
+    record = ctx.record(source, cwd, history, overrides, display_history_prefix=display_history_prefix,
                         todo_state=_todo_state_from_history(history))
     if (reused := ctx.claim(sid, record)) is not None:
         return reused
@@ -1005,8 +1024,7 @@ def _resume_eager(ctx: _Resume) -> dict:
     sid, source, _cwd = ctx.mint()
     with _profile_build_scope(ctx.profile_home):
         try:
-            history, display_history, raw_history = ctx.restore()
-            display_history_prefix = ctx.display_prefix()
+            history, display_history, display_history_prefix, raw_history = ctx.restore_bundle()
             # Profile db so turns persist to the right state.db; stored runtime identity so switching chats does
             # not inherit another chat's global model.
             stored_runtime_overrides = _stored_session_runtime_overrides(ctx.found)
@@ -1182,7 +1200,8 @@ def _(rid, params: dict, session: dict) -> dict:
         with session["history_lock"]:
             _rebind_live_transport(sid, session, current_transport() or _stdio_transport)
     return _ok(rid, _live_session_payload(
-        sid, session, touch=True, omit_messages=is_truthy_value(params.get("omit_messages", False))))
+        sid, session, touch=True, omit_messages=is_truthy_value(params.get("omit_messages", False)),
+        tool_labels=_resolve_session_source(_str_param(params, "source") or None) != "tui"))
 
 
 @method("session.delete")

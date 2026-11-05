@@ -1668,8 +1668,24 @@ class SessionMessagesMixin(SessionDetachedResultsMixin, SessionTodoResultMixin):
         read as deleted even though every row is still on disk, and the REST transcript read (which has
         always included them) disagreed with this one about the same session (#92080).
         """
+        model_history, display_history, _prefix = self.get_resume_bundle(session_id)
+        return model_history, display_history
+
+    def get_resume_bundle(
+        self, session_id: str
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+        """``(model_history, display_history, ancestor_display_prefix)`` from ONE lineage SELECT.
+
+        :meth:`get_resume_conversations` and :meth:`get_ancestor_display_prefix` each used to fetch and
+        dedupe the whole lineage; a cold resume calls both, so a compacted conversation paid the full
+        transcript read twice. The ancestor prefix is the same display projection filtered to rows that
+        originate outside the tip segment, so it is derived here without a second read. The two public
+        projections stay byte-identical to their standalone methods.
+        """
+        session_ids = self._resume_lineage_ids(session_id)
         rows = self._fetch_conversation_rows(
-            self._resume_lineage_ids(session_id), "", with_session_id=True, with_compacted=True)
+            session_ids, "", with_session_id=True, with_compacted=True)
+        deduped = self._dedupe_display_generations(rows, drop_removed=True)
         # The model projection stays active-only: it is the compressed working context. The gateway's
         # first-turn ``session_meta`` marker (tools/model/platform bookkeeping) is transcript logging,
         # never LLM input: a resuming surface that fed it to the agent would count it in the history
@@ -1679,9 +1695,17 @@ class SessionMessagesMixin(SessionDetachedResultsMixin, SessionTodoResultMixin):
             session_id=session_id,
             include_ancestors=False, repair_alternation=True, include_row_ids=True, include_summary_markers=True)
         display_history = self._rows_to_conversation(
-            self._dedupe_display_generations(rows, drop_removed=True), session_id=session_id,
+            deduped, session_id=session_id,
             include_ancestors=True, repair_alternation=False, include_row_ids=True)
-        return model_history, display_history
+        if len(session_ids) <= 1:
+            return model_history, display_history, []
+        ancestor_ids = {int(row["id"]) for row in deduped
+                        if row["session_id"] != session_id and row["id"] is not None}
+        if not ancestor_ids:
+            return model_history, display_history, []
+        prefix = [{k: v for k, v in message.items() if k != "_row_id"}
+                  for message in display_history if message.get("_row_id") in ancestor_ids]
+        return model_history, display_history, prefix
 
     def _resume_lineage_ids(self, session_id: str) -> list[str]:
         """Session ids a display resume materializes: the VERIFIED compression lineage (root → tip; each
