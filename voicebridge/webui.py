@@ -1396,6 +1396,76 @@ def _gzip_cache_put(key: tuple[str, int, int], body: bytes) -> None:
             _GZIP_CACHE_BYTES -= len(evicted)
 
 
+#: Proxy-first reads that are expensive enough to snapshot. ``/api/config``
+#: re-normalizes the whole runtime config on every request; the rest of the
+#: proxy-first reads also start the in-process ASGI bridge, which the prewarm
+#: below absorbs. Only exact paths are listed so no credential-bearing read is
+#: ever cached.
+_PROXIED_READ_CACHE_PATHS = frozenset({"/api/config"})
+
+
+def _proxied_read_cache_key(cfg: Any, method: str, path: str,
+                            query: Dict[str, str]) -> Any:
+    """Profile/home-scoped identity for one proxied read.
+
+    Shares the ``config`` namespace with the compat settings read so the
+    config-save invalidation clears both, and folds in the config stores so a
+    write from another process changes the key.
+    """
+    from . import read_cache as RC
+
+    extra = []
+    try:
+        from . import qubit_runtime as QR
+        home = QR.runtime_home_for_cfg(cfg)
+        if home is not None:
+            extra.append(Path(home) / "config.yaml")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from . import qubit_compat as _HC
+        extra.append(Path(_HC._config_overrides_read_path(cfg)))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from .config import preferred_config_dir
+        extra.append(preferred_config_dir() / "voice.yaml")
+    except Exception:  # noqa: BLE001
+        pass
+    clean = path.split("?", 1)[0].rstrip("/") or "/"
+    return RC.cfg_key(cfg, "config", "proxied", method.upper(), clean,
+                      tuple(sorted(query.items())), RC.stamp_of(*extra))
+
+
+def _proxied_read_cache_get(cfg: Any, method: str, path: str,
+                            query: Dict[str, str]) -> Optional[Any]:
+    from . import read_cache as RC
+
+    if method.upper() != "GET":
+        return None
+    clean = path.split("?", 1)[0].rstrip("/") or "/"
+    if clean not in _PROXIED_READ_CACHE_PATHS:
+        return None
+    return RC.get(_proxied_read_cache_key(cfg, method, clean, query))
+
+
+def _proxied_read_cache_put(cfg: Any, method: str, path: str,
+                            query: Dict[str, str], code: int,
+                            hdrs: Dict[str, str], body: bytes) -> None:
+    from . import read_cache as RC
+
+    if method.upper() != "GET":
+        return
+    clean = path.split("?", 1)[0].rstrip("/") or "/"
+    if clean not in _PROXIED_READ_CACHE_PATHS:
+        return
+    if not (200 <= int(code) < 400):
+        return
+    RC.put(_proxied_read_cache_key(cfg, method, clean, query),
+           (int(code), dict(hdrs), bytes(body)),
+           RC.ttl_seconds("config", 300.0))
+
+
 class WebUIHandler(BaseHTTPRequestHandler):
     server_version = "VoiceDashboard/1.0"
 
@@ -3262,9 +3332,17 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 from . import qubit_asgi as HA
                 if not HA.gated_path(api_path) and \
                         HA.safe_to_proxy(method, api_path):
-                    code, hdrs, rbody = HA.call(
-                        method, api_path, query=query,
-                        headers={"accept": "application/json"})
+                    cached = _proxied_read_cache_get(
+                        self.app.orch.cfg, method, api_path, query)
+                    if cached is not None:
+                        code, hdrs, rbody = cached
+                    else:
+                        code, hdrs, rbody = HA.call(
+                            method, api_path, query=query,
+                            headers={"accept": "application/json"})
+                        _proxied_read_cache_put(
+                            self.app.orch.cfg, method, api_path, query,
+                            code, hdrs, rbody)
                     # A 422 is the fork refusing to serve the read because the
                     # request shape does not match its own route contract (e.g.
                     # `/api/git/worktrees`, whose vendored route requires a
@@ -6161,10 +6239,15 @@ class WebUI:
         """Warm the expensive read-only dashboard inventories after boot.
 
         The first browser load asks for skills/status/terminal profiles/model
-        options/MCP/office together. Those reads are cached for the poll
-        window, but the first call is cold and can take seconds on a large
-        profile. Prime them in the background so opening Chat (new or resumed)
-        does not pay that one-time scan. Never blocks the listener and never
+        options/MCP/office and the System/Settings cards (gateway, approvals,
+        model info, toolsets, update check, config) together. Those reads are
+        cached for the poll window, but the first call is cold and can take
+        seconds on a large profile (a 1.9 MB approvals journal, a full runtime
+        config normalize, a systemd read, a model-metadata probe). Prime them
+        in the background so the first page load does not pay that one-time
+        scan. The proxy-first ``/api/config`` read is warmed through the same
+        handler/bridge the browser uses, so starting the in-process ASGI bridge
+        also moves off the request path. Never blocks the listener and never
         runs under pytest.
         """
         if os.environ.get("PYTEST_CURRENT_TEST"):
@@ -6180,13 +6263,24 @@ class WebUI:
             import time as _time
             from . import qubit_compat as compat
 
+            # ``live`` checks answer a process/service snapshot that an
+            # operator expects to move within seconds; they are refreshed on a
+            # short cadence and cached with a slightly longer TTL so the next
+            # page load always finds a hit. The ``slow`` inventories re-walk
+            # files/registries and only need the long cadence.
             checks = (
-                ("skills", compat.h_skills),
-                ("status", compat.h_status),
-                ("terminal_profiles", compat.h_terminal_profiles),
-                ("model_options", compat.h_model_options),
-                ("mcp_servers", compat.h_mcp_servers),
-                ("office_tower", compat.h_office_tower),
+                ("skills", compat.h_skills, "slow"),
+                ("status", compat.h_status, "slow"),
+                ("terminal_profiles", compat.h_terminal_profiles, "slow"),
+                ("model_options", compat.h_model_options, "slow"),
+                ("mcp_servers", compat.h_mcp_servers, "slow"),
+                ("office_tower", compat.h_office_tower, "slow"),
+                ("gateway", compat.h_gateway, "live"),
+                ("approvals", compat.h_approvals_list, "live"),
+                ("model_info", compat.h_model_info, "slow"),
+                ("toolsets", compat.h_toolsets, "slow"),
+                ("update_check", compat.h_qubit_update_check, "slow"),
+                ("config", compat.h_config, "slow"),
             )
             interval = 240.0
             raw = os.environ.get("QUBIT_WEBUI_PREWARM_INTERVAL_S")
@@ -6195,19 +6289,82 @@ class WebUI:
                     interval = max(0.0, float(raw))
                 except ValueError:
                     interval = 240.0
+            live_interval = 20.0
+            raw = os.environ.get("QUBIT_WEBUI_PREWARM_LIVE_INTERVAL_S")
+            if raw is not None:
+                try:
+                    live_interval = max(0.0, float(raw))
+                except ValueError:
+                    live_interval = 20.0
+            # A zero interval still runs the group once (the old contract),
+            # then disables only that group; negative is treated as zero.
+            slow_pending = True
+            live_pending = True
+            next_slow = 0.0
+            next_live = 0.0
             while True:
+                now = _time.monotonic()
+                run_slow = slow_pending or (interval > 0 and now >= next_slow)
+                run_live = live_pending or (
+                    live_interval > 0 and now >= next_live)
                 timings = {}
-                for name, handler in checks:
+                for name, handler, group in checks:
+                    if group == "live" and not run_live:
+                        continue
+                    if group == "slow" and not run_slow:
+                        continue
                     started = _time.monotonic()
                     try:
                         handler(cfg, {}, {}, {})
                     except Exception:  # noqa: BLE001 - prewarm is best-effort
                         log.debug("webui.prewarm.reads %s failed", name, exc_info=True)
                     timings[name] = round((_time.monotonic() - started) * 1000, 1)
-                log_event("webui.prewarm.reads", timings=timings)
-                if interval <= 0:
+                if run_slow:
+                    # The browser reads ``/api/config`` through the proxy-first
+                    # vendored backend, not the compat handler; warm that exact
+                    # path (and start the ASGI bridge off the request path).
+                    try:
+                        _backend_enabled = bool(cfg.get("webui", "qubit_backend",
+                                                       default=True))
+                    except Exception:  # noqa: BLE001 - config-less prewarm still runs
+                        _backend_enabled = True
+                    if _backend_enabled:
+                        started = _time.monotonic()
+                        try:
+                            from . import qubit_asgi as _HA
+                            if _HA.safe_to_proxy("GET", "/api/config") and \
+                                    _proxied_read_cache_get(
+                                        cfg, "GET", "/api/config", {}) is None:
+                                _code, _hdrs, _body = _HA.call(
+                                    "GET", "/api/config", query={},
+                                    headers={"accept": "application/json"})
+                                _proxied_read_cache_put(
+                                    cfg, "GET", "/api/config", {},
+                                    _code, _hdrs, _body)
+                        except Exception:  # noqa: BLE001 - prewarm is best-effort
+                            log.debug("webui.prewarm.reads config_proxy failed",
+                                      exc_info=True)
+                        timings["config_proxy"] = round(
+                            (_time.monotonic() - started) * 1000, 1)
+                if timings:
+                    log_event("webui.prewarm.reads", timings=timings)
+                if run_slow:
+                    slow_pending = False
+                    if interval > 0:
+                        next_slow = now + interval
+                if run_live:
+                    live_pending = False
+                    if live_interval > 0:
+                        next_live = now + live_interval
+                if interval <= 0 and live_interval <= 0:
                     return
-                _time.sleep(interval)
+                now = _time.monotonic()
+                waits = []
+                if interval > 0:
+                    waits.append(max(0.05, next_slow - now))
+                if live_interval > 0:
+                    waits.append(max(0.05, next_live - now))
+                _time.sleep(min(waits))
 
         threading.Thread(target=_run, daemon=True, name="read-prewarm").start()
 

@@ -1514,6 +1514,33 @@ def _terminal_live_block() -> Dict[str, Any]:
     return out
 
 
+def _config_read_key(cfg: Any) -> Any:
+    """Cache identity for the live settings record.
+
+    The record merges defaults, the loaded voice config, the dashboard override
+    store and the runtime home's ``config.yaml`` (the read-only terminal block),
+    so each of those is stamped. A config save invalidates eagerly as well.
+    """
+    extra = []
+    try:
+        extra.append(Path(_config_overrides_read_path(cfg)))
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from .config import preferred_config_dir
+        extra.append(preferred_config_dir() / "voice.yaml")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from . import qubit_runtime as QR
+        home = QR.runtime_home_for_cfg(cfg)
+        if home is not None:
+            extra.append(Path(home) / "config.yaml")
+    except Exception:  # noqa: BLE001
+        pass
+    return _rc.cfg_key(cfg, "config", _rc.stamp_of(*extra))
+
+
 def h_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/config -> the live Qubit settings record (``Record<string, unknown>``).
@@ -1524,14 +1551,20 @@ def h_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ``terminal`` block (live /chat model slot) so the page can show both
     model slots honestly.
     """
+    cache_key = _config_read_key(cfg)
+    cached = _rc.get(cache_key)
+    if cached is not None:
+        return cached[0], cached[1]
     try:
         data = _config_live(cfg)
         terminal = _terminal_live_block()
         if terminal:
             data["terminal"] = terminal
-        return 200, data
     except Exception as exc:
         return _fail(exc)
+    result = (200, data)
+    _rc.put(cache_key, result, _rc.ttl_seconds("config", 300.0))
+    return result
 
 
 def h_config_defaults(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1957,8 +1990,40 @@ def _auto_context_length(model: str, base_url: str, provider: str) -> int:
     return 0
 
 
+def _model_info_cache_key(cfg: Any, q: Dict[str, str]) -> Any:
+    """Cache identity for the model-info read (resolved route + capabilities).
+
+    The resolver reads the runtime ``config.yaml`` and its profile/session
+    stores; the model metadata probe reads its own cache. Folding those stamps
+    in means a model switch or a profile edit invalidates the snapshot even
+    from another process, while the explicit switch handlers also invalidate.
+    """
+    extra = []
+    try:
+        from . import qubit_runtime as QR
+        home = QR.runtime_home_for_cfg(cfg)
+        if home is not None:
+            extra.append(Path(home) / "config.yaml")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        base = Path(cfg.state_dir())
+        extra.extend((base / "profiles.json",
+                      base / "model_profile_sessions.json"))
+    except Exception:  # noqa: BLE001
+        pass
+    return _rc.cfg_key(cfg, "model_info",
+                       str(q.get("model", "") or ""),
+                       str(q.get("provider", "") or ""),
+                       _rc.stamp_of(*extra))
+
+
 def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    cache_key = _model_info_cache_key(cfg, q)
+    cached = _rc.get(cache_key)
+    if cached is not None:
+        return cached[0], cached[1]
     r = _resolved_model(cfg)
     # The default role's resolved selection is the answer. A stored model on
     # the old canonical session (e.g. the ``dashboard-chat`` fossil's
@@ -2048,9 +2113,11 @@ def h_model_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if isinstance(identity, dict):
         extra = {"identity": identity, "identity_match": bool(identity.get("match")),
                  "identity_code": str(identity.get("code") or "")}
-    return _ok(model=model, provider=provider,
-               auto_context_length=auto_ctx, config_context_length=config_out,
-               effective_context_length=effective, capabilities=caps, **extra)
+    result = _ok(model=model, provider=provider,
+                 auto_context_length=auto_ctx, config_context_length=config_out,
+                 effective_context_length=effective, capabilities=caps, **extra)
+    _rc.put(cache_key, result, _rc.ttl_seconds("model_info", 300.0))
+    return result
 
 
 #: Internal record/error tokens that must never reach the model picker
@@ -2515,6 +2582,8 @@ def _model_set_auxiliary(cfg: Any, b: Dict[str, Any]) -> Tuple[int, Dict[str, An
         if status == 400:
             return 400, {"ok": False, "code": "MALFORMED", "detail": detail}
         return _fail(exc)
+    _rc.invalidate("model_info")
+    _rc.invalidate("config")
     return 200, out
 
 
@@ -2617,6 +2686,8 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                              "model": applied_model, "scope": "main",
                              "terminal_follows": follow["terminal_follows"],
                              "terminal_detail": follow["terminal_detail"]})
+        _rc.invalidate("model_info")
+        _rc.invalidate("config")
         return 200, {"ok": True, "scope": "main",
                      "provider": applied_provider,
                      "model": applied_model,
@@ -2646,6 +2717,9 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             out = OPS.confirm_op(cfg, latest.id, actor="dashboard:user",
                                  session="dashboard")
             ok = out.get("state") == "executed"
+            if ok:
+                _rc.invalidate("model_info")
+                _rc.invalidate("config")
             return (200 if ok else 400), {
                 "ok": ok, "scope": "main", "provider": "ollama-local",
                 "model": model,
@@ -2666,6 +2740,8 @@ def h_model_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         _publish_chat_frame(cfg, "model.changed",
                             {"provider": "ollama-local", "model": model,
                              "scope": "main"})
+        _rc.invalidate("model_info")
+        _rc.invalidate("config")
     # ModelAssignmentResponse wire shape.
     return (200 if ok else 400), {
         "ok": ok, "scope": "main", "provider": "ollama-local", "model": model,
@@ -3148,9 +3224,36 @@ def _terminal_follow_main_model(cfg: Any, profile_id: str, *,
             "terminal_detail": ""}
 
 
+def _toolsets_cache_key(cfg: Any) -> Any:
+    """Cache identity for the toolset catalog read.
+
+    The catalog is derived from the runtime config (platform-enabled sets) and
+    the persisted dashboard toolset states; both are stamped so an edit from
+    any process invalidates the snapshot.
+    """
+    extra = []
+    try:
+        from . import qubit_runtime as QR
+        home = QR.runtime_home_for_cfg(cfg)
+        if home is not None:
+            extra.append(Path(home) / "config.yaml")
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        extra.append(Path(cfg.state_dir()) / "toolsets.json")
+    except Exception:  # noqa: BLE001
+        pass
+    return _rc.cfg_key(cfg, "toolsets", _rc.stamp_of(*extra))
+
+
 def h_toolsets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                p: Dict[str, str]) -> Tuple[int, Any]:
     from . import toolsets as TS
+
+    cache_key = _toolsets_cache_key(cfg)
+    cached = _rc.get(cache_key)
+    if cached is not None:
+        return cached[0], cached[1]
     # The canonical toolset catalog is the vendored configurable toolset list
     # (the same list `qubit tools` and the runtime resolver use), NOT the broker
     # action inventory: broker actions (``local.*``) are single capabilities,
@@ -3216,7 +3319,9 @@ def h_toolsets(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 row["tools"] = sorted(set(resolve(key)))
             except Exception:
                 pass
-    return 200, rows
+    result = (200, rows)
+    _rc.put(cache_key, result, _rc.ttl_seconds("toolsets", 300.0))
+    return result
 
 
 def _epoch_to_iso(value: Any) -> Optional[str]:
@@ -5581,11 +5686,41 @@ def h_files(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                entries=entries)
 
 
+def _gateway_read_key(cfg: Any) -> Any:
+    """Cache identity for the gateway status read.
+
+    The status is a live process/systemd snapshot, not a store read, so the key
+    folds in every file whose change can move it (the daemon heartbeat, the
+    drain marker and the durable control record) plus the config identity.
+    A short TTL bounds unrelated state changes that leave no file stamp (for
+    example another process starting/stopping the unit).
+    """
+    extra = []
+    try:
+        from . import qubit_runtime as QR
+        home = QR.runtime_home_for_cfg(cfg)
+        if home is not None:
+            extra.append(Path(home) / "gateway_state.json")
+    except Exception:  # noqa: BLE001 - a resolution miss still needs a key
+        pass
+    try:
+        base = Path(cfg.state_dir())
+        extra.extend((base / "gateway_drain.json",
+                      base / "gateway_control_status.json"))
+    except Exception:  # noqa: BLE001
+        pass
+    return _rc.cfg_key(cfg, "gateway", _rc.stamp_of(*extra))
+
+
 def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     from . import dashboard_ops as OPS
     from . import gateway_supervisor as GS
 
+    cache_key = _gateway_read_key(cfg)
+    cached = _rc.get(cache_key)
+    if cached is not None:
+        return cached[0], cached[1]
     out = OPS.run_op(cfg, "gateway", {}, actor="dashboard:user", session="dashboard")
     st = GS.status(cfg)
     # ``supervision`` is the SPA's refusal signal: empty when the real
@@ -5597,9 +5732,11 @@ def h_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # (``qubit-gateway.service``) with its live runtime + control-socket answer
     # merged in. The web-UI/voice unit is named separately (read-only; no second
     # systemctl call), so the card tells the two apart truthfully.
-    return _ok(gateway=_res(out), state=out.get("state"),
-               supervision=supervision, process=st,
-               web_ui_service_unit=GS.service_unit(cfg))
+    result = _ok(gateway=_res(out), state=out.get("state"),
+                 supervision=supervision, process=st,
+                 web_ui_service_unit=GS.service_unit(cfg))
+    _rc.put(cache_key, result, _rc.ttl_seconds("gateway", 30.0))
+    return result
 
 
 def h_gateway_drain(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -5629,6 +5766,7 @@ def h_gateway_drain(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             return _fail(exc)
         _audit("gateway_drain", "dashboard:user", {"action": "cancel",
                                                    "existed": existed})
+        _rc.invalidate("gateway")
         return _ok(ok=True, action="cancel", was_draining=existed,
                    draining=False)
     payload = {"schema": "qubit-gateway-drain/1",
@@ -5640,6 +5778,7 @@ def h_gateway_drain(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except Exception as exc:
         return _fail(exc)
     _audit("gateway_drain", "dashboard:user", {"action": "drain"})
+    _rc.invalidate("gateway")
     return _ok(ok=True, action="drain", requested_at=payload["requested_at"],
                draining=True,
                suppress_notification=payload["suppress_notification"])
@@ -5667,6 +5806,10 @@ def h_gateway_supervision(action: str) -> Handler:
 
             out = GS.control(cfg, action, confirmed=bool(b.get("confirm", False)),
                              actor="dashboard:user")
+            # Start/stop/restart changes the unit state read by /api/gateway;
+            # drop the snapshot even when the control was refused (a refusal
+            # can still reflect a state transition already in flight).
+            _rc.invalidate("gateway")
             code = str(out.get("code") or "")
             if out.get("ok"):
                 return 200, out
@@ -7408,9 +7551,13 @@ def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     through the same OPS journal path — one permission/confirmation path.
     """
     from .approvals import ApprovalJournal
+    journal_path = Path(cfg.state_dir()) / "approvals.jsonl"
+    cache_key = _rc.cfg_key(cfg, "approvals", _rc.stamp_of(journal_path))
+    cached = _rc.get(cache_key)
+    if cached is not None:
+        return cached[0], cached[1]
     try:
-        journal = ApprovalJournal(Path(cfg.state_dir()) / "approvals.jsonl",
-                                  default_ttl_s=120.0)
+        journal = ApprovalJournal(journal_path, default_ttl_s=120.0)
         items = [{"id": a.id, "capability": str(a.capability or ""),
                   "summary": _redact(a.summary)[:300],
                   "created_at": a.created_at, "expires_at": a.expires_at,
@@ -7418,7 +7565,13 @@ def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                  for a in journal.pending()]
     except Exception as exc:
         return _fail(exc)
-    return _ok(approvals=items, count=len(items))
+    result = _ok(approvals=items, count=len(items))
+    # The journal is append-only; its stamp invalidates the entry as soon as a
+    # confirmation is staged or settled (in this process or another). The TTL
+    # (kept just above the prewarm's live cadence so the next poll is a hit)
+    # bounds a cached pending row that expires by clock alone.
+    _rc.put(cache_key, result, _rc.ttl_seconds("approvals", 30.0))
+    return result
 
 
 def _confirm_payload(out: Dict[str, Any]) -> Tuple[int, Dict[str, Any]]:
@@ -16551,6 +16704,12 @@ def config_save(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         _save_json_store(path, merged)
     except Exception as exc:
         return _fail(exc)
+    # The store changed: drop every config/model/toolset snapshot before any
+    # later best-effort step can fail, so the next read cannot serve the old
+    # tree.
+    _rc.invalidate("config")
+    _rc.invalidate("model_info")
+    _rc.invalidate("toolsets")
     # B-03 runtime consumer: also merge into the Qubit runtime home config so
     # the vendored runtime / CLI / voice actually read the applied settings.
     applied_to_home = _persist_overrides_to_home(values, cfg)
@@ -17399,6 +17558,21 @@ def h_qubit_update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     ``behind=null`` — never a fabricated "up to date". ``?source=`` / ``?channel=``
     / ``?tag=`` select the update source without changing the checkout.
     """
+    force = _truthy(q.get("force"))
+    # The report depends on the installed checkout, not only on the request:
+    # stamp the version file and git HEAD so an update applied by another
+    # process (CLI/voice) changes the key even before the eager invalidation.
+    repo = Path(__file__).resolve().parents[1]
+    cache_key = _rc.cfg_key(cfg, "update_check",
+                            str(q.get("source", "") or ""),
+                            str(q.get("channel", "") or ""),
+                            str(q.get("tag", "") or ""),
+                            _rc.stamp_of(repo / "VERSION",
+                                         repo / ".git" / "HEAD"))
+    if not force:
+        cached = _rc.get(cache_key)
+        if cached is not None:
+            return cached[0], cached[1]
     try:
         source = _update_resolve_source(cfg, q.get("source"),
                                         q.get("channel"), q.get("tag"))
@@ -17407,7 +17581,9 @@ def h_qubit_update_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             tag=(q.get("tag") or None))
     except Exception as exc:
         return _fail(exc)
-    return _ok(**out)
+    result = _ok(**out)
+    _rc.put(cache_key, result, _rc.ttl_seconds("update_check", 300.0))
+    return result
 
 
 def h_qubit_update_receipt(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -17477,6 +17653,7 @@ def h_qubit_update_apply(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     """
     try:
         out = _update_apply(cfg, b, actor="dashboard:user")
+        _rc.invalidate("update_check")
     except Exception as exc:
         return _fail(exc)
     return _update_response(out)
@@ -17502,6 +17679,7 @@ def h_qubit_update_rollback(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             }
         out = _update_rollback(cfg, backup_dir=(b.get("backup_dir") or None),
                                actor="dashboard:user")
+        _rc.invalidate("update_check")
     except Exception as exc:
         return _fail(exc)
     if isinstance(out, dict) and not out.get("ok"):
