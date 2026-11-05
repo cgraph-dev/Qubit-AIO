@@ -1681,6 +1681,136 @@ def h_config_schema(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _fail(exc)
 
 
+def h_ui_preferences(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/ui-preferences -> this profile's bounded preference document.
+
+    The reference keeps this store at machine level; Qubit scopes it to the
+    active profile's state directory so profiles never share preferences.
+    """
+    from . import ui_preferences as UP
+
+    try:
+        return 200, UP.read(cfg)
+    except UP.PreferencesUnavailable as exc:
+        return 503, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "UI_PREFERENCES_UNAVAILABLE",
+                     "detail": _redact(str(exc))[:200]}
+    except Exception as exc:
+        return _fail(exc)
+
+
+def h_ui_preferences_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """PUT/PATCH /api/ui-preferences -> merge a bounded preference document.
+
+    ``values`` maps keys to strings; a null deletes the key (unless ``seed``
+    is true, which only adds missing keys, matching the reference contract).
+    A bare object is accepted as the values map for PUT clients.
+    """
+    from . import ui_preferences as UP
+
+    body = b if isinstance(b, dict) else {}
+    if "values" in body:
+        changes = body.get("values")
+    elif "seed" in body:
+        changes = None
+    else:
+        changes = body
+    if not isinstance(changes, dict):
+        return 400, {"ok": False, "state": "INVALID",
+                     "code": "UI_PREFERENCES_INVALID",
+                     "detail": "values must be an object of string keys to "
+                               "strings or null"}
+    seed = bool(body.get("seed", False))
+    try:
+        return 200, UP.write(cfg, changes, seed=seed)
+    except UP.PreferencesInvalid as exc:
+        return 400, {"ok": False, "state": "INVALID",
+                     "code": "UI_PREFERENCES_INVALID",
+                     "detail": _redact(str(exc))[:200]}
+    except UP.PreferencesUnavailable as exc:
+        return 503, {"ok": False, "state": "UNAVAILABLE",
+                     "code": "UI_PREFERENCES_UNAVAILABLE",
+                     "detail": _redact(str(exc))[:200]}
+    except Exception as exc:
+        return _fail(exc)
+
+
+def _lan_address() -> Optional[str]:
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("10.255.255.255", 1))
+            address = probe.getsockname()[0]
+    except OSError:
+        return None
+    return None if address.startswith("127.") or address == "0.0.0.0" else address
+
+
+def _nous_signed_in() -> bool:
+    try:
+        from qubit_cli.auth_nous import get_nous_auth_status_local  # type: ignore
+
+        status = get_nous_auth_status_local()
+        return bool(status.get("logged_in") and not status.get("free_tier"))
+    except Exception:
+        return False
+
+
+def h_webapp_access_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/webapp-access/status -> honest local/token state.
+
+    Qubit serves its dashboard locally and does not ship the reference's
+    remote Webapp launch, LAN exposure, or Portal sign-in. The status is a
+    typed UNAVAILABLE with the local token/bind facts, never a fake enabled
+    state.
+    """
+    webui = cfg.get("webui", default={})
+    if not isinstance(webui, dict):
+        webui = {}
+    try:
+        port = int(webui.get("port", 8890))
+    except (TypeError, ValueError):
+        port = 8890
+    try:
+        host = cfg.webui_bind_host()
+    except Exception:
+        host = str(webui.get("host") or "127.0.0.1")
+    loopback = host in ("127.0.0.1", "::1", "localhost")
+    token_configured = bool(str(webui.get("token") or "").strip())
+    enabled = bool(webui.get("enabled", True))
+    return 200, {
+        "ok": False,
+        "state": "UNAVAILABLE",
+        "code": "WEBAPP_ACCESS_NOT_IMPLEMENTED",
+        "detail": "Qubit serves its dashboard locally; remote Webapp launch, "
+                  "LAN exposure and Portal sign-in are not implemented here.",
+        "implemented": False,
+        "available": False,
+        "enabled": False,
+        "mode": None,
+        "port": port,
+        "public_url": "",
+        "lan_address": _lan_address(),
+        "nous_signed_in": _nous_signed_in(),
+        "gateway": {
+            "state": "unavailable",
+            "url": None,
+            "reason": "remote Webapp access is not implemented",
+        },
+        "local": {
+            "dashboard_enabled": enabled,
+            "host": host,
+            "port": port,
+            "loopback_only": loopback,
+            "token_configured": token_configured,
+            "token_required": token_configured or not loopback,
+        },
+        "qubit_counterpart": f"local dashboard at http://127.0.0.1:{port}/",
+    }
+
+
 def h_egress_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                     p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Egress proxy status (EgressStatusResponse wire shape: ``text``).
@@ -11306,6 +11436,12 @@ _r("GET", r"/api/config", "h_config")
 _r("GET", r"/api/config/schema", "h_config_schema")
 _r("GET", r"/api/config/defaults", "h_config_defaults")
 _r("GET", r"/api/config/effective", "h_config_effective")
+# Profile-local UI preferences (Hermes reference shape, Qubit profile scope).
+_r("GET", r"/api/ui-preferences", "h_ui_preferences")
+_r("PUT", r"/api/ui-preferences", "h_ui_preferences_write")
+_r("PATCH", r"/api/ui-preferences", "h_ui_preferences_write")
+# Remote Webapp access is not shipped: report honest local/token state.
+_r("GET", r"/api/webapp-access/status", "h_webapp_access_status")
 _r("POST", r"/api/browser/open", "h_browser_open")
 _r("GET", r"/api/egress/status", "h_egress_status")
 _r("GET", r"/api/model/info", "h_model_info")
@@ -19908,6 +20044,9 @@ HANDLERS: Dict[str, Handler] = {
     "h_config": h_config, "h_config_defaults": h_config_defaults,
     "h_config_effective": h_config_effective,
     "h_config_schema": h_config_schema, "h_model_info": h_model_info,
+    "h_ui_preferences": h_ui_preferences,
+    "h_ui_preferences_write": h_ui_preferences_write,
+    "h_webapp_access_status": h_webapp_access_status,
     "h_model_recommended_default": h_model_recommended_default,
     "h_model_options": h_model_options, "h_model_moa": h_model_moa,
     "h_model_auxiliary": h_model_auxiliary, "h_model_set": h_model_set,

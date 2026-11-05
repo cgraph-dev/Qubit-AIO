@@ -1105,6 +1105,14 @@ QUBIT_READ_AUTHORITY: tuple = (
     # page loads in seconds and repeated loads are instant. Same queries/shapes
     # as the plugin (no reimplementation of its aggregation).
     "/api/plugins/memory-wiki",
+    # Profile-local dashboard UI preferences. The reference route name is
+    # served by the Qubit compat handler so the store is the active profile's,
+    # never the machine root's (no cross-profile read/write leak).
+    "/api/ui-preferences",
+    # Remote Webapp access is not shipped; the compat handler reports the
+    # honest local/token state (typed UNAVAILABLE) instead of a fork proxy
+    # answer that would imply the reference capability exists.
+    "/api/webapp-access/status",
 )
 
 
@@ -3626,6 +3634,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # (``/agent/api/<x>`` is rewritten to ``/api/<x>``).
             self._qubit_api("GET")
             return
+        if path.rstrip("/") in ("/api/ui-preferences",
+                                "/api/webapp-access/status"):
+            # Reference-literal reads on the classic API prefix. The same
+            # compat authority serves the SPA's ``/agent/api`` alias.
+            self._qubit_api("GET")
+            return
         # Built dashboard assets are served from Qubit-owned root paths.
         if (path.startswith("/assets/") or path.startswith("/fonts/")
                 or path.startswith("/fonts-terminal/")
@@ -5313,6 +5327,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         path = self.path.split("?")[0]
         if path.startswith("/agent/"):
             self._qubit_api("PUT")
+        elif path.rstrip("/") == "/api/ui-preferences":
+            self._qubit_api("PUT")
         elif self._is_office_client_path(path):
             # Office-client mutations under PUT (e.g. the character edit) are
             # routed the same way POST is: C4-staged or a typed refusal.
@@ -5323,6 +5339,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def do_PATCH(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
         if path.startswith("/agent/"):
+            self._qubit_api("PATCH")
+        elif path.rstrip("/") == "/api/ui-preferences":
             self._qubit_api("PATCH")
         elif self._is_office_client_path(path):
             self._serve_office_client_api("PATCH")
