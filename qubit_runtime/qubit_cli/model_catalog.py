@@ -24,13 +24,16 @@ from utils import atomic_json_write
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CATALOG_URL = install_source.raw_asset_url(
-    "website/static/api/model-catalog.json")
+# The website lives under the runtime package (`qubit_runtime/website`), so the
+# raw-content path must carry that prefix. `website/static/api/...` is a 404 at
+# the repository root.
+MODEL_CATALOG_PATH = "qubit_runtime/website/static/api/model-catalog.json"
+DEFAULT_CATALOG_URL = install_source.raw_asset_url(MODEL_CATALOG_PATH)
 # Qubit serves the same manifest from its own repository's raw copy; the primary
 # is already a non-bot-gated raw endpoint, so the fallback mirrors it (the fetch
 # helper skips a fallback equal to the primary).
 DEFAULT_CATALOG_FALLBACK_URLS: tuple[str, ...] = (
-    install_source.raw_asset_url("website/static/api/model-catalog.json"),
+    install_source.raw_asset_url(MODEL_CATALOG_PATH),
 )
 DEFAULT_TTL_MINUTES = 20
 # Legacy key, honoured only when the user set it explicitly; ``ttl_minutes`` is the shipped default.

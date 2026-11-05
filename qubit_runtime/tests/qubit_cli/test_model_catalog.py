@@ -248,24 +248,28 @@ class TestFallbackChain:
     releases (opus 4.8, etc.) never reach the picker.
 
     The fallback resolves through :mod:`qubit_cli.install_source`, so it points
-    at the Qubit fork's raw copy (``cgraph-dev/Qubit-AIO``), never the upstream
-    Hermes repository — see ``docs/BRAND.md`` ("never point this at a
-    Hermes/OpenClaw URL: it is Qubit-owned product output") and the owner
-    decision recorded at the top of ``install_source.py``.
+    at the public Qubit repository's raw copy (``cgraph-dev/Qubit``, branch
+    ``production``), never the upstream Hermes repository — see
+    ``docs/BRAND.md`` ("never point this at a Hermes/OpenClaw URL: it is
+    Qubit-owned product output").
     """
 
-    # A non-raw operator-configured mirror; distinct from the raw fork fallback
+    # A non-raw operator-configured mirror; distinct from the raw repo fallback
     # so the chain is actually exercised.
     PRIMARY = "https://docs.example.invalid/api/model-catalog.json"
-    FALLBACK = install_source.raw_asset_url("website/static/api/model-catalog.json")
+    FALLBACK = install_source.raw_asset_url(
+        "qubit_runtime/website/static/api/model-catalog.json")
 
-    def test_fallback_url_is_the_qubit_fork_raw_copy(self):
-        """Pin the deliberate fork-org divergence: the fallback must not name
-        the upstream repository."""
+    def test_fallback_url_is_the_qubit_public_raw_copy(self):
+        """The fallback is the public Qubit repo raw copy, not upstream or the
+        retired private repo."""
         from qubit_cli import install_source as source
-        expected = source.raw_asset_url("website/static/api/model-catalog.json")
+        expected = source.raw_asset_url(
+            "qubit_runtime/website/static/api/model-catalog.json")
         assert model_catalog.DEFAULT_CATALOG_FALLBACK_URLS == (expected,)
         assert "NousResearch" not in expected
+        assert "Qubit-AIO" not in expected
+        assert "/cgraph-dev/Qubit/production/" in expected
 
     def test_uses_primary_when_it_succeeds(self, isolated_home):
         from qubit_cli import model_catalog

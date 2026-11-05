@@ -6,10 +6,12 @@ before the full config machinery loads, and it never imports the vendored fork.
 
 What it decides
 ---------------
-* **Repository identity.** :data:`QUBIT_REPOSITORY` (``cgraph-dev/Qubit-AIO``)
-  is the intended public Qubit repo — the *default destination*, never a
-  hard requirement. A user's own clone may track its own ``origin`` (which for
-  a public user *is* the Qubit repo), a mirror, or a private fork.
+* **Repository identity.** :data:`QUBIT_REPOSITORY` (``cgraph-dev/Qubit``,
+  default branch ``production``) is the public Qubit repo — the *default
+  destination*, never a hard requirement. A user's own clone may track its own
+  ``origin`` (which for a public user *is* the Qubit repo), a mirror, or a
+  private fork. The retired private ``cgraph-dev/Qubit-AIO`` spelling stays
+  recognised as a read-old origin so an existing checkout is never orphaned.
 * **Source.** :func:`resolve_source` resolves the effective git remote/branch/
   tag/ref from, in order: an explicit override (``--source``), the configured
   full URL (``update.remote_url``), a configured remote *name* whose actual URL
@@ -17,8 +19,8 @@ What it decides
   and otherwise the canonical Qubit repository URL (:data:`QUBIT_UPDATE_URL`) —
   the clone's own ``origin`` is used when it already points at the Qubit repo
   and overridden by the canonical URL when it is legacy-branded. Plus the
-  configured branch (``update.branch``, default ``main``) and the optional
-  version tag (``update.tag``).
+  configured branch (``update.branch``, default ``production``) and the
+  optional version tag (``update.tag``).
 * **Channel.** :func:`resolve_channel` selects ``stable`` / ``beta`` /
   ``canary``; :func:`set_channel` persists it **under QUBIT_HOME** (never in
   the source tree, never a secret). Default: ``stable``.
@@ -59,23 +61,26 @@ from urllib.parse import urlsplit
 # ---------------------------------------------------------------------------
 # Public constants (the documented defaults)
 # ---------------------------------------------------------------------------
-#: The intended public Qubit repository identity. Default destination only —
-#: overridable per install via ``update.remote`` / ``update.remote_url``.
-QUBIT_REPOSITORY = "cgraph-dev/Qubit-AIO"
-#: The public product repository named by README/INSTALL. Both are Qubit-owned,
-#: so a clone of either keeps updating from its own ``origin`` instead of being
-#: redirected to the other (which would fail for a public user without access).
-QUBIT_PUBLIC_REPOSITORY = "cgraph-dev/Qubit"
-QUBIT_REPOSITORIES = (QUBIT_REPOSITORY, QUBIT_PUBLIC_REPOSITORY)
+#: The public Qubit repository identity (default branch ``production``).
+#: Default destination only — overridable per install via ``update.remote`` /
+#: ``update.remote_url``.
+QUBIT_REPOSITORY = "cgraph-dev/Qubit"
+#: Backwards-compatible alias for the public product repository.
+QUBIT_PUBLIC_REPOSITORY = QUBIT_REPOSITORY
+#: The retired private repository name. Accepted as a read-old origin so an
+#: existing checkout keeps updating from itself; never used as the canonical
+#: destination.
+QUBIT_LEGACY_REPOSITORY = "cgraph-dev/Qubit-AIO"
+QUBIT_REPOSITORIES = (QUBIT_REPOSITORY, QUBIT_LEGACY_REPOSITORY)
 QUBIT_REPOSITORY_URL = f"https://github.com/{QUBIT_REPOSITORY}.git"
 #: The canonical public Qubit update URL. :func:`resolve_source` prefers this
 #: when no explicit Qubit source is configured, or when the configured clone's
 #: origin is legacy-branded. Its value is exactly :data:`QUBIT_REPOSITORY_URL`;
 #: callers must never point the updater at Hermes or OpenClaw.
-QUBIT_UPDATE_URL = "https://github.com/cgraph-dev/Qubit-AIO.git"
+QUBIT_UPDATE_URL = QUBIT_REPOSITORY_URL
 
 DEFAULT_REMOTE_NAME = "origin"
-DEFAULT_BRANCH = "main"
+DEFAULT_BRANCH = "production"
 DEFAULT_CHANNEL = "stable"
 CHANNELS = ("stable", "beta", "canary")
 
@@ -693,8 +698,8 @@ def resolve_source(cfg: Any = None, override: Any = None, *,
     """Resolve the effective update source/ref policy.
 
     The canonical public repository is :data:`QUBIT_UPDATE_URL`
-    (``https://github.com/cgraph-dev/Qubit-AIO.git``), channel
-    ``stable``, branch ``main``. Resolution order (first non-empty wins):
+    (``https://github.com/cgraph-dev/Qubit.git``), channel
+    ``stable``, branch ``production``. Resolution order (first non-empty wins):
 
     1. explicit ``override`` (a local **path**, a **URL**, or a remote **name**);
     2. ``cfg update.remote_url`` (a full URL);
@@ -848,8 +853,8 @@ def _utc_iso() -> str:
 
 
 __all__ = [
-    "QUBIT_REPOSITORY", "QUBIT_PUBLIC_REPOSITORY", "QUBIT_REPOSITORIES",
-    "QUBIT_REPOSITORY_URL", "QUBIT_UPDATE_URL",
+    "QUBIT_REPOSITORY", "QUBIT_PUBLIC_REPOSITORY", "QUBIT_LEGACY_REPOSITORY",
+    "QUBIT_REPOSITORIES", "QUBIT_REPOSITORY_URL", "QUBIT_UPDATE_URL",
     "DEFAULT_REMOTE_NAME",
     "DEFAULT_BRANCH", "DEFAULT_CHANNEL", "CHANNELS",
     "LEGACY_SOURCE_URL_CODE", "INVALID_SOURCE_URL_CODE", "INVALID_CHANNEL_CODE",

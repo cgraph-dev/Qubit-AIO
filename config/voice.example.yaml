@@ -247,12 +247,12 @@ agent_runtime:
 #
 # update:
 #   # Canonical Qubit repository (default destination; channel `stable`,
-#   # branch `main`). With no explicit source configured, the updater prefers
-#   # this URL; a legacy-branded clone `origin` is overridden by it, and an
-#   # `origin` that already points at Qubit is used as-is.
-#   remote_url: "https://github.com/cgraph-dev/Qubit-AIO.git"
+#   # branch `production`). With no explicit source configured, the updater
+#   # prefers this URL; a legacy-branded clone `origin` is overridden by it, and
+#   # an `origin` that already points at Qubit is used as-is.
+#   remote_url: "https://github.com/cgraph-dev/Qubit.git"
 #   remote: origin                      # git remote NAME to update from (default)
-#   branch: main                        # branch to track when following a branch
+#   branch: production                  # branch to track when following a branch
 #   tag: ""                             # optional version tag (e.g. v1.2.3);
 #                                       # stable/beta follow tags, canary branch
 #   channel: stable                     # stable | beta | canary

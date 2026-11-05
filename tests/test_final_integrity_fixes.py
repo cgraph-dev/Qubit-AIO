@@ -231,10 +231,10 @@ def test_production_modules_bake_no_operator_identity():
         # which is not an operator identity.
         if "Europe/Bucharest" in line:
             continue
-        # The canonical public repository identity (owner decision: canonical
-        # source = cgraph-dev/Qubit-AIO) is Qubit-owned product output,
-        # not a private operator handle.
-        if "cgraph-dev/Qubit-AIO" in line:
+        # The canonical public repository identity (cgraph-dev/Qubit) and its
+        # read-old predecessor are Qubit-owned product output, not a private
+        # operator handle.
+        if "cgraph-dev/Qubit" in line:
             continue
         assert not bad.search(line), f"baked operator identity: {line}"
 

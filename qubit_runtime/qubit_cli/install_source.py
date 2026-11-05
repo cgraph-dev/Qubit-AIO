@@ -1,8 +1,7 @@
 """The single source of truth for Qubit's public installer location.
 
-Owner decision 2026-09-27: the canonical Qubit domain is not purchased yet, so
-the public GitHub repository is used until the owner supplies a domain or a
-final release URL. Change ``DEFAULT_BASE_URL`` (or set ``QUBIT_INSTALL_BASE_URL``)
+The public product repository is ``cgraph-dev/Qubit`` (default branch
+``production``). Change ``DEFAULT_BASE_URL`` (or set ``QUBIT_INSTALL_BASE_URL``)
 in ONE place and every installer/reinstall message follows.
 
 Never point this at a Hermes/OpenClaw URL: it is Qubit-owned product output.
@@ -16,25 +15,25 @@ from __future__ import annotations
 
 import os
 
-#: Public Qubit GitHub repository (owner decision 2026-09-27). Override with
-#: ``QUBIT_INSTALL_BASE_URL`` for the future canonical domain or a pinned release
-#: asset; override the ref with ``QUBIT_INSTALL_BRANCH``.
-DEFAULT_BASE_URL = "https://github.com/cgraph-dev/Qubit-AIO"
-DEFAULT_BRANCH = "main"
+#: Public Qubit GitHub repository. Override with ``QUBIT_INSTALL_BASE_URL`` for
+#: a mirror, pinned release asset, or future canonical domain; override the ref
+#: with ``QUBIT_INSTALL_BRANCH``.
+DEFAULT_BASE_URL = "https://github.com/cgraph-dev/Qubit"
+DEFAULT_BRANCH = "production"
 
 #: GitHub ``owner/name`` for the Qubit project (one configurable place). Used by
 #: update/channel identity checks; override with ``QUBIT_REPOSITORY``.
-DEFAULT_REPOSITORY = "cgraph-dev/Qubit-AIO"
+DEFAULT_REPOSITORY = "cgraph-dev/Qubit"
 
 #: Documentation root printed in help/setup/provider text. The public GitHub
 #: repository's ``docs`` tree until a canonical docs domain exists; override
 #: with ``QUBIT_DOCS_BASE_URL``.
-DEFAULT_DOCS_BASE_URL = "https://github.com/cgraph-dev/Qubit-AIO/tree/main/docs"
+DEFAULT_DOCS_BASE_URL = "https://github.com/cgraph-dev/Qubit/tree/production/docs"
 
 #: Release-asset host used for internal update-channel metadata (never printed).
 #: Override with ``QUBIT_RELEASE_ASSETS_BASE_URL`` once a Qubit asset host or
 #: final release URL is supplied by the owner.
-DEFAULT_RELEASE_ASSETS_BASE_URL = "https://github.com/cgraph-dev/Qubit-AIO"
+DEFAULT_RELEASE_ASSETS_BASE_URL = "https://github.com/cgraph-dev/Qubit"
 
 _BASE_ENV = "QUBIT_INSTALL_BASE_URL"
 _BRANCH_ENV = "QUBIT_INSTALL_BRANCH"

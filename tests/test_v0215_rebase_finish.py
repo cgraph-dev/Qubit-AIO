@@ -67,7 +67,8 @@ def test_install_source_docs_helpers_are_qubit_owned_and_configurable(
     monkeypatch.delenv("QUBIT_RAW_ASSET_BASE_URL", raising=False)
 
     docs_base = s.docs_base_url()
-    assert "qubit-aio" in docs_base.lower()
+    assert "github.com/cgraph-dev/qubit/tree/production/docs" in docs_base.lower()
+    assert "qubit-aio" not in docs_base.lower()
     assert "hermes" not in docs_base.lower()
     assert "nousresearch" not in docs_base.lower()
 
@@ -77,7 +78,8 @@ def test_install_source_docs_helpers_are_qubit_owned_and_configurable(
     assert s.docs_url() == docs_base
 
     raw = s.raw_asset_url("website/static/api/model-catalog.json")
-    assert "qubit-aio" in raw.lower()
+    assert "raw.githubusercontent.com/cgraph-dev/qubit/production/" in raw.lower()
+    assert "qubit-aio" not in raw.lower()
     assert "hermes" not in raw.lower()
     assert "nousresearch" not in raw.lower()
 
@@ -104,7 +106,8 @@ def test_install_source_docs_helpers_are_qubit_owned_and_configurable(
 
 def _assert_t2_qubit_owned(value: str) -> None:
     lowered = value.lower()
-    assert "qubit-aio" in lowered, value
+    assert "qubit" in lowered, value
+    assert "qubit-aio" not in lowered, value
     for legacy in ("hermes", "nousresearch", "nousresearch.com", "openclaw"):
         assert legacy not in lowered, (value, legacy)
 
@@ -217,7 +220,10 @@ def test_t2_local_runtime_catalog_url_is_qubit_owned(runtime_on_path, monkeypatc
     from qubit_cli.local_runtime import catalog
 
     monkeypatch.delenv("QUBIT_RAW_ASSET_BASE_URL", raising=False)
-    assert catalog._CATALOG_URL == s.raw_asset_url("qubit_cli/local_runtime/catalog.json")
+    assert catalog._CATALOG_URL == s.raw_asset_url(
+        "qubit_runtime/qubit_cli/local_runtime/catalog.json")
+    assert catalog._CATALOG_URL.endswith(
+        "/cgraph-dev/Qubit/production/qubit_runtime/qubit_cli/local_runtime/catalog.json")
     _assert_t2_qubit_owned(catalog._CATALOG_URL)
 
 
@@ -227,7 +233,8 @@ def test_t2_installer_repo_identity_is_qubit_owned():
         text = path.read_text(encoding="utf-8")
         assert "NousResearch/hermes-agent" not in text, path
         assert "hermes-agent.git" not in text, path
-        assert "cgraph-dev/Qubit-AIO" in text, path
+        assert "cgraph-dev/Qubit" in text, path
+        assert "cgraph-dev/Qubit-AIO" not in text, path
 
 
 

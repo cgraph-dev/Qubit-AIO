@@ -307,7 +307,8 @@ def recommended_entry(budget: HardwareBudget,
 # In-repo JSON manifest: the raw URL is derived from the single configurable
 # installer source (``qubit_cli.install_source``) so it follows the Qubit repo
 # and branch, never a hardcoded Hermes repo.
-_CATALOG_URL = install_source.raw_asset_url("qubit_cli/local_runtime/catalog.json")
+_CATALOG_URL = install_source.raw_asset_url(
+    "qubit_runtime/qubit_cli/local_runtime/catalog.json")
 _SCHEMA_VERSION = 3  # bump when an older app would read a newer catalog but launch its entries wrongly
 _REFRESH_TTL_S = 6 * 3600
 _refresh_lock = threading.Lock()
