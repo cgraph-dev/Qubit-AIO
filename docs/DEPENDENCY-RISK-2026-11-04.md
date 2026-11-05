@@ -248,3 +248,24 @@ Verification (focused, no full matrix):
   so they are not caused by this upgrade.
 - Pillow 13 emits a deprecation warning for `Image.getdata` (removal in Pillow 14) in
   `qubit_runtime/tests/scripts/test_icon_flavors.py`; tests still pass.
+
+## 8. Follow-up (2026-11-05, branch `fix5/nodedeps`, base `b257b1b08`)
+
+- **simple-git decision executed.** `qubit_runtime/apps/desktop` now uses `simple-git` **4.0.2**
+  and `@simple-git/argv-parser` **2.0.1** (`@simple-git/args-pathspec` 1.0.4), via
+  `qubit_runtime/package-lock.json`. The v4 port uses the named `simpleGit` import, allowlists
+  `GIT_TERMINAL_PROMPT` for the Windows no-console wrapper, mirrors v4's filtering of
+  git-impacting env keys, and drops the obsolete v3 `console.warn` filter.
+- **Docs-site criticals cleared.** `qubit_runtime/website` overrides `dompurify` 3.4.17,
+  `proxy-addr` 2.0.8, `shell-quote` 1.12.0 and `tinypool` 2.2.0. Audit (`npm 11.17.0`,
+  `--package-lock-only --omit=dev`) went **20 critical → 0**. Docusaurus remains **3.10.2**:
+  no patched 3.10.x exists and the npm-proposed downgrade was not applied; its remaining
+  advisories reclassify to high.
+- **Workspace criticals cleared.** A root `shell-quote` 1.12.0 override removes the
+  `concurrently` → `shell-quote` critical chain. Workspace audit went **4 critical → 0**.
+- **Verification:** desktop focused Vitest 22 passed; `tsc -p tsconfig.electron.json` reports no
+  error in the touched files (unrelated pre-existing errors remain); website `npm ci --dry-run`,
+  `npm run typecheck`, `check_doc_links.py` and `docusaurus build --locale en` (with
+  `DOCUSAURUS_SSG_WORKER_THREAD_COUNT=2`, exercising tinypool 2.2.0) all pass; both workspace
+  locks pass `npm ci --dry-run`. No full matrix, no live service/config change, no publish, no
+  `VERIFIED` claim.
