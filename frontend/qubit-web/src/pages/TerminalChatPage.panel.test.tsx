@@ -1118,6 +1118,60 @@ describe("Qubit TerminalChatPage copy last response", () => {
       return button!;
     });
     await act(async () => copy.click());
-    expect(apiMocks.getSessionMessages).toHaveBeenCalledWith("session-1");
+    // Reads the management store the terminal is scoped to (the mocked
+    // ProfileProvider reports "default"), never the global management default.
+    expect(apiMocks.getSessionMessages).toHaveBeenCalledWith(
+      "session-1",
+      "default",
+    );
+  });
+});
+
+describe("Qubit TerminalChatPage /chat?resume=<id>&profile=<p>", () => {
+  it("scopes the probe, ticket and PTY to the deep-linked profile", async () => {
+    // Regression: the resume link used to carry only `?resume=`. The PTY's
+    // HOME is resolved from the `/api/pty?profile=` query (not the ws-ticket),
+    // so a row owned by another profile resumed against the launch home, where
+    // the id does not exist — the TUI forged a fresh chat instead of opening
+    // the transcript.
+    apiMocks.getSessionDetail.mockClear();
+    apiMocks.wsTicket.mockClear();
+    apiMocks.wsTicket.mockImplementation(async () => ({
+      ticket: "tkt",
+      expires_in: 60,
+      scope: "pty",
+      profile_id: "other",
+      provider: "opencode-go",
+      model: "deepseek",
+      context_tokens: 200000,
+      context_verified: true,
+    }));
+
+    const { default: TerminalChatPage } = await import("./TerminalChatPage");
+    await render(
+      <MemoryRouter
+        initialEntries={["/chat?resume=session-1&profile=other"]}
+      >
+        <TerminalChatPage isActive />
+      </MemoryRouter>,
+    );
+
+    await vi.waitFor(() =>
+      expect(apiMocks.getSessionDetail).toHaveBeenCalledWith(
+        "session-1",
+        "other",
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(FakeWebSocket.instances.length).toBeGreaterThan(0),
+    );
+    expect(apiMocks.wsTicket).toHaveBeenCalledWith(
+      undefined,
+      undefined,
+      "session-1",
+    );
+    const url = new URL(FakeWebSocket.instances.at(-1)!.url);
+    expect(url.searchParams.get("resume")).toBe("session-1");
+    expect(url.searchParams.get("profile")).toBe("other");
   });
 });

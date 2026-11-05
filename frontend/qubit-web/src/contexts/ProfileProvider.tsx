@@ -63,20 +63,28 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
 
   // Re-assert ?profile= after navigations that dropped it (bare nav links).
   // Runs on every pathname/profile change; no-ops when already in sync.
+  //
+  // A URL that NAMES a profile is an explicit scope request and must win: the
+  // adoption effect above copies it into state, but that state update lands a
+  // render later. Without this guard the re-assert effect ran first with the
+  // STALE state profile and rewrote the query, deleting the profile a resume
+  // link had just carried (`/chat?resume=<id>&profile=<owner>` -> the
+  // dashboard's own home, where the session does not exist). Only re-map when
+  // the URL has no profile at all (a bare nav link).
   useEffect(() => {
-    const inUrl = searchParams.get("profile") ?? "";
-    if ((profile || "") === inUrl) return;
+    const urlProfileNow = searchParams.get("profile");
+    if (urlProfileNow !== null) return;
+    if (!profile) return;
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);
-        if (profile) next.set("profile", profile);
-        else next.delete("profile");
+        next.set("profile", profile);
         return next;
       },
       { replace: true },
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, profile]);
+  }, [pathname, profile, searchParams]);
 
   useEffect(() => {
     let cancelled = false;

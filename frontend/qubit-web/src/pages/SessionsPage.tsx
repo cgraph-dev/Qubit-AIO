@@ -79,6 +79,7 @@ import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
 import { isDashboardEmbeddedChatEnabled } from "@/lib/dashboard-flags";
+import { sessionResumeHref } from "@/lib/session-resume-href";
 
 const SOURCE_CONFIG: Record<string, { icon: typeof Terminal; color: string }> =
   {
@@ -508,6 +509,7 @@ function MessageList({
  */
 function RecentSessionCard({ session }: { session: SessionInfo }) {
   const { t } = useI18n();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<SessionMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -540,6 +542,9 @@ function RecentSessionCard({ session }: { session: SessionInfo }) {
         aria-label={`${t.common.expand} ${session.title ?? t.common.untitled}`}
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={(event) => {
+          // Keyboard activation of the nested Resume button must not also
+          // toggle this disclosure (its keydown bubbles here before its click).
+          if (event.target !== event.currentTarget) return;
           if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             setOpen((prev) => !prev);
@@ -577,13 +582,28 @@ function RecentSessionCard({ session }: { session: SessionInfo }) {
           )}
         </div>
 
-        <Badge
-          tone="outline"
-          className="shrink-0 self-start text-xs sm:self-center"
-        >
-          <Database className="mr-1 h-3 w-3" />
-          {session.source ? sourceLabel(session.source) : "local"}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1 self-start sm:self-center">
+          <Badge tone="outline" className="text-xs">
+            <Database className="mr-1 h-3 w-3" />
+            {session.source ? sourceLabel(session.source) : "local"}
+          </Badge>
+
+          {!session.archived && (
+            <Button
+              ghost
+              size="icon"
+              className="text-muted-foreground hover:text-success"
+              aria-label={t.sessions.resumeInChat}
+              title={t.sessions.resumeInChat}
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(sessionResumeHref(session.id, session.profile));
+              }}
+            >
+              <Play />
+            </Button>
+          )}
+        </div>
       </div>
 
       {open && (
@@ -692,7 +712,7 @@ function SessionRow({
           title={t.sessions.resumeInChat}
           onClick={(e) => {
             e.stopPropagation();
-            navigate(`/chat?resume=${encodeURIComponent(session.id)}`);
+            navigate(sessionResumeHref(session.id, session.profile));
           }}
         >
           <Play />
