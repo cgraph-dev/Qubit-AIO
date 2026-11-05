@@ -2589,17 +2589,55 @@ def _model_set_auxiliary(cfg: Any, b: Dict[str, Any]) -> Tuple[int, Dict[str, An
 
 def h_model_moa(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    # MoaConfigResponse wire shape; MoA is superseded by the ordered-fallback
-    # gateway (8Q): no reference/aggregator fan-out exists to configure.
+    """GET /api/model/moa — the REAL, read-only MoA state for this profile.
+
+    MoA is not a decorative upstream leftover: the vendored engine
+    (``agent/moa_loop.py``) executes it through the ``moa`` virtual provider,
+    and the model picker advertises that provider exactly when the user's RAW
+    config enables a preset (``qubit_cli.inventory._raw_config_has_enabled_moa_preset``).
+    Mirror that same gate here so the Models card and the picker never disagree:
+
+    * opted in → serve ``normalize_moa_config`` of the live raw config, which is
+      exactly what the engine will run (no invented slots/presets);
+    * not opted in → an empty state with the exact real reason (opt-in, not
+      configured) and the supported way to enable it. The merged
+      ``DEFAULT_CONFIG`` preset is deliberately NOT served for a profile that
+      never opted in, because the picker would not offer it.
+
+    The surface is read-only: preset writes go through ``qubit moa configure``
+    (or ``moa.presets`` in config.yaml), never a dashboard PUT.
+    """
+    try:
+        _vendored_runtime(cfg)
+        from qubit_cli.config import load_config
+        from qubit_cli.moa_config import normalize_moa_config
+
+        try:
+            from qubit_cli.inventory import _raw_config_has_enabled_moa_preset
+            enabled = bool(_raw_config_has_enabled_moa_preset())
+        except Exception:  # noqa: BLE001 - treat an unreadable check as "not opted in"
+            enabled = False
+        if enabled:
+            state = normalize_moa_config(load_config().get("moa") or {})
+            return _ok(read_only=True,
+                       detail=("Live MoA presets from this profile's config. "
+                               "Read-only here — edit with `qubit moa "
+                               "configure` or `moa.presets` in config.yaml."),
+                       **state)
+    except Exception as exc:  # noqa: BLE001 - a read failure is typed, never a 500
+        return _fail(exc)
     slot = {"provider": "", "model": "", "enabled": False}
     return _ok(default_preset="none", active_preset="none", presets={},
                reference_models=[], aggregator=slot,
                reference_temperature=0.0, aggregator_temperature=0.0,
                reference_timeout=None, degraded_reference_policy="loud",
-               enabled=False,
-               detail="MoA fan-out is not routed by Qubit's canonical model "
-                      "resolver; ordered provider fallback (8Q gateway) is "
-                      "the Qubit counterpart")
+               enabled=False, read_only=True,
+               detail=("MoA is opt-in and not configured for this profile: no "
+                       "enabled `moa.presets` entry exists, so the engine has "
+                       "nothing to run. Enable it with `qubit moa configure` "
+                       "(or an enabled preset in config.yaml), then reload. "
+                       "Qubit executes real MoA through the vendored engine; "
+                       "no preset is fabricated here."))
 
 
 def _publish_model_changed(cfg: Any, provider: str, model: str,
@@ -14694,10 +14732,11 @@ def skill_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def moa_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
-    return _gate("MOA_SUPERSEDED",
-                 "MoA fan-out presets are not executed by Qubit; the ordered "
-                 "provider fallback gateway (8Q) is the counterpart.",
-                 "Models page provider/fallback display + 8Q gateway", 501)
+    return _gate("MOA_READ_ONLY",
+                 "MoA presets are executed by Qubit but this dashboard route "
+                 "is read-only; edit them with `qubit moa configure` or the "
+                 "`moa.presets` map in config.yaml, then reload.",
+                 "CLI `qubit moa list|configure`", 501)
 
 
 def _mcp_error(exc: Exception) -> Tuple[int, Dict[str, Any]]:

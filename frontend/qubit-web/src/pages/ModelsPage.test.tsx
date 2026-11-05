@@ -201,6 +201,64 @@ describe("ModelsPage Mixture of Agents card", () => {
     expect(configureButtons.some((button) => button.disabled)).toBe(true);
     expect(apiMocks.getMoaModels).toHaveBeenCalled();
   });
+
+  it("renders real presets read-only and opens a viewer with no Save", async () => {
+    const reference = {
+      provider: "openrouter",
+      model: "deepseek/deepseek-v4-pro",
+    };
+    const aggregator = {
+      provider: "openrouter",
+      model: "anthropic/claude-opus-4.8",
+    };
+    apiMocks.getMoaModels.mockResolvedValue({
+      default_preset: "studio",
+      active_preset: "",
+      presets: {
+        studio: {
+          reference_models: [reference],
+          aggregator,
+          reference_temperature: null,
+          aggregator_temperature: null,
+          reference_timeout: null,
+          degraded_reference_policy: "loud",
+          enabled: true,
+        },
+      },
+      reference_models: [reference],
+      aggregator,
+      reference_temperature: null,
+      aggregator_temperature: null,
+      reference_timeout: null,
+      degraded_reference_policy: "loud",
+      enabled: true,
+      read_only: true,
+      detail: "Live MoA presets from this profile's config.",
+    });
+    await renderModels();
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain("studio"),
+    );
+    expect(document.body.textContent).toContain("Read-only");
+
+    const view = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.trim() === "View");
+    expect(view).toBeTruthy();
+    expect(view!.disabled).toBe(false);
+
+    await act(async () => {
+      view!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await vi.waitFor(() =>
+      expect(document.body.textContent).toContain("Mixture of Agents presets"),
+    );
+    expect(document.body.textContent).toContain("qubit moa configure");
+    const save = Array.from(
+      document.body.querySelectorAll<HTMLButtonElement>("button"),
+    ).find((button) => button.textContent?.trim() === "Save");
+    expect(save).toBeUndefined();
+  });
 });
 
 describe("ModelsPage main-model picker authority", () => {

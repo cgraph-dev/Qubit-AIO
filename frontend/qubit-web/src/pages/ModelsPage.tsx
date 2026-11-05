@@ -713,15 +713,18 @@ type MoaPickerTarget =
 function MoaModelsModal({
   config,
   refreshKey,
+  readOnly = false,
   onClose,
   onSaved,
 }: {
   config: MoaConfigResponse;
   refreshKey: number;
+  readOnly?: boolean;
   onClose(): void;
   onSaved(next: MoaConfigResponse): void;
 }) {
   const [draft, setDraft] = useState<MoaConfigResponse>(config);
+  const ro = readOnly;
   const presetNames = Object.keys(draft.presets || {});
   const [selected, setSelected] = useState(() => {
     const preferred = draft.default_preset;
@@ -841,7 +844,7 @@ function MoaModelsModal({
             id="moa-modal-title"
             className="font-mondwest text-display text-base tracking-wider"
           >
-            Configure Mixture of Agents presets
+            {ro ? "Mixture of Agents presets" : "Configure Mixture of Agents presets"}
           </h2>
         </header>
         <div className="space-y-4 p-5">
@@ -850,6 +853,14 @@ function MoaModelsModal({
             References produce perspectives; the aggregator is the acting model
             that answers and calls tools.
           </p>
+          {ro && (
+            <p className="text-xs text-text-tertiary">
+              Read-only here — edit presets with{" "}
+              <span className="font-mono">qubit moa configure</span> or the{" "}
+              <span className="font-mono">moa.presets</span> map in
+              config.yaml.
+            </p>
+          )}
 
           <div className="flex flex-wrap items-center gap-2">
             <select
@@ -866,6 +877,7 @@ function MoaModelsModal({
             <Button
               size="sm"
               outlined
+              disabled={ro}
               onClick={() =>
                 setDraft((prev) => ({ ...prev, default_preset: selected }))
               }
@@ -875,7 +887,7 @@ function MoaModelsModal({
             <Button
               size="sm"
               ghost
-              disabled={presetNames.length <= 1}
+              disabled={ro || presetNames.length <= 1}
               onClick={deletePreset}
             >
               Delete
@@ -883,13 +895,14 @@ function MoaModelsModal({
             <Input
               className="h-8 max-w-40 text-xs"
               placeholder="new preset name"
+              disabled={ro}
               value={newName}
               onChange={(event) => setNewName(event.target.value)}
             />
             <Button
               size="sm"
               outlined
-              disabled={!newName.trim() || !!draft.presets[newName.trim()]}
+              disabled={ro || !newName.trim() || !!draft.presets[newName.trim()]}
               onClick={addPreset}
             >
               Add preset
@@ -916,6 +929,7 @@ function MoaModelsModal({
                   >
                     <Switch
                       checked={slot.enabled !== false}
+                      disabled={ro}
                       onCheckedChange={(checked) =>
                         updateSelectedPreset((prev) => ({
                           ...prev,
@@ -933,6 +947,7 @@ function MoaModelsModal({
                     <Button
                       size="sm"
                       outlined
+                      disabled={ro}
                       onClick={() => setPicker({ kind: "reference", index })}
                     >
                       Change
@@ -940,7 +955,7 @@ function MoaModelsModal({
                     <Button
                       size="sm"
                       ghost
-                      disabled={preset.reference_models.length <= 1}
+                      disabled={ro || preset.reference_models.length <= 1}
                       onClick={() =>
                         updateSelectedPreset((prev) => ({
                           ...prev,
@@ -957,6 +972,7 @@ function MoaModelsModal({
                 <Button
                   size="sm"
                   outlined
+                  disabled={ro}
                   onClick={() =>
                     updateSelectedPreset((prev) => ({
                       ...prev,
@@ -982,6 +998,7 @@ function MoaModelsModal({
                   <Button
                     size="sm"
                     outlined
+                    disabled={ro}
                     onClick={() => setPicker({ kind: "aggregator" })}
                   >
                     Change
@@ -999,11 +1016,13 @@ function MoaModelsModal({
           {error && <div className="text-xs text-destructive">{error}</div>}
           <div className="flex justify-end gap-2 pt-2">
             <Button ghost onClick={onClose} disabled={busy}>
-              Cancel
+              {ro ? "Close" : "Cancel"}
             </Button>
-            <Button onClick={() => void save()} disabled={busy || !preset}>
-              {busy ? "Saving…" : "Save"}
-            </Button>
+            {!ro && (
+              <Button onClick={() => void save()} disabled={busy || !preset}>
+                {busy ? "Saving…" : "Save"}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -1183,15 +1202,21 @@ function ModelSettingsPanel({
         </div>
 
         {/* Mixture of Agents — same card/control as the reference. The backend
-            may report no presets (with a `detail` explaining the surface is
-            inert); render that state honestly and keep Configure disabled. */}
+            reports the profile's REAL presets when MoA is opted in, and an
+            explicit opt-in `detail` otherwise. `read_only` means Qubit executes
+            MoA but preset writes go through `qubit moa configure`; the modal is
+            then a viewer. */}
         {(() => {
-          const presetCount = moa ? Object.keys(moa.presets || {}).length : 0;
+          const presetNames = moa ? Object.keys(moa.presets || {}) : [];
+          const presetCount = presetNames.length;
           const configurable = presetCount > 0;
+          const readOnly = Boolean(moa?.read_only);
           const summary = !moa
             ? "not loaded"
             : configurable
-              ? `${moa.reference_models.length} reference${
+              ? `${presetNames.join(", ")} · ${
+                  moa.reference_models.length
+                } reference${
                   moa.reference_models.length === 1 ? "" : "s"
                 } · ${moa.aggregator.provider}/${shortModelName(
                   moa.aggregator.model,
@@ -1209,6 +1234,13 @@ function ModelSettingsPanel({
                 <div className="text-xs font-mono text-text-secondary [overflow-wrap:anywhere]">
                   {summary}
                 </div>
+                {configurable && readOnly && (
+                  <div className="mt-1 text-xs text-text-tertiary [overflow-wrap:anywhere]">
+                    Read-only — edit with{" "}
+                    <span className="font-mono">qubit moa configure</span> or
+                    config.yaml.
+                  </div>
+                )}
                 {!configurable && moa?.detail && (
                   <div className="mt-1 text-xs text-text-tertiary [overflow-wrap:anywhere]">
                     Configured presets appear here once the backend enables the
@@ -1230,7 +1262,7 @@ function ModelSettingsPanel({
                 }
                 className="shrink-0 self-start text-xs uppercase sm:self-center"
               >
-                Configure
+                {readOnly && configurable ? "View" : "Configure"}
               </Button>
             </div>
           );
@@ -1287,6 +1319,7 @@ function ModelSettingsPanel({
           <MoaModelsModal
             config={moa}
             refreshKey={refreshKey}
+            readOnly={Boolean(moa.read_only)}
             onSaved={(next) => {
               setMoa(next);
               onSaved();

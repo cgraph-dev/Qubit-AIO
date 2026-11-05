@@ -7,10 +7,11 @@ Qubit dashboard:
   stricter per-hop SSRF policy (host allowlist + redirect re-validation +
   size/content-type bounds). These tests are fully hermetic: DNS resolution
   and the HTTP layer are injected, so no live network is touched.
-* ``GET /api/model/moa`` — verified and deliberately preserved as a typed
-  refusal. The vendored runtime has MoA internals, but Qubit's canonical model
-  resolver does not route a MoA provider and ships no presets of its own, so
-  returning upstream defaults would fabricate configuration.
+* ``GET /api/model/moa`` — a real read-only surface behind the same opt-in gate
+  the model picker uses. Qubit's engine executes MoA; the compat handler serves
+  the profile's actual presets once ``moa.presets`` is enabled, and an explicit
+  opt-in refusal otherwise (never the merged defaults for an unconfigured
+  profile, and never a writable dashboard PUT).
 """
 from __future__ import annotations
 
@@ -238,29 +239,58 @@ def test_media_proxy_route_is_registered_and_read_authoritative():
     assert webui.qubit_read_authority("/api/media/proxy") is True
 
 
-def test_model_moa_stays_a_truthful_typed_refusal(tmp_path):
-    """Verified gap: preserve the refusal instead of vendored MoA defaults.
+def test_model_moa_serves_the_real_read_only_state(tmp_path, monkeypatch):
+    """MoA is a real engine behind an opt-in gate, not an always-empty refusal.
 
-    The vendored runtime has ``agent/moa_loop.py``/``moa_config.py``, but
-    Qubit's canonical model resolver never advertises a selectable ``moa``
-    provider, so serving upstream's curated presets would claim fan-out the
-    product cannot route (and name providers Qubit does not ship).
+    The vendored runtime executes MoA (``agent/moa_loop.py`` /
+    ``qubit_cli/moa_config.py``) and the model picker advertises the ``moa``
+    provider once the RAW config enables a preset. The compat GET mirrors that
+    gate: real presets when opted in, an explicit opt-in refusal otherwise
+    (never the merged DEFAULT_CONFIG preset for a profile that did not opt in).
     """
     from voicebridge import qubit_compat as QC
 
+    home = tmp_path / "qh"
+    home.mkdir()
+
+    # Unconfigured profile: empty state, exact reason, no fabricated preset.
+    monkeypatch.setenv("QUBIT_HOME", str(home))
     code, body = QC.h_model_moa(None, {}, {}, {})
     assert code == 200 and body["ok"] is True
     assert body["enabled"] is False
     assert body["presets"] == {}
     assert body["reference_models"] == []
-    assert body["aggregator"] == {"provider": "", "model": "",
-                                  "enabled": False}
-    assert "ordered provider fallback" in body["detail"]
-    blob = str(body)
-    assert "openai-codex" not in blob and "openrouter" not in blob
+    assert body["read_only"] is True
+    assert "opt-in" in body["detail"]
+    assert "qubit moa configure" in body["detail"]
+    assert "openai-codex" not in str(body) and "openrouter" not in str(body)
 
+    # Opted-in profile: the real preset the engine would run.
+    (home / "config.yaml").write_text(
+        "moa:\n"
+        "  default_preset: studio\n"
+        "  presets:\n"
+        "    studio:\n"
+        "      reference_models:\n"
+        "        - {provider: openrouter, model: deepseek/deepseek-v4-pro}\n"
+        "      aggregator: {provider: openrouter, model: anthropic/claude-opus-4.8}\n"
+        "      enabled: true\n"
+    )
+    code, body = QC.h_model_moa(None, {}, {}, {})
+    assert code == 200 and body["ok"] is True, body
+    assert body["enabled"] is True
+    assert body["read_only"] is True
+    assert body["default_preset"] == "studio"
+    assert set(body["presets"]) == {"studio"}
+    preset = body["presets"]["studio"]
+    assert preset["reference_models"][0]["provider"] == "openrouter"
+    assert preset["aggregator"]["model"] == "anthropic/claude-opus-4.8"
+    assert "qubit moa configure" in body["detail"]
+
+    # Writes stay a typed read-only refusal, naming the supported path.
     code, refused = QC.moa_put(None, {}, {"reference_models": []}, {})
-    assert code == 501 and refused["code"] == "MOA_SUPERSEDED"
+    assert code == 501 and refused["code"] == "MOA_READ_ONLY"
+    assert "qubit moa" in refused["qubit_counterpart"]
 
 
 def test_raw_media_proxy_route_auth_and_allowlist(tmp_path, monkeypatch):
