@@ -218,3 +218,33 @@ done
 Dependabot disagree on the docs site (56 vs 53 total alerts, 20 vs 5 critical) and on some
 build-only packages; both are reported rather than reconciled. No full matrix, no live
 service/config change, no publish, and no `VERIFIED` claim.
+
+## 7. Addendum — Python criticals applied on `fix5/pydeps` (2026-11-05)
+
+Branch `fix5/pydeps` (base `b257b1b08`) applied the remaining Python critical/major
+fixes without publishing. Files changed: root `pyproject.toml`,
+`qubit_runtime/pyproject.toml`, `qubit_runtime/uv.lock`.
+
+| Package | Before | After | Notes |
+|---|---|---|---|
+| `Pillow` | 12.3.0 | **13.0.0** | Root and vendored pins. `[tool.uv] override-dependencies` forces it because `browser-harness==0.1.13` (newest published) hard-pins `pillow==12.3.0`; browser-harness only uses stable public Pillow APIs. |
+| `filelock` | 3.32.4 | **4.2.6** | New explicit floor `>=4.2.6,<5` in both pyprojects. 4.2.6 is the newest 4.x that clears the repo's 3-day `exclude-newer` quarantine (4.2.7–4.2.9 are too new). |
+| `oauthlib` | 3.3.1 | **4.0.1** | New explicit floor `>=4.0.1,<5` in both pyprojects. |
+| `opentelemetry-api` | 1.39.1 | 1.39.1 | **Not moved.** `opentelemetry-sdk==1.39.1` and `opentelemetry-exporter-otlp-proto-http==1.39.1` pin `opentelemetry-api==1.39.1` exactly; `uv lock --upgrade-package opentelemetry-api` reproduces 1.39.1. Lifting it requires a coordinated bump of the pinned SDK/exporter set. |
+| `PyJWT` | 2.15.0 | 2.15.0 | No patched release exists for `GHSA-gvp8-978c-rx2q`; left as a documented accepted no-fix advisory (2 alerts). |
+
+Verification (focused, no full matrix):
+
+- `(cd qubit_runtime && uv lock --check)` → `LOCK_CHECK_OK`.
+- Temp Python 3.14 venv: Pillow resize/filter/PNG/WebP/thumbnail, pillow-heif 1.6.0
+  HEIF encode/decode, filelock exclusive acquire + timeout, oauthlib 4.0.1 OAuth1/OAuth2,
+  `requests-oauthlib` 2.0.0, and `google-auth-oauthlib` 1.3.1 flow construction all passed.
+  `browser_harness.helpers`/`video_render` import and use Pillow 13 successfully.
+- Focused tests with the new libraries on `PYTHONPATH`: runtime vision/image set
+  **216 passed, 6 skipped**; oauth/provider-auth + filelock set **227 passed**;
+  root MCP-OAuth/auth set **34 passed**; `tests/pm/test_pip_check.py` (reads the real lock)
+  **16 passed**. Pre-existing vision failures in `tests/test_vision8tf.py` and
+  `tests/test_vision_role_resolution9u.py` reproduce byte-identically with the old libraries,
+  so they are not caused by this upgrade.
+- Pillow 13 emits a deprecation warning for `Image.getdata` (removal in Pillow 14) in
+  `qubit_runtime/tests/scripts/test_icon_flavors.py`; tests still pass.

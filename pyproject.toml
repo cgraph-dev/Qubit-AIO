@@ -79,7 +79,13 @@ dependencies = [
     "watchfiles>=0.20,<2",
     "python-multipart>=0.0.9,<1",
     "ptyprocess>=0.7.0,<1; sys_platform != 'win32'",
-    "Pillow==12.3.0",
+    "Pillow==13.0.0",
+    # Explicit floor for the transitive filelock used by the test harness and
+    # build tooling, so it cannot resolve to a vulnerable 3.x.
+    "filelock>=4.2.6,<5",
+    # Explicit floor for the transitive oauthlib behind requests-oauthlib /
+    # google-auth-oauthlib, so OAuth signing cannot resolve to a vulnerable 3.x.
+    "oauthlib>=4.0.1,<5",
     # HEIF/HEIC/AVIF decode for the vision tools (registers a Pillow opener).
     "pillow-heif>=1.4.0,<2",
     # SVG renderer for the icon generator used by source builds.

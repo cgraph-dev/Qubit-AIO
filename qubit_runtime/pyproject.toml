@@ -174,7 +174,13 @@ dependencies = [
   # libs required for the codecs we use, so it's safe to ship in the base
   # install rather than gating it behind an extra + a mid-session lazy install
   # (which deadlocked the CLI under prompt_toolkit — see #40490).
-  "Pillow==12.3.0; python_version >= '3.14'",
+  "Pillow==13.0.0; python_version >= '3.14'",
+  # Explicit floor for the transitive filelock used by the test harness and
+  # build tooling, so the vendored closure cannot resolve to a vulnerable 3.x.
+  "filelock>=4.2.6,<5; python_version >= '3.14'",
+  # Explicit floor for the transitive oauthlib behind requests-oauthlib /
+  # google-auth-oauthlib, so OAuth signing cannot resolve to a vulnerable 3.x.
+  "oauthlib>=4.0.1,<5; python_version >= '3.14'",
   # HEIF/HEIC/AVIF decode for the vision tools. iPhone photos and screenshots
   # are HEIC (frequently mislabeled .jpg by upload pipelines); Pillow has no
   # built-in HEIF codec, so without this the vision resolver rejects them as
@@ -647,6 +653,12 @@ override-dependencies = [
   # replace that requirement too, not only the vendor's upper bound.
   # Remove this line when alibabacloud-tea-openapi lifts the cap.
   "cryptography==50.0.1",
+  # browser-harness 0.1.13 (the newest published release) hard-pins
+  # pillow==12.3.0. That pin is the last unpatched Pillow in the product
+  # closure, so force the reviewed Pillow 13.0.0 here. browser-harness only
+  # uses Pillow's public image API, which is unchanged in 13; remove this
+  # override when a browser-harness release widens the pin.
+  "pillow==13.0.0",
   # misaki[en] (pulled by [kittentts]) lists spacy-curated-transformers.
   # The newest release that fits spacy 3.8 (2.x needs thinc 9), 0.3.1, caps
   # Python below 3.14, so PM's `uv pip check` rejects the venv. Nothing
