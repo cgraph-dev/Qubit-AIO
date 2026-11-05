@@ -831,7 +831,7 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
     if hit is not None:
         return hit
     out = _list_servers_uncached(cfg)
-    RC.put(key, out, RC.ttl_seconds("mcp_servers", 5.0))
+    RC.put(key, out, RC.ttl_seconds("mcp_servers", 300.0))
     return out
 
 

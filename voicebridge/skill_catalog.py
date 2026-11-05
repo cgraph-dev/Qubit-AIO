@@ -368,7 +368,7 @@ def catalog_entries(cfg: Any) -> List[Dict[str, Any]]:
     if hit is not None:
         return hit
     out = _catalog_entries_uncached(cfg)
-    RC.put(key, out, RC.ttl_seconds("skills", 5.0))
+    RC.put(key, out, RC.ttl_seconds("skills", 300.0))
     return out
 
 

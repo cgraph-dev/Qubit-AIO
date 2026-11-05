@@ -130,7 +130,7 @@ def _vision(cfg: Any) -> Dict[str, Any]:
         out = _vision_status(cfg, timeout_s=2.0)
     except Exception as exc:
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
-    RC.put(key, out, RC.ttl_seconds("vision", 10.0))
+    RC.put(key, out, RC.ttl_seconds("vision", 60.0))
     return out
 
 
@@ -243,7 +243,7 @@ def device_inventory(cfg: Any) -> Dict[str, Any]:
     if hit is not None:
         return hit
     out = _device_inventory(cfg)
-    RC.put(key, out, RC.ttl_seconds("device_inventory", 5.0))
+    RC.put(key, out, RC.ttl_seconds("device_inventory", 300.0))
     return out
 
 
@@ -295,7 +295,7 @@ def _marketplace(cfg: Any) -> Dict[str, Any]:
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160],
                 "marketplace": "remote plugin/marketplace installs are "
                                "refused by pinned-source policy"}
-    RC.put(key, out, RC.ttl_seconds("marketplace", 5.0))
+    RC.put(key, out, RC.ttl_seconds("marketplace", 300.0))
     return out
 
 

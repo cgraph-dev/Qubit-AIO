@@ -2372,7 +2372,7 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             return hit
     result = _h_model_options_uncached(cfg, q, b, p)
     if result[0] == 200:
-        _rc.put(key, result, _rc.ttl_seconds("model_options", 10.0))
+        _rc.put(key, result, _rc.ttl_seconds("model_options", 300.0))
     return result
 
 
@@ -2961,7 +2961,7 @@ def h_terminal_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "has_credential": bool(str(getattr(prof, "key_ref", "")
                                        or "").strip()),
         })
-    _rc.put(cache_key, rows, _rc.ttl_seconds("terminal_profiles", 10.0))
+    _rc.put(cache_key, rows, _rc.ttl_seconds("terminal_profiles", 300.0))
     return 200, rows
 
 
@@ -5789,7 +5789,7 @@ def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     if cache_key is not None:
         # The office page polls every 2 s; a 2.5 s window lets the next poll
         # hit while keeping the rendered clock at most one poll behind.
-        _rc.put(cache_key, result, _rc.ttl_seconds("office_tower", 2.5))
+        _rc.put(cache_key, result, _rc.ttl_seconds("office_tower", 60.0))
     return result
 
 

@@ -6188,15 +6188,26 @@ class WebUI:
                 ("mcp_servers", compat.h_mcp_servers),
                 ("office_tower", compat.h_office_tower),
             )
-            timings = {}
-            for name, handler in checks:
-                started = _time.monotonic()
+            interval = 240.0
+            raw = os.environ.get("QUBIT_WEBUI_PREWARM_INTERVAL_S")
+            if raw is not None:
                 try:
-                    handler(cfg, {}, {}, {})
-                except Exception:  # noqa: BLE001 - prewarm is best-effort
-                    log.debug("webui.prewarm.reads %s failed", name, exc_info=True)
-                timings[name] = round((_time.monotonic() - started) * 1000, 1)
-            log_event("webui.prewarm.reads", timings=timings)
+                    interval = max(0.0, float(raw))
+                except ValueError:
+                    interval = 240.0
+            while True:
+                timings = {}
+                for name, handler in checks:
+                    started = _time.monotonic()
+                    try:
+                        handler(cfg, {}, {}, {})
+                    except Exception:  # noqa: BLE001 - prewarm is best-effort
+                        log.debug("webui.prewarm.reads %s failed", name, exc_info=True)
+                    timings[name] = round((_time.monotonic() - started) * 1000, 1)
+                log_event("webui.prewarm.reads", timings=timings)
+                if interval <= 0:
+                    return
+                _time.sleep(interval)
 
         threading.Thread(target=_run, daemon=True, name="read-prewarm").start()
 
