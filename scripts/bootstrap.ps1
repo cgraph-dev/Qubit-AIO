@@ -538,7 +538,6 @@ function Invoke-QubitBootstrap {
         if (-not [string]::IsNullOrEmpty($ProfileName)) {
             $env:QUBIT_PROFILE = $ProfileName
         }
-        $env:QUBIT_BOOTSTRAP = '1'
 
         $hostExe = Get-HostExecutable
         if ([string]::IsNullOrEmpty($hostExe)) {
