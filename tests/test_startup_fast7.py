@@ -119,6 +119,21 @@ def test_health_state_cache_key_tracks_config_mtime(tmp_path, monkeypatch):
     assert len(calls) == 2, calls
 
 
+def test_health_auth_required_matches_the_status_gate(
+        tmp_path, monkeypatch):
+    from voicebridge import qubit_compat as HC
+    from voicebridge import lifecycle as LC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(LC, "health_inventory", lambda _c: {"state": "READY"})
+
+    for token in ("", "sekret"):
+        cfg.data.setdefault("webui", {})["token"] = token
+        expected = HC._status_auth_gate(cfg)["auth_required"]
+        got = HC.h_health(cfg, {}, {}, {})[1]["auth_required"]
+        assert got is expected, (token, got, expected)
+
+
 # ---------------------------------------------------------------------------
 # `qubit --version` fast path
 # ---------------------------------------------------------------------------

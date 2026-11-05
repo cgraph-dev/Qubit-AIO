@@ -744,8 +744,14 @@ def h_health(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         version = "qubit-" + str(getattr(D, "PACKAGE_VERSION", "0.0.2"))
     except Exception:  # noqa: BLE001 - liveness must never crash
         version = "qubit-0.0.2"
+    # Same auth-required rule as ``_status_auth_gate`` (webui.token, then a
+    # bare ``cfg.api_token``), without its provider/flow discovery: liveness
+    # does not need the provider list, and that discovery is the entire warm
+    # cost once the STATE snapshot is cached.
     try:
-        auth_required = bool(_status_auth_gate(cfg).get("auth_required", False))
+        auth_required = bool(
+            str(cfg.get("webui", "token", default="") or "")
+            or str(getattr(cfg, "api_token", "") or ""))
     except Exception:  # noqa: BLE001
         auth_required = False
     state = "READY"
