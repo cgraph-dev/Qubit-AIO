@@ -40,6 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # install), then the checkout. Keeps an isolated install self-contained.
 from . import resources as _resources  # noqa: E402
 from . import qubit_plugins as _qubit_plugins  # noqa: E402
+from . import read_cache as _rc  # noqa: E402
 OVERLAY_DIR = _resources.resource_path("frontend/qubit-app")
 
 Handler = Callable[..., Tuple[int, Dict[str, Any]]]
@@ -2131,8 +2132,8 @@ def _merge_local_ollama_row(payload: Dict[str, Any], cfg: Any) -> None:
         pass
 
 
-def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
-                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+def _h_model_options_uncached(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/model/options -> the real vendored provider/model catalogue.
 
     Owner decision #5: the picker delegates to the vendored Hermes foundation
@@ -2207,6 +2208,42 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     except Exception:  # noqa: BLE001 - markers stay as built on failure
         pass
     return _ok(**_strip_provider_secret_fields(payload))
+
+
+def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Cached provider/model catalogue read.
+
+    The vendored builder resolves provider metadata (and may refresh it) on
+    every call, which made the picker route one of the slowest reads. The
+    result is a non-secret payload (credential values and references are
+    stripped before it is cached) and is keyed by the query args plus the
+    runtime config/auth/profile files, so a config or login change is picked
+    up. ``refresh=1`` always bypasses and re-warms the cache.
+    """
+    refresh = str((q or {}).get("refresh", "")).strip().lower() in {
+        "1", "true", "yes", "on"}
+    try:
+        from . import qubit_runtime as QR
+
+        home = Path(QR.runtime_home_for_cfg(cfg))
+        stamps = _rc.stamp_of(home / "config.yaml", home / "auth.json",
+                              home / "profiles.json")
+        registry = Path(cfg.state_dir()) / "profiles.json"
+        stamps = stamps + _rc.stamp_of(registry)
+    except Exception:  # noqa: BLE001 - still cacheable by config identity
+        stamps = ()
+    key = _rc.cfg_key(cfg, "model_options",
+                      tuple(sorted((str(k), str(v))
+                                   for k, v in (q or {}).items())), stamps)
+    if not refresh:
+        hit = _rc.get(key)
+        if hit is not None:
+            return hit
+    result = _h_model_options_uncached(cfg, q, b, p)
+    if result[0] == 200:
+        _rc.put(key, result, _rc.ttl_seconds("model_options", 10.0))
+    return result
 
 
 def h_model_recommended_default(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -2758,6 +2795,15 @@ def h_terminal_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         current = str(cfg.get("terminal", "profile", default="") or "")
     except Exception:
         current = ""
+    try:
+        registry = R._registry_file(cfg)
+    except Exception:  # noqa: BLE001 - still cacheable by config identity
+        registry = None
+    cache_key = _rc.cfg_key(cfg, "terminal_profiles",
+                            _rc.stamp_of(registry) if registry else ())
+    cached = _rc.get(cache_key)
+    if cached is not None:
+        return 200, cached
     rows: List[Dict[str, Any]] = []
     try:
         profiles = R.load_profiles(cfg)
@@ -2785,6 +2831,7 @@ def h_terminal_profiles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             "has_credential": bool(str(getattr(prof, "key_ref", "")
                                        or "").strip()),
         })
+    _rc.put(cache_key, rows, _rc.ttl_seconds("terminal_profiles", 10.0))
     return 200, rows
 
 
@@ -2825,6 +2872,7 @@ def terminal_profile_set(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             audit_action="terminal_profile_set")
     except Exception as exc:
         return _fail(exc)
+    _rc.invalidate("terminal_profiles")
     try:
         verdict = R.terminal_context_guard(cfg, profile_id=pid)
     except Exception as exc:  # noqa: BLE001 - persist won; report guard state
@@ -5583,6 +5631,23 @@ def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # *empty* org — so a live office is never mixed with a drawing of one, and
     # the C7 rule that an empty tower reports itself empty still holds.
     preview = str((q or {}).get("preview", "")).lower() in ("1", "true", "yes")
+    cache_key = None
+    if now is None:
+        # Repeated dashboard polls within the TTL reuse one computed snapshot.
+        # A caller that pins the clock (``?now=``) always gets a fresh compute,
+        # so tests and previews stay exact. The store (db + WAL) is part of the
+        # key, so an event written by the office runtime is reflected at once.
+        try:
+            db = TWR.store.db_path(cfg)
+            wal = db.with_name(db.name + "-wal")
+            cache_key = _rc.cfg_key(
+                cfg, "office_tower", bool(motion), bool(preview),
+                _rc.stamp_of(db, wal))
+            cached = _rc.get(cache_key)
+            if cached is not None:
+                return cached
+        except Exception:  # noqa: BLE001 - caching must never break the read
+            cache_key = None
     try:
         out = (TWR.motion_states(cfg, now=now) if motion
                else TWR.state(cfg, now=now, preview=preview))
@@ -5590,7 +5655,12 @@ def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return 503, {"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
                      "detail": f"the office store could not be read: "
                                f"{str(exc)[:200]}"}
-    return _ok(**out)
+    result = _ok(**out)
+    if cache_key is not None:
+        # The office page polls every 2 s; a 2.5 s window lets the next poll
+        # hit while keeping the rendered clock at most one poll behind.
+        _rc.put(cache_key, result, _rc.ttl_seconds("office_tower", 2.5))
+    return result
 
 
 # ===========================================================================
