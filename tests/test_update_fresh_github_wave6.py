@@ -178,8 +178,8 @@ def test_installed_layout_check_reports_git_checkout_and_available_update(tmp_pa
     checkout = tmp_path / "install"
 
     bare.parent.mkdir(parents=True)
-    _git(["init", "--bare", "-b", "main", str(bare)], tmp_path, env)
-    _git(["init", "-b", "main", str(source)], tmp_path, env)
+    _git(["init", "--bare", "-b", "production", str(bare)], tmp_path, env)
+    _git(["init", "-b", "production", str(source)], tmp_path, env)
     (source / "VERSION").write_text("1\n")
     (source / "pyproject.toml").write_text(
         "[project]\nname = \"qubit-voicebridge\"\nversion = \"0.0.5\"\n")
@@ -187,12 +187,12 @@ def test_installed_layout_check_reports_git_checkout_and_available_update(tmp_pa
     _git(["add", "-A"], source, env)
     _git(["commit", "-m", "first"], source, env)
     _git(["remote", "add", "origin", str(bare)], source, env)
-    _git(["push", "-u", "origin", "main"], source, env)
+    _git(["push", "-u", "origin", "production"], source, env)
     _git(["clone", str(bare), str(checkout)], tmp_path, env)
     first = _git(["rev-parse", "HEAD"], checkout, env)
 
     second = _commit(source, env, "2\n", "second")
-    _git(["push", "origin", "main"], source, env)
+    _git(["push", "origin", "production"], source, env)
 
     module = _installed_module(checkout)
     monkeypatch.setattr(UM, "__file__", str(module))

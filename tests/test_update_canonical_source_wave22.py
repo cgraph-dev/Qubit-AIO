@@ -1,8 +1,8 @@
 """Wave 22 — canonical Qubit update source resolution.
 
-The canonical public repository is ``cgraph-dev/Qubit-AIO``
-(``https://github.com/cgraph-dev/Qubit-AIO.git``), channel ``stable``,
-branch ``main``. This suite proves, hermetically (injected git runners and
+The canonical public repository is ``cgraph-dev/Qubit``
+(``https://github.com/cgraph-dev/Qubit.git``), channel ``stable``,
+branch ``production``. This suite proves, hermetically (injected git runners and
 injected remote-URL lookups — no network, no real checkout, no ``~/.hermes``):
 
 * a fresh install with no configured source resolves to the canonical URL;
@@ -27,7 +27,7 @@ sys.path.insert(0, str(REPO_ROOT))
 
 LOCAL_SHA = "a" * 40
 REMOTE_SHA = "b" * 40
-CANONICAL = "https://github.com/cgraph-dev/Qubit-AIO.git"
+CANONICAL = "https://github.com/cgraph-dev/Qubit.git"
 OPENCLAW_ORIGIN = "https://github.com/cgraph-dev/openclaw-voice-bridge.git"
 HERMES_ORIGIN = "https://github.com/NousResearch/hermes-agent.git"
 
@@ -64,7 +64,7 @@ def test_resolve_source_no_config_is_canonical():
     assert out["url"] == CANONICAL
     assert out["source_kind"] == "canonical"
     assert out["channel"] == "stable"
-    assert out["branch"] == "main"
+    assert out["branch"] == "production"
     assert out["follow"] == "tag"
 
 

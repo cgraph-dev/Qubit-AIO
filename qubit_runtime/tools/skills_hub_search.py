@@ -27,7 +27,8 @@ from tools.skills_hub_sources import BrowseShSource, LobeHubSource, UrlSource, W
 # Log-record parity with the origin module.
 logger = logging.getLogger("tools.skills_hub")
 
-QUBIT_INDEX_URL = install_source.raw_asset_url("website/static/api/skills-index.json")
+QUBIT_INDEX_URL = install_source.raw_asset_url(
+    "qubit_runtime/website/static/api/skills-index.json")
 QUBIT_INDEX_TTL = 6 * 3600  # 6 hours
 
 

@@ -36,10 +36,10 @@ restoring.
 ## 2. Source and ref
 
 With no extra flags the updater follows the clone's own `origin` and the
-configured branch (`update.branch`, default `main`). Both Qubit-owned
-repositories are recognised as first-party origins, so a clone of the public
-`cgraph-dev/Qubit` repository updates from that origin instead of being
-redirected to another repository.
+configured branch (`update.branch`, default `production`). The public
+`cgraph-dev/Qubit` repository (default branch `production`) is the canonical
+destination; the retired private `cgraph-dev/Qubit-AIO` spelling is still
+recognised as a read-old origin so an existing checkout is not orphaned.
 
 ```bash
 qubit update --channel stable   # newest strict vX.Y.Z release tag

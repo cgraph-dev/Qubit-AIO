@@ -321,9 +321,10 @@ def test_live_catalog_url_targets_the_runtime_website_assets(monkeypatch):
     assert pc.LIVE_CATALOG_PATH == (
         "qubit_runtime/website/static/api/plugin-catalog.json")
     assert pc.LIVE_CATALOG_URL.endswith(
-        "/qubit_runtime/website/static/api/plugin-catalog.json")
+        "/cgraph-dev/Qubit/production/qubit_runtime/website/static/api/plugin-catalog.json")
     # The old root-relative path is the defect this pins against.
-    assert "/main/website/static/api/plugin-catalog.json" not in pc.LIVE_CATALOG_URL
+    assert "/production/website/static/api/plugin-catalog.json" not in pc.LIVE_CATALOG_URL
+    assert "Qubit-AIO" not in pc.LIVE_CATALOG_URL
 
     # The resolver honours its override and keeps the corrected path.
     monkeypatch.setenv("QUBIT_RAW_ASSET_BASE_URL", "https://raw.example/")
