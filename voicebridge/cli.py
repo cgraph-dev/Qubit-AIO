@@ -7901,7 +7901,17 @@ def _update_resolve_channel(cfg, source, channel, tag):
             f"unknown update channel {channel!r} (valid: "
             f"{', '.join(UC.CHANNELS)})")
 
-    resolved = UC.resolve_source(cfg, src)
+    # Resolve the source against the real checkout: without ``repo`` a default
+    # ``origin`` lookup runs in the caller's cwd, silently falls back to the
+    # canonical repository, and a public clone loses its own remote (and its
+    # release tags) whenever a channel/tag is selected.
+    try:
+        from . import update_manager as _UM
+
+        repo = _UM.repo_root(cfg)
+    except Exception:  # noqa: BLE001 — optional; a bare URL source still works
+        repo = None
+    resolved = UC.resolve_source(cfg, src, repo=repo)
     if channel:
         resolved["channel"] = channel
     if tag:

@@ -252,3 +252,18 @@ def test_persisted_channel_is_used_by_the_next_bare_check(monkeypatch):
         channel="", tag="", backup_dir=None, dry_run=False))
     assert rc == 0
     assert seen.get("channel") == "stable", seen
+
+
+def test_channel_resolution_reads_the_checkout_origin(tmp_path, monkeypatch):
+    from voicebridge import cli as CLI
+
+    seen = {}
+
+    def fake_resolve(cfg, source=None, *, repo=None, remote_url_lookup=None):
+        seen["repo"] = repo
+        return {"ok": True, "remote": "origin"}
+
+    monkeypatch.setattr(UM, "repo_root", lambda _cfg: tmp_path)
+    monkeypatch.setattr(UC, "resolve_source", fake_resolve)
+    assert CLI._update_resolve_channel(None, None, "stable", None) == "origin"
+    assert seen["repo"] == tmp_path
