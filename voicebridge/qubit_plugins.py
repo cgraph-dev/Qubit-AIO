@@ -1069,6 +1069,26 @@ def h_plugin_kanban_orchestration(
     return _kanban_read(cfg, "get_orchestration_settings")
 
 
+def h_plugin_kanban_workflow(
+        cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+        p: Dict[str, str]) -> Tuple[int, Any]:
+    """Board columns, manual move allow-list, and the archive marker.
+
+    Every board uses the runtime's one default workflow today (the vendored
+    plugin has no per-board ``board.json`` yet), so this serves the SAME
+    ``kanban_workflow.DEFAULT_WORKFLOW.to_dict()`` shape the vendored
+    ``GET /workflow`` returns — real column/label/icon/drag-target and move
+    data, not a synthesized placeholder. Nothing is mutated.
+    """
+    _prepare_runtime(cfg)
+    try:
+        from qubit_cli import kanban_workflow
+
+        return 200, kanban_workflow.DEFAULT_WORKFLOW.to_dict()
+    except Exception as exc:  # noqa: BLE001 - typed refusal, never a bare 500
+        return _fail(exc, "kanban")
+
+
 # ---------------------------------------------------------------------------
 # Plugin fleet discovery
 # ---------------------------------------------------------------------------

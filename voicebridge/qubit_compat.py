@@ -40,6 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # install), then the checkout. Keeps an isolated install self-contained.
 from . import resources as _resources  # noqa: E402
 from . import qubit_plugins as _qubit_plugins  # noqa: E402
+from . import qubit_desktop_plugins as _qubit_desktop_plugins  # noqa: E402
 from . import read_cache as _rc  # noqa: E402
 OVERLAY_DIR = _resources.resource_path("frontend/qubit-app")
 
@@ -11453,6 +11454,17 @@ _NO_REMOTE = _g("BLOCKED_REMOTE_SOURCE",
                 "Remote fetch is refused; only local reviewed manifests install "
                 "with explicit confirmation.",
                 "CLI `qubit skills install <local-manifest>` + 7E validation")
+# The desktop-plugin READ routes are served from the host tree (see
+# ``qubit_desktop_plugins``); reconcile is the one write in that family. Native
+# Desktop owns the copy pass on its own disk, and the vendored Webapp surface
+# owns the browser-hosted variant. The Qubit dashboard surface is read-only.
+_GATE_DESKTOP_RECONCILE = _g(
+    "DESKTOP_PLUGINS_RECONCILE_UNAVAILABLE",
+    "The Qubit dashboard surface serves the desktop-plugin tree read-only; it "
+    "does not copy unified packages' desktop halves. Native Desktop reconciles "
+    "on its own disk and the Webapp surface owns the browser-hosted variant.",
+    "native Desktop plugin loader, or the Webapp surface's "
+    "POST /api/desktop-plugins/reconcile")
 _NO_OAUTH = _g("OAUTH_MANUAL_HANDOFF",
                "No live OAuth token dance is performed; enrollment is a manual "
                "handoff in the user's own browser.",
@@ -11665,6 +11677,15 @@ _r("PUT", r"/api/ui-preferences", "h_ui_preferences_write")
 _r("PATCH", r"/api/ui-preferences", "h_ui_preferences_write")
 # Remote Webapp access is not shipped: report honest local/token state.
 _r("GET", r"/api/webapp-access/status", "h_webapp_access_status")
+# Desktop-plugin READ surface (the browser loader's three reads). The vendored
+# routes exist but the dashboard surface's policy keeps them off, so the fork
+# proxy answers 404; these handlers call the same audited vendored helpers over
+# the host tree. Reconcile (the one write) stays a typed refusal.
+_r("GET", r"/api/desktop-plugins/root", "h_desktop_plugins_root")
+_r("GET", r"/api/desktop-plugins/list", "h_desktop_plugins_list")
+_r("GET", r"/api/desktop-plugins/read", "h_desktop_plugins_read")
+_r("POST", r"/api/desktop-plugins/reconcile", "__gate__", "gated",
+   _GATE_DESKTOP_RECONCILE)
 _r("POST", r"/api/browser/open", "h_browser_open")
 _r("GET", r"/api/egress/status", "h_egress_status")
 _r("GET", r"/api/model/info", "h_model_info")
@@ -11986,6 +12007,10 @@ _r("GET", r"/api/plugins/kanban/runs/(?P<run_id>[^/]+)",
 _r("GET", r"/api/plugins/kanban/profiles", "h_plugin_kanban_profiles")
 _r("GET", r"/api/plugins/kanban/orchestration",
    "h_plugin_kanban_orchestration")
+# Board columns + manual-move allow-list. The vendored plugin's one real
+# WORKFLOW read was not mirrored here, so the dashboard's board settings tab
+# got a bare no-compat-route 404 even though the same module owns the data.
+_r("GET", r"/api/plugins/kanban/workflow", "h_plugin_kanban_workflow")
 # Binary-capable attachment download. The vendored dashboard calls
 # GET /api/plugins/kanban/attachments/{id} and downloads the bytes; the compat
 # dispatcher is a JSON surface, so the handler serves the SAME vendored kanban
@@ -20278,7 +20303,11 @@ _EXTRA_HANDLERS: Dict[str, Handler] = {
     "h_plugin_kanban_profiles": _qubit_plugins.h_plugin_kanban_profiles,
     "h_plugin_kanban_orchestration":
         _qubit_plugins.h_plugin_kanban_orchestration,
+    "h_plugin_kanban_workflow": _qubit_plugins.h_plugin_kanban_workflow,
     "h_plugin_kanban_events": _qubit_plugins.h_plugin_kanban_events,
+    "h_desktop_plugins_root": _qubit_desktop_plugins.h_desktop_plugins_root,
+    "h_desktop_plugins_list": _qubit_desktop_plugins.h_desktop_plugins_list,
+    "h_desktop_plugins_read": _qubit_desktop_plugins.h_desktop_plugins_read,
     "h_plugin_fleet": _qubit_plugins.h_plugin_fleet,
 }
 
