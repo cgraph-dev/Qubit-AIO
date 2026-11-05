@@ -249,6 +249,7 @@ def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
         and not ext_dir
         and (tui_dir / "dist" / "entry.js").is_file()
         and not (tui_dir.parent / ".git").exists()
+        and not (tui_dir.parent / "scripts" / "build" / "tui.mjs").is_file()
     ):
         return [_tui_node_bin("node"), "--expose-gc", str(tui_dir / "dist/entry.js")], tui_dir
 

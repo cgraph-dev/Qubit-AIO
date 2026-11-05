@@ -100,6 +100,37 @@ def test_prebuilt_bundle_launch_does_not_touch_missing_source(tmp_path, monkeypa
 
 
 @pytest.mark.platforms("posix")
+def test_packaged_tree_uses_dist_without_source_rebuild(tmp_path, monkeypatch):
+    """A wheel tree carries ``ui-tui/dist`` but no ``.git`` or ``scripts/build``.
+
+    The launcher must select the compiled entry before it reaches the source
+    dependency/build path (the wheel intentionally omits the npm workspace).
+    """
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is unavailable")
+    root = tmp_path / "runtime"
+    tui = root / "ui-tui"
+    _touch_tui_entry(tui)
+    assert not (root / ".git").exists()
+
+    monkeypatch.delenv("HERMES_TUI_DIR", raising=False)
+    monkeypatch.setenv("HERMES_NODE", node)
+    monkeypatch.setattr(main_tui_launch, "_find_bundled_tui", lambda: None)
+
+    def _boom(*args, **kwargs):
+        raise AssertionError("the packaged tree tried to rebuild from source")
+
+    monkeypatch.setattr(main_tui_launch, "_ensure_tui_workspace", _boom)
+    monkeypatch.setattr(main_tui_launch, "_tui_need_rebuild", _boom)
+
+    argv, cwd = main_tui_launch._make_tui_argv(tui, tui_dev=False)
+    assert cwd == tui
+    assert argv[-1] == str(tui / "dist/entry.js")
+    assert argv[0] == node
+
+
+@pytest.mark.platforms("posix")
 @pytest.mark.parametrize("local_tsx", [False, True])
 def test_dev_launch_builds_ink_before_running_source(tui_source, local_tsx):
     root, acquired = tui_source
