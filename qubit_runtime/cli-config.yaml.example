@@ -1,22 +1,22 @@
-# Hermes Agent CLI Configuration
-# Copy settings from this example into ~/.hermes/config.yaml, or use
+# Qubit Agent CLI Configuration
+# Copy settings from this example into ~/.qubit/config.yaml, or use
 # `qubit config set <section.key> <value>` to update the active profile.
 # This file configures CLI behavior; only documented secret environment
 # variables in .env take precedence over their corresponding settings.
 
 # Schema version of this file. The installers copy it to seed config.yaml, and
 # `qubit update` uses it to know which one-time migrations the file already
-# has. Hermes manages it: do not copy it into another config.
+# has. Qubit manages it: do not copy it into another config.
 _config_version: 52
 
 # =============================================================================
 # Database Configuration
 # =============================================================================
-# WAL is the normal default. Hermes automatically falls back to DELETE when
+# WAL is the normal default. Qubit automatically falls back to DELETE when
 # SQLite reports that WAL is incompatible with the filesystem. Set this to
 # "delete" explicitly for deployments whose backing filesystem is not WAL
 # crash-safe, such as Linux containers bind-mounted through macOS virtiofs,
-# NFS, or SMB. Hermes will not live-downgrade a database already open in WAL.
+# NFS, or SMB. Qubit will not live-downgrade a database already open in WAL.
 database:
   journal_mode: "wal"  # Supported values: "wal", "delete"
   # Optional WAL sizing pragmas (integers). Unset = SQLite defaults.
@@ -35,7 +35,7 @@ database:
 # =============================================================================
 # Runtime Limits
 # =============================================================================
-# Long-running Hermes server processes raise their RLIMIT_NOFILE soft limit to
+# Long-running Qubit server processes raise their RLIMIT_NOFILE soft limit to
 # this value when the operating system permits it. The value is clamped to the
 # hard limit and never lowers an already higher soft limit. Set to 0, false, or
 # null to disable the adjustment. Default: 4096.
@@ -133,15 +133,15 @@ model:
   # ── Token limits — two settings, easy to confuse ──────────────────────────
   #
   # context_length: TOTAL context window (input + output tokens combined).
-  #   Controls when Hermes compresses history and validates requests.
-  #   Leave unset — Hermes auto-detects the correct value from the provider.
+  #   Controls when Qubit compresses history and validates requests.
+  #   Leave unset — Qubit auto-detects the correct value from the provider.
   #   Set manually only when auto-detection is wrong (e.g. a local server with
   #   a custom num_ctx, or a proxy that doesn't expose /v1/models).
   #
   # context_length: 131072
   #
   # ollama_num_ctx: Ollama only — the num_ctx sent on every chat request.
-  #   Hermes auto-detects the model's window and sends it (Ollama otherwise
+  #   Qubit auto-detects the model's window and sends it (Ollama otherwise
   #   defaults to 2048); context_length, if set, caps the detected value.
   #   An explicit ollama_num_ctx is sent as-is (never capped) — set it to
   #   pin VRAM use.
@@ -149,7 +149,7 @@ model:
   # ollama_num_ctx: 32768
   #
   # Output-token limits are provider-owned, not user configuration. Native
-  # protocols requiring a limit receive an internal value from Hermes.
+  # protocols requiring a limit receive an internal value from Qubit.
 
   # ── Custom request headers (optional) ─────────────────────────────────────
   #
@@ -184,7 +184,7 @@ model:
   #       CF-Access-Client-Secret: "${CF_ACCESS_SECRET}"
   #       X-Client-Name: "qubit"
   #
-  # session_affinity_header: NAME of a header that carries Hermes' conversation
+  # session_affinity_header: NAME of a header that carries Qubit's conversation
   # id on every request to that provider (all api_modes + auxiliary calls). Off
   # unless set. For session-aware proxies that otherwise treat each agent-loop
   # request as a new conversation and replay the whole history upstream.
@@ -225,7 +225,7 @@ model:
 # Enterprise gateways often issue SHORT-LIVED bearers (SSO/OIDC brokers, cloud
 # IAM, internal auth proxies) rather than static API keys, so a value copied
 # into .env via `key_env` is stale within the hour and every later request 401s.
-# `key_cmd` names a command that PRINTS a token instead: Hermes runs it per
+# `key_cmd` names a command that PRINTS a token instead: Qubit runs it per
 # request (cached until shortly before expiry), so long sessions keep working
 # with no restart.
 #
@@ -309,7 +309,7 @@ model:
 # =============================================================================
 # Unified Timeouts (operation deadlines)
 # =============================================================================
-# One place to override Hermes's internal operation deadlines (seconds).
+# One place to override Qubit's internal operation deadlines (seconds).
 # Keys are dotted paths resolved by agent/deadline.py:resolve_timeout().
 # Precedence: this section > legacy QUBIT_* env var (back-compat) > built-in
 # default. 0 or a negative value disables the bound (unbounded); very large
@@ -467,7 +467,7 @@ terminal:
 #   # chosen docker_image expects to start as root.
 #   docker_run_as_host_user: true
 #   # Optional: explicitly forward selected env vars into Docker.
-#   # These values come from your current shell first, then ~/.hermes/.env.
+#   # These values come from your current shell first, then ~/.qubit/.env.
 #   # Warning: anything forwarded here is visible to commands run in the container.
 #   docker_forward_env:
 #     - "GITHUB_TOKEN"
@@ -542,7 +542,7 @@ terminal:
 # - Password is cached for the session
 #
 # EMPTY PASSWORDS: Setting sudo_password to an explicit empty string is different
-# from leaving it unset. Hermes will try an empty password via `sudo -S` and
+# from leaving it unset. Qubit will try an empty password via `sudo -S` and
 # will not open the interactive prompt. This is useful for passwordless sudo,
 # Touch ID sudo setups, and environments where prompting is just noise.
 #
@@ -584,11 +584,11 @@ terminal:
 #   enabled: true
 #   # Language servers only load code a project ships (its .venv interpreter,
 #   # node_modules TypeScript, svelte.config.js, cargo/Gradle/mix build files)
-#   # in the git worktree of the directory you launched Hermes in or opened
+#   # in the git worktree of the directory you launched Qubit in or opened
 #   # the session in (qubit -w, a Desktop project, terminal.cwd), or under a
 #   # directory listed here. In other checkouts, such as a repository the agent
 #   # cloned, only servers that run no project code start (pinned to
-#   # Hermes-side tools) and the npx tsc / rustfmt lint fallbacks are skipped.
+#   # Qubit-side tools) and the npx tsc / rustfmt lint fallbacks are skipped.
 #   trusted_workspaces:
 #     - ~/code/my-app
 
@@ -600,7 +600,7 @@ browser:
   # after this period of no activity between agent loops (default: 120 = 2 minutes)
   inactivity_timeout: 120
   # Let an authenticated browser extension register as the controller for an
-  # existing Hermes session. Disabled by default. Local API registration also
+  # existing Qubit session. Disabled by default. Local API registration also
   # requires the API server bearer key to be configured.
   extension_control:
     enabled: false
@@ -712,7 +712,7 @@ compression:
   # cap above the window is a no-op. Survives model switches and fallback activations.
   # threshold_tokens: 200000
 
-  # Existing Codex gpt-5.5 behavior: raise Hermes' compaction trigger to 85%
+  # Existing Codex gpt-5.5 behavior: raise Qubit's compaction trigger to 85%
   # for the ChatGPT Codex OAuth route. Set false to opt back down to threshold.
   codex_gpt55_autoraise: true
 
@@ -743,19 +743,19 @@ compression:
   max_attempts: 3
 
   # Codex app-server (codex CLI runtime) thread-compaction mode. The codex
-  # agent owns the real thread context on this runtime, so Hermes' summarizer
+  # agent owns the real thread context on this runtime, so Qubit's summarizer
   # cannot shrink it — compaction goes through the app server instead.
   #   native = let Codex decide when to compact its own thread (default)
-  #   qubit = let Hermes threshold trigger Codex thread/compact/start
-  #   off    = Hermes will not auto-trigger compaction; Codex may still compact natively
+  #   qubit = let Qubit threshold trigger Codex thread/compact/start
+  #   off    = Qubit will not auto-trigger compaction; Codex may still compact natively
   codex_app_server_auto: native
 
   # Native OpenAI Responses server-side compaction (default: false). When true,
   # gpt-5.6-family models on the DIRECT OpenAI API (api.openai.com) or a ChatGPT
   # Codex subscription, plus gpt-6-astra (and its -900k alias) on official Codex OAuth, compact
   # server-side: OpenAI prunes older context into an
-  # encrypted checkpoint that Hermes replays on later turns. No other provider,
-  # route, or model is affected. Hermes' local compression stays armed as the
+  # encrypted checkpoint that Qubit replays on later turns. No other provider,
+  # route, or model is affected. Qubit's local compression stays armed as the
   # fallback and still handles every non-eligible session.
   codex_responses_native: false
 
@@ -859,7 +859,7 @@ prompt_caching:
 # =============================================================================
 # Auxiliary Models (Advanced — Experimental)
 # =============================================================================
-# Hermes uses lightweight "auxiliary" models for side tasks: image analysis,
+# Qubit uses lightweight "auxiliary" models for side tasks: image analysis,
 # browser screenshot analysis, web page summarization, TTS audio-tag insertion,
 # and context compression.
 #
@@ -1026,7 +1026,7 @@ memory:
 # unlimited concurrent sessions. When the limit is reached, new sessions get a
 # clean error while existing active sessions keep their normal behavior. This
 # top-level key takes precedence over gateway.max_concurrent_sessions. The cap
-# is a best-effort single-host/profile runtime guard; Hermes fails open if the
+# is a best-effort single-host/profile runtime guard; Qubit fails open if the
 # local runtime lease registry cannot be read or locked.
 max_concurrent_sessions: null
 
@@ -1039,10 +1039,10 @@ group_sessions_per_user: true
 # =============================================================================
 # Session Storage Retention (state.db)
 # =============================================================================
-# ~/.hermes/state.db keeps every session, message, and tool call, plus the
+# ~/.qubit/state.db keeps every session, message, and tool call, plus the
 # FTS5 search indexes. Since #54189, auto-pruning is ON by default so the file
 # stays bounded: at CLI/gateway/cron startup (at most once per
-# min_interval_hours) Hermes deletes ENDED sessions whose last activity is
+# min_interval_hours) Qubit deletes ENDED sessions whose last activity is
 # older than retention_days. Open, pinned, and in-progress sessions are never
 # deleted. Stale automation sessions (cron/kanban/subagent/one-shot CLI) whose
 # process died without closing them are first *closed*, then aged through a
@@ -1065,7 +1065,7 @@ group_sessions_per_user: true
 # Optional direct endpoint for autonomous Bot Mode rooms spanning gateways.
 # Leave unset for the safe default: Desktop coordinates cross-gateway rooms and
 # same-gateway rooms can still continue on their own. Set this only to the
-# public HTTPS base URL that another trusted Hermes gateway can reach. The API
+# public HTTPS base URL that another trusted Qubit gateway can reach. The API
 # server key authorizes the initial invitation; scoped grants are signed by a
 # separate installation-private secret and survive API-key rotation. Disbanding
 # a Group Chat revokes its known peer routes; API-key rotation alone does not.
@@ -1075,10 +1075,10 @@ group_sessions_per_user: true
 # must use HTTPS.
 #
 # gateway:
-#   room_link_url: "https://hermes.example.net"
+#   room_link_url: "https://qubit.example.net"
 #
 # The equivalent environment override is QUBIT_ROOM_LINK_URL. After changing
-# it, restart the gateway and reopen New Group Chat > Advanced; Hermes will
+# it, restart the gateway and reopen New Group Chat > Advanced; Qubit will
 # re-check the selected gateways automatically.
 
 # Startup sweep of session rows orphaned by a dead gateway process.
@@ -1098,7 +1098,7 @@ group_sessions_per_user: true
 # API Server — per-client model routing
 # ─────────────────────────────────────────────────────────────────────────────
 # Route different API clients to different models/providers on a single
-# Hermes deployment.  Clients choose a backend by sending a specific string
+# Qubit deployment.  Clients choose a backend by sending a specific string
 # as the OpenAI ``model`` field.  Unmapped model values fall back to the
 # global model configured in the ``model:`` section above, and an explicit
 # session /model override always wins over a route.
@@ -1156,9 +1156,9 @@ skills:
   creation_nudge_interval: 15
 
   # External skill directories — share skills across tools/agents without
-  # copying them into ~/.hermes/skills/.  Each path is expanded (~ and ${VAR})
+  # copying them into ~/.qubit/skills/.  Each path is expanded (~ and ${VAR})
   # and resolved to an absolute path.  External dirs are read-only: skill
-  # creation always writes to ~/.hermes/skills/.  Local skills take precedence
+  # creation always writes to ~/.qubit/skills/.  Local skills take precedence
   # when names collide.
   # external_dirs:
   #   - ~/.agents/skills
@@ -1179,7 +1179,7 @@ agent:
   # gateway_timeout: 1800
 
   # Maximum time an alias routing key waits for an active turn holding the same
-  # resolved session lease. On expiry Hermes rejects this inbound message and
+  # resolved session lease. On expiry Qubit rejects this inbound message and
   # asks the user to resend rather than running it without serialization.
   # Non-positive values fall back to the 5-second default.
   # gateway_turn_lease_timeout: 5
@@ -1197,7 +1197,7 @@ agent:
 
   # Transcript-sanitiser repeated-heal escalation (#96870). The pre-send
   # sanitiser silently repairs empty non-final turns on the wire copy; after
-  # this many heal passes within a 10-minute session window Hermes logs one
+  # this many heal passes within a 10-minute session window Qubit logs one
   # ERROR (with session id + heal pattern) and sends a ONE-TIME out-of-band
   # notice to the user suggesting /debug share or `qubit doctor`. The notice
   # goes through the status channel only — conversation context and prompt
@@ -1257,12 +1257,12 @@ agent:
   # timeouts, 5xx, etc.) before the agent surfaces the failure. Lower this
   # to 1 if you use fallback providers and want fast failover on flaky
   # primaries (default 3). The OpenAI SDK does its own low-level retries
-  # underneath this wrapper — this is the Hermes-level loop.
+  # underneath this wrapper — this is the Qubit-level loop.
   # api_max_retries: 3
 
   # Once api_max_retries AND the fallback chain are spent on a transient outage
   # (5xx, overloaded/529, connect/read timeouts) and nothing has been delivered
-  # yet, Hermes waits and retries this many more cycles (jittered 15/30/60/60/60s;
+  # yet, Qubit waits and retries this many more cycles (jittered 15/30/60/60/60s;
   # a provider Retry-After wins, up to 120s) showing "Provider temporarily
   # unavailable — retrying automatically in Ns (cycle k/5); press Esc to stop"
   # instead of ending the turn. Auth/format/billing/policy errors never enter.
@@ -1278,7 +1278,7 @@ agent:
   # QUBIT_VERIFY_ON_STOP env var (1/0) takes precedence.
   # verify_on_stop: false
 
-  # Standing operator instructions for the coding posture (when Hermes is in a
+  # Standing operator instructions for the coding posture (when Qubit is in a
   # code workspace). Appended to the coding brief as an extra system block, so
   # you can pin project-wide workflow rules without editing the shipped brief.
   # Accepts a string or a list of strings. Takes effect next session.
@@ -1443,12 +1443,12 @@ platform_toolsets:
 #       rich_drafts: false            # Experimental rich draft previews during Telegram DM streaming; default false because Telegram Desktop/macOS can visually overlay draft frames
 #       allow_cjk_rich_messages: false # Keep CJK content on the safe MarkdownV2 path unless an unaffected client explicitly opts in to native rich rendering
 #       command_menu:
-#         # Telegram allows up to 100 BotCommands; Hermes defaults to 60 so
+#         # Telegram allows up to 100 BotCommands; Qubit defaults to 60 so
 #         # all built-in commands plus common skill commands stay visible
 #         # while remaining under Telegram's payload-size limit. Clamped 1..100.
 #         max_commands: 60
-#         # prepend = user priority first, then Hermes defaults
-#         # append  = Hermes defaults first, then user priority
+#         # prepend = user priority first, then Qubit defaults
+#         # append  = Qubit defaults first, then user priority
 #         # replace = only the list below defines priority
 #         priority_mode: prepend
 #         # Priority is applied across core + plugin + skill commands before
@@ -1618,7 +1618,7 @@ platform_toolsets:
 # =============================================================================
 # Text-to-Speech
 # =============================================================================
-# TTS defaults to Edge TTS unless changed in ~/.hermes/config.yaml.
+# TTS defaults to Edge TTS unless changed in ~/.qubit/config.yaml.
 # Gemini TTS supports persona/director prompt files, and Gemini 3.1 Flash TTS
 # can use a hidden auxiliary rewrite pass to insert expressive square-bracket
 # audio tags into the TTS script without showing tags in chat.
@@ -1637,7 +1637,7 @@ platform_toolsets:
 #     model: "gemini-3.1-flash-tts-preview"
 #     voice: "Kore"
 #     audio_tags: false
-#     persona_prompt_file: ""  # e.g. ~/.hermes/tts/radio-host.md
+#     persona_prompt_file: ""  # e.g. ~/.qubit/tts/radio-host.md
 #   xai:
 #     voice_id: "eve"       # built-in or custom voice ID from xAI Console
 #     language: "en"        # BCP-47 code ("en", "pt-BR") or "auto"
@@ -1675,7 +1675,7 @@ stt:
   # that provider.
   #
   # Length / truncation contract: Whisper-family backends (local, openai,
-  # groq, deepinfra) only use the final ~224 prompt tokens, so Hermes
+  # groq, deepinfra) only use the final ~224 prompt tokens, so Qubit
   # truncates longer prompts client-side (keeping the tail) with a WARNING
   # log — never an error. Other backends own their own validation.
   #
@@ -1687,7 +1687,7 @@ stt:
   #   local_command/xai/
   #   elevenlabs             -> unsupported; DEBUG log, then continue
   #   plugin providers       -> `prompt` in `**extra`; plugin owns limits
-  # prompt: "Hermes, Teknium, Nous Research, kanban"
+  # prompt: "Qubit, Teknium, Nous Research, kanban"
   local:
     model: "base"              # tiny | base | small | medium | large-v3 | turbo
     # language: ""             # auto-detect; set to "en", "es", "fr", etc. to force
@@ -1738,7 +1738,7 @@ stt:
 #     model: ""
 #     voice: "default"
 
-# "Hey Hermes" hands-free wake word (off by default; toggle with /wake).
+# "Hey Qubit" hands-free wake word (off by default; toggle with /wake).
 # Full engine/provider options inherit from DEFAULT_CONFIG in
 # qubit_cli/config_defaults.py — only capture placement is documented here.
 # wake_word:
@@ -1788,7 +1788,7 @@ stt:
 # =============================================================================
 # Code Execution Sandbox (Programmatic Tool Calling)
 # =============================================================================
-# The execute_code tool runs Python scripts that call Hermes tools via RPC.
+# The execute_code tool runs Python scripts that call Qubit tools via RPC.
 # Intermediate tool results stay out of the LLM's context window.
 code_execution:
   timeout: 300         # Max seconds per script before kill (default: 300 = 5 min)
@@ -1842,7 +1842,7 @@ delegation:
 #
 # Requires: qubit plugins install honcho (Plastic Labs' plugin from the catalog)
 # Config: ~/.honcho/config.json (shared with Claude Code, Cursor, etc.)
-# API key: HONCHO_API_KEY in ~/.hermes/.env or ~/.honcho/config.json
+# API key: HONCHO_API_KEY in ~/.qubit/.env or ~/.honcho/config.json
 #
 # Qubit-specific overrides (optional — most config comes from ~/.honcho/config.json):
 # honcho: {}
@@ -1861,7 +1861,7 @@ display:
   #   new:     Show a tool indicator only when the tool changes (skip repeats)
   #   all:     Show every tool call with a short preview (default)
   #   verbose: Full args, results, and debug logs (same as /verbose)
-  #   log:     Silent in chat; append every tool call to ~/.hermes/logs/tool_calls.log (gateway only)
+  #   log:     Silent in chat; append every tool call to ~/.qubit/logs/tool_calls.log (gateway only)
   # Toggle at runtime with /verbose in the CLI
   # Independent of show_reasoning: hiding reasoning never hides tool rows.
   # Answer-only (just the final response) is show_reasoning: false plus
@@ -1935,8 +1935,8 @@ display:
   # "⏳ Working — 12 min, terminal".
   # busy_ack_detail: true
 
-  # What Enter does when Hermes is already busy (CLI and gateway platforms).
-  #   interrupt: Interrupt the current run and redirect Hermes (default)
+  # What Enter does when Qubit is already busy (CLI and gateway platforms).
+  #   interrupt: Interrupt the current run and redirect Qubit (default)
   #   queue:     Queue your message for the next turn
   #   steer:     Inject your message mid-run via /steer, arriving at the agent
   #              after the next tool call — no interrupt, no role violation.
@@ -1996,7 +1996,7 @@ display:
   # response box label, and branding text. Change at runtime with /skin <name>.
   #
   # Built-in skins:
-  #   default        — Classic Hermes gold/kawaii
+  #   default        — Classic Qubit gold/kawaii
   #   ares           — Crimson/bronze war-god theme with spinner wings
   #   mono           — Clean grayscale monochrome
   #   slate          — Cool blue developer-focused
@@ -2006,7 +2006,7 @@ display:
   #   sisyphus       — Earthy stone-and-moss theme
   #   charizard      — Fiery orange dragon theme
   #
-  # Custom skins: drop a YAML file in ~/.hermes/skins/<name>.yaml
+  # Custom skins: drop a YAML file in ~/.qubit/skins/<name>.yaml
   # Schema (all fields optional, missing values inherit from default):
   #
   #   name: my-theme
@@ -2093,7 +2093,7 @@ display:
 #   on_session_finalize, on_session_reset, subagent_stop
 #
 # First-use consent: each (event, command) pair prompts once on a TTY, then
-# is persisted to ~/.hermes/shell-hooks-allowlist.json.  Non-interactive
+# is persisted to ~/.qubit/shell-hooks-allowlist.json.  Non-interactive
 # runs (gateway, cron) need --accept-hooks, QUBIT_ACCEPT_HOOKS=1, or the
 # hooks_auto_accept key below.
 #
@@ -2103,15 +2103,15 @@ display:
 # hooks:
 #   pre_tool_call:
 #     - matcher: "terminal"
-#       command: "~/.hermes/agent-hooks/block-rm-rf.sh"
+#       command: "~/.qubit/agent-hooks/block-rm-rf.sh"
 #       timeout: 10
 #   post_tool_call:
 #     - matcher: "write_file|patch"
-#       command: "~/.hermes/agent-hooks/auto-format.sh"
+#       command: "~/.qubit/agent-hooks/auto-format.sh"
 #   pre_llm_call:
-#     - command: "~/.hermes/agent-hooks/inject-cwd-context.sh"
+#     - command: "~/.qubit/agent-hooks/inject-cwd-context.sh"
 #   subagent_stop:
-#     - command: "~/.hermes/agent-hooks/log-orchestration.sh"
+#     - command: "~/.qubit/agent-hooks/log-orchestration.sh"
 #
 # hooks_auto_accept: false
 
@@ -2119,7 +2119,7 @@ display:
 # =============================================================================
 # Telemetry
 # =============================================================================
-# Shared metrics are disabled by default. When enabled, Hermes writes only
+# Shared metrics are disabled by default. When enabled, Qubit writes only
 # allowlisted aggregate counters and immutable JSON
 # packages under $QUBIT_HOME/telemetry/shared_metrics.
 # Packages include a random profile-scoped ID that stays stable until this
@@ -2152,9 +2152,9 @@ telemetry:
 # Login Policy (credentials themselves live in auth.json / .env)
 # =============================================================================
 auth:
-  # Borrow and refresh the Codex CLI (~/.codex/auth.json) and Claude Code logins when Hermes has
+  # Borrow and refresh the Codex CLI (~/.codex/auth.json) and Claude Code logins when Qubit has
   # no usable login of its own. Their refresh tokens are single-use, so two programs on one login
-  # can log each other out; set false to make Hermes use only its own logins.
+  # can log each other out; set false to make Qubit use only its own logins.
   adopt_external_logins: true
   # How `qubit auth add openai-codex` / `qubit model` sign in to OpenAI Codex.
   #   device_code (default) — open a URL and enter a code.
@@ -2173,14 +2173,14 @@ updates:
   # Explicit `qubit update --check` and `qubit update` remain available.
   check: true
   # Create a full QUBIT_HOME zip before every `qubit update`.
-  # Backups land in ~/.hermes/backups/ and can be restored with `qubit import`.
+  # Backups land in ~/.qubit/backups/ and can be restored with `qubit import`.
   # Off by default because large homes can add minutes to every update.
   pre_update_backup: false
 
   # Number of pre-update backup zips to retain.
   backup_keep: 5
 
-  # What non-interactive updates do with local source edits in the Hermes repo.
+  # What non-interactive updates do with local source edits in the Qubit repo.
   # Interactive terminal updates always prompt before restoring the autostash.
   #
   #   stash   - auto-stash before pull, then auto-restore after success (default)
@@ -2206,7 +2206,7 @@ updates:
 # so a provisioned-but-not-populated secret can't shadow a valid entry here.
 #
 # Local dev / on-prem deploys should typically set these via config.yaml
-# (the ~/.hermes/.env file is reserved for API keys and secrets).
+# (the ~/.qubit/.env file is reserved for API keys and secrets).
 #
 # dashboard:
 #   oauth:
@@ -2221,7 +2221,7 @@ updates:
 #   # full proxy header chains).
 #   #
 #   # When set, the value is the complete authority: scheme + host +
-#   # optional path prefix (e.g. "https://example.com/hermes"). The OAuth
+#   # optional path prefix (e.g. "https://example.com/qubit"). The OAuth
 #   # callback URL becomes "<public_url>/auth/callback" — X-Forwarded-Prefix
 #   # is IGNORED on this code path because the operator has explicitly
 #   # declared the public URL and we no longer need to guess.
@@ -2229,7 +2229,7 @@ updates:
 #   # Leave empty to use the existing proxy-header reconstruction (the
 #   # default — works on Fly.io out of the box).
 #   #
-#   #   public_url: "https://example.com/hermes"
+#   #   public_url: "https://example.com/qubit"
 #   #
 #   # Reverse proxies connecting from another container or host are not
 #   # trusted by default. Add only the proxy's exact IP address, or a bounded
@@ -2256,29 +2256,29 @@ updates:
 #   oauth:
 #     provider: self-hosted
 #     self_hosted:
-#       issuer: "https://auth.example.com/application/o/hermes/"  # required
+#       issuer: "https://auth.example.com/application/o/qubit/"  # required
 #       client_id: "qubit-dashboard"                             # required
 #       scopes: "openid profile email"                            # optional
 #
 #       # OPTIONAL — set ONLY if your IDP registered the client as
 #       # *confidential* (Authentik / Keycloak often default to this). When
-#       # set, Hermes authenticates the client at the token endpoint
+#       # set, Qubit authenticates the client at the token endpoint
 #       # (client_secret_basic or client_secret_post, auto-selected from the
 #       # IDP's discovery doc) IN ADDITION to PKCE. Leave unset for a public
 #       # (PKCE-only) client — the common case.
 #       #
 #       # This is a CREDENTIAL: prefer setting QUBIT_DASHBOARD_OIDC_CLIENT_SECRET
-#       # in ~/.hermes/.env over putting it here in config.yaml.
+#       # in ~/.qubit/.env over putting it here in config.yaml.
 #       #   client_secret: ""
 
 # =============================================================================
 # External secret sources
 # =============================================================================
 # Pull provider credentials from external secret managers at process startup
-# instead of storing them in ~/.hermes/.env. Only the manager's bootstrap
+# instead of storing them in ~/.qubit/.env. Only the manager's bootstrap
 # credential (e.g. BWS_ACCESS_TOKEN / OP_SERVICE_ACCOUNT_TOKEN) lives in .env
 # (or your shell / desktop session); everything else rotates centrally.
-# Failures never block startup — Hermes warns once and continues with
+# Failures never block startup — Qubit warns once and continues with
 # whatever .env already had.
 #
 # Multiple sources can be enabled at once:
@@ -2305,7 +2305,7 @@ updates:
 #       enabled: false
 #       max_stale_seconds: 0               # 0 disables stale fallback
 #     override_existing: true              # BSM values win over existing env
-#     auto_install: true                   # lazy-download bws into ~/.hermes/bin
+#     auto_install: true                   # lazy-download bws into ~/.qubit/bin
 #
 #   # ---- 1Password (op CLI) -------------------------------------------------
 #   onepassword:
