@@ -269,3 +269,29 @@ Verification (focused, no full matrix):
   `DOCUSAURUS_SSG_WORKER_THREAD_COUNT=2`, exercising tinypool 2.2.0) all pass; both workspace
   locks pass `npm ci --dry-run`. No full matrix, no live service/config change, no publish, no
   `VERIFIED` claim.
+
+## 9. Final cleanup — 0 open Dependabot alerts (2026-11-05, Qubit 0.0.5)
+
+The second dependency pass cleared every remaining high and medium alert and all but one low:
+
+- Node workspace: `electron` 42.11.16, `vite` 8.3.5, `axios` 1.21.0, `glob` 14.0.3,
+  `joi` 18.3.2, `zod` 4.6.7, `minimatch` 11.0.4, `@vitest/mocker`/`vitest` 4.1.12;
+  `npm audit --package-lock-only` → **0 vulnerabilities**.
+- Frontend: `undici` 8.12.3, `vite` 8.3.5, `vitest` 4.1.12, `zod` 4.6.7;
+  `npm audit --package-lock-only` → **0 vulnerabilities**.
+- Website: Docusaurus remains 3.10.2 with fixed transitive overrides; ``npm audit
+  --package-lock-only --omit=dev`` → **0 high / 0 critical**, 5 low (all one
+  `deepmerge` advisory with no patched release).
+- Python: `mcp` 2.3.0, `setuptools` 84.1.0, `mistralai` 3.7.0, and the OpenTelemetry
+  API/SDK/OTLP exporter 1.45.2; `uv lock --check` passes.
+- GitHub Dependabot on `cgraph-dev/Qubit`: **0 open alerts**. The sole remaining low
+  `deepmerge` alert (GHSA-gcqx-w48m-w2h4, docs-site build-only, no patched release) was
+  dismissed with the explicit reason `tolerable_risk`.
+- Verification: workspace/frontend/website lockfile dry-runs pass; website typecheck and
+  Docusaurus build pass; frontend typecheck, 1,254 tests, and build pass (5 loaded-host
+  flakes passed individually: ChatPage voice 8/8, SystemPage 10/10); public `v0.0.5`
+  release verification **PASS**; public POSIX bootstrap installed `qubit 0.0.5`; Windows
+  and POSIX bootstrap dry-runs PASS.
+
+No published artifact was edited in place; `v0.0.5` is a new release. `VERIFIED` is still
+not claimed because the full matrix and real Windows/macOS E2E remain unrun.
