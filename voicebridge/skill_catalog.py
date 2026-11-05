@@ -26,6 +26,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from . import read_cache as RC
+
 
 class SkillAuthorityError(Exception):
     """Typed skills-authority failure carrying a stable ``code``."""
@@ -238,7 +240,7 @@ def _fork_lookup_name(cfg: Any, resolved: Dict[str, Any]) -> str:
     return skill_dir.name
 
 
-def catalog_entries(cfg: Any) -> List[Dict[str, Any]]:
+def _catalog_entries_uncached(cfg: Any) -> List[Dict[str, Any]]:
     """Merged skills catalog.
 
     Ported from the reference ``get_skills``: the vendored on-disk catalog
@@ -338,6 +340,36 @@ def catalog_entries(cfg: Any) -> List[Dict[str, Any]]:
     except Exception:  # noqa: BLE001 - fork catalog unavailable: serve the store set
         pass
     return list(items.values())
+
+
+def catalog_entries(cfg: Any) -> List[Dict[str, Any]]:
+    """Cached merged skills catalog (dashboard/CLI/voice read authority).
+
+    Building the catalog walks every skill root and merges the permissioned
+    store; the result changes only when a skill file, the disabled set
+    (``<runtime home>/config.yaml``) or the permissioned store
+    (``<state dir>/permissions.json``) changes. Those two files are part of the
+    cache key, so an edit from another process is reflected on the next read;
+    in-process writes additionally call :func:`clear_skills_prompt_cache`,
+    which invalidates this namespace eagerly.
+    """
+    try:
+        from . import qubit_runtime as QR
+
+        runtime_cfg = Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
+    except Exception:  # noqa: BLE001 - still cacheable by config identity
+        runtime_cfg = None
+    try:
+        permissions = Path(cfg.state_dir()) / "permissions.json"
+    except Exception:  # noqa: BLE001
+        permissions = None
+    key = RC.cfg_key(cfg, "skills", RC.stamp_of(runtime_cfg, permissions))
+    hit = RC.get(key)
+    if hit is not None:
+        return hit
+    out = _catalog_entries_uncached(cfg)
+    RC.put(key, out, RC.ttl_seconds("skills", 5.0))
+    return out
 
 
 def merged_store_view(cfg: Any) -> List[Dict[str, Any]]:
@@ -480,6 +512,7 @@ def clear_skills_prompt_cache() -> None:
     """Best-effort skills prompt-cache invalidation after a write (mirrors
     the reference router so a dashboard-authored skill is picked up by the
     next session without a manual cache reset)."""
+    RC.invalidate("skills")
     try:
         _fork_scope(None)
         from agent.prompt_builder import (  # type: ignore
@@ -636,6 +669,7 @@ def set_skill_enabled(cfg: Any, name: str, enabled: bool,
                                               confirmed=confirmed)
             status = str(getattr(changed, "status", "")
                          or ("active" if enabled else "disabled"))
+            RC.invalidate("skills")
             _audit("toggle", requested_by,
                    {"skill_id": clean, "enabled": bool(enabled),
                     "origin": "permissioned"})

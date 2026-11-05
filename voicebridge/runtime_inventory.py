@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from . import foundation as F
+from . import read_cache as RC
 
 
 def _short_home(path: str) -> str:
@@ -119,12 +120,18 @@ def _providers(cfg: Any) -> Dict[str, Any]:
 
 
 def _vision(cfg: Any) -> Dict[str, Any]:
+    key = RC.cfg_key(cfg, "vision")
+    hit = RC.get(key)
+    if hit is not None:
+        return hit
     try:
         from .vision import status as _vision_status
 
-        return _vision_status(cfg, timeout_s=2.0)
+        out = _vision_status(cfg, timeout_s=2.0)
     except Exception as exc:
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160]}
+    RC.put(key, out, RC.ttl_seconds("vision", 10.0))
+    return out
 
 
 def _messaging(cfg: Any) -> Dict[str, Any]:
@@ -203,15 +210,7 @@ def _node_host_capability(cfg: Any) -> Dict[str, Any]:
             "remote_capabilities": list(st.get("remote_capabilities", []))}
 
 
-def device_inventory(cfg: Any) -> Dict[str, Any]:
-    """Device capability inventory: browser / desktop / IDE / vision / runtime.
-
-    One real, read-only probe per family plus the node-host-derived
-    capabilities. Every leaf is observed or typed UNAVAILABLE/DISABLED;
-    availability is never treated as authorization. No process is started,
-    no outbound network is opened (the browser probe only checks the
-    loopback CDP endpoint), and every string is redacted.
-    """
+def _device_inventory(cfg: Any) -> Dict[str, Any]:
     return {
         "schema": "qubit-device-capabilities/1",
         "state": "OK",
@@ -223,6 +222,29 @@ def device_inventory(cfg: Any) -> Dict[str, Any]:
         "node_host": _safe(_node_host_capability, cfg),
         "authority": "read-only probes; availability is not authorization",
     }
+
+
+def device_inventory(cfg: Any) -> Dict[str, Any]:
+    """Device capability inventory: browser / desktop / IDE / vision / runtime.
+
+    One real, read-only probe per family plus the node-host-derived
+    capabilities. Every leaf is observed or typed UNAVAILABLE/DISABLED;
+    availability is never treated as authorization. No process is started,
+    no outbound network is opened (the browser probe only checks the
+    loopback CDP endpoint), and every string is redacted.
+
+    The probe family (a CDP doctor, a vision endpoint check, an editor scan and
+    the runtime inventory) is the most expensive part of ``/api/status``; a
+    short-TTL snapshot keyed by home+state+config answers repeated dashboard
+    polls without re-probing. Nothing here mutates state.
+    """
+    key = RC.cfg_key(cfg, "device_inventory")
+    hit = RC.get(key)
+    if hit is not None:
+        return hit
+    out = _device_inventory(cfg)
+    RC.put(key, out, RC.ttl_seconds("device_inventory", 5.0))
+    return out
 
 
 def _discovery(cfg: Any) -> Dict[str, Any]:
@@ -238,22 +260,43 @@ def _discovery(cfg: Any) -> Dict[str, Any]:
 
 
 def _marketplace(cfg: Any) -> Dict[str, Any]:
-    """Local reviewed plugin catalog; remote marketplace fetches refused."""
+    """Local reviewed plugin catalog; remote marketplace fetches refused.
+
+    The vendored plugin scan is the other expensive inventory leaf. The
+    registry file and the bundled plugin tree are part of the cache key, so an
+    install/removal is reflected without waiting for the TTL.
+    """
+    try:
+        from . import qubit_runtime as QR
+
+        home = Path(QR.runtime_home_for_cfg(cfg))
+        plugin_tree = home / "plugins"
+        registry = Path(cfg.state_dir()) / "plugin-runtime.json"
+    except Exception:  # noqa: BLE001 - still cacheable by config identity
+        plugin_tree = None
+        registry = None
+    key = RC.cfg_key(cfg, "marketplace", str(plugin_tree or ""),
+                     RC.stamp_of(registry) if registry else ())
+    hit = RC.get(key)
+    if hit is not None:
+        return hit
     try:
         from . import plugin_runtime as PR
 
         status = PR.status(cfg)
         plugins = PR.list_plugins(cfg).get("plugins", [])
-        return {"state": "OK", "local_plugins": len(plugins),
-                "kinds": status.get("kinds", []),
-                "marketplace": "remote plugin/marketplace installs are "
-                               "refused by pinned-source policy; local "
-                               "reviewed manifests only",
-                "plugins": plugins}
+        out = {"state": "OK", "local_plugins": len(plugins),
+               "kinds": status.get("kinds", []),
+               "marketplace": "remote plugin/marketplace installs are "
+                              "refused by pinned-source policy; local "
+                              "reviewed manifests only",
+               "plugins": plugins}
     except Exception as exc:
         return {"state": "UNAVAILABLE", "detail": str(exc)[:160],
                 "marketplace": "remote plugin/marketplace installs are "
                                "refused by pinned-source policy"}
+    RC.put(key, out, RC.ttl_seconds("marketplace", 5.0))
+    return out
 
 
 def runtime_inventory(cfg: Any) -> Dict[str, Any]:

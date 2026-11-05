@@ -29,6 +29,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from . import mcp_client as MC
+from . import read_cache as RC
 
 SCHEMA = "qubit-mcp-servers/1"
 STORE_NAME = "mcp_servers.json"
@@ -249,6 +250,7 @@ def _commit(cfg: Any, data: Dict[str, Any], runtime_sync: Any) -> None:
             "the dashboard MCP store changed but the runtime mcp_servers config "
             f"could not be synced; the dashboard write was rolled back: {exc}",
         ) from exc
+    RC.invalidate("mcp_servers")
 
 
 def _bounded(value: Any, limit: int = MAX_FIELD_CHARS) -> str:
@@ -714,7 +716,7 @@ def _oauth_login_hint(name: str, rec: Dict[str, Any]) -> Optional[str]:
             "flow.")
 
 
-def list_servers(cfg: Any) -> Dict[str, Any]:
+def _list_servers_uncached(cfg: Any) -> Dict[str, Any]:
     """Configured MCP servers (canonical registry + read-only config records).
 
     PRB-01: this is the ONE MCP read authority. Dashboard GET, CLI
@@ -800,6 +802,37 @@ def list_servers(cfg: Any) -> Dict[str, Any]:
             row["status"] = "login-required"
             row["error"] = hint
     return {"schema": SCHEMA, "servers": rows, "total": len(rows)}
+
+
+def list_servers(cfg: Any) -> Dict[str, Any]:
+    """Cached read of the ONE MCP inventory (dashboard/CLI/voice/status).
+
+    The canonical read merges the registry, the read-only runtime config, the
+    recorded discovery cache and the reviewed catalog; on a warm dashboard that
+    is the expensive part of both ``/api/mcp/servers`` and the runtime status
+    inventory. The cache key includes the registry file, the runtime
+    ``config.yaml`` and the schema cache, so a write through any of those
+    invalidates the next read even from another process. :func:`upsert`,
+    :func:`delete`, :func:`set_enabled` and discovery also invalidate eagerly.
+    """
+    try:
+        from . import qubit_runtime as QR
+
+        runtime_cfg = Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
+        schema_cache = (Path(QR.runtime_home_for_cfg(cfg)) / "cache"
+                        / "mcp_schema_cache.json")
+    except Exception:  # noqa: BLE001 - still cacheable by config identity
+        runtime_cfg = None
+        schema_cache = None
+    key = RC.cfg_key(
+        cfg, "mcp_servers",
+        RC.stamp_of(_store_path(cfg), runtime_cfg, schema_cache))
+    hit = RC.get(key)
+    if hit is not None:
+        return hit
+    out = _list_servers_uncached(cfg)
+    RC.put(key, out, RC.ttl_seconds("mcp_servers", 5.0))
+    return out
 
 
 def sanitize_catalog_entry(entry: Dict[str, Any]) -> Dict[str, Any]:
@@ -1086,6 +1119,7 @@ def discover(cfg: Any, name: str, *, persist: bool = False,
             stored["capabilities"] = tools
             stored["updated_at"] = time.time()
             _save(cfg, data)
+            RC.invalidate("mcp_servers")
     _audit("discover", requested_by,
            {"name": clean, "tools": str(len(tools)), "persisted": str(persist)})
     row = next((s for s in list_servers(cfg).get("servers", [])
@@ -1135,6 +1169,7 @@ def set_auth_ref(cfg: Any, name: str, ref: str) -> Dict[str, Any]:
     rec["auth"] = "header"
     rec["updated_at"] = time.time()
     _save(cfg, data)
+    RC.invalidate("mcp_servers")
     return {"state": "OK", "name": clean, "reference": value,
             "reference_set": True, "auth": "header"}
 
