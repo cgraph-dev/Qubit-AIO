@@ -694,6 +694,12 @@ class _Resume:
         projections remain the fallback for duck-typed DB doubles. ``omit_messages`` resumes
         materialize the tip segment only, so they keep the narrow :meth:`read_history` path.
         """
+        # A restart discarded the in-memory queue; retire never-drained accept rows
+        # before projecting, or the repaired transcript absorbs the queued prompt
+        # into the previous turn. Same best-effort rule as read_history().
+        retire = getattr(self.db, "retire_undrained_queue_rows", None)
+        if callable(retire):
+            retire(self.target)
         bundle = getattr(self.db, "get_resume_bundle", None)
         if not self.omit_messages and callable(bundle):
             raw, display, prefix = bundle(self.target)
@@ -917,7 +923,7 @@ def _resume_reuse_live_locked(ctx: _Resume, sid: str, session: dict) -> dict:
     _cancel_ws_orphan_reap(sid)  # unconditionally: the fast path must never race the reap Timer
     payload = _live_session_payload(sid, session, cols=ctx.cols, touch=True, omit_messages=ctx.omit_messages,
                                     transport=current_transport() or _stdio_transport,
-                                    inline_images=ctx.inline_images, tool_labels=ctx.tool_labels)
+                                    inline_images=ctx.inline_images, tool_labels=getattr(ctx, "tool_labels", True))
     payload["resumed"] = ctx.target
     if ctx.defer_history:
         payload.update(messages=[], hydrating=bool(session.get("resume_hydrating")),
@@ -1006,7 +1012,12 @@ def _resume_cold(ctx: _Resume) -> dict:
     prompt beats it. Unlike lazy, restores full ancestor history + persisted runtime identity."""
     sid, source, cwd = ctx.mint()
     try:
-        history, display_history, display_history_prefix, raw_history = ctx.restore_bundle()
+        restore_bundle = getattr(ctx, "restore_bundle", None)
+        if callable(restore_bundle):
+            history, display_history, display_history_prefix, raw_history = restore_bundle()
+        else:
+            history, display_history, raw_history = ctx.restore()
+            display_history_prefix = ctx.display_prefix()
     except Exception as e:
         return _err(ctx.rid, 5000, resume_failed_message(e))
     with _profile_build_scope(ctx.profile_home):
@@ -1027,7 +1038,12 @@ def _resume_eager(ctx: _Resume) -> dict:
     sid, source, _cwd = ctx.mint()
     with _profile_build_scope(ctx.profile_home):
         try:
-            history, display_history, display_history_prefix, raw_history = ctx.restore_bundle()
+            restore_bundle = getattr(ctx, "restore_bundle", None)
+            if callable(restore_bundle):
+                history, display_history, display_history_prefix, raw_history = restore_bundle()
+            else:
+                history, display_history, raw_history = ctx.restore()
+                display_history_prefix = ctx.display_prefix()
             # Profile db so turns persist to the right state.db; stored runtime identity so switching chats does
             # not inherit another chat's global model.
             stored_runtime_overrides = _stored_session_runtime_overrides(ctx.found)

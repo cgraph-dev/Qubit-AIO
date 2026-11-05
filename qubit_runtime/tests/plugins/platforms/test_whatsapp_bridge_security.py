@@ -1,5 +1,6 @@
 import stat
 from pathlib import Path
+import tempfile
 from unittest.mock import MagicMock
 
 from plugins.platforms.whatsapp.bridge_security import (
@@ -65,7 +66,7 @@ def test_media_path_rejects_a_symlink_escape(tmp_path):
 def test_media_roots_include_gateway_caches_and_tempdir():
     roots = bridge_media_roots()
     assert any(str(path).endswith("/cache/images") for path in roots)
-    assert Path("/tmp").resolve() in roots
+    assert Path(tempfile.gettempdir()).resolve() in roots
 
 
 def test_adapter_env_carries_the_token_and_media_roots(tmp_path):

@@ -36,7 +36,7 @@ def mod():
 
 
 @pytest.mark.parametrize("directory,source,prefix", [
-    ("skills", "built-in", "cgraph-dev/Qubit-AIO/skills"),
+    ("skills", "built-in", "cgraph-dev/Qubit/skills"),
     ("optional-skills", "optional", "official"),
 ])
 def test_local_skills_publish_exact_install_target(mod, tmp_path, monkeypatch, directory, source, prefix):
