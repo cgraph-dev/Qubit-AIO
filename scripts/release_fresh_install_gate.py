@@ -427,7 +427,11 @@ def check_release_dir(release_dir: Path, repo: Path | None, report: Report,
     except GateError as exc:
         report.add("release_checksums", "FAIL", str(exc))
         return
-    uncovered = [name for name in REQUIRED_ASSETS if name not in checksums]
+    # SHA256SUMS cannot name itself; existence is already checked above.
+    uncovered = [
+        name for name in REQUIRED_ASSETS
+        if name != "SHA256SUMS" and name not in checksums
+    ]
     bad = []
     for name, expected in checksums.items():
         path = release_dir / name
