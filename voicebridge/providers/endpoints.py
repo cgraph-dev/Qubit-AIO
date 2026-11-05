@@ -586,6 +586,13 @@ def _persist_runtime_model(cfg: Any, *, provider: str, model: str,
         if key_ref:
             node["key_env"] = key_ref
         data["model"] = node
+        # A fresh local selection would otherwise leave only the model node,
+        # and the vendored resolver refuses ``provider: ollama`` with no
+        # ``providers.ollama.base_url``. Fill the safe local defaults without
+        # touching any endpoint the user already configured.
+        from .local_defaults import ensure_ollama_provider_defaults
+
+        ensure_ollama_provider_defaults(data, provider=provider)
         # Tripwire: every slot write names its author. A repeat of the
         # split-slot corruption names the rogue writer in the journal.
         try:
