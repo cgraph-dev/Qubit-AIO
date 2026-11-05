@@ -26,6 +26,22 @@ DENIED = "denied"
 TERMINAL = {COMPLETE, ABORTED, DENIED}
 
 
+def _invalidate_read_cache() -> None:
+    """Drop the dashboard's pending-approvals snapshot after a transition.
+
+    The read cache is an optional dashboard optimization (disabled under
+    pytest); importing lazily keeps this durable journal free of a hard
+    dependency on it and never fails a state transition if the cache module is
+    unavailable.
+    """
+    try:
+        from . import read_cache
+
+        read_cache.invalidate("approvals")
+    except Exception:  # noqa: BLE001 - cache invalidation is never fatal
+        pass
+
+
 @dataclass
 class Approval:
     id: str
@@ -111,6 +127,7 @@ class ApprovalJournal:
             self._items[item.id] = item
         self._append(item)
         self._emit("approval.required", item)
+        _invalidate_read_cache()
         return item
 
     def get(self, approval_id: str) -> Optional[Approval]:
@@ -159,12 +176,14 @@ class ApprovalJournal:
                 item.settled_at = now
                 self._append(item)
                 self._emit("approval.aborted", item)
+                _invalidate_read_cache()
                 return item
             item.state = EXECUTING if decision == "approve" else DENIED
             item.decision = decision
             item.settled_at = now if decision == "deny" else None
             self._append(item)                    # durable BEFORE returning
             self._emit("approval.settled", item)
+            _invalidate_read_cache()
             return item
 
     def finish(self, approval_id: str) -> Approval:
@@ -180,6 +199,7 @@ class ApprovalJournal:
             item.state, item.settled_at = COMPLETE, self._clock()
         self._append(item)
         self._emit("approval.finished", item)
+        _invalidate_read_cache()
         return item
 
     def abort(self, approval_id: str) -> Approval:
@@ -191,6 +211,7 @@ class ApprovalJournal:
             item.state, item.decision, item.settled_at = ABORTED, "abort", self._clock()
         self._append(item)
         self._emit("approval.aborted", item)
+        _invalidate_read_cache()
         return item
 
     def sweep_expired(self) -> int:
@@ -206,4 +227,6 @@ class ApprovalJournal:
                     n += 1
         for item in swept:
             self._emit("approval.aborted", item)
+        if n:
+            _invalidate_read_cache()
         return n

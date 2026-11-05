@@ -267,6 +267,12 @@ def apply_toolset_mutation(cfg: Any, name: str, enabled: bool, *,
         _save(cfg, state)
     except OSError as exc:
         return _fail(STAGE_CODE, f"toolset store write failed: {exc}", 500)
+    try:
+        from . import read_cache
+
+        read_cache.invalidate("toolsets")
+    except Exception:  # noqa: BLE001 - cache invalidation is never fatal
+        pass
     _audit("enable" if enabled else "disable", actor,
            {"name": clean, "enabled": bool(enabled)})
     return {"ok": True, "state": "executed", "code": "OK", "name": clean,
