@@ -23,7 +23,7 @@ and optional voice.
 |---|---|
 | Linux (Ubuntu x86_64) | Supported |
 | macOS | Core install supported; voice bridge/orb/typing not yet supported |
-| Windows | Installer provided; Windows release validation is still pending |
+| Windows | Installer provided; Windows install E2E still pending (no Windows release runner) |
 
 Linux is the reference platform. macOS installs the core runtime, CLI, dashboard,
 and launchd gateway; voice/audio is not supported there yet. Windows has a
@@ -77,6 +77,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$en
 `-Prefix DIR` is accepted as the same root as `-QubitHome`; `-Yes` becomes
 `-NonInteractive`. `-WithSystemd` is refused with a typed error because Windows
 has no systemd/launchd equivalent.
+
+Verify a published release without installing (read-only):
+
+```bash
+python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.2
+```
+
+It checks the release identity, every required asset and checksum, the archive
+installer match, and the source archive for operator paths, `node_modules`, and
+secrets. See [INSTALL.md](INSTALL.md#verify-a-published-release).
 
 New installs keep runtime state and voice under `$QUBIT_HOME`
 (`~/.qubit` on Linux/macOS, `%LOCALAPPDATA%\qubit` on Windows), with voice
