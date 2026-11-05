@@ -39,6 +39,7 @@ def pty_keepalive_harness(monkeypatch):
 
     spawned = Spawned()
     spawned.bridges = []
+    spawned.argv_kwargs = []
 
     def fake_spawn(argv, cwd=None, env=None):
         b = FakeBridge()
@@ -52,6 +53,7 @@ def pty_keepalive_harness(monkeypatch):
     monkeypatch.setattr(_web_server_chat, "_ws_client_reason", lambda ws: None)
 
     async def fake_argv(**kw):
+        spawned.argv_kwargs.append(dict(kw))
         resume = "child" if kw.get("resume") == "parent" else kw.get("resume")
         env = {"HERMES_TUI_RESUME": resume} if resume else {}
         return (["x", resume or "fresh"], "/tmp", env)
@@ -378,3 +380,25 @@ async def test_fresh_start_pops_stale_marker_and_reregisters_child_path(
     assert markers["CHANFRESH"] is stale_path
     await web_server.PTY_REGISTRY.close_all()
     assert markers == {}
+
+
+@pytest.mark.asyncio
+async def test_pty_forwards_profile_query_to_chat_argv(pty_keepalive_harness):
+    """A resume link's ``?profile=`` must scope the PTY child.
+
+    The PTY's HOME is decided by ``_resolve_chat_argv(profile=...)``, fed only
+    from the ``/api/pty?profile=`` query — not the ws-ticket. A dashboard row
+    owned by a secondary profile needs both the resume id and the profile, or
+    the TUI resumes against the launch home and cannot find the session.
+    """
+    from starlette.testclient import TestClient
+
+    client = TestClient(web_server.app)
+    with client.websocket_connect(
+        "/api/pty?attach=TOKPROFILE&resume=sid-1&profile=secondary"
+    ) as ws:
+        ws.send_bytes(b"hi")
+
+    kwargs = pty_keepalive_harness.argv_kwargs[-1]
+    assert kwargs["profile"] == "secondary"
+    assert kwargs["resume"] == "sid-1"

@@ -163,6 +163,7 @@ function terminalWsUrl(
   cwd?: string,
   attach?: string,
   fresh?: boolean,
+  profile?: string,
 ): string {
   const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
   const qs = new URLSearchParams({
@@ -175,6 +176,12 @@ function terminalWsUrl(
   // spawning a fresh one. The server validates/ensures the id against the one
   // canonical store (`terminal_bridge.canonical_terminal_session`).
   if (resume) qs.set("resume", resume);
+  // The server scopes the child's HOME from THIS query param, not from the
+  // ws-ticket (`pty_ws` -> `_resolve_chat_argv(profile=...)`). Without it a
+  // resumed session from a non-default profile runs against the dashboard's
+  // launch home, where the id does not exist: the TUI either errors or forges
+  // a fresh chat. Omitted for the dashboard's own profile ("").
+  if (profile) qs.set("profile", profile);
   // Forced-fresh intent (New chat / "Start new session"): tells the server to
   // ignore any active-session fallback and force an empty resume, so a fresh
   // press can NEVER re-adopt a detached terminal (upstream parity:
@@ -209,6 +216,14 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // seeds the first connect without double-spawning on mount.
   const [searchParams, setSearchParams] = useSearchParams();
   const resumeParam = searchParams.get("resume") || "";
+  // A deep link may name the owning MANAGEMENT profile
+  // (`/chat?resume=<id>&profile=<p>`). The URL is authoritative for this page:
+  // it can arrive before the global ProfileProvider has mirrored the scope,
+  // and a resume must read the probe and spawn the PTY in the SAME store that
+  // owns the row. This is NOT the terminal MODEL profile (that travels in the
+  // ws-ticket `profile` field and is resolved separately).
+  const urlProfile = (searchParams.get("profile") || "").trim();
+  const effectiveProfile = urlProfile || scopedProfile;
   const resumeRef = useRef(resumeParam);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const termRef = useRef<XtermTerminal | null>(null);
@@ -283,6 +298,10 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // probe first: `verifiedId` = the id we proved exists, `missingId` = the id
   // we proved does NOT. The page must not dial the PTY for a missing id.
   const [resumeVerifiedId, setResumeVerifiedId] = useState<string | null>(null);
+  // The profile the verified id was probed in. A URL/scope change must re-probe
+  // even when the id is unchanged: the same id can exist in one store and not
+  // another.
+  const [resumeVerifiedProfile, setResumeVerifiedProfile] = useState("");
   const [resumeMissingId, setResumeMissingId] = useState<string | null>(null);
   // Visible "copy last response" control over the terminal pane, matching the
   // reference. The terminal canvas is not readable text, so the copy reads the
@@ -551,6 +570,9 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
       setSrAnnouncement("");
     }
     lastConnectTargetRef.current = connectTarget;
+    // `picked` is the terminal MODEL profile for the ws-ticket (e.g. qubit-go),
+    // never the management profile: the ticket route rejects a management name
+    // as UNKNOWN_PROFILE. The management/PTY scope travels separately below.
     const picked = profileId ?? selectedRef.current ?? undefined;
     setPtyState("connecting");
     setNotice(null);
@@ -625,6 +647,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
             workspaceRef.current,
             attach,
             forceFresh,
+            effectiveProfile || undefined,
           ),
         );
         ws.binaryType = "arraybuffer";
@@ -849,7 +872,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           }, delay);
         }
       });
-  }, [attachToken, beginResumeReplay, clearPerConnectionTimers, finishResumeHydration, pushTranscript]);
+  }, [attachToken, beginResumeReplay, clearPerConnectionTimers, finishResumeHydration, pushTranscript, effectiveProfile]);
 
   useEffect(() => {
     connectRef.current = (profileId, forceFresh, rotateAttach) =>
@@ -868,17 +891,29 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     const id = resumeParam.trim();
     if (!id) {
       setResumeVerifiedId(null);
+      setResumeVerifiedProfile("");
       setResumeMissingId(null);
       return;
     }
-    if (resumeVerifiedId === id || resumeMissingId === id) return;
+    if (
+      resumeMissingId === id ||
+      (resumeVerifiedId === id && resumeVerifiedProfile === effectiveProfile)
+    )
+      return;
     let cancelled = false;
-    withBackoff(() => api.getSessionDetail(id), {
-      shouldStop: () => cancelled || disposedRef.current,
-    })
+    withBackoff(
+      () =>
+        effectiveProfile
+          ? api.getSessionDetail(id, effectiveProfile)
+          : api.getSessionDetail(id),
+      {
+        shouldStop: () => cancelled || disposedRef.current,
+      },
+    )
       .then(() => {
         if (cancelled || disposedRef.current) return;
         setResumeVerifiedId(id);
+        setResumeVerifiedProfile(effectiveProfile);
         setResumeMissingId(null);
       })
       .catch((err: unknown) => {
@@ -891,12 +926,19 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
           // id unverified-but-dialable so a flaky backend still reaches the
           // PTY's own error surface rather than a false "not found".
           setResumeVerifiedId(id);
+          setResumeVerifiedProfile(effectiveProfile);
         }
       });
     return () => {
       cancelled = true;
     };
-  }, [resumeParam, resumeVerifiedId, resumeMissingId]);
+  }, [
+    resumeParam,
+    resumeVerifiedId,
+    resumeVerifiedProfile,
+    resumeMissingId,
+    effectiveProfile,
+  ]);
 
   const resumeProbe = resumeProbeState({
     resumeId: resumeParam,
@@ -940,6 +982,18 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     // this tab's still-live terminal and ignore the new resume target.
     connectRef.current();
   }, [resumeParam]);
+
+  // Reconnect when the owning profile changes (a `/sessions` row from another
+  // profile, a deep link whose `?profile=` arrives after mount, or the sidebar
+  // switcher). Keeping the old PTY would leave the terminal in the previous
+  // store: same id, different home. `connect` scopes both the ticket and the
+  // PTY URL to this value.
+  const effectiveProfileRef = useRef(effectiveProfile);
+  useEffect(() => {
+    if (effectiveProfileRef.current === effectiveProfile) return;
+    effectiveProfileRef.current = effectiveProfile;
+    connectRef.current();
+  }, [effectiveProfile]);
 
   // Reconnect when the page resumes (tab return, sleep/wake, signal regain)
   // if the socket is down. A burst of visibilitychange/pageshow/focus/online
@@ -1379,7 +1433,11 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     }
     setCopyBusy(true);
     try {
-      const res = await api.getSessionMessages(id);
+      // Read from the management store the terminal is attached to (the same
+      // scope the PTY child's HOME uses).
+      const res = effectiveProfile
+        ? await api.getSessionMessages(id, effectiveProfile)
+        : await api.getSessionMessages(id);
       const last = [...res.messages]
         .reverse()
         .find(
@@ -1399,7 +1457,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
     } finally {
       setCopyBusy(false);
     }
-  }, [resumeParam, resumeTarget]);
+  }, [resumeParam, resumeTarget, effectiveProfile]);
 
   useEffect(() => {
     if (copyState === "idle") return undefined;
