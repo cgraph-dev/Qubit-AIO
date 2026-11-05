@@ -15,6 +15,9 @@ Checks (each one typed PASS / FAIL / DEGRADED):
   calling ``scripts/build/node-deps.mjs`` or rebuilding from source;
 * the shipped ``cli-config.yaml.example`` names a working local Ollama default,
   and the POSIX/Windows installers seed ``<QUBIT_HOME>/config.yaml`` from it;
+* the served-dashboard perf/cache contract is present in source: hashed
+  ``assets/`` are immutable, the token-bearing shell is ``no-store``, and the
+  gzip body cache exists;
 * the POSIX assets (``bootstrap.sh``, ``install.sh``, ``qubit-release.tar.gz``,
   ``SHA256SUMS``) and the Windows assets (``bootstrap.ps1``, ``install.ps1``,
   ``qubit-release.zip``) are present and checksum-consistent;
@@ -36,6 +39,7 @@ Exit codes: 0 PASS, 2 FAIL, 4 DEGRADED, 8 BLOCKED (missing required input).
 from __future__ import annotations
 
 import argparse
+import ast
 import hashlib
 import importlib.util
 import json
@@ -195,6 +199,108 @@ def _installer_seeds_root_config(installer: Path) -> tuple[bool, str]:
     )
 
 
+IMMUTABLE_ASSET_CACHE = "public, max-age=31536000, immutable"
+
+
+def _function_node(tree: ast.AST, name: str) -> ast.AST | None:
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return node
+    return None
+
+
+def _string_literals(node: ast.AST) -> set[str]:
+    return {
+        child.value
+        for child in ast.walk(node)
+        if isinstance(child, ast.Constant) and isinstance(child.value, str)
+    }
+
+
+def _default_arguments(function: ast.AST) -> dict[str, ast.AST]:
+    args = function.args  # type: ignore[attr-defined]
+    positional = list(getattr(args, "posonlyargs", [])) + list(args.args)
+    defaults: dict[str, ast.AST] = {}
+    for name, default in zip(positional[-len(args.defaults):], args.defaults):
+        defaults[name.arg] = default
+    for name, default in zip(args.kwonlyargs, args.kw_defaults):
+        if default is not None:
+            defaults[name.arg] = default
+    return defaults
+
+
+def _perf_cache_contract(webui: Path) -> tuple[bool, str]:
+    """Statically prove the served-dashboard cache contract.
+
+    This is a source-level check, not a live request: a release tree has no
+    running server. It pins the two behaviours the perf lane established and
+    that a fresh install depends on:
+
+    * content-hashed ``assets/`` are served ``immutable`` (a reload re-uses
+      them instead of re-transferring the bundle);
+    * the dashboard shell (``index.html``, which carries the one-shot session
+      token) is served with the ``_send`` default ``no-store`` and never opts
+      into a cache.
+
+    It also confirms the gzip-body cache still exists, since that is what makes
+    the immutable path cheap on the server.
+    """
+    if not webui.is_file():
+        return False, "missing %s" % webui
+    try:
+        source = webui.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+    except (OSError, SyntaxError) as exc:
+        return False, "unreadable %s: %s" % (webui, exc)
+
+    send = _function_node(tree, "_send")
+    if send is None:
+        return False, "WebUIHandler._send is missing"
+    cache_default = _default_arguments(send).get("cache_control")
+    if not (isinstance(cache_default, ast.Constant)
+            and cache_default.value == "no-store"):
+        return False, "_send does not default Cache-Control to no-store"
+
+    static = _function_node(tree, "_serve_qubit_static")
+    if static is None:
+        return False, "_serve_qubit_static is missing"
+    static_strings = _string_literals(static)
+    if IMMUTABLE_ASSET_CACHE not in static_strings:
+        return False, "hashed /assets/ are not served immutable"
+    if "assets/" not in static_strings:
+        return False, "_serve_qubit_static has no /assets/ cache branch"
+
+    index = _function_node(tree, "_serve_qubit_index")
+    if index is None:
+        return False, "_serve_qubit_index is missing"
+    shell_sends = [
+        node for node in ast.walk(index)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "_send"
+    ]
+    if not shell_sends:
+        return False, "_serve_qubit_index never sends the shell"
+    cached_shell = [
+        node for node in shell_sends
+        if any(keyword.arg == "cache_control" for keyword in node.keywords)
+    ]
+    if cached_shell:
+        return False, "the token-bearing shell opts into a cache policy"
+
+    gzip_helpers = {"_gzip_if_wanted", "_gzip_cache_get", "_gzip_cache_put"}
+    missing_gzip = sorted(
+        name for name in gzip_helpers if _function_node(tree, name) is None
+    )
+    if missing_gzip:
+        return False, "gzip body cache missing: %s" % ", ".join(missing_gzip)
+
+    return (
+        True,
+        "assets immutable; shell no-store; gzip body cache present",
+    )
+
+
 def _find_dashboard(root: Path) -> Path | None:
     candidate = root / DASHBOARD_SUFFIX
     return candidate if candidate.is_file() else None
@@ -295,6 +401,9 @@ def check_runtime_tree(repo: Path, report: Report, *, require_dashboard: bool = 
     example = repo / "qubit_runtime" / "cli-config.yaml.example"
     ok, detail = _config_contract(example)
     report.add("config_default_ollama", "OK" if ok else "FAIL", detail)
+
+    ok, detail = _perf_cache_contract(repo / "voicebridge" / "webui.py")
+    report.add("perf_cache_static_contract", "OK" if ok else "FAIL", detail)
 
     for name in ("install.sh", "install.ps1"):
         installer = repo / "scripts" / name
