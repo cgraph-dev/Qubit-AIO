@@ -71,6 +71,7 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `HERMES_RESIDUE_INVENTORY.md` | Hermes-residue inventory (deliberate compat vs accidental half-rebrand) |
 | `IDENTITY.md` | Qubit IDENTITY — what Qubit is |
 | `LEFTOVER_UNVERIFIED_VERDICTS_2026-10-19.md` | Leftover unverified items — verdicts with literal evidence |
+| `LOCAL-CI.md` | Local CI — deterministic local reproduction of the hosted jobs |
 | `MIGRATION.md` | Qubit MIGRATION — the three different things called "migration" |
 | `OFFICE-ACCEPTANCE-AND-RISK.md` | Office port — risk review and acceptance checklist |
 | `OFFICE-ACCEPTANCE-CLOSEOUT.md` | Office acceptance closeout — A1-A20 and the risk findings, re-run against current HEAD |
