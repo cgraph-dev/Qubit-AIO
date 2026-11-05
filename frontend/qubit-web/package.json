@@ -66,6 +66,8 @@
   },
   "overrides": {
     "undici": "8.12.3",
-    "@vitest/mocker": "4.1.12"
+    "@vitest/mocker": "4.1.12",
+    "zod": "4.6.7",
+    "minimatch": "11.0.4"
   }
 }

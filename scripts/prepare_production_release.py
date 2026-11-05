@@ -16,7 +16,7 @@ Usage::
 
     python3 scripts/prepare_production_release.py --out /tmp/qubit-production-release
     python3 scripts/prepare_production_release.py --out /tmp/qubit-production-release \\
-        --tag v0.0.4 --verify
+        --tag v0.0.5 --verify
 
 ``--verify`` runs the full release qualifier (``--build --install
 --reproduce --unsigned-ok``) and fails unless it returns PASS.  Without it the

@@ -70,8 +70,8 @@ need an external `tar`):
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Help
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.4
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.4
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.5
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.5
 ```
 
 `-Prefix DIR` is accepted as the same root as `-QubitHome`; `-Yes` becomes
@@ -81,7 +81,7 @@ has no systemd/launchd equivalent.
 Verify a published release without installing (read-only):
 
 ```bash
-python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.4
+python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.5
 ```
 
 It checks the release identity, every required asset and checksum, the archive
