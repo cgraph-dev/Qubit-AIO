@@ -570,7 +570,7 @@ def _resolve_chat_argv(
     from qubit_cli.web_server_sessions import _open_session_db_for_profile, _session_latest_descendant
     from qubit_cli.main import PROJECT_ROOT
     from qubit_cli.main_tui_launch import (
-        _apply_tui_python_env, _make_tui_argv, _tui_product_version)
+        _apply_tui_node_env, _apply_tui_python_env, _make_tui_argv, _tui_product_version)
 
     profile_dir: Optional[Path] = None
     requested = (profile or "").strip()
@@ -614,6 +614,7 @@ def _resolve_chat_argv(
         env["HERMES_CWD"] = workspace_cwd
         env["HERMES_TUI_CWD"] = workspace_cwd
     _apply_tui_python_env(env)
+    _apply_tui_node_env(env)
     # Same product release the shell TUI banner shows; the Ink client reads it
     # from the child env and otherwise renders the stale 0.0.1 placeholder.
     env["QUBIT_VERSION"] = _tui_product_version()

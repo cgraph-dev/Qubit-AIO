@@ -213,17 +213,24 @@ export function outputIntact(out, product) {
   } catch { return false }
 }
 
-/** The receipt in ``out`` when it was written for ``product`` by this platform, arch and Node. */
-function hostReceipt(out, product) {
+// A TUI product is an esbuild bundle: the Node that *ran* the build does not
+// change its bytes, only the esbuild binary and the recorded inputs do. Treating
+// the builder's Node as part of the identity made a host Node upgrade (or a build
+// performed by PM's Node while the freshness probe used another) invalidate a
+// valid receipt, so every dashboard chat after the cache TTL rebuilt the whole
+// TUI before spawning it. platform/arch stay exact — those select the esbuild
+// binary — and the source/output hashes still certify the bundle against the
+// current tree. Desktop/web keep the exact-Node rule.
+function hostReceipt(out, product, { nodeAgnostic = false } = {}) {
   const saved = JSON.parse(readFileSync(join(out, receiptName), 'utf8'))
   return saved.schema === 1 && saved.product === product
     && saved.platform === process.platform && saved.arch === process.arch
-    && saved.node === process.versions.node ? saved : null
+    && (nodeAgnostic || saved.node === process.versions.node) ? saved : null
 }
 
 export function productCurrent({ source, product, out, prepared }) {
   try {
-    const saved = hostReceipt(out, product)
+    const saved = hostReceipt(out, product, { nodeAgnostic: product === 'tui' })
     const paths = saved && (prepared ?? preparedPaths(saved.inputs))
     return !!saved
       // The pre-build gate, unlike recordProduct, must also see the clock. A restamp
