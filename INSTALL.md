@@ -100,8 +100,8 @@ executes **that extracted copy**. Neither reads a source checkout to install.
 ```powershell
 # Windows (ZIP assets)
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Help
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.8
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.8
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.9
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.9
 ```
 
 `scripts\bootstrap.cmd` is a CMD wrapper that forwards every flag to
@@ -129,7 +129,7 @@ same release tree.
 
 The published Qubit release publishes `SHA256SUMS` entries for `bootstrap.sh`, `bootstrap.ps1`, the wheel, the sdist and the source archive; each bootstrap only requires its own installer/archive pair.
 
-Starting with v0.0.8 the release is gated on the fresh-install contract by
+Starting with v0.0.9 the release is gated on the fresh-install contract by
 `scripts/release_fresh_install_gate.py`. `scripts/prepare_production_release.py`
 builds all six bootstrap payloads (`bootstrap.sh`, `install.sh`,
 `qubit-release.tar.gz`, `bootstrap.ps1`, `install.ps1`, `qubit-release.zip`)
@@ -139,7 +139,7 @@ the packaged dashboard/TUI assets are present:
 
 ```bash
 python3 scripts/prepare_production_release.py \
-  --out /tmp/qubit-production-release --tag v0.0.8 --verify
+  --out /tmp/qubit-production-release --tag v0.0.9 --verify
 python3 scripts/release_fresh_install_gate.py \
   --repo . --release-dir /tmp/qubit-production-release \
   --fresh-install --require-fresh-install --json
@@ -196,14 +196,14 @@ source archive contains no operator home path, `node_modules`/build
 directories, or secret files/content.
 
 ```bash
-python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.8
+python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.9
 python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --latest
 python3 scripts/verify_public_release.py \
-  --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.8
+  --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.9
 
-# v0.0.8+: require the Windows bootstrap assets too
+# v0.0.9+: require the Windows bootstrap assets too
 python3 scripts/verify_public_release.py \
-  --repo cgraph-dev/Qubit --tag v0.0.8 --require-platform-assets
+  --repo cgraph-dev/Qubit --tag v0.0.9 --require-platform-assets
 ```
 
 Add `--json` for a machine-readable report. The verifier downloads assets into
