@@ -1,6 +1,6 @@
 [project]
 name = "qubit-voicebridge"
-version = "0.0.3"
+version = "0.0.4"
 description = "Qubit Agent (Qubit VoiceBridge) — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
 readme = "README.md"
 # The project's own LICENSE is the Qubit VoiceBridge Educational Project
@@ -146,7 +146,7 @@ orb-qt = ["PySide6-Essentials>=6.5"]
 test = [
     "pytest>=8",
     "anthropic==0.87.0",
-    "mcp==2.0.0",
+    "mcp==2.3.0",
     "jsonschema==4.26.0",
     "fal-client==0.13.1",
     "truststore==0.10.4",

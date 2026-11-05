@@ -77,8 +77,8 @@ executes **that extracted copy**. Neither reads a source checkout to install.
 ```powershell
 # Windows (ZIP assets)
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Help
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.3
-powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.3
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.4
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.4
 ```
 
 `scripts\bootstrap.cmd` is a CMD wrapper that forwards every flag to
@@ -151,10 +151,10 @@ source archive contains no operator home path, `node_modules`/build
 directories, or secret files/content.
 
 ```bash
-python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.3
+python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.4
 python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --latest
 python3 scripts/verify_public_release.py \
-  --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.3
+  --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.4
 ```
 
 Add `--json` for a machine-readable report. The verifier downloads assets into
