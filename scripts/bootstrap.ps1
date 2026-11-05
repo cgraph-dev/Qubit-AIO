@@ -7,8 +7,8 @@
 # and executes ONLY that extracted copy. It never reads a source checkout.
 #
 #   powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -Help
-#   powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.7
-#   powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.7
+#   powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -DryRun C:\releases\v0.0.8
+#   powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap.ps1 -QubitHome "$env:LOCALAPPDATA\qubit" C:\releases\v0.0.8
 #
 # Release asset contract (see INSTALL.md):
 #   install.ps1            verified bootstrap copy of the Windows installer

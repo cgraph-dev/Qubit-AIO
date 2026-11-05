@@ -9,8 +9,8 @@ REM downloads or installs the upstream Hermes/OpenClaw tree.
 REM
 REM Usage (from a checkout or beside a downloaded bootstrap.ps1):
 REM   scripts\bootstrap.cmd -Help
-REM   scripts\bootstrap.cmd -DryRun C:\releases\v0.0.7
-REM   scripts\bootstrap.cmd -QubitHome "%%LOCALAPPDATA%%\qubit" C:\releases\v0.0.7
+REM   scripts\bootstrap.cmd -DryRun C:\releases\v0.0.8
+REM   scripts\bootstrap.cmd -QubitHome "%%LOCALAPPDATA%%\qubit" C:\releases\v0.0.8
 REM
 REM Fetched form (a release base is required):
 REM   powershell -ExecutionPolicy Bypass -Command "& ([scriptblock]::Create((irm https://github.com/cgraph-dev/Qubit/raw/production/scripts/bootstrap.ps1))) -Help"
