@@ -27,10 +27,10 @@ service, or a remote repository.
 
 Usage::
 
-    python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.5
+    python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.6
     python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --latest
     python3 scripts/verify_public_release.py \
-        --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.5
+        --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.6
 
 Exit code is 0 only when every check passes.
 """
@@ -895,7 +895,7 @@ def main(argv: list[str] | None = None) -> int:
         description="Verify a published Qubit release (read-only)."
     )
     parser.add_argument("--repo", default=None, help="GitHub repo, owner/name")
-    parser.add_argument("--tag", default=None, help="release tag, e.g. v0.0.5")
+    parser.add_argument("--tag", default=None, help="release tag, e.g. v0.0.6")
     parser.add_argument("--latest", action="store_true", help="use the latest release")
     parser.add_argument(
         "--release-base",

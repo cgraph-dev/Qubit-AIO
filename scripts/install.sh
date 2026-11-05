@@ -922,6 +922,15 @@ install_config_files() {
   fi
 
   mkdir -p "$CONFIG_DIR"
+  # Seed the root agent config once from the packaged example.  A fresh
+  # install must be able to talk to the local Ollama default without a manual
+  # provider edit; an existing config is never overwritten.
+  if [ ! -f "$QUBIT_HOME/config.yaml" ]; then
+    if [ -f "$PROJECT_DIR/qubit_runtime/cli-config.yaml.example" ]; then
+      cp "$PROJECT_DIR/qubit_runtime/cli-config.yaml.example" "$QUBIT_HOME/config.yaml"
+      echo "==> agent config created: $QUBIT_HOME/config.yaml"
+    fi
+  fi
   if [ ! -f "$CONFIG_DIR/voice.yaml" ]; then
     cp "$PROJECT_DIR/config/voice.example.yaml" "$CONFIG_DIR/voice.yaml"
     echo "==> config created: $CONFIG_DIR/voice.yaml"
