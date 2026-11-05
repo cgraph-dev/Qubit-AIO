@@ -37,7 +37,7 @@ def _git(repo: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def _repo(tmp_path: Path, version: str = "0.0.6") -> Path:
+def _repo(tmp_path: Path, version: str = "0.0.7") -> Path:
     repo = tmp_path / "repo"
     repo.mkdir()
     _git(repo, "init", "-q")
@@ -55,9 +55,9 @@ def _repo(tmp_path: Path, version: str = "0.0.6") -> Path:
 def test_resolve_release_binds_version_and_tag(tmp_path: Path):
     module = _load()
     repo = _repo(tmp_path)
-    release = module.resolve_release(repo, tag="v0.0.6")
-    assert release["version"] == "0.0.6"
-    assert release["tag"] == "v0.0.6"
+    release = module.resolve_release(repo, tag="v0.0.7")
+    assert release["version"] == "0.0.7"
+    assert release["tag"] == "v0.0.7"
     assert release["identity"]["state"] == "OK"
 
 
@@ -65,29 +65,29 @@ def test_resolve_release_rejects_version_and_tag_mismatch(tmp_path: Path):
     module = _load()
     repo = _repo(tmp_path)
     with pytest.raises(SystemExit):
-        module.resolve_release(repo, version="0.0.7")
+        module.resolve_release(repo, version="0.0.8")
     with pytest.raises(SystemExit):
-        module.resolve_release(repo, tag="v0.0.7")
+        module.resolve_release(repo, tag="v0.0.8")
     with pytest.raises(SystemExit):
-        module.resolve_release(repo, tag="0.0.6")
+        module.resolve_release(repo, tag="0.0.7")
 
 
 def test_tag_is_never_moved(tmp_path: Path):
     module = _load()
     repo = _repo(tmp_path)
-    _git(repo, "tag", "-a", "v0.0.6", "-m", "old tag")
+    _git(repo, "tag", "-a", "v0.0.7", "-m", "old tag")
     (repo / "new.txt").write_text("x\n", encoding="utf-8")
     _git(repo, "add", "new.txt")
     _git(repo, "commit", "-q", "-m", "later")
     with pytest.raises(SystemExit) as exc:
-        module.check_tag(repo, "v0.0.6")
+        module.check_tag(repo, "v0.0.7")
     assert "refusing to move" in str(exc.value).lower()
 
 
 def test_absent_tag_is_allowed_for_local_preparation(tmp_path: Path):
     module = _load()
     repo = _repo(tmp_path)
-    assert module.check_tag(repo, "v0.0.6")["state"] == "ABSENT"
+    assert module.check_tag(repo, "v0.0.7")["state"] == "ABSENT"
 
 
 def test_dirty_tree_is_refused(tmp_path: Path):
@@ -126,8 +126,8 @@ def test_source_tar_is_deterministic_and_keeps_exec_bits(tmp_path: Path):
 
     one = tmp_path / "one.tar.gz"
     two = tmp_path / "two.tar.gz"
-    module._tar_source(tree, "0.0.6", one)
-    module._tar_source(tree, "0.0.6", two)
+    module._tar_source(tree, "0.0.7", one)
+    module._tar_source(tree, "0.0.7", two)
     assert module.sha256(one) == module.sha256(two)
 
     import tarfile
@@ -135,13 +135,13 @@ def test_source_tar_is_deterministic_and_keeps_exec_bits(tmp_path: Path):
     with tarfile.open(one, "r:gz") as tar:
         names = sorted(tar.getnames())
         assert names == sorted([
-            "Qubit-0.0.6/README.md",
-            "Qubit-0.0.6/link",
-            "Qubit-0.0.6/scripts",
-            "Qubit-0.0.6/scripts/run.sh",
+            "Qubit-0.0.7/README.md",
+            "Qubit-0.0.7/link",
+            "Qubit-0.0.7/scripts",
+            "Qubit-0.0.7/scripts/run.sh",
         ])
-        assert tar.getmember("Qubit-0.0.6/scripts/run.sh").mode == 0o755
-        assert tar.getmember("Qubit-0.0.6/link").issym()
+        assert tar.getmember("Qubit-0.0.7/scripts/run.sh").mode == 0o755
+        assert tar.getmember("Qubit-0.0.7/link").issym()
 
 
 def test_component_manifest_records_components_and_artifacts(tmp_path: Path):
@@ -169,7 +169,7 @@ def test_component_manifest_records_components_and_artifacts(tmp_path: Path):
     (repo / "skills" / "one").mkdir(parents=True)
     (repo / "skills" / "one" / "SKILL.md").write_text("# skill\n")
 
-    release = module.resolve_release(repo, tag="v0.0.6")
+    release = module.resolve_release(repo, tag="v0.0.7")
     tree = {"head": _git(repo, "rev-parse", "HEAD").stdout.strip(),
             "branch": "main", "clean": True}
     source = {"source": {"tracked_files": 3}, "included_files": 2,
@@ -184,8 +184,8 @@ def test_component_manifest_records_components_and_artifacts(tmp_path: Path):
         tree,
     )
     assert manifest["schema"] == "qubit-component-manifest/1"
-    assert manifest["product"]["version"] == "0.0.6"
-    assert manifest["product"]["tag"] == "v0.0.6"
+    assert manifest["product"]["version"] == "0.0.7"
+    assert manifest["product"]["tag"] == "v0.0.7"
     assert manifest["components"]["vendored_runtime"]["version"] == "0.21.5"
     assert manifest["components"]["tui"]["ink"]["name"] == "@qubit/ink"
     assert manifest["components"]["plugin_catalog"]["yaml_entries"] == 1
@@ -196,11 +196,11 @@ def test_component_manifest_records_components_and_artifacts(tmp_path: Path):
 def test_release_notes_never_claim_verified_or_publish(tmp_path: Path):
     module = _load()
     notes = module._release_notes(
-        {"version": "0.0.6", "tag": "v0.0.6"},
+        {"version": "0.0.7", "tag": "v0.0.7"},
         {"head": "a" * 40, "branch": "production"},
         [{"name": "x.whl", "sha256": "0" * 64, "size_bytes": 1}],
     )
-    assert "Qubit 0.0.6" in notes
+    assert "Qubit 0.0.7" in notes
     assert "sha256sum -c SHA256SUMS" in notes
     assert "unsigned" in notes
     assert "--unsigned-ok" in notes
@@ -223,12 +223,12 @@ def test_release_payloads_include_posix_and_windows_bootstraps(tmp_path: Path):
     (tree / "README.md").write_text("hello\n", encoding="utf-8")
     (tree / "link").symlink_to("README.md")
     source = tmp_path / "source.tar.gz"
-    module._tar_source(tree, "0.0.6", source)
+    module._tar_source(tree, "0.0.7", source)
 
     out = tmp_path / "release"
     out.mkdir()
     payloads = module._build_release_payloads(
-        repo, tree, source, "0.0.6", out
+        repo, tree, source, "0.0.7", out
     )
     names = {path.name for path in payloads}
     assert names == {
@@ -239,6 +239,6 @@ def test_release_payloads_include_posix_and_windows_bootstraps(tmp_path: Path):
 
     with zipfile.ZipFile(out / "qubit-release.zip") as bundle:
         entries = set(bundle.namelist())
-    assert "Qubit-0.0.6/scripts/install.ps1" in entries
-    assert "Qubit-0.0.6/README.md" in entries
+    assert "Qubit-0.0.7/scripts/install.ps1" in entries
+    assert "Qubit-0.0.7/README.md" in entries
     assert not any(name.endswith("/link") for name in entries)
