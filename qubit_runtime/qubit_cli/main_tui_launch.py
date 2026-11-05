@@ -15,7 +15,11 @@ import sys
 
 from pathlib import Path
 from typing import Optional
-from agent.i18n import t
+
+# NOTE: ``agent.i18n`` is imported inside ``_print_tui_exit_summary`` only. It
+# drags in the whole agent package (~70 ms) and this module is imported by the
+# CLI's startup path, so keeping it off the module import is part of the
+# ``qubit --version`` fast path.
 
 # Log-record parity with the origin module.
 logger = logging.getLogger("qubit_cli.main")
@@ -108,6 +112,7 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
             db.close()
 
     # Sessions live under the profile's QUBIT_HOME — mirror cli_session_mixin::_print_exit_summary.
+    from agent.i18n import t
     from qubit_cli.profiles import get_active_profile_name
     active_profile = get_active_profile_name()
     profile_flag = "" if active_profile in ("default", "custom") else f" -p {active_profile}"
@@ -125,11 +130,37 @@ def _print_tui_exit_summary(session_id: Optional[str], active_session_file: Opti
     )
 
 
+def _tui_is_packaged_bundle(tui_dir: Path) -> bool:
+    """True when ``tui_dir`` is an installed release bundle, not a source checkout.
+
+    A packaged install ships the compiled ``ui-tui/dist/entry.js`` and has no
+    checkout (``.git`` at the runtime root) and no source build recipe
+    (``scripts/build/tui.mjs``). In that layout the freshness receipt can never
+    be re-derived, so consulting it would spawn ``scripts/build/freshness.mjs``
+    (often followed by ``node-deps.mjs``) on every launch for no benefit.
+    """
+    return (
+        (tui_dir / "dist" / "entry.js").is_file()
+        and not (tui_dir.parent / ".git").exists()
+        and not (tui_dir.parent / "scripts" / "build" / "tui.mjs").is_file()
+    )
+
+
 def _tui_need_rebuild(root: Path) -> bool:
+    force = (os.environ.get("HERMES_TUI_FORCE_BUILD") or "").strip().lower()
+    if force in {"1", "true", "yes", "on"}:
+        return True
+    # A packaged bundle that also carries its compiler receipt cannot be
+    # rebuilt (the wheel ships no source recipe), so do not import
+    # ``source_build``/PM and do not spawn the freshness probe. A bundle with
+    # no receipt is unverifiable and still takes the source check: that is what
+    # makes a half-copied tree stale rather than silently trusted.
+    if _tui_is_packaged_bundle(root) and (root / "dist" / "hermes-build.json").is_file():
+        return False
+
     from qubit_cli.source_build import source_product_current
 
-    force = (os.environ.get("HERMES_TUI_FORCE_BUILD") or "").strip().lower()
-    return force in {"1", "true", "yes", "on"} or not source_product_current(root.parent, "tui", root / "dist")
+    return not source_product_current(root.parent, "tui", root / "dist")
 
 
 def _find_bundled_tui(qubit_cli_dir: Path | None = None) -> Path | None:
@@ -276,13 +307,7 @@ def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
     # A packaged release tree (no .git checkout) already carries the compiled
     # TUI and its build receipt. Do not try to rebuild it from source: the
     # wheel intentionally omits ``scripts/build/`` and the runtime npm tree.
-    if (
-        not tui_dev
-        and not ext_dir
-        and (tui_dir / "dist" / "entry.js").is_file()
-        and not (tui_dir.parent / ".git").exists()
-        and not (tui_dir.parent / "scripts" / "build" / "tui.mjs").is_file()
-    ):
+    if not tui_dev and not ext_dir and _tui_is_packaged_bundle(tui_dir):
         return [_tui_node_bin("node"), "--expose-gc", str(tui_dir / "dist/entry.js")], tui_dir
 
     # About to npm install/build from source, so the workspace must exist.

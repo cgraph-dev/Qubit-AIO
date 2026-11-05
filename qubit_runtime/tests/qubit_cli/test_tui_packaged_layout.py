@@ -120,3 +120,60 @@ def test_checkout_with_the_build_script_still_rebuilds(monkeypatch, tmp_path):
     assert entry.read_text(encoding="utf-8") == "fresh"
     assert argv[-1] == str(entry)
     assert cwd == tui_dir
+
+
+def test_packaged_need_rebuild_skips_the_freshness_probe(monkeypatch, tmp_path):
+    """``_tui_need_rebuild`` is a no-op for a packaged bundle.
+
+    The guard in ``_make_tui_argv`` normally returns first, but every other
+    caller must also avoid importing ``source_build``/PM and spawning
+    ``scripts/build/freshness.mjs`` in an installed tree.
+    """
+    tui_dir = tmp_path / "_data" / "qubit_runtime" / "ui-tui"
+    _write_entry(tui_dir, "console.log('packaged')")
+    (tui_dir / "dist" / "hermes-build.json").write_text(
+        '{"schema":1,"product":"tui"}\n', encoding="utf-8")
+    assert not (tui_dir.parent / ".git").exists()
+    assert not (tui_dir.parent / "scripts" / "build" / "tui.mjs").exists()
+
+    import qubit_cli.source_build as source_build
+
+    monkeypatch.setattr(source_build, "source_product_current", _forbidden)
+    monkeypatch.delenv("HERMES_TUI_FORCE_BUILD", raising=False)
+
+    assert main_tui_launch._tui_need_rebuild(tui_dir) is False
+
+
+def test_packaged_launch_spawns_no_freshness_or_node_deps(monkeypatch, tmp_path):
+    """The packaged launch makes no subprocess call at all."""
+    import subprocess as subprocess_mod
+
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("node is unavailable")
+
+    tui_dir = tmp_path / "_data" / "qubit_runtime" / "ui-tui"
+    entry = _write_entry(tui_dir, "console.log('packaged')")
+
+    calls = []
+    real_run = subprocess_mod.run
+
+    def _recording_run(argv, *args, **kwargs):
+        calls.append(argv)
+        return real_run(argv, *args, **kwargs)
+
+    import qubit_cli.source_build as source_build
+
+    monkeypatch.setattr(subprocess_mod, "run", _recording_run)
+    monkeypatch.setattr(source_build.subprocess, "run", _recording_run)
+    monkeypatch.setattr(source_build, "source_product_current", _forbidden)
+    monkeypatch.setattr(main_tui_launch, "_find_bundled_tui", lambda *_a, **_k: None)
+    monkeypatch.setattr(main_tui_launch, "_tui_node_bin", lambda _bin: node)
+    monkeypatch.delenv("HERMES_TUI_DIR", raising=False)
+    monkeypatch.delenv("HERMES_TUI_FORCE_BUILD", raising=False)
+
+    argv, cwd = main_tui_launch._make_tui_argv(tui_dir, tui_dev=False)
+
+    assert calls == []
+    assert cwd == tui_dir
+    assert argv == [node, "--expose-gc", str(entry)]
