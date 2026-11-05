@@ -985,12 +985,13 @@ QUBIT_READ_AUTHORITY: tuple = (
     # checks. Proxying it to the vendored route would (a) answer 401 for the
     # tokenless in-process call and (b) bypass the Qubit fetch policy.
     "/api/media/proxy",
-    # MoA: after the v0.21.5 1:1 pin rebase the vendored ``GET /api/model/moa``
-    # serves the upstream curation defaults (``openai-codex``/``openrouter``)
-    # that Qubit does not ship. The proxy would fabricate providers on the
-    # Models page; serve the Qubit compat ``h_model_moa`` (no fan-out, enabled
-    # false) instead. Pinned by
-    # tests/test_dashboard_audit_truthfulness9u.py::test_moa_defaults_do_not_fabricate_providers.
+    # MoA: the compat handler owns this read so the Models card and the model
+    # picker share ONE gate. The vendored GET would serve the merged
+    # DEFAULT_CONFIG preset even for a profile that never opted in (the picker
+    # would not offer it), and Qubit does not proxy MoA writes. The handler
+    # therefore returns the profile's REAL presets once `moa.presets` is
+    # enabled, and an explicit opt-in refusal otherwise. See
+    # voicebridge.qubit_compat.h_model_moa.
     "/api/model/moa",
     # The canonical conversation history lives in the ONE chat-session
     # authority (state.db via QubitSessionStore, C7). Serving the Sessions
@@ -4072,6 +4073,17 @@ class WebUIHandler(BaseHTTPRequestHandler):
             from . import qubit_compat as _HC
             code, out = _HC.h_media_proxy(self.app.orch.cfg,
                                           query_params(self.path), {}, {})
+            self._json(out, code)
+        elif path == "/api/model/moa":
+            # Reference-literal MoA read; the SPA reaches the same handler
+            # through `/agent/api/model/moa`. Same session/token gate as the
+            # other dashboard API reads.
+            if not self._qubit_token_ok():
+                self._send(401, b"unauthorized")
+                return
+            from . import qubit_compat as _HC
+            code, out = _HC.h_model_moa(self.app.orch.cfg,
+                                        query_params(self.path), {}, {})
             self._json(out, code)
         elif path == "/api/status" and self._office_client_read_ok():
             # The vendored office client asks for its own status document at

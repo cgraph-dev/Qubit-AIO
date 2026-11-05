@@ -827,7 +827,7 @@ REMAINING_TYPED = [
     # POST /api/sessions/{bulk-delete,import,prune} were converted to real
     # Qubit-backed confirm-gated mutations (owner decisions in force); they are
     # covered by tests/test_sessions_mutations_wave18.py, not this typed table.
-    ("PUT", "/api/model/moa", "MOA_SUPERSEDED", 501),
+    ("PUT", "/api/model/moa", "MOA_READ_ONLY", 501),
     # POST /api/profiles/{name}/describe-auto is now a real ported handler
     # (reference web_routers/profiles.py) that validates the profile and runs
     # the auxiliary-LLM describer; it is covered by

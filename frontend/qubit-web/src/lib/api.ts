@@ -4607,6 +4607,11 @@ export interface MoaConfigResponse {
   degraded_reference_policy: "loud" | "silent";
 
   enabled: boolean;
+  /**
+   * True when the backend serves this state read-only (Qubit executes MoA, but
+   * preset writes go through `qubit moa configure` / config.yaml, not a PUT).
+   */
+  read_only?: boolean;
   /** Backend note when the surface is present but not shipped/configured. */
   detail?: string;
 }

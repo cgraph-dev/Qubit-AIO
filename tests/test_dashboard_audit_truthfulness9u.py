@@ -217,41 +217,48 @@ def test_cancel_all_includes_skill_pending(tmp_path, monkeypatch):
 
 # --------------------------------------------------- honest MoA defaults
 def test_moa_defaults_do_not_fabricate_providers(tmp_path, monkeypatch):
-    """The Qubit-served MoA surface fabricates no providers.
+    """The Qubit-served MoA surface fabricates no presets or providers.
 
-    The v0.21.5 1:1 pin rebase (Owner Decision #25: "rebrand the exact pinned
-    source with the deterministic engine rather than manual porting") restored
-    the upstream ``qubit_cli.moa_config`` curation defaults. Qubit's
-    truthfulness policy is an overlay at the boundary -- ``h_model_moa`` returns
-    no fan-out and ``moa_put`` is a typed refusal
-    (voicebridge/qubit_compat.py; docs/QubitVSupstream.md records that
-    ``h_model_moa`` always returns ``enabled:false, presets:{}``). Assert on the
-    surface the dashboard/SPA actually serves, not the vendored internals.
+    Qubit really executes MoA (``agent/moa_loop.py``) once a profile opts in by
+    writing an enabled ``moa.presets`` entry; the model picker advertises the
+    ``moa`` provider under that same gate. ``h_model_moa`` mirrors it: an
+    unconfigured profile gets an explicit opt-in refusal, NOT the merged
+    ``DEFAULT_CONFIG`` preset (which would name providers the picker does not
+    offer). ``moa_put`` stays a typed read-only refusal.
     """
     from voicebridge import qubit_compat as QC
     from voicebridge import webui
 
-    # The SPA reads /agent/api/model/moa; it must be served by the Qubit compat
-    # handler, never proxied to the vendored fork whose upstream defaults
-    # fabricate providers Qubit does not ship.
+    # The SPA reads /agent/api/model/moa; the Qubit compat handler is the one
+    # authority so the card and the picker apply the same opt-in gate.
     assert webui.qubit_read_authority("/api/model/moa") is True
     assert "/api/model/moa" in webui.QUBIT_READ_AUTHORITY
 
     cfg = _cfg(tmp_path, monkeypatch)
+    home = tmp_path / "qh"
+    home.mkdir()
+    (home / "config.yaml").write_text("model:\n  provider: ollama\n")
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+
     code, served = QC.h_model_moa(cfg, {}, {}, {})
     assert code == 200 and served["ok"] is True, served
     assert served["reference_models"] == [], served
     assert served["presets"] == {}, served
     assert served["enabled"] is False, served
+    assert served["read_only"] is True, served
     assert served["aggregator"] == {"provider": "", "model": "",
                                     "enabled": False}, served
+    # The refusal states the real reason and the supported way to enable MoA.
+    assert "opt-in" in served["detail"], served
+    assert "qubit moa configure" in served["detail"], served
     # No fabricated provider/model anywhere in the rendered payload.
     blob = str(served)
     assert "openai-codex" not in blob and "openrouter" not in blob
 
-    # The write path is a typed refusal: no fabricated preset can be stored.
+    # The write path is a typed read-only refusal: no preset can be stored here.
     code, refused = QC.moa_put(cfg, {}, {
         "reference_models": [{"provider": "openai-codex", "model": "gpt-5.5"}]},
         {})
     assert code == 501 and refused["ok"] is False, refused
-    assert refused["code"] == "MOA_SUPERSEDED", refused
+    assert refused["code"] == "MOA_READ_ONLY", refused
+    assert "qubit moa" in refused["qubit_counterpart"], refused
