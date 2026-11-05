@@ -5,9 +5,105 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import threading
+import time
 
 
-def source_product_current(project_root: Path, product: str, out: Path) -> bool:
+# ``source_product_current`` spawns Node (and PM's import graph) to hash the
+# compiler's inputs on every call. The dashboard resolves the chat argv once
+# per new/resumed chat, so a steady source checkout paid ~350 ms per open for a
+# receipt that only changes when a build writes it. Cache the authoritative
+# answer in-process while a cheap fingerprint of the watched inputs is
+# unchanged; any source edit (or a rebuilt receipt) misses the cache and asks
+# the compiler again. The max age bounds a content change that somehow keeps
+# its mtime, so the compiler still re-verifies periodically.
+_FRESHNESS_CACHE_MAX_AGE_S = 60.0
+_freshness_cache: dict[tuple[str, str, str], tuple[tuple, float, bool]] = {}
+_freshness_cache_lock = threading.Lock()
+
+# A conservative superset of the TUI compiler's inputs (scripts/build/freshness.mjs
+# ``tuiInputs``). This does not need to match exactly: anything newer than the
+# receipt forces the authoritative Node probe, and anything older is still
+# covered by the probe's content hashes.
+_TUI_WATCH_ROOTS = ("ui-tui", "apps/shared")
+_TUI_WATCH_PATHS = (
+    "tsconfig.json", "package.json", "package-lock.json", ".npmrc", "pm/lock.json",
+    "scripts/build",
+)
+_GENERATED_DIRS = frozenset({
+    "node_modules", "dist", "dist-webapp", "build", "release", ".cache", ".git",
+    "coverage", "test-results", "playwright-report", "__pycache__",
+})
+_OS_METADATA = frozenset({".DS_Store", ".localized", "Thumbs.db", "Desktop.ini"})
+
+
+def _cache_max_age_s() -> float:
+    raw = (os.environ.get("QUBIT_SOURCE_FRESHNESS_TTL_S")
+           or os.environ.get("HERMES_SOURCE_FRESHNESS_TTL_S") or "").strip()
+    if not raw:
+        return _FRESHNESS_CACHE_MAX_AGE_S
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        return _FRESHNESS_CACHE_MAX_AGE_S
+
+
+def _newest_mtime_ns(path: Path) -> int:
+    """Newest mtime under ``path`` (a file or a directory tree), skipping build output."""
+    try:
+        info = path.stat()
+    except OSError:
+        return 0
+    if not path.is_dir():
+        return info.st_mtime_ns
+    newest = 0
+    for dirpath, dirnames, filenames in os.walk(path):
+        dirnames[:] = [name for name in dirnames if name not in _GENERATED_DIRS]
+        for name in filenames:
+            if name in _OS_METADATA or name.startswith("._"):
+                continue
+            try:
+                newest = max(newest, os.stat(os.path.join(dirpath, name)).st_mtime_ns)
+            except OSError:
+                continue
+    return newest
+
+
+def _tui_freshness_fingerprint(project_root: Path, out: Path) -> tuple | None:
+    """Cheap identity of the inputs a TUI receipt vouches for, or None without one."""
+    try:
+        receipt = (out / "hermes-build.json").stat()
+    except OSError:
+        return None
+    newest = 0
+    for relative in (*_TUI_WATCH_ROOTS, *_TUI_WATCH_PATHS):
+        newest = max(newest, _newest_mtime_ns(project_root / relative))
+    # A post-build edit/corruption of the bundle is newer than the receipt and
+    # must fall through to the compiler's output-hash check.
+    try:
+        for name in os.listdir(out):
+            if name in {"hermes-build.json", ".hermes-product"}:
+                continue
+            newest = max(newest, _newest_mtime_ns(out / name))
+    except OSError:
+        pass
+    return (receipt.st_mtime_ns, receipt.st_size, newest)
+
+
+def _prune_freshness_cache_locked(now: float, max_age: float) -> None:
+    for key, (_fingerprint, stamp, _current) in list(_freshness_cache.items()):
+        if now - stamp > max_age:
+            _freshness_cache.pop(key, None)
+
+
+def invalidate_source_product_current(project_root: Path, product: str, out: Path) -> None:
+    """Forget the cached freshness verdict for a product (call after a build)."""
+    key = (str(Path(project_root).resolve()), product, str(Path(out).resolve()))
+    with _freshness_cache_lock:
+        _freshness_cache.pop(key, None)
+
+
+def _probe_source_product_current(project_root: Path, product: str, out: Path) -> bool:
     """Read the compiler's receipt without acquiring tools or dependencies."""
     from pm import env_for, installed_package
 
@@ -24,6 +120,35 @@ def source_product_current(project_root: Path, product: str, out: Path) -> bool:
         return result.stdout.strip() == "true"
     except (OSError, subprocess.SubprocessError):
         return False
+
+
+def source_product_current(project_root: Path, product: str, out: Path) -> bool:
+    """Whether ``out`` is current, reusing a verified verdict while inputs are unchanged.
+
+    The cache only ever stores an answer the compiler produced, so it cannot
+    turn a stale bundle current. Only the TUI (the dashboard chat hot path) is
+    fingerprinted; every other product keeps the straight-through probe.
+    """
+    project_root, out = Path(project_root), Path(out)
+    max_age = _cache_max_age_s()
+    if product != "tui" or max_age <= 0:
+        return _probe_source_product_current(project_root, product, out)
+
+    key = (str(project_root.resolve()), product, str(out.resolve()))
+    fingerprint = _tui_freshness_fingerprint(project_root, out)
+    now = time.monotonic()
+    if fingerprint is not None:
+        with _freshness_cache_lock:
+            cached = _freshness_cache.get(key)
+            if cached is not None and cached[0] == fingerprint and now - cached[1] <= max_age:
+                return cached[2]
+
+    current = _probe_source_product_current(project_root, product, out)
+    if fingerprint is not None:
+        with _freshness_cache_lock:
+            _prune_freshness_cache_locked(now, max_age)
+            _freshness_cache[key] = (fingerprint, time.monotonic(), current)
+    return current
 
 
 def source_build_env(base_env: dict | None = None, *, explicit: bool = False, verify: bool = True) -> dict[str, str]:
@@ -100,7 +225,10 @@ def prepare_launch_dependencies(project_root: Path, *, env: dict) -> None:
 
 
 def build_source_tui(project_root: Path, *, env: dict) -> None:
-    run_source_script(project_root, "scripts/build/tui.mjs", env=env, label="Building the TUI")
+    try:
+        run_source_script(project_root, "scripts/build/tui.mjs", env=env, label="Building the TUI")
+    finally:
+        invalidate_source_product_current(project_root, "tui", project_root / "ui-tui/dist")
 
 
 def build_source_web(project_root: Path, *, env: dict, icons: Path | None = None) -> None:
