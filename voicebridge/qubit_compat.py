@@ -1921,26 +1921,87 @@ def sanitize_model_options_providers(rows: Any) -> List[Dict[str, Any]]:
     return clean
 
 
+#: Provider ids that mean "the loopback Ollama runtime". The vendored catalog
+#: folds bare ``ollama`` into ``custom``; only these spellings are local.
+_LOCAL_OLLAMA_ALIASES = frozenset({"ollama", "local", "llamacpp", "llama.cpp",
+                                   "llama-cpp"})
+
+
+def _runtime_local_config(cfg: Any) -> Dict[str, Any]:
+    """The runtime ``config.yaml`` facts the picker needs (typed, never raises).
+
+    A fresh install writes only ``model: {provider: ollama, default: …}``.
+    Without ``providers.ollama.base_url`` the vendored catalog has no Ollama
+    row at all, so the local tier vanished from the picker. These are the
+    explicit local facts only — no endpoint or model is invented.
+    """
+    out: Dict[str, Any] = {"configured": False, "is_local": False,
+                           "current_model": "", "models": []}
+    try:
+        from . import qubit_runtime as QR
+        import yaml as _yaml
+        path = Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
+        data = _yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001 - absent/unreadable runtime config
+        return out
+    if not isinstance(data, dict):
+        return out
+    models: List[str] = []
+
+    def _add(value: Any) -> None:
+        text = str(value or "").strip()
+        if text and text not in models:
+            models.append(text)
+
+    model = data.get("model")
+    if isinstance(model, dict):
+        provider = str(model.get("provider") or "").strip().lower()
+        if provider in _LOCAL_OLLAMA_ALIASES:
+            out["is_local"] = True
+            out["configured"] = True
+            _add(model.get("default") or model.get("model")
+                 or model.get("name"))
+            out["current_model"] = models[0] if models else ""
+    providers = data.get("providers")
+    ollama = providers.get("ollama") if isinstance(providers, dict) else None
+    if isinstance(ollama, dict):
+        out["configured"] = True
+        _add(ollama.get("default_model") or ollama.get("model"))
+    out["models"] = models
+    return out
+
+
+def _local_ollama_configured(cfg: Any) -> bool:
+    """True when the runtime config names a local Ollama provider/model."""
+    return bool(_runtime_local_config(cfg).get("configured"))
+
+
 def _ollama_options_row(cfg: Any) -> Optional[Dict[str, Any]]:
     """Qubit-owned Ollama row for the model picker (``/api/model/options``).
 
     The vendored builder only knows the managed llamacpp runtime's staged
     GGUFs, so Qubit's Ollama tier (brain, Spark 1.7B/4B) was invisible in
     every MODEL picker and local models could not be chosen in /qubit-chat.
-    This row lists the registered, enabled, chat-eligible LOCAL profiles —
-    exactly the set ``POST /api/model/set`` can activate — with the checkmark
-    resolved from the canonical active profile (not the vendored context, so
-    it never disagrees with the MODEL card). ``authenticated`` is
-    reachability, same rationale as the vendored local row: no credential
-    exists for loopback Ollama. ``None`` when no local profile qualifies.
+    This row lists the registered, enabled LOCAL profiles — including the
+    shipped default (whose roles deliberately omit ``chat`` so a fresh
+    /qubit-chat keeps the operator's API profile) — plus any local model the
+    runtime ``config.yaml`` actually names. The checkmark follows the
+    canonical active profile; when no active record exists yet it falls back
+    to the explicit runtime model so a clean install shows its real default.
+    ``authenticated`` is reachability, same rationale as the vendored local
+    row: no credential exists for loopback Ollama. ``None`` when nothing
+    local qualifies.
     """
     try:
         from .providers import resolver as R
 
+        local = _runtime_local_config(cfg)
+        configured_models = list(local.get("models") or [])
         profiles = [p for p in R.load_profiles(cfg)
                     if p.kind == R.LOCAL and p.enabled
-                    and "chat" in (p.roles or ["chat"])]
-        if not profiles:
+                    and ("chat" in (p.roles or ["chat"]) or p.default
+                         or p.model in configured_models)]
+        if not profiles and not configured_models:
             return None
         try:
             current = str(R.get_active_profile(cfg).get("active") or "")
@@ -1951,13 +2012,58 @@ def _ollama_options_row(cfg: Any) -> Optional[Dict[str, Any]]:
         for p in profiles:
             if p.model not in models:
                 models.append(p.model)
+        for model_id in configured_models:
+            if model_id not in models:
+                models.append(model_id)
+        if not models:
+            return None
+        is_current = current in ids
+        if not is_current and local.get("is_local"):
+            is_current = str(local.get("current_model") or "") in models
         return {"slug": "ollama", "name": "Ollama (local)",
                 "models": models, "total_models": len(models),
-                "is_current": current in ids, "is_user_defined": False,
+                "is_current": is_current, "is_user_defined": False,
                 "source": "qubit-ollama", "authenticated": True,
                 "auth_type": "local", "warning": None}
     except Exception:  # noqa: BLE001 - options must never 500 on Ollama
         return None
+
+
+def _merge_local_ollama_row(payload: Dict[str, Any], cfg: Any) -> None:
+    """Add (or fill) the Qubit-owned Ollama row in a model-options payload.
+
+    Only a runtime config that names a local provider/model triggers this, so
+    a cloud-only setup is unchanged. A vendored Ollama row that exists but
+    lists no model (for example ``providers.ollama.base_url`` with no
+    ``default_model``) is filled from the Qubit-owned set instead of being
+    duplicated or dropped. Mutates ``payload`` in place; never raises.
+    """
+    try:
+        rows = payload.get("providers")
+        if not isinstance(rows, list) or not _local_ollama_configured(cfg):
+            return
+        ollama_row = _ollama_options_row(cfg)
+        if ollama_row is None:
+            return
+        local_rows = [
+            r for r in rows if isinstance(r, dict)
+            and str(r.get("slug") or "").lower() in {"ollama", "llamacpp"}]
+        ollama_existing = [
+            r for r in local_rows
+            if str(r.get("slug") or "").lower() == "ollama"]
+        if not local_rows:
+            payload["providers"] = [*rows, ollama_row]
+        elif ollama_existing:
+            for row in ollama_existing:
+                if not row.get("models"):
+                    row["models"] = list(ollama_row["models"])
+                    row["total_models"] = len(row["models"])
+                    row.setdefault("authenticated", True)
+                    row.setdefault("auth_type", "local")
+                    if not row.get("warning"):
+                        row["warning"] = None
+    except Exception:  # noqa: BLE001 - additive row never breaks options
+        pass
 
 
 def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1995,19 +2101,8 @@ def h_model_options(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     payload = payload or {}
     # Qubit-owned Ollama row (registered LOCAL profiles). The vendored
     # builder cannot see the Ollama tier; without this, /qubit-chat's MODEL
-    # card offered no local model. Skipped when empty or when a vendored
-    # local row already owns the surface.
-    try:
-        rows = payload.get("providers")
-        if isinstance(rows, list):
-            seen = {str(r.get("slug") or "").lower() for r in rows
-                    if isinstance(r, dict)}
-            if not seen & {"ollama", "llamacpp"}:
-                ollama_row = _ollama_options_row(cfg)
-                if ollama_row is not None:
-                    payload["providers"] = [*rows, ollama_row]
-    except Exception:  # noqa: BLE001 - additive row never breaks options
-        pass
+    # card offered no local model.
+    _merge_local_ollama_row(payload, cfg)
     # Picker-surface guard: a refusal/error payload must never render as a
     # selectable provider or model row, and internal record names must never
     # reach the screen — failures degrade to a row NOTE (warning) or are

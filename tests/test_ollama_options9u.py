@@ -9,9 +9,14 @@ tier.
 
 Contract pinned here:
 
-* ``_ollama_options_row`` lists registered, enabled, chat-eligible LOCAL
-  profiles (the exact set ``POST /api/model/set`` activates); ``None``
-  when none qualify; the checkmark follows the canonical active profile.
+* ``_ollama_options_row`` lists registered, enabled LOCAL profiles —
+  chat-eligible ones plus the shipped default (whose roles deliberately omit
+  ``chat``) — and any model the runtime config names; ``None`` when nothing
+  local qualifies. The checkmark follows the canonical active profile, with
+  the explicit runtime model as the pre-selection fallback.
+* ``_merge_local_ollama_row`` adds that row only when the runtime config names
+  a local Ollama provider/model, fills an empty vendored Ollama row, and
+  never disturbs an explicitly configured current provider.
 * A local activation mirrors the runtime model slot (like the remote path),
   so vendored readers agree on the selection.
 
@@ -133,3 +138,103 @@ def test_runtime_slot_uses_single_key_convention(tmp_path, monkeypatch):
     node = yaml.safe_load(path.read_text(encoding="utf-8"))["model"]
     assert node == {"provider": "ollama",
                     "default": "qubit-spark17"}, node
+
+
+def _write_runtime_config(cfg, body):
+    from voicebridge import qubit_runtime
+
+    path = qubit_runtime.runtime_home_for_cfg(cfg) / "config.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(body, encoding="utf-8")
+
+
+def _payload(*rows):
+    return {"providers": list(rows), "model": "", "provider": ""}
+
+
+def test_merge_adds_local_ollama_for_clean_default_config(tmp_path,
+                                                          monkeypatch):
+    """A fresh config naming only the local Ollama default still lists it.
+
+    Regression: ``model: {provider: ollama, default: qubit-brain}`` with no
+    ``providers.ollama`` block produced only Ollama Cloud / unrelated rows.
+    The shipped default profile must appear as a selectable local provider.
+    """
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _write_runtime_config(
+        cfg, "model:\n  provider: ollama\n  default: qubit-brain\n")
+    payload = _payload()
+
+    QC._merge_local_ollama_row(payload, cfg)
+
+    rows = {str(r.get("slug")): r for r in payload["providers"]}
+    local = rows.get("ollama")
+    assert local is not None, sorted(rows)
+    assert local["models"] == ["qubit-brain"]
+    assert local["total_models"] == 1
+    assert local["is_current"] is True
+    assert local["authenticated"] is True
+    assert local["source"] == "qubit-ollama"
+
+
+def test_merge_fills_local_row_from_configured_base_url(tmp_path,
+                                                        monkeypatch):
+    """``providers.ollama.base_url`` alone yields a selectable local model.
+
+    The vendored builder creates the Ollama row but leaves it empty when no
+    ``default_model`` is written; the Qubit-owned default fills it instead of
+    duplicating or dropping the row.
+    """
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _write_runtime_config(
+        cfg,
+        "providers:\n  ollama:\n"
+        "    base_url: http://127.0.0.1:11434/v1\n")
+    payload = _payload(
+        {"slug": "ollama", "name": "ollama", "models": [],
+         "total_models": 0, "is_current": False, "source": "user-config"})
+
+    QC._merge_local_ollama_row(payload, cfg)
+
+    rows = {str(r.get("slug")): r for r in payload["providers"]}
+    local = rows["ollama"]
+    assert local["models"] == ["qubit-brain"]
+    assert local["total_models"] == 1
+    assert local["authenticated"] is True
+    # Filled in place, never duplicated.
+    assert [r.get("slug") for r in payload["providers"]] == ["ollama"]
+
+
+def test_merge_keeps_explicit_provider_current(tmp_path, monkeypatch):
+    """An explicitly configured provider still wins over the local default."""
+    from voicebridge import qubit_compat as QC
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    _write_runtime_config(
+        cfg,
+        "model:\n  provider: opencode-go\n"
+        "  default: deepseek-v4.1-flash\n"
+        "  base_url: https://opencode.ai/zen/go/v1\n"
+        "providers:\n  ollama:\n"
+        "    base_url: http://127.0.0.1:11434/v1\n"
+        "    default_model: qubit-brain\n")
+    cloud = {"slug": "opencode-go", "name": "OpenCode Go",
+             "models": ["deepseek-v4.1-flash"], "total_models": 1,
+             "is_current": True, "source": "configured-current"}
+    local = {"slug": "ollama", "name": "ollama",
+             "models": ["qubit-brain"], "total_models": 1,
+             "is_current": False, "source": "user-config"}
+    payload = _payload(cloud, local)
+
+    QC._merge_local_ollama_row(payload, cfg)
+
+    assert payload["providers"][0] is cloud
+    assert cloud["is_current"] is True
+    assert cloud["models"] == ["deepseek-v4.1-flash"]
+    assert local["is_current"] is False
+    assert local["models"] == ["qubit-brain"]
+    assert [r for r in payload["providers"] if r.get("is_current")] == [cloud]
