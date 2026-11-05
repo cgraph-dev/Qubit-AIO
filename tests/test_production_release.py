@@ -206,3 +206,39 @@ def test_release_notes_never_claim_verified_or_publish(tmp_path: Path):
     assert "--unsigned-ok" in notes
     assert "VERIFIED" not in notes
     assert "gh release" not in notes
+
+
+def test_release_payloads_include_posix_and_windows_bootstraps(tmp_path: Path):
+    module = _load()
+    repo = _repo(tmp_path)
+    (repo / "scripts").mkdir()
+    (repo / "scripts" / "bootstrap.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+    (repo / "scripts" / "bootstrap.ps1").write_text("# win\n", encoding="utf-8")
+    (repo / "scripts" / "install.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+    (repo / "scripts" / "install.ps1").write_text("# win install\n", encoding="utf-8")
+    tree = tmp_path / "tree"
+    (tree / "scripts").mkdir(parents=True)
+    (tree / "scripts" / "install.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+    (tree / "scripts" / "install.ps1").write_text("# win install\n", encoding="utf-8")
+    (tree / "README.md").write_text("hello\n", encoding="utf-8")
+    (tree / "link").symlink_to("README.md")
+    source = tmp_path / "source.tar.gz"
+    module._tar_source(tree, "0.0.5", source)
+
+    out = tmp_path / "release"
+    out.mkdir()
+    payloads = module._build_release_payloads(
+        repo, tree, source, "0.0.5", out
+    )
+    names = {path.name for path in payloads}
+    assert names == {
+        "bootstrap.sh", "bootstrap.ps1", "install.sh", "install.ps1",
+        "qubit-release.tar.gz", "qubit-release.zip",
+    }
+    import zipfile
+
+    with zipfile.ZipFile(out / "qubit-release.zip") as bundle:
+        entries = set(bundle.namelist())
+    assert "Qubit-0.0.5/scripts/install.ps1" in entries
+    assert "Qubit-0.0.5/README.md" in entries
+    assert not any(name.endswith("/link") for name in entries)

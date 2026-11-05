@@ -78,6 +78,44 @@ def _write_fixture(repo: Path, body: str = "one") -> None:
     )
     (repo / "voicebridge" / "state.txt").write_text(body, encoding="utf-8")
     (repo / "README.md").write_text("# Qubit fixture\n", encoding="utf-8")
+    scripts = repo / "scripts"
+    scripts.mkdir()
+    (scripts / "bootstrap.sh").write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    (scripts / "bootstrap.ps1").write_text("# windows bootstrap\n", encoding="utf-8")
+    (scripts / "install.sh").write_text(
+        "#!/usr/bin/env bash\n"
+        "# seeds root config.yaml from cli-config.yaml.example\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    (scripts / "install.ps1").write_text(
+        "# seeds root config.yaml from cli-config.yaml.example\n",
+        encoding="utf-8",
+    )
+    (repo / "qubit_runtime" / "ui-tui" / "dist").mkdir(parents=True)
+    (repo / "qubit_runtime" / "ui-tui" / "dist" / "entry.js").write_text(
+        "// tui\n", encoding="utf-8"
+    )
+    (repo / "qubit_runtime" / "cli-config.yaml.example").write_text(
+        "model:\n  provider: ollama\n  default: qubit-brain\n"
+        "  base_url: http://127.0.0.1:11434\n",
+        encoding="utf-8",
+    )
+    (repo / "qubit_runtime" / "qubit_cli").mkdir(parents=True)
+    (repo / "qubit_runtime" / "qubit_cli" / "main_tui_launch.py").write_text(
+        "def _find_bundled_tui(*args, **kwargs):\n"
+        "    return None\n"
+        "def _tui_node_bin(name):\n"
+        "    return '/nonexistent/node'\n"
+        "def _ensure_tui_workspace(tui_dir):\n"
+        "    raise AssertionError('source workspace required')\n"
+        "def _tui_need_rebuild(tui_dir):\n"
+        "    raise AssertionError('source rebuild required')\n"
+        "def _make_tui_argv(tui_dir, tui_dev):\n"
+        "    return ['/nonexistent/node', '--expose-gc', "
+        "str(tui_dir / 'dist' / 'entry.js')], tui_dir\n",
+        encoding="utf-8",
+    )
     for doc in PUBLIC_DOCS:
         (repo / doc).write_text("public doc\n", encoding="utf-8")
     (repo / "docs" / "INTERNAL.md").write_text("internal\n", encoding="utf-8")

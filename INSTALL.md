@@ -127,7 +127,29 @@ refuses symlink entries; Windows would otherwise need elevated privileges), so
 the two archives are not byte-identical payloads even though they carry the
 same release tree.
 
-The published Qubit release also publishes `SHA256SUMS` entries for `bootstrap.sh`, the wheel, the sdist and the source archive; each bootstrap only requires its own installer/archive pair.
+The published Qubit release publishes `SHA256SUMS` entries for `bootstrap.sh`, `bootstrap.ps1`, the wheel, the sdist and the source archive; each bootstrap only requires its own installer/archive pair.
+
+Starting with v0.0.6 the release is gated on the fresh-install contract by
+`scripts/release_fresh_install_gate.py`. `scripts/prepare_production_release.py`
+builds all six bootstrap payloads (`bootstrap.sh`, `install.sh`,
+`qubit-release.tar.gz`, `bootstrap.ps1`, `install.ps1`, `qubit-release.zip`)
+plus a `release-gate-report.json`, and refuses to finish unless a throwaway
+install creates a root `config.yaml` with the default local Ollama provider and
+the packaged dashboard/TUI assets are present:
+
+```bash
+python3 scripts/prepare_production_release.py \
+  --out /tmp/qubit-production-release --tag v0.0.6 --verify
+python3 scripts/release_fresh_install_gate.py \
+  --repo . --release-dir /tmp/qubit-production-release \
+  --fresh-install --require-fresh-install --json
+```
+
+A DEGRADED gate result is never treated as PASS; release preparation runs with
+`--require-fresh-install` so an un-runnable fresh install blocks the release.
+Real Windows PowerShell 5.1 execution, a real macOS host, signed artifacts and
+live-service behavior remain manual checks (see
+`docs/V0.0.6-RELEASE-CHECKLIST.md`).
 
 The archive is the install payload: its extracted tree is where `PROJECT_DIR`
 resolves, so the installer builds the venv, installs the package, builds/serves
@@ -178,6 +200,10 @@ python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.5
 python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --latest
 python3 scripts/verify_public_release.py \
   --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.5
+
+# v0.0.6+: require the Windows bootstrap assets too
+python3 scripts/verify_public_release.py \
+  --repo cgraph-dev/Qubit --tag v0.0.6 --require-platform-assets
 ```
 
 Add `--json` for a machine-readable report. The verifier downloads assets into

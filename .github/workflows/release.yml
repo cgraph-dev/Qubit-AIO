@@ -57,7 +57,16 @@ jobs:
         # canonical builder so a clean tag checkout can produce the bundle.
         run: bash scripts/build_dashboard.sh
       - name: Install build tooling
-        run: python -m pip install --upgrade pip build
+        run: python -m pip install --upgrade pip build uv
+      - name: Enforce the fresh-install release gate
+        # Refuse the release unless a fresh install produces a root config.yaml
+        # with the default Ollama provider, the dashboard/TUI bundle is
+        # packaged, and the POSIX + Windows release assets exist. A DEGRADED
+        # result is a failure here (the release cannot be certified).
+        run: |
+          set -euo pipefail
+          python scripts/release_fresh_install_gate.py \
+            --repo . --fresh-install --require-fresh-install --json
       - name: Build, install, and reproduce artifacts
         env:
           TAG: ${{ github.ref_name }}

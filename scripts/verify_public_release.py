@@ -101,6 +101,7 @@ SECRET_PATTERNS = (
 )
 
 EXACT_ASSETS = ("bootstrap.sh", "install.sh", "qubit-release.tar.gz", "SHA256SUMS")
+PLATFORM_ASSETS = ("bootstrap.ps1", "install.ps1", "qubit-release.zip")
 
 
 class VerifyError(SystemExit):
@@ -329,8 +330,12 @@ def _single(candidates: Iterable[str], label: str) -> str | None:
     return names[0] if names else None
 
 
-def find_assets(names: set[str], version: str) -> dict[str, str | None]:
+def find_assets(names: set[str], version: str,
+                require_platform_assets: bool = False) -> dict[str, str | None]:
     assets = {name: (name if name in names else None) for name in EXACT_ASSETS}
+    if require_platform_assets:
+        for name in PLATFORM_ASSETS:
+            assets[name] = name if name in names else None
     assets["wheel"] = _single(
         (
             name
@@ -425,6 +430,29 @@ def _archive_info(path: Path, version: str, install_sha: str) -> dict:
             if commit:
                 info["source_commit"] = commit.group(1)
     return info
+
+
+def _archive_zip_info(path: Path, install_name: str, install_sha: str) -> dict:
+    """Read the Windows ZIP installer and VERSION the same way as the tar helper."""
+    with zipfile.ZipFile(path) as bundle:
+        matches = [name for name in bundle.namelist()
+                   if name == "scripts/" + install_name
+                   or name.endswith("/scripts/" + install_name)]
+        if not matches:
+            raise VerifyError(
+                "PUBLIC_RELEASE_ARCHIVE_INSTALLER_MISSING: %s" % path.name
+            )
+        name = sorted(matches, key=lambda item: (len(item), item))[0]
+        install_sha = _sha256_bytes(bundle.read(name))
+        version_matches = [name for name in bundle.namelist()
+                           if name == "VERSION" or name.endswith("/VERSION")]
+        version = None
+        if version_matches:
+            version = bundle.read(
+                sorted(version_matches, key=lambda item: (len(item), item))[0]
+            ).decode("utf-8", "replace").strip()
+    return {"install_sha": install_sha, "version": version,
+            "source_commit": None}
 
 
 def scan_archive(path: Path) -> dict:
@@ -552,6 +580,7 @@ def verify(
     version: str | None,
     expect_source_commit: str | None,
     timeout: float,
+    require_platform_assets: bool = False,
 ) -> Report:
     report = Report(repo=repo, tag=tag)
     release: dict | None = None
@@ -625,7 +654,7 @@ def verify(
             "tag=%s version=%s" % (report.tag, version),
         )
 
-    assets = find_assets(names, version)
+    assets = find_assets(names, version, require_platform_assets=require_platform_assets)
     for label, name in assets.items():
         report.add(
             "asset_%s" % label,
@@ -758,6 +787,35 @@ def verify(
             except Exception as exc:  # noqa: BLE001 - typed archive refusal
                 report.add("source_archive_scan", False, str(exc))
 
+        windows_archive_name = assets.get("qubit-release.zip")
+        windows_archive_path = (downloaded.get(windows_archive_name)
+                                if windows_archive_name else None)
+        windows_installer_name = assets.get("install.ps1")
+        windows_installer_path = (downloaded.get(windows_installer_name)
+                                  if windows_installer_name else None)
+        if windows_archive_path is not None and windows_installer_path is not None:
+            try:
+                info = _archive_zip_info(
+                    windows_archive_path, "install.ps1",
+                    _sha256_file(windows_installer_path))
+                report.add(
+                    "archive_installer_windows",
+                    info["install_sha"] == _sha256_file(windows_installer_path),
+                    "%s scripts/install.ps1 sha256=%s asset=%s"
+                    % (windows_archive_name, info["install_sha"],
+                       _sha256_file(windows_installer_path)),
+                )
+                report.add(
+                    "archive_version_windows",
+                    info["version"] == version,
+                    "%s VERSION=%s expected=%s"
+                    % (windows_archive_name, info["version"], version),
+                )
+            except VerifyError as exc:
+                report.add("archive_windows", False, str(exc))
+            except Exception as exc:  # noqa: BLE001 - typed archive refusal
+                report.add("archive_windows", False, str(exc))
+
         wheel_name = assets.get("wheel")
         if wheel_name and wheel_name in downloaded:
             try:
@@ -848,6 +906,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", default=None)
     parser.add_argument("--expect-source-commit", default=None)
     parser.add_argument("--timeout", type=float, default=60.0)
+    parser.add_argument("--require-platform-assets", action="store_true",
+                        help="require the Windows bootstrap assets too "
+                             "(bootstrap.ps1, install.ps1, qubit-release.zip)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -871,6 +932,7 @@ def main(argv: list[str] | None = None) -> int:
             version=version,
             expect_source_commit=args.expect_source_commit,
             timeout=args.timeout,
+            require_platform_assets=args.require_platform_assets,
         )
     except VerifyError as exc:
         print("FAIL qubit-public-release %s" % exc, file=sys.stderr)
