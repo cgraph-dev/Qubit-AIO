@@ -343,8 +343,10 @@ def test_served_dashboard_has_no_voice_selector(tmp_path: Path) -> None:
         assert resp.getheader("Location") == "/chat", \
             resp.getheader("Location")
         resp.read()
-        html = urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/classic/", timeout=10).read().decode()
+        conn.close()
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/classic/", timeout=10) as r:
+            html = r.read().decode()
     finally:
         ui.stop()
     for needle in VOICE_SELECTOR_FORBIDDEN:
@@ -409,8 +411,9 @@ def test_served_dashboard_http_content_is_rate_aware(tmp_path: Path) -> None:
     ui.start()
     try:
         port = ui._server.server_address[1]
-        html = urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/classic/", timeout=10).read().decode()
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/classic/", timeout=10) as r:
+            html = r.read().decode()
     finally:
         ui.stop()
     assert "<!doctype html" in html.lower()
