@@ -439,13 +439,31 @@ def build_wheel(dest: Path, out_dir: Path, checks: Checks) -> Path | None:
     return wheels[-1] if wheels else None
 
 
-def make_release_base(dest: Path, base: Path, archive: Path | None = None) -> tuple[Path, Path]:
+def make_release_base(
+    dest: Path,
+    base: Path,
+    archive: Path | None = None,
+    zip_archive: Path | None = None,
+) -> tuple[Path, Path]:
+    """Publish the bootstrap release assets for both host families.
+
+    The POSIX bootstrap consumes ``install.sh`` + ``qubit-release.tar.gz``.
+    The Windows bootstrap consumes ``install.ps1`` + ``qubit-release.zip``.
+    Both are named in one ``SHA256SUMS``; each bootstrap reads only the two
+    entries it needs. A caller may publish just one family by passing only the
+    matching archive argument.
+    """
     if base.exists():
         shutil.rmtree(base)
     base.mkdir(parents=True)
     assets = [("install.sh", dest / "scripts" / "install.sh")]
     if archive is not None:
         assets.append(("qubit-release.tar.gz", archive))
+    windows_installer = dest / "scripts" / "install.ps1"
+    if windows_installer.is_file():
+        assets.append(("install.ps1", windows_installer))
+    if zip_archive is not None:
+        assets.append(("qubit-release.zip", zip_archive))
     lines = []
     for name, source in assets:
         shutil.copy2(source, base / name)
@@ -565,6 +583,71 @@ def archive_seed(dest: Path, tag: str, version: str, out_dir: Path) -> Path:
     return archive
 
 
+def _tracked_symlinks(dest: Path, tag: str) -> list[str]:
+    """Return the paths Git records as symlinks (mode 120000) at ``tag``."""
+    proc = subprocess.run(
+        ["git", "ls-tree", "-r", "-z", tag],
+        cwd=str(dest),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=300,
+    )
+    if proc.returncode != 0:
+        raise SeedError(
+            "git ls-tree failed: %s" % proc.stderr.decode("utf-8", "replace")
+        )
+    paths: list[str] = []
+    for entry in proc.stdout.split(b"\0"):
+        if not entry:
+            continue
+        meta, _, path = entry.partition(b"\t")
+        if not path:
+            continue
+        if meta.split(b" ", 1)[0] == b"120000":
+            paths.append(path.decode("utf-8", "surrogateescape"))
+    return paths
+
+
+def archive_seed_zip(dest: Path, tag: str, version: str, out_dir: Path) -> Path:
+    """Write the Windows release archive (ZIP) from the same seed tag.
+
+    ``git archive --format=zip`` is deterministic for a given commit and keeps
+    the one-top-level-directory layout the bootstrap expects
+    (``Qubit-<version>/scripts/install.ps1``).
+
+    Tracked symlinks are excluded: the Windows extractor deliberately refuses
+    symlink entries, and Windows extraction of them would otherwise need
+    elevated privileges. The POSIX tar archive keeps them.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    archive = out_dir / ("Qubit-%s-seed.zip" % version)
+    command = [
+        "git",
+        "archive",
+        "--format=zip",
+        "--prefix=Qubit-%s/" % version,
+        "--output",
+        str(archive),
+        tag,
+        "--",
+        ".",
+    ]
+    for link in _tracked_symlinks(dest, tag):
+        command.append(":(exclude,literal)%s" % link)
+    binary = subprocess.run(
+        command,
+        cwd=str(dest),
+        stderr=subprocess.PIPE,
+        timeout=300,
+    )
+    if binary.returncode != 0:
+        raise SeedError(
+            "git archive --format=zip failed: %s"
+            % binary.stderr.decode("utf-8", "replace")
+        )
+    return archive
+
+
 def write_manifest(
     path: Path,
     *,
@@ -573,6 +656,7 @@ def write_manifest(
     tag: str,
     seed_commit: str,
     archive: Path,
+    zip_archive: Path | None,
     wheel: Path | None,
     release_base: Path,
     removed_refs: list[str],
@@ -627,8 +711,12 @@ def write_manifest(
         lines.append("- none")
     lines += ["", "## Checksums (SHA-256)", ""]
     lines.append("- Seed archive `%s`: `%s`" % (archive.name, _sha256(archive)))
+    if zip_archive is not None:
+        lines.append("- Seed archive `%s`: `%s`" % (zip_archive.name, _sha256(zip_archive)))
     asset = release_base / "install.sh"
     release_archive = release_base / "qubit-release.tar.gz"
+    windows_installer = release_base / "install.ps1"
+    windows_archive = release_base / "qubit-release.zip"
     if asset.is_file():
         lines.append("- Release asset `install.sh`: `%s`" % _sha256(asset))
         if release_archive.is_file():
@@ -636,6 +724,14 @@ def write_manifest(
                 "- Release archive `qubit-release.tar.gz`: `%s`"
                 % _sha256(release_archive)
             )
+    if windows_installer.is_file():
+        lines.append("- Release asset `install.ps1`: `%s`" % _sha256(windows_installer))
+        if windows_archive.is_file():
+            lines.append(
+                "- Release archive `qubit-release.zip`: `%s`"
+                % _sha256(windows_archive)
+            )
+    if asset.is_file() or windows_installer.is_file():
         lines.append(
             "- Release `SHA256SUMS`: `%s`"
             % _sha256(release_base / "SHA256SUMS")
@@ -684,12 +780,16 @@ def write_manifest(
         "",
         "## Known release-asset caveat",
         "",
-        "`scripts/bootstrap.sh` consumes an `install.sh` asset at the release base.",
-        "The seed's `scripts/install.sh` is project-relative (`PROJECT_DIR` is its",
-        "parent directory's parent), so a public one-line install needs either a",
-        "standalone `install.sh` release asset or a release base that contains the",
-        "full tree. The local dry-run above proves the bootstrap checksum/asset",
-        "path; the actual local install above is run from the seed tree itself.",
+        "`scripts/bootstrap.sh` consumes an `install.sh` asset and",
+        "`qubit-release.tar.gz`; `scripts/bootstrap.ps1` consumes `install.ps1` and",
+        "`qubit-release.zip`. Both are published above with one shared",
+        "`SHA256SUMS`. The seed's installers are project-relative (`PROJECT_DIR` is",
+        "the extracted release tree), so a public one-line install needs either a",
+        "standalone installer asset or a release base that contains the full tree.",
+        "The local dry-run above proves the POSIX bootstrap checksum/asset path;",
+        "the actual local install above is run from the seed tree itself. The",
+        "Windows bootstrap path is exercised hermetically under PowerShell 7; no",
+        "real Windows host or Windows PowerShell 5.1 execution is claimed.",
         "",
     ]
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -753,8 +853,9 @@ def main(argv: list[str] | None = None) -> int:
         checks.finish()
 
     archive = archive_seed(dest, tag, version, artifact_dir)
+    zip_archive = archive_seed_zip(dest, tag, version, artifact_dir)
 
-    make_release_base(dest, release_base, archive)
+    make_release_base(dest, release_base, archive, zip_archive)
 
     install_results: dict[str, str] = {}
     if not args.skip_install_check:
@@ -778,6 +879,7 @@ def main(argv: list[str] | None = None) -> int:
         tag=tag,
         seed_commit=seed_commit,
         archive=archive,
+        zip_archive=zip_archive,
         wheel=wheel,
         release_base=release_base,
         removed_refs=removed_refs,

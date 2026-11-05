@@ -197,7 +197,8 @@ def test_help_lists_options_and_linux_scope(tmp_path: Path):
     assert ARCHIVE_NAME in r.stdout
     assert "SHA256SUMS" in r.stdout
     assert "Supported host: Linux" in r.stdout
-    assert "macOS and Windows are typed refusals" in r.stdout
+    assert "macOS is a typed refusal" in r.stdout
+    assert "Windows uses bootstrap.ps1" in r.stdout
 
 
 def test_unknown_option_exits_2_with_guidance(tmp_path: Path):
