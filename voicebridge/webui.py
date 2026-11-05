@@ -36,7 +36,7 @@ import struct
 import threading
 import time
 import uuid
-from collections import deque
+from collections import OrderedDict, deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Deque, Dict, List, Optional
@@ -1351,6 +1351,42 @@ def security_headers(*, allow_same_origin_frame: bool = False) -> list:
     ]
 
 
+#: Process-wide cache of gzip-compressed static bodies, keyed by
+#: (path, mtime_ns, size). Compression is deterministic per input, so a cached
+#: body is byte-identical to a fresh compress; the cache only removes repeated
+#: CPU work for immutable dashboard chunks that are re-requested (a reload, a
+#: new tab, or a lazy route the operator revisits). Bounded in both bytes and
+#: entry count so a large tree cannot pin memory.
+_GZIP_CACHE_MAX_BYTES = 24 * 1024 * 1024
+_GZIP_CACHE_MAX_ENTRIES = 512
+_GZIP_CACHE: "OrderedDict[tuple[str, int, int], bytes]" = OrderedDict()
+_GZIP_CACHE_BYTES = 0
+_GZIP_CACHE_LOCK = threading.Lock()
+
+
+def _gzip_cache_get(key: tuple[str, int, int]) -> Optional[bytes]:
+    with _GZIP_CACHE_LOCK:
+        body = _GZIP_CACHE.get(key)
+        if body is not None:
+            _GZIP_CACHE.move_to_end(key)
+        return body
+
+
+def _gzip_cache_put(key: tuple[str, int, int], body: bytes) -> None:
+    global _GZIP_CACHE_BYTES
+    with _GZIP_CACHE_LOCK:
+        old = _GZIP_CACHE.pop(key, None)
+        if old is not None:
+            _GZIP_CACHE_BYTES -= len(old)
+        _GZIP_CACHE[key] = body
+        _GZIP_CACHE_BYTES += len(body)
+        while _GZIP_CACHE and (
+                _GZIP_CACHE_BYTES > _GZIP_CACHE_MAX_BYTES
+                or len(_GZIP_CACHE) > _GZIP_CACHE_MAX_ENTRIES):
+            _, evicted = _GZIP_CACHE.popitem(last=False)
+            _GZIP_CACHE_BYTES -= len(evicted)
+
+
 class WebUIHandler(BaseHTTPRequestHandler):
     server_version = "VoiceDashboard/1.0"
 
@@ -1360,12 +1396,13 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     # -- helpers ---------------------------------------------------------
     def _send(self, code: int, body: bytes, ctype: str = "text/plain",
-              extra_headers: Optional[list] = None) -> None:
+              extra_headers: Optional[list] = None,
+              cache_control: str = "no-store") -> None:
         try:
             self.send_response(code)
             self.send_header("Content-Type", ctype)
             self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
+            self.send_header("Cache-Control", cache_control)
             for k, v in security_headers(
                     allow_same_origin_frame=getattr(
                         self, "_allow_same_origin_frame", False)):
@@ -1409,9 +1446,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
     def _html(self, page: str, code: int = 200) -> None:
         self._send(code, page.encode(), "text/html; charset=utf-8")
 
-    def _file(self, path: Path, ctype: str) -> None:
+    def _file(self, path: Path, ctype: str,
+              cache_control: str = "no-store") -> None:
         if ctype.startswith(("video/", "audio/")) or path.stat().st_size > 4 * 1024 * 1024:
-            self._send_file_ranged(path, ctype)
+            self._send_file_ranged(path, ctype, cache_control=cache_control)
             return
         try:
             body = path.read_bytes()
@@ -1424,7 +1462,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         extra = None
         if gzipped:
             extra = [("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")]
-        self._send(200, wire, ctype, extra_headers=extra)
+        self._send(200, wire, ctype, extra_headers=extra,
+                   cache_control=cache_control)
 
     # Text assets that compress well. Images, video, audio, fonts and maps are
     # already compressed (or binary) — gzipping them burns CPU for no wire win.
@@ -1461,12 +1500,26 @@ class WebUIHandler(BaseHTTPRequestHandler):
             or not self._accepts_gzip()
         ):
             return body, False
+        key: Optional[tuple[str, int, int]] = None
         try:
-            return gzip.compress(body, 6), True
+            st = path.stat()
+            key = (str(path), st.st_mtime_ns, st.st_size)
+        except OSError:
+            # Tests and callers may compress an in-memory body whose path does
+            # not exist; cache it under the body length instead.
+            key = (str(path), 0, len(body))
+        cached = _gzip_cache_get(key)
+        if cached is not None:
+            return cached, True
+        try:
+            wire = gzip.compress(body, 6)
         except Exception:  # noqa: BLE001 - never fail a request over gzip
             return body, False
+        _gzip_cache_put(key, wire)
+        return wire, True
 
-    def _send_file_ranged(self, path: Path, ctype: str) -> None:
+    def _send_file_ranged(self, path: Path, ctype: str,
+                          cache_control: str = "public, max-age=3600") -> None:
         """Stream a media file, honouring a single ``Range`` request.
 
         `_file` reads the whole body into memory and offers no `Accept-Ranges`,
@@ -1507,7 +1560,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self.send_header("Accept-Ranges", "bytes")
             if status == 206:
                 self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-            self.send_header("Cache-Control", "public, max-age=3600")
+            self.send_header("Cache-Control", cache_control)
             self.end_headers()
             if getattr(self, "_head_only", False):
                 return
@@ -2211,7 +2264,22 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # string. Title ownership belongs to the build.
         html = html.replace('"/hermes/', '"/')
         html = debrand_theme_style_id(html)
-        self._send(200, html.encode("utf-8"), "text/html; charset=utf-8")
+        # Compress the shell on the wire. It is generated per request (token +
+        # theme injection), so do not key it by file mtime: compress directly
+        # instead of using the static-body cache. The decoded bytes are the
+        # exact same document, and the response stays no-store.
+        body = html.encode("utf-8")
+        wire = body
+        extra = None
+        if len(body) >= self._MIN_GZIP_BYTES and self._accepts_gzip():
+            try:
+                wire = gzip.compress(body, 6)
+                extra = [("Content-Encoding", "gzip"),
+                         ("Vary", "Accept-Encoding")]
+            except Exception:  # noqa: BLE001 - never fail a request over gzip
+                wire = body
+                extra = None
+        self._send(200, wire, "text/html; charset=utf-8", extra_headers=extra)
 
     def _serve_qubit_static(self, sub: str) -> None:
         dist = self._qubit_dist()
@@ -2253,7 +2321,16 @@ class WebUIHandler(BaseHTTPRequestHandler):
         elif low.endswith(".avif"): ctype = "image/avif"
         elif low.endswith(".map"): ctype = "application/json"
         else: ctype = "application/octet-stream"
-        self._file(fp, ctype)
+        # Content-hashed Vite assets under /assets/ are safe to cache forever:
+        # a changed file gets a new hash, so a stale hit cannot shadow a fix.
+        # Stable-name assets (media, plugin bundles) get a short cache so an
+        # update becomes visible within the hour. index.html is never routed
+        # here; it stays no-store because it carries the one-shot session token.
+        if rel.startswith("assets/"):
+            cache_control = "public, max-age=31536000, immutable"
+        else:
+            cache_control = "public, max-age=3600"
+        self._file(fp, ctype, cache_control=cache_control)
 
     def _serve_office_stream(self) -> None:
         """GET /api/stream — the office client's live feed.

@@ -3,7 +3,12 @@ import { BrowserRouter } from "react-router";
 import "./index.css";
 import App from "./App";
 import { SystemActionsProvider } from "./contexts/SystemActions";
-import { I18nProvider } from "./i18n";
+import {
+  I18nProvider,
+  getInitialLocale,
+  loadTranslations,
+} from "./i18n";
+import { en } from "./i18n/en";
 import { exposePluginSDK } from "./plugins";
 import { ThemeProvider } from "./themes";
 import { QUBIT_BASE_PATH } from "./lib/api";
@@ -25,14 +30,34 @@ installBuildWatch({ onNewBuild: (bundle) => showBuildNotice(bundle) });
 // can access React, components, etc. immediately.
 exposePluginSDK();
 
-createRoot(document.getElementById("root")!).render(
-  <BrowserRouter basename={QUBIT_BASE_PATH || undefined}>
-    <I18nProvider>
-      <ThemeProvider>
-        <SystemActionsProvider>
-          <App />
-        </SystemActionsProvider>
-      </ThemeProvider>
-    </I18nProvider>
-  </BrowserRouter>,
-);
+async function mount(): Promise<void> {
+  // Load the saved dictionary before the first paint. English (the default)
+  // is already in this chunk, so the common path resolves without a network
+  // request; a non-English locale fetches only its own dictionary chunk.
+  let initialLocale = getInitialLocale();
+  let initialTranslations = en;
+  try {
+    initialTranslations = await loadTranslations(initialLocale);
+  } catch {
+    // A missing/broken locale chunk must not block the dashboard: start in
+    // English with the document language matching what is rendered.
+    initialLocale = "en";
+    initialTranslations = en;
+  }
+  createRoot(document.getElementById("root")!).render(
+    <BrowserRouter basename={QUBIT_BASE_PATH || undefined}>
+      <I18nProvider
+        initialLocale={initialLocale}
+        initialTranslations={initialTranslations}
+      >
+        <ThemeProvider>
+          <SystemActionsProvider>
+            <App />
+          </SystemActionsProvider>
+        </ThemeProvider>
+      </I18nProvider>
+    </BrowserRouter>,
+  );
+}
+
+void mount();

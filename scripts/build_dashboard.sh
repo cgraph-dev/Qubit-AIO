@@ -87,6 +87,12 @@ cd "$SHARED_DIR"
 npm install --include=dev --legacy-peer-deps --no-audit --no-fund --no-package-lock \
   || build_failed "frontend/qubit-shared dependency install failed"
 cd "$WEB_DIR"
+# NODE_ENV=development above forces devDependencies in for the install. It must
+# NOT leak into the bundle: Vite/React resolve the development React build when
+# NODE_ENV=development, which shipped ~2x the vendor JS (react-vendor 225 KB vs
+# 430 KB) plus dev-only validation and warnings. Restore production for the
+# compile/build while leaving the installed tree intact.
+export NODE_ENV=production
 npx tsc -p . --noEmit || build_failed "TypeScript typecheck failed"
 npx vite build --base=/ --outDir "$DIST_DIR" --emptyOutDir \
   || build_failed "vite build failed"

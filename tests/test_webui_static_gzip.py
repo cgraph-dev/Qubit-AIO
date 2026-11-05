@@ -180,3 +180,111 @@ def test_compressor_never_writes_headers_itself(tmp_path):
 
     assert gzipped is True
     assert gzip.decompress(wire) == body
+
+
+def test_hashed_assets_are_immutable_and_revalidate_free(tmp_path):
+    """Vite content-hashes every /assets/ name, so a changed file gets a new
+    URL. Serving them as immutable lets a reload or a revisited lazy route use
+    the browser cache instead of re-downloading the bundle."""
+    body = b"export const cached = 1;\n" * 500
+    base = _asset_tree(tmp_path, "index-jkl012.js", body)
+    handler, captured = _handler(base, "gzip")
+
+    handler._serve_qubit_static("/assets/index-jkl012.js")
+
+    assert captured["headers"]["Cache-Control"] == \
+        "public, max-age=31536000, immutable"
+
+
+def test_stable_name_assets_get_a_short_cache(tmp_path):
+    """Plugin/media files keep stable names, so they must not be immutable: an
+    update has to become visible without a cache-busting rename."""
+    (tmp_path / "plugins" / "demo").mkdir(parents=True)
+    body = b"export const x = 1;\n" * 200
+    (tmp_path / "plugins" / "demo" / "plugin.js").write_bytes(body)
+    handler, captured = _handler(tmp_path, "gzip")
+
+    handler._serve_qubit_static("/plugins/demo/plugin.js")
+
+    assert captured["headers"]["Cache-Control"] == "public, max-age=3600"
+
+
+def test_generic_send_defaults_to_no_store(tmp_path):
+    """The dashboard shell carries the one-shot token; it must not be cached by
+    accident when a caller does not opt into a cache policy."""
+    handler, captured = _handler(tmp_path)
+
+    handler._send(200, b"hello", "text/plain")
+
+    assert captured["headers"]["Cache-Control"] == "no-store"
+
+
+def test_gzip_output_is_reused_for_an_unchanged_file(tmp_path, monkeypatch):
+    body = b"export const reused = 1;\n" * 500
+    base = _asset_tree(tmp_path, "index-mno345.js", body)
+    handler, _ = _handler(base, "gzip")
+    calls = {"n": 0}
+    real_compress = ui.gzip.compress
+
+    def counting_compress(data, level=6):
+        calls["n"] += 1
+        return real_compress(data, level)
+
+    monkeypatch.setattr(ui.gzip, "compress", counting_compress)
+
+    first, first_gz = handler._gzip_if_wanted(
+        body, base / "assets" / "index-mno345.js")
+    second, second_gz = handler._gzip_if_wanted(
+        body, base / "assets" / "index-mno345.js")
+
+    assert first_gz is True and second_gz is True
+    assert first is second
+    assert calls["n"] == 1
+    assert gzip.decompress(second) == body
+
+
+def _index_handler(base: Path, accept_encoding: str = "gzip"):
+    handler, captured = _handler(base, accept_encoding)
+    handler.client_address = ("127.0.0.1", 0)
+    handler.headers = {"Host": "127.0.0.1",
+                       "Accept-Encoding": accept_encoding}
+    return handler, captured
+
+
+def test_dashboard_shell_is_gzipped_and_never_cached(tmp_path):
+    body = ("<html><head><!-- " + ("pad " * 500) +
+            " --></head><body>shell</body></html>").encode()
+    (tmp_path / "index.html").write_bytes(body)
+    handler, captured = _index_handler(tmp_path)
+
+    handler.server.app.api_token = "token-one"
+    handler._serve_qubit_index()
+
+    headers = captured["headers"]
+    assert headers["Content-Encoding"] == "gzip"
+    assert headers["Vary"] == "Accept-Encoding"
+    assert headers["Cache-Control"] == "no-store"
+    decoded = gzip.decompress(handler.wfile.getvalue()).decode()
+    assert "token-one" in decoded
+
+
+def test_dashboard_shell_does_not_serve_a_cached_injection(tmp_path):
+    """The shell is generated per request (session token + theme). Reusing a
+    gzip body keyed by the file would hand a stale credential to the next tab."""
+    body = ("<html><head><!-- " + ("pad " * 500) +
+            " --></head><body>shell</body></html>").encode()
+    (tmp_path / "index.html").write_bytes(body)
+    handler, _ = _index_handler(tmp_path)
+
+    handler.server.app.api_token = "token-one"
+    handler._serve_qubit_index()
+    first = gzip.decompress(handler.wfile.getvalue()).decode()
+
+    handler.server.app.api_token = "token-two"
+    handler.wfile = _FakeWfile()
+    handler._serve_qubit_index()
+    second = gzip.decompress(handler.wfile.getvalue()).decode()
+
+    assert "token-one" in first
+    assert "token-two" in second
+    assert "token-one" not in second
