@@ -97,8 +97,31 @@ def _write_fixture(repo: Path, body: str = "one") -> None:
                 "        return None",
                 "    def _serve_qubit_index(self):",
                 "        self._send(200, b'shell', 'text/html; charset=utf-8')",
+                "class WebUI:",
+                "    def start(self):",
+                "        self._prewarm_reads()",
+                "    def _prewarm_reads(self):",
+                "        os.environ.get('QUBIT_WEBUI_PREWARM', '1')",
+                "        return ('h_skills', 'h_status', 'h_terminal_profiles',",
+                "                'h_model_options', 'h_mcp_servers', 'h_office_tower')",
                 "",
             ]
+        ),
+        encoding="utf-8",
+    )
+    (repo / "voicebridge" / "read_cache_ttls.py").write_text(
+        "".join(
+            "RC.put(key, out, RC.ttl_seconds(%r, 300.0))\n" % name
+            for name in (
+                "skills",
+                "terminal_profiles",
+                "model_options",
+                "mcp_servers",
+                "office_tower",
+                "device_inventory",
+                "marketplace",
+                "vision",
+            )
         ),
         encoding="utf-8",
     )

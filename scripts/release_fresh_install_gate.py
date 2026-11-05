@@ -301,6 +301,125 @@ def _perf_cache_contract(webui: Path) -> tuple[bool, str]:
     )
 
 
+PREWARM_HANDLERS = (
+    "h_skills",
+    "h_status",
+    "h_terminal_profiles",
+    "h_model_options",
+    "h_mcp_servers",
+    "h_office_tower",
+)
+WARM_READ_TTL_NAMESPACES = (
+    "skills",
+    "terminal_profiles",
+    "model_options",
+    "mcp_servers",
+    "office_tower",
+    "device_inventory",
+    "marketplace",
+    "vision",
+)
+MIN_WARM_READ_TTL_S = 60.0
+
+
+def _prewarm_cache_contract(repo: Path) -> tuple[bool, str]:
+    """Statically prove the 0.0.8 prewarm/warm-read cache contract.
+
+    The v0.0.8 delta is defined by two behaviours a release must carry:
+
+    * ``WebUI.start`` prewarms the slow read-only inventories through
+      ``WebUI._prewarm_reads`` (gated by ``QUBIT_WEBUI_PREWARM``) so the first
+      browser load does not pay the cold scan; and
+    * the slow read namespaces keep a warm TTL of at least 60 s instead of the
+      old 2.5/5/10 s poll windows, so a reload is served from the in-process
+      cache.
+
+    This is a source-level check: a release tree has no running dashboard.
+    """
+    webui = repo / "voicebridge" / "webui.py"
+    if not webui.is_file():
+        return False, "missing %s" % webui
+    try:
+        tree = ast.parse(webui.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError) as exc:
+        return False, "unreadable %s: %s" % (webui, exc)
+
+    prewarm = _function_node(tree, "_prewarm_reads")
+    if prewarm is None:
+        return False, "WebUI._prewarm_reads is missing"
+    prewarm_strings = _string_literals(prewarm)
+    if "QUBIT_WEBUI_PREWARM" not in prewarm_strings:
+        return False, "prewarm has no QUBIT_WEBUI_PREWARM gate"
+    referenced = prewarm_strings | {
+        node.attr
+        for node in ast.walk(prewarm)
+        if isinstance(node, ast.Attribute)
+    }
+    missing = [name for name in PREWARM_HANDLERS if name not in referenced]
+    if missing:
+        return False, "prewarm does not prime: %s" % ", ".join(missing)
+
+    start = _function_node(tree, "start")
+    if start is None:
+        return False, "WebUI.start is missing"
+    starts_prewarm = any(
+        isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "_prewarm_reads"
+        for node in ast.walk(start)
+    )
+    if not starts_prewarm:
+        return False, "WebUI.start never calls _prewarm_reads"
+
+    ttl: dict[str, float] = {}
+    for path in sorted((repo / "voicebridge").glob("*.py")):
+        try:
+            module = ast.parse(path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError):
+            continue
+        for node in ast.walk(module):
+            if not (
+                isinstance(node, ast.Call)
+                and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "ttl_seconds"
+                and len(node.args) >= 2
+            ):
+                continue
+            namespace, default = node.args[0], node.args[1]
+            if not (
+                isinstance(namespace, ast.Constant)
+                and isinstance(namespace.value, str)
+                and namespace.value in WARM_READ_TTL_NAMESPACES
+            ):
+                continue
+            if not (
+                isinstance(default, ast.Constant)
+                and isinstance(default.value, (int, float))
+                and not isinstance(default.value, bool)
+            ):
+                continue
+            value = float(default.value)
+            current = ttl.get(namespace.value)
+            ttl[namespace.value] = value if current is None else min(current, value)
+
+    short = [
+        "%s=%s" % (name, ttl.get(name, "missing"))
+        for name in WARM_READ_TTL_NAMESPACES
+        if ttl.get(name, 0.0) < MIN_WARM_READ_TTL_S
+    ]
+    if short:
+        return (
+            False,
+            "slow read TTLs below %ss: %s"
+            % (int(MIN_WARM_READ_TTL_S), ", ".join(short)),
+        )
+    return (
+        True,
+        "prewarm primes %d reads; slow read TTLs >= %ss"
+        % (len(PREWARM_HANDLERS), int(MIN_WARM_READ_TTL_S)),
+    )
+
+
 def _find_dashboard(root: Path) -> Path | None:
     candidate = root / DASHBOARD_SUFFIX
     return candidate if candidate.is_file() else None
@@ -404,6 +523,9 @@ def check_runtime_tree(repo: Path, report: Report, *, require_dashboard: bool = 
 
     ok, detail = _perf_cache_contract(repo / "voicebridge" / "webui.py")
     report.add("perf_cache_static_contract", "OK" if ok else "FAIL", detail)
+
+    ok, detail = _prewarm_cache_contract(repo)
+    report.add("prewarm_cache_contract", "OK" if ok else "FAIL", detail)
 
     for name in ("install.sh", "install.ps1"):
         installer = repo / "scripts" / name

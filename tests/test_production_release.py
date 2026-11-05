@@ -242,3 +242,21 @@ def test_release_payloads_include_posix_and_windows_bootstraps(tmp_path: Path):
     assert "Qubit-0.0.8/scripts/install.ps1" in entries
     assert "Qubit-0.0.8/README.md" in entries
     assert not any(name.endswith("/link") for name in entries)
+
+
+def test_promote_workflow_uploads_every_release_payload():
+    """A draft release must carry the bootstrap assets, not just wheel/sdist."""
+    workflow = (REPO / ".github" / "workflows" / "promote-release.yml").read_text(
+        encoding="utf-8"
+    )
+    for name in (
+        "bootstrap.sh",
+        "bootstrap.ps1",
+        "install.sh",
+        "install.ps1",
+    ):
+        assert "qubit-production-release/%s" % name in workflow
+        assert "release-assets/%s" % name in workflow
+    # The archives ride the *.tar.gz / *.zip globs in both places.
+    assert "qubit-production-release/*.zip" in workflow
+    assert "release-assets/*.zip" in workflow
