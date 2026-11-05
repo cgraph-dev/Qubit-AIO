@@ -75,13 +75,13 @@ checkout to install.
 ### Release-asset contract
 
 `<release-base>` is an HTTPS URL, a `file://` URL, or a local directory. It
-must contain exactly these three assets:
+must contain at least these three assets:
 
 | Asset | Meaning |
 |---|---|
 | `install.sh` | The installer asset. It is downloaded and checksum-verified; its hash must equal the `scripts/install.sh` inside the archive. |
-| `qubit-release.tar.gz` | The release source tree. It must extract to `scripts/install.sh`, either at the archive root or under exactly one top-level directory (for example `Qubit-0.0.1/scripts/install.sh`). Override the file name with `--archive NAME` (or `QUBIT_RELEASE_ARCHIVE`). |
-| `SHA256SUMS` | Standard `sha256  filename` lines naming **both** assets. `--checksum FILE` overrides discovery. |
+| `qubit-release.tar.gz` | The release source tree. It must extract to `scripts/install.sh`, either at the archive root or under exactly one top-level directory (for example `Qubit-0.0.2/scripts/install.sh`). Override the file name with `--archive NAME` (or `QUBIT_RELEASE_ARCHIVE`). |
+| `SHA256SUMS` | Standard `sha256  filename` lines naming **both** assets. The published Qubit release also publishes checksums for `bootstrap.sh`, the wheel, the sdist and the source archive. `--checksum FILE` overrides discovery. |
 
 The archive is the install payload: its extracted tree is where `PROJECT_DIR`
 resolves, so the installer builds the venv, installs the package, builds/serves
@@ -103,11 +103,34 @@ it validates the local assets and checksum names. Linux is supported now;
 macOS and Windows are typed refusals until their bootstrap paths exist.
 
 **Public release base:** the Qubit release publishes `bootstrap.sh`,
-`install.sh`, `qubit-release.tar.gz`, and a `SHA256SUMS` naming the installer
-and archive. The stable base is
+`install.sh`, `qubit-release.tar.gz`, and a `SHA256SUMS` covering the published
+assets (including the installer and archive). The stable base is
 `https://github.com/cgraph-dev/Qubit/releases/latest/download`; use it with
 `bootstrap.sh` as shown above (download the script first rather than piping an
 unverified URL into a shell).
+
+## Verify a published release
+
+`scripts/verify_public_release.py` is a read-only verifier for a published
+release. It checks that the release exists and is published, that the tag,
+wheel, sdist and source archive agree on the version, that every required asset
+is present, that every `SHA256SUMS` entry matches, that both source archives
+contain the same `scripts/install.sh` as the `install.sh` asset, and that the
+source archive contains no operator home path, `node_modules`/build
+directories, or secret files/content.
+
+```bash
+python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --tag v0.0.2
+python3 scripts/verify_public_release.py --repo cgraph-dev/Qubit --latest
+python3 scripts/verify_public_release.py \
+  --release-base https://github.com/cgraph-dev/Qubit/releases/download/v0.0.2
+```
+
+Add `--json` for a machine-readable report. The verifier downloads assets into
+a temporary directory and deletes it; it never writes to the release, a Git
+checkout, or a live service. Exit code 0 means every check passed, 1 means a
+PASS/FAIL check failed, and 2 means the request itself was invalid. It verifies
+asset integrity and provenance, not a behavioral release verdict.
 
 ## Options
 
