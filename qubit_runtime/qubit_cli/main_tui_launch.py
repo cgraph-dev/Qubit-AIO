@@ -241,6 +241,17 @@ def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
         if bundled is not None:
             return [_tui_node_bin("node"), "--expose-gc", str(bundled)], bundled.parent
 
+    # A packaged release tree (no .git checkout) already carries the compiled
+    # TUI and its build receipt. Do not try to rebuild it from source: the
+    # wheel intentionally omits ``scripts/build/`` and the runtime npm tree.
+    if (
+        not tui_dev
+        and not ext_dir
+        and (tui_dir / "dist" / "entry.js").is_file()
+        and not (tui_dir.parent / ".git").exists()
+    ):
+        return [_tui_node_bin("node"), "--expose-gc", str(tui_dir / "dist/entry.js")], tui_dir
+
     # About to npm install/build from source, so the workspace must exist.
     if not ext_dir:
         _ensure_tui_workspace(tui_dir)
