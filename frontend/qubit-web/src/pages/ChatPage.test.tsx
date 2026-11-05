@@ -1096,7 +1096,10 @@ describe("ChatPage New chat mint reliability", () => {
   it("mints exactly one session for a repeated New-chat press", async () => {
     // Regression: every press fired `createChatSession`, so a double click
     // minted two `dashboard-*` sessions and the panel could land on either.
-    let resolveCreate!: (value: unknown) => void;
+    let resolveCreate!: (value: {
+      session: { id: string };
+      ok: boolean;
+    }) => void;
     apiMocks.createChatSession.mockImplementationOnce(
       () => new Promise((resolve) => { resolveCreate = resolve; }),
     );
@@ -1136,7 +1139,10 @@ describe("ChatPage New chat mint reliability", () => {
     // Regression: a slow `createChatSession` response landed after the
     // operator had clicked another session, rewrote `?resume=` to the new
     // empty session, and yanked the transcript off the chosen conversation.
-    let resolveCreate!: (value: unknown) => void;
+    let resolveCreate!: (value: {
+      session: { id: string };
+      ok: boolean;
+    }) => void;
     apiMocks.createChatSession.mockImplementationOnce(
       () => new Promise((resolve) => { resolveCreate = resolve; }),
     );
