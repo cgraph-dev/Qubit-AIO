@@ -3186,6 +3186,39 @@ var init_json_rpc_channel = __esm({
   }
 });
 
+// src/lib/parentLog.ts
+import { appendFileSync, mkdirSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
+function recordParentLifecycle(line) {
+  if (!enabled) {
+    return;
+  }
+  try {
+    const oneLine = line.replace(/[\r\n]+/g, " \u21B5 ");
+    const capped = oneLine.length > MAX_BREADCRUMB ? `${oneLine.slice(0, MAX_BREADCRUMB)}\u2026 [truncated ${oneLine.length} chars]` : oneLine;
+    mkdirSync(logDir, { recursive: true });
+    appendFileSync(CRASH_LOG, `[tui-parent] ${(/* @__PURE__ */ new Date()).toISOString()} ${capped}
+`);
+  } catch {
+    if (!warned2) {
+      warned2 = true;
+      process.stderr.write("hermes-tui: parent lifecycle log unavailable\n");
+    }
+  }
+}
+var logDir, CRASH_LOG, enabled, MAX_BREADCRUMB, warned2;
+var init_parentLog = __esm({
+  "src/lib/parentLog.ts"() {
+    "use strict";
+    logDir = join(process.env.QUBIT_HOME?.trim() || join(homedir(), ".hermes"), "logs");
+    CRASH_LOG = join(logDir, "tui_gateway_crash.log");
+    enabled = !process.env.VITEST;
+    MAX_BREADCRUMB = 4096;
+    warned2 = false;
+  }
+});
+
 // node_modules/undici/lib/core/symbols.js
 var require_symbols = __commonJS({
   "node_modules/undici/lib/core/symbols.js"(exports, module) {
@@ -22060,39 +22093,6 @@ var require_undici = __commonJS({
     module.exports.mockErrors = mockErrors;
     var { EventSource } = require_eventsource();
     module.exports.EventSource = EventSource;
-  }
-});
-
-// src/lib/parentLog.ts
-import { appendFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-function recordParentLifecycle(line) {
-  if (!enabled) {
-    return;
-  }
-  try {
-    const oneLine = line.replace(/[\r\n]+/g, " \u21B5 ");
-    const capped = oneLine.length > MAX_BREADCRUMB ? `${oneLine.slice(0, MAX_BREADCRUMB)}\u2026 [truncated ${oneLine.length} chars]` : oneLine;
-    mkdirSync(logDir, { recursive: true });
-    appendFileSync(CRASH_LOG, `[tui-parent] ${(/* @__PURE__ */ new Date()).toISOString()} ${capped}
-`);
-  } catch {
-    if (!warned2) {
-      warned2 = true;
-      process.stderr.write("hermes-tui: parent lifecycle log unavailable\n");
-    }
-  }
-}
-var logDir, CRASH_LOG, enabled, MAX_BREADCRUMB, warned2;
-var init_parentLog = __esm({
-  "src/lib/parentLog.ts"() {
-    "use strict";
-    logDir = join(process.env.QUBIT_HOME?.trim() || join(homedir(), ".hermes"), "logs");
-    CRASH_LOG = join(logDir, "tui_gateway_crash.log");
-    enabled = !process.env.VITEST;
-    MAX_BREADCRUMB = 4096;
-    warned2 = false;
   }
 });
 
@@ -95247,7 +95247,6 @@ function reconnectBackoffDelayMs(attempt, options = {}) {
 }
 
 // src/gatewayClient.ts
-var import_undici = __toESM(require_undici(), 1);
 init_runtime();
 
 // src/lib/circularBuffer.ts
@@ -95293,6 +95292,7 @@ var CircularBuffer = class {
 
 // src/gatewayClient.ts
 init_parentLog();
+var UndiciWebSocket = typeof WebSocket === "undefined" ? (await Promise.resolve().then(() => __toESM(require_undici(), 1))).WebSocket : void 0;
 var MAX_GATEWAY_LOG_LINES = 200;
 var MAX_LOG_LINE_BYTES = 4096;
 var MAX_BUFFERED_EVENTS = 2e3;
@@ -95305,7 +95305,7 @@ var WS_CLOSING = 2;
 var WS_CLOSED = 3;
 var RECONNECT_BASE_MS = 1e3;
 var RECONNECT_MAX_MS = 3e4;
-var getWebSocketCtor = () => typeof WebSocket === "undefined" ? import_undici.WebSocket : WebSocket;
+var getWebSocketCtor = () => typeof WebSocket === "undefined" ? UndiciWebSocket : WebSocket;
 var BOOTSTRAP_TIMEOUT_MS = 75e3;
 var isDashboardLaunch = () => {
   for (const name of ["HERMES_TUI_DASHBOARD", "QUBIT_TUI_DASHBOARD"]) {

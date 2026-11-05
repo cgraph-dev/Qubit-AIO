@@ -13,12 +13,19 @@ import {
   wireFrameText
 } from '@qubit/shared/json-rpc-channel'
 import { reconnectBackoffDelayMs } from '@qubit/shared/reconnect-backoff'
-import { WebSocket as UndiciWebSocket } from 'undici'
-
 import type { AnyGatewayEvent } from './gatewayTypes.js'
 import { t } from './i18n/runtime.js'
 import { CircularBuffer } from './lib/circularBuffer.js'
 import { recordParentLifecycle } from './lib/parentLog.js'
+
+// Node 22+ ships a native global WebSocket. Only older Node (the bundle still
+// targets node20) needs undici, so importing it eagerly made every TUI launch
+// compile and initialize undici's CommonJS graph before the first frame. Load
+// it only when the native API is missing; the fallback is unchanged.
+const UndiciWebSocket: typeof WebSocket | undefined =
+  typeof WebSocket === 'undefined'
+    ? ((await import('undici')).WebSocket as unknown as typeof WebSocket)
+    : undefined
 
 const MAX_GATEWAY_LOG_LINES = 200
 const MAX_LOG_LINE_BYTES = 4096

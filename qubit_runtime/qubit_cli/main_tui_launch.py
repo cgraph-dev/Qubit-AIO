@@ -255,12 +255,29 @@ def _ensure_tui_workspace(tui_dir: Path) -> None:
     sys.exit(1)
 
 
+# ``pm.ensure`` re-validates the PM tool store on every call (several stat()
+# probes plus its lock/stamp graph). A dashboard opens one TUI per chat, so the
+# same Node path was re-resolved each time. The resolved *path* is stable while
+# the tool store is installed; keep it and re-check only that the binary still
+# exists, so a repair/removal falls back to a fresh ``ensure`` instead of
+# launching a dead path.
+_TUI_NODE_BIN_CACHE: dict[str, str] = {}
+
+
+def _reset_tui_node_bin_cache() -> None:
+    """Forget the resolved TUI Node paths (tests / an in-process PM repair)."""
+    _TUI_NODE_BIN_CACHE.clear()
+
+
 def _tui_node_bin(bin: str) -> str:
     """Resolve the TUI runtime through PM; an explicit bundled HERMES_NODE wins."""
     if bin == "node":
         env_node = os.environ.get("HERMES_NODE")
         if env_node and os.path.isfile(env_node) and os.access(env_node, os.X_OK):
             return env_node
+    cached = _TUI_NODE_BIN_CACHE.get(bin)
+    if cached and os.path.isfile(cached) and os.access(cached, os.X_OK):
+        return cached
     from pm import ensure
     path = shutil.which(bin, path=ensure(bin).env["PATH"])
     if not path:
@@ -270,7 +287,36 @@ def _tui_node_bin(bin: str) -> str:
             "retry `hermes --tui`. To keep working now, run `hermes --cli`."
         )
         sys.exit(1)
+    _TUI_NODE_BIN_CACHE[bin] = path
     return path
+
+
+def _tui_node_compile_cache_dir(env: dict) -> Path:
+    """Per-home directory Node may use for its V8 bytecode cache."""
+    home = str(env.get("QUBIT_HOME") or env.get("HERMES_HOME") or "").strip()
+    base = Path(home).expanduser() if home else Path.home() / ".qubit"
+    return base / "cache" / "node-compile-cache"
+
+
+def _apply_tui_node_env(env: dict) -> None:
+    """Enable Node's compile cache for the TUI process.
+
+    The bundled ``ui-tui/dist/entry.js`` is a multi-megabyte ES module that Node
+    compiles from source on every launch. Node 22.1+ can cache that bytecode
+    (keyed by source hash + Node version), which removes a measurable slice of
+    the per-chat startup on each dashboard tab. An operator-provided
+    ``NODE_COMPILE_CACHE`` always wins. Node creates the directory (including
+    missing parents) on first use and silently skips an unwritable one, so this
+    only computes the path: no launch fails and nothing is written when Node
+    never starts.
+    """
+    if str(env.get("NODE_COMPILE_CACHE") or "").strip():
+        return
+    try:
+        cache = _tui_node_compile_cache_dir(env)
+    except (OSError, RuntimeError):
+        return
+    env["NODE_COMPILE_CACHE"] = str(cache)
 
 
 def _make_tui_argv(tui_dir: Path, tui_dev: bool) -> tuple[list[str], Path]:
@@ -592,6 +638,7 @@ def _launch_tui(
         env.pop("HERMES_TUI_CWD", None)
 
     _apply_tui_python_env(env)
+    _apply_tui_node_env(env)
     # The Ink banner renders ``QUBIT_VERSION`` and falls back to a stale 0.0.1;
     # always seed the real product release (fresh installs must announce it).
     env["QUBIT_VERSION"] = _tui_product_version()

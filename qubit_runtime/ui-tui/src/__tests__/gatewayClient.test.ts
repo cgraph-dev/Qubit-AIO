@@ -428,11 +428,16 @@ describe('GatewayClient websocket attach mode', () => {
     gw.kill()
   })
 
-  it('uses the undici WebSocket fallback when global WebSocket is unavailable', () => {
+  it('uses the undici WebSocket fallback when global WebSocket is unavailable', async () => {
     process.env.HERMES_TUI_GATEWAY_URL = 'ws://gateway.test/api/ws?token=hunter2&channel=secret'
     delete (globalThis as { WebSocket?: unknown }).WebSocket
 
-    const gw = new GatewayClient()
+    // The fallback is resolved once, when the module loads (Node 22+ has a
+    // native WebSocket, so real launches never import undici at all). Load a
+    // fresh module instance while the global is absent to exercise that path.
+    vi.resetModules()
+    const { GatewayClient: ColdGatewayClient } = await import('../gatewayClient.js')
+    const gw = new ColdGatewayClient()
 
     gw.start()
     expect(FakeWebSocket.instances).toHaveLength(1)
