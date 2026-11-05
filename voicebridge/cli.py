@@ -17,6 +17,39 @@ def _shared_power(cfg):
     return PW.power_policy(cfg)
 
 
+def _install_gettext_find_cache() -> None:
+    """Memoise ``gettext.find`` for this process.
+
+    CPython 3.14's argparse asks gettext for every help string. With no
+    installed ``messages`` catalog each lookup re-scans the locale directories
+    (measured ~130 ms for this CLI's ~2,600 help strings under
+    ``LANG=en_US.UTF-8``). ``find`` is a pure lookup of (domain, localedir,
+    languages, all), so cache it keyed also by the locale environment. Output
+    is byte-identical; only the repeated directory scans disappear.
+    """
+    import functools
+    import gettext as _gettext
+
+    if getattr(_gettext.find, "_qubit_cached", False):
+        return
+    _orig = _gettext.find
+
+    @functools.lru_cache(maxsize=256)
+    def _cached(domain, localedir, languages, all_, lang_env):
+        return _orig(domain, localedir,
+                     list(languages) if languages is not None else None, all_)
+
+    def _find(domain, localedir=None, languages=None, all=False):
+        lang_env = (os.environ.get("LANGUAGE"), os.environ.get("LC_ALL"),
+                    os.environ.get("LC_MESSAGES"), os.environ.get("LANG"))
+        langs = tuple(languages) if languages is not None else None
+        return _cached(domain, localedir, langs, bool(all), lang_env)
+
+    _find._qubit_cached = True  # type: ignore[attr-defined]
+    _find._qubit_orig = _orig  # type: ignore[attr-defined]
+    _gettext.find = _find  # type: ignore[assignment]
+
+
 def _launcher_name() -> str:
     """User-facing launcher name for help/usage banners.
 
@@ -4646,6 +4679,16 @@ def main(argv=None) -> int:
                            "hermes-migrate": "legacy-migrate",
                            "hermes-rollback": "legacy-rollback"}
     raw = [_legacy_cmd_aliases.get(tok, tok) for tok in raw]
+    # Startup fast path: `qubit --version` is a pure identity probe. Building
+    # the full argparse tree (~870 sub-parsers, ~230 ms warm) is unnecessary
+    # and dominated the measurement. Emit the exact same string the parser's
+    # ``--version`` action would (``%(prog)s <PRODUCT_VERSION>``) and exit.
+    # Only the exact top-level probe is caught, so `qubit agent --version`
+    # still reaches the vendored runtime's own version output.
+    if raw == ["--version"]:
+        from .product import PRODUCT_VERSION as _PV
+        print(f"{_launcher_name()} {_PV}")
+        return 0
     # Passthrough to the vendored Qubit Agent runtime must not be re-parsed by
     # Qubit's argparse (leading --help/--version/--flags would be swallowed).
     # `qubit agent <args…>` dispatches verbatim. `qubit` stays as an
@@ -4694,6 +4737,9 @@ def main(argv=None) -> int:
         from .branding import help_overlay
         with help_overlay.active():
             return qubit_runtime.run(_route.argv)
+    # The parser asks gettext for ~2,600 help strings; with no catalog each
+    # call re-scans the locale dirs. Memoise the pure lookup before building.
+    _install_gettext_find_cache()
     args = build_parser().parse_args(raw)
     command = args.command or "run"
 
