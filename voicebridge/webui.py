@@ -61,6 +61,10 @@ _SSE_HEARTBEAT_S = 15.0
 #: and the vendoring script's rewrite target must agree — three copies of this
 #: string is three chances to drift.
 OFFICE_APP_PREFIX = "/plugin-apps/"
+#: The ported workbench's canonical public path. `/wb` is its short alias —
+#: upstream's own JS and its shim assume that shorter form, so both are routed
+#: to the same tree. Keep them in sync with `workbench_ui_routes.MOUNT`.
+WORKBENCH_MOUNT = "/qubit-workbench"
 
 # --------------------------------------------------------------------------
 # Transport-boundary redaction (Wave 5, G2).
@@ -3904,16 +3908,21 @@ class WebUIHandler(BaseHTTPRequestHandler):
         the API half without duplicating the parse.
         """
         path = self.path.split("?")[0]
-        if path != "/wb" and not path.startswith("/wb/"):
+        # Two prefixes, one surface: /qubit-workbench is the page the sidebar
+        # links to, /wb is the short alias upstream's own JS assumes. Both serve
+        # the same tree and the same shim, so a link from either works.
+        mount = next((m for m in (WORKBENCH_MOUNT, "/wb")
+                      if path == m or path.startswith(m + "/")), "")
+        if not mount:
             return False
         from . import workbench_ui_routes as R
 
         app = getattr(self.server, "app", None)
         token = str(getattr(app, "api_token", "") or "")
-        if path.startswith("/wb/api/"):
+        if path.startswith(mount + "/api/"):
             from urllib.parse import parse_qs, urlsplit
 
-            sub = path[len("/wb/api/"):].strip("/")
+            sub = path[len(mount) + len("/api/"):].strip("/")
             query = {k: v[0] for k, v in parse_qs(
                 urlsplit(self.path).query, keep_blank_values=True).items()}
             body: Dict[str, Any] = {}
@@ -3935,8 +3944,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 {"sub": sub, "method": method})
             self._json(payload, status)
             return True
-        R.serve_asset(self, "/" if path == "/wb" else path[len("/wb"):],
-                      token=token, base_path="/wb")
+        R.serve_asset(self, "/" if path == mount else path[len(mount):],
+                      token=token, base_path=mount)
         return True
 
     # -- routes ----------------------------------------------------------
@@ -3952,10 +3961,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if self._refuse_qubit_ws():
             return
         path = self.path.split("?")[0]
-        # The ported workbench UI (/wb/*): the static tree under
-        # voicebridge/workbench_ui/static plus its /wb/api/* shim. Placed before
-        # the SPA branch so its own documents and assets win, and confining every
-        # file read to the static root the way /plugin-apps/ does.
+        # The ported workbench (upstream's own HTML/CSS/JS) is what
+        # /qubit-workbench now serves, and /wb stays as its short alias. The
+        # static tree wins over the React page it replaced: the React route and
+        # its sidebar entry point here, so there is ONE workbench and this is it.
         if self._serve_workbench_ui("GET"):
             return
         if path in ("/", "/index.html"):

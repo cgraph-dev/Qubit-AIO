@@ -175,7 +175,7 @@ def _inject_globals(html: str, token: str, base_path: str) -> str:
         "window.__QUBIT_BASE_PATH__=%s;"
         "window.__QUBIT_WB_MOUNT__=%s;</script>"
         % (json.dumps(token or ""), json.dumps("/agent"),
-           json.dumps(base_path or ""), json.dumps(MOUNT))
+           json.dumps(base_path or MOUNT), json.dumps(base_path or MOUNT))
     )
     # The globals MUST precede everything that reads them. Upstream's document
     # computes its `<base href>` in the <head> before any other markup, and that
@@ -183,17 +183,24 @@ def _inject_globals(html: str, token: str, base_path: str) -> str:
     # 130 lines too late, so the mount was undefined, the base fell back to the
     # origin, and every relative asset resolved to /static/* and 404'd. Insert
     # immediately after <head> so the definitions exist before the first reader.
+    # Emit a REAL <base> element rather than relying on the document's own
+    # document.write() bootstrap. That script writes during <head> parse, which
+    # is timing-sensitive: measured in Chrome, stylesheets and defer scripts
+    # still resolved against the origin (/static/*), so every asset 404'd while
+    # the page looked fine. A static tag is decided before the first subresource
+    # is resolved, so there is nothing to race. The upstream bootstrap stays in
+    # place for standalone use; this tag comes first, so it is the one that wins.
+    base_tag = '<base href="%s/">' % (base_path or MOUNT)
     for opener in ("<head>", "<head ", "<HEAD>", "<HEAD "):
         idx = html.find(opener)
         if idx != -1:
             end = html.find(">", idx)
             if end != -1:
-                return html[:end + 1] + payload + html[end + 1:]
-    if _INJECT_MARKER in html:
-        return html.replace(_INJECT_MARKER, payload, 1)
+                head_end = end + 1
+                return html[:head_end] + payload + base_tag + html[head_end:]
     if "</head>" in html:
-        return html.replace("</head>", payload + "</head>", 1)
-    return payload + html
+        return html.replace("</head>", payload + base_tag + "</head>", 1)
+    return payload + base_tag + html
 
 
 def serve_asset(handler: Any, path: str,
