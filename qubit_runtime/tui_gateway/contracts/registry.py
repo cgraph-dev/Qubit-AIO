@@ -144,10 +144,19 @@ def canonical_param_problems(contract: MethodContract, params: dict) -> list[str
 def check_params_accepted(contract: MethodContract | ServerRequestContract, params: dict) -> None:
     """The handler answered with a result: the params it accepted must be valid under the
     contract, else the contract is narrower than the wire (a required field that is optional in
-    practice, a type the handler coerces). Same strict/error-log policy as results."""
+    practice, a type the handler coerces). Same strict/error-log policy as results.
+
+    A method declared on both transports keeps the legacy (``METHODS``) optionality for
+    missing fields, exactly as :func:`canonical_param_problems` does at admission: the
+    canonical control shape may require ``execution_generation`` while the shipped Ink TUI /
+    Desktop wire shape (``SessionInterruptParams``) has no such field, and the handler
+    resolves it. Only a shared method is exempt, and only for ``missing`` — unknown keys and
+    wrong types still violate the contract."""
     try:
         contract.params.model_validate(params)
     except ValidationError as exc:
+        if contract.name in METHODS and all(err.get("type") == "missing" for err in exc.errors()):
+            return
         _report("params accepted by", contract.name, exc)
 
 

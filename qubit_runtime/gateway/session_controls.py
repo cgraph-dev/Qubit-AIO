@@ -928,10 +928,22 @@ class AuthorityConnection:
             self.actor, ref, params['admission_id'], params['execution_generation']))
 
     async def interrupt(self, ref, params):
+        """Stop the referenced turn.
+
+        The canonical control shape carries ``execution_generation`` so a stop that raced a
+        replaced turn is refused as stale. The legacy Ink TUI / Desktop wire shape
+        (``SessionInterruptParams``) sends only ``session_id``: it addresses *the turn running
+        now*. Resolve an omitted generation from the current handle instead of treating it as
+        stale, otherwise Ctrl+C on an attached TUI silently no-ops while the turn keeps running
+        and persists its full reply. An explicitly supplied generation stays strict.
+        """
         from gateway.session_managed_worker import interrupt_managed
-        if interrupt_managed(self.authority, self.actor, ref, params.get('execution_generation')):
+        generation = params.get('execution_generation')
+        if type(generation) is not int:
+            generation = self.authority._handle(ref).execution_generation
+        if interrupt_managed(self.authority, self.actor, ref, generation):
             return asdict(self.authority._handle(ref))
-        return asdict(await self.authority.interrupt(self.actor, ref, params.get('execution_generation')))
+        return asdict(await self.authority.interrupt(self.actor, ref, generation))
 
     def _resolve_response(self, frame):
         from gateway.session_server_requests import may_settle, resolve
