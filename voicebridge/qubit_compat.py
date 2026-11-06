@@ -21574,3 +21574,12 @@ _r("POST", r"/api/computer/files/write", "h_computer_files_write")
 _r("POST", r"/api/computer/files/mkdir", "h_computer_files_mkdir")
 
 HANDLERS["h_browser_open"] = h_browser_open
+
+# Qubit HUD tab routes (see voicebridge/hud_routes.py). Registered last so the
+# handler map keys cannot shadow an existing upstream handler of the same name;
+# the rows degrade to 503 HUD_COLLECTOR_UNAVAILABLE if voicebridge/hud is absent.
+from .hud_routes import hud_routes as _hud_routes, hud_handlers as _hud_handlers
+
+for _m, _p, _h in _hud_routes():
+    _r(_m, _p, _h)
+HANDLERS.update(_hud_handlers())

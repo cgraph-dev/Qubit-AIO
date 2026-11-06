@@ -49,30 +49,38 @@ from typing import Any, Callable, Dict, List, Tuple
 # One row per panel: (route suffix, collector function name). The collector is
 # resolved lazily so this table can be read (and tested for shape) with the
 # collector package absent.
-_PANELS: Tuple[Tuple[str, str], ...] = (
-    ("health", "health"),
-    ("sessions", "sessions"),
-    ("cron", "cron"),
-    ("models", "models"),
-    ("skills", "skills"),
-    ("plugins", "plugins"),
-    ("costs", "costs"),
+_PANELS: Tuple[Tuple[str, str, str], ...] = (
+    ("health", "collectors_health", "collect_health"),
+    ("sessions", "collectors_sessions", "collect_sessions"),
+    ("cron", "collectors_cron", "collect_cron"),
+    ("models", "collectors_model_info", "collect_model_info"),
+    ("skills", "collectors_skills", "collect_skills"),
+    ("plugins", "collectors_plugins", "collect_plugins"),
+    ("costs", "collectors_model_analytics", "collect_model_analytics"),
 )
 
 
-def _collector(name: str) -> Callable[..., Any]:
+def _collector(panel: str) -> Callable[..., Any]:
     """Resolve one collector from ``voicebridge.hud``.
 
-    Raises — never returns None — so the caller has exactly one failure path.
-    The caller turns that into the 503; this function does not invent a
-    payload, because an empty snapshot and an absent collector must not look
-    the same to the UI.
+    ``panel`` is the route suffix (``health``); the module AND function that own
+    it are looked up in ``_PANELS`` because the panel name is not always the
+    function name (``models`` -> ``collect_model_info``). Raises — never returns
+    None — so the caller has exactly one failure path. The caller turns that
+    into the 503; this function does not invent a payload, because an empty
+    snapshot and an absent collector must not look the same to the UI.
     """
     hud_pkg = importlib.import_module(".hud", __package__)
 
-    fn = getattr(hud_pkg, name, None)
+    row = {p: (m, f) for p, m, f in _PANELS}.get(panel)
+    if row is None:
+        raise AttributeError(f"no HUD collector is mapped to {panel!r}")
+    module_name, fn_name = row
+    module = importlib.import_module("." + module_name, hud_pkg.__name__)
+    fn = getattr(module, fn_name, None)
     if not callable(fn):
-        raise AttributeError(f"voicebridge.hud.{name} is not callable")
+        raise AttributeError(
+            f"voicebridge.hud.{module_name} exposes no {fn_name}")
     return fn
 
 
@@ -98,7 +106,7 @@ def _serve(panel: str, cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        f"tree, so /api/hud/{panel} has nothing to serve."),
         }
     try:
-        out = fn(cfg, q, b, p)
+        out = fn(cfg=cfg)
     except Exception as exc:
         return 502, {
             "ok": False,
@@ -188,7 +196,7 @@ def hud_routes() -> List[Tuple[str, str, str]]:
     tree without ``voicebridge/hud`` bootable.
     """
     return [("GET", f"/api/hud/{suffix}", f"h_hud_{suffix}")
-            for suffix, _name in _PANELS]
+            for suffix, _module, _fn in _PANELS]
 
 
 def hud_handlers() -> Dict[str, Callable[..., Tuple[int, Any]]]:

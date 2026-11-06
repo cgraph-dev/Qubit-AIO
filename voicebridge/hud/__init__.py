@@ -69,6 +69,7 @@ __all__ = [
     "collectors_model_analytics",
     "collectors_model_info",
     "collectors_plugins",
+    "collectors_sessions",
     "collectors_skills",
 ]
 
