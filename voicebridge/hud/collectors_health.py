@@ -118,11 +118,16 @@ def _qubit_home(home: Optional[Path]) -> Path:
     try:
         from qubit_constants import get_qubit_home  # type: ignore
     except Exception:  # pragma: no cover - vendored tree not importable
-        from .. import qubit_runtime
-
-        qubit_runtime.ensure_path()
+        _ensure_vendored()
         from qubit_constants import get_qubit_home  # type: ignore
     return Path(get_qubit_home())
+
+
+def _ensure_vendored() -> None:
+    """Put the vendored agent core on ``sys.path`` (idempotent)."""
+    from .. import qubit_runtime
+
+    qubit_runtime.ensure_path()
 
 
 def _qubit_version() -> str:
@@ -427,6 +432,11 @@ def collect_health(home: Optional[Path] = None, cfg: Any = None) -> Dict[str, An
     JSON-ready dict. ``cfg`` is the VoiceBridge config threaded to the session
     authority so a profile resolves its own island; ``home`` overrides the
     resolved Qubit home (tests, profile views).
+
+    Session/usage counters come from the ONE chat-session authority for the
+    *active* home; an explicit ``home`` that is not the home the authority
+    resolves would otherwise report another island's database, so the file
+    diagnostics use ``home`` while the counters always follow the authority.
     """
     root = _qubit_home(home)
     state_db = root / "state.db"
