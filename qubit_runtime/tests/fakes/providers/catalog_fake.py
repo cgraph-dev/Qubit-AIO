@@ -311,6 +311,14 @@ def _handler_for(fake: CatalogFake) -> type[BaseHTTPRequestHandler]:
             if fake.models_status != 200:
                 self._json(fake.models_status, {"error": {"message": "no listing here"}})
                 return
+            if bare_path(self.path).endswith("/api/v1/models"):
+                # LM Studio's NATIVE management listing (the switch-validation probe), not the
+                # OpenAI-compatible ``/v1/models`` shape: ``{"models": [{"key", "type"}]}``.
+                self._json(200, {"models": [
+                    {"key": m, "id": m, "type": "llm", "display_name": m,
+                     "max_context_length": 131072, "loaded_instances": []}
+                    for m in fake.models]})
+                return
             self._json(200, {"object": "list", "data": [
                 {"id": m, "object": "model", "type": "model", "display_name": m, "created": 1,
                  "created_at": "2026-01-01T00:00:00Z", "owned_by": "catalog", "context_length": 131072}
