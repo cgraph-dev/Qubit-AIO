@@ -168,6 +168,16 @@ def _m():
     return main
 
 
+def _git_root() -> Path:
+    """The checkout git commands run in.
+
+    ``PROJECT_ROOT`` is the runtime source root; in the Qubit monorepo it is nested under
+    ``qubit_runtime/`` inside the git checkout, and helpers that build ``<root>/.git/<marker>``
+    must target the checkout, not the vendored subtree.
+    """
+    return checkout_root(_m().PROJECT_ROOT)
+
+
 def _updates_config() -> dict:
     """The ``updates:`` config section (``{}`` when absent/malformed); may raise on config errors."""
     from qubit_cli.config import load_config
@@ -502,7 +512,7 @@ def _should_zip_fallback_on_update_error(exc: BaseException) -> bool:
         and _called_process_error_is_git(exc)
         # Only from an untouched checkout: the ZIP overlay replaces every top-level entry, so
         # after git already stashed, switched or half-moved the tree it would bury that state.
-        and _commit.run_checkout_untouched(_m().PROJECT_ROOT)
+        and _commit.run_checkout_untouched(_git_root())
     )
 
 
@@ -1100,11 +1110,11 @@ def _pull_updates(
     update_succeeded = False
     # Rescue refs must retain the immediate pre-pull tip, even when syntax
     # rollback needs to cross an earlier upstream sync.
-    pre_pull_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
+    pre_pull_sha = _capture_head_sha(git_cmd, _git_root())
     # Git moves the tree file by file and HEAD last: if this process dies in between, the next launch
     # of any entry point finds this marker and puts the old tree back (_early_recovery). The target is
     # the resolved commit, so a later `git fetch` cannot widen what that restore considers.
-    pull_marker = interrupted_pull_marker(_m().PROJECT_ROOT)
+    pull_marker = interrupted_pull_marker(_git_root())
     # A release update moves the tree to its tag, not the branch tip: the marker names what git writes.
     merge_ref = target_ref if target_ref is not None else f"origin/{branch}"
     # Every refusal below runs inside the try: its finally names the autostash this run took.
@@ -1125,7 +1135,7 @@ def _pull_updates(
             _record_stop("head_moved")
             sys.exit(1)
         # The commit point: the tail, the fleet restart and the marker are durable BEFORE git writes.
-        refused = _commit.arm_commit_point(git_cmd, _m().PROJECT_ROOT, target_sha, pre=pre_pull_sha,
+        refused = _commit.arm_commit_point(git_cmd, _git_root(), target_sha, pre=pre_pull_sha,
                                            target=target_sha, stash=auto_stash_ref)
         if refused:
             print(f"✗ {refused}.")
@@ -1143,10 +1153,10 @@ def _pull_updates(
             # put back what it wrote; the marker stays until the tree is verified whole. Settled:
             # handed back at the run's start, else owed for the HEAD it settled on; torn: owed for
             # the commit the next launch's restore lands on.
-            if _commit.settle_failed_tree_move(_m().PROJECT_ROOT):
+            if _commit.settle_failed_tree_move(_git_root()):
                 _commit.disarm_commit_obligations()
             else:
-                _commit.owe_restore_of(_m().PROJECT_ROOT, pre_pull_sha)
+                _commit.owe_restore_of(_git_root(), pre_pull_sha)
             raise
         pull_marker.unlink(missing_ok=True)  # git exited 0: the tree is whole at the target
         if sync_upstream:
@@ -1157,7 +1167,7 @@ def _pull_updates(
                 _windows_gateway_resume=_windows_gateway_resume)
             try:
                 _m()._sync_with_upstream_if_needed(
-                    git_cmd, _m().PROJECT_ROOT, assume_yes=assume_yes, input_fn=gw_input_fn,
+                    git_cmd, _git_root(), assume_yes=assume_yes, input_fn=gw_input_fn,
                     checkout_move=_moves_for(_windows_gateway_resume))
             except UpstreamTargetBroken as broken:  # refused before its move: the update rolls back
                 _verify_head_after_pull(  # never reset an unexpected branch's ref onto pre
@@ -1175,7 +1185,7 @@ def _pull_updates(
             _windows_gateway_resume=_windows_gateway_resume)
         if sync_upstream:
             # Only a validated update is published to the fork (#97052 sync, after the commit point).
-            _push_synced_fork(git_cmd, _m().PROJECT_ROOT)
+            _push_synced_fork(git_cmd, _git_root())
         update_succeeded = True
     finally:
         if auto_stash_ref is not None:
@@ -1186,13 +1196,13 @@ def _pull_updates(
                 _clear_pending_autostash()  # named just above; a later boundary must not repeat it
             elif discard_local_changes:
                 # Non-interactive + updates.non_interactive_local_changes: discard.
-                _m()._discard_stashed_changes(git_cmd, _m().PROJECT_ROOT, auto_stash_ref)
+                _m()._discard_stashed_changes(git_cmd, _git_root(), auto_stash_ref)
             elif keep_stash:
                 # --keep-stash (desktop updater): leave edits parked rather than re-apply silently.
                 _m()._park_stashed_changes(auto_stash_ref)
             else:
                 _m()._restore_stashed_changes(
-                    git_cmd, _m().PROJECT_ROOT, auto_stash_ref, prompt_user=prompt_for_restore,
+                    git_cmd, _git_root(), auto_stash_ref, prompt_user=prompt_for_restore,
                     input_fn=gw_input_fn, checkout_move=_moves_for(_windows_gateway_resume))
     return movement_baseline
 
@@ -1263,7 +1273,7 @@ def _switch_branch_at_commit_point(git_cmd, branch, target_ref, *, pre, stash):
 
 def _refuse_before_commit_point(git_cmd, target_ref, _windows_gateway_resume) -> None:
     """Preconditions that used to fail AFTER the swap: refuse with the install untouched."""
-    reason = _commit.preflight_refusal(git_cmd, _m().PROJECT_ROOT, target_ref, _UPDATE_CRITICAL_FILES)
+    reason = _commit.preflight_refusal(git_cmd, _git_root(), target_ref, _UPDATE_CRITICAL_FILES)
     if reason is None:
         from qubit_cli.update_downgrade_guard import downgrade_refusal
 
@@ -1288,7 +1298,7 @@ def _exit_after_failed_branch_switch(
     re-applying it onto a half-written tree would mix the user's edits into git's partial writes.
     """
     detail = (track_result.stderr or "").strip()
-    if interrupted_pull_marker(_m().PROJECT_ROOT).is_file():
+    if interrupted_pull_marker(_git_root()).is_file():
         print(f"✗ Switching to '{branch}' stopped part-way; the next `hermes` launch puts the checkout back.")
         if detail:
             print(f"  {detail.splitlines()[0]}")
@@ -1415,7 +1425,7 @@ def _prepare_checkout_for_update(
     if not release_tag and not in_place_update and current_branch != branch:
         # Both checkout forms can land on the fetched tip before the count runs.
         # Keep the running code AND its branch identity for syntax rollback.
-        moved_from_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
+        moved_from_sha = _capture_head_sha(git_cmd, _git_root())
         rollback_branch = current_branch
         # The switch (or its -B fallback) is this update's first tree write: bind both commits first,
         # on the POSIX pause's baseline (its refusal, sticky, reaches the switch's arm_commit_point).
@@ -1435,7 +1445,7 @@ def _prepare_checkout_for_update(
 
     if release_tag:
         # An ancestor release still needs applying when switching channels.
-        head_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
+        head_sha = _capture_head_sha(git_cmd, _git_root())
         return _CheckoutPlan(
             auto_stash_ref=auto_stash_ref, commit_count=0 if head_sha == target_ref else -1,
             in_place_update=True, parked_branch_switched=False,
@@ -1459,7 +1469,7 @@ def _prepare_checkout_for_update(
     # without adding ancestors. It still needs the post-update pipeline.
     switched_without_new_commits = False
     if commit_count == 0 and moved_from_sha:
-        landed_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
+        landed_sha = _capture_head_sha(git_cmd, _git_root())
         if landed_sha and landed_sha != moved_from_sha:
             commit_count = -1
             switched_without_new_commits = True
@@ -1475,7 +1485,7 @@ def _prepare_checkout_for_update(
     # the official repo, so "Already up to date!" is fully verified there.
     upstream_checked = True
     if commit_count == 0 and is_fork and branch == "main" and not release_tag:
-        pre_sync_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
+        pre_sync_sha = _capture_head_sha(git_cmd, _git_root())
         try:
             upstream_checked = _m()._sync_with_upstream_if_needed(
                 git_cmd, _m().PROJECT_ROOT, assume_yes=assume_yes, input_fn=gw_input_fn,
@@ -1489,7 +1499,7 @@ def _prepare_checkout_for_update(
                                      header=_upstream_broken_header(broken),
                                      _windows_gateway_resume=_windows_gateway_resume,
                                      stop_class="target_syntax_error")
-        post_sync_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
+        post_sync_sha = _capture_head_sha(git_cmd, _git_root())
         if pre_sync_sha and post_sync_sha and pre_sync_sha != post_sync_sha:
             synced_count = _count_commits_between(
                 git_cmd, _m().PROJECT_ROOT, pre_sync_sha, post_sync_sha)
@@ -1648,7 +1658,7 @@ def _verify_head_after_pull(
     # reinstalled deps + rebuilt the desktop app against the stale tree — no error, no warning, ``hermes
     # doctor`` healthy. Compare pre-pull and post-pull HEAD; if they match, surface the no-op instead of
     # claiming success.
-    post_pull_sha = _capture_head_sha(git_cmd, _m().PROJECT_ROOT)
+    post_pull_sha = _capture_head_sha(git_cmd, _git_root())
     if pre_pull_sha and post_pull_sha == pre_pull_sha:
         print()
         print("✗ Code did not move — update was a no-op.")
@@ -1755,7 +1765,7 @@ def _finish_already_up_to_date(
     if completion_request is not None:
         # Same code, same host obligation: an SHA-less arm would REPLACE the standing record
         # (and its restarted proof), so a sibling profile's no-op update re-kills the multiplexer.
-        completion_request["expected_sha"] = _capture_head_sha(git_cmd, _m().PROJECT_ROOT) or ""
+        completion_request["expected_sha"] = _capture_head_sha(git_cmd, _git_root()) or ""
         completion_request["completion_message"] = held_message or (
             "✓ Already up to date!" if _plan.upstream_checked
             else "✓ Up to date with your fork (official repo not checked).")
@@ -1772,7 +1782,7 @@ def _apply_pulled_update(
         _windows_gateway_resume=_windows_gateway_resume)
 
     if completion_request is not None:
-        observed = _capture_head_sha(git_cmd, _m().PROJECT_ROOT) or post_pull_sha
+        observed = _capture_head_sha(git_cmd, _git_root()) or post_pull_sha
         pinned = completion_request.get("expected_sha")
         if pinned is not None and observed != pinned:
             print("✗ Checkout no longer matches the selected channel commit. No completion was applied.")
@@ -1809,7 +1819,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
     # declare this local, so only they hand off through retired shims.
     _qubit_current_updater_frame = True
     _commit.begin_update_attempt()  # nothing an earlier update in this process armed is ours (O5)
-    git_operation = git_operation_in_progress(_m().PROJECT_ROOT)
+    git_operation = git_operation_in_progress(_git_root())
     if git_operation:
         root = _m().PROJECT_ROOT
         print(f"✗ Cannot update while a Git {git_operation} is in progress in {root}.")
@@ -1825,9 +1835,9 @@ def _cmd_update_impl(args, gateway_mode: bool):
     # index.lock is younger than the sweep's age floor, so it goes here once its git is proven
     # dead (we hold the update lock: no other update's git can own it).
     from qubit_cli.gitlock import release_dead_index_lock
-    if release_dead_index_lock(_m().PROJECT_ROOT):
+    if release_dead_index_lock(_git_root()):
         print("  (removed .git/index.lock left by a git that was killed)")
-    _check.clear_git_debris(_m().PROJECT_ROOT)
+    _check.clear_git_debris(_git_root())
 
     opts = _resolve_update_options(args, gateway_mode)
     gw_input_fn, assume_yes = opts.gw_input_fn, opts.assume_yes
@@ -1881,26 +1891,26 @@ def _cmd_update_impl(args, gateway_mode: bool):
         return
 
     try:
-        _check.report_pack_tidy(_m().PROJECT_ROOT)
+        _check.report_pack_tidy(_git_root())
         # Shallow installer checkouts collect one `.git/shallow` graft per past depth-1 fetch
         # (#105951); stale grafts break merge-base and push this run into the divergence path.
         from qubit_cli.gitlock import repair_broken_shallow_boundaries, prune_stale_shallow_grafts
-        repaired = repair_broken_shallow_boundaries(_m().PROJECT_ROOT)
+        repaired = repair_broken_shallow_boundaries(_git_root())
         if repaired:
             print(f"  (restored {repaired} broken shallow boundary(ies))")
-        pruned = prune_stale_shallow_grafts(_m().PROJECT_ROOT)
+        pruned = prune_stale_shallow_grafts(_git_root())
         if pruned:
             print(f"  (pruned {pruned} stale shallow graft(s) left by past depth-1 checks)")
 
         # Surface autostashes left by earlier updates (--keep-stash, failed restores).
         # Surface autostash entries left behind by earlier updates (#63717 problem 6) — parked --keep-stash
         # runs and failed restores preserve the stash but nothing ever mentioned it again.
-        _m()._warn_orphaned_update_autostashes(git_cmd, _m().PROJECT_ROOT)
+        _m()._warn_orphaned_update_autostashes(git_cmd, _git_root())
 
         # A shallow checkout's plain fetch drags in ~the whole history and cannot finish inside
         # the network cap (#123254); its grafts also make merge-base report orphan divergence
         # (#123346, #124645). Unshallow it (commits only) first.
-        _heal_stale_shallow_checkout(_m().PROJECT_ROOT, branch)
+        _heal_stale_shallow_checkout(_git_root(), branch)
 
         if release_sha and target_is_head:
             # Forward-only default: the checkout already contains the release; nothing to fetch.
@@ -1927,9 +1937,9 @@ def _cmd_update_impl(args, gateway_mode: bool):
                          if "No space left on device" in (fetch_result.stderr or "") else "fetch_failed")
             sys.exit(1)
 
-        _check.fetch_release_tag(git_cmd, _m().PROJECT_ROOT, completion_request)
+        _check.fetch_release_tag(git_cmd, _git_root(), completion_request)
         current_branch = _current_branch_name(git_cmd, check=True)
-        _commit.record_run_start(git_cmd, _m().PROJECT_ROOT)
+        _commit.record_run_start(git_cmd, _git_root())
         held_message = None
         if release_sha and not target_is_head:
             channel = _update_run_channel(args)
