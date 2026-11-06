@@ -51,7 +51,7 @@ import json
 import mimetypes
 import re
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 #: The SERVING ROOT — the ``workbench_ui/`` directory, not its ``static/`` child.
 #: The HTML's own asset URLs are ``static/ui.js``, i.e. they carry the ``static/``
@@ -284,6 +284,171 @@ def _refusal(code: str, detail: str, *, endpoint: str,
         "owner": "qubit-policy",
         "rollback": "read-only; nothing to roll back",
     }
+
+
+# ------------------------------------------------- ported-client call set
+# Implemented in ``voicebridge/workbench_ui/handlers_extra.py`` (one readable
+# file for the paths the ported page actually calls) and re-exported here so the
+# route table and the handlers stay one audit surface, as every other family is.
+from .workbench_ui.handlers_extra import (chat_start as _x_chat_start,
+                                          chat_steer as _x_chat_steer,
+                                          chat_stop as _x_chat_stop,
+                                          chat_stream_status as _x_chat_status,
+                                          session_verb as _x_session_verb,
+                                          session_stream as _x_session_stream,
+                                          session_flag as _x_session_flag,
+                                          sessions_events as _x_sessions_events,
+                                          approval_pending as _x_approval_pending,
+                                          approval_respond as _x_approval_respond,
+                                          clarify_pending as _x_clarify_pending,
+                                          clarify_respond as _x_clarify_respond,
+                                          workspace_list as _x_workspace_list,
+                                          workspaces as _x_workspaces,
+                                          profile_active as _x_profile_active,
+                                          health_agent as _x_health_agent,
+                                          dashboard_config as _x_dash_config,
+                                          dashboard_status as _x_dash_status,
+                                          onboarding_status as _x_onboard,
+                                          client_events_log as _x_client_log,
+                                          transcribe_capability as _x_transcribe,
+                                          updates_check as _x_updates_check)
+
+
+def chat_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_chat_start(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def chat_steer(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_chat_steer(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def chat_stop(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+              p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_chat_stop(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                        dict(p or {}))
+
+
+def chat_stream_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_chat_status(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                          dict(p or {}))
+
+
+def session_verb(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/session/<verb>`` — the verb is the tail after ``session/``."""
+    params = dict(p or {})
+    sub = str(params.get("sub") or "").strip("/")
+    params["action"] = (sub[len("session/"):] if sub.startswith("session/")
+                        else sub.rsplit("/", 1)[-1])
+    return _x_session_verb(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                           params)
+
+
+def session_stream(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_session_stream(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                             dict(p or {}))
+
+
+def session_flag(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_session_flag(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                           dict(p or {}))
+
+
+def sessions_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_sessions_events(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                              dict(p or {}))
+
+
+def approval_pending(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_approval_pending(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                               dict(p or {}))
+
+
+def approval_respond(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_approval_respond(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                               dict(p or {}))
+
+
+def clarify_pending(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_clarify_pending(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                              dict(p or {}))
+
+
+def clarify_respond(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_clarify_respond(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                              dict(p or {}))
+
+
+def workspace_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_workspace_list(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                             dict(p or {}))
+
+
+def workspaces(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+               p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_workspaces(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def profile_active(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_profile_active(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                             dict(p or {}))
+
+
+def health_agent(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_health_agent(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                           dict(p or {}))
+
+
+def dashboard_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_dash_config(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                          dict(p or {}))
+
+
+def dashboard_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_dash_status(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                          dict(p or {}))
+
+
+def onboarding_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_onboard(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                      dict(p or {}))
+
+
+def client_events_log(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_client_log(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def transcribe_capability(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_transcribe(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def updates_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_updates_check(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                            dict(p or {}))
 
 
 def _adapter(module: str) -> Any:
@@ -913,6 +1078,97 @@ PORT_SET: Dict[str, str] = {
     "share/create": "h_wb_file_save_stub",
 }
 
+#: Paths under ``/api/wb/api/`` that are dispatched by the gateway itself rather
+#: than by a name in ``PORT_SET``: they need the query string (session ids, stream
+#: ids, paging cursors) or the raw sub-path, so a single ``sub`` key is not enough.
+#:
+#: ``chat/start`` used to answer ``WB_NOT_IN_PORT_SET`` although
+#: ``workbench_shim.sessions`` already implemented it — the table said it was
+#: served and the live server said it was not. These are the paths the ported
+#: client calls that the table simply never listed.
+_EXTRA_PREFIXES: Dict[str, str] = {
+    # chat: upstream's start/stream pair over chat_transport.stream_turn
+    "chat/start": "chat_start",
+    "chat/steer": "chat_steer",
+    "chat/stop": "chat_stop",
+    "chat/stream/status": "chat_stream_status",
+    # the client's sidebar hot channel (SSE; see stream_kind below)
+    "sessions/events": "sessions_events",
+    # workspace tree the composer's file picker and the workspace panel read
+    "list": "workspace_list",
+    "workspaces": "workspaces",
+    # small status endpoints the page polls on boot; each answers only real facts
+    "profile/active": "profile_active",
+    "health/agent": "health_agent",
+    "dashboard/config": "dashboard_config",
+    "dashboard/status": "dashboard_status",
+    "onboarding/status": "onboarding_status",
+    "client-events/log": "client_events_log",
+    "transcribe/capability": "transcribe_capability",
+    "updates/check": "updates_check",
+}
+
+#: Prefixes whose tail is a verb or an id. The gateway resolves these to the
+#: named handler, which computes its own ``action`` from ``sub``; the prefix exists
+#: so a nested verb (``session/title/regenerate``) never falls through to the
+#: bare-id row.
+_EXTRA_FAMILIES: Tuple[Tuple[str, str], ...] = (
+    ("session/", "session_verb"),
+    ("approval/", "approval_family"),
+    ("clarify/", "clarify_family"),
+    ("file/", "file_family"),
+)
+
+
+def approval_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/approval/<verb>`` — pending is read, respond settles once."""
+    verb = str(p.get("action") or str(p.get("sub") or "").rsplit("/", 1)[-1])
+    if verb == "pending":
+        return approval_pending(cfg, q, b, p)
+    if verb == "respond":
+        return approval_respond(cfg, q, b, p)
+    return _refusal("WB_CAPABILITY_UNBOUND",
+                    f"/api/approval/{verb} has no Qubit authority; nothing was "
+                    f"changed.", endpoint="approval/" + verb)
+
+
+def clarify_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/clarify/<verb>`` — a GAP in both directions (named, not blank)."""
+    verb = str(p.get("action") or str(p.get("sub") or "").rsplit("/", 1)[-1])
+    if verb == "pending":
+        return clarify_pending(cfg, q, b, p)
+    if verb == "respond":
+        return clarify_respond(cfg, q, b, p)
+    return _refusal("WB_CAPABILITY_UNBOUND",
+                    f"/api/clarify/{verb} has no Qubit authority",
+                    endpoint="clarify/" + verb)
+
+
+def file_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/file/<verb>`` — reads delegate; every write is brokered or refused."""
+    sub = str(p.get("sub") or "")
+    verb = sub.rsplit("/", 1)[-1] if "/" in sub else str(p.get("action") or "")
+    read_verbs = {"read", "preview", "open", "path", "reveal"}
+    if verb in read_verbs:
+        return h_wb_workspace_preview(cfg, q, b, p)
+    if verb == "save":
+        return h_wb_file_save(cfg, q, b, p)
+    if verb in ("create", "rename", "delete", "move", "upload", "write"):
+        return _refusal(
+            "WB_BROKERED_WRITE",
+            f"file/{verb} is a mutating workspace write: Qubit file mutations are "
+            f"brokered, confirmed actions with an audit receipt "
+            f"(voicebridge.file_patch via voicebridge.broker), never a viewer "
+            f"write. Nothing was changed.",
+            endpoint="file/" + verb, status=403,
+            counterpart="Qubit file patch (brokered + confirmed)")
+    return _refusal("WB_CAPABILITY_UNBOUND",
+                    f"/api/file/{verb} has no Qubit authority",
+                    endpoint="file/" + verb)
+
 
 def h_wb_file_save_stub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         p: Dict[str, str]) -> Tuple[int, Any]:
@@ -940,6 +1196,10 @@ def _resolve_handler(sub: str, method: str) -> Optional[Callable[..., Any]]:
     lookup made six endpoints answer ``WB_NOT_IN_PORT_SET`` while the doc claimed
     they were served — the live proof caught that (``/api/logs`` et al returned
     501), which is exactly why the table is checked against the running server.
+
+    Then ``_EXTRA_PREFIXES`` / ``_EXTRA_FAMILIES``: the paths the ported client
+    actually calls that the original table never listed (``chat/start`` among
+    them). A live probe of the page showed all of them answering 501.
     """
     clean = sub.strip("/")
     if not clean:
@@ -949,8 +1209,14 @@ def _resolve_handler(sub: str, method: str) -> Optional[Callable[..., Any]]:
     name = PORT_SET.get(clean)
     if name:
         return getattr(mod, name, None)
+    name = _EXTRA_PREFIXES.get(clean)
+    if name:
+        return getattr(mod, name, None)
     if clean in EXISTING_SET:
         return h_wb_passthrough
+    for prefix, handler_name in _EXTRA_FAMILIES:
+        if clean.startswith(prefix) and len(clean) > len(prefix):
+            return getattr(mod, handler_name, None)
     return None
 
 
@@ -971,13 +1237,15 @@ def h_wb_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _refusal(
             "WB_NOT_IN_PORT_SET",
             f"{method} /api/{sub} is not in the workbench port set "
-            f"({len(PORT_SET)} ported, {len(EXISTING_SET)} existing of 184 "
-            f"endpoints the upstream UI calls). Qubit exposes no authority "
-            f"for it; nothing was fabricated.",
+            f"({len(PORT_SET) + len(_EXTRA_PREFIXES)} ported, "
+            f"{len(EXISTING_SET)} existing of 184 endpoints the upstream UI "
+            f"calls, plus {len(_EXTRA_FAMILIES)} routed families). Qubit "
+            f"exposes no authority for it; nothing was fabricated.",
             endpoint=sub,
-            counterpart=("Qubit Dashboard (/)"
-                         if not head.startswith(("kanban", "wiki", "notes"))
-                         else "no Qubit counterpart yet"))
+            counterpart=("no Qubit counterpart yet" if head in (
+                "kanban", "wiki", "notes", "auth", "extensions", "background",
+                "gateway", "commands", "goal", "insights", "media", "mcp")
+                else "Qubit Dashboard (/)"))
     # pass the sub-path through so action handlers know which verb fired
     params = dict(p)
     params.setdefault("method", method)
@@ -1015,6 +1283,34 @@ _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "h_wb_workspace_tree": h_wb_workspace_tree,
     "h_wb_projects": h_wb_projects,
     "h_wb_passthrough": h_wb_passthrough,
+    # the ported client's own call set (workbench_ui/handlers_extra.py). These
+    # names are what _EXTRA_PREFIXES / _EXTRA_FAMILIES point at; a name here with
+    # no entry answered _WB_NOT_IN_PORT_SET even though the handler existed.
+    "chat_start": chat_start,
+    "chat_steer": chat_steer,
+    "chat_stop": chat_stop,
+    "chat_stream_status": chat_stream_status,
+    "session_verb": session_verb,
+    "session_stream": session_stream,
+    "session_flag": session_flag,
+    "sessions_events": sessions_events,
+    "approval_pending": approval_pending,
+    "approval_respond": approval_respond,
+    "approval_family": approval_family,
+    "clarify_pending": clarify_pending,
+    "clarify_respond": clarify_respond,
+    "clarify_family": clarify_family,
+    "file_family": file_family,
+    "workspace_list": workspace_list,
+    "workspaces": workspaces,
+    "profile_active": profile_active,
+    "health_agent": health_agent,
+    "dashboard_config": dashboard_config,
+    "dashboard_status": dashboard_status,
+    "onboarding_status": onboarding_status,
+    "client_events_log": client_events_log,
+    "transcribe_capability": transcribe_capability,
+    "updates_check": updates_check,
 }
 
 
@@ -1036,3 +1332,97 @@ def wbui_routes() -> List[Tuple[str, str, str]]:
 def wbui_handlers() -> Dict[str, Callable[..., Tuple[int, Any]]]:
     """The ``HANDLERS`` entries ``wbui_routes`` names."""
     return dict(_HANDLERS)
+
+
+# ---------------------------------------------------------------------------
+# SSE: the two paths that are streams, not JSON
+# ---------------------------------------------------------------------------
+def stream_kind(sub: str) -> Optional[str]:
+    """``"chat"`` / ``"sessions"`` when ``sub`` must be served as SSE, else None.
+
+    Upstream serves both as ``text/event-stream`` and the ported client opens
+    them with ``EventSource`` (``messages.js:8206``, ``sessions.js:8523``).
+    Answering them with JSON — or with a typed 501 — made the client's
+    ``onerror`` reconnect in a permanent loop, which is what the live network
+    log showed before this branch. The listener asks THIS function; the framing
+    (chunked writes, keep-alives, the closing chunk) lives in ``webui`` where
+    every other SSE route already does it.
+    """
+    clean = str(sub or "").strip("/")
+    if clean.startswith("chat/stream"):
+        return "chat"
+    if clean == "sessions/events":
+        return "sessions"
+    return None
+
+
+def stream_frames(sub: str, cfg: Any, q: Dict[str, str]) -> Iterable[str]:
+    """SSE frames for one stream path. A refusal is an ``error`` frame."""
+    kind = stream_kind(sub)
+    if kind == "chat":
+        from .workbench_ui.chat_stream import chat_stream_frames
+
+        stream_id = str((q or {}).get("stream_id") or "").strip()
+        if not stream_id:
+            yield (': missing stream_id\n\n'
+                   'event: error\n'
+                   'data: {"event": "error", "code": "STREAM_ID_REQUIRED", '
+                   '"detail": "GET /api/chat/stream needs ?stream_id="}\n\n')
+            return
+        try:
+            after = int(str((q or {}).get("after_seq") or "0"))
+        except (TypeError, ValueError):
+            after = 0
+        yield from chat_stream_frames(stream_id, after)
+        return
+    if kind == "sessions":
+        from .workbench_ui.handlers_extra import sessions_events_frames
+
+        yield from sessions_events_frames(cfg)
+        return
+    yield ('event: error\n'
+           'data: {"event": "error", "code": "WB_NOT_IN_PORT_SET", '
+           '"detail": "this path is not a stream in this port"}\n\n')
+
+
+def stream_sse(handler: Any, sub: str, cfg: Any,
+               q: Optional[Dict[str, str]] = None) -> None:
+    """Write one SSE response on ``handler``, framed HTTP/1.1 CHUNKED.
+
+    Copy of the framing ``webui`` uses for its own SSE routes (office tower,
+    qubit chat): a body with no ``Content-Length`` and no ``Transfer-Encoding``
+    is delimited by connection close, which browsers do NOT treat as a live
+    stream — the live probe of this exact page showed ``EventSource`` opening
+    and then never delivering a frame. Each frame is one chunk; the terminating
+    chunk is written when the frame iterator ends, so the client's ``onerror``
+    fires once and its own reconnect ladder takes over (with ``after_seq``, so
+    nothing is duplicated).
+    """
+    handler.protocol_version = "HTTP/1.1"
+    handler.close_connection = True
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream; charset=utf-8")
+    handler.send_header("Cache-Control", "no-store")
+    handler.send_header("X-Accel-Buffering", "no")
+    handler.send_header("Transfer-Encoding", "chunked")
+    handler.send_header("Connection", "close")
+    handler.end_headers()
+
+    def write(frame: str) -> None:
+        raw = frame.encode("utf-8")
+        handler.wfile.write(("%X\r\n" % len(raw)).encode("ascii") + raw + b"\r\n")
+        handler.wfile.flush()
+
+    try:
+        write(": connected\n\n")
+        for frame in stream_frames(sub, cfg, dict(q or {})):
+            write(frame)
+    except (BrokenPipeError, ConnectionResetError, OSError):
+        # The client navigated away or reconnected: not an error, and there is
+        # no longer a socket to close a chunked body on.
+        return
+    try:
+        handler.wfile.write(b"0\r\n\r\n")
+        handler.wfile.flush()
+    except (BrokenPipeError, ConnectionResetError, OSError):
+        pass
