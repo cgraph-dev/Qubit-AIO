@@ -108,6 +108,70 @@ def test_office_app_html_enables_same_origin_framing_for_that_call(tmp_path):
 
 
 # --------------------------------------------------------------------------
+# 1b. The HUD route is the SECOND framed document — and ONLY that route
+# --------------------------------------------------------------------------
+def _index_frame_flag(path: str, tmp_path) -> tuple:
+    """Serve the SPA shell for ``path`` and report the framing flag it sent.
+
+    Drives the real ``_serve_qubit_index`` with ``_send`` recorded, so the
+    answer is the one the browser would receive, not a re-reading of the source.
+    """
+    handler = object.__new__(ui.WebUIHandler)
+    handler.path = path
+    handler.headers = {"Host": "127.0.0.1"}
+    handler.client_address = ("127.0.0.1", 50000)
+    handler.server = type("S", (), {
+        "app": type("A", (), {"api_token": ""})()})()
+    handler._peer_is_loopback = lambda: True
+    handler._token_bootstrap_allowed = lambda: True
+    dist = tmp_path / "dist"
+    dist.mkdir(exist_ok=True)
+    (dist / "index.html").write_text(
+        "<!doctype html><html><head></head><body></body></html>")
+    handler._qubit_dist = lambda: dist
+    sent: dict = {}
+
+    class _Sent(Exception):
+        pass
+
+    def _send(code, body, ctype="text/plain", extra_headers=None):
+        sent["code"] = code
+        sent["flag"] = getattr(handler, "_allow_same_origin_frame", False)
+        # The flag is decided immediately before the response is sent; stop
+        # here rather than letting the shell try to stream assets from a
+        # half-built handler.
+        raise _Sent
+
+    handler._send = _send
+    try:
+        handler._serve_qubit_index()
+    except _Sent:
+        pass
+    return sent.get("flag"), sent.get("code")
+
+
+def test_the_hud_route_grants_same_origin_framing(tmp_path):
+    """The Office HUD dock frames /qubit-hud, so that route must answer
+    SAMEORIGIN instead of DENY. Measured before the grant: DENY, and the
+    drawer could only ever paint its refusal."""
+    flag, code = _index_frame_flag("/qubit-hud", tmp_path)
+    assert code == 200
+    assert flag is True
+
+
+def test_the_hud_grant_is_exact_and_scoped_to_one_response(tmp_path):
+    """A folder is the wrong shape for a security exception: it is path-exact,
+    query-tolerant, and reverted after the response."""
+    assert _index_frame_flag("/qubit-hud/", tmp_path)[0] is True
+    assert _index_frame_flag("/qubit-hud?x=1", tmp_path)[0] is True
+    for other in ("/", "/sessions", "/qubit-workbench", "/qubit-hud-other",
+                  "/qubit-office", "/ops"):
+        assert _index_frame_flag(other, tmp_path)[0] is False, other
+    # And the allowlist itself names exactly one route.
+    assert ui.HUD_FRAME_ROUTE == frozenset({"/qubit-hud"})
+
+
+# --------------------------------------------------------------------------
 # 2. Constant-time REST token comparison
 # --------------------------------------------------------------------------
 def test_token_comparison_uses_compare_digest(monkeypatch):
@@ -222,8 +286,12 @@ def _static_handler(root: Path):
               allow_same_origin_frame=False):
         captured.update(code=code, body=body)
 
-    def _file(path, ctype):
-        captured.update(code=200, file=path, ctype=ctype)
+    def _file(path, ctype, cache_control=None):
+        # `_serve_qubit_static` passes `cache_control` (immutable for hashed
+        # assets); the stub must accept the same signature or the probe raises
+        # before it can assert anything.
+        captured.update(code=200, file=path, ctype=ctype,
+                        cache_control=cache_control)
 
     handler._send = _send
     handler._file = _file

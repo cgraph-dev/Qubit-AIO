@@ -27,10 +27,6 @@
  */
 
 import { createOfficeComponent, type OfficeGameShellProps } from "./OfficeGameShell";
-import {
-  setHudDockProps, watchHudRegistration,
-  type FetchJSONLike, type HudRegistration,
-} from "./ui/HudPanel";
 import { createOfficeApp } from "./app/OfficeAppShell";
 // F08's styles. Imported here so the bundler emits them with the entry; the
 // rules are all scoped to `.office-game`, so the dashboard is untouched.
@@ -86,17 +82,6 @@ if (!SDK || !SDK.React || !SDK.hooks) {
   const wantShell = params.has("shell") && !params.has("app");
   const R = SDK.React as OfficeGameShellProps["React"];
   const H = SDK.hooks as OfficeGameShellProps["hooks"];
-  // Watch for the HUD's registration BEFORE any render, so an install that
-  // happened during load is in the tap by the time the dock can open. The dock
-  // reads its host wiring from here (ui/HudPanel.ts), because the plugin
-  // contract gives a registered component no props.
-  setHudDockProps({
-    hudTap: watchHudRegistration(
-      window.__QUBIT_PLUGINS__ as { register?: HudRegistration } | undefined,
-      { component: null, listeners: new Set() },
-    ),
-    fetchJSON: (SDK as { fetchJSON?: FetchJSONLike }).fetchJSON,
-  });
   const Office = wantShell
     ? createOfficeComponent(R, H, liveData)
     : createOfficeWithSeatRouting(R, H);

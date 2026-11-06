@@ -1323,6 +1323,19 @@ def debrand_theme_style_id(markup: str) -> str:
     return markup.replace(LEGACY_THEME_CSS_STYLE_ID, QUBIT_THEME_CSS_STYLE_ID)
 
 
+#: The dashboard ROUTES allowed to be framed on the SAME ORIGIN, and only those.
+#:
+#: `security_headers` emits `X-Frame-Options: DENY` and `frame-ancestors 'none'`
+#: for every document, and `_serve_qubit_index` grants the SAMEORIGIN exception
+#: for the paths listed here — no others, and by EXACT match, so a future route
+#: that merely shares a prefix does not inherit the grant. Today that is one
+#: entry: the HUD (`/qubit-hud`), framed by the Office page's HUD dock so the
+#: operator can read the vitals without leaving the room they belong to.
+#: Same-origin framing only (`'self'`); no other origin can frame the page, and
+#: every other route keeps refusing frames.
+HUD_FRAME_ROUTE = frozenset({"/qubit-hud"})
+
+
 def security_headers(*, allow_same_origin_frame: bool = False) -> list:
     """Browser hardening headers emitted on every ``_send`` response.
 
@@ -1333,11 +1346,18 @@ def security_headers(*, allow_same_origin_frame: bool = False) -> list:
     stylesheet the theme presets load is the only third-party style source,
     and its font files are the only third-party font source.
 
-    ``allow_same_origin_frame`` is used for exactly ONE document: the plugin
-    application HTML (Office) that the dashboard embeds in a same-origin
-    iframe. Emitting ``DENY`` there would break that intentional embedding,
-    so it gets ``SAMEORIGIN`` + ``frame-ancestors 'self'`` instead. Every
-    other response refuses framing outright.
+    ``allow_same_origin_frame`` is granted to exactly TWO documents, both
+    first-party and both same-origin only:
+
+      * the plugin application HTML (Office), which the dashboard embeds in a
+        same-origin iframe (``_serve_plugin_app``);
+      * ``HUD_FRAME_ROUTE`` (``/qubit-hud``), which the Office page's HUD dock
+        frames (``_serve_qubit_index``).
+
+    Emitting ``DENY`` there would break those intentional embeddings, so they
+    get ``SAMEORIGIN`` + ``frame-ancestors 'self'`` instead. Every other
+    response refuses framing outright, and ``'self'`` means no other ORIGIN
+    can frame them either.
     """
     frame_ancestors = "'self'" if allow_same_origin_frame else "'none'"
     x_frame_options = "SAMEORIGIN" if allow_same_origin_frame else "DENY"
@@ -2507,7 +2527,36 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception:  # noqa: BLE001 - never fail a request over gzip
                 wire = body
                 extra = None
-        self._send(200, wire, "text/html; charset=utf-8", extra_headers=extra)
+        # TWO same-origin documents may be framed, and only these two:
+        #
+        #  1. The Office plugin app (`/plugin-apps/qubit-office/...`), served by
+        #     `_serve_app_html` — NOT by this method. It gets SAMEORIGIN so the
+        #     dashboard's intentional full-bleed embed keeps working.
+        #  2. `HUD_FRAME_ROUTE` (`/qubit-hud`), framed by the Office page's HUD
+        #     dock (`frontend/qubit-app/plugins/qubit-office/game/ui/
+        #     HudPanel.ts`) so the operator reads the vitals without leaving the
+        #     room they belong to. Without the grant the browser refuses the
+        #     frame (measured: `X-Frame-Options: DENY`,
+        #     `frame-ancestors 'none'`) and the dock can only say so.
+        #
+        # WHY THIS IS NARROW AND WHY IT IS SAFE. `SAMEORIGIN` + `frame-ancestors
+        # 'self'` names the framing ORIGIN, not "anyone": no other origin can
+        # frame the page, and same-origin framing adds no privilege a
+        # same-origin page does not already have (it can read this document via
+        # `window.open`, or fetch it with the same credentials). The grant is
+        # keyed on the REQUEST PATH as an EXACT match, so every other SPA route
+        # — `/sessions`, `/qubit-workbench`, the catch-all deep links — still
+        # answers DENY, and a future route that merely shares the prefix
+        # (`/qubit-hud-anything`) does not inherit it. It is set immediately
+        # before the response and cleared in `finally`, so it cannot leak onto
+        # the next request on a keep-alive socket.
+        if (self.path.split("?", 1)[0].rstrip("/") or "/") in HUD_FRAME_ROUTE:
+            self._allow_same_origin_frame = True
+        try:
+            self._send(200, wire, "text/html; charset=utf-8",
+                       extra_headers=extra)
+        finally:
+            self._allow_same_origin_frame = False
 
     def _serve_qubit_static(self, sub: str) -> None:
         dist = self._qubit_dist()

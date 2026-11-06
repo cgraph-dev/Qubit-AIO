@@ -6,7 +6,7 @@
  */
 
 import type { OfficeGameShellProps } from "../OfficeGameShell";
-import { createHudPanel, hudDockProps, type HudTap } from "../ui/HudPanel";
+import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
 import { createSeatModelPanel } from "./SeatModelPanel";
@@ -88,20 +88,11 @@ export function createOfficeApp(
     const [failed, setFailed] = useState<string | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
     // The HUD, IN the office. A dock beside the game, never a mutation: the
-    // office shell issues no request of its own, and the only client the HUD
-    // gets refuses anything but a bodyless GET (../ui/HudPanel.ts).
+    // dock frames the HUD's own dashboard route (../ui/HudPanel.ts), so the
+    // panel that appears is the real HUD — its bundle, its client, its seven
+    // GET tabs — and this page issues no request of its own.
     const [hudOpen, setHudOpen] = useState(false);
-    // Read once per render from the module entry.ts wires before mounting.
-    const hud = hudDockProps();
-    const hudTapRef = useRef<HudTap | null>(null);
-    if (!hudTapRef.current) {
-      hudTapRef.current = hud.hudTap ?? { component: null, listeners: new Set() };
-    }
-    /** Non-null by the assignment above; the local names it so TS agrees. */
-    const hudTap: HudTap = hudTapRef.current;
-    const HudPanel = createHudPanel({
-      React: R, hooks, fetchJSON: hud.fetchJSON, tap: hudTap,
-    });
+    const HudDock = createHudDock({ React: R, hooks, base: props.base });
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // Built unconditionally (hooks must not be conditional) but only rendered
     // when a seat is chosen, so the default view is still just the game.
@@ -298,13 +289,19 @@ export function createOfficeApp(
       }, [
         R.createElement("div", { key: "head", className: "office-game__dockHead" }, [
           R.createElement("span", { key: "t" }, "HUD"),
+          R.createElement("a", {
+            key: "open",
+            className: "office-game__hudLink",
+            "data-testid": "office-game-hud-open-link",
+            href: hudFrameSrc(props.base),
+          }, "Open HUD"),
           R.createElement("button", {
             key: "x", type: "button", className: "office-game__btn",
             "data-testid": "office-game-hud-close", "aria-label": "Close HUD",
             onClick: () => setHudOpen(false),
           }, "Close"),
         ]),
-        R.createElement(HudPanel as never, { key: "body" }),
+        R.createElement(HudDock as never, { key: "body" }),
       ]));
     }
 
