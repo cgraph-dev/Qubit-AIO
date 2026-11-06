@@ -57,12 +57,30 @@ def _owns_live_checkout(root: Path) -> bool:
     return _m()._pytest_owns_live_checkout(root)
 
 
+def _state_root(root: Path) -> Path:
+    """The PM install-state root (``PROJECT_ROOT``), not the git checkout root.
+
+    ``completion_pending_path`` is keyed by the project root. In the Qubit monorepo the git
+    checkout root is one level above the runtime ``PROJECT_ROOT``, so the commit point must arm
+    the tail under the same root the launch/update completion later clears.
+    """
+    try:
+        from qubit_cli.update_cmd import _m
+
+        project_root = Path(_m().PROJECT_ROOT)
+        if project_root.exists():
+            return project_root
+    except Exception:
+        pass
+    return Path(root)
+
+
 def _obligation_paths(root: Path) -> list[Path]:
     from qubit_cli.update_cmd_fleet import _fleet_restart_pending_marker_path
     from qubit_cli.update_host_obligation import host_obligation_path
     from qubit_cli.venv_sync import completion_pending_path
 
-    return [completion_pending_path(root), _fleet_restart_pending_marker_path(), host_obligation_path()]
+    return [completion_pending_path(_state_root(root)), _fleet_restart_pending_marker_path(), host_obligation_path()]
 
 
 def _read_or_none(path: Path) -> Optional[bytes]:
@@ -94,7 +112,7 @@ def arm_commit_obligations(root: Path, expected_sha: str) -> None:
         _armed_snapshot = {path: _read_or_none(path) for path in _obligation_paths(root)}
         _owner = f"{root}|{os.getpid()}|{uuid.uuid4().hex}"
     try:
-        arm_completion(root)
+        arm_completion(_state_root(root))
         owed = _write_fleet_restart_pending_marker(expected_sha=expected_sha or "", owner=_owner)
     finally:  # even a half-done arm: disarm must still recognise what this run wrote
         _armed_bytes.update({path: _read_or_none(path) for path in _armed_snapshot})

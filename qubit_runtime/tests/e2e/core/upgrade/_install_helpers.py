@@ -47,7 +47,7 @@ def git(*args: str, cwd: Path, check: bool = True, env: dict | None = None) -> s
 def head_sha() -> str:
     """The commit the sandbox installs: HEAD, or HERMES_E2E_INSTALL_REF (a patched commit object,
     used to prove a scenario red against a sabotaged install without moving the branch)."""
-    return git("rev-parse", os.environ.get("HERMES_E2E_INSTALL_REF") or "HEAD", cwd=H.WORKTREE)
+    return git("rev-parse", os.environ.get("HERMES_E2E_INSTALL_REF") or "HEAD", cwd=H.repo_root())
 
 
 def make_origin(root: Path, ref: str) -> Path:
@@ -59,7 +59,7 @@ def make_origin(root: Path, ref: str) -> Path:
     ``uploadpack.allowFilter``: a blobless host checkout's object store is itself partial, and the
     installer's clone of this origin needs the filter capability to be served from it."""
     origin = root / "origin.git"
-    git("clone", "-q", "--bare", "--shared", "--no-tags", "--single-branch", str(H.WORKTREE), str(origin), cwd=root)
+    git("clone", "-q", "--bare", "--shared", "--no-tags", "--single-branch", str(H.repo_root()), str(origin), cwd=root)
     git("update-ref", "refs/heads/main", ref, cwd=origin)
     git("symbolic-ref", "HEAD", "refs/heads/main", cwd=origin)
     git("config", "uploadpack.allowAnySHA1InWant", "true", cwd=origin)
@@ -105,6 +105,12 @@ class Sandbox:
         return self.qubit_home / "qubit"
 
     @property
+    def runtime(self) -> Path:
+        """The runtime source root inside the checkout (``qubit_runtime/`` in the Qubit repo)."""
+        nested = self.checkout / "qubit_runtime"
+        return nested if nested.is_dir() else self.checkout
+
+    @property
     def qubit(self) -> str:
         """The canonical command the installer put on PATH, as a user's shell resolves it."""
         return str(self.home / ".local" / "bin" / "qubit")
@@ -119,7 +125,7 @@ class Sandbox:
         """The installed PM generation's selected interpreter, not a legacy checkout venv."""
         from pm.environments import install_key
 
-        facts = self.qubit_home / "installs" / install_key(self.checkout) / "facts.json"
+        facts = self.qubit_home / "installs" / install_key(self.runtime) / "facts.json"
         assert facts.is_file(), f"installer did not publish PM facts at {facts}"
         selected = json.loads(facts.read_text(encoding="utf-8"))["packages"]["venv"]["environment"]
         python = Path(selected) / "bin" / "python"
@@ -145,6 +151,12 @@ def new_sandbox(root: Path, origin: Path | None = None, *, pythonpath: Path | No
     (root / "tmp").mkdir(exist_ok=True)
     env["TMPDIR"] = str(root / "tmp")
     env["SHELL"] = "/bin/bash"
+    # The product installer defaults to the public Qubit repository; a sandboxed run must
+    # name the harness's "official" URL instead, or it would clone real GitHub. Naming it
+    # here also lets the sandbox ~/.gitconfig rewrite (and the installer/updater's
+    # official-URL classification) see the URL the product actually uses.
+    env["QUBIT_REPO_URL"] = OFFICIAL_HTTPS
+    env["HERMES_REPO_URL"] = OFFICIAL_HTTPS
     # A fresh machine: ~/.local/bin is NOT on PATH yet; the installer must wire it up.
     if origin is not None:
         (home / ".gitconfig").write_text(
@@ -180,11 +192,11 @@ def fresh_install_env(sb: Sandbox) -> dict[str, str]:
     # Reuse the host's pinned uv + populated cache so a probe does not re-download
     # the toolchain and the whole wheel set for every scenario (the sandbox only
     # needs read access; the venv itself is written under the sandbox root).
-    host_tools = Path.home() / ".local/state/qubit-voicebridge/runtime/tools"
     host_cache = Path.home() / ".cache/uv"
     extra = {}
-    if (host_tools / "uv-0.12.3-linux-x64/uv").is_file():
-        extra["HERMES_RUNTIME_DIR"] = str(host_tools)
+    # Never point HERMES_RUNTIME_DIR at the developer's live tool store: it is the product's
+    # install root, not a cache, so a sandbox install would silently reuse (and could mutate)
+    # the live store while leaving the sandbox with no tools of its own.
     host_pythons = Path.home() / ".local/share/uv/python"
     if host_cache.is_dir():
         extra.update({"UV_CACHE_DIR": str(host_cache), "UV_LINK_MODE": "copy", "UV_OFFLINE": "1"})

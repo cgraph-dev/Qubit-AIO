@@ -35,6 +35,11 @@ from tests.e2e.core.upgrade import _helpers as H
 from tests.e2e.core.upgrade import _install_helpers as I
 from tests.e2e.core.upgrade.network import _netedge as N
 
+def source_path(rel: str) -> str:
+    """A runtime-source-relative path as a checkout (git toplevel) path."""
+    return H.repo_rel(H.WORKTREE / rel)
+
+
 ASSETS = "qubit-assets.nousresearch.com"
 # The runtime installer clones this origin (scripts/install.sh REPO_URL), and channel
 # records are validated against the origin repository, so the harness publishes for it.
@@ -158,7 +163,7 @@ class Installed:
         environment, the PM runtime generation, and the installed tool store."""
         from pm.environments import install_key
 
-        key = install_key(self.sb.checkout)
+        key = install_key(self.sb.runtime)
         inst = self.sb.qubit_home / "installs" / key
 
         def read(p: Path) -> str:

@@ -59,7 +59,7 @@ def configure(sb: I.Sandbox, base_url: str, extra: str = "", env_extra: str = ""
 def state_dir(sb: I.Sandbox) -> Path:
     from pm.environments import install_key
 
-    return sb.qubit_home / "installs" / install_key(sb.checkout)
+    return sb.qubit_home / "installs" / install_key(sb.runtime)
 
 
 def facts(sb: I.Sandbox) -> dict:
@@ -81,9 +81,11 @@ def pending_marker(sb: I.Sandbox) -> Path:
 
 
 def lazy_env(sb: I.Sandbox) -> dict[str, str]:
-    """The sandbox env WITHOUT the suite-wide ``QUBIT_DISABLE_LAZY_INSTALLS``: a real user's
-    launch, which finishes an owed source-update tail before it imports the app."""
+    """The sandbox env WITHOUT the suite-wide lazy-install switch: a real user's launch, which
+    finishes an owed source-update tail before it imports the app. The product reads the legacy
+    ``HERMES_`` spelling (the ``QUBIT_`` alias is a harness half-rebrand)."""
     env = dict(sb.env)
+    env.pop("HERMES_DISABLE_LAZY_INSTALLS", None)
     env.pop("QUBIT_DISABLE_LAZY_INSTALLS", None)
     return env
 
@@ -109,11 +111,17 @@ def update(sb: I.Sandbox, *, env: dict[str, str] | None = None) -> subprocess.Co
     return run_env(sb, [sb.qubit, "update", "--yes", "--branch", "main"], env or sb.env, timeout=UPDATE_TIMEOUT)
 
 
+def source_path(rel: str) -> str:
+    """A runtime-source-relative path as a checkout (git toplevel) path."""
+    return I.H.repo_rel(I.H.WORKTREE / rel)
+
+
 def publish_dependency_release(origin: Path, scratch: Path, n: int) -> str:
     """Publish a release whose ``uv.lock`` bytes differ (same resolution): the next update must
     build and select a new dependency generation."""
-    lock = (I.git("show", "main:uv.lock", cwd=origin) + f"\n# e2e dependency release {n}\n")
-    return I.publish_commit(origin, scratch, f"release: e2e dependency release {n}", {"uv.lock": lock})
+    rel = source_path("uv.lock")
+    lock = (I.git("show", f"main:{rel}", cwd=origin) + f"\n# e2e dependency release {n}\n")
+    return I.publish_commit(origin, scratch, f"release: e2e dependency release {n}", {rel: lock})
 
 
 def diagnostics(sb: I.Sandbox, *cps: subprocess.CompletedProcess) -> str:

@@ -238,31 +238,32 @@ def _publish_release(w: G.World, tag: str) -> str:
     """A release that changes a module the gateway imports lazily plus a web build input."""
     return w.publish(f"release: e2e hostile pause {tag}", {
         f"docs/e2e-hostile-pause-{tag}.txt": f"release {tag}\n",
-        f"web/e2e-hostile-pause-{tag}.txt": f"web input changed by release {tag}\n",
+        G.source_path(f"web/e2e-hostile-pause-{tag}.txt"): f"web input changed by release {tag}\n",
     })
 
 
 def _publish_slow_deps_release(w: G.World, tag: str) -> str:
-    text = w.git("show", "HEAD:pm/client.py") + "\n"
+    text = w.git("show", f"HEAD:{G.source_path('pm/client.py')}") + "\n"
     if _DEPS_MARK not in text:
         m = re.search(r"^def ensure_tools_for_sync\(\) -> None:\n    \"\"\".*?\"\"\"\n", text, re.S | re.M)
         assert m, "premise: pm/client.py has no ensure_tools_for_sync() with a docstring to inject after"
         text = text[:m.end()] + _SLOW_DEPS + text[m.end():]
     return w.publish(f"release: e2e hostile pause slow deps {tag}", {
-        "pm/client.py": text, f"docs/e2e-hostile-pause-{tag}.txt": f"release {tag}\n"})
+        G.source_path("pm/client.py"): text, f"docs/e2e-hostile-pause-{tag}.txt": f"release {tag}\n"})
 
 
 def _publish_broken_deps_release(w: G.World, tag: str) -> str:
-    text = w.git("show", "HEAD:pm/client.py") + "\n"
+    text = w.git("show", f"HEAD:{G.source_path('pm/client.py')}") + "\n"
     if _BREAK_MARK not in text:
         m = re.search(r"^def ensure_tools_for_sync\(\) -> None:\n    \"\"\".*?\"\"\"\n", text, re.S | re.M)
         assert m, "premise: pm/client.py has no ensure_tools_for_sync() with a docstring to inject after"
         text = text[:m.end()] + _BREAK_DEPS + text[m.end():]
     # pm's dependency stamp hashes uv.lock's bytes: a trailing TOML comment makes the venv stale
     # at the new HEAD without changing what any dependency resolves to.
-    lock = w.git("show", "HEAD:uv.lock") + f"\n# e2e hostile pause {tag}: dependency stamp moves\n"
+    lock = w.git("show", f"HEAD:{G.source_path('uv.lock')}") + f"\n# e2e hostile pause {tag}: dependency stamp moves\n"
     return w.publish(f"release: e2e hostile pause broken deps {tag}", {
-        "pm/client.py": text, "uv.lock": lock, f"docs/e2e-hostile-pause-{tag}.txt": f"release {tag}\n"})
+        G.source_path("pm/client.py"): text, G.source_path("uv.lock"): lock,
+        f"docs/e2e-hostile-pause-{tag}.txt": f"release {tag}\n"})
 
 
 def _diag(w: G.World, host: NamespaceHost, cp=None, **extra) -> str:
@@ -518,7 +519,7 @@ def test_desktop_handoff_update_pauses_and_restarts_through_the_same_path(w):
         ulog = w.sb.qubit_home / "logs" / "update.log"
         ulog0 = len(_read(ulog))
         with _Timeline(host, w, old_pid) as tl:
-            cp = host.run(["bash", str(w.checkout / "scripts" / "desktop-update" / "posix.sh"),
+            cp = host.run(["bash", str(w.runtime / "scripts" / "desktop-update" / "posix.sh"),
                            "--install-root", str(w.checkout), "--desktop-pid", "0", "--no-ui"],
                           timeout=UPDATE_TIMEOUT, cwd=w.checkout)
 
@@ -547,9 +548,9 @@ def test_desktop_handoff_update_pauses_and_restarts_through_the_same_path(w):
 
 def test_failed_move_restarts_exactly_the_paused_set_on_the_old_code(w):
     w.reset_clean()
-    blocked = w.checkout / "website"
+    blocked = w.runtime / "website"
     assert blocked.is_dir(), "premise: website/ is tracked"
-    target = w.publish("release: e2e hostile pause i", {"website/e2e-hostile-pause-i.txt": "release i\n"})
+    target = w.publish("release: e2e hostile pause i", {G.source_path("website/e2e-hostile-pause-i.txt"): "release i\n"})
 
     def failing_update(host):
         blocked.chmod(0o555)

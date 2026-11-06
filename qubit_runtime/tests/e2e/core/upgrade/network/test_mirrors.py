@@ -51,7 +51,7 @@ def test_pip_mirror_update_restages_pm_runtime_through_the_mirror(inst):
     """The new upstream commit changes the PM runtime's inputs (``pm/pyproject.toml``), so the
     update must restage that runtime from ``pm/uv.lock``. pip.conf names the mirror; the public
     index is unreachable. The update must land, restage through the mirror, and never ask pypi."""
-    pm = inst.sb.checkout / "pm"
+    pm = inst.sb.runtime / "pm"
     wheels: dict[str, list] = {}
     for name, url, sha in S.lock_wheels(pm / "uv.lock"):
         path = S.prefetch(url, sha, inst.root / "pypi-mirror" / url.rsplit("/", 1)[1])
@@ -61,7 +61,7 @@ def test_pip_mirror_update_restages_pm_runtime_through_the_mirror(inst):
     pip_conf.parent.mkdir(parents=True, exist_ok=True)
     pip_conf.write_text(f"[global]\nindex-url = {mirror.url}/simple/\n", encoding="utf-8")
     pyproject = (pm / "pyproject.toml").read_text(encoding="utf-8")
-    new = inst.publish("pm-runtime-input", {"pm/pyproject.toml": pyproject + "\n# e2e: PM runtime input change\n"})
+    new = inst.publish("pm-runtime-input", {S.source_path("pm/pyproject.toml"): pyproject + "\n# e2e: PM runtime input change\n"})
     before = inst.state()
     edge = inst.edge(sites=[mirror])
     try:

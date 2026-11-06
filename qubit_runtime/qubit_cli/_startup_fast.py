@@ -213,6 +213,14 @@ def print_fast_version_info(*, check_updates: bool = True) -> None:
         install_root = owning_install_root(install_root) or install_root
     except Exception:
         pass
+    try:
+        # The runtime may be vendored one level inside its git checkout (Qubit's
+        # qubit_runtime/); the user's install directory is the checkout they cloned.
+        from qubit_cli.update_cmd_common import checkout_root
+
+        install_root = checkout_root(install_root)
+    except Exception:
+        pass
     print(f"Install directory: {install_root}")
     # Authoritative resolver first (code-scoped stamp → managed → nix → git → pip; also self-heals
     # poisoned shared-home 'docker' stamps); cheap stdlib stamp probe only if it fails.

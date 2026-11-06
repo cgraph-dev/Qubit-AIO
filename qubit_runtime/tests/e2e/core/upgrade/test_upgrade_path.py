@@ -301,7 +301,7 @@ _RETRY_PREFIX = ["/bin/sh", "-c", 'true; exec "$0" "$@"']
 
 def _make_origin(root: Path) -> Path:
     origin = root / "origin.git"
-    _git("clone", "-q", "--bare", "--shared", "--no-tags", str(H.WORKTREE), str(origin), cwd=root)
+    _git("clone", "-q", "--bare", "--shared", "--no-tags", str(H.repo_root()), str(origin), cwd=root)
     _git("update-ref", "refs/heads/main", _refs().base, cwd=origin)
     _git("symbolic-ref", "HEAD", "refs/heads/main", cwd=origin)
     _git("tag", "-f", "e2e-upgrade-base", _refs().base, cwd=origin)

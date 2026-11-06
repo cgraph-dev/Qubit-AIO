@@ -17,7 +17,8 @@ import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PACKAGES = ("agent", "tools", "qubit_cli", "gateway", "tui_gateway", "cron", "acp_adapter", "plugins", "providers")
+PACKAGES = ("agent", "tools", "qubit_cli", "gateway", "tui_gateway", "cron", "acp_adapter", "plugins",
+            "providers", "pm", "connectors", "evals", "recipes", "roles", "traces")
 
 
 def _root_py_modules() -> set[str]:
@@ -73,3 +74,29 @@ def test_every_root_module_imported_by_packaged_code_is_shipped():
     missing = {f: v for f, v in missing.items() if v}
     assert not missing, f"packaged code imports root modules the wheel would not ship: {missing}"
     assert "qubit_state" in shipped and "setup" not in shipped
+
+
+def test_every_top_level_package_imported_by_packaged_code_is_in_packages_find():
+    """``packages.find.generated`` only ships listed directories: a new top-level package that
+    packaged code imports is an installed-wheel ``ModuleNotFoundError`` (recipes, traces, ...)."""
+    cfg = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    included = {row.split(".")[0] for row in cfg["tool"]["setuptools"]["packages"]["find"]["include"]}
+    missing: dict[str, set[str]] = {}
+    for pkg in PACKAGES:
+        for path in (REPO_ROOT / pkg).rglob("*.py"):
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8", errors="ignore"))
+            except (SyntaxError, OSError):
+                continue
+            names: set[str] = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import):
+                    names.update(a.name.split(".")[0] for a in node.names)
+                elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                    names.add(node.module.split(".")[0])
+            for name in names:
+                if name == "tests":  # dev-only eval benches import the test tree; it is never shipped
+                    continue
+                if (REPO_ROOT / name / "__init__.py").is_file() and name not in included:
+                    missing.setdefault(str(path.relative_to(REPO_ROOT)), set()).add(name)
+    assert not missing, f"packaged code imports top-level packages not in packages.find: {missing}"

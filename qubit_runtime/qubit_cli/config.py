@@ -348,8 +348,11 @@ def detect_install_method(project_root: Optional[Path] = None) -> str:
     except OSError:
         pass
 
-    # A .git directory, or a ``gitdir:`` pointer file for worktrees.
-    git_path = root / ".git"
+    # A .git directory, or a ``gitdir:`` pointer file for worktrees. The runtime can be
+    # vendored one level inside the checkout (qubit_runtime/), so resolve the toplevel.
+    from qubit_cli.update_cmd_common import checkout_root
+
+    git_path = checkout_root(root) / ".git"
     try:
         if git_path.is_dir() or git_path.read_text(encoding="utf-8-sig").strip().startswith("gitdir:"):
             return "git"

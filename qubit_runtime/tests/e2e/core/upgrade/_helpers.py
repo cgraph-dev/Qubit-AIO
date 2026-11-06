@@ -17,6 +17,7 @@ Every Hermes process these suites spawn runs:
 
 from __future__ import annotations
 
+import functools
 import os
 import pwd
 import shutil
@@ -30,6 +31,36 @@ from typing import Iterable, Sequence
 WORKTREE = Path(__file__).resolve().parents[4]
 REAL_HOME = Path(pwd.getpwuid(os.getuid()).pw_dir)
 UID = os.getuid()
+
+
+@functools.cache
+def repo_root() -> Path:
+    """The git worktree that contains the runtime source.
+
+    Upstream's runtime tree IS the repository root, so ``WORKTREE`` and the git root were
+    the same path. After vendoring the runtime under ``qubit_runtime/`` the source root is
+    no longer a repository (``.git`` lives one level up), which breaks ``git clone
+    --shared $WORKTREE`` and ``git describe`` for release tags. Resolve the real toplevel
+    once; fall back to ``WORKTREE`` when this is not a git checkout at all.
+    """
+    try:
+        cp = subprocess.run(
+            ["git", "-C", str(WORKTREE), "rev-parse", "--show-toplevel"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return WORKTREE
+    out = (cp.stdout or "").strip()
+    return Path(out) if cp.returncode == 0 and out else WORKTREE
+
+
+def repo_rel(path: Path) -> str:
+    """``path`` relative to the git toplevel (git paths in ``git show``/``git archive`` are
+    toplevel-relative, not cwd-relative)."""
+    try:
+        return path.resolve().relative_to(repo_root().resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
 
 
 def _home_resetting_profile_scripts() -> tuple[Path, ...]:

@@ -409,6 +409,11 @@ class ReadFaults:
         monkeypatch.setattr(_utils, "fast_safe_load", wrapped)
         # ``qubit_cli.config`` imported the function at module load; keep that alias in lockstep.
         monkeypatch.setattr(C, "fast_safe_load", wrapped)
+        # qubit_cli.config_backend reads through its own late `from utils import fast_safe_load`
+        # (the backend owns the file layer), so patching qubit_cli.config alone misses every
+        # read_user_config_raw()/save_config() call now.
+        import utils as _utils
+        monkeypatch.setattr(_utils, "fast_safe_load", wrapped)
 
     def arm(self, *ks: int) -> None:
         self.count, self.fail_at = 0, set(ks)
@@ -526,6 +531,9 @@ def _set_value_for(path: tuple, default: Any, current: Any, rng: random.Random) 
     if isinstance(default, float):
         v = round(rng.uniform(1, 999), 2) + 0.25
         return repr(v), v
+    if path == ("display", "language"):
+        v = "de" if current != "de" else "fr"
+        return v, v
     v = f"c18-{rng.choice(_WORDS)}-{rng.randrange(10**6)}"
     return v, v
 

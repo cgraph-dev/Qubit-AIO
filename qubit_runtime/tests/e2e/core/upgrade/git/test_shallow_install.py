@@ -32,7 +32,9 @@ ORPHAN = "orphan divergence"
 
 
 def _depth1(root) -> dict:
-    cm, w = G.start_world(root / "depth1", base=G.n1_base(), installer_ref=G.n1_tag())
+    # A legacy depth-1 user checkout, seeded directly: Qubit's vendored bootstrap in N-1 does not
+    # make a shallow clone (every Qubit release is treeless), so the installer cannot produce one.
+    cm, w = G.start_world(root / "depth1", base=G.n1_base(), preclone=["--depth", "1"])
     run = {"cm": cm, "w": w, "shape0": w.install_shape}
     w.set_main(I.head_sha())
     run["mark1"] = w.srv.mark()
@@ -46,7 +48,7 @@ def _depth1(root) -> dict:
 
 
 def _checked(root) -> dict:
-    cm, w = G.start_world(root / "checked", base=G.n1_base(), installer_ref=G.n1_tag())
+    cm, w = G.start_world(root / "checked", base=G.n1_base(), preclone=["--depth", "1"])
     run = {"cm": cm, "w": w, "shape0": w.install_shape, "checks": []}
     between = I.git("rev-list", "--first-parent", f"{G.n1_base()}..{I.head_sha()}", cwd=I.H.WORKTREE).split()
     for k in (len(between) * 3 // 4, len(between) // 2, len(between) // 4):

@@ -28,7 +28,10 @@ SHAPES = {
 
 
 def _scenario(root, shape: str) -> dict:
-    cm, w = G.start_world(root / shape, base=G.n1_base(), installer_ref=G.n1_tag(), preclone=SHAPES[shape])
+    # The preclone is the user's N-1 clone shape; the install runs HEAD's own scripts/install.sh
+    # because Qubit's vendored runtime bootstrap in an older release predates the monorepo layout
+    # (it looks for pm/ at the checkout root), so it cannot install this tree at all.
+    cm, w = G.start_world(root / shape, base=G.n1_base(), preclone=SHAPES[shape])
     run = {"cm": cm, "w": w, "shape0": w.install_shape}
     w.set_main(I.head_sha())
     run["cp1"], run["head1"], run["shape1"] = w.update(), w.head(), w.shape()

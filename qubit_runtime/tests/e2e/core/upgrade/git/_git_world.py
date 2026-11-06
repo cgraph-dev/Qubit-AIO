@@ -46,6 +46,15 @@ PYTESTMARK = [
 ]
 
 
+def source_path(rel: str) -> str:
+    """A runtime-source-relative path as a checkout (git toplevel) path.
+
+    Upstream's runtime tree IS the checkout root; Qubit vendors it under ``qubit_runtime/``, so a
+    path a test reads from ``HEAD`` or writes into a release commit needs that prefix.
+    """
+    return H.repo_rel(H.WORKTREE / rel)
+
+
 def output(cp: subprocess.CompletedProcess) -> str:
     return (cp.stdout or "") + (cp.stderr or "")
 
@@ -54,9 +63,30 @@ def reported_success(cp: subprocess.CompletedProcess) -> bool:
     return cp.returncode == 0 or SUCCESS in output(cp)
 
 
+# Qubit releases are 0.x semver (``v0.0.6``); upstream Hermes used CalVer (``v2026.10.1``).
+# Do NOT match ``v1.0.0``: it is an unrelated local tag, not a Qubit release, and predates the
+# layout fixes an N-1 updater needs to move a monorepo checkout.
+RELEASE_TAG_GLOBS = ("v20[0-9][0-9].*", "v0.*")
+
+
+def _release_tag() -> str | None:
+    for pattern in RELEASE_TAG_GLOBS:
+        try:
+            return I.git("describe", "--tags", "--abbrev=0", "--match", pattern, "HEAD~1", cwd=H.repo_root())
+        except AssertionError:
+            continue
+    return None
+
+
 def n1_tag() -> str:
-    """N-1: the newest release tag strictly before HEAD."""
-    return I.git("describe", "--tags", "--abbrev=0", "--match", "v20[0-9][0-9].*", "HEAD~1", cwd=H.WORKTREE)
+    """N-1: the newest release tag strictly before HEAD.
+
+    A checkout without a reachable release tag (a local branch, or a shallow CI clone without
+    tags) still has an older commit: ``HEAD~1`` exercises the same upgrade path (install an older
+    tree, update to HEAD) instead of erroring during fixture setup. ``QUBIT_E2E_N1_REF`` pins a
+    patched commit object, used to prove red a cell whose bug lives in N-1's own updater code.
+    """
+    return os.environ.get("QUBIT_E2E_N1_REF") or _release_tag() or "HEAD~1"
 
 
 def n1_base() -> str:
@@ -66,14 +96,18 @@ def n1_base() -> str:
 
 
 def commit_of(ref: str) -> str:
-    return I.git("rev-parse", f"{ref}^{{commit}}", cwd=H.WORKTREE)
+    return I.git("rev-parse", f"{ref}^{{commit}}", cwd=H.repo_root())
 
 
 def installer_script(ref: str | None) -> str:
-    """``scripts/install.sh`` as of ``ref`` (None: this worktree's copy)."""
+    """``scripts/install.sh`` as of ``ref`` (None: this worktree's copy).
+
+    The bootstrap installer lives in the vendored runtime tree; git paths are toplevel-relative,
+    so ask for ``qubit_runtime/scripts/install.sh`` from the repository root.
+    """
     if ref is None:
         return (H.WORKTREE / "scripts" / "install.sh").read_text(encoding="utf-8")
-    return I.git("show", f"{ref}:scripts/install.sh", cwd=H.WORKTREE) + "\n"
+    return I.git("show", f"{ref}:{H.repo_rel(H.WORKTREE / 'scripts' / 'install.sh')}", cwd=H.repo_root()) + "\n"
 
 
 @dataclass
@@ -98,6 +132,11 @@ class World:
     @property
     def checkout(self) -> Path:
         return self.sb.checkout
+
+    @property
+    def runtime(self) -> Path:
+        """The runtime source root inside the checkout (``qubit_runtime/`` in the Qubit repo)."""
+        return self.sb.runtime
 
     def git_env(self) -> dict[str, str]:
         """Host-side git with the sandbox's HOME: its URL rewrite, never the real GitHub."""
@@ -210,7 +249,7 @@ def world(root: Path, *, base: str, installer_ref: str | None = None,
     root.mkdir(parents=True, exist_ok=True)
     srv_root = root / "srv"
     srv_root.mkdir(exist_ok=True)
-    bare = serve_bare(srv_root, REPO, H.WORKTREE, base)
+    bare = serve_bare(srv_root, REPO, H.repo_root(), base)
     with GitHTTPServer(srv_root) as srv:
         sb = I.new_sandbox(root / "sb")
         url = srv.url(REPO)
@@ -222,7 +261,11 @@ def world(root: Path, *, base: str, installer_ref: str | None = None,
             _preclone(sb, preclone, w.git_env())
         script = sb.root / "install.sh"
         script.write_text(installer_script(installer_ref), encoding="utf-8")
-        cp = sb.run(["bash", str(script), "--non-interactive"], timeout=1800, input="")
+        # The sandbox origin publishes ``main`` and no release tags: force the main channel so a
+        # fresh-install release lookup never reaches the network (and never asks for a tag the
+        # fake origin cannot serve).
+        cp = sb.run(["bash", str(script), "--non-interactive"], timeout=1800, input="",
+                    env={**sb.env, "HERMES_INSTALL_CHANNEL": "main", "QUBIT_INSTALL_CHANNEL": "main"})
         assert cp.returncode == 0, f"install ({installer_ref or 'HEAD'} installer, base {base[:12]}) failed:\n{w.diag(cp)}"
         head = w.head()
         assert head == base, f"installer left HEAD at {head}, expected {base}\n{w.diag(cp)}"

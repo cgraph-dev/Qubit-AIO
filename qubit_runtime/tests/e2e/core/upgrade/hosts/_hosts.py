@@ -45,12 +45,13 @@ def make_origin(root: Path) -> Path:
 def new_sandbox(root: Path, origin: Path) -> I.Sandbox:
     """``I.new_sandbox`` with the launch-time source-update check a real user's process runs.
 
-    The shared sandbox env sets ``QUBIT_DISABLE_LAZY_INSTALLS=1``, which also short-circuits
+    The shared sandbox env sets ``HERMES_DISABLE_LAZY_INSTALLS=1``, which also short-circuits
     ``prepare_launch`` (the per-launch "is this install current?" check). Host-shape bugs live in
     exactly that check (path strings that differ from one launch to the next), so these
     sandboxes run without it, as users do.
     """
     sb = I.new_sandbox(root, origin)
+    sb.env.pop("HERMES_DISABLE_LAZY_INSTALLS", None)
     sb.env.pop("QUBIT_DISABLE_LAZY_INSTALLS", None)
     return sb
 

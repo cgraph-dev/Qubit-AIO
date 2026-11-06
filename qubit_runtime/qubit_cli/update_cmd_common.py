@@ -3,6 +3,7 @@
 import logging
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 
 # Log-record parity with the origin module.
 logger = logging.getLogger("qubit_cli.update_cmd")
@@ -36,3 +37,19 @@ def _best_effort(message: str):
         yield
     except Exception as exc:
         logger.debug(message, exc)
+
+
+def checkout_root(project_root) -> Path:
+    """The git worktree that owns ``project_root``.
+
+    Upstream's runtime tree IS the repository root, so ``PROJECT_ROOT`` and the checkout were the
+    same path. Qubit vendors the runtime under ``qubit_runtime/``, so the runtime's
+    ``PROJECT_ROOT`` can be one directory inside the checkout; git commands still work there (git
+    walks up), but an explicit ``PROJECT_ROOT/.git`` probe does not. Check the path and its
+    parent for a ``.git`` entry (a directory, or a file in a linked worktree).
+    """
+    base = Path(project_root).resolve()
+    for candidate in (base, base.parent):
+        if (candidate / ".git").exists():
+            return candidate
+    return base
