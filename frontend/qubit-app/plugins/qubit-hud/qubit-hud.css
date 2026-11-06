@@ -1,0 +1,675 @@
+/* Qubit HUD — observability tabs for the dashboard (/qubit-hud).
+ *
+ * A read-only viewer of Qubit's own /api reads: health, sessions, cron, models,
+ * skills, plugins, costs. Nothing on this page writes, and nothing here invents
+ * a number the backend did not send.
+ *
+ * THE VISUAL LANGUAGE IS THE OFFICE SHELL'S, deliberately. The TOKENS are
+ * declared here with the same names and values as `qubit-office.game.css`
+ * (`:root`) rather than imported — there is no bundler on the plugin path, so
+ * this stylesheet is self-contained and the two pages can be re-skinned
+ * independently without one silently restyling the other.
+ *
+ * Layering, as in the office shell: dark vertical surface -> plate -> border ->
+ * ink. State colours are used ONLY for state (ok for a live thing, warn for
+ * something needing attention, bad for a failure, muted for anything not yet
+ * real). Nothing is coloured for decoration.
+ *
+ * Every motion value goes through `--hud-dur`, which the reduced-motion rule
+ * zeroes — both the attribute form and the OS media query, so a stale saved
+ * preference cannot override the system setting.
+ */
+
+:root {
+  /* surfaces, darkest to lightest — same ramp as the office shell */
+  --hud-void: #0b0f16;
+  --hud-ground: #1b2230;
+  --hud-plate: #2a3342;
+  --hud-wall: #39445a;
+
+  /* ink */
+  --hud-ink: #e8edf6;
+  --hud-muted: #8b97ad;
+  --hud-dim: rgba(232, 237, 246, 0.55);
+
+  /* accent + semantic state (mirrors the office shell's state colours) */
+  --hud-accent: #e08fb0;
+  --hud-ok: #6fd3a6;
+  --hud-warn: #f0c05a;
+  --hud-bad: #e0554a;
+
+  /* the frame */
+  --hud-radius: 6px;
+  --hud-border: 1px solid rgba(255, 255, 255, 0.12);
+  --hud-border-strong: 1px solid rgba(255, 255, 255, 0.24);
+  --hud-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  /* hover lifts, so a hover state is a token like any other surface */
+  --hud-hover: rgba(255, 255, 255, 0.03);
+  --hud-hover-border: rgba(255, 255, 255, 0.24);
+
+  /* spacing scale: 4px base */
+  --hud-s1: 4px;
+  --hud-s2: 8px;
+  --hud-s3: 12px;
+  --hud-s4: 16px;
+  --hud-s5: 24px;
+  --hud-s6: 32px;
+
+  /* text — one scale knob, nothing hardcodes a font size */
+  --hud-scale: 1;
+  --hud-fs-xs: calc(10px * var(--hud-scale));
+  --hud-fs-sm: calc(12px * var(--hud-scale));
+  --hud-fs-md: calc(14px * var(--hud-scale));
+  --hud-fs-lg: calc(18px * var(--hud-scale));
+  --hud-fs-xl: calc(24px * var(--hud-scale));
+
+  /* motion — one switch */
+  --hud-dur: 160ms;
+  --hud-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* the monospace face used for ids, counts and timestamps, so a reader can
+     tell a payload value from our own prose at a glance */
+  --hud-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+[data-hud-reduced-motion="1"] {
+  --hud-dur: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --hud-dur: 0ms;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+ * The page shell.
+ *
+ * Same bounding problem the office shell documents: a route wrapper chain with
+ * a `display: contents` div does not carry height, so `height: 100%` resolves
+ * against an auto-height ancestor and the page grows past the viewport instead
+ * of scrolling inside it. `flex: 1 1 auto` + `min-height: 0` sizes from a flex
+ * parent; `100%` stays only as the block-parent fallback.
+ * ------------------------------------------------------------------------- */
+.hud {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1 1 auto;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: var(--hud-s4);
+  gap: var(--hud-s3);
+  background: var(--hud-void);
+  color: var(--hud-ink);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: var(--hud-fs-md);
+  overflow: hidden;
+}
+
+/* ---- header ------------------------------------------------------------- */
+.hud__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--hud-s3);
+  flex-wrap: wrap;
+}
+
+.hud__title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hud-s3);
+  flex-wrap: wrap;
+}
+
+.hud__name {
+  font-size: var(--hud-fs-lg);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.hud__subtitle {
+  font-size: var(--hud-fs-sm);
+  color: var(--hud-muted);
+}
+
+.hud__headRight {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hud-s3);
+}
+
+.hud__stamp {
+  font-family: var(--hud-mono);
+  font-size: var(--hud-fs-xs);
+  color: var(--hud-dim);
+}
+
+/* ---- tab strip ----------------------------------------------------------
+ * A real tablist: roving focus, a selected state carried by colour AND a
+ * bottom rule (so the selection does not depend on colour alone), and no
+ * element that looks selectable without being one.
+ * ----------------------------------------------------------------------- */
+.hud__tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  overflow-x: auto;
+  border-bottom: var(--hud-border);
+  flex: 0 0 auto;
+}
+
+.hud__tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--hud-muted);
+  font: inherit;
+  font-size: var(--hud-fs-sm);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: var(--hud-s2) var(--hud-s3);
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hud-s2);
+  transition: color var(--hud-dur) var(--hud-ease),
+              border-color var(--hud-dur) var(--hud-ease);
+}
+
+.hud__tab:hover {
+  color: var(--hud-ink);
+}
+
+.hud__tab:focus-visible {
+  outline: 2px solid var(--hud-accent);
+  outline-offset: -2px;
+}
+
+.hud__tab--on {
+  color: var(--hud-ink);
+  border-bottom-color: var(--hud-accent);
+}
+
+/* A per-tab count. Muted on purpose: it is an indicator, not a badge that
+ * demands attention. */
+.hud__tabCount {
+  font-family: var(--hud-mono);
+  font-size: var(--hud-fs-xs);
+  color: var(--hud-dim);
+}
+
+/* ---- body -------------------------------------------------------------- */
+.hud__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-s3);
+  padding-right: var(--hud-s1);
+}
+
+.hud__body:focus-visible {
+  outline: 2px solid var(--hud-accent);
+  outline-offset: 2px;
+}
+
+/* ---- panels ------------------------------------------------------------ */
+.hud__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--hud-s3);
+}
+
+.hud__panel {
+  background: var(--hud-ground);
+  border: var(--hud-border);
+  border-radius: var(--hud-radius);
+  padding: var(--hud-s3);
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.hud__panel--wide {
+  grid-column: 1 / -1;
+}
+
+.hud__panelHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--hud-s2);
+  margin-bottom: var(--hud-s2);
+}
+
+.hud__panelTitle {
+  font-size: var(--hud-fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--hud-muted);
+  margin: 0;
+  font-weight: 600;
+}
+
+.hud__panelHint {
+  font-size: var(--hud-fs-xs);
+  color: var(--hud-dim);
+  font-family: var(--hud-mono);
+}
+
+/* ---- stat tiles -------------------------------------------------------- */
+.hud__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--hud-s2);
+}
+
+.hud__stat {
+  background: var(--hud-ground);
+  border: var(--hud-border);
+  border-radius: var(--hud-radius);
+  padding: var(--hud-s2) var(--hud-s3);
+  min-width: 0;
+}
+
+.hud__statLabel {
+  font-size: var(--hud-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--hud-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hud__statValue {
+  font-family: var(--hud-mono);
+  font-size: var(--hud-fs-lg);
+  font-weight: 600;
+  color: var(--hud-ink);
+  overflow-wrap: anywhere;
+}
+
+.hud__statValue--ok { color: var(--hud-ok); }
+.hud__statValue--warn { color: var(--hud-warn); }
+.hud__statValue--bad { color: var(--hud-bad); }
+.hud__statValue--accent { color: var(--hud-accent); }
+
+/* ---- key/value rows ---------------------------------------------------- */
+.hud__kv {
+  display: grid;
+  grid-template-columns: minmax(120px, max-content) 1fr;
+  gap: var(--hud-s1) var(--hud-s3);
+  font-size: var(--hud-fs-sm);
+  margin: 0;
+}
+
+.hud__kv dt {
+  color: var(--hud-muted);
+}
+
+.hud__kv dd {
+  margin: 0;
+  color: var(--hud-ink);
+  overflow-wrap: anywhere;
+}
+
+.hud__mono {
+  font-family: var(--hud-mono);
+  font-size: var(--hud-fs-sm);
+}
+
+/* ---- tables ------------------------------------------------------------ */
+.hud__tableWrap {
+  overflow-x: auto;
+  border: var(--hud-border);
+  border-radius: var(--hud-radius);
+}
+
+.hud__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--hud-fs-sm);
+}
+
+.hud__table caption {
+  text-align: left;
+  color: var(--hud-muted);
+  font-size: var(--hud-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: var(--hud-s2) var(--hud-s3);
+}
+
+.hud__table th {
+  position: sticky;
+  top: 0;
+  background: var(--hud-plate);
+  color: var(--hud-muted);
+  font-size: var(--hud-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+  font-weight: 600;
+  padding: var(--hud-s2) var(--hud-s3);
+  white-space: nowrap;
+}
+
+.hud__table td {
+  padding: var(--hud-s2) var(--hud-s3);
+  border-top: var(--hud-border);
+  color: var(--hud-ink);
+  vertical-align: top;
+}
+
+.hud__table tr:hover td {
+  background: var(--hud-hover);
+}
+
+.hud__num {
+  font-family: var(--hud-mono);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.hud__trunc {
+  max-width: 46ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- list rows (sessions, cron, plugins, skills) ------------------------ */
+.hud-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-s2);
+}
+
+.hud-row {
+  background: var(--hud-ground);
+  border: var(--hud-border);
+  border-radius: var(--hud-radius);
+  padding: var(--hud-s2) var(--hud-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-s1);
+  min-width: 0;
+}
+
+.hud-row--button {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color var(--hud-dur) var(--hud-ease),
+              background var(--hud-dur) var(--hud-ease);
+}
+
+.hud-row--button:hover {
+  border-color: var(--hud-hover-border);
+}
+
+.hud-row--button:focus-visible {
+  outline: 2px solid var(--hud-accent);
+  outline-offset: 2px;
+}
+
+.hud-row--sel {
+  border-color: var(--hud-accent);
+  background: var(--hud-plate);
+}
+
+.hud-row__top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--hud-s2);
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.hud-row__name {
+  font-size: var(--hud-fs-md);
+  font-weight: 600;
+  color: var(--hud-ink);
+  overflow-wrap: anywhere;
+}
+
+.hud-row__meta {
+  font-size: var(--hud-fs-xs);
+  color: var(--hud-dim);
+  font-family: var(--hud-mono);
+}
+
+.hud-row__desc {
+  font-size: var(--hud-fs-sm);
+  color: var(--hud-muted);
+  overflow-wrap: anywhere;
+}
+
+.hud-row__actions {
+  display: flex;
+  gap: var(--hud-s1);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ---- state chips ------------------------------------------------------- */
+.hud-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--hud-s1);
+  font-size: var(--hud-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: var(--hud-border-strong);
+  border-radius: 999px;
+  padding: 1px var(--hud-s2);
+  color: var(--hud-muted);
+  white-space: nowrap;
+}
+
+.hud-chip--ok { color: var(--hud-ok); border-color: var(--hud-ok); }
+.hud-chip--warn { color: var(--hud-warn); border-color: var(--hud-warn); }
+.hud-chip--bad { color: var(--hud-bad); border-color: var(--hud-bad); }
+.hud-chip--accent { color: var(--hud-accent); border-color: var(--hud-accent); }
+
+/* ---- bare buttons (expand, page, filter) ------------------------------- */
+.hud-btn {
+  appearance: none;
+  background: transparent;
+  border: var(--hud-border-strong);
+  border-radius: var(--hud-radius);
+  color: var(--hud-ink);
+  font: inherit;
+  font-size: var(--hud-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: var(--hud-s1) var(--hud-s2);
+  cursor: pointer;
+  transition: border-color var(--hud-dur) var(--hud-ease),
+              color var(--hud-dur) var(--hud-ease);
+}
+
+.hud-btn:hover {
+  border-color: var(--hud-accent);
+  color: var(--hud-accent);
+}
+
+.hud-btn:focus-visible {
+  outline: 2px solid var(--hud-accent);
+  outline-offset: 2px;
+}
+
+.hud-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.hud-btn--on {
+  border-color: var(--hud-accent);
+  color: var(--hud-accent);
+}
+
+.hud__bar {
+  display: flex;
+  align-items: center;
+  gap: var(--hud-s2);
+  flex-wrap: wrap;
+  font-size: var(--hud-fs-sm);
+  color: var(--hud-muted);
+}
+
+.hud__spacer {
+  flex: 1 1 auto;
+}
+
+/* ---- the search field -------------------------------------------------- */
+.hud__input {
+  appearance: none;
+  background: var(--hud-ground);
+  border: var(--hud-border);
+  border-radius: var(--hud-radius);
+  color: var(--hud-ink);
+  font: inherit;
+  font-size: var(--hud-fs-sm);
+  padding: var(--hud-s1) var(--hud-s2);
+  min-width: 18ch;
+  box-sizing: border-box;
+}
+
+.hud__input:focus-visible {
+  outline: 2px solid var(--hud-accent);
+  outline-offset: 1px;
+}
+
+/* ---- a bar (distribution / daily trend) -------------------------------- */
+.hud-bar {
+  display: grid;
+  grid-template-columns: minmax(90px, 12rem) 1fr max-content;
+  align-items: center;
+  gap: var(--hud-s2);
+  font-size: var(--hud-fs-sm);
+  padding: 1px 0;
+}
+
+.hud-bar__label {
+  color: var(--hud-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud-bar__track {
+  height: 8px;
+  background: var(--hud-plate);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.hud-bar__fill {
+  height: 100%;
+  background: var(--hud-accent);
+  border-radius: 999px;
+}
+
+.hud-bar__fill--ok { background: var(--hud-ok); }
+
+.hud-bar__value {
+  font-family: var(--hud-mono);
+  color: var(--hud-ink);
+  text-align: right;
+  white-space: nowrap;
+}
+
+/* ---- the honest empty / offline / error states -------------------------
+ * These are the most important styles on the page: they are what a reader
+ * sees when a route failed, and they must look deliberate, never broken.
+ * ---------------------------------------------------------------------- */
+.hud-state {
+  border: var(--hud-border);
+  border-left: 3px solid var(--hud-muted);
+  border-radius: var(--hud-radius);
+  background: var(--hud-ground);
+  padding: var(--hud-s3);
+  font-size: var(--hud-fs-sm);
+  color: var(--hud-muted);
+  display: flex;
+  flex-direction: column;
+  gap: var(--hud-s1);
+}
+
+.hud-state--empty {
+  border-left-color: var(--hud-muted);
+}
+
+.hud-state--offline {
+  border-left-color: var(--hud-bad);
+  color: var(--hud-ink);
+}
+
+.hud-state--error {
+  border-left-color: var(--hud-warn);
+  color: var(--hud-ink);
+}
+
+.hud-state__title {
+  color: var(--hud-ink);
+  font-weight: 600;
+}
+
+.hud-state__endpoint {
+  font-family: var(--hud-mono);
+  font-size: var(--hud-fs-xs);
+  color: var(--hud-dim);
+  overflow-wrap: anywhere;
+}
+
+.hud-state__detail {
+  color: var(--hud-muted);
+  overflow-wrap: anywhere;
+}
+
+.hud-state__action {
+  align-self: flex-start;
+  margin-top: var(--hud-s1);
+}
+
+/* ---- footer ------------------------------------------------------------ */
+.hud__foot {
+  flex: 0 0 auto;
+  font-size: var(--hud-fs-xs);
+  color: var(--hud-dim);
+  display: flex;
+  gap: var(--hud-s2);
+  flex-wrap: wrap;
+  border-top: var(--hud-border);
+  padding-top: var(--hud-s2);
+}
+
+.hud__footDim {
+  color: var(--hud-dim);
+  opacity: 0.8;
+}
+
+/* Screen-reader-only text: carries the full value of a truncated cell. */
+.hud-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
