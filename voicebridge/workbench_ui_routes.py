@@ -53,9 +53,13 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-#: The ported tree. ``static/`` is the URL segment below the mount, matching the
-#: HTML's own ``static/...`` URLs, so ``index.html`` needs no asset rewrite.
-STATIC_ROOT = Path(__file__).resolve().parent / "workbench_ui" / "static"
+#: The SERVING ROOT — the ``workbench_ui/`` directory, not its ``static/`` child.
+#: The HTML's own asset URLs are ``static/ui.js``, i.e. they carry the ``static/``
+#: segment themselves, so the root has to be the PARENT of the tree: resolving
+#: ``static/ui.js`` against ``.../workbench_ui/static`` produced
+#: ``static/static/ui.js`` and every asset 404'd (caught by _prove_live.py).
+#: A request for ``/wb`` maps to ``workbench_ui/index.html`` (see resolve()).
+STATIC_ROOT = Path(__file__).resolve().parent / "workbench_ui"
 
 #: Mount prefix the listener hands us (see the registration block in the doc).
 MOUNT = "/wb"
@@ -106,13 +110,23 @@ def resolve(path: str) -> Optional[Path]:
     cannot escape either. A directory request that names no document gets
     ``index.html``.
     """
-    rel = (path or "").lstrip("/").split("?")[0].split("#")[0]
+    rel = (path or "").split("?")[0].split("#")[0]
+    # Accept the FULL request path (``/wb/static/ui.js``) as well as a
+    # mount-relative one (``static/ui.js``): the listener hands the full path,
+    # and a caller reading this module directly passes the relative form.
+    if rel == MOUNT or rel.startswith(MOUNT + "/"):
+        rel = rel[len(MOUNT):]
     parts = [p for p in rel.split("/") if p not in ("", ".")]
     if ".." in parts:
         return None
-    # A bare ``/wb`` or ``/wb/`` is the app document. A path whose last segment
-    # has no dot is a directory too (``/wb/static`` -> ``static/index.html``).
-    if not parts or "." not in parts[-1]:
+    # A bare ``/wb`` or ``/wb/`` is the app document, which lives in ``static/``
+    # beside its own assets. A path whose last segment has no dot is a directory
+    # request too (``/wb/static`` -> ``static/index.html``) — EXCEPT a bare
+    # notice file (``LICENSE``, ``NOTICE``), which has no suffix by design and
+    # must NOT be turned into ``LICENSE/index.html``.
+    if not parts:
+        parts = ["static", "index.html"]
+    elif "." not in parts[-1] and parts[-1].lower() not in _NOTICE_NAMES:
         parts = parts + ["index.html"]
     root = STATIC_ROOT
     try:
@@ -746,18 +760,41 @@ def h_wb_projects(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         endpoint="projects")
 
 
+#: The top-level key the ported UI reads from each EXISTING endpoint. Some compat
+#: handlers answer a BARE LIST (``/api/skills`` -> ``[{name, description}, …]``);
+#: the ported panel indexes a named key, so the shim wraps the list under the
+#: name the panel uses. Without this the skills panel renders nothing while the
+#: endpoint reports 200 — a silent empty screen, which is the failure mode this
+#: whole port is being fixed for.
+_EXISTING_WRAP: Dict[str, str] = {
+    "skills": "skills",
+    "profiles": "profiles",
+    "mcp/servers": "servers",
+    "memory": "memory",
+    "logs": "lines",
+    "sessions/search": "sessions",
+}
+
+
 def h_wb_passthrough(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Any]:
     """The EXISTING set: dispatch to the compat route with the same request."""
-    target = "/api/" + str(p.get("rest") or "")
+    rest = str(p.get("rest") or "")
+    target = "/api/" + rest
     try:
         from voicebridge import qubit_compat as HC
-        return HC.dispatch(cfg, str(p.get("method") or "GET"), target,
-                           query=dict(q or {}), body=dict(b or {}))
+        code, out = HC.dispatch(cfg, str(p.get("method") or "GET"), target,
+                                query=dict(q or {}), body=dict(b or {}))
     except Exception as exc:  # noqa: BLE001
         return _refusal("WB_BACKEND_UNAVAILABLE",
                         f"{target} unavailable: {type(exc).__name__}: {exc}",
                         endpoint=target)
+    if code == 200 and isinstance(out, list):
+        key = _EXISTING_WRAP.get(rest, "items")
+        return 200, {"ok": True, key: out, "count": len(out), "source": target}
+    if code == 200 and isinstance(out, dict) and "ok" not in out:
+        return 200, {"ok": True, **out, "source": target}
+    return code, out
 
 
 # -------------------------------------------------------------- the port table
@@ -864,7 +901,14 @@ EXISTING_SET = frozenset({
 
 
 def _resolve_handler(sub: str, method: str) -> Optional[Callable[..., Any]]:
-    """Pick the handler for a path below ``/api/wb/api/``."""
+    """Pick the handler for a path below ``/api/wb/api/``.
+
+    PORT_SET first; then EXISTING_SET, which is served by ``qubit_compat`` and so
+    dispatches through ``h_wb_passthrough``. Leaving the EXISTING set out of this
+    lookup made six endpoints answer ``WB_NOT_IN_PORT_SET`` while the doc claimed
+    they were served — the live proof caught that (``/api/logs`` et al returned
+    501), which is exactly why the table is checked against the running server.
+    """
     clean = sub.strip("/")
     if not clean:
         return None
@@ -873,6 +917,8 @@ def _resolve_handler(sub: str, method: str) -> Optional[Callable[..., Any]]:
     name = PORT_SET.get(clean)
     if name:
         return getattr(mod, name, None)
+    if clean in EXISTING_SET:
+        return h_wb_passthrough
     return None
 
 
