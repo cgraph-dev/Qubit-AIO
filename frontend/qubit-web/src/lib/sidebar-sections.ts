@@ -86,6 +86,7 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
     index: "06",
     paths: [
       "/system",
+      "/qubit-hud",
       "/config",
       "/env",
       "/profiles",
@@ -137,6 +138,7 @@ export const NAV_DESCRIPTIONS: Readonly<Record<string, string>> = {
   "/env": "API keys and secrets",
   "/profiles": "Profile isolation",
   "/system": "Machine and runtime status",
+  "/qubit-hud": "Vitals — health, sessions, cron, models, skills, plugins, costs",
   "/docs": "API reference (endpoint list)",
   "/guide": "How to use Qubit",
 };
