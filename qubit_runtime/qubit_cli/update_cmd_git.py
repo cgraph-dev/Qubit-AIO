@@ -17,7 +17,7 @@ from typing import Optional
 
 from qubit_cli._subprocess_compat import windows_hide_flags, noninteractive_git_env, NO_LAZY_FETCH_ENV
 from qubit_cli import install_source
-from qubit_cli.update_cmd_common import _record_stop
+from qubit_cli.update_cmd_common import _record_stop, checkout_root
 
 logger = logging.getLogger("qubit_cli.update_cmd")  # log-record parity with the origin module
 
@@ -523,8 +523,9 @@ def _checkout_rejected_by_git(stderr: str, git_cmd, root: Path) -> bool:
     if not any(line.startswith("fatal: not a git repository") for line in stderr.splitlines()):
         return False
     top = _git_run(git_cmd, ["rev-parse", "--show-toplevel"], cwd=root)
+    expected = checkout_root(root)
     return top.returncode != 0 or os.path.normcase(os.path.realpath(top.stdout.strip())) != os.path.normcase(
-        os.path.realpath(root))
+        os.path.realpath(expected))
 
 
 # Ordered (predicate, diagnosis): curl reports HTTP errors as ``unable to access '<url>': ... error: 429``,

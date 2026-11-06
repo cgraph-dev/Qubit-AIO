@@ -54,9 +54,29 @@ def reported_success(cp: subprocess.CompletedProcess) -> bool:
     return cp.returncode == 0 or SUCCESS in output(cp)
 
 
+# Qubit releases are semver (``v0.0.6``); upstream Hermes used CalVer (``v2026.10.1``). Accept
+# both so an N-1 release can be found on either tag scheme.
+RELEASE_TAG_GLOBS = ("v20[0-9][0-9].*", "v[0-9]*")
+
+
+def _release_tag() -> str | None:
+    for pattern in RELEASE_TAG_GLOBS:
+        try:
+            return I.git("describe", "--tags", "--abbrev=0", "--match", pattern, "HEAD~1", cwd=H.repo_root())
+        except AssertionError:
+            continue
+    return None
+
+
 def n1_tag() -> str:
-    """N-1: the newest release tag strictly before HEAD."""
-    return I.git("describe", "--tags", "--abbrev=0", "--match", "v20[0-9][0-9].*", "HEAD~1", cwd=H.WORKTREE)
+    """N-1: the newest release tag strictly before HEAD.
+
+    A checkout without a reachable release tag (a local branch, or a shallow CI clone without
+    tags) still has an older commit: ``HEAD~1`` exercises the same upgrade path (install an older
+    tree, update to HEAD) instead of erroring during fixture setup. ``QUBIT_E2E_N1_REF`` pins a
+    patched commit object, used to prove red a cell whose bug lives in N-1's own updater code.
+    """
+    return os.environ.get("QUBIT_E2E_N1_REF") or _release_tag() or "HEAD~1"
 
 
 def n1_base() -> str:
@@ -66,14 +86,18 @@ def n1_base() -> str:
 
 
 def commit_of(ref: str) -> str:
-    return I.git("rev-parse", f"{ref}^{{commit}}", cwd=H.WORKTREE)
+    return I.git("rev-parse", f"{ref}^{{commit}}", cwd=H.repo_root())
 
 
 def installer_script(ref: str | None) -> str:
-    """``scripts/install.sh`` as of ``ref`` (None: this worktree's copy)."""
+    """``scripts/install.sh`` as of ``ref`` (None: this worktree's copy).
+
+    The bootstrap installer lives in the vendored runtime tree; git paths are toplevel-relative,
+    so ask for ``qubit_runtime/scripts/install.sh`` from the repository root.
+    """
     if ref is None:
         return (H.WORKTREE / "scripts" / "install.sh").read_text(encoding="utf-8")
-    return I.git("show", f"{ref}:scripts/install.sh", cwd=H.WORKTREE) + "\n"
+    return I.git("show", f"{ref}:{H.repo_rel(H.WORKTREE / 'scripts' / 'install.sh')}", cwd=H.repo_root()) + "\n"
 
 
 @dataclass
@@ -210,7 +234,7 @@ def world(root: Path, *, base: str, installer_ref: str | None = None,
     root.mkdir(parents=True, exist_ok=True)
     srv_root = root / "srv"
     srv_root.mkdir(exist_ok=True)
-    bare = serve_bare(srv_root, REPO, H.WORKTREE, base)
+    bare = serve_bare(srv_root, REPO, H.repo_root(), base)
     with GitHTTPServer(srv_root) as srv:
         sb = I.new_sandbox(root / "sb")
         url = srv.url(REPO)

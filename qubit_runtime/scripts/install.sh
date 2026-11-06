@@ -934,18 +934,30 @@ stage_venv() {
     log_success "bootstrap Python ready; PM prepares the dependency environment"
 }
 
+# The runtime source root inside the checkout. Upstream's runtime tree IS the repository
+# root; Qubit vendors it under qubit_runtime/, so PM, the completion tail and its receipts
+# live one level down while git operations stay on the checkout root.
+runtime_dir() {
+    if [ -d "$INSTALL_DIR/qubit_runtime" ]; then
+        printf '%s' "$INSTALL_DIR/qubit_runtime"
+    else
+        printf '%s' "$INSTALL_DIR"
+    fi
+}
+
 # Tool-only bootstrap: acquire uv and Python before PM's own dependencies exist.
 # The application dependency graph is never installed in this interpreter.
 bootstrap_python() {
     ensure_uv
-    local _py
+    local _py _rt
+    _rt="$(runtime_dir)"
     # Read packages.python.version by following object names and braces, not
     # indentation — same pre-Python reader contract as setup-qubit.sh's pin().
     _py="$(awk -F '"' '
         /^[[:space:]]*("[^"]+"[[:space:]]*:[[:space:]]*)?\{/ { path[++depth] = $2; next }
         /^[[:space:]]*\}[[:space:]]*,?[[:space:]]*$/ { delete path[depth--]; next }
         path[2] == "packages" && path[3] == "python" && $2 == "version" && depth == 3 { print $4; exit }
-    ' "$INSTALL_DIR/pm/lock.json" | cut -d+ -f1 | cut -d. -f1,2)"
+    ' "$_rt/pm/lock.json" | cut -d+ -f1 | cut -d. -f1,2)"
     [ -n "$_py" ] || _py="3.14"
     # Only base interpreters qualify: an activated app venv must not become
     # PM's bootstrap parent. Prefer the existing managed Python, then a host
@@ -971,7 +983,9 @@ bootstrap_pm() {
     [ "$SKIP_BROWSER" = true ] && pm_args+=(--without agent-browser)
     [ "$SKIP_COMPUTER_USE" = true ] && pm_args+=(--without cua-driver)
     bootstrap_python
-    (cd "$INSTALL_DIR" && run_logged "Installing dependencies (hash-verified via uv.lock)" \
+    local rt
+    rt="$(runtime_dir)"
+    (cd "$rt" && run_logged "Installing dependencies (hash-verified via uv.lock)" \
         "$boot_py" -m pm.cli "${pm_args[@]}") \
         || fail "pm install failed" deps_install_failed
     log_success "dependencies installed"
@@ -990,7 +1004,8 @@ desktop_product_present() {
     # electron-builder suffixes the output dir with the arch on every non-x64
     # target (linux-arm64-unpacked, mac-arm64, win-arm64-unpacked), so the x64
     # names alone miss a desktop build on ARM64 Linux/Windows (#94703).
-    local release="$INSTALL_DIR/apps/desktop/release" dir
+    local release; release="$(runtime_dir)/apps/desktop/release"
+    local dir
     for dir in linux-unpacked linux-arm64-unpacked mac mac-arm64 \
                win-unpacked win-ia32-unpacked win-arm64-unpacked; do
         [ -d "$release/$dir" ] && return 0
@@ -1049,13 +1064,14 @@ stage_products() {
     # config. Node, browsers and the frontend build tools arrive through pm as
     # the build asks for them; the bootstrap interpreter itself only re-enters
     # the tree on PM's selected Python.
-    local boot_py
-    local args=(--source "$INSTALL_DIR")
+    local boot_py rt
+    rt="$(runtime_dir)"
+    local args=(--source "$rt")
     bootstrap_python
     if [ "$INCLUDE_DESKTOP" = true ] || desktop_product_present; then
         args+=(--desktop)
     fi
-    (cd "$INSTALL_DIR" && run_logged "Building the qubit command and apps" \
+    (cd "$rt" && run_logged "Building the qubit command and apps" \
         "$boot_py" -I -B -X utf8 qubit_cli/source_completion.py "${args[@]}") \
         || fail "app products or command publication failed" products_build_failed
     wire_shell_path
@@ -1075,11 +1091,11 @@ stage_config() {
         "$QUBIT_HOME"/pairing "$QUBIT_HOME"/hooks "$QUBIT_HOME"/image_cache \
         "$QUBIT_HOME"/audio_cache "$QUBIT_HOME"/memories "$QUBIT_HOME"/skills
     if [ ! -f "$QUBIT_HOME/.env" ]; then
-        cp "$INSTALL_DIR/.env.example" "$QUBIT_HOME/.env" 2>/dev/null || touch "$QUBIT_HOME/.env"
+        cp "$(runtime_dir)/.env.example" "$QUBIT_HOME/.env" 2>/dev/null || touch "$QUBIT_HOME/.env"
     fi
     chmod 600 "$QUBIT_HOME/.env"
-    if [ ! -f "$QUBIT_HOME/config.yaml" ] && [ -f "$INSTALL_DIR/cli-config.yaml.example" ]; then
-        cp "$INSTALL_DIR/cli-config.yaml.example" "$QUBIT_HOME/config.yaml"
+    if [ ! -f "$QUBIT_HOME/config.yaml" ] && [ -f "$(runtime_dir)/cli-config.yaml.example" ]; then
+        cp "$(runtime_dir)/cli-config.yaml.example" "$QUBIT_HOME/config.yaml"
     fi
     log_success "config prepared in $QUBIT_HOME"
 }
@@ -1095,7 +1111,7 @@ stage_setup() {
         log "setup skipped (no terminal); run 'qubit setup' after install"
         return 0
     fi
-    "$INSTALL_DIR/.qubit/bin/qubit" setup </dev/tty || fail "setup failed" setup_failed
+    "$(runtime_dir)/.qubit/bin/qubit" setup </dev/tty || fail "setup failed" setup_failed
 }
 
 stage_gateway() {
@@ -1105,19 +1121,20 @@ stage_gateway() {
         return 0
     fi
     # Setup installs the service when it handles the gateway; ask only if it did not.
-    "$INSTALL_DIR/.qubit/bin/qubit" gateway install --if-missing </dev/tty || fail "gateway installation failed" gateway_failed
+    "$(runtime_dir)/.qubit/bin/qubit" gateway install --if-missing </dev/tty || fail "gateway installation failed" gateway_failed
 }
 
 stage_complete() {
-    local commit
+    local commit rt
+    rt="$(runtime_dir)"
     commit="$INSTALL_COMMIT"
     [ -n "$commit" ] || commit=$(git -C "$INSTALL_DIR" rev-parse HEAD 2>/dev/null) || commit=""
     if [ -n "$commit" ]; then
         printf '{\n  "schemaVersion": 1,\n  "pinnedCommit": "%s",\n  "pinnedBranch": "%s",\n  "completedAt": "%s"\n}\n' \
-            "$commit" "$BRANCH" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" > "$INSTALL_DIR/.hermes-bootstrap-complete.tmp"
-        mv -f "$INSTALL_DIR/.hermes-bootstrap-complete.tmp" "$INSTALL_DIR/.hermes-bootstrap-complete"
+            "$commit" "$BRANCH" "$(date -u +%Y-%m-%dT%H:%M:%S.000Z)" > "$rt/.hermes-bootstrap-complete.tmp"
+        mv -f "$rt/.hermes-bootstrap-complete.tmp" "$rt/.hermes-bootstrap-complete"
         # Dual-publish: the canonical marker beside the legacy one every reader still accepts.
-        cp -f "$INSTALL_DIR/.hermes-bootstrap-complete" "$INSTALL_DIR/.qubit-bootstrap-complete" 2>/dev/null || :
+        cp -f "$rt/.hermes-bootstrap-complete" "$rt/.qubit-bootstrap-complete" 2>/dev/null || :
     fi
     log_success "Qubit Agent install complete. Run: qubit"
 }

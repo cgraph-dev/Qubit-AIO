@@ -22,7 +22,7 @@ from qubit_cli._subprocess_compat import no_prompt_git_kwargs as _no_prompt_git_
 from qubit_cli.config import get_qubit_home  # noqa: F401  (re-exported; patched via update_cmd)
 from qubit_cli import update_handoff as _update_handoff
 from qubit_cli import install_source
-from qubit_cli.update_cmd_common import _best_effort, _record_stop
+from qubit_cli.update_cmd_common import _best_effort, _record_stop, checkout_root
 # Captured BEFORE a checkout swap: parent transport/lifecycle never imports new code.
 from qubit_cli.update_completion import run_completion
 from qubit_cli.update_channel import adopt_retired_channel
@@ -655,7 +655,7 @@ def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False, ch
         sys.exit(2)
 
     root = _m().PROJECT_ROOT
-    if not (root / ".git").exists():
+    if not (checkout_root(root) / ".git").exists():
         print("✗ Not a git repository — cannot check for updates.")
         sys.exit(1)
 
@@ -1597,7 +1597,7 @@ def _prepare_git_command(*, checkout_move=None) -> tuple[bool, list, bool]:
     """Return ``(use_zip_update, git_cmd, is_fork)``; ``sys.exit(1)`` when not a git repo
     on a non-Windows host (Windows falls back to ZIP: broken git file I/O, AV, NTFS filters).
     *checkout_move* binds the churn cleanups' file writes to the paused gateways' tree gate."""
-    git_dir = _m().PROJECT_ROOT / ".git"
+    git_dir = checkout_root(_m().PROJECT_ROOT) / ".git"
     use_zip_update = not git_dir.exists()
     if use_zip_update and sys.platform != "win32":
         print("✗ Not a git repository. Please reinstall:")
