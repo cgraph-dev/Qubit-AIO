@@ -63,9 +63,10 @@ def reported_success(cp: subprocess.CompletedProcess) -> bool:
     return cp.returncode == 0 or SUCCESS in output(cp)
 
 
-# Qubit releases are semver (``v0.0.6``); upstream Hermes used CalVer (``v2026.10.1``). Accept
-# both so an N-1 release can be found on either tag scheme.
-RELEASE_TAG_GLOBS = ("v20[0-9][0-9].*", "v[0-9]*")
+# Qubit releases are 0.x semver (``v0.0.6``); upstream Hermes used CalVer (``v2026.10.1``).
+# Do NOT match ``v1.0.0``: it is an unrelated local tag, not a Qubit release, and predates the
+# layout fixes an N-1 updater needs to move a monorepo checkout.
+RELEASE_TAG_GLOBS = ("v20[0-9][0-9].*", "v0.*")
 
 
 def _release_tag() -> str | None:
