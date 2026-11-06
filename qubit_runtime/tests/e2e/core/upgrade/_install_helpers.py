@@ -192,11 +192,11 @@ def fresh_install_env(sb: Sandbox) -> dict[str, str]:
     # Reuse the host's pinned uv + populated cache so a probe does not re-download
     # the toolchain and the whole wheel set for every scenario (the sandbox only
     # needs read access; the venv itself is written under the sandbox root).
-    host_tools = Path.home() / ".local/state/qubit-voicebridge/runtime/tools"
     host_cache = Path.home() / ".cache/uv"
     extra = {}
-    if (host_tools / "uv-0.12.3-linux-x64/uv").is_file():
-        extra["HERMES_RUNTIME_DIR"] = str(host_tools)
+    # Never point HERMES_RUNTIME_DIR at the developer's live tool store: it is the product's
+    # install root, not a cache, so a sandbox install would silently reuse (and could mutate)
+    # the live store while leaving the sandbox with no tools of its own.
     host_pythons = Path.home() / ".local/share/uv/python"
     if host_cache.is_dir():
         extra.update({"UV_CACHE_DIR": str(host_cache), "UV_LINK_MODE": "copy", "UV_OFFLINE": "1"})
