@@ -338,7 +338,9 @@ def _supervised_child() -> bool:
     exports ``HERMES_SUPERVISED_CHILD`` and still owes the tail. Writes use the
     canonical ``QUBIT_`` name (see gateway/restart.py ``SUPERVISED_CHILD_ENV``).
     """
-    from gateway.restart import (
+    # Leaf constants only: ``gateway.restart`` reads DEFAULT_CONFIG (ruamel), and this probe
+    # runs in the bootstrap interpreter BEFORE PM activates the venv that provides ruamel.
+    from gateway.supervisor_markers import (
         S6_SUPERVISED_CHILD_ENV,
         S6_SUPERVISED_CHILD_ENV_ALIASES,
         SUPERVISED_CHILD_ENV,
