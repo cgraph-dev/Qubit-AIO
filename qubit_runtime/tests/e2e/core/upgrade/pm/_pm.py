@@ -59,7 +59,7 @@ def configure(sb: I.Sandbox, base_url: str, extra: str = "", env_extra: str = ""
 def state_dir(sb: I.Sandbox) -> Path:
     from pm.environments import install_key
 
-    return sb.qubit_home / "installs" / install_key(sb.checkout)
+    return sb.qubit_home / "installs" / install_key(sb.runtime)
 
 
 def facts(sb: I.Sandbox) -> dict:

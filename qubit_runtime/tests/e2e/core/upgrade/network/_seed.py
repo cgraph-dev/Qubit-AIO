@@ -158,7 +158,7 @@ class Installed:
         environment, the PM runtime generation, and the installed tool store."""
         from pm.environments import install_key
 
-        key = install_key(self.sb.checkout)
+        key = install_key(self.sb.runtime)
         inst = self.sb.qubit_home / "installs" / key
 
         def read(p: Path) -> str:
