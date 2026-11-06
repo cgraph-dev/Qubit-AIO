@@ -6,6 +6,7 @@
  */
 
 import type { OfficeGameShellProps } from "../OfficeGameShell";
+import { createHudPanel, hudDockProps, type HudTap } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
 import { createSeatModelPanel } from "./SeatModelPanel";
@@ -86,6 +87,21 @@ export function createOfficeApp(
     const [loaded, setLoaded] = useState(false);
     const [failed, setFailed] = useState<string | null>(null);
     const [panelOpen, setPanelOpen] = useState(false);
+    // The HUD, IN the office. A dock beside the game, never a mutation: the
+    // office shell issues no request of its own, and the only client the HUD
+    // gets refuses anything but a bodyless GET (../ui/HudPanel.ts).
+    const [hudOpen, setHudOpen] = useState(false);
+    // Read once per render from the module entry.ts wires before mounting.
+    const hud = hudDockProps();
+    const hudTapRef = useRef<HudTap | null>(null);
+    if (!hudTapRef.current) {
+      hudTapRef.current = hud.hudTap ?? { component: null, listeners: new Set() };
+    }
+    /** Non-null by the assignment above; the local names it so TS agrees. */
+    const hudTap: HudTap = hudTapRef.current;
+    const HudPanel = createHudPanel({
+      React: R, hooks, fetchJSON: hud.fetchJSON, tap: hudTap,
+    });
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // Built unconditionally (hooks must not be conditional) but only rendered
     // when a seat is chosen, so the default view is still just the game.
@@ -256,6 +272,40 @@ export function createOfficeApp(
           seatLabel: props.seatLabel,
         }));
       }
+    }
+
+    // THE HUD, OPENED FROM INSIDE THE OFFICE. The page's own link to
+    // /qubit-hud leaves the office; this opens the same panels over it, so the
+    // vitals are one click from the room they belong to. Both stay: the link
+    // is still the way to the HUD as its own tab.
+    children.push(R.createElement("button", {
+      key: "hud-toggle",
+      type: "button",
+      className: "office-game__hudToggle",
+      "data-testid": "office-game-hud-btn",
+      "aria-expanded": hudOpen,
+      "aria-controls": "office-game-hud-dock",
+      onClick: () => setHudOpen(!hudOpen),
+    }, hudOpen ? "Hide HUD" : "HUD"));
+    if (hudOpen) {
+      children.push(R.createElement("div", {
+        key: "hud-dock",
+        id: "office-game-hud-dock",
+        className: "office-game__dock office-game__panel",
+        "data-testid": "office-game-hud-dock",
+        role: "region",
+        "aria-label": "HUD",
+      }, [
+        R.createElement("div", { key: "head", className: "office-game__dockHead" }, [
+          R.createElement("span", { key: "t" }, "HUD"),
+          R.createElement("button", {
+            key: "x", type: "button", className: "office-game__btn",
+            "data-testid": "office-game-hud-close", "aria-label": "Close HUD",
+            onClick: () => setHudOpen(false),
+          }, "Close"),
+        ]),
+        R.createElement(HudPanel as never, { key: "body" }),
+      ]));
     }
 
     return R.createElement("div", {
