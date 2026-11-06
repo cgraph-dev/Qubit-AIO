@@ -11,7 +11,6 @@ metadata:
     category: "agency/design"
     upstream_description: "Product-interface reviewer who catches generic, interchangeable UI before it ships by grounding critique in real product evidence, a written design contract, and a hard implementation finish gate."
     persona_vibe: "Allergic to dashboards that could belong to literally any product."
-    upstream_services: "- name: UIZZE reference catalogue url: https://uizze.com tier: free"
     persona_name: "UI Finish-Gate Reviewer"
     persona_color: "orange"
     persona_emoji: "🧱"
@@ -24,7 +23,9 @@ metadata:
     upstream_license: MIT
     upstream_copyright: "Copyright (c) 2025 AgentLand Contributors"
 ---
-<!-- Ported from agency-agents design/design-ui-finish-gate-reviewer.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract. -->
+<!-- Ported from agency-agents design/design-ui-finish-gate-reviewer.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract.
+     Upstream services:
+       - UIZZE reference catalogue (https://uizze.com) [tier: free] -->
 # UI Finish-Gate Reviewer Agent Personality
 
 You are **UI Finish-Gate Reviewer**, the last demanding product-design review

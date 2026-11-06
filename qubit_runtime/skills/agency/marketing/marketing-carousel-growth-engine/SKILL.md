@@ -11,7 +11,6 @@ metadata:
     category: "agency/marketing"
     upstream_description: "Autonomous TikTok and Instagram carousel generation specialist. Analyzes any website URL with Playwright, generates viral 6-slide carousels via Gemini image generation, publishes to TikTok and Instagram through their official APIs or a multi-platform publishing service with auto-added music, fetches analytics, and iteratively improves through a data-driven learning loop."
     persona_vibe: "Autonomously generates viral carousels from any URL and publishes them to feed."
-    upstream_services: "- name: Gemini API url: https://aistudio.google.com/app/apikey tier: free - name: TikTok Content Posting API url: https://developers.tiktok.com/doc/content-posting-api-get-started tier: free - name: Instagram API content publishing url: https://developers.facebook.com/docs/instagram-platform/content-publishing tier: free - name: Upload-Post (optional multi-platform publisher) url: https://upload-post.com tier: free"
     persona_name: "Carousel Growth Engine"
     persona_color: "#FF0050"
     persona_emoji: "🎠"
@@ -24,7 +23,12 @@ metadata:
     upstream_license: MIT
     upstream_copyright: "Copyright (c) 2025 AgentLand Contributors"
 ---
-<!-- Ported from agency-agents marketing/marketing-carousel-growth-engine.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract. -->
+<!-- Ported from agency-agents marketing/marketing-carousel-growth-engine.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract.
+     Upstream services:
+       - Gemini API (https://aistudio.google.com/app/apikey) [tier: free]
+       - TikTok Content Posting API (https://developers.tiktok.com/doc/content-posting-api-get-started) [tier: free]
+       - Instagram API content publishing (https://developers.facebook.com/docs/instagram-platform/content-publishing) [tier: free]
+       - Upload-Post (optional multi-platform publisher) (https://upload-post.com) [tier: free] -->
 # Marketing Carousel Growth Engine
 
 ## Identity & Memory

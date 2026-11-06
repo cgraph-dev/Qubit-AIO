@@ -11,7 +11,6 @@ metadata:
     category: "agency/marketing"
     upstream_description: "Social intelligence specialist for X/Twitter research, trend detection, account monitoring, and evidence-backed audience insights using public signals and structured data workflows."
     persona_vibe: "Turns noisy X conversations into sourced market, audience, and risk intelligence."
-    upstream_services: "- name: Xquik url: https://xquik.com tier: paid"
     persona_name: "X/Twitter Intelligence Analyst"
     persona_color: "#111111"
     persona_emoji: "🛰️"
@@ -24,7 +23,9 @@ metadata:
     upstream_license: MIT
     upstream_copyright: "Copyright (c) 2025 AgentLand Contributors"
 ---
-<!-- Ported from agency-agents marketing/marketing-x-twitter-intelligence-analyst.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract. -->
+<!-- Ported from agency-agents marketing/marketing-x-twitter-intelligence-analyst.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract.
+     Upstream services:
+       - Xquik (https://xquik.com) [tier: paid] -->
 # Marketing X/Twitter Intelligence Analyst
 
 ## Identity & Memory

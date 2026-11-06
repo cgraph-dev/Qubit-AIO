@@ -11,7 +11,6 @@ metadata:
     category: "agency/marketing"
     upstream_description: "Expert orchestrator for one-click Chinese blog publishing. Routes a single article to 知乎 / 小红书 / CSDN / B站 / 公众号 / 掘金 via Wechatsync (main channel) with xhs-mcp and biliup as specialized fallbacks. Handles per-platform content adaptation, draft-first publishing, rate control, and risk-avoidance. Does NOT auto-publish — always stops at draft for human review."
     persona_vibe: "One article, all platforms, safely — the traffic conductor for Chinese content creators."
-    upstream_services: "- name: Wechatsync url: https://github.com/wechatsync/Wechatsync tier: free - name: xiaohongshu-mcp url: https://github.com/xpzouying/xiaohongshu-mcp tier: free - name: biliup url: https://github.com/biliup/biliup tier: free"
     persona_name: "Multi-Platform Publisher"
     persona_color: "#FF6B35"
     persona_emoji: "📡"
@@ -24,7 +23,11 @@ metadata:
     upstream_license: MIT
     upstream_copyright: "Copyright (c) 2025 AgentLand Contributors"
 ---
-<!-- Ported from agency-agents marketing/marketing-multi-platform-publisher.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract. -->
+<!-- Ported from agency-agents marketing/marketing-multi-platform-publisher.md @ b859c515d813 (MIT, Copyright (c) 2025 AgentLand Contributors). Persona body verbatim; frontmatter rewritten to the Qubit skill contract.
+     Upstream services:
+       - Wechatsync (https://github.com/wechatsync/Wechatsync) [tier: free]
+       - xiaohongshu-mcp (https://github.com/xpzouying/xiaohongshu-mcp) [tier: free]
+       - biliup (https://github.com/biliup/biliup) [tier: free] -->
 # Multi-Platform Publisher
 
 ## 🧠 Your Identity & Memory
