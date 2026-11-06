@@ -212,6 +212,23 @@ That is byte-for-byte the contract `_check_answer` validates — `type`, `probab
 set equal to the offered options, mass 1.0, `choice` == argmax. (`jev-latest` on Zen answers
 `Model is unavailable` 400, so the working free id is `jev-1.13-free`.)
 
+**The free tier takes no bearer at all.** Sending `Authorization: Bearer <anything>` to the
+Zen systemone path answers `401 {"error":{"type":"server_error","message":"Upstream request
+failed: Invalid credential"}}`; the identical body with no `Authorization` header answers
+200 with `billing_source: "free"`, `cost: 0`. So the optional provider must treat the Zen free
+tier as a no-key door: with no key it still answers, and sending a bogus key is *worse* than
+sending none. A real `OPENCODE_ZEN_API_KEY` (paid Zen) is for the pay-as-you-go chat models,
+not for this path.
+
+Live end-to-end through the ported client (real network, real model, `jev-1.13-free`,
+551 ms, 369 input tokens), all three question types validated:
+
+```
+refund   {"type":"noul","noul":0.99}
+queue    {"type":"choice","choice":"billing","probabilities":{"billing":1.0,"tech":0.0,"spam":0.0},"confidence":1.0}
+severity {"type":"score","score":0.99,"probabilities":{"0":0.03,"1":0.95,"2":0.02},"spread_reported":true,"confidence":0.92}
+```
+
 Upstream already knows this door: `client.py:37-38` `ZEN_ENDPOINT =
 "https://opencode.ai/zen/v1/systemone"`, `ZEN_MODEL = "jev-1.13-free"`, with the comment
 "TypeSafe is not accepting new signups, so this is the door a new install can actually open."
@@ -226,11 +243,10 @@ systemone path directly with the Zen key.
 
 ## (e) Decision and implementation plan
 
-**Decision: integrate.** Wire jevkit's contract into Qubit as an optional decision client
-under `qubit_runtime/plugins/jev/`, resolving the key through
-`agent.secret_scope.get_secret` / the providers registry, and calling the real
-`/v1/systemone` contract — Zen first (free tier), TypeSafe second (if the owner ever has a
-key), and `unavailable` otherwise.
+**Decision: integrate.** Wire Jev's contract into Qubit as an optional decision client
+under `qubit_runtime/plugins/jev/`, calling the real `/v1/systemone` contract on the OpenCode
+Zen free tier (no credential needed, and none sent), with a TypeSafe key as the metered
+alternative when an operator has one, and `unavailable` otherwise.
 
 Explicitly **not** done: an "opencode-go chat-completions translation", a fake-confidence
 prompt shim, or any stub that pretends to route decisions.
@@ -242,17 +258,36 @@ Ordered plan:
 2. `client.py` — a small stdlib transport over the real contract: `{state, model, questions}`
    in, `{answers,…}` out, with `_check_answer`-equivalent invariants (mass 1, key set,
    argmax, score-vs-distribution). Deliberately narrower than upstream: no images/`box`, no
-   TypеSafe custom-endpoint/`JEV_PROXY_API_KEY` surface.
-3. `providers` resolution — ordered candidates `zen` (`OPENCODE_ZEN_API_KEY` →
-   `https://opencode.ai/zen/v1/systemone`, model `jev-1.13-free`) then `typesafe`
-   (`TYPESAFE_API_KEY`); key read only via `agent.secret_scope.get_secret`, never
-   `os.environ`. No key for any candidate → `unavailable`.
+   TypeSafe custom-endpoint/`JEV_PROXY_API_KEY` surface.
+3. `providers` resolution — ordered candidates `zen` (`https://opencode.ai/zen/v1/systemone`,
+   model `jev-1.13-free`, **no bearer ever sent** — the free tier rejects one) then
+   `typesafe` (`TYPESAFE_API_KEY` → `https://api.typesafe.ai/v1/systemone`, bearer sent); key
+   read only via `agent.secret_scope.get_secret`, never `os.environ`. A pinned provider
+   without its credential → `unavailable`, never a silent fall-through.
 4. `__init__.py` `register(ctx)` — one tool, `jev_decide`, gated by a `check_fn` that reports
-   unavailable when no candidate resolves. No hook, no core edit.
-5. `plugin.yaml` + `__init__.py` header carry the MIT notice.
-6. Prove fail-soft: with the key unset, the tool reports unavailable and the agent's tool set
-   is otherwise unchanged; with a key present (or the free Zen path), one real decision call
-   returns validated answers.
+   unavailable when the pinned provider has no credential. No hook, no core edit.
+5. `plugin.yaml` + `NOTICE` + every file header carry the MIT notice.
+6. Prove fail-soft: with no credential at all the free Zen tier answers (optional in the
+   strictest sense); with a provider pinned and its key absent, the tool is hidden and a
+   forced call reports `available: false`; network/malformed/self-contradictory replies all
+   report `available: false` with a typed code and never raise into the turn.
 
-Optional must be optional: every entry point reports unavailable rather than raising, and no
-decision path is reached unless a key resolves.
+**Result (implemented and proven).** Real discovery loads `jev` as a bundled `backend`;
+`jev_decide` registers in its own `jev` toolset; a live call over the network with **no
+credential configured at all** returned, in 647 ms and 377 input tokens:
+
+```
+refund   {"type":"noul","noul":0.99}
+queue    {"type":"choice","choice":"billing","probabilities":{"billing":1.0,"tech":0.0,"spam":0.0},"confidence":1.0}
+severity {"type":"score","score":1.89,"probabilities":{"0":0.0,"1":0.1,"2":0.9},"spread_reported":true,"confidence":0.85}
+```
+
+`qubit_runtime/tests/plugins/test_jev_plugin.py` (17 tests, all passing) goes through the real
+`PluginManager` discovery path and asserts: the bespoke request keys (`state`/`model`/
+`questions`, never `messages`/`choices`); no `Authorization` header on the Zen door even when
+a key is configured; the TypeSafe bearer only on the TypeSafe door; every reply invariant
+refused when broken; and every failure mode returning `available: false` with a typed code.
+
+Optional is optional: no hook is registered, no core file is modified, and a pinned provider
+without its credential hides the tool entirely.
+

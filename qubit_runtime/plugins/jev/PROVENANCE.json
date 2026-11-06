@@ -1,0 +1,18 @@
+{
+  "upstream": {
+    "repository": "https://github.com/kerpopule/hermes-jev-skills",
+    "commit": "8316358bf60e98a21477582af829ef11c9cf52fb",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Steve Darlow",
+    "source_paths": ["jevkit/client.py"],
+    "notice_file": "NOTICE"
+  },
+  "local_changes": [
+    "Re-implemented the decision wire (jevkit/client.py ask/_check_answer) as a small stdlib module; upstream jevkit is ~48k LOC across 60+ modules (routing, mailbox, triage, browser/computer next-action) and none of that product surface is absorbed here.",
+    "Transport narrowed to the two doors that actually serve the bespoke contract: OpenCode Zen (/v1/systemone, key OPENCODE_ZEN_API_KEY) and TypeSafe (/v1/systemone, key TYPESAFE_API_KEY). opencode-go is NOT a candidate: it is an OpenAI-compatible chat relay with no decision model.",
+    "No images/box questions, no TypeSafe custom-endpoint override, no JEV_PROXY_API_KEY: those surfaces carry credential-forwarding risk and are not needed by an optional decision provider.",
+    "Credentials resolve only through agent.secret_scope.get_secret (never os.environ directly).",
+    "No keystore/credential-file reader: a missing key yields `unavailable`, never a silent fallback."
+  ],
+  "rebrand": "Zero upstream product brand on Qubit surfaces; upstream identity appears only in this provenance record, NOTICE and file headers."
+}
