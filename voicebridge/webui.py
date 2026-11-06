@@ -3939,9 +3939,20 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     except ValueError:
                         parsed = {}
                     body = parsed if isinstance(parsed, dict) else {}
+            # The config lives on the orchestrator, exactly as every other compat
+            # handler reads it. `wb_cfg` was never set on the server object, so
+            # every handler that needed a real config (the approval journal, the
+            # cron store, the session store) was handed None and answered a 503
+            # with "AttributeError: 'NoneType' object has no attribute
+            # 'state_dir'". The live probe caught it on /api/approval/pending.
+            _orch = getattr(getattr(self, "app", None), "orch", None)
+            cfg = (getattr(self.server, "wb_cfg", None)
+                   or (getattr(_orch, "cfg", None) if _orch is not None else None))
+            if R.stream_kind(sub) and cfg is not None:
+                R.stream_sse(self, sub, cfg, query)
+                return True
             status, payload = R.h_wb_gateway(
-                getattr(self.server, "wb_cfg", None), query, body,
-                {"sub": sub, "method": method})
+                cfg, query, body, {"sub": sub, "method": method})
             self._json(payload, status)
             return True
         R.serve_asset(self, "/" if path == mount else path[len(mount):],
