@@ -331,6 +331,18 @@ def run_oneshot(
     # inherited tui/desktop transport label, and delegate dispatch to route detached results inline.
     os.environ["HERMES_SINGLE_QUERY_SESSION"] = "1"
 
+    # `-z` bypasses cli.py and runs its agent in THIS process, but `_chat_runs_at_gateway` makes
+    # main's startup treat every chat command as gateway-owned, so the shell-hook registration
+    # that a gateway/classic CLI performs never ran here. Register the configured
+    # ``hooks.pre_llm_call`` scripts now or a one-shot turn silently loses their context
+    # injection (plugin hooks still fire; only the shell bridge is missed).
+    try:
+        from qubit_cli.config import load_config
+        from agent.shell_hooks import register_from_config
+        register_from_config(load_config(), accept_hooks=True, interactive=False)
+    except Exception:
+        pass
+
     # Nothing here drains process_registry.completion_queue (only cli.py's process_loop and the
     # gateway watchers do), so left unbound delegate_task would be forced background and every
     # subagent result discarded. Stateless routes it to the inline/synchronous path.

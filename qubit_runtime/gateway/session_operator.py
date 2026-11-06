@@ -22,7 +22,10 @@ def is_viewer_input(row):
 
 def check_local_input(authority, ref, row, *, source=None):
     payload = row['payload']
-    allowed = set(LOCAL_INPUT_FIELDS)
+    # ``kanban_card_v1`` is the dispatcher's trusted producer marker (session_authority adds it
+    # after the payload checks). It is not a viewer field, so it stays out of LOCAL_INPUT_FIELDS /
+    # is_viewer_input, but the drain's local-input gate must accept the row it was committed on.
+    allowed = set(LOCAL_INPUT_FIELDS) | {'kanban_card_v1'}
     if 'local_operator_v1' in payload:
         allowed.add('local_operator_v1')
         if payload['local_operator_v1'] != {

@@ -299,3 +299,20 @@ def test_a_client_cannot_mint_the_kanban_card_marker(kanban_owner):
             await owner.close()
 
     asyncio.run(scenario())
+
+
+def test_kanban_card_marker_passes_the_local_input_gate_without_becoming_viewer_input():
+    """The dispatcher's ``kanban_card_v1`` is added to the committed admission after the payload
+    checks; the drain's local-input gate must accept that row (it used to raise
+    ``permission_denied``, pausing the card session before its turn ever ran). It is still a
+    producer marker, so ``is_viewer_input`` must stay False for it."""
+    from types import SimpleNamespace
+    from gateway.session_operator import check_local_input, is_viewer_input
+    ref = SimpleNamespace(session_id="sid")
+    source = SimpleNamespace(user_id="owner", platform="local")
+    authority = SimpleNamespace(profile_id="p", sessions={"sid": SimpleNamespace(source=source)})
+    row = {"principal_id": "owner", "request_id": "kanban:b:t1:1",
+           "payload": {"text": "work kanban task t1", "finite": True,
+                       "kanban_card_v1": {"board": "b", "task_id": "t1", "run_id": 1}}}
+    check_local_input(authority, ref, row)  # must not raise
+    assert is_viewer_input(row) is False

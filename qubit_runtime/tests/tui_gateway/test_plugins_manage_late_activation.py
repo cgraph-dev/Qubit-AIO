@@ -64,3 +64,48 @@ def test_plugins_manage_install_rescans_fires_on_plugin_loaded_and_exposes_mcp_s
     merged: dict = {}
     _portable_mcp_servers(merged)
     assert set(merged) == set(servers)
+
+
+def test_live_activation_refreshes_open_chats_with_the_server_signature(monkeypatch, tmp_path):
+    """A live activation must refresh the open chats' MCP registry.
+
+    The caller used to pass ``(home, plugin_key, note)`` into a 2-argument
+    ``refresh_plugin_sessions(home, note)``; the TypeError was swallowed by the
+    surrounding ``except`` and every open chat kept the old tool registry while the
+    activation result still reported the server ``connected``. Pin the call shape:
+    the server must actually be asked, with the note, not just handed a key.
+    """
+    import contextlib
+    from pathlib import Path
+    from types import SimpleNamespace
+    from qubit_cli import plugins as plugins_mod
+    from qubit_cli import plugins_activation as pa
+    from qubit_cli import plugins_activation_live as live
+    from tui_gateway import server
+
+    activation = {"key": "user/plug", "name": "plug", "deferred": {"mcp_servers": ["s"]}}
+    manager = SimpleNamespace(
+        _discovery_lock=contextlib.nullcontext(),
+        discover_and_load=lambda *, force: None,
+        get_portable_mcp_servers=lambda: {},
+    )
+    monkeypatch.setattr(plugins_mod, "_join_background_discovery", lambda: None)
+    monkeypatch.setattr(plugins_mod, "get_plugin_manager", lambda: manager)
+    monkeypatch.setattr(pa, "activation_summaries", lambda _m: [activation])
+    monkeypatch.setattr(pa, "find_activation", lambda _s, _n: activation)
+    monkeypatch.setattr(live, "plugin_skills", lambda _k: [])
+    monkeypatch.setattr(live, "connect_plugin_mcp",
+                        lambda _a, _p: [{"name": "s", "connected": True, "tools": ["mcp__s__t"]}])
+    monkeypatch.setattr(live, "live_notice", lambda _a: "live note")
+
+    calls = []
+    monkeypatch.setattr(server, "refresh_plugin_sessions",
+                        lambda *a, **k: calls.append((a, k)))
+
+    result = pa._go_live("plug")
+    assert result is activation
+    assert len(calls) == 1, calls
+    args, kwargs = calls[0]
+    assert len(args) == 2 and not kwargs, calls
+    assert str(args[0]) == str(Path(os.environ["QUBIT_HOME"]).resolve()) or str(args[0]) == os.environ["QUBIT_HOME"]
+    assert args[1] == "live note"
