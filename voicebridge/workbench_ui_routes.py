@@ -573,7 +573,7 @@ def h_wb_session(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         endpoint="session")
     session = out.get("session") or {}
     msgs = out.get("messages") or []
-    return 200, {
+    payload = {
         "ok": True,
         "session": {
             "session_id": sid,
@@ -586,6 +586,14 @@ def h_wb_session(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         "messages": msgs,
         "entries": msgs,
     }
+    # Upstream nests the transcript INSIDE session (api/routes.py:17326), and
+    # its client reads d.session.messages — not the top-level array. Serving
+    # only the top level made the pane fetch a correct 2-message transcript and
+    # then render an empty state: the count came from session.message_count
+    # (right) while the rows came from session.messages (absent). Both shapes
+    # are emitted so neither old nor new client code loses the transcript.
+    payload["session"]["messages"] = msgs
+    return 200, payload
 
 
 def h_wb_session_write(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1356,6 +1364,14 @@ def stream_kind(sub: str) -> Optional[str]:
         return "chat"
     if clean == "sessions/events":
         return "sessions"
+    # The per-session EventSource the transcript pane opens before it paints.
+    # Upstream uses it for confirm-connection, bg_task_complete and self-heal;
+    # only the first is load-bearing for rendering, and the client's listener
+    # for 'initial' just confirms the connection. Not porting it meant the pane
+    # fetched its transcript (200, correct messages) and then hung waiting on a
+    # stream that answered 501.
+    if clean == "session/stream":
+        return "session"
     return None
 
 
@@ -1382,6 +1398,13 @@ def stream_frames(sub: str, cfg: Any, q: Dict[str, str]) -> Iterable[str]:
         from .workbench_ui.handlers_extra import sessions_events_frames
 
         yield from sessions_events_frames(cfg)
+        return
+    if kind == "session":
+        # Confirm-connection only. Upstream also pushes bg_task_complete and
+        # server_turn_started self-heal frames here; Qubit's own session store
+        # is the authority for both, and inventing those events would be worse
+        # than not sending them. `initial` is what the client blocks on.
+        yield 'event: initial\ndata: {"event": "initial"}\n\n'
         return
     yield ('event: error\n'
            'data: {"event": "error", "code": "WB_NOT_IN_PORT_SET", '
