@@ -1329,6 +1329,58 @@ export function createGatewayEventHandler(ctx: GatewayEventHandlerContext): (ev:
         return
       }
 
+      case 'approval.request': {
+        // An attached gateway runs this session's turn in its own process, so its approval card
+        // arrives as a local-viewer event (PendingControls.register publishes it), not as a
+        // server→client request. Seed the same overlay the request path opens; the answer is the
+        // generation-fenced ``approval.respond`` RPC (useMainApp.answerApproval).
+        const payload = ev.payload as Record<string, unknown> | undefined
+        const promptId = payload && typeof payload.prompt_id === 'string' ? payload.prompt_id : ''
+
+        if (!promptId) {
+          return
+        }
+
+        const offered = Array.isArray(payload?.choices)
+          ? (payload.choices as unknown[]).filter((c): c is string => typeof c === 'string')
+          : []
+        // The event payload orders choices for messaging; the terminal card keeps the canonical
+        // once → session → always → deny order (see ApprovalChoice in server_requests.py).
+        const order = ['once', 'session', 'always', 'deny'] as const
+        const choices = offered.length ? order.filter(c => offered.includes(c)) : undefined
+
+        patchOverlayState({
+          approval: {
+            allowPermanent: !choices || choices.includes('always'),
+            choices,
+            command: typeof payload?.command === 'string' ? payload.command : '',
+            description: typeof payload?.description === 'string' ? payload.description : '',
+            eventBased: true,
+            executionGeneration:
+              typeof payload?.execution_generation === 'number' ? payload.execution_generation : undefined,
+            requestId: promptId,
+            smartDenied: false
+          }
+        })
+        patchUiState({ status: t('session.status.approvalNeeded') })
+
+        if (bellOnPrompt && stdout?.isTTY) {
+          stdout.write('\x07')
+        }
+
+        return
+      }
+
+      case 'approval.settled': {
+        const promptId = (ev.payload as Record<string, unknown> | undefined)?.prompt_id
+
+        if (typeof promptId === 'string' && getOverlayState().approval?.requestId === promptId) {
+          patchOverlayState({ approval: null })
+        }
+
+        return
+      }
+
       case 'request.cancel': {
         // The backend withdrew a server→client request (timeout / interrupt /
         // session close): tear down whichever card carries that id. A clarify

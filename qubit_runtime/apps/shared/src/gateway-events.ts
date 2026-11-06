@@ -28,7 +28,32 @@ export interface ClientLocalGatewayEventMap {
   'gateway.stderr': { line: string }
 }
 
-export interface GatewayEventMap extends BackendGatewayEventMap, ClientLocalGatewayEventMap {}
+/**
+ * Canonical session-authority events the TUI consumes when it attaches to the running gateway
+ * (a shell TUI's turn executes there). They are published by `gateway/session_pending_controls.py`
+ * (the local-viewer control stream), not by `tui_gateway`, so they are not in the generated map.
+ */
+export interface AuthorityGatewayEventMap {
+  'approval.request': {
+    session_id: string
+    prompt_id: string
+    execution_generation: number
+    command?: string
+    description?: string
+    choices?: string[]
+    timeout_s?: number | null
+  }
+  'approval.settled': {
+    session_id?: string
+    prompt_id: string
+    execution_generation?: number | null
+  }
+}
+
+export interface GatewayEventMap
+  extends BackendGatewayEventMap,
+    AuthorityGatewayEventMap,
+    ClientLocalGatewayEventMap {}
 
 export type GatewayEventName = keyof GatewayEventMap
 

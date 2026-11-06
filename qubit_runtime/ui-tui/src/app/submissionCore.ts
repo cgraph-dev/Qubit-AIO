@@ -86,6 +86,13 @@ export function submitPrompt(
       // (retry/Alt+K replays share it); the TUI-dialect gateway ignores it.
       // Minted here so every transport accepts the same submit.
       .request<PromptSubmitResponse>('prompt.submit', {
+        // The Ink TUI renders the clarify tool's whole question set in one batch card
+        // (createServerRequestHandler → prompts.tsx). A shell TUI runs its turn in the attached
+        // messaging gateway, which cannot see this renderer: without this admission flag it falls
+        // back to the per-question text prompt, which a terminal has no card for, so clarify blocks
+        // until its timeout. CanonicalSubmitParams already carries the field
+        // (tui_gateway/contracts/canonical_sessions.py); the stdio dialect accepts it too.
+        clarify_batch: true,
         session_id: liveSid,
         text: submitText,
         submission_id: randomUUID()

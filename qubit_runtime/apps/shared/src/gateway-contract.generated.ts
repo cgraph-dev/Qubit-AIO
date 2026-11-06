@@ -2787,6 +2787,7 @@ export interface PromptSubmitParams {
   surface?: string | null
   voice_context?: string | null
   voice_turn?: boolean | null
+  clarify_batch?: boolean | null
   title_preview?: string | null
   truncate_before_user_ordinal?: number | null
   truncate_before_row_id?: number | null

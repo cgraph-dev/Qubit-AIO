@@ -73822,6 +73822,40 @@ function createGatewayEventHandler(ctx) {
         }
         return;
       }
+      case "approval.request": {
+        const payload = ev.payload;
+        const promptId = payload && typeof payload.prompt_id === "string" ? payload.prompt_id : "";
+        if (!promptId) {
+          return;
+        }
+        const offered = Array.isArray(payload?.choices) ? payload.choices.filter((c) => typeof c === "string") : [];
+        const order = ["once", "session", "always", "deny"];
+        const choices = offered.length ? order.filter((c) => offered.includes(c)) : void 0;
+        patchOverlayState({
+          approval: {
+            allowPermanent: !choices || choices.includes("always"),
+            choices,
+            command: typeof payload?.command === "string" ? payload.command : "",
+            description: typeof payload?.description === "string" ? payload.description : "",
+            eventBased: true,
+            executionGeneration: typeof payload?.execution_generation === "number" ? payload.execution_generation : void 0,
+            requestId: promptId,
+            smartDenied: false
+          }
+        });
+        patchUiState({ status: t("session.status.approvalNeeded") });
+        if (bellOnPrompt && stdout?.isTTY) {
+          stdout.write("\x07");
+        }
+        return;
+      }
+      case "approval.settled": {
+        const promptId = ev.payload?.prompt_id;
+        if (typeof promptId === "string" && getOverlayState().approval?.requestId === promptId) {
+          patchOverlayState({ approval: null });
+        }
+        return;
+      }
       case "request.cancel": {
         const id = ev.payload?.id;
         if (!id) {
@@ -81107,7 +81141,20 @@ function useInputHandlers(ctx) {
       return actions.cancelClarify();
     }
     if (overlay.approval) {
-      respondToServerRequest(overlay.approval.requestId, { choice: "deny" });
+      const approval = overlay.approval;
+      if (approval.eventBased) {
+        const sid = getUiState().sid;
+        if (sid) {
+          void gateway.rpc("approval.respond", {
+            choice: "deny",
+            execution_generation: approval.executionGeneration,
+            prompt_id: approval.requestId,
+            session_id: sid
+          }).catch(() => void 0);
+        }
+      } else {
+        respondToServerRequest(approval.requestId, { choice: "deny" });
+      }
       patchOverlayState({ approval: null });
       patchTurnState({ outcome: t("session.approval.denied") });
       return;
@@ -82011,6 +82058,13 @@ function submitPrompt(text2, deps, showUserMessage = true, displayOverride, opts
     turnController.bufRef = "";
     turnController.interrupted = false;
     deps.gw.request("prompt.submit", {
+      // The Ink TUI renders the clarify tool's whole question set in one batch card
+      // (createServerRequestHandler → prompts.tsx). A shell TUI runs its turn in the attached
+      // messaging gateway, which cannot see this renderer: without this admission flag it falls
+      // back to the per-question text prompt, which a terminal has no card for, so clarify blocks
+      // until its timeout. CanonicalSubmitParams already carries the field
+      // (tui_gateway/contracts/canonical_sessions.py); the stdio dialect accepts it too.
+      clarify_batch: true,
       session_id: liveSid,
       text: submitText,
       submission_id: randomUUID2()
@@ -83080,18 +83134,33 @@ function useMainApp(gw2) {
   }, []);
   const answerApproval = (0, import_react65.useCallback)(
     (choice) => {
-      if (!overlay.approval) {
+      const approval = overlay.approval;
+      if (!approval) {
         return;
       }
-      respondWith(overlay.approval.requestId, { choice }, () => {
+      const done = () => {
         patchOverlayState({ approval: null });
         patchTurnState({
           outcome: choice === "deny" ? t("session.approval.denied") : t("session.approval.approved", choice)
         });
         patchUiState({ status: "running\u2026" });
-      });
+      };
+      if (approval.eventBased) {
+        const sid = getUiState().sid;
+        if (sid) {
+          void rpc("approval.respond", {
+            choice,
+            execution_generation: approval.executionGeneration,
+            prompt_id: approval.requestId,
+            session_id: sid
+          }).catch(() => void 0);
+        }
+        done();
+        return;
+      }
+      respondWith(approval.requestId, { choice }, done);
     },
-    [overlay.approval, respondWith]
+    [overlay.approval, respondWith, rpc]
   );
   const answerSudo = (0, import_react65.useCallback)(
     (pw) => {

@@ -28604,6 +28604,18 @@
             "default": null,
             "title": "Voice Turn"
           },
+          "clarify_batch": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Clarify Batch"
+          },
           "title_preview": {
             "anyOf": [
               {
