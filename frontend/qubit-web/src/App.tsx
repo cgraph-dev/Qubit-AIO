@@ -158,6 +158,7 @@ const CheckpointsPage = lazy(() => import("@/pages/CheckpointsPage"));
 const BoardAdminPage = lazy(() => import("@/pages/BoardAdminPage"));
 const TaskInboxPage = lazy(() => import("@/pages/TaskInboxPage"));
 const TalkPage = lazy(() => import("@/pages/TalkPage"));
+const WorkbenchPage = lazy(() => import("@/pages/WorkbenchPage"));
 const SchedulerMediaPage = lazy(() => import("@/pages/SchedulerMediaPage"));
 const SkillsReviewPage = lazy(() => import("@/pages/SkillsReviewPage"));
 const McpCallsPage = lazy(() => import("@/pages/McpCallsPage"));
@@ -328,6 +329,7 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/qubit-board-admin": BoardAdminPage,
   "/qubit-task-inbox": TaskInboxPage,
   "/qubit-talk": TalkPage,
+  "/qubit-workbench": WorkbenchPage,
   "/qubit-scheduler": SchedulerMediaPage,
   "/admin/skills-review": SkillsReviewPage,
   "/admin/mcp-calls": McpCallsPage,
@@ -1344,6 +1346,7 @@ const ROUTE_IMPORTERS: Record<string, () => Promise<unknown>> = {
   "/qubit-board-admin": () => import("@/pages/BoardAdminPage"),
   "/qubit-task-inbox": () => import("@/pages/TaskInboxPage"),
   "/qubit-talk": () => import("@/pages/TalkPage"),
+  "/qubit-workbench": () => import("@/pages/WorkbenchPage"),
   "/qubit-scheduler": () => import("@/pages/SchedulerMediaPage"),
   "/admin/skills-review": () => import("@/pages/SkillsReviewPage"),
   "/admin/mcp-calls": () => import("@/pages/McpCallsPage"),
