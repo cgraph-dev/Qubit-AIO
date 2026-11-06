@@ -1216,7 +1216,7 @@ _REF_MOVED = ["ref_moved"]
 def _switch_branch_at_commit_point(git_cmd, branch, target_ref, *, pre, stash):
     """CP0: switch the parked checkout to *branch* under the interrupted-pull marker and the armed
     obligations, so a kill mid-switch is restored by the next launch like a killed pull."""
-    root = _m().PROJECT_ROOT
+    root = _git_root()
 
     def resolve(ref):
         return (_git_run(git_cmd, ["rev-parse", "-q", "--verify", f"{ref}^{{commit}}"]).stdout or "").strip()
