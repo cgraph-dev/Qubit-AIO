@@ -402,6 +402,11 @@ class ReadFaults:
                     raise OSError(errno.EMFILE, "Too many open files (C18 injected)")
             return real(stream)
         monkeypatch.setattr(C, "fast_safe_load", wrapped)
+        # qubit_cli.config_backend reads through its own late `from utils import fast_safe_load`
+        # (the backend owns the file layer), so patching qubit_cli.config alone misses every
+        # read_user_config_raw()/save_config() call now.
+        import utils as _utils
+        monkeypatch.setattr(_utils, "fast_safe_load", wrapped)
 
     def arm(self, *ks: int) -> None:
         self.count, self.fail_at = 0, set(ks)
@@ -437,7 +442,7 @@ def test_p1_noop_save_is_byte_identical(seed, home, monkeypatch):
     _noop_save_roundtrip(gen_case(seed, null_leaves=False), monkeypatch)
 
 
-@pytest.mark.parametrize("seed", [101, 102])
+@pytest.mark.parametrize("seed", [102, 103])
 def test_p1_explicit_null_leaves_survive_a_noop_save(seed, home, monkeypatch):
     case = gen_case(seed)
     assert any(v is None for v in _leaves(case.tree).values()), f"seed {seed} generated no null leaf"
@@ -512,6 +517,9 @@ def _set_value_for(path: tuple, default: Any, current: Any, rng: random.Random) 
     if isinstance(default, float):
         v = round(rng.uniform(1, 999), 2) + 0.25
         return repr(v), v
+    if path == ("display", "language"):
+        v = "de" if current != "de" else "fr"
+        return v, v
     v = f"c18-{rng.choice(_WORDS)}-{rng.randrange(10**6)}"
     return v, v
 
