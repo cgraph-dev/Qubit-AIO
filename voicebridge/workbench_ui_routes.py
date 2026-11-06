@@ -1349,7 +1349,10 @@ def stream_kind(sub: str) -> Optional[str]:
     every other SSE route already does it.
     """
     clean = str(sub or "").strip("/")
-    if clean.startswith("chat/stream"):
+    # Exact match, not a prefix: "chat/stream/status" is a JSON route that lives
+    # under the same name space, and a prefix test swallowed it — the status call
+    # came back as an SSE body (": connected") instead of the run's JSON state.
+    if clean == "chat/stream":
         return "chat"
     if clean == "sessions/events":
         return "sessions"
