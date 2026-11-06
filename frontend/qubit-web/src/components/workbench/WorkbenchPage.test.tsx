@@ -165,6 +165,39 @@ describe("workbench — backend not available", () => {
   });
 });
 
+describe("workbench — timestamps", () => {
+  it("reads ISO timestamps and millisecond epochs as seconds", async () => {
+    routes = {
+      "/api/workbench/sessions/abc": {
+        status: 200,
+        body: {
+          id: "abc",
+          messages: [
+            { role: "user", content: "iso", timestamp: new Date().toISOString() },
+            { role: "assistant", content: "ms", timestamp: Date.now() },
+          ],
+          prompt_tokens: null,
+          context_window: null,
+        },
+      },
+      "/api/workbench/sessions": {
+        status: 200,
+        body: { sessions: [{ id: "abc", title: "T" }] },
+      },
+      "/api/workbench/workspace/tree": { status: 200, body: { entries: [] } },
+    };
+    await renderPage();
+    const row = container.querySelector<HTMLElement>('[data-testid="workbench-session-abc"]');
+    await act(async () => row!.click());
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    });
+    // Both normalise to "just now" rather than a 20000-day figure.
+    expect(all('[data-testid="workbench-message-user"]')[0]?.textContent).toContain("just now");
+    expect(all('[data-testid="workbench-message-assistant"]')[0]?.textContent).toContain("just now");
+  });
+});
+
 describe("workbench — live backend", () => {
   it("renders the sessions it was given, and can open one", async () => {
     routes = {

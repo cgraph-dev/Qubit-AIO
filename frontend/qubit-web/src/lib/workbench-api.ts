@@ -141,6 +141,22 @@ function num(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/**
+ * Epoch seconds from either an epoch number or an ISO-8601 string. Milliseconds
+ * are folded to seconds — the house `timeAgo` helper takes seconds, and a
+ * millisecond value would read as "20000 days ago" rather than a bug report.
+ */
+function epochSeconds(value: unknown): number | null {
+  const asNumber = num(value);
+  if (asNumber !== null) {
+    if (asNumber <= 0) return null;
+    return asNumber > 1e11 ? Math.round(asNumber / 1000) : asNumber;
+  }
+  if (typeof value !== "string" || !value.trim()) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? Math.round(parsed / 1000) : null;
+}
+
 function parseSessionRow(raw: unknown): WorkbenchSessionRow | null {
   const row = asRecord(raw);
   const id = str(row?.id);
@@ -152,7 +168,7 @@ function parseSessionRow(raw: unknown): WorkbenchSessionRow | null {
     model: str(row.model),
     source: str(row.source),
     message_count: num(row.message_count),
-    last_active: num(row.last_active),
+    last_active: epochSeconds(row.last_active),
   };
 }
 
@@ -174,7 +190,7 @@ function parseMessage(raw: unknown): WorkbenchMessage | null {
   const role = str(msg?.role);
   const content = str(msg?.content);
   if (!msg || !role || content === null) return null;
-  return { role, content, timestamp: num(msg.timestamp) };
+  return { role, content, timestamp: epochSeconds(msg.timestamp) };
 }
 
 export function parseSessionDetail(raw: unknown): WorkbenchSessionDetail | null {
