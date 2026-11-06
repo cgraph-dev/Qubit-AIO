@@ -146,7 +146,13 @@ def _run_child(argv: list[str], nh: NativeHome, fake: acp.AcpFake, drive: Callab
 
 def _home(root: Path) -> tuple[NativeHome, acp.AcpFake]:
     fake = acp.AcpFake(root / "acp", [_deep_turn()])
-    return make_home(root, {"provider": "copilot-acp", "default": "copilot-acp"}, env_file=fake.env()), fake
+    nh = make_home(root, {"provider": "copilot-acp", "default": "copilot-acp"}, env_file=fake.env())
+    # This test drives the CORE copilot-acp provider with a fake launch command. A fresh home
+    # otherwise triggers the left-core migration to install the catalog 'github-copilot' plugin
+    # (a network install unrelated to the wire under test) and session/new then fails. Mark the
+    # plugin present so migration is a no-op, as on a home that already migrated.
+    (nh.qubit_home / "plugins" / "github-copilot").mkdir(parents=True, exist_ok=True)
+    return nh, fake
 
 
 def _tui_gateway(root: Path) -> Observed:

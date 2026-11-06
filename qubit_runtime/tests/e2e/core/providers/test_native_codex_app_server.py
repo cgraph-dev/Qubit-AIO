@@ -36,7 +36,7 @@ KNOWN: dict[str, tuple[str, str]] = {
 }
 
 YOLO = ["--yolo"]
-SEED_MARKER = "Prior conversation from this Hermes session"
+SEED_MARKER = "Prior conversation from this Qubit session"
 
 SCENARIOS = {
     # a + b: reasoning, a command needing approval, usage, final answer; then --resume in a new process.

@@ -168,20 +168,33 @@ def test_tool_result_goes_back_paired_to_the_signed_call(results: dict[str, Any]
 
 def test_wire_scheme_bearer_and_single_token_mint(results: dict[str, Any]) -> None:
     """Every request hits the configured project/location path on the regional host with a bearer the
-    OAuth endpoint minted from a verified SA JWT; one mint per process, reused across API calls."""
+    OAuth endpoint minted from a verified SA JWT, minted once and reused across API calls.
+
+    Qubit runs ``chat -q`` turns inside its long-lived gateway process, so the two CLI invocations
+    below (turn 1 and its ``--resume`` in a new CLI process) are served by the SAME process and
+    share one mint. A deployment that forks a per-turn worker may mint once per process instead;
+    either way a token is never re-minted per request.
+    """
     res = results["session"]
     fake = res["fake"]
     _ok(res["turn1"], "turn 1")
     _ok(res["turn2"], "turn 2")
     assert all(r["claims"] for r in fake.token_requests), fake.token_requests
     assert [c["target"] for c in fake.connects if c["allowed"]], "no request reached Vertex through the proxy"
-    per_process = [fake.requests[: res["boundary"]], fake.requests[res["boundary"]:]]
+    per_turn = [fake.requests[: res["boundary"]], fake.requests[res["boundary"]:]]
     minted = fake.minted_tokens()
-    assert res["tokens_after_turn1"] == 1 and len(minted) == 2, (
-        f"expected one token exchange per process, saw {len(fake.token_requests)}: {fake.token_requests}")
-    for token, reqs in zip(minted, per_process):
-        assert len(reqs) >= 2
-        assert {r["auth"] for r in reqs} == {f"Bearer {token}"}, "bearer not the minted token / not reused"
+    assert res["tokens_after_turn1"] == 1 and len(minted) in (1, 2), (
+        f"expected one token exchange per serving process (shared gateway = 1), saw "
+        f"{len(fake.token_requests)}: {fake.token_requests}")
+    assert {f"Bearer {t}" for t in minted} == {r["auth"] for r in fake.requests}, (
+        "a request used a bearer this run never minted")
+    if len(minted) == 2:
+        # Per-turn process: turn 1 used the first token and the resumed process the second.
+        for token, reqs in zip(minted, per_turn):
+            assert len(reqs) >= 2 and {r["auth"] for r in reqs} == {f"Bearer {token}"}
+    else:
+        # Shared gateway process: both turns reuse the single mint.
+        assert all(len(reqs) >= 2 for reqs in per_turn)
     expected_path = f"/v1beta1/projects/{PROJECT}/locations/{REGION}/endpoints/openapi/chat/completions"
     assert {(r["host"], r["path"]) for r in fake.requests} == {(f"{REGION}-aiplatform.googleapis.com", expected_path)}
     assert {r["body"]["model"] for r in fake.requests} == {"google/gemini-3-flash-preview"}

@@ -116,6 +116,14 @@ def sanitize_gemini_schema(schema: Any) -> Dict[str, Any]:
             cleaned.pop("required", None)
         elif len(valid_required) != len(required_val):
             cleaned["required"] = valid_required
+
+    # The proto ``Schema`` parser requires ``items`` on every ARRAY node (Google 400s
+    # "items: missing field"), including an array branch of an ``anyOf`` union where the
+    # producer never emitted one (e.g. a parameter that accepts string|object|array). The
+    # JSON-Schema surface (v1beta ``parametersJsonSchema``) allows an item-less array, but
+    # this legacy ``parameters`` surface does not, so give it a permissive item schema.
+    if cleaned.get("type") == "array" and "items" not in cleaned:
+        cleaned["items"] = {}
     return cleaned
 
 

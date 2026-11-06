@@ -6,6 +6,7 @@ VERTEX_REGION. project_id/region may also live in config.yaml ``vertex:``;
 env wins over config.
 """
 
+import datetime
 import hashlib
 import json
 import logging
@@ -138,12 +139,21 @@ def _load_credentials(resolved_path: Optional[str], sa_raw: Optional[bytes]) -> 
 
 
 def _needs_refresh(creds) -> bool:
-    """No token, expired, or within 5 minutes of expiry."""
-    return (
-        not getattr(creds, "token", None)
-        or getattr(creds, "expired", False)
-        or (getattr(creds, "expiry", None) is not None and (creds.expiry.timestamp() - time.time()) < 300)
-    )
+    """No token, expired, or within 5 minutes of expiry.
+
+    ``google-auth`` publishes ``expiry`` as a NAIVE UTC datetime in some versions. Calling
+    ``.timestamp()`` on it interprets the value in the local timezone, so on any host that is
+    not UTC a token with an hour left looks already expired and is re-minted on every call
+    (the retry then mints again). Compare against an aware UTC "now" instead.
+    """
+    if not getattr(creds, "token", None) or getattr(creds, "expired", False):
+        return True
+    expiry = getattr(creds, "expiry", None)
+    if expiry is None:
+        return False
+    if expiry.tzinfo is None:
+        expiry = expiry.replace(tzinfo=datetime.timezone.utc)
+    return (expiry - datetime.datetime.now(datetime.timezone.utc)).total_seconds() < 300
 
 
 def _cached_credentials(resolved_path: Optional[str], sa_raw: Optional[bytes], cache_key: Tuple[Any, ...]):

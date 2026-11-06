@@ -72,7 +72,10 @@ LATE_TEXT = "LATE-ANSWER-65788"
 # the host can advertise (browser tools appear only where agent-browser and Chromium exist). With that pin
 # the system prompt + tool bridge is ~3.5K estimated tokens and each file read adds ~0.6K, so eight reads
 # cross this absolute threshold mid-turn (ACP reports no usage, so Hermes estimates).
-COMPACT_THRESHOLD = 5_500
+# The threshold is measured against the live system prompt: it grew with the Qubit tool bridge,
+# so crossing at 5.5K now happens with only 7 messages (below the compressor's >=7-message
+# window). 6.5K crosses mid-turn with a real middle window to summarize.
+COMPACT_THRESHOLD = 6_500
 COMPACT_TOOLSETS = ("--toolsets", "file")
 COMPACT_FILES = 8
 COMPACT_ASK = "Read f1.txt through f8.txt one by one, then say done (COMPACT-ASK)."
@@ -164,7 +167,11 @@ def _compaction(root: Path) -> Scenario:
         f"call_f{i}", "read_file", {"path": str(project / f"f{i}.txt")}))] for i in range(1, COMPACT_FILES + 1)]
     fake = acp.AcpFake(root / "acp", [*turns, [acp.message(FINAL_COMPACT)]], models=MODELS, aux_text=SUMMARY)
     nh = _acp_home(root, fake, CONFIGURED_MODEL,
-                   extra_config={"compression": {"threshold_tokens": COMPACT_THRESHOLD, "protect_last_n": 4}})
+                   extra_config={"compression": {"threshold_tokens": COMPACT_THRESHOLD, "protect_last_n": 4,
+                                    # The default "lean" tail has a 10K-token floor, which is above
+                                    # this 5.5K test threshold (nothing left to compress); pin the
+                                    # token-bounded legacy tail so the middle window exists.
+                                    "tail_mode": "legacy"}})
     for i in range(1, COMPACT_FILES + 1):
         (nh.project / f"f{i}.txt").write_text(f"file {i} " + "lorem ipsum dolor " * 250 + "\n", encoding="utf-8")
     sc = Scenario(nh, fake)
@@ -302,7 +309,12 @@ def test_compaction_in_an_acp_session_keeps_the_next_prompt_valid_and_grounded(o
     assert sc.fake.invalid() == [], f"requests rejected by the ACP schema: {sc.fake.invalid()}"
     aux = sc.fake.aux_prompts()
     assert aux, "compaction never called the summarizer through the ACP provider"
-    assert "file 2 lorem" in acp.prompt_text(aux[0]), "the summarizer did not receive the history to compact"
+    # The pre-summary prune deliberately demotes old tool-result BODIES to one-line summaries
+    # (tool-call arguments are canonical and survive), so the summarizer sees the conversation
+    # structure (the ask + each read_file call) rather than the raw file text.
+    summary_input = acp.prompt_text(aux[0])
+    assert COMPACT_ASK in summary_input and "read_file" in summary_input and "f1.txt" in summary_input, (
+        f"the summarizer did not receive the history to compact:\n{summary_input[:1500]}")
     after = [r for r in sc.fake.main_prompts() if r["t"] > aux[0]["t"]]
     assert after, "no main-turn call followed the compaction"
     final = _transcript(after[-1])
