@@ -33,7 +33,10 @@ from tests.e2e.core.cli_tmux._classic import ClassicHome, Pane, last_user, new_n
 from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall
 
 # Process discovery, cleanup and the witness's pid accounting read /proc.
-pytestmark = pytest.mark.platforms("linux")
+pytestmark = [
+    pytest.mark.platforms("linux"),
+    pytest.mark.live_system_guard_bypass,  # detached gateway is reaped by its sandbox QUBIT_HOME
+]
 
 WITNESS_DIR = Path(__file__).resolve().parent / "witness"
 TITLE = "Live session title"

@@ -173,6 +173,7 @@ class ClassicHome:
         """Allowlisted child env: no inherited HERMES_*, provider keys, display or TMUX variables."""
         keep = ("PATH", "LANG", "USER", "LOGNAME", "SHELL", "TMPDIR")
         env = {k: os.environ[k] for k in keep if k in os.environ}
+        env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
         env.update({
             "LC_ALL": "C.UTF-8", "LANG": "C.UTF-8", "TERM": "xterm-256color", "TZ": "UTC",
             "HOME": str(self.home), "QUBIT_HOME": str(self.qubit_home), "PYTHONPATH": str(REPO_ROOT),

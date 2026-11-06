@@ -15,6 +15,7 @@ import json
 import os
 import re
 import secrets
+import shutil
 import signal
 import socket
 import sqlite3
@@ -89,6 +90,9 @@ def hermetic_env(home: Path, extra: dict[str, str] | None = None) -> dict[str, s
         HERMES_STATE_DB_GUARD_BYPASS="1",
         HERMES_DISABLE_LAZY_INSTALLS="1",
     )
+    node = shutil.which("node")
+    if node:
+        env["HERMES_NODE"] = node
     env.update(extra or {})
     return env
 

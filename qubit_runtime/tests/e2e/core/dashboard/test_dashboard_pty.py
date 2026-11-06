@@ -127,7 +127,6 @@ class Chat:
             assert not term.closed, f"/api/pty closed (code={term.close_code}) during TUI startup"
         except AssertionError as exc:
             raise AssertionError(f"{exc}\n--- screen ---\n{term.dump()}") from None
-        term.wait_quiet(0.5)
         self.ledger.snapshot()
 
     def turn(self, term: WsTerm, p: H.Profile, canary: str, n_main_before: int) -> dict:
