@@ -1,0 +1,36 @@
+{
+  "plugin": "browser-companion",
+  "port_of": "hermes-browser-extension/companion-plugin",
+  "upstream": {
+    "repository": "https://github.com/abundantbeing/hermes-browser-extension",
+    "commit": "16d42430ff45d5833cb6176b401db867b591c2f2",
+    "commit_date": "2026-11-06 (survey pin)",
+    "source_path": "companion-plugin/",
+    "version_ported": "0.4.0",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Jon Komet",
+    "license_text_requirement": "The MIT copyright notice and permission statement MUST ship with every distribution of this directory. See LICENSE beside this file."
+  },
+  "port_scope": {
+    "ported": [
+      "text_utilities.py",
+      "events.py",
+      "protocol.py",
+      "hooks.py (excerpt: the owner-scoped BCP turn parser, re-implemented against the native hook payload)",
+      "schemas.py (the status / get / clear contract, kept verbatim)"
+    ],
+    "not_ported": [
+      "actions.py, context_routes.py, control_routes.py, profile_routes.py, status_route.py, __init__.py::_chain/register_status_route (HTTP surface; needs ctx.register_platform_handler, which Qubit does not expose to plugins)",
+      "control_broker.py, control_schemas.py, control_tools.py (21 tab_* tools; Qubit already routes its own browser_* tools through qubit_runtime/gateway/browser_control_broker.py)",
+      "context_store.py, journal.py (event log / journal / durable receipts: DROP, see docs/EXT_COLLISION_NOTE.md)",
+      "schemas.py::SCHEMA_JOURNAL / SCHEMA_CONTROL_STATUS / SCHEMA_EVENT_LOG (drop side)"
+    ],
+    "decision_note": "docs/EXT_COLLISION_NOTE.md (authority for PORT / RENAME / DROP / DEFER)"
+  },
+  "local_divergence": [
+    "Rebranded: the plugin is named browser-companion, the toolset and skill namespace follow it, and every Qubit-facing identifier is rebranded. Page-supplied protocol ids (qubit.browser.turn.v2, qubit.browser.context.v1) are renamed in this copy and MUST match whatever the extension front end ships before the two halves can talk.",
+    "The HTTP readiness/context/control routes are absent: Qubit exposes no register_platform_handler seam to plugins, so this port is tool-only and reports its state through browser_context_status instead.",
+    "The hook authorizes a tool call by handing it a one-shot lease; the port keeps that lease (contextvars plus a runtime-identity table) but keys it on the native hook payload Qubit actually sends (session_id / turn_id / task_id as keyword fields).",
+    "Fail-soft: with no browser context attached (and no extension route to upload one) every context tool answers {\"available\": false, \"reason\": \"Browser context unavailable.\"}; that is the shipped steady state of this port, not a defect."
+  ]
+}
