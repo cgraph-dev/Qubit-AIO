@@ -24,6 +24,7 @@ import { useState, type ReactNode } from "react";
 
 import type { ApiResult, WorkspaceTree as WorkspaceTreeData } from "@/lib/workbench-api";
 import { MISSING_WORKBENCH_ROUTES } from "@/lib/workbench-api";
+import { copyTextToClipboard } from "@/lib/clipboard";
 
 import { FilePreview } from "./FilePreview";
 import { GapNotice, HeadIconButton } from "./WorkbenchStates";
@@ -85,15 +86,13 @@ export function WorkspacePanel({
   const copySelection = async () => {
     const paths = [...selected];
     const text = paths.length > 0 ? paths.join("\n") : treePath;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1400);
-    } catch {
-      // A blocked clipboard is not an error the panel should invent a result
-      // for; the button simply does not claim success.
-      setCopied(false);
-    }
+    // The repo's single sanctioned clipboard writer. A direct
+    // navigator.clipboard call here is rejected by clipboard-usage.test.ts for
+    // a reason: the helper owns the fallback paths a blocked or absent
+    // clipboard needs, and every surface is supposed to share them.
+    const ok = await copyTextToClipboard(text);
+    setCopied(ok);
+    if (ok) window.setTimeout(() => setCopied(false), 1400);
   };
 
   const truncated =
