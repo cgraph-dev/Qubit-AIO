@@ -55,6 +55,7 @@ DEATH AND RE-A TTACH ARE BOTH EXPLICIT
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 import uuid
@@ -81,7 +82,7 @@ class _Run:
 
     __slots__ = ("stream_id", "session_id", "started_at", "events", "seq",
                  "done", "error", "lock", "changed", "truncated", "thread",
-                 "title", "model")
+                 "title", "model", "finished_at")
 
     def __init__(self, stream_id: str, session_id: str) -> None:
         self.stream_id = stream_id
@@ -96,6 +97,7 @@ class _Run:
         self.changed = threading.Condition(self.lock)
         self.thread: Optional[threading.Thread] = None
         self.title: Optional[str] = None
+        self.finished_at: Optional[float] = None
         self.model: Optional[str] = None
 
     def push(self, event: Dict[str, Any]) -> None:
@@ -132,8 +134,25 @@ def _gc() -> None:
     """Forget finished runs past their retention window (and any orphan)."""
     now = time.time()
     with _RUNS_LOCK:
-        for sid in [k for k, r in _RUNS.items()
-                    if r.done and now - r.started_at > _RETAIN_S]:
+        dead = []
+        for sid, r in _RUNS.items():
+            # Retention is measured from when the run FINISHED (falls back to
+            # started_at for a run that never finished). Measuring from the
+            # start meant a turn slower than _RETAIN_S was reaped the instant it
+            # completed, before any client could read its result.
+            _t0 = r.finished_at or r.started_at
+            if r.done and now - _t0 > _RETAIN_S:
+                dead.append(sid)
+            elif (not r.done and r.thread is not None
+                  and r.thread.ident is not None
+                  and not r.thread.is_alive()):
+                # ORPHAN: the pump thread died without ever marking the run
+                # terminal. Leaving it in _RUNS makes live_run_for_session()
+                # return it forever, so every later /chat/start for that session
+                # is refused 409 SESSION_BUSY — a session permanently locked out
+                # by one crashed turn. Observed exactly that before this fix.
+                dead.append(sid)
+        for sid in dead:
             _RUNS.pop(sid, None)
 
 
@@ -214,8 +233,25 @@ def _pump(run: _Run, cfg: Any, text: str, *, model: Optional[str],
         gen = CT.stream_turn(cfg, text, session=run.session_id, model=model,
                              reasoning=reasoning, timeout_s=timeout_s,
                              actor="dashboard:user")
+        # Watchdog. chat_transport.stream_turn accepts timeout_s but never
+        # applies it, so a stalled model call blocks this generator forever and
+        # the run sits 'active' indefinitely — the pane spins and the server
+        # holds a dead thread (observed: 140s of ': connected' on an active
+        # run). Bound the wall clock here and emit a real terminal event
+        # instead of hanging. The turn itself is not cancelled (the transport
+        # owns that); this only stops the stream lying about being alive.
+        deadline = time.monotonic() + float(os.environ.get("QU_WB_TURN_MAX_S", "300"))
         for ev in _upstream_events(gen, run.session_id):
             run.push(ev)
+            if str(ev.get("event") or "") in ("done", "error"):
+                break
+            if time.monotonic() > deadline:
+                run.push({"event": "error", "code": "TURN_TIMEOUT",
+                          "detail": ("the turn produced no terminal event within "
+                                     f"{int(deadline - run.started_at)}s; the "
+                                     "transcript on disk is authoritative — "
+                                     "reload the session to read it")})
+                break
         # A generator that ended without a terminal event is a transport fault,
         # not a successful turn: say so instead of closing the stream silently.
         with run.lock:
@@ -227,8 +263,14 @@ def _pump(run: _Run, cfg: Any, text: str, *, model: Optional[str],
         run.push({"event": "error", "code": "TURN_FAILED",
                   "detail": f"{type(exc).__name__}: {exc}"[:400]})
     finally:
-        # Whatever happened, mark the run terminal so readers unblock.
+        # A run that ends before any reader attaches must still be READABLE.
+        # Reaping it immediately left the client with STREAM_NOT_FOUND, which
+        # the pane renders as a bare "Processed" row with no text and no error —
+        # an instant refusal looked exactly like a successful silent turn.
+        # Stamp the finish time so _gc() measures retention from the END, not
+        # from the start, and a fast turn stays replayable for the full window.
         with run.changed:
+            run.finished_at = time.time()
             if not run.done:
                 run.done = True
             run.changed.notify_all()
