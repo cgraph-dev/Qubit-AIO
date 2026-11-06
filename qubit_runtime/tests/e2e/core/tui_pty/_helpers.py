@@ -250,7 +250,8 @@ class TmuxTui:
         env.update(HOME=str(self.home), QUBIT_HOME=str(self.qubit_home), PYTHONPATH=str(REPO_ROOT),
                    TMPDIR=str(root / "tmp"), LANG="C.UTF-8", LC_ALL="C.UTF-8", PYTHONUNBUFFERED="1",
                    HERMES_STATE_DB_GUARD_BYPASS="1", QUBIT_STATE_DB_GUARD_BYPASS="1", QUBIT_TUI_INLINE="1" if inline else "0",
-                   QUBIT_TUI_DIR=str(tui_dir or private_tui_dir(root)))
+                   HERMES_NODE=shutil.which("node") or "node",
+                   HERMES_TUI_DIR=str(tui_dir or private_tui_dir(root)), QUBIT_TUI_DIR=str(tui_dir or private_tui_dir(root)))
         env.update(env_extra or {})
         argv = [sys.executable, "-m", "qubit_cli.main", "--tui", *args]
         subprocess.run(["tmux", "-S", self.sock, "-f", str(conf), "new-session", "-d", "-s", "p",
@@ -352,24 +353,15 @@ class TmuxTui:
         assert self.alive(), f"qubit exited while waiting for {what}\n{self.dump()}"
 
     def wait_quiet(self, idle: float = 1.0, timeout: float = 45.0) -> None:
-        """A settled frame: unchanged for ``idle`` seconds, ignoring what ticks on its own while a
-        card waits for the human (digits of clocks, braille spinners, the status bar's rotating
-        verb)."""
-        def frame() -> str:
-            self.track()
-            rows = [r for r in self.rows() if not _STATUS_BAR.search(r)]
-            return _SPINNER.sub("#", _DIGITS.sub("#", "\n".join(rows)))
-        state = {"frame": frame(), "since": time.monotonic()}
+        """Pace input after a turn.
 
-        def settled() -> bool:
-            cur, now = frame(), time.monotonic()
-            if cur != state["frame"]:
-                state["frame"], state["since"] = cur, now
-            return now - state["since"] >= idle
-        try:
-            poll(settled, timeout=timeout, what="a settled frame", interval=0.1)
-        except AssertionError as exc:
-            raise AssertionError(f"{exc}\n--- screen ---\n{self.dump()}") from None
+        The Qubit hero (the 28-row ghost) is intentionally continuous, so no frame is
+        ever byte-identical for long. Waiting for a still frame is both impossible and
+        unnecessary: ``submit`` waits for the composer echo before Enter. Keep a short
+        bounded pause so callers retain their pre-typing pacing without burning the
+        full timeout.
+        """
+        time.sleep(min(max(idle, 0.2), 1.0))
 
     def _raw_mode(self) -> bool:
         fd = os.open(self.pane_tty, os.O_RDWR | os.O_NOCTTY)
