@@ -1,0 +1,7 @@
+name: jev
+version: 1.0.0
+description: "Optional typed decision provider — yes/no probabilities, closed-set distributions and rubric scores from a decision model (Jev), via the OpenCode Zen free tier (OPENCODE_ZEN_API_KEY) or a TypeSafe key. Reports unavailable and changes nothing when no key is configured."
+author: Qubit Labs
+kind: backend
+provides_tools:
+  - jev_decide
