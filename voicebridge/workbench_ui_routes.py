@@ -884,6 +884,22 @@ def h_wb_models(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         rows = [m if isinstance(m, dict) else {"id": str(m)} for m in models]
     else:
         rows = [{"id": str(k)} for k in models]
+    # /api/config carries no flat model list, only per-provider defaults. An
+    # empty picker is not cosmetic: the client then falls back to upstream's
+    # HARDCODED names ("GPT-5.4 Mini"), sends one to /api/chat/start, and the
+    # turn fails deep in the transport with CIRCUIT_OPEN while the pane shows a
+    # blank "Processed" row. Derive the real inventory from the providers Qubit
+    # actually has configured, and label each row with its provider.
+    if not rows:
+        provs = out.get("providers")
+        if isinstance(provs, dict):
+            for pname, pcfg in sorted(provs.items()):
+                if not isinstance(pcfg, dict):
+                    continue
+                mid = str(pcfg.get("default_model") or "").strip()
+                if mid:
+                    rows.append({"id": mid, "provider": pname,
+                                 "label": f"{mid} ({pname})"})
     return 200, {"ok": True, "active": active, "provider": provider,
                  "models": rows}
 
