@@ -1,5 +1,5 @@
 (function() {
-	//#region ../../../../Projects/Repos/qubit-voicebridge/frontend/qubit-web/node_modules/phaser/dist/phaser.esm.js
+	// node_modules/phaser/dist/phaser.esm.js
 	var __webpack_modules__ = {
 		50792(module) {
 			var has = Object.prototype.hasOwnProperty, prefix = "~";
@@ -189420,8 +189420,7 @@ create: function(game) {
 	__webpack_exports__.xv;
 	__webpack_exports__.CB;
 	var __webpack_exports__default = __webpack_exports__.Ay;
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts
+	// ../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts
 	/**
 	* Phaser 4 boots into a container element. The drawing itself stays in the
 	* SAME `RenderModel.draw` a Canvas2D context would receive — Phaser supplies a
@@ -189576,8 +189575,7 @@ create: function(game) {
 	function createPhaserHost() {
 		return new PhaserOfficeHost();
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/input.ts
+	// ../qubit-app/plugins/qubit-office/game/input.ts
 	/** Innermost last. A key is offered in reverse order and stops at the first taker. */
 	var CONTEXT_ORDER = [
 		"world",
@@ -189762,8 +189760,7 @@ create: function(game) {
 		if (state.active.includes(c)) return state;
 		return { active: [...state.active, c] };
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/navigation.ts
+	// ../qubit-app/plugins/qubit-office/game/navigation.ts
 	/** The exterior district: the root of the graph. */
 	var EXTERIOR = { kind: "exterior" };
 	function same(a, b) {
@@ -190015,8 +190012,7 @@ create: function(game) {
 			}
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/colour.ts
+	// ../qubit-app/plugins/qubit-office/game/art/colour.ts
 	/** '#rgb', '#rrggbb', '#rrggbbaa'. Unknown or non-hex input returns magenta.
 	*
 	* Magenta-on-failure is deliberate: a typo'd colour must be LOUD. Returning
@@ -190211,8 +190207,7 @@ create: function(game) {
 			return s / 4294967296;
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/surfaces.ts
+	// ../qubit-app/plugins/qubit-office/game/art/surfaces.ts
 	var THEMES$1 = [
 		{
 			carpet: "#6b7688",
@@ -190519,8 +190514,7 @@ create: function(game) {
 		widthTiles: 16
 	};
 	ROOM.wallFaceTiles + ROOM.floorTiles + ROOM.southTiles;
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/room.ts
+	// ../qubit-app/plugins/qubit-office/game/art/room.ts
 	var THEMES = [
 		{
 			carpet: "#8fa0b8",
@@ -190930,8 +190924,7 @@ create: function(game) {
 		standees.sort((a, b) => a.key - b.key);
 		for (const s of standees) s.draw();
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/scene-adapter.ts
+	// ../qubit-app/plugins/qubit-office/game/art/scene-adapter.ts
 	function occupantsOf(room) {
 		return room.occupants.map((c) => ({
 			agentId: c.agent_id,
@@ -190965,8 +190958,7 @@ create: function(game) {
 			rooms
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/fittings.ts
+	// ../qubit-app/plugins/qubit-office/game/art/fittings.ts
 	function poly(f, pts) {
 		const { ctx, cam } = f;
 		ctx.beginPath();
@@ -191142,8 +191134,7 @@ create: function(game) {
 			for (let i = 0; i < tiles; i++) fill(f, tileDiamond(gx + i, gy + Math.floor(tiles / 2)), mix(r.hi, "#ffffff", .1));
 		});
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/scenes.ts
+	// ../qubit-app/plugins/qubit-office/game/scenes.ts
 	/** Qubit Office's palette. Base colours only — the ramps are derived. */
 	var PALETTE = {
 		void: "#161320",
@@ -191516,8 +191507,7 @@ create: function(game) {
 				text(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 		}
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/InteractionController.ts
+	// ../qubit-app/plugins/qubit-office/game/InteractionController.ts
 	/**
 	* The hotspots for a place. DERIVED from the same geometry the scene painter
 	* uses, so a click always lands on a door that is actually drawn — the classic
@@ -191787,8 +191777,7 @@ create: function(game) {
 			refused: true
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/ui/settings.ts
+	// ../qubit-app/plugins/qubit-office/game/ui/settings.ts
 	/** The settings the shell owns. Ids are stable — they are storage keys. */
 	var SETTINGS = {
 		/** Text zoom. LOCAL: it scales the UI, nothing else. */
@@ -191920,8 +191909,7 @@ create: function(game) {
 			"data-office-scale": String(values.textScale)
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/OfficeGameShell.tsx
+	// ../qubit-app/plugins/qubit-office/game/OfficeGameShell.tsx
 	/**
 	* Build the component the plugin registry wants, bound to the host's React.
 	*
@@ -192216,7 +192204,14 @@ create: function(game) {
 					if (settingsModal) setSettingsModal(false);
 					else setSettingsDrawer(!settingsDrawer);
 				}
-			}, "Settings")
+			}, "Settings"),
+			R.createElement("a", {
+				key: "hud",
+				className: "office-game__btn",
+				href: "/qubit-hud",
+				"data-testid": "office-game-open-hud",
+				"aria-label": "Open HUD"
+			}, "Open HUD")
 		]);
 		const attrs = shellAttributes(settings);
 		const scenes = [];
@@ -192386,8 +192381,7 @@ create: function(game) {
 	function samePlace(a, b) {
 		return a.kind === b.kind && a.building === b.building && a.floor === b.floor && a.room === b.room;
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/office-app.ts
+	// ../qubit-app/plugins/qubit-office/game/app/office-app.ts
 	/** The plugin's served directory, relative to the dashboard base path. */
 	var OFFICE_APP_PATH = "/plugin-apps/qubit-office/habblaud/";
 	/**
@@ -192426,8 +192420,7 @@ create: function(game) {
 		const suffix = query.toString();
 		return suffix ? `${url}?${suffix}` : url;
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/api-bridge.ts
+	// ../qubit-app/plugins/qubit-office/game/app/api-bridge.ts
 	var activeBridges = /* @__PURE__ */ new WeakMap();
 	function installOfficeApiBridge(win, opts = {}) {
 		const prefix = `${(opts.apiPrefix ?? win.__QUBIT_API_PREFIX__ ?? "/agent").replace(/\/+$/, "")}/api/office/habblaud/`;
@@ -192618,8 +192611,7 @@ create: function(game) {
 			ok: true
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/SeatModelPanel.tsx
+	// ../qubit-app/plugins/qubit-office/game/app/SeatModelPanel.tsx
 	function createSeatModelPanel(R, hooks) {
 		const { useState, useEffect } = hooks;
 		return function SeatModelPanel(props) {
@@ -192743,8 +192735,7 @@ create: function(game) {
 			}, children);
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/office-api.ts
+	// ../qubit-app/plugins/qubit-office/game/app/office-api.ts
 	var ROUTES = [
 		{
 			client: "access",
@@ -192796,17 +192787,17 @@ create: function(game) {
 		},
 		{
 			client: "permissions/:id",
-			qubit: null,
+			qubit: "/api/permissions/:id",
 			readOnly: false,
 			gated: true,
-			note: "Permission decisions need the Qubit confirmation authority."
+			note: "A decision settles the shared Qubit approval journal once."
 		},
 		{
 			client: "messages",
-			qubit: null,
+			qubit: "/api/messages",
 			readOnly: false,
 			gated: true,
-			note: "Sending messages is an org mutation requiring confirmation."
+			note: "A send becomes a real office task claimed for the seat."
 		},
 		{
 			client: "terminal/pty",
@@ -192816,15 +192807,15 @@ create: function(game) {
 		},
 		{
 			client: "spawn",
-			qubit: null,
+			qubit: "/api/spawn",
 			readOnly: false,
-			note: "Starting an agent is not exposed through this client adapter."
+			note: "A spawn queues a real office task; no second Claude session."
 		},
 		{
 			client: "renameRoom",
-			qubit: null,
+			qubit: "/api/rooms/rename",
 			readOnly: false,
-			note: "Room rename is not exposed from this embedded app."
+			note: "Room rename writes the real office store."
 		},
 		{
 			client: "deliveries",
@@ -192854,7 +192845,7 @@ create: function(game) {
 			missing,
 			gated,
 			canRender: true,
-			viewOnly: true,
+			viewOnly: false,
 			live: ROUTES.some((route) => route.client === "stream" && !!route.qubit)
 		};
 	}
@@ -192862,8 +192853,7 @@ create: function(game) {
 		const v = bindingVerdict();
 		return `${v.bound.length} bound · ${v.missing.length} unavailable · ${v.gated.length} confirmation-gated`;
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
+	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
 	function connectionText(props) {
 		const state = props.officeState ?? "connecting";
 		const rooms = props.officeRooms ?? 0;
@@ -193027,12 +193017,10 @@ create: function(game) {
 			}, children);
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/types.ts
+	// ../qubit-app/plugins/qubit-office/game/types.ts
 	/** The schema this adapter is written against. A mismatch is refused, not coerced. */
 	var EXPECTED_SCHEMA = "qubit-office-tower/1";
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/adapter.ts
+	// ../qubit-app/plugins/qubit-office/game/adapter.ts
 	/**
 	* Poll cadence. It is deliberately slower than the store's animation tick: the
 	* tower fold takes hundreds of milliseconds, and a sub-second abort/restart
@@ -193196,8 +193184,7 @@ create: function(game) {
 			payload: body
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/entry.ts
+	// ../qubit-app/plugins/qubit-office/game/entry.ts
 	var SDK = window.__QUBIT_PLUGIN_SDK__;
 	if (!SDK || !SDK.React || !SDK.hooks) console.warn("[qubit-office] plugin SDK missing (React/hooks); the game entry cannot register. The Office tab will show no office.");
 	else {
@@ -193301,5 +193288,4 @@ create: function(game) {
 			})))
 		};
 	}
-	//#endregion
 })();

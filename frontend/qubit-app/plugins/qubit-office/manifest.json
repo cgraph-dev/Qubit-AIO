@@ -1,7 +1,7 @@
 {
   "name": "qubit-office",
   "label": "Qubit Office",
-  "description": "Qubit Office — the agent corporation as a place you can walk: floors, rooms, desks and characters that animate only from office_event rows (C7). Reads /api/office/tower, the same store `qubit office` writes. Its one link, Open HUD, navigates to /qubit-hud for the agent's vitals.",
+  "description": "Qubit Office — the agent corporation as a place you can walk: floors, rooms, desks and characters that animate only from office_event rows (C7). Reads /api/office/tower, the same store `qubit office` writes.",
   "icon": "Users",
   "version": "1.0.0",
   "tab": {
