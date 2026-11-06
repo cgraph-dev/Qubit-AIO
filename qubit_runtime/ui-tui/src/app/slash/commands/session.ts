@@ -19,6 +19,11 @@ import type { PanelSection } from '../../../types.js'
 import { applyConfiguredTuiTheme } from '../../createGatewayEventHandler.js'
 import { DEFAULT_INDICATOR_STYLE, INDICATOR_STYLES, type IndicatorStyle } from '../../interfaces.js'
 import { patchOverlayState } from '../../overlayStore.js'
+import {
+  canUseCanonicalSessionCompress,
+  isCanonicalCompressFallback,
+  runCanonicalCompress
+} from '../../sessionCompress.js'
 import { patchUiState } from '../../uiStore.js'
 import type { SlashCommand } from '../types.js'
 
@@ -253,59 +258,91 @@ export const sessionCommands: SlashCommand[] = [
     help: 'compress transcript',
     name: 'compress',
     run: (arg, ctx) => {
-      ctx.gateway
-        .rpc<SessionCompressResponse>('session.compress', {
-          session_id: ctx.sid,
-          ...(arg ? { focus_topic: arg } : {})
-        })
-        .then(
-          ctx.guarded<SessionCompressResponse>(r => {
-            if (Array.isArray(r.messages)) {
-              const rows = toTranscriptMessages(r.messages)
+      const render = ctx.guarded<SessionCompressResponse>(r => {
+        if (Array.isArray(r.lines) && r.lines.length) {
+          for (const line of r.lines) {
+            ctx.transcript.sys(line)
+          }
 
-              ctx.transcript.setHistoryItems(r.info ? [introMsg(r.info), ...rows] : rows)
-            }
+          return
+        }
 
-            if (r.info) {
-              patchUiState({ info: r.info })
-            }
+        if (Array.isArray(r.messages)) {
+          const rows = toTranscriptMessages(r.messages)
 
-            if (r.usage) {
-              patchUiState(state => ({ ...state, usage: { ...state.usage, ...r.usage } }))
-            }
+          ctx.transcript.setHistoryItems(r.info ? [introMsg(r.info), ...rows] : rows)
+        }
 
-            if (r.summary?.headline) {
-              const prefix = r.summary.noop ? '' : '✓ '
+        if (r.info) {
+          patchUiState({ info: r.info })
+        }
 
-              ctx.transcript.sys(`${prefix}${r.summary.headline}`)
+        if (r.usage) {
+          patchUiState(state => ({ ...state, usage: { ...state.usage, ...r.usage } }))
+        }
 
-              if (r.summary.token_line) {
-                ctx.transcript.sys(`  ${r.summary.token_line}`)
-              }
+        if (r.summary?.headline) {
+          const prefix = r.summary.noop ? '' : '✓ '
 
-              if (r.summary.note) {
-                ctx.transcript.sys(`  ${r.summary.note}`)
-              }
+          ctx.transcript.sys(`${prefix}${r.summary.headline}`)
 
-              return
-            }
+          if (r.summary.token_line) {
+            ctx.transcript.sys(`  ${r.summary.token_line}`)
+          }
 
-            if ((r.removed ?? 0) <= 0) {
-              return ctx.transcript.sys(t('slashCmd.session.compress.nothing'))
-            }
+          if (r.summary.note) {
+            ctx.transcript.sys(`  ${r.summary.note}`)
+          }
 
-            const removed = r.removed ?? 0
-            const count = String(removed)
-            const tok = r.usage?.total ? t('slashCmd.session.compress.tokSuffix', compactNumber(r.usage.total)) : ''
+          return
+        }
 
-            ctx.transcript.sys(
-              (removed === 1
-                ? t('slashCmd.session.compress.compressedOne', count)
-                : t('slashCmd.session.compress.compressedOther', count)) + tok
-            )
-          })
+        if ((r.removed ?? 0) <= 0) {
+          return ctx.transcript.sys(t('slashCmd.session.compress.nothing'))
+        }
+
+        const removed = r.removed ?? 0
+        const count = String(removed)
+        const tok = r.usage?.total ? t('slashCmd.session.compress.tokSuffix', compactNumber(r.usage.total)) : ''
+
+        ctx.transcript.sys(
+          (removed === 1
+            ? t('slashCmd.session.compress.compressedOne', count)
+            : t('slashCmd.session.compress.compressedOther', count)) + tok
         )
-        .catch(ctx.guardedErr)
+      })
+
+      const legacy = () =>
+        ctx.gateway
+          .rpc<SessionCompressResponse>('session.compress', {
+            session_id: ctx.sid,
+            ...(arg ? { focus_topic: arg } : {})
+          })
+          .then(render)
+          .catch(ctx.guardedErr)
+
+      if (!ctx.sid || !canUseCanonicalSessionCompress(ctx.gateway.gw)) {
+        return legacy()
+      }
+
+      runCanonicalCompress(ctx.gateway.gw, ctx.sid, arg)
+        .then(render)
+        .catch(err => {
+          // An older/out-of-sync backend that never served `session.mutate`: retry the
+          // legacy verb exactly once, with the raw wire text kept in `/logs`. A failure
+          // after a committed mutate is never retried — the mutation already landed.
+          if (!isCanonicalCompressFallback(err)) {
+            return ctx.guardedErr(err)
+          }
+
+          const code = (err as { code?: number }).code
+
+          ctx.gateway.gw.recordLog(
+            `[compress] session.mutate unavailable (${code === undefined ? 'out-of-sync' : `code=${code}`}); retrying session.compress`
+          )
+
+          return legacy()
+        })
     }
   },
 

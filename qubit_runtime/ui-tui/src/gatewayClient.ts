@@ -207,6 +207,10 @@ export class GatewayClient extends EventEmitter {
   private bufferedRequests: ServerRequest[] = []
   private pendingExit: number | null | undefined
   private ready = false
+  // The authority-advertised canonical session capability. The WebSocket authority sets
+  // `session_authority` on the first frame; the stdio sidecar never does, so a shell TUI
+  // only selects `session.mutate` against a backend that really serves it.
+  private sessionAuthority = false
   private readyTimer: ReturnType<typeof setTimeout> | null = null
   private subscribed = false
   private drainGeneration = 0
@@ -238,9 +242,15 @@ export class GatewayClient extends EventEmitter {
     return this.attachUrl !== null
   }
 
+  /** True when the connected backend advertised the canonical `session.mutate` authority. */
+  get hasSessionAuthority(): boolean {
+    return this.sessionAuthority
+  }
+
   private publish(ev: AnyGatewayEvent) {
     if (ev.type === 'gateway.ready') {
       this.ready = true
+      this.sessionAuthority = (ev as GatewayEvent<'gateway.ready'>).payload?.session_authority === true
       this.clearReconnect()
       this.reconnectAttempts = 0
 

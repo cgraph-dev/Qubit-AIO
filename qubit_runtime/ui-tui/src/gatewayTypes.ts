@@ -280,6 +280,8 @@ export interface SessionCompressResponse {
   before_messages?: number
   before_tokens?: number
   info?: SessionInfo
+  /** Canonical `session.mutate compress --preview` report lines (read-only). */
+  lines?: string[]
   messages?: TranscriptMessage[]
   removed?: number
   summary?: {
