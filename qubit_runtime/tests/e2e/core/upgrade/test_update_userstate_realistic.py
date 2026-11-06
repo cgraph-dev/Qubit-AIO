@@ -259,7 +259,7 @@ def conflicting_leg(world):
     (installed into the tree by a third-party tool) sits next to it."""
     sb = world["sb"]
     assert world["update"].returncode == 0, I.describe(world["update"])
-    ext = sb.checkout / "plugins" / "my-inplace-ext"
+    ext = sb.runtime / "plugins" / "my-inplace-ext"
     ext.mkdir(parents=True, exist_ok=True)
     (ext / "__init__.py").write_text("NAME = 'my-inplace-ext'\n", encoding="utf-8")
     (ext / "server.py").write_text("PORT = 8754\n", encoding="utf-8")

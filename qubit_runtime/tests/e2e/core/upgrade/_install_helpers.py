@@ -105,6 +105,12 @@ class Sandbox:
         return self.qubit_home / "qubit"
 
     @property
+    def runtime(self) -> Path:
+        """The runtime source root inside the checkout (``qubit_runtime/`` in the Qubit repo)."""
+        nested = self.checkout / "qubit_runtime"
+        return nested if nested.is_dir() else self.checkout
+
+    @property
     def qubit(self) -> str:
         """The canonical command the installer put on PATH, as a user's shell resolves it."""
         return str(self.home / ".local" / "bin" / "qubit")

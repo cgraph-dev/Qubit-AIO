@@ -46,6 +46,15 @@ PYTESTMARK = [
 ]
 
 
+def source_path(rel: str) -> str:
+    """A runtime-source-relative path as a checkout (git toplevel) path.
+
+    Upstream's runtime tree IS the checkout root; Qubit vendors it under ``qubit_runtime/``, so a
+    path a test reads from ``HEAD`` or writes into a release commit needs that prefix.
+    """
+    return H.repo_rel(H.WORKTREE / rel)
+
+
 def output(cp: subprocess.CompletedProcess) -> str:
     return (cp.stdout or "") + (cp.stderr or "")
 
@@ -122,6 +131,11 @@ class World:
     @property
     def checkout(self) -> Path:
         return self.sb.checkout
+
+    @property
+    def runtime(self) -> Path:
+        """The runtime source root inside the checkout (``qubit_runtime/`` in the Qubit repo)."""
+        return self.sb.runtime
 
     def git_env(self) -> dict[str, str]:
         """Host-side git with the sandbox's HOME: its URL rewrite, never the real GitHub."""

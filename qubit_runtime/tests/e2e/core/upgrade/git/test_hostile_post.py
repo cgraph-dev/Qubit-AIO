@@ -227,7 +227,7 @@ def _facts(w: G.World, cp=None, **extra) -> str:
 
 
 def _head_file(w: G.World, rel: str) -> str:
-    return w.git("show", f"HEAD:{rel}") + "\n"
+    return w.git("show", f"HEAD:{G.source_path(rel)}") + "\n"
 
 
 def _hostile_web_mjs(w: G.World) -> str:
@@ -247,8 +247,8 @@ def _hostile_web_mjs(w: G.World) -> str:
 def _publish_web_release(w: G.World, tag: str) -> str:
     """A release whose web build obeys the toggles and whose web inputs changed (web UI stale)."""
     return w.publish(f"release: e2e hostile post web {tag}", {
-        "scripts/build/web.mjs": _hostile_web_mjs(w),
-        f"web/e2e-hostile-post-{tag}.txt": f"web input changed by release {tag}\n",
+        G.source_path("scripts/build/web.mjs"): _hostile_web_mjs(w),
+        G.source_path(f"web/e2e-hostile-post-{tag}.txt"): f"web input changed by release {tag}\n",
     })
 
 
@@ -260,7 +260,7 @@ def _publish_gateway_fault_release(w: G.World, tag: str) -> str:
         assert m, "premise: qubit_cli/gateway.py has no run_gateway() with a docstring to inject after"
         text = text[:m.end()] + _HOSTILE_GATEWAY + text[m.end():]
     return w.publish(f"release: e2e hostile post gateway {tag}", {
-        "qubit_cli/gateway.py": text,
+        G.source_path("qubit_cli/gateway.py"): text,
         f"docs/e2e-hostile-post-{tag}.txt": f"release {tag}\n",
     })
 
@@ -273,7 +273,7 @@ def _publish_deps_fault_release(w: G.World, tag: str) -> str:
         assert m, "premise: pm/client.py has no ensure_tools_for_sync() with a docstring to inject after"
         text = text[:m.end()] + _HOSTILE_DEPS + text[m.end():]
     return w.publish(f"release: e2e hostile post deps {tag}", {
-        "pm/client.py": text,
+        G.source_path("pm/client.py"): text,
         f"docs/e2e-hostile-post-{tag}.txt": f"release {tag}\n",
     })
 
@@ -388,7 +388,7 @@ def test_failed_web_build_after_commit_is_a_followup_not_a_failed_update(w):
     assert cp.returncode == 0 and w.head() == target, f"the healing update failed:\n{diag}"
     assert not _followups(rec), f"the healing update still reports followups:\n{diag}"
     assert not _pending_markers(w), f"the healing update left the completion obligation armed:\n{diag}"
-    assert (w.checkout / "qubit_cli" / "web_dist" / "index.html").is_file(), \
+    assert (w.runtime / "qubit_cli" / "web_dist" / "index.html").is_file(), \
         f"the healing update did not build the web UI:\n{diag}"
 
 
@@ -556,7 +556,7 @@ def test_sticky_profile_update_logs_and_receipts_land_in_the_root_home(w):
             f"root latest.json is not this run's success:\n{diag}"
         # The readers follow the writers: `hermes logs update` under the profile shows the root log.
         logs_cp = w.sb.cli("logs", "update", "-n", "400", timeout=300)
-        assert logs_cp.returncode == 0 and "hermes update started" in G.output(logs_cp), \
+        assert logs_cp.returncode == 0 and "qubit update started" in G.output(logs_cp), \
             f"`hermes logs update` under the sticky profile does not show the root update.log:\n{H.describe(logs_cp)}\n{diag}"
     finally:
         w.sb.cli("profile", "use", "default", timeout=300)

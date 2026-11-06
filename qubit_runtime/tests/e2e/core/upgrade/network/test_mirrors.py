@@ -51,7 +51,7 @@ def test_pip_mirror_update_restages_pm_runtime_through_the_mirror(inst):
     """The new upstream commit changes the PM runtime's inputs (``pm/pyproject.toml``), so the
     update must restage that runtime from ``pm/uv.lock``. pip.conf names the mirror; the public
     index is unreachable. The update must land, restage through the mirror, and never ask pypi."""
-    pm = inst.sb.checkout / "pm"
+    pm = inst.sb.runtime / "pm"
     wheels: dict[str, list] = {}
     for name, url, sha in S.lock_wheels(pm / "uv.lock"):
         path = S.prefetch(url, sha, inst.root / "pypi-mirror" / url.rsplit("/", 1)[1])
