@@ -20,7 +20,13 @@ from __future__ import annotations
 
 import subprocess
 
-from tests.e2e.core.parity._helpers import TURN_TIMEOUT, DriveResult, ParityHome, hermes_argv
+from tests.e2e.core.parity._helpers import (
+    TURN_TIMEOUT,
+    DriveResult,
+    ParityHome,
+    hermes_argv,
+    stop_profile_gateway,
+)
 from tests.fakes.fake_llm_provider import FakeLLMServer
 
 
@@ -40,7 +46,12 @@ def drive_oneshot(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResul
 def drive_chat_q(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResult:
     proc = _run_cli(ph, "chat", "-q", prompt, "-Q")
     assert proc.returncode == 0, f"hermes chat -q exited {proc.returncode}: {proc.stderr[-2000:]}"
-    return DriveResult(final_text=proc.stdout.strip(), toolset="hermes-cli")
+    # chat -q attaches to the session authority; with no gateway running it auto-starts a
+    # detached --idle-exit daemon that owns the turn (and its MCP servers). That daemon is
+    # part of this surface, so its normal SIGTERM shutdown is the end of the entrypoint.
+    stopped = stop_profile_gateway(ph)
+    return DriveResult(final_text=proc.stdout.strip(), toolset="hermes-cli",
+                       graceful_exit=stopped, extra={"gateway_stopped": stopped})
 
 
 # --- ported from upstream pin (wave 25 short-port) ---

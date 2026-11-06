@@ -226,7 +226,10 @@ def _go_live(name: str) -> Optional[dict[str, Any]]:
     if server is not None and (servers or note):
         from qubit_constants import get_qubit_home
         try:
-            server.refresh_plugin_sessions(Path(get_qubit_home()), activation["key"], note)
+            # The server's contract is (home, note); the plugin key is only the caller's diagnostic
+            # label. Passing it through shifted ``note`` and raised TypeError, so a live activation
+            # reported connected tools while every open chat kept its old tool registry.
+            server.refresh_plugin_sessions(Path(get_qubit_home()), note)
         except Exception:
             logger.warning("open chats were not refreshed after activating %r", name, exc_info=True)
     return activation

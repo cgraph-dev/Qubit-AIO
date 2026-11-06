@@ -250,3 +250,28 @@ def test_chat_refuses_a_non_native_engine_for_an_interactive_session(capsys):
 
     assert exc.value.code == 2
     assert "only supported for non-interactive single-query runs" in capsys.readouterr().err
+
+
+def test_oneshot_registers_the_configured_shell_hooks(monkeypatch):
+    """``-z`` runs its agent in THIS process, but main's startup classifies every chat command as
+    gateway-owned and skips the shell-hook registration. Without this call a one-shot turn loses
+    every ``hooks.pre_llm_call`` context injection (plugin hooks still fire)."""
+    import agent.shell_hooks as shell_hooks
+    import qubit_cli.config as config_mod
+
+    captured = {}
+    calls = []
+    monkeypatch.setattr(
+        oneshot, "_run_agent",
+        _fake_run_agent("ok", {"final_response": "ok", "completed": True}, captured),
+    )
+    monkeypatch.setattr(config_mod, "load_config", lambda: {"hooks": {"pre_llm_call": []}})
+    monkeypatch.setattr(shell_hooks, "register_from_config",
+                        lambda cfg, **kwargs: calls.append((cfg, kwargs)))
+
+    assert oneshot.run_oneshot("hello") == 0
+    assert len(calls) == 1
+    cfg, kwargs = calls[0]
+    assert cfg == {"hooks": {"pre_llm_call": []}}
+    assert kwargs.get("accept_hooks") is True
+    assert kwargs.get("interactive") is False

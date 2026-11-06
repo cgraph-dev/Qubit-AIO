@@ -18,6 +18,7 @@ import json
 import os
 import queue
 import re
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -357,6 +358,59 @@ class Spawned:
 _SID_RE = re.compile(r"^session_id:\s*(\S+)\s*$", re.M)
 
 
+def _pid_environ(pid: int) -> bytes:
+    try:
+        with open(f"/proc/{pid}/environ", "rb") as fh:
+            return fh.read()
+    except OSError:
+        return b""
+
+
+def _pid_cmdline(pid: int) -> str:
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as fh:
+            return fh.read().replace(b"\0", b" ").decode(errors="replace")
+    except OSError:
+        return ""
+
+
+def stop_oneshot_gateway(env: dict[str, str], timeout: float = 60.0) -> None:
+    """Stop the detached ``--idle-exit`` gateway a ``chat -q`` client auto-starts for this home.
+
+    ``-q`` is gateway-backed: with no daemon serving the home it spawns one and returns once the
+    turn is committed, leaving the daemon to idle out after 10 minutes. The journey below is a
+    sequence of FRESH processes against ONE store; a left-over daemon owns the home and the next
+    ``tui_gateway.entry`` refuses to start ("owned by a running gateway"). SIGTERM is the daemon's
+    normal shutdown (the same signal ``qubit gateway stop`` sends); matching on ``QUBIT_HOME``
+    keeps the signal on THIS test's tmp home, never a real install (the suite is marked
+    ``live_system_guard_bypass`` for exactly this detached-child case).
+    """
+    if not os.path.isdir("/proc"):
+        return
+    home = str(env.get("QUBIT_HOME") or "")
+    if not home:
+        return
+    needle = f"QUBIT_HOME={home}".encode()
+    pids = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit():
+            continue
+        cmd = _pid_cmdline(int(entry))
+        if "qubit_cli.main" in cmd and " gateway " in f" {cmd} " and " run" in cmd:
+            if needle in _pid_environ(int(entry)).split(b"\0"):
+                pids.append(int(entry))
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not any(_pid_cmdline(pid) for pid in pids):
+            return
+        time.sleep(0.1)
+
+
 def run_oneshot(env: dict[str, str], cwd: Path, prompt: str, spawned: Spawned, *,
                 resume: str | None = None, timeout: float = 180.0) -> tuple[str, str]:
     """``hermes chat -q PROMPT -Q [--resume SID]`` in a fresh process -> (stdout, durable sid)."""
@@ -374,6 +428,8 @@ def run_oneshot(env: dict[str, str], cwd: Path, prompt: str, spawned: Spawned, *
     assert p.returncode == 0, f"oneshot rc={p.returncode}; stderr tail: {err[-3000:]}"
     sids = _SID_RE.findall(err)
     assert sids, f"oneshot printed no session_id line; stderr tail: {err[-2000:]}"
+    # Leave the durable store free for the next FRESH surface (see stop_oneshot_gateway).
+    stop_oneshot_gateway(env)
     return out, sids[-1]
 
 

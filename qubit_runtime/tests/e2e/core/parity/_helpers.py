@@ -445,6 +445,43 @@ def hermes_argv(*args: str) -> list[str]:
     return [sys.executable, "-m", "qubit_cli.main", *args]
 
 
+def _pid_cmdline(pid: int) -> str:
+    try:
+        with open(f"/proc/{pid}/cmdline", "rb") as fh:
+            return fh.read().replace(b"\0", b" ").decode(errors="replace")
+    except OSError:
+        return ""
+
+
+def _is_unmanaged_gateway(pid: int) -> bool:
+    """A ``qubit ... gateway run`` daemon (the shape a client entrypoint auto-starts)."""
+    argv = _pid_cmdline(pid).split()
+    return "qubit_cli.main" in argv and "gateway" in argv and "run" in argv
+
+
+def stop_profile_gateway(ph: ParityHome, timeout: float = 60.0) -> bool:
+    """Stop the ``--idle-exit`` gateway this fixture's client entrypoint started.
+
+    Client surfaces (chat -q, ACP, cron run) attach to the session authority and start a
+    detached unmanaged gateway when none is running. That daemon is part of the surface and
+    owns the MCP servers, so the entrypoint is only fully shut down once it stops. SIGTERM is
+    its normal shutdown (not this suite's SIGKILL sweep) and it reaps its MCP tree on the way
+    out. Returns True when no such gateway is left for this fixture home.
+    """
+    pids = [pid for pid in tagged_pids(ph.tag) if _is_unmanaged_gateway(pid)]
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except OSError:
+            pass
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not [pid for pid in tagged_pids(ph.tag) if _is_unmanaged_gateway(pid)]:
+            return True
+        time.sleep(0.1)
+    return False
+
+
 def terminate(proc: subprocess.Popen, timeout: float = 30.0) -> int | None:
     """Graceful SIGTERM (the normal stop), SIGKILL only if it overstays."""
     if proc.poll() is None:
