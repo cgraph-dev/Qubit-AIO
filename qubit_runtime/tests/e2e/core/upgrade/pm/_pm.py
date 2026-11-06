@@ -81,9 +81,11 @@ def pending_marker(sb: I.Sandbox) -> Path:
 
 
 def lazy_env(sb: I.Sandbox) -> dict[str, str]:
-    """The sandbox env WITHOUT the suite-wide ``QUBIT_DISABLE_LAZY_INSTALLS``: a real user's
-    launch, which finishes an owed source-update tail before it imports the app."""
+    """The sandbox env WITHOUT the suite-wide lazy-install switch: a real user's launch, which
+    finishes an owed source-update tail before it imports the app. The product reads the legacy
+    ``HERMES_`` spelling (the ``QUBIT_`` alias is a harness half-rebrand)."""
     env = dict(sb.env)
+    env.pop("HERMES_DISABLE_LAZY_INSTALLS", None)
     env.pop("QUBIT_DISABLE_LAZY_INSTALLS", None)
     return env
 
