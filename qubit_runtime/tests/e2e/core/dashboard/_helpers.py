@@ -41,7 +41,7 @@ _STRIP_SUFFIXES = ("_API_KEY", "_TOKEN", "_BASE_URL", "_SECRET", "_ACCESS_KEY", 
 _STRIP_PREFIXES = ("HERMES_", "OPENAI", "ANTHROPIC", "OPENROUTER", "AWS_", "AZURE_", "GOOGLE_", "GEMINI",
                    "PYTEST_", "NOUS_", "XAI_", "LLM_", "CUSTOM_", "TERMINAL_", "DASH_")
 _TOKEN_RE = re.compile(r'__QUBIT_SESSION_TOKEN__\s*=\s*"([^"]+)"')
-_READY_RE = re.compile(r"HERMES_DASHBOARD_READY port=(\d+)")
+_READY_RE = re.compile(r"(?:HERMES|QUBIT)_DASHBOARD_READY port=(\d+)")
 
 
 def real_user_home() -> Path:
