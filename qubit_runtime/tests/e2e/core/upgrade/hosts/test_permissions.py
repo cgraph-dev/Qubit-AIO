@@ -45,8 +45,12 @@ ACTIONABLE = re.compile(r"(?i)permission denied|read-only|not writable|no write 
 
 
 def _chmod_code(sb: I.Sandbox, *, writable: bool) -> None:
+    # The PM store lands inside the checkout in the monorepo layout, so not every
+    # upstream code dir exists beside the home; chmod the ones this install has.
     for name in CODE_DIRS:
-        subprocess.run(["chmod", "-R", "u+w" if writable else "a-w", str(sb.qubit_home / name)], check=True)
+        path = sb.qubit_home / name
+        if path.exists():
+            subprocess.run(["chmod", "-R", "u+w" if writable else "a-w", str(path)], check=True)
 
 
 @pytest.fixture(scope="module")

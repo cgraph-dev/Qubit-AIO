@@ -826,7 +826,7 @@ def _probe_failure_next_step(name: str, exc: BaseException) -> str:
     if _is_auth_error(root) or getattr(getattr(root, "response", None), "status_code", None) in (401, 403):
         return f"The server rejected the sign-in. Run: qubit mcp login {name}"
     if isinstance(root, NodeAbiMismatchError):
-        return f"After rebuilding it under Hermes's Node as above, run: qubit mcp test {name}"
+        return f"After rebuilding it under Qubit's Node as above, run: qubit mcp test {name}"
     if "missing executable" in _format_connect_error(exc):
         return (f"Install that command, or set mcp_servers.{name}.command in {display_qubit_home()}/config.yaml "
                 "to its full path.")
