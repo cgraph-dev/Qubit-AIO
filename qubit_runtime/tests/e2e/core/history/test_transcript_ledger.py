@@ -57,6 +57,12 @@ from tests.fakes.fake_llm_provider import (
     write_qubit_home,
 )
 
+
+# The journey stops the detached --idle-exit gateway a `chat -q` hop auto-starts so a
+# later FRESH surface can own the same store; that child is outside the pytest subtree
+# and matches this fixture home exactly.
+pytestmark = pytest.mark.live_system_guard_bypass
+
 # ---------------------------------------------------------------------------------------------
 # scripted model
 

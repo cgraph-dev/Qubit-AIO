@@ -17,7 +17,14 @@ import threading
 import time
 from typing import Any
 
-from tests.e2e.core.parity._helpers import TURN_TIMEOUT, DriveResult, ParityHome, hermes_argv, terminate
+from tests.e2e.core.parity._helpers import (
+    TURN_TIMEOUT,
+    DriveResult,
+    ParityHome,
+    hermes_argv,
+    stop_profile_gateway,
+    terminate,
+)
 from tests.fakes.fake_llm_provider import FakeLLMServer
 
 ACP_TOOLSET = "hermes-acp"  # acp_adapter/session.py::_expand_acp_enabled_toolsets default
@@ -133,6 +140,10 @@ def drive_acp(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResult:
             except subprocess.TimeoutExpired:
                 graceful = False
                 terminate(proc)
+            # The ACP process is a viewer/caller: it attaches to the session authority and
+            # auto-starts a detached --idle-exit gateway that runs the turn and owns the MCP
+            # servers. Stop that daemon (normal SIGTERM) as part of the surface shutdown.
+            graceful = stop_profile_gateway(ph) and graceful
     return DriveResult(
         final_text="".join(client.chunks),
         toolset=ACP_TOOLSET,

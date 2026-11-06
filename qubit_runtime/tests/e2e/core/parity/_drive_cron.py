@@ -20,7 +20,13 @@ from __future__ import annotations
 import re
 import subprocess
 
-from tests.e2e.core.parity._helpers import TURN_TIMEOUT, DriveResult, ParityHome, hermes_argv
+from tests.e2e.core.parity._helpers import (
+    TURN_TIMEOUT,
+    DriveResult,
+    ParityHome,
+    hermes_argv,
+    stop_profile_gateway,
+)
 from tests.fakes.fake_llm_provider import FakeLLMServer
 
 # cron/scheduler.py::_resolve_cron_enabled_toolsets -> _get_platform_tools(cfg, "cron") default.
@@ -50,6 +56,11 @@ def drive_cron(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResult:
     # worker this driver cannot observe — a harness problem, not a parity result.
     assert "Ran now:" in ran.stdout, f"hermes cron run did not execute synchronously: {ran.stdout[-1000:]}"
 
+    # `cron run` executes through the session authority, which auto-starts a detached
+    # --idle-exit gateway (the process that owns the job's MCP servers). Stop it as part of
+    # the surface's normal shutdown before the orphan sweep.
+    gateway_stopped = stop_profile_gateway(ph)
+
     outputs = sorted((ph.qubit_home / "cron" / "output" / job_id).glob("*.md"))
     final_text = None
     if outputs:
@@ -60,9 +71,10 @@ def drive_cron(ph: ParityHome, srv: FakeLLMServer, prompt: str) -> DriveResult:
         final_text=final_text,
         toolset=CRON_TOOLSET,
         cwd_channel="job workdir",
-        graceful_exit=True,  # both CLI invocations exited on their own (subprocess.run, no signal)
+        graceful_exit=gateway_stopped,  # both CLI invocations exited on their own; daemon stopped normally
         extra={
             "job_id": job_id,
+            "gateway_stopped": gateway_stopped,
             "run_stdout": ran.stdout.strip()[-500:],
             "run_succeeded": "Ran now: succeeded." in ran.stdout,
             "output_file": str(outputs[-1]) if outputs else None,

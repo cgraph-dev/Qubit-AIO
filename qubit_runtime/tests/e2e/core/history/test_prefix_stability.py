@@ -43,6 +43,12 @@ from tests.e2e.core.history._helpers import (
 )
 from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall, write_qubit_home
 
+
+# The journey stops the detached --idle-exit gateway a `chat -q` hop auto-starts so a
+# later FRESH surface can own the same store; that child is outside the pytest subtree
+# and matches this fixture home exactly.
+pytestmark = pytest.mark.live_system_guard_bypass
+
 # A hop is (surface, cwd, turns); a turn is its prompt, "TOOLS:<prompt>" (parallel tool batch
 # first) or "/compress" (gateway only). Every hop is a FRESH process.
 Hop = tuple[str, str, list[str]]

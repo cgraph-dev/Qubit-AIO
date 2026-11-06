@@ -383,16 +383,19 @@ def _quiet():
 
 
 class ReadFaults:
-    """Counts every read of config.yaml through the lowest-level YAML read seam
-    (``qubit_cli.config.fast_safe_load`` — every config.yaml reader in qubit_cli.config,
-    ``read_user_config_raw`` and therefore tui_gateway go through it) and fails chosen reads with
-    a transient ``EMFILE`` on an otherwise intact file."""
+    """Counts every read of config.yaml through the lowest-level YAML read seam and fails chosen
+    reads with a transient ``EMFILE`` on an otherwise intact file.
+
+    The seam moved when config I/O was split out of ``qubit_cli/config.py``: ``read_config_doc``
+    now lives in ``qubit_cli/config_backend.py`` and does ``from utils import fast_safe_load`` at
+    call time, so patching only ``qubit_cli.config.fast_safe_load`` sees nothing. Patch the real
+    ``utils.fast_safe_load`` (which also backs ``load_yaml_file_readonly``) *and* the module-level
+    alias, so every reader this suite exercises is counted/faulted."""
 
     def __init__(self, monkeypatch, config_path: Path):
         self.path = os.path.abspath(str(config_path))
         self.count = 0
         self.fail_at: set[int] = set()
-        real = C.fast_safe_load
 
         def wrapped(stream):
             name = getattr(stream, "name", None)
@@ -401,6 +404,10 @@ class ReadFaults:
                 if self.count in self.fail_at:
                     raise OSError(errno.EMFILE, "Too many open files (C18 injected)")
             return real(stream)
+        import utils as _utils
+        real = _utils.fast_safe_load
+        monkeypatch.setattr(_utils, "fast_safe_load", wrapped)
+        # ``qubit_cli.config`` imported the function at module load; keep that alias in lockstep.
         monkeypatch.setattr(C, "fast_safe_load", wrapped)
 
     def arm(self, *ks: int) -> None:
@@ -437,8 +444,10 @@ def test_p1_noop_save_is_byte_identical(seed, home, monkeypatch):
     _noop_save_roundtrip(gen_case(seed, null_leaves=False), monkeypatch)
 
 
-@pytest.mark.parametrize("seed", [101, 102])
+@pytest.mark.parametrize("seed", [102, 103])
 def test_p1_explicit_null_leaves_survive_a_noop_save(seed, home, monkeypatch):
+    # The generator draws nulls probabilistically; these seeds are verified to produce at
+    # least one (seed 101 no longer does after the documented-key set changed).
     case = gen_case(seed)
     assert any(v is None for v in _leaves(case.tree).values()), f"seed {seed} generated no null leaf"
     _noop_save_roundtrip(case, monkeypatch)
@@ -501,6 +510,11 @@ def _cli_key(path: tuple) -> str:
 
 def _set_value_for(path: tuple, default: Any, current: Any, rng: random.Random) -> tuple[str, Any]:
     """(CLI string, the value it must persist as). Only unambiguous encodings."""
+    if path == ("display", "language"):
+        # A closed enum: the setter correctly refuses an arbitrary token (it names the
+        # supported packs), so pick a bundled language instead of a generated word.
+        v = "de" if current != "de" else "fr"
+        return v, v
     if isinstance(default, bool):
         v = not current if isinstance(current, bool) else not default
         return ("true" if v else "false"), v
