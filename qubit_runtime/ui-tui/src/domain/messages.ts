@@ -30,7 +30,13 @@ export const toTranscriptMessages = (rows: unknown): Msg[] => {
       continue
     }
 
-    const { context, display_kind, name, role, text, timestamp } = row as TranscriptRow
+    const { context, display_kind, name, role, timestamp } = row as TranscriptRow
+    const text =
+      typeof (row as TranscriptRow).text === 'string'
+        ? (row as TranscriptRow).text
+        : typeof (row as TranscriptRow).content === 'string'
+          ? (row as TranscriptRow).content
+          : undefined
 
     const createdAt =
       typeof timestamp === 'number' && Number.isFinite(timestamp) && timestamp > 0 ? timestamp : undefined
@@ -126,5 +132,7 @@ interface TranscriptRow {
   name?: string
   role?: string
   text?: string
+  /** Canonical gateway history rows carry `content`; the stdio sidecar carries `text`. */
+  content?: string
   timestamp?: number
 }

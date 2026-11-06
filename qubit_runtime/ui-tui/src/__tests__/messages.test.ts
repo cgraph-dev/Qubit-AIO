@@ -28,6 +28,18 @@ describe('toTranscriptMessages', () => {
     expect(toTranscriptMessages(rows)[1]?.tools?.[0]).toContain('Search Files')
   })
 
+  it('accepts canonical gateway history rows that carry content', () => {
+    const rows = [
+      { role: 'user', content: 'canonical prompt' },
+      { role: 'assistant', content: 'canonical answer' }
+    ]
+
+    expect(toTranscriptMessages(rows).map(msg => [msg.role, msg.text])).toEqual([
+      ['user', 'canonical prompt'],
+      ['assistant', 'canonical answer']
+    ])
+  })
+
   it('skips hidden display_kind rows entirely', () => {
     const rows = [
       { role: 'user', text: 'visible prompt' },

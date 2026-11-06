@@ -75655,7 +75655,8 @@ var init_messages2 = __esm({
         if (!row || typeof row !== "object") {
           continue;
         }
-        const { context, display_kind, name, role, text: text2, timestamp } = row;
+        const { context, display_kind, name, role, timestamp } = row;
+        const text2 = typeof row.text === "string" ? row.text : typeof row.content === "string" ? row.content : void 0;
         const createdAt = typeof timestamp === "number" && Number.isFinite(timestamp) && timestamp > 0 ? timestamp : void 0;
         if (role === "tool") {
           pending.push(buildToolTrailLine(name ?? "tool", context ?? ""));
