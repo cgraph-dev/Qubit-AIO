@@ -313,7 +313,10 @@ def provider_hosts(catalog: list[Row]) -> set[str]:
 
 def evaluate(t: TurnResult, catalog: list[Row]) -> dict[str, bool]:
     """Every invariant of one row. Relationship checks only — never literals of today's output."""
-    inference = [r for r in t.requests if r.method == "POST"]
+    # Inference = POST requests to a chat/anthropic/responses endpoint. A local provider's native
+    # management probe (LM Studio POST /api/v1/models/load) is not an inference call.
+    inference = [r for r in t.requests if r.method == "POST"
+                 and not r.path.split("?", 1)[0].endswith("/api/v1/models/load")]
     # A transport mandated by the provider's own host may fall back to chat at a foreign URL.
     expected = {t.row.dialect} | ({"chat"} if t.row.host_mandated else set())
     main = [r for r in inference if isinstance(r.body, dict) and r.body.get("tools")]
