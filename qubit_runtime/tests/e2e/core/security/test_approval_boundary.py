@@ -38,6 +38,10 @@ from tests.fakes.fake_llm_provider import FakeLLMServer, Text, ToolCall
 pytestmark = pytest.mark.skipif(sys.platform == "win32", reason="POSIX shell variants + process-group harness")
 
 MANUAL = "approvals:\n  mode: manual\n  timeout: 120\n"
+# The gateway registers this harness under a FAKE platform name (``fk_ap``), whose implicit toolset
+# (``hermes-fk_ap``) resolves to no tools; pin the real telegram bundle so the gateway agent carries
+# ``terminal``, the tool these scenarios drive through the real approval path.
+GATEWAY_MANUAL = MANUAL + "platform_toolsets:\n  fk_ap:\n    - hermes-telegram\n"
 
 # name -> command template; ``{X}`` is the victim dir, relative to the terminal's cwd.
 VARIANTS: Dict[str, str] = {
@@ -198,7 +202,7 @@ def gateway(tmp_path_factory):
     root = tmp_path_factory.mktemp("approval-gw")
     with FakeLLMServer(model) as srv:
         gw = GatewayProcess(root, platforms={PLATFORM: "telegram"}, llm_base_url=srv.base_url,
-                            extra_config=MANUAL + "updates:\n  check: false\n")
+                            extra_config=GATEWAY_MANUAL + "updates:\n  check: false\n")
         gw.start()
         try:
             yield gw, model, root / "victims"

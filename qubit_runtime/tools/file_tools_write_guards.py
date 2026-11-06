@@ -365,7 +365,14 @@ def _check_approval_required_write(paths: list[str], task_id: str = "default") -
     except Exception:
         return None
 
-    targets = [p for p in paths if is_write_approval_required(p)]
+    # Judge the same RESOLVED target the write will hit. A relative path (or a
+    # symlinked parent) is anchored to the task's workspace, which can differ from
+    # the process cwd (a gateway/CLI launches from the install tree); checking the
+    # raw spelling against the process cwd misses ``~/.ssh/config`` reached through
+    # the workspace and lets the approval gate be bypassed.
+    targets = [p for p in paths
+               if is_write_approval_required(p)
+               or is_write_approval_required(_resolved_or_raw(p, task_id))]
     if not targets:
         return None
 

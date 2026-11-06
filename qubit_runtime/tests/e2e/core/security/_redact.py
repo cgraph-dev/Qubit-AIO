@@ -48,7 +48,13 @@ class Secrets:
 
 # The user explicitly runs without approval prompts, so the credential-in-command scan does not block the
 # tool-argument scenario before the command executes (that guard is covered by the approvals lane).
-CONFIG = "approvals:\n  mode: \"off\"\n"
+# The gateway registers this harness under a FAKE platform name (``fk_tg``), so its implicit toolset
+# (``hermes-fk_tg``) resolves to no tools; pin the real telegram bundle so the gateway agent carries the
+# core tools this lane drives through the REAL tool path. The CLI surface ignores this section.
+CONFIG = (
+    "approvals:\n  mode: \"off\"\n"
+    "platform_toolsets:\n  fk_tg:\n    - hermes-telegram\n"
+)
 
 
 def core(value: str) -> str:

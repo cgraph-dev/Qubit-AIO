@@ -1084,3 +1084,46 @@ class TestMultiplexProfileWriteGuardsAreProfileScoped:
             reset_qubit_home_override(tok)
         assert err is not None
         assert "Refusing to write to Qubit config file" in err
+
+
+class TestSshConfigApprovalGateThroughWorkspace:
+    """The approval gate judges the RESOLVED write target, not the raw spelling.
+
+    A gateway/CLI process runs from the install tree while the session works in
+    another directory. A relative path (or a symlinked parent) must therefore be
+    resolved against the task's workspace before the ``~/.ssh/config`` approval
+    check, or a spelling like ``sshdir/config`` reaches the protected file with no
+    human approval (the shell layer only hard-denies key material, not config).
+    """
+
+    def test_relative_symlinked_ssh_config_is_gated_from_another_process_cwd(self, tmp_path: Path, monkeypatch):
+        import json
+
+        from tools.file_tools import read_file_tool, write_file_tool
+        from tools.terminal_tool import clear_session_cwd, record_session_cwd
+
+        home = tmp_path / "home"
+        ws = home / "work"
+        (home / ".ssh").mkdir(parents=True)
+        ws.mkdir(parents=True)
+        target = home / ".ssh" / "config"
+        target.write_text("Host original\n", encoding="utf-8")
+        (ws / "sshdir").symlink_to(home / ".ssh")
+
+        monkeypatch.setenv("HOME", str(home))
+        monkeypatch.setenv("HERMES_SINGLE_QUERY_SESSION", "1")
+        monkeypatch.delenv("HERMES_YOLO", raising=False)
+        monkeypatch.chdir(tmp_path)  # process cwd is NOT the session workspace
+
+        task_id = "ssh-approval-rel"
+        record_session_cwd(task_id, str(ws))
+        try:
+            # Reading first satisfies write_file's stale-overwrite guard, so the
+            # approval gate — not that guard — is what must refuse the write.
+            assert "Host original" in read_file_tool("sshdir/config", task_id=task_id)
+            result = json.loads(write_file_tool("sshdir/config", "Host evil\n", task_id=task_id))
+        finally:
+            clear_session_cwd(task_id)
+
+        assert result.get("error"), result
+        assert target.read_text(encoding="utf-8") == "Host original\n"
