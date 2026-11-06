@@ -114,6 +114,146 @@
       "changes": [
         "Qubit-authored. Carry-over of the rebrand convention (voicebridge/qubit_plugins.rebrand_catalog_text) as pure text helpers: legacy-product substitutions, tab labels for the seven in-scope tabs, surface title."
       ]
+    },
+    {
+      "here": "collectors_sudo.py",
+      "upstream": "backend/collectors/sudo.py",
+      "upstream_lines": 200,
+      "adapted": true,
+      "changes": [
+        "Transcript mentions read through QubitSessionStore instead of a second sqlite3 opener on state.db",
+        "Outcome inference (exit_code/tool-blob regex, gateway.log prose scrape) removed; the approvals journal's real decision states are reported instead",
+        "The sudo rule is read from the LIVE voicebridge.safety.policy verdict rather than re-derived",
+        "Returns a JSON-ready dict"
+      ]
+    },
+    {
+      "here": "collectors_replay.py",
+      "upstream": "backend/collectors/replay.py",
+      "upstream_lines": 124,
+      "adapted": true,
+      "changes": [
+        "QubitSessionStore.list()/messages() replace the direct sqlite3 reads",
+        "tool_calls/reasoning/token_count reported null with a per-run reason (the authority publishes none)",
+        "rewind is reported as an available, confirmation-gated counterpart but never invoked"
+      ]
+    },
+    {
+      "here": "collectors_corrections.py",
+      "upstream": "backend/collectors/corrections.py",
+      "upstream_lines": 178,
+      "adapted": true,
+      "changes": [
+        "Reads the MemoryStore supersedes/history ledger instead of keyword-grepping MEMORY.md/USER.md and LIKE-scanning messages",
+        "The invented minor/major/critical severity is dropped; the store's own source field is shown",
+        "Connection opened with PRAGMA query_only before any SELECT"
+      ]
+    },
+    {
+      "here": "collectors_patterns.py",
+      "upstream": "backend/collectors/patterns.py",
+      "upstream_lines": 301,
+      "adapted": true,
+      "changes": [
+        "The SQL aggregates are re-expressed over QubitSessionStore rows (no direct state.db access, no window-function JOIN)",
+        "Hour histogram computed in Python from started_at (the authority has no SQL seam)",
+        "tool_workflows returned null with a reason instead of an empty list",
+        "Added a daily token rollup from QubitSessionStore.analytics_usage"
+      ]
+    },
+    {
+      "here": "collectors_verify.py",
+      "upstream": null,
+      "upstream_lines": 0,
+      "adapted": false,
+      "changes": [
+        "Qubit-authored: upstream has no verify collector (the tab shelled `hermes verify`)",
+        "Re-hashes voicebridge.checkpoints entries; an empty index is NO_CHECKPOINTS, never a pass"
+      ]
+    },
+    {
+      "here": "collectors_providers.py",
+      "upstream": "backend/collectors/providers.py",
+      "upstream_lines": 0,
+      "adapted": false,
+      "changes": [
+        "Qubit-authored: the upstream collector behind the 13-line stub router shelled `hermes auth`",
+        "Projects voicebridge.credentials.inventory + voicebridge.auth_status; no value, fragment or preview is read"
+      ]
+    },
+    {
+      "here": "collectors_projects.py",
+      "upstream": "backend/collectors/projects.py",
+      "upstream_lines": 272,
+      "adapted": true,
+      "changes": [
+        "Reads the voicebridge.projects registry instead of projects.db + a ~/projects directory scan",
+        "Git enrichment kept, but activity is bucketed from %ct rather than parsing a locale-dependent '3 days ago' string",
+        "Bounded: one git status per repo, a per-project timeout, and a projects inspection budget"
+      ]
+    },
+    {
+      "here": "collectors_profiles.py",
+      "upstream": "backend/collectors/profiles.py",
+      "upstream_lines": 400,
+      "adapted": true,
+      "changes": [
+        "Per-profile session totals read through QubitSessionStore on a profile-scoped cfg",
+        "systemctl service probe, outbound local-server probe and .env key-name scan removed (ProfileInfo.has_env answers the last one)"
+      ]
+    },
+    {
+      "here": "profiles_shim.py",
+      "upstream": null,
+      "upstream_lines": 0,
+      "adapted": false,
+      "changes": [
+        "Qubit-authored helper: registry binding mirroring qubit_compat._profiles_module, and profile-scoped cfg construction",
+        "Never mutates QUBIT_HOME (process-global); derives the home from a cfg whose state dir is the profile home"
+      ]
+    },
+    {
+      "here": "collectors_memory.py",
+      "upstream": "backend/collectors/memory.py",
+      "upstream_lines": 126,
+      "adapted": true,
+      "changes": [
+        "Reads voicebridge.active_memory.status + MemoryStore rows instead of parsing MEMORY.md/USER.md",
+        "The \u00a7-split, regex category tables and the 2200/1375 char budgets are not ported (they describe an upstream prompt limit)",
+        "PRAGMA query_only before any SELECT"
+      ]
+    },
+    {
+      "here": "collectors_gateway.py",
+      "upstream": "backend/collectors/gateway.py",
+      "upstream_lines": 414,
+      "adapted": true,
+      "changes": [
+        "Reads voicebridge.gateway_supervisor.status (a superset) and the RPC registry instead of gateway_state.json + a pid probe",
+        "run_action (detached CLI subprocess + log) removed: the HUD is a viewer",
+        "Per-platform rows come from the daemon's own platforms_map; absence is a typed reason"
+      ]
+    },
+    {
+      "here": "collectors_live_chat.py",
+      "upstream": null,
+      "upstream_lines": 0,
+      "adapted": false,
+      "changes": [
+        "Qubit-authored: no chat WebSocket exists (QUBIT_WS_GATE_CODES refuses a second transport)",
+        "Serves the WS refusal plus a polled snapshot of voicebridge.events.journal (RUN_STARTED/STATE_SNAPSHOT tail)"
+      ]
+    },
+    {
+      "here": "collectors_live_models.py",
+      "upstream": null,
+      "upstream_lines": 0,
+      "adapted": false,
+      "changes": [
+        "Qubit-authored: per-model capability rows via agent.models_dev (the /api/model/info path)",
+        "Model ids come from the dashboard picker payload (refresh=False, no probe)",
+        "Recent real-call failures surfaced from voicebridge.providers.dead_models"
+      ]
     }
   ],
   "upstream_api_reference": {
@@ -131,20 +271,138 @@
       "POST /plugins/rescan|install|{name}/enable|disable|show|hide|update (upstream plugin writers)"
     ]
   },
-  "dropped_tabs": {
-    "sudo_governance": "HUD classified sudo from gateway.log prose; Qubit keeps no structured sudo-approval ledger to read.",
-    "replay": "Upstream replayed state.db rows through its verified schema; Qubit's schema genuinely differs and the session authority exposes no replay/rewind read model.",
-    "corrections": "Qubit records no correction events.",
-    "patterns": "Qubit records no pattern-mining events.",
-    "verify": "HUD shelled `hermes verify`; Qubit has no verify command or verify artifact.",
-    "providers": "HUD shelled `hermes auth`; the credential facts Qubit does expose feed the health tab's credential-presence rows instead of a separate panel.",
-    "projects": "Qubit's projects.db has no single-writer public read seam.",
-    "profiles": "Qubit profiles are independent islands; a cross-profile aggregate would need a second home reader.",
-    "memory": "Memory providers are plugin-owned and expose no single read authority.",
-    "gateway": "Qubit gateway control is an operator/action surface (voicebridge.approvals), not a read-only collector.",
-    "live_chat": "Out of scope by owner decision; needs a websocket this package does not own.",
-    "live_model_capabilities": "Collapsed into collectors_model_info, which reads the real models.dev catalog Qubit ships."
-  },
+  "dropped_tabs": {},
   "no_route_registered": true,
-  "recorded_by": "hudwave/hud-core backend pass, 2026-11-06"
+  "recorded_by": "voicebridge/hud/PROVENANCE.json \u2014 updated 2026-11-06 when the twelve panels were restored; every `previous_claim` above is preserved verbatim so the measurement that overturned it stays checkable.",
+  "panels_restored": {
+    "_record": "The previous revision of this file listed twelve tabs under `dropped_tabs` on claims that Qubit had no data (e.g. 'Qubit records no correction events', 'MemoryStore exposes no single read authority'). Each claim was re-measured against the worktree on 2026-11-06 and found false: the inputs were either already published by a Qubit module or reachable through the session authority. The list is kept here with its evidence so the claim can be re-checked, not re-asserted. Decision values: PORT (upstream logic over Qubit inputs), MAP (Qubit equivalent, adapted), GAP (genuinely absent; typed reason returned).",
+    "sudo_governance": {
+      "collector": "collectors_sudo.py",
+      "decision": "MAP",
+      "previous_claim": "Qubit keeps no structured sudo-approval ledger to read.",
+      "evidence": [
+        "voicebridge/safety/policy.py DESTRUCTIVE_PATTERNS matches \\bsudo\\b and SafetyPolicy.check() returns require_confirm",
+        "voicebridge/approvals.py ApprovalJournal is a durable append-only JSONL state machine (in_progress/executing/complete/denied/aborted) at <state_dir>/approvals.jsonl",
+        "voicebridge/qubit_session_store.QubitSessionStore publishes role/content/timestamp rows for the mention scan"
+      ],
+      "not_ported": "upstream's outcome inference from tool-result JSON and a gateway.log prose scrape (a guess, not a record)"
+    },
+    "replay": {
+      "collector": "collectors_replay.py",
+      "decision": "MAP",
+      "previous_claim": "the session authority exposes no replay/rewind read model.",
+      "evidence": [
+        "QubitSessionStore.list() returns id/title/source/model/started_at/last_active/message_count/tool_call_count/tokens",
+        "QubitSessionStore.messages(sid, limit, offset) returns {state, messages[{role,content,timestamp,meta}], total, limit, offset}",
+        "QubitSessionStore.rewind() exists as a confirmation-gated mutation (never called from the HUD)"
+      ],
+      "not_ported": "per-step tool_calls/reasoning/token_count \u2014 null with an on-screen reason"
+    },
+    "corrections": {
+      "collector": "collectors_corrections.py",
+      "decision": "MAP",
+      "previous_claim": "Qubit records no correction events.",
+      "evidence": [
+        "voicebridge/memory/store.py memories.supersedes column + history table",
+        "MemoryStore.correct() writes action='corrected' (payload {superseded_by,to}) and action='correct' (payload {supersedes})",
+        "callers: voicebridge/memory/semantic.py:787, voicebridge/memory/journal.py:252, voicebridge/evaluation/runner.py:143"
+      ],
+      "not_ported": "upstream's memory-file keyword heuristic and its invented minor/major/critical severity"
+    },
+    "patterns": {
+      "collector": "collectors_patterns.py",
+      "decision": "PORT (+ tool sequences GAP)",
+      "previous_claim": "Qubit records no pattern-mining events.",
+      "evidence": [
+        "upstream mined nothing durable either: four SQL aggregates over sessions/messages at request time",
+        "every input is published by QubitSessionStore.list()/messages() (title, message_count, tool_call_count, started_at, first user message)",
+        "daily token rollup reuses QubitSessionStore.analytics_usage \u2014 the same function GET /api/analytics serves"
+      ],
+      "not_ported": "tool_workflows trigrams: the authority publishes no ordered tool-name sequence; returned null with a reason"
+    },
+    "verify": {
+      "collector": "collectors_verify.py",
+      "decision": "MAP",
+      "previous_claim": "Qubit has no verify command and no verify artifact to read.",
+      "evidence": [
+        "voicebridge/checkpoints.create() records a sha256 + line count of the action journal",
+        "voicebridge/checkpoints.verify(name) recomputes the digest and returns OK/TAMPERED/MISSING",
+        "list_all()/verify() are read-only; prune() is never called"
+      ],
+      "note": "no upstream collector exists for this tab (upstream shelled `hermes verify`), so this file contains no upstream code"
+    },
+    "providers": {
+      "collector": "collectors_providers.py",
+      "decision": "MAP",
+      "previous_claim": "HUD shelled `hermes auth`; the credential facts feed the health tab instead of a separate panel.",
+      "evidence": [
+        "voicebridge/credentials.inventory() returns per-provider entries with id/label/auth_type/source/priority/last_status/request_count/has_refresh and an explicitly empty token_preview",
+        "voicebridge/auth_status.auth_status() returns key_ref kind (env/file/missing) + allowlisted per provider"
+      ],
+      "not_ported": "the `hermes auth` shell-out and any network probe: /api/providers/validate is a recorded refusal (_NO_NETWORK_PROBE)"
+    },
+    "projects": {
+      "collector": "collectors_projects.py",
+      "decision": "PORT",
+      "previous_claim": "Qubit's projects.db has no single-writer public read seam.",
+      "evidence": [
+        "Qubit has no projects.db; voicebridge/projects.py is the canonical registry (schema qubit-projects/1)",
+        "list_projects(cfg) backs the CLI `qubit project`, the dashboard Projects page and GET /api/profiles/projects/tree"
+      ],
+      "not_ported": "upstream's raw ~/projects directory scan (a folder is not a project)"
+    },
+    "profiles": {
+      "collector": "collectors_profiles.py (+ profiles_shim.py)",
+      "decision": "MAP",
+      "previous_claim": "a cross-profile aggregate would need a second home reader.",
+      "evidence": [
+        "the profile registry (voicebridge/qubit_compat.py::_profiles_module binding) is a deliberately shared list surface",
+        "QubitSessionStore is constructed from a cfg, so a profile-scoped cfg reads THAT island's totals through the same authority \u2014 no second opener"
+      ],
+      "not_ported": "systemctl per profile, an outbound local-server probe, and an .env KEY/TOKEN/SECRET substring scan"
+    },
+    "memory": {
+      "collector": "collectors_memory.py",
+      "decision": "MAP",
+      "previous_claim": "Memory providers are plugin-owned and expose no single read authority.",
+      "evidence": [
+        "voicebridge/active_memory.status(cfg) is one authority (state/enabled/min_score/max_items/store_state/store_path/memories/estop) and GET /api/memory serves it",
+        "voicebridge/memory/store.py owns tiers/scope/kind/confidence/sensitivity/tombstoned/staged rows"
+      ],
+      "not_ported": "MEMORY.md/USER.md \u00a7-splitting, the regex category tables, and the upstream 2200/1375 char budgets (a prompt limit Qubit does not enforce)"
+    },
+    "gateway": {
+      "collector": "collectors_gateway.py",
+      "decision": "PORT (status) / refuse (actions)",
+      "previous_claim": "Qubit gateway control is an operator/action surface, not a read-only collector.",
+      "evidence": [
+        "voicebridge/gateway_supervisor.status(cfg) is a superset of upstream's gateway_state.json read: unit, active/sub state, pid, port probe, n_restarts, health, daemon snapshot, control socket",
+        "daemon.platforms_map carries per-platform state",
+        "voicebridge/gateway/rpc.py default_registry().names() is the RPC surface GET /api/gateway/rpc serves"
+      ],
+      "not_ported": "upstream's run_action (detached subprocess of the CLI); the HUD is a viewer"
+    },
+    "live_chat": {
+      "collector": "collectors_live_chat.py",
+      "decision": "GAP (stream) + MAP (snapshot)",
+      "previous_claim": "Out of scope by owner decision; needs a websocket this package does not own.",
+      "evidence": [
+        "voicebridge/webui.py QUBIT_WS_GATE_CODES refuses /api/ws, /api/pub, /api/audio/speak-stream and /api/plugins/kanban/events with WS_SINGLE_PATH",
+        "voicebridge/events/journal.py EventJournal over <state_dir>/typed-events.jsonl is the durable single event path (redacted at write); it carries RUN_STARTED/RUN_FINISHED/RUN_CANCELLED/STATE_SNAPSHOT"
+      ],
+      "gap": "no chat WebSocket; the panel is a polled snapshot and says so on screen"
+    },
+    "live_model_capabilities": {
+      "collector": "collectors_live_models.py",
+      "decision": "MAP (caps) + GAP (probe)",
+      "previous_claim": "Collapsed into collectors_model_info, which reads the real models.dev catalog Qubit ships.",
+      "evidence": [
+        "agent.models_dev.get_model_capabilities(provider, model) is the same call GET /api/model/info makes (_CAPABILITY_FIELDS)",
+        "voicebridge/chat_transport.resolve_route/resolve_model give the model a turn actually uses",
+        "qubit_cli.inventory.build_model_options_payload(refresh=False) gives the ids the dashboard picker offers",
+        "voicebridge/providers/dead_models records recent REAL call failures"
+      ],
+      "gap": "no live probe endpoint; /api/providers/validate is a recorded refusal, so rows say 'catalog', never 'pinged'"
+    }
+  }
 }

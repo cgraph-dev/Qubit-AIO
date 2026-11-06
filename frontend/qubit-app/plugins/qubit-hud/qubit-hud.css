@@ -673,3 +673,53 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* ---- the twelve restored panels ---------------------------------------
+ * Section 14 of the bundle adds no new layout primitives: every restored
+ * panel composes the same .hud__panel / .hud__stats / .hud__table / .hud-row
+ * / .hud-chip / .hud-state pieces the seven original tabs use, so the page
+ * stays one visual system. What is added here is only the few things those
+ * panels need that did not exist before: a wide tab strip that stays usable
+ * at nineteen items, and readable multi-line cells for transcript excerpts.
+ */
+
+/* Nineteen tabs on a narrow viewport: the strip scrolls (it always could), and
+ * a thin scrollbar keeps the overflow discoverable instead of invisible. */
+.hud__tabs {
+  scrollbar-width: thin;
+  scrollbar-color: var(--hud-muted) transparent;
+}
+
+.hud__tabs::-webkit-scrollbar {
+  height: 6px;
+}
+
+.hud__tabs::-webkit-scrollbar-thumb {
+  background: var(--hud-muted);
+  border-radius: 3px;
+}
+
+/* A transcript excerpt (Replay, Corrections, Live Chat) is prose, not a code
+ * token: it wraps and keeps its own line breaks, and is bounded in height so
+ * one long message cannot push the rest of the panel off screen. */
+.hud-row__desc--prose {
+  white-space: pre-wrap;
+  max-height: 9.5em;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* A verdict that is not OK must be readable at a glance: the tampered and
+ * missing counts in Verify already carry --warn/--bad tones on their stat
+ * value, and this adds the same weight to the row's state chip. */
+.hud-chip--bad {
+  font-weight: 600;
+}
+
+/* The "not available at this layer" notes (Replay trace, Patterns tool
+ * sequences, Live Chat transport, Live Models probe) are explanation, not a
+ * failure of the page: they sit in the standard empty state but without the
+ * alert role, so a screen reader does not announce them as errors. */
+.hud-state--note .hud-state__title {
+  color: var(--hud-ink);
+}
