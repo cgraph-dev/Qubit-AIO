@@ -61,7 +61,7 @@ def test_pip_mirror_update_restages_pm_runtime_through_the_mirror(inst):
     pip_conf.parent.mkdir(parents=True, exist_ok=True)
     pip_conf.write_text(f"[global]\nindex-url = {mirror.url}/simple/\n", encoding="utf-8")
     pyproject = (pm / "pyproject.toml").read_text(encoding="utf-8")
-    new = inst.publish("pm-runtime-input", {"pm/pyproject.toml": pyproject + "\n# e2e: PM runtime input change\n"})
+    new = inst.publish("pm-runtime-input", {S.source_path("pm/pyproject.toml"): pyproject + "\n# e2e: PM runtime input change\n"})
     before = inst.state()
     edge = inst.edge(sites=[mirror])
     try:
