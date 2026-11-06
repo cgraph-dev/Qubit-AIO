@@ -1,9 +1,9 @@
 # WIP — inline TUI resize splice (vendored qubit-ink)
 
-**Status:** open. This file records the investigation for the remaining four
-`test_resize_ledger.py` cells. No renderer change is shipped: every attempted fix
-either duplicated or lost transcript rows, so the four cells are still red on
-`e2e/tui-resize` (base `fix/e2e-final` `bd36a2c5e`).
+**Status:** resolved. The four inline cells pass on `e2e/tui-resize` with the
+`LogUpdate` scrollback-boundary fix described under "Resolution" below. The
+upstream-shaped no-`3J` resize patch from this WIP was measured unsafe and is not
+shipped; the evidence is in the same section.
 
 ## Scope
 
@@ -126,3 +126,62 @@ the regenerated `hermes-build.json` in the same change.
 - **Product app:** correct — the last frame has every word once.
 - **Test:** correct — alternate-screen passes; inline is the documented
   main-screen (dashboard) mode.
+
+
+## Resolution — real root cause and shipped fix
+
+Instrumenting every `LogUpdate.render` call (dumped to JSONL, reverted) showed the
+app frame is correct in every frame, and identified the frame that corrupts the
+physical screen: at the end of a turn the idle "Available Tools" help panel
+expands for a few frames, inserting **7 rows above the transcript** and shifting
+the whole conversation down (H 76 → 83 → 76). The transcript's older rows are in
+tmux scrollback.
+
+`LogUpdate.render` handled main-screen scrollback rows by *ignoring* them
+(`if (!altScreen) return`) while still patching the visible rows. On a shift that
+is worse than either choice: the scrollback keeps the old rows and the visible
+region gets the shifted rows, so text is duplicated at the boundary and a block
+at the tail is lost. Replaying the exact byte stream after the last resize into
+`tests/e2e/core/terminal/_vt.Screen` reproduced the duplicate block, proving the
+emitted bytes — not the terminal state — are wrong.
+
+**Shipped:** when one main-screen frame changes both rows above the viewport
+(terminal scrollback) and rows inside it (or grows), `LogUpdate` now emits the
+same full reset it already uses for resize/offscreen and repaints the whole
+frame. A pure scrollback-only change is still ignored (its unit test still
+passes), so a timer in old history does not cause repeated resets.
+`log-update.ts` only; no `ink.tsx`/`clearTerminal.ts` change was needed.
+
+```
+cd qubit_runtime
+TMPDIR=/tmp PYTHONPATH="$PWD:$PWD/.." \
+  /home/trick/Projects/Repos/Qubit/.venv/bin/python -m pytest \
+  tests/e2e/core/tui_pty/test_resize_ledger.py -q
+# 22 passed
+```
+
+Unit: `log-update.test.ts` gains a main-screen reset case (23 tests with
+`ink-focus-redraw.test.ts`); `test_modals_resize.py` stays green (10 passed).
+
+### Why the proposed no-`3J` resize repaint was not shipped
+
+Measured, not assumed:
+
+- tmux maps `CSI 3J` to clearing its history (probe: fill 68 rows at 110 cols,
+  resize to 90, `2J 3J H` + rewrite 68 rows at 90 → history 39, exactly
+  `H - V + 1`; a control run without the rewrite keeps the 107-row reflowed
+  history).
+- The inline transcript's content width is narrower than the terminal (gutters,
+  rails), so tmux's character reflow of the old buffer does **not** produce the
+  same row count the app lays out at the new width. Skipping `3J` and repainting
+  the full frame appends the frame after the retained, differently-reflowed
+  scrollback (measured: 1692 screen words vs 392 persisted in attempt 1 above).
+  Repainting only `H - V + 1` from the current cursor cannot fix a boundary that
+  does not match.
+- Therefore, on a width change, the only coherent repaint is "clear visible
+  screen **and** scrollback, then write the frame from home" — the current resize
+  behavior. The four red cells were not caused by the resize reset; they were
+  caused by the scrollback-boundary shift above, which the fix now handles.
+
+The rebuild note above still applies: the committed `ui-tui/dist/entry.js` and
+`hermes-build.json` were regenerated with this source change.

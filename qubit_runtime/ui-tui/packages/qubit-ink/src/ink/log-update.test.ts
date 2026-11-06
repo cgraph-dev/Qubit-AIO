@@ -212,6 +212,31 @@ describe('LogUpdate.render diff contract', () => {
     expect(stdoutOnly(diff)).not.toContain('timer2s')
   })
 
+  it('resets main screen when a scrollback change also shifts visible rows', () => {
+    // A layout change above the viewport (e.g. the idle help panel growing)
+    // shifts the whole transcript. The terminal cannot rewrite scrollback, so
+    // patching only the visible rows would splice old and new content together.
+    // Repaint the whole frame instead.
+    const w = 20
+    const viewportH = 5
+    const h = 8
+
+    const prev = mkScreen(w, h)
+    paint(prev, 0, 'old top')
+    paint(prev, 6, 'visible prompt')
+
+    const next = mkScreen(w, h)
+    paint(next, 0, 'new top')
+    paint(next, 6, 'shifted prompt')
+    next.damage = { x: 0, y: 0, width: w, height: h }
+
+    const log = new LogUpdate({ isTTY: true, stylePool })
+    const diff = log.render(mkFrame(prev, w, viewportH, h), mkFrame(next, w, viewportH, h), false, false)
+
+    expect(diff.some(p => p.type === 'clearTerminal')).toBe(true)
+    expect(stdoutOnly(diff)).toContain('shiftedprompt')
+  })
+
   it('keeps alt-screen full reset for unreachable scrollback row changes', () => {
     const w = 20
     const viewportH = 5
