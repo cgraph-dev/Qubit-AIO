@@ -20,16 +20,44 @@
  *
  * WHAT THIS PAGE IS
  * -----------------
- * Seven read-only tabs over routes that already exist in this build:
+ * Nineteen read-only tabs. Seven read routes that already existed when the HUD
+ * was absorbed; twelve more were DROPPED by a previous revision on the claim
+ * that Qubit had no data, were measured again from both trees, and are read
+ * from the collectors under `voicebridge/hud/` — each of which records its
+ * PORT/MAP/GAP decision and the evidence in its own docstring.
  *
- *   Health    GET /api/health, /api/health/idle
- *   Sessions  GET /api/sessions, /api/sessions/stats, /api/sessions/search,
- *                 /api/sessions/{id}/messages, /api/sessions/{id}/timeline
- *   Cron      GET /api/cron/jobs, /api/cron/jobs/{id}, /api/cron/jobs/{id}/runs
- *   Models    GET /api/model/options   (plus /api/model/info)
- *   Skills    GET /api/skills
- *   Plugins   GET /api/dashboard/plugins, /api/dashboard/plugins/catalog
- *   Costs     GET /api/analytics, /api/sessions/stats
+ *   Health       GET /api/health, /api/health/idle
+ *   Sessions     GET /api/sessions, /api/sessions/stats, /api/sessions/search,
+ *                /api/sessions/{id}/messages, /api/sessions/{id}/timeline
+ *   Cron         GET /api/cron/jobs, /api/cron/jobs/{id}, /api/cron/jobs/{id}/runs
+ *   Models       GET /api/model/options   (plus /api/model/info)
+ *   Skills       GET /api/skills
+ *   Plugins      GET /api/dashboard/plugins, /api/dashboard/plugins/catalog
+ *   Costs        GET /api/analytics, /api/sessions/stats
+ *   Sudo         GET /api/hud/sudo
+ *   Replay       GET /api/hud/replay (?session_id=)
+ *   Corrections  GET /api/hud/corrections
+ *   Patterns     GET /api/hud/patterns
+ *   Verify       GET /api/hud/verify
+ *   Providers    GET /api/hud/providers
+ *   Projects     GET /api/hud/projects
+ *   Profiles     GET /api/hud/profiles
+ *   Memory       GET /api/hud/memory
+ *   Gateway      GET /api/hud/gateway
+ *   Live Chat    GET /api/hud/live-chat     (a polled snapshot, see §14k)
+ *   Live Models  GET /api/hud/live-models   (catalog caps, no probe, see §14l)
+ *
+ * THE TWELVE RESTORED TABS — WHAT THEY DO NOT PRETEND
+ * --------------------------------------------------
+ * Three of them carry a hole the backend refuses to paper over, and each says
+ * so ON SCREEN rather than drawing an empty chart:
+ *   - Replay shows no per-step tool trace (the session authority publishes
+ *     role/content/timestamp only);
+ *   - Patterns shows no tool-sequence graph for the same reason;
+ *   - Live Chat opens no WebSocket (this build refuses a second transport with
+ *     `WS_SINGLE_PATH`) and Live Models issues no probe (`/api/providers/
+ *     validate` is a recorded refusal). Both render the refusal, then whatever
+ *     real register does exist.
  *
  * The route strings are literal and unrebased (`/api/...`) because the host's
  * `fetchJSON` adds the SPA's API prefix and the session auth itself. This file
@@ -2150,7 +2178,1348 @@
   }
 
   /* ======================================================================
-   * 13. THE TABS — one table, so the strip and the body cannot disagree.
+   * 14. THE TWELVE RESTORED PANELS.
+   *
+   * READ THE DOCSTRINGS IN voicebridge/hud/collectors_*.py BEFORE EDITING.
+   * Each of these tabs was dropped once on a claim that Qubit had no data; the
+   * backend modules re-derived the truth and every one of them records a
+   * PORT/MAP/GAP decision with the evidence. This section follows the same
+   * discipline, and the rules are unchanged from the seven tabs above:
+   *
+   *   - every caller is a GET against /api/hud/<panel>;
+   *   - a payload that says `available: false` renders its `detail` text, so a
+   *     missing source is never drawn as a zero;
+   *   - a field the backend reports as null (a trace step it cannot read) is
+   *     rendered as an explicit note, never as an empty column;
+   *   - nothing here writes, and no control is rendered that would imply it.
+   * ==================================================================== */
+
+  var HUD = {
+    sudo: "/api/hud/sudo",
+    replay: "/api/hud/replay",
+    corrections: "/api/hud/corrections",
+    patterns: "/api/hud/patterns",
+    verify: "/api/hud/verify",
+    providers: "/api/hud/providers",
+    projects: "/api/hud/projects",
+    profiles: "/api/hud/profiles",
+    memory: "/api/hud/memory",
+    gateway: "/api/hud/gateway",
+    liveChat: "/api/hud/live-chat",
+    liveModels: "/api/hud/live-models"
+  };
+
+  /* These panels read stores and journals rather than live counters, so their
+   * intervals are slower than the seven above and still above the floor. */
+  var HUD_POLL = {
+    sudo: 15000,
+    replay: 15000,
+    corrections: 30000,
+    patterns: 60000,
+    verify: 30000,
+    providers: 30000,
+    projects: 30000,
+    profiles: 30000,
+    memory: 30000,
+    gateway: 5000,
+    liveChat: 10000,
+    liveModels: 60000
+  };
+
+  /* The one honest gate every restored panel uses. The backend agents answer
+   * `{available, detail, ...}`; when `available` is false the reason the
+   * collector gave is the whole panel, not a decoration under an empty chart. */
+  function Unavailable(props) {
+    return e(StateBox, {
+      kind: "empty",
+      title: props.title || "Not available from this build",
+      route: props.route,
+      detail: props.detail || "The collector reported no source."
+    });
+  }
+
+  function availOf(d) {
+    return !isObj(d) || d.available !== false;
+  }
+
+  /* A JSON object rendered as key/value rows, with the same em-dash discipline
+   * as `KV`: a null is the dash, never a zero. */
+  function mapRows(map, limit) {
+    var out = [];
+    var ks = keysOf(map).sort();
+    var n = limit || ks.length;
+    for (var i = 0; i < ks.length && i < n; i++) {
+      var v = map[ks[i]];
+      out.push([label(ks[i]), v === null || v === undefined ? null : String(v)]);
+    }
+    return out;
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14a. SUDO GOVERNANCE — /api/hud/sudo
+   *
+   * Three separate reads, shown separately and never summed: the live safety
+   * POLICY rule for sudo, the confirmation JOURNAL's real decision states, and
+   * transcript MENTIONS (a bounded text scan — not executions). The backend
+   * refuses to infer an outcome, so this panel shows decision states instead of
+   * inventing "success"/"failed" per command.
+   * ------------------------------------------------------------------- */
+  function SudoTab() {
+    var st = useRead(HUD.sudo, [], HUD_POLL.sudo);
+    return e(Ready, {
+      state: st, what: "sudo governance",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!isObj(d.policy) || !isObj(d.journal)) {
+          return "no `policy`/`journal` objects";
+        }
+        return null;
+      },
+      render: function (d) {
+        var pol = d.policy || {};
+        var jr = d.journal || {};
+        var tr = d.transcripts || {};
+        var states = jr.by_state || {};
+        var policyPanel = e(Panel, {
+          title: "Confirmation rule",
+          hint: pol.available ? "live policy" : "unavailable"
+        },
+          pol.available === false
+            ? e(Unavailable, { route: HUD.sudo, detail: pol.detail })
+            : e(KV, { rows: [
+                ["Triggers on", pol.pattern || null],
+                ["Requires confirmation",
+                  pol.requires_confirmation === null || pol.requires_confirmation === undefined
+                    ? "unknown" : (pol.requires_confirmation ? "yes" : "no")],
+                ["Reason", pol.confirm_reason || null],
+                ["Approval mode", pol.approval_mode || null],
+                ["Approval timeout",
+                  pol.approval_timeout_s ? pol.approval_timeout_s + "s" : null]
+              ] })
+        );
+
+        var journalPanel = e(Panel, {
+          title: "Confirmation journal", wide: true,
+          hint: jr.authority || ""
+        },
+          jr.available === false
+            ? e(Unavailable, { route: HUD.sudo, detail: jr.detail })
+            : e(React.Fragment, null,
+                e(StatGrid, null,
+                  e(Stat, { label: "Pending", value: num(jr.pending),
+                            tone: jr.pending > 0 ? "warn" : "" }),
+                  e(Stat, { label: "Settled records",
+                            value: num(jr.total_terminal) }),
+                  e(Stat, { label: "Complete", value: num(states.complete),
+                            tone: "ok" }),
+                  e(Stat, { label: "Denied", value: num(states.denied),
+                            tone: states.denied > 0 ? "warn" : "" }),
+                  e(Stat, { label: "Aborted", value: num(states.aborted) }),
+                  e(Stat, { label: "Journal file",
+                            value: jr.path_present ? "present" : "absent" })
+                ),
+                (jr.by_capability || []).length === 0
+                  ? e(StateBox, {
+                      kind: "empty", title: "No settled approval",
+                      route: HUD.sudo,
+                      detail: "The journal holds no terminal record yet, so there is no capability to rank."
+                    })
+                  : e(Table, {
+                      caption: "Settled records by capability",
+                      cols: [
+                        { key: "capability", label: "Capability" },
+                        { key: "count", label: "Count", num: true }
+                      ],
+                      rows: jr.by_capability
+                    }),
+                (jr.recent || []).length > 0
+                  ? e(Table, {
+                      caption: "Most recent settled records",
+                      cols: [
+                        { label: "Capability", render: function (r) {
+                            return label(r.capability); } },
+                        { label: "State", render: function (r) {
+                            return e(Chip, {
+                              tone: r.state === "complete" ? "ok"
+                                : r.state === "denied" ? "warn" : ""
+                            }, label(r.state)); } },
+                        { label: "Decision", render: function (r) {
+                            return text(r.decision); } },
+                        { label: "Actor", render: function (r) {
+                            return clip(r.actor, 40) || DASH; } },
+                        { label: "Created", render: function (r) {
+                            return fmtAgoIso(r.created_at); } },
+                        { label: "Summary", trunc: true, render: function (r) {
+                            return clip(r.summary, 90); } }
+                      ],
+                      rows: jr.recent
+                    })
+                  : null
+              )
+        );
+
+        var transcriptPanel = e(Panel, {
+          title: "Sudo mentions in transcripts", wide: true,
+          hint: "a bounded scan \\u2014 mentions, not executions"
+        },
+          tr.available === false
+            ? e(Unavailable, { route: HUD.sudo, detail: tr.detail })
+            : e(React.Fragment, null,
+                e(StatGrid, null,
+                  e(Stat, { label: "Mentions", value: num(tr.occurrences) }),
+                  e(Stat, { label: "Sessions scanned",
+                            value: num(tr.sessions_scanned) }),
+                  e(Stat, { label: "Sessions with sudo",
+                            value: num(tr.sessions_with_sudo) })
+                ),
+                e("div", { className: "hud-state hud-state--empty hud-state--note", role: "status" },
+                  e("div", { className: "hud-state__detail" },
+                    "A mention is text that appeared in a transcript. The session " +
+                    "authority publishes no exit code or command result, so this " +
+                    "panel does not report whether any sudo command ran or succeeded.")
+                ),
+                (tr.samples || []).length === 0
+                  ? e(StateBox, {
+                      kind: "empty", title: "No sudo mention in the scanned window",
+                      route: HUD.sudo,
+                      detail: tr.detail || "The bounded scan found no occurrence."
+                    })
+                  : e(Table, {
+                      cols: [
+                        { label: "Session", trunc: true, render: function (r) {
+                            return clip(r.session_title || r.session_id, 40); } },
+                        { label: "Role", render: function (r) {
+                            return e(Chip, { tone: msgRoleTone(r.role) },
+                              label(r.role)); } },
+                        { label: "Excerpt", trunc: true, render: function (r) {
+                            return clip(r.excerpt, 110); } },
+                        { label: "Hits", num: true, render: function (r) {
+                            return num(r.count); } }
+                      ],
+                      rows: tr.samples
+                    })
+              )
+        );
+        return e(React.Fragment, null, journalPanel, policyPanel, transcriptPanel);
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14b. REPLAY — /api/hud/replay (?session_id=)
+   *
+   * The run list is the session authority's own list; selecting a run reads
+   * its transcript page by page. The backend marks tool_calls/reasoning/
+   * token_count null and explains why, so this panel prints that explanation
+   * once per run instead of three empty columns.
+   * ------------------------------------------------------------------- */
+  function ReplayTab() {
+    var selS = useState("");
+    var selected = selS[0], setSelected = selS[1];
+    var offS = useState(0);
+    var offset = offS[0], setOffset = offS[1];
+
+    var route = HUD.replay + (selected
+      ? "?session_id=" + encodeURIComponent(selected) : "");
+    var st = useRead(route, [selected], selected ? 0 : HUD_POLL.replay);
+
+    var idRef = useRef(selected);
+    useEffect(function () {
+      if (idRef.current !== selected) {
+        idRef.current = selected;
+        setOffset(0);
+      }
+    }, [selected]);
+
+    return e(Ready, {
+      state: st, what: "replay runs",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.runs)) return "no `runs` array";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: route, detail: d.detail });
+        }
+        var runs = d.runs || [];
+        if (selected && isObj(d.detail_view)) {
+          var dv = d.detail_view;
+          var msgs = dv.messages || [];
+          var total = isNum(dv.total) ? dv.total : msgs.length;
+          var page = isNum(dv.limit) ? dv.limit : MESSAGES_PAGE;
+          var start = offset;
+          var shown = start + msgs.length;
+          return e(Panel, {
+            title: "Replay", wide: true,
+            hint: clip((dv.session || {}).title || selected, 48)
+          },
+            e("div", { className: "hud__bar" },
+              e("button", {
+                type: "button", className: "hud-btn",
+                onClick: function () { setSelected(""); }
+              }, "Back to runs"),
+              e("span", { className: "hud__spacer" }),
+              e("span", null, num(msgs.length) + " of " + num(total) + " step(s)")
+            ),
+            dv.available === false
+              ? e(Unavailable, { route: route, detail: dv.detail })
+              : e(React.Fragment, null,
+                  e(StatGrid, null,
+                    e(Stat, { label: "Steps", value: num(total) }),
+                    e(Stat, { label: "Tool calls",
+                              value: num((dv.session || {}).tool_call_count) }),
+                    e(Stat, { label: "Source", value: text((dv.session || {}).source) }),
+                    e(Stat, { label: "Model", value: text((dv.session || {}).model) }),
+                    e(Stat, { label: "Started",
+                              value: fmtAgoIso((dv.session || {}).started_at) })
+                  ),
+                  e("div", { className: "hud-state hud-state--empty", role: "status" },
+                    e("div", { className: "hud-state__detail" },
+                      str(dv.trace_note) || "Per-step trace fields are not published by this authority.")
+                  ),
+                  e("div", { className: "hud__bar" },
+                    e("button", {
+                      type: "button", className: "hud-btn",
+                      disabled: start <= 0,
+                      onClick: function () {
+                        setOffset(Math.max(0, start - page));
+                      }
+                    }, "Prev"),
+                    e("span", { className: "hud__spacer" }),
+                    e("button", {
+                      type: "button", className: "hud-btn",
+                      disabled: msgs.length === 0 || shown >= total,
+                      onClick: function () { setOffset(start + page); }
+                    }, "Next")
+                  ),
+                  msgs.length === 0
+                    ? e(StateBox, {
+                        kind: "empty", title: "No step on this page",
+                        route: route,
+                        detail: "The authority reports " + num(total) +
+                          " step(s) for this run."
+                      })
+                    : e("div", { className: "hud-list" },
+                        msgs.map(function (m) {
+                          return e("div", {
+                            key: str(m.id) || ("i" + m.index),
+                            className: "hud-row"
+                          },
+                            e("div", { className: "hud-row__top" },
+                              e(Chip, { tone: msgRoleTone(m.role) },
+                                label(m.role)),
+                              e("span", { className: "hud-row__meta" },
+                                "#" + num(m.index) + " \\u00b7 " +
+                                fmtTime(m.timestamp))
+                            ),
+                            e("div", {
+                              className: "hud-row__desc hud-row__desc--prose"
+                            }, clip(m.content, 4000))
+                          );
+                        })
+                      )
+                )
+          );
+        }
+
+        return e(Panel, {
+          title: "Replay runs", wide: true,
+          hint: num(d.shown) + " of " + num(d.total) + " run(s)"
+        },
+          runs.length === 0
+            ? e(StateBox, {
+                kind: "empty", title: "No replayable run",
+                route: route,
+                detail: d.detail || "The session authority listed no run."
+              })
+            : e(Table, {
+                cols: [
+                  { label: "Run", trunc: true, render: function (r) {
+                      return clip(r.title || r.session_id, 44); } },
+                  { label: "Source", render: function (r) {
+                      return text(r.source); } },
+                  { label: "Model", render: function (r) {
+                      return text(r.model); } },
+                  { label: "Steps", num: true, render: function (r) {
+                      return num(r.message_count); } },
+                  { label: "Tool calls", num: true, render: function (r) {
+                      return num(r.tool_call_count); } },
+                  { label: "Last active", render: function (r) {
+                      return fmtAgoIso(r.last_active); } },
+                  { label: "", render: function (r) {
+                      return e("button", {
+                        type: "button", className: "hud-btn",
+                        onClick: function () { setSelected(r.session_id); }
+                      }, "Open"); } }
+                ],
+                rows: runs
+              })
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14c. CORRECTIONS — /api/hud/corrections
+   *
+   * The memory store's own supersedes/history ledger. No severity is shown:
+   * the store never assigned one, so printing "minor|major|critical" would
+   * invent it (the backend docstring records this).
+   * ------------------------------------------------------------------- */
+  function CorrectionsTab() {
+    var st = useRead(HUD.corrections, [], HUD_POLL.corrections);
+    return e(Ready, {
+      state: st, what: "corrections",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.corrections)) return "no `corrections` array";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: HUD.corrections, detail: d.detail });
+        }
+        var rows = d.corrections || [];
+        return e(Panel, {
+          title: "Corrections", wide: true,
+          hint: d.authority || ""
+        },
+          e(StatGrid, null,
+            e(Stat, { label: "Corrections", value: num(d.total) }),
+            e(Stat, { label: "Current facts", value: num(d.current) }),
+            e(Stat, { label: "Superseded", value: num(d.superseded) }),
+            e(Stat, { label: "Store", value: d.store_present ? "present" : "absent",
+                      tone: d.store_present ? "ok" : "warn" })
+          ),
+          mapRows(d.by_source).length > 0
+            ? e(KV, { rows: [["By source", JSON.stringify(d.by_source)]] })
+            : null,
+          rows.length === 0
+            ? e(StateBox, {
+                kind: "empty",
+                title: d.store_present ? "No correction recorded" : "No memory store yet",
+                route: HUD.corrections,
+                detail: d.detail
+              })
+            : e(Table, {
+                cols: [
+                  { label: "New fact", trunc: true, render: function (r) {
+                      return clip(r.text, 120); } },
+                  { label: "Supersedes", num: true, render: function (r) {
+                      return r.supersedes === null ? DASH : num(r.supersedes); } },
+                  { label: "Scope", render: function (r) {
+                      return text(r.scope); } },
+                  { label: "Tier", render: function (r) {
+                      return text(r.tier); } },
+                  { label: "Source", render: function (r) {
+                      return text(r.source); } },
+                  { label: "Updated", render: function (r) {
+                      return fmtAgoIso(r.updated_at); } }
+                ],
+                rows: rows
+              })
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14d. PATTERNS — /api/hud/patterns
+   *
+   * Upstream's clusters/repeats/hour histogram, computed from the session
+   * authority's own rows. `tool_workflows` is null and its reason is shown:
+   * the authority publishes no ordered tool-name sequence.
+   * ------------------------------------------------------------------- */
+  function PatternsTab() {
+    var st = useRead(HUD.patterns, [], HUD_POLL.patterns);
+    return e(Ready, {
+      state: st, what: "prompt patterns",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.clusters)) return "no `clusters` array";
+        if (!Array.isArray(d.hourly_activity)) return "no `hourly_activity` array";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: HUD.patterns, detail: d.detail });
+        }
+        var clusters = d.clusters || [];
+        var repeats = d.repeated_prompts || [];
+        var hours = d.hourly_activity || [];
+        var daily = (d.daily_tokens || {}).daily || [];
+        var peak = 0;
+        for (var i = 0; i < hours.length; i++) {
+          if (isNum(hours[i].sessions) && hours[i].sessions > peak) {
+            peak = hours[i].sessions;
+          }
+        }
+        return e(React.Fragment, null,
+          e(Panel, {
+            title: "Task clusters", wide: true,
+            hint: num(d.sessions_scanned) + " of " + num(d.total_sessions) +
+              " session(s) analysed"
+          },
+            clusters.length === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No session to cluster",
+                  route: HUD.patterns, detail: d.detail
+                })
+              : e(Table, {
+                  cols: [
+                    { key: "label", label: "Cluster" },
+                    { key: "count", label: "Sessions", num: true },
+                    { label: "Avg messages", num: true, render: function (r) {
+                        return isNum(r.avg_messages)
+                          ? r.avg_messages.toFixed(1) : DASH; } },
+                    { label: "Avg tool calls", num: true, render: function (r) {
+                        return isNum(r.avg_tool_calls)
+                          ? r.avg_tool_calls.toFixed(1) : DASH; } },
+                    { label: "Examples", trunc: true, render: function (r) {
+                        return clip((r.example_titles || []).join(" \\u00b7 "), 90); } }
+                  ],
+                  rows: clusters
+                })
+          ),
+          e(Panel, {
+            title: "Repeated prompts",
+            hint: "seen at least twice"
+          },
+            repeats.length === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No repeated prompt",
+                  route: HUD.patterns,
+                  detail: "No first message recurred in the analysed window."
+                })
+              : e("div", { className: "hud-list" },
+                  repeats.map(function (r, i) {
+                    return e("div", { key: "rp" + i, className: "hud-row" },
+                      e("div", { className: "hud-row__top" },
+                        e(Chip, { tone: r.could_be_skill ? "accent" : "" },
+                          num(r.count) + "\\u00d7"),
+                        e("span", { className: "hud-row__meta" },
+                          fmtAgoIso(r.last_seen))
+                      ),
+                      e("div", { className: "hud-row__desc",
+                                 title: str(r.pattern).length > 120 ? str(r.pattern) : null },
+                        clip(r.pattern, 120))
+                    );
+                  })
+                )
+          ),
+          e(Panel, {
+            title: "Hour of day", wide: true,
+            hint: "sessions started per hour (local)"
+          },
+            peak === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No start time recorded",
+                  route: HUD.patterns,
+                  detail: "The analysed sessions carry no started_at."
+                })
+              : e("div", { className: "hud-list" },
+                  hours.map(function (h) {
+                    return e(Bar, {
+                      key: "h" + h.hour,
+                      label: ("0" + h.hour).slice(-2) + ":00",
+                      value: isNum(h.sessions) ? h.sessions : 0,
+                      max: peak,
+                      display: num(h.sessions)
+                    });
+                  })
+                )
+          ),
+          e(Panel, {
+            title: "Daily tokens", wide: true,
+            hint: "same aggregate the Costs tab reads"
+          },
+            (d.daily_tokens || {}).available === false
+              ? e(Unavailable, { route: HUD.patterns,
+                                 detail: (d.daily_tokens || {}).detail })
+              : daily.length === 0
+                ? e(StateBox, {
+                    kind: "empty", title: "No token usage recorded",
+                    route: HUD.patterns,
+                    detail: "The usage aggregate returned no day for this window."
+                  })
+                : e(Table, {
+                    cols: [
+                      { key: "day", label: "Day" },
+                      { key: "sessions", label: "Sessions", num: true },
+                      { label: "Tokens", num: true, render: function (r) {
+                          return tokens(r.tokens); } }
+                    ],
+                    rows: daily.slice(-31)
+                  })
+          ),
+          e(Panel, {
+            title: "Tool sequences",
+            hint: "not available at this layer"
+          },
+            e(StateBox, {
+              kind: "note",
+              title: "Tool sequences are not recorded",
+              route: HUD.patterns,
+              detail: d.tool_workflows_reason ||
+                "The session authority publishes no ordered tool-name sequence."
+            })
+          )
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14e. VERIFY — /api/hud/verify
+   *
+   * Checkpoint journals re-hashed against their recorded digest. An empty index
+   * is NO_CHECKPOINTS, never a green "all verified": verifying nothing is not
+   * a pass, and the backend makes that distinction, so this panel keeps it.
+   * ------------------------------------------------------------------- */
+  function VerifyTab() {
+    var st = useRead(HUD.verify, [], HUD_POLL.verify);
+    return e(Ready, {
+      state: st, what: "checkpoint verification",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.checkpoints)) return "no `checkpoints` array";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: HUD.verify, detail: d.detail });
+        }
+        var rows = d.checkpoints || [];
+        var verdict = str(d.verdict);
+        var tone = verdict === "OK" ? "ok"
+          : (verdict === "TAMPERED" ? "bad" : "warn");
+        return e(Panel, {
+          title: "Integrity check", wide: true,
+          hint: d.authority || ""
+        },
+          e(StatGrid, null,
+            e(Stat, { label: "Verdict", value: text(verdict), tone: tone }),
+            e(Stat, { label: "Checkpoints", value: num(d.total) }),
+            e(Stat, { label: "Verified", value: num(d.ok), tone: "ok" }),
+            e(Stat, { label: "Tampered", value: num(d.tampered),
+                      tone: d.tampered > 0 ? "bad" : "" }),
+            e(Stat, { label: "Missing", value: num(d.missing),
+                      tone: d.missing > 0 ? "warn" : "" })
+          ),
+          rows.length === 0
+            ? e(StateBox, {
+                kind: verdict === "NO_CHECKPOINTS" ? "empty" : "error",
+                title: verdict === "NO_CHECKPOINTS"
+                  ? "No checkpoint to verify" : "No checkpoint verified",
+                route: HUD.verify,
+                detail: d.detail
+              })
+            : e(Table, {
+                cols: [
+                  { key: "name", label: "Checkpoint" },
+                  { label: "State", render: function (r) {
+                      return e(Chip, {
+                        tone: r.state === "OK" ? "ok"
+                          : r.state === "TAMPERED" ? "bad" : "warn"
+                      }, label(r.state)); } },
+                  { label: "Lines now", num: true, render: function (r) {
+                      return num(r.lines); } },
+                  { label: "Lines recorded", num: true, render: function (r) {
+                      return r.recorded_lines === null
+                        ? DASH : num(r.recorded_lines); } },
+                  { label: "Created", render: function (r) {
+                      return fmtAgoIso(r.created_at); } },
+                  { label: "Detail", trunc: true, render: function (r) {
+                      return clip(r.detail, 80); } }
+                ],
+                rows: rows
+              })
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14f. PROVIDERS — /api/hud/providers
+   *
+   * The redacted credential inventory. `token_preview` is empty BY POLICY; the
+   * panel prints the policy rather than hunting for a fragment, and it says
+   * "configured" instead of "authenticated" because this build runs no probe.
+   * ------------------------------------------------------------------- */
+  function ProvidersTab() {
+    var st = useRead(HUD.providers, [], HUD_POLL.providers);
+
+    function entryRows(pool) {
+      var out = [];
+      for (var i = 0; i < pool.length; i++) {
+        var p = pool[i] || {};
+        var entries = p.entries || [];
+        if (entries.length === 0) {
+          out.push({ provider: p.provider, entry: "(no credential entry)",
+                     auth_type: null, source: null, status: null });
+          continue;
+        }
+        for (var j = 0; j < entries.length; j++) {
+          var en = entries[j] || {};
+          out.push({
+            provider: p.provider,
+            entry: en.label || en.id || "#" + en.index,
+            auth_type: en.auth_type,
+            source: en.source,
+            status: en.last_status
+          });
+        }
+      }
+      return out;
+    }
+
+    return e(Ready, {
+      state: st, what: "provider credentials",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!isObj(d.pool)) return "no `pool` object";
+        return null;
+      },
+      render: function (d) {
+        var poolWrap = d.pool || {};
+        var pol = d.policy || {};
+        var pool = poolWrap.providers || [];
+        var policy = pol.providers || [];
+        return e(React.Fragment, null,
+          e(Panel, {
+            title: "Credential pool", wide: true,
+            hint: poolWrap.authority || ""
+          },
+            poolWrap.available === false
+              ? e(Unavailable, { route: HUD.providers, detail: poolWrap.detail })
+              : e(React.Fragment, null,
+                  e(StatGrid, null,
+                    e(Stat, { label: "Providers", value: num(poolWrap.count) }),
+                    e(Stat, { label: "Configured", value: num(poolWrap.configured_count),
+                              tone: "ok" })
+                  ),
+                  e("div", { className: "hud-state hud-state--empty", role: "status" },
+                    e("div", { className: "hud-state__detail" },
+                      d.secrets_rule || "No token value is read or returned.")
+                  ),
+                  pool.length === 0
+                    ? e(StateBox, {
+                        kind: "empty", title: "No credential in the pool",
+                        route: HUD.providers, detail: poolWrap.detail
+                      })
+                    : e(Table, {
+                        cols: [
+                          { key: "provider", label: "Provider" },
+                          { key: "entry", label: "Entry", trunc: true },
+                          { label: "Auth", render: function (r) {
+                              return text(r.auth_type); } },
+                          { label: "Source", trunc: true, render: function (r) {
+                              return clip(r.source, 40); } },
+                          { label: "Last status", render: function (r) {
+                              return text(r.status); } }
+                        ],
+                        rows: entryRows(pool)
+                      })
+                )
+          ),
+          e(Panel, {
+            title: "Frontier key references", wide: true,
+            hint: pol.available ? (pol.frontier_enabled ? "frontier enabled"
+                                                        : "frontier disabled")
+                                : "unavailable"
+          },
+            pol.available === false
+              ? e(Unavailable, { route: HUD.providers, detail: pol.detail })
+              : policy.length === 0
+                ? e(StateBox, {
+                    kind: "empty", title: "No frontier provider configured",
+                    route: HUD.providers,
+                    detail: pol.detail || "The policy lists no provider key reference."
+                  })
+                : e(Table, {
+                    cols: [
+                      { key: "provider", label: "Provider" },
+                      { key: "key_ref", label: "Key ref kind" },
+                      { label: "Configured", render: function (r) {
+                          return e(Chip, { tone: r.configured ? "ok" : "warn" },
+                            r.configured ? "yes" : "no"); } },
+                      { label: "Allowlisted", render: function (r) {
+                          return e(Chip, { tone: r.allowlisted ? "ok" : "" },
+                            r.allowlisted ? "yes" : "no"); } }
+                    ],
+                    rows: policy
+                  }),
+            e("div", { className: "hud-state hud-state--empty", role: "status" },
+              e("div", { className: "hud-state__detail" },
+                (d.probe_reason || "") + " " +
+                ("Probe: " + (d.probe === null || d.probe === undefined
+                  ? "none issued" : "reported")))
+            )
+          )
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14g. PROJECTS — /api/hud/projects
+   *
+   * The registry's projects with their real on-disk git state. A folder that
+   * is gone renders `present: false`, and a project past the git budget says
+   * so rather than looking like a clean tree.
+   * ------------------------------------------------------------------- */
+  function ProjectsTab() {
+    var st = useRead(HUD.projects, [], HUD_POLL.projects);
+    return e(Ready, {
+      state: st, what: "projects",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.projects)) return "no `projects` array";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: HUD.projects, detail: d.detail });
+        }
+        var rows = d.projects || [];
+        return e(Panel, {
+          title: "Projects", wide: true,
+          hint: d.authority || ""
+        },
+          e(StatGrid, null,
+            e(Stat, { label: "Projects", value: num(d.total) }),
+            e(Stat, { label: "Git repos", value: num(d.git_repos) }),
+            e(Stat, { label: "Dirty", value: num(d.dirty),
+                      tone: d.dirty > 0 ? "warn" : "" }),
+            e(Stat, { label: "Active/recent", value: num(d.active_recent) }),
+            e(Stat, { label: "Missing folder", value: num(d.missing_folders),
+                      tone: d.missing_folders > 0 ? "bad" : "" })
+          ),
+          rows.length === 0
+            ? e(StateBox, {
+                kind: "empty", title: "No project registered",
+                route: HUD.projects, detail: d.detail
+              })
+            : e(Table, {
+                cols: [
+                  { label: "Project", render: function (r) {
+                      return e(React.Fragment, null,
+                        label(r.name),
+                        r.active ? e(Chip, { tone: "accent" }, "active") : null); } },
+                  { label: "Present", render: function (r) {
+                      return e(Chip, { tone: r.present ? "ok" : "bad" },
+                        r.present ? "on disk" : "missing"); } },
+                  { label: "Branch", render: function (r) {
+                      return text(r.branch); } },
+                  { label: "Dirty", num: true, render: function (r) {
+                      return num(r.dirty_files); } },
+                  { label: "Commits", num: true, render: function (r) {
+                      return num(r.total_commits); } },
+                  { label: "Last commit", trunc: true, render: function (r) {
+                      return clip(r.last_commit_msg, 60); } },
+                  { label: "Activity", render: function (r) {
+                      return e(Chip, {
+                        tone: r.activity === "active" ? "ok"
+                          : r.activity === "recent" ? "accent"
+                          : r.activity === "stale" ? "warn" : ""
+                      }, label(r.activity)); } },
+                  { label: "Note", trunc: true, render: function (r) {
+                      return clip(r.git_error, 60); } }
+                ],
+                rows: rows
+              })
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14h. PROFILES — /api/hud/profiles
+   *
+   * Islands, one row each. Session counts come from the ONE session authority
+   * scoped per island; a per-island read failure shows its own reason and does
+   * not blank the others. No outbound probe and no .env scan (backend notes).
+   * ------------------------------------------------------------------- */
+  function ProfilesTab() {
+    var st = useRead(HUD.profiles, [], HUD_POLL.profiles);
+    return e(Ready, {
+      state: st, what: "profiles",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.profiles)) return "no `profiles` array";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: HUD.profiles, detail: d.detail });
+        }
+        var rows = d.profiles || [];
+        return e(Panel, {
+          title: "Profiles", wide: true,
+          hint: "active: " + text(d.active)
+        },
+          rows.length === 0
+            ? e(StateBox, {
+                kind: "empty", title: "No profile island", route: HUD.profiles,
+                detail: d.detail
+              })
+            : e(Table, {
+                cols: [
+                  { label: "Profile", render: function (r) {
+                      return e(React.Fragment, null,
+                        label(r.name),
+                        r.active ? e(Chip, { tone: "accent" }, "active") : null,
+                        r.is_default ? e(Chip, null, "default") : null); } },
+                  { label: "Model", render: function (r) {
+                      return text(r.model); } },
+                  { label: "Provider", render: function (r) {
+                      return text(r.provider); } },
+                  { label: "Sessions", num: true, render: function (r) {
+                      return r.sessions === null ? DASH : num(r.sessions); } },
+                  { label: "Skills", num: true, render: function (r) {
+                      return num(r.skill_count); } },
+                  { label: "Env", render: function (r) {
+                      return e(Chip, { tone: r.has_env ? "ok" : "" },
+                        r.has_env ? "present" : "none"); } },
+                  { label: "Sessions note", trunc: true, render: function (r) {
+                      return clip(r.sessions_detail, 40); } }
+                ],
+                rows: rows
+              }),
+          (rows || []).some(function (r) { return r.sessions_detail; })
+            ? e("div", { className: "hud-state hud-state--empty", role: "status" },
+                e("div", { className: "hud-state__detail" },
+                  "A per-island session count that could not be read shows the " +
+                  "reason in its note instead of a zero."))
+            : null
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14i. MEMORY — /api/hud/memory
+   *
+   * active_memory's policy/status plus the store's own rows and breakdowns.
+   * The upstream markdown files and character budgets are not rendered: they
+   * do not exist in this product (backend docstring records why).
+   * ------------------------------------------------------------------- */
+  function MemoryTab() {
+    var st = useRead(HUD.memory, [], HUD_POLL.memory);
+    return e(Ready, {
+      state: st, what: "memory",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!isObj(d.store)) return "no `store` object";
+        return null;
+      },
+      render: function (d) {
+        var status = d.status || {};
+        var store = d.store || {};
+        var rows = store.rows || [];
+        return e(React.Fragment, null,
+          e(Panel, {
+            title: "Active memory",
+            hint: d.available ? "voicebridge.active_memory" : "unavailable"
+          },
+            e(StatGrid, null,
+              e(Stat, { label: "State", value: text(status.state),
+                        tone: healthTone(status.state) }),
+              e(Stat, { label: "Enabled", value: status.enabled ? "yes" : "no",
+                        tone: status.enabled ? "ok" : "warn" }),
+              e(Stat, { label: "E-stop", value: status.estop ? "engaged" : "clear",
+                        tone: status.estop ? "bad" : "ok" })
+            ),
+            e(KV, { rows: [
+              ["Store state", status.store_state || null],
+              ["Policy state", status.policy_state || null],
+              ["Min score", isNum(status.min_score) ? String(status.min_score) : null],
+              ["Max items", isNum(status.max_items) ? String(status.max_items) : null],
+              ["Session scoped", status.session_scoped ? "yes" : "no"]
+            ] })
+          ),
+          e(Panel, {
+            title: "Store", wide: true,
+            hint: store.detail || ""
+          },
+            store.available === false
+              ? e(Unavailable, { route: HUD.memory, detail: store.detail })
+              : e(React.Fragment, null,
+                  e(StatGrid, null,
+                    e(Stat, { label: "Active", value: num(store.total) }),
+                    e(Stat, { label: "Staged", value: num(store.staged_count),
+                              tone: store.staged_count > 0 ? "accent" : "" }),
+                    e(Stat, { label: "Tombstoned", value: num(store.tombstoned) })
+                  ),
+                  keysOf(store.by_tier).length > 0
+                    ? e(KV, { rows: [
+                        ["By tier", JSON.stringify(store.by_tier)],
+                        ["By scope", JSON.stringify(store.by_scope)],
+                        ["By kind", JSON.stringify(store.by_kind)]
+                      ] })
+                    : null,
+                  rows.length === 0
+                    ? e(StateBox, {
+                        kind: "empty",
+                        title: store.store_present
+                          ? "No active memory yet" : "No memory store yet",
+                        route: HUD.memory, detail: store.detail
+                      })
+                    : e(Table, {
+                        cols: [
+                          { label: "Memory", trunc: true, render: function (r) {
+                              return clip(r.text, 110); } },
+                          { key: "tier", label: "Tier" },
+                          { key: "scope", label: "Scope" },
+                          { key: "kind", label: "Kind" },
+                          { label: "Confidence", num: true, render: function (r) {
+                              return isNum(r.confidence)
+                                ? r.confidence.toFixed(2) : DASH; } },
+                          { label: "Updated", render: function (r) {
+                              return fmtAgoIso(r.updated_at); } }
+                        ],
+                        rows: rows
+                      })
+                )
+          )
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14j. GATEWAY — /api/hud/gateway
+   *
+   * gateway_supervisor's live status (a superset of upstream's
+   * gateway_state.json read), the daemon's own platform snapshot, the control
+   * socket answer and the RPC method surface. The action endpoints upstream
+   * exposed are NOT rendered: this page is a viewer, and the backend lists the
+   * counterparts instead.
+   * ------------------------------------------------------------------- */
+  function GatewayTab() {
+    var st = useRead(HUD.gateway, [], HUD_POLL.gateway);
+    return e(Ready, {
+      state: st, what: "gateway status",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!isObj(d.platforms)) return "no `platforms` object";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: HUD.gateway, detail: d.detail });
+        }
+        var plats = d.platforms || {};
+        var ctl = d.control || {};
+        var rpc = d.rpc || {};
+        var rows = plats.platforms || [];
+        var methods = rpc.observability || [];
+        return e(React.Fragment, null,
+          e(Panel, {
+            title: "Gateway", wide: true,
+            hint: d.service_unit ? d.service_unit : "no unit resolved"
+          },
+            e(StatGrid, null,
+              e(Stat, { label: "State", value: text(d.state),
+                        tone: healthTone(d.state) }),
+              e(Stat, { label: "Running", value: d.running ? "yes" : "no",
+                        tone: d.running ? "ok" : "warn" }),
+              e(Stat, { label: "Health", value: text(d.health),
+                        tone: healthTone(d.health) }),
+              e(Stat, { label: "PID", value: d.pid === null ? DASH : num(d.pid) }),
+              e(Stat, { label: "Port", value: d.port === null ? DASH : num(d.port),
+                        tone: d.port_in_use ? "ok" : "warn" }),
+              e(Stat, { label: "Restarts", value: num(d.n_restarts),
+                        tone: (isNum(d.n_restarts) && d.n_restarts > 0) ? "warn" : "" }),
+              e(Stat, { label: "Failed", value: d.failed ? "yes" : "no",
+                        tone: d.failed ? "bad" : "ok" }),
+              e(Stat, { label: "Daemon live", value: ctl.daemon_live ? "yes" : "no",
+                        tone: ctl.daemon_live ? "ok" : "warn" })
+            ),
+            e(KV, { rows: [
+              ["Active state", d.active_state || null],
+              ["Sub state", d.sub_state || null],
+              ["Started", d.started_at || null],
+              ["Health detail", d.health_detail || null],
+              ["Failure", d.failure || null]
+            ] })
+          ),
+          e(Panel, {
+            title: "Platforms", wide: true,
+            hint: plats.available
+              ? num(plats.connected) + " of " + num(plats.count) + " connected"
+              : "no snapshot published"
+          },
+            rows.length === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No platform state", route: HUD.gateway,
+                  detail: plats.detail || "The daemon has published no platform snapshot."
+                })
+              : e(Table, {
+                  cols: [
+                    { key: "name", label: "Platform" },
+                    { label: "State", render: function (r) {
+                        return e(Chip, {
+                          tone: r.state === "connected" ? "ok" : "warn"
+                        }, label(r.state)); } },
+                    { label: "Error code", render: function (r) {
+                        return text(r.error_code); } },
+                    { label: "Error", trunc: true, render: function (r) {
+                        return clip(r.error_message, 70); } },
+                    { label: "Updated", render: function (r) {
+                        return fmtAgoIso(r.updated_at); } }
+                  ],
+                  rows: rows
+                })
+          ),
+          e(Panel, {
+            title: "Control socket",
+            hint: "live daemon answer"
+          },
+            ctl.available
+              ? e(KV, { rows: mapRows(ctl.control, 12) })
+              : e(StateBox, {
+                  kind: "empty", title: "Control socket did not answer",
+                  route: HUD.gateway, detail: ctl.detail
+                })
+          ),
+          e(Panel, {
+            title: "RPC surface",
+            hint: rpc.available ? num((rpc.methods || []).length) + " method(s)"
+                                : "unavailable"
+          },
+            rpc.available === false
+              ? e(Unavailable, { route: HUD.gateway, detail: rpc.detail })
+              : methods.length === 0
+                ? e(StateBox, {
+                    kind: "empty", title: "No observability method advertised",
+                    route: HUD.gateway, detail: rpc.detail
+                  })
+                : e("div", { className: "hud-list" },
+                    methods.map(function (m, i) {
+                      return e("div", { key: "rm" + i, className: "hud-row" },
+                        e("div", { className: "hud-row__name hud__mono" }, label(m)));
+                    })
+                  )
+          )
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14k. LIVE CHAT — /api/hud/live-chat
+   *
+   * A polled SNAPSHOT, not a stream. The WS the reference tab used is a
+   * recorded refusal here (WS_SINGLE_PATH), and the backend serves that refusal
+   * in `transport`; this panel puts it on screen rather than hiding it, then
+   * shows the durable event journal the single path actually writes.
+   * ------------------------------------------------------------------- */
+  function LiveChatTab() {
+    var st = useRead(HUD.liveChat, [], HUD_POLL.liveChat);
+    return e(Ready, {
+      state: st, what: "live chat activity",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.active_runs)) return "no `active_runs` array";
+        if (!Array.isArray(d.tail)) return "no `tail` array";
+        return null;
+      },
+      render: function (d) {
+        var transport = d.transport || {};
+        var runs = d.active_runs || [];
+        var tail = d.tail || [];
+        var snap = d.last_snapshot || {};
+        return e(React.Fragment, null,
+          e(Panel, {
+            title: "Transport", wide: true,
+            hint: "a snapshot, not a stream"
+          },
+            e(StateBox, {
+              kind: "note",
+              title: "No chat WebSocket in this build (" + text(transport.code) + ")",
+              route: HUD.liveChat,
+              detail: (transport.detail || "") +
+                (transport.counterpart ? " Counterpart: " + transport.counterpart : "")
+            })
+          ),
+          e(Panel, {
+            title: "Runs", wide: true,
+            hint: d.detail || ""
+          },
+            e(StatGrid, null,
+              e(Stat, { label: "Started, no finish",
+                        value: num(runs.length),
+                        tone: runs.length > 0 ? "warn" : "ok" }),
+              e(Stat, { label: "Journal events", value: num(d.records) })
+            ),
+            runs.length === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No run in flight", route: HUD.liveChat,
+                  detail: d.detail || "Every run in the journal has a finish event."
+                })
+              : e(Table, {
+                  cols: [
+                    { label: "Run", trunc: true, render: function (r) {
+                        return clip(r.run_id, 20); } },
+                    { label: "Thread", trunc: true, render: function (r) {
+                        return clip(r.thread_id, 40); } },
+                    { label: "Stage", render: function (r) {
+                        return e(Chip, { tone: r.stage === "running" ? "accent" : "" },
+                          text(r.stage)); } },
+                    { label: "Started", render: function (r) {
+                        return fmtTime(r.started_at); } },
+                    { label: "Description", trunc: true, render: function (r) {
+                        return clip(r.description, 90); } }
+                  ],
+                  rows: runs
+                })
+          ),
+          e(Panel, {
+            title: "Latest snapshot",
+            hint: snap.stage ? text(snap.stage) : "none"
+          },
+            keysOf(snap).length === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No state snapshot",
+                  route: HUD.liveChat,
+                  detail: "The journal holds no STATE_SNAPSHOT record."
+                })
+              : e(KV, { rows: [
+                  ["Run", snap.run_id || null],
+                  ["Stage", snap.stage || null],
+                  ["At", fmtTime(snap.at) === DASH ? null : fmtTime(snap.at)],
+                  ["Description", clip(snap.description, 300) || null]
+                ] })
+          ),
+          e(Panel, {
+            title: "Event tail", wide: true,
+            hint: num(d.tail_count) + " recent event(s), redacted at write"
+          },
+            tail.length === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No event journaled",
+                  route: HUD.liveChat, detail: d.detail
+                })
+              : e(Table, {
+                  cols: [
+                    { label: "Seq", num: true, render: function (r) {
+                        return num(r.seq); } },
+                    { key: "type", label: "Type" },
+                    { label: "At", render: function (r) {
+                        return fmtTime(r.at); } },
+                    { label: "Run", trunc: true, render: function (r) {
+                        return clip(r.run_id, 18); } },
+                    { label: "Detail", trunc: true, render: function (r) {
+                        return clip(r.detail, 90); } }
+                  ],
+                  rows: tail.slice().reverse()
+                }),
+            e("div", { className: "hud-state hud-state--empty", role: "status" },
+              e("div", { className: "hud-state__detail" },
+                d.stream_note || "Polled snapshot; no token delta is delivered here.")
+            )
+          )
+        );
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+   * 14l. LIVE MODEL CAPABILITIES — /api/hud/live-models
+   *
+   * Per-model capability rows from the same models.dev client the dashboard's
+   * /api/model/info reads. "Configured, not pinged": the probe is null and the
+   * backend's reason is printed. A model recorded as recently failed is marked
+   * from a real call, which is evidence a probe could not give.
+   * ------------------------------------------------------------------- */
+  function CapChip(props) {
+    var v = props.value;
+    if (v === null || v === undefined) {
+      return e(Chip, null, props.unknown || "unknown");
+    }
+    if (typeof v === "boolean") {
+      return e(Chip, { tone: v ? "ok" : "" }, v ? "yes" : "no");
+    }
+    return e(Chip, null, String(v));
+  }
+
+  function LiveModelsTab() {
+    var st = useRead(HUD.liveModels, [], HUD_POLL.liveModels);
+    return e(Ready, {
+      state: st, what: "model capabilities",
+      expect: function (d) {
+        if (!isObj(d)) return "payload is not an object";
+        if (!Array.isArray(d.models)) return "no `models` array";
+        return null;
+      },
+      render: function (d) {
+        if (d.available === false) {
+          return e(Unavailable, { route: HUD.liveModels, detail: d.detail });
+        }
+        var rows = d.models || [];
+        var conf = d.configured || {};
+        return e(React.Fragment, null,
+          e(Panel, {
+            title: "Resolved route",
+            hint: conf.available ? "live resolver" : "unavailable"
+          },
+            e(KV, { rows: [
+              ["Model", conf.model || null],
+              ["Provider", conf.provider || null],
+              ["Route", conf.route || null],
+              ["Kind", conf.route_kind || null]
+            ] })
+          ),
+          e(Panel, {
+            title: "Capabilities", wide: true,
+            hint: num(d.found_count) + " of " + num(d.count) +
+              " row(s) in the catalog"
+          },
+            rows.length === 0
+              ? e(StateBox, {
+                  kind: "empty", title: "No model to describe",
+                  route: HUD.liveModels, detail: d.detail
+                })
+              : e(Table, {
+                  cols: [
+                    { label: "Model", trunc: true, render: function (r) {
+                        return clip(r.model || "(no model id)", 40); } },
+                    { key: "provider", label: "Provider" },
+                    { key: "role", label: "Role" },
+                    { label: "Tools", render: function (r) {
+                        return e(CapChip, { value: (r.caps || {}).supports_tools }); } },
+                    { label: "Vision", render: function (r) {
+                        return e(CapChip, { value: (r.caps || {}).supports_vision }); } },
+                    { label: "Reasoning", render: function (r) {
+                        return e(CapChip, { value: (r.caps || {}).supports_reasoning }); } },
+                    { label: "Context", num: true, render: function (r) {
+                        return tokens((r.caps || {}).context_window); } },
+                    { label: "Failed", render: function (r) {
+                        return r.recently_failed
+                          ? e(Chip, { tone: "bad" }, "recently")
+                          : DASH; } },
+                    { label: "Note", trunc: true, render: function (r) {
+                        return clip(r.recently_failed
+                          ? r.recently_failed.reason : r.detail, 60); } }
+                  ],
+                  rows: rows
+                }),
+            e("div", { className: "hud-state hud-state--empty", role: "status" },
+              e("div", { className: "hud-state__detail" },
+                (d.probe_reason || "") + " Probe: " +
+                (d.probe === null || d.probe === undefined
+                  ? "none issued" : "reported") + ".")
+            )
+          )
+        );
+      }
+    });
+  }
+
+  /* ======================================================================
+   * 15. THE TABS — one table, so the strip and the body cannot disagree.
    * ==================================================================== */
   var TABS = [
     { id: "health", label: "Health", route: P.health, View: HealthTab },
@@ -2159,7 +3528,27 @@
     { id: "models", label: "Models", route: P.modelOptions, View: ModelsTab },
     { id: "skills", label: "Skills", route: P.skills, View: SkillsTab },
     { id: "plugins", label: "Plugins", route: P.plugins, View: PluginsTab },
-    { id: "costs", label: "Costs", route: P.analytics, View: CostsTab }
+    { id: "costs", label: "Costs", route: P.analytics, View: CostsTab },
+    /* The twelve restored panels (see section 14). */
+    { id: "sudo", label: "Sudo", route: HUD.sudo, View: SudoTab },
+    { id: "replay", label: "Replay", route: HUD.replay, View: ReplayTab },
+    { id: "corrections", label: "Corrections", route: HUD.corrections,
+      View: CorrectionsTab },
+    { id: "patterns", label: "Patterns", route: HUD.patterns,
+      View: PatternsTab },
+    { id: "verify", label: "Verify", route: HUD.verify, View: VerifyTab },
+    { id: "providers", label: "Providers", route: HUD.providers,
+      View: ProvidersTab },
+    { id: "projects", label: "Projects", route: HUD.projects,
+      View: ProjectsTab },
+    { id: "profiles", label: "Profiles", route: HUD.profiles,
+      View: ProfilesTab },
+    { id: "memory", label: "Memory", route: HUD.memory, View: MemoryTab },
+    { id: "gateway", label: "Gateway", route: HUD.gateway, View: GatewayTab },
+    { id: "live-chat", label: "Live Chat", route: HUD.liveChat,
+      View: LiveChatTab },
+    { id: "live-models", label: "Live Models", route: HUD.liveModels,
+      View: LiveModelsTab }
   ];
 
   /* Roving focus across the tab strip: Left/Right move, Home/End jump. The
@@ -2192,8 +3581,9 @@
         e("div", { className: "hud__title" },
           e("span", { className: "hud__name" }, "HUD"),
           e("span", { className: "hud__subtitle" },
-            "Health, sessions, cron, models, skills, plugins and cost \u2014 " +
-            "read from Qubit's own routes, read-only.")
+            "Nineteen read-only tabs \u2014 health, sessions, cron, models, " +
+            "skills, plugins, costs and the twelve governance/registry " +
+            "panels, every one read from Qubit's own routes.")
         ),
         e("div", { className: "hud__headRight" },
           e("span", { className: "hud__stamp" }, "GET only")

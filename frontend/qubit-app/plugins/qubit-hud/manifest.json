@@ -1,9 +1,9 @@
 {
   "name": "qubit-hud",
   "label": "Qubit HUD",
-  "description": "Qubit HUD — one read-only page for the agent's vitals, in 7 panels: Health, Sessions, Cron, Models, Skills, Plugins and Costs. Every panel reads a `GET /api/hud/<panel>` collector over the same stores the CLI and voice surfaces read; a panel whose collector is not installed says so with its own status instead of drawing an empty chart.",
+  "description": "Qubit HUD — one read-only page for the agent's vitals, in 19 panels: Health, Sessions, Cron, Models, Skills, Plugins, Costs, Sudo, Replay, Corrections, Patterns, Verify, Providers, Projects, Profiles, Memory, Gateway, Live Chat and Live Models. Every panel reads a `GET /api/hud/<panel>` collector over the same stores the CLI and voice surfaces read; a panel whose collector is not installed says so with its own status instead of drawing an empty chart.",
   "icon": "Gauge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "tab": {
     "path": "/qubit-hud",
     "hidden": true,
