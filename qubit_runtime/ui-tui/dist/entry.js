@@ -78240,6 +78240,108 @@ ${body}` : body;
   }
 });
 
+// src/app/sessionCompress.ts
+import { randomUUID as randomUUID2 } from "node:crypto";
+var CanonicalCompressError, canUseCanonicalSessionCompress, buildCanonicalCompressParams, adaptCanonicalCompressResult, fetchSnapshot, runCanonicalCompress, isCanonicalCompressFallback;
+var init_sessionCompress = __esm({
+  "src/app/sessionCompress.ts"() {
+    "use strict";
+    init_userMessages2();
+    CanonicalCompressError = class extends Error {
+      code;
+      fallback;
+      stage;
+      constructor(stage, cause, fallback = false) {
+        super(cause instanceof Error ? cause.message : String(cause));
+        this.name = "CanonicalCompressError";
+        this.stage = stage;
+        this.code = cause?.code;
+        this.fallback = fallback;
+      }
+    };
+    canUseCanonicalSessionCompress = (gw2) => gw2.hasSessionAuthority === true;
+    buildCanonicalCompressParams = (sessionId, arg, snapshot, requestId = randomUUID2()) => {
+      if (typeof snapshot.revision !== "number" || typeof snapshot.execution_generation !== "number") {
+        throw new CanonicalCompressError(
+          "resume",
+          new Error("canonical session snapshot is missing revision/execution_generation"),
+          true
+        );
+      }
+      const focus = arg.trim();
+      return {
+        expected_generation: snapshot.execution_generation,
+        expected_revision: snapshot.revision,
+        operation: "compress",
+        payload: focus ? { focus } : {},
+        request_id: requestId,
+        session_id: sessionId
+      };
+    };
+    adaptCanonicalCompressResult = (receipt, snapshot, before = null) => {
+      const messages2 = receipt.messages ?? snapshot?.messages;
+      const info = receipt.info ?? snapshot?.info;
+      const usage = receipt.usage ?? info?.usage;
+      const beforeMessages = receipt.before_messages ?? before?.message_count;
+      const afterMessages = receipt.after_messages ?? snapshot?.message_count ?? receipt.message_count;
+      const removed = receipt.removed ?? (typeof beforeMessages === "number" && typeof afterMessages === "number" ? Math.max(0, beforeMessages - afterMessages) : void 0);
+      return {
+        ...typeof afterMessages === "number" ? { after_messages: afterMessages } : {},
+        ...typeof beforeMessages === "number" ? { before_messages: beforeMessages } : {},
+        ...info ? { info } : {},
+        ...receipt.lines ? { lines: receipt.lines } : {},
+        ...messages2 ? { messages: messages2 } : {},
+        ...typeof removed === "number" ? { removed } : {},
+        ...receipt.summary ? { summary: receipt.summary } : {},
+        ...usage ? { usage } : {}
+      };
+    };
+    fetchSnapshot = async (gw2, sessionId) => await gw2.request("session.resume", { session_id: sessionId }) ?? {};
+    runCanonicalCompress = async (gw2, sessionId, arg, requestId) => {
+      let before;
+      try {
+        before = await fetchSnapshot(gw2, sessionId);
+      } catch (err) {
+        throw new CanonicalCompressError("resume", err);
+      }
+      let params;
+      try {
+        params = buildCanonicalCompressParams(sessionId, arg, before, requestId);
+      } catch (err) {
+        if (err instanceof CanonicalCompressError) {
+          throw err;
+        }
+        throw new CanonicalCompressError("resume", err);
+      }
+      let receipt;
+      try {
+        receipt = await gw2.request("session.mutate", params) ?? {};
+      } catch (err) {
+        throw new CanonicalCompressError("mutate", err);
+      }
+      if (receipt.status === "preview" || receipt.status === "noop") {
+        return adaptCanonicalCompressResult(receipt, null, before);
+      }
+      try {
+        const after = await fetchSnapshot(gw2, sessionId);
+        return adaptCanonicalCompressResult(receipt, after, before);
+      } catch (err) {
+        gw2.recordLog(`[compress] canonical post-compress resume failed after a committed mutate: ${String(err)}`);
+        return adaptCanonicalCompressResult(receipt, null, before);
+      }
+    };
+    isCanonicalCompressFallback = (err) => {
+      if (!(err instanceof CanonicalCompressError)) {
+        return false;
+      }
+      if (err.fallback || err.code === -32601) {
+        return true;
+      }
+      return isVersionSkewError(err);
+    };
+  }
+});
+
 // src/app/slash/commands/session.ts
 var TUI_SESSION_MODEL_RE, REASONING_SESSION_FLAGS, REASONING_GLOBAL_FLAGS, fastModeWord, modelValueForConfigSet, reasoningConfigPayload, sessionCommands;
 var init_session3 = __esm({
@@ -78254,6 +78356,7 @@ var init_session3 = __esm({
     init_createGatewayEventHandler();
     init_interfaces();
     init_overlayStore();
+    init_sessionCompress();
     init_uiStore();
     TUI_SESSION_MODEL_RE = new RegExp(`(?:^|\\s)${TUI_SESSION_MODEL_FLAG}(?:\\s|$)`);
     REASONING_SESSION_FLAGS = /* @__PURE__ */ new Set(["--session"]);
@@ -78426,43 +78529,61 @@ var init_session3 = __esm({
         help: "compress transcript",
         name: "compress",
         run: (arg, ctx) => {
-          ctx.gateway.rpc("session.compress", {
+          const render2 = ctx.guarded((r) => {
+            if (Array.isArray(r.lines) && r.lines.length) {
+              for (const line of r.lines) {
+                ctx.transcript.sys(line);
+              }
+              return;
+            }
+            if (Array.isArray(r.messages)) {
+              const rows = toTranscriptMessages(r.messages);
+              ctx.transcript.setHistoryItems(r.info ? [introMsg(r.info), ...rows] : rows);
+            }
+            if (r.info) {
+              patchUiState({ info: r.info });
+            }
+            if (r.usage) {
+              patchUiState((state) => ({ ...state, usage: { ...state.usage, ...r.usage } }));
+            }
+            if (r.summary?.headline) {
+              const prefix = r.summary.noop ? "" : "\u2713 ";
+              ctx.transcript.sys(`${prefix}${r.summary.headline}`);
+              if (r.summary.token_line) {
+                ctx.transcript.sys(`  ${r.summary.token_line}`);
+              }
+              if (r.summary.note) {
+                ctx.transcript.sys(`  ${r.summary.note}`);
+              }
+              return;
+            }
+            if ((r.removed ?? 0) <= 0) {
+              return ctx.transcript.sys(t("slashCmd.session.compress.nothing"));
+            }
+            const removed = r.removed ?? 0;
+            const count = String(removed);
+            const tok = r.usage?.total ? t("slashCmd.session.compress.tokSuffix", compactNumber(r.usage.total)) : "";
+            ctx.transcript.sys(
+              (removed === 1 ? t("slashCmd.session.compress.compressedOne", count) : t("slashCmd.session.compress.compressedOther", count)) + tok
+            );
+          });
+          const legacy = () => ctx.gateway.rpc("session.compress", {
             session_id: ctx.sid,
             ...arg ? { focus_topic: arg } : {}
-          }).then(
-            ctx.guarded((r) => {
-              if (Array.isArray(r.messages)) {
-                const rows = toTranscriptMessages(r.messages);
-                ctx.transcript.setHistoryItems(r.info ? [introMsg(r.info), ...rows] : rows);
-              }
-              if (r.info) {
-                patchUiState({ info: r.info });
-              }
-              if (r.usage) {
-                patchUiState((state) => ({ ...state, usage: { ...state.usage, ...r.usage } }));
-              }
-              if (r.summary?.headline) {
-                const prefix = r.summary.noop ? "" : "\u2713 ";
-                ctx.transcript.sys(`${prefix}${r.summary.headline}`);
-                if (r.summary.token_line) {
-                  ctx.transcript.sys(`  ${r.summary.token_line}`);
-                }
-                if (r.summary.note) {
-                  ctx.transcript.sys(`  ${r.summary.note}`);
-                }
-                return;
-              }
-              if ((r.removed ?? 0) <= 0) {
-                return ctx.transcript.sys(t("slashCmd.session.compress.nothing"));
-              }
-              const removed = r.removed ?? 0;
-              const count = String(removed);
-              const tok = r.usage?.total ? t("slashCmd.session.compress.tokSuffix", compactNumber(r.usage.total)) : "";
-              ctx.transcript.sys(
-                (removed === 1 ? t("slashCmd.session.compress.compressedOne", count) : t("slashCmd.session.compress.compressedOther", count)) + tok
-              );
-            })
-          ).catch(ctx.guardedErr);
+          }).then(render2).catch(ctx.guardedErr);
+          if (!ctx.sid || !canUseCanonicalSessionCompress(ctx.gateway.gw)) {
+            return legacy();
+          }
+          runCanonicalCompress(ctx.gateway.gw, ctx.sid, arg).then(render2).catch((err) => {
+            if (!isCanonicalCompressFallback(err)) {
+              return ctx.guardedErr(err);
+            }
+            const code = err.code;
+            ctx.gateway.gw.recordLog(
+              `[compress] session.mutate unavailable (${code === void 0 ? "out-of-sync" : `code=${code}`}); retrying session.compress`
+            );
+            return legacy();
+          });
         }
       },
       {
@@ -82034,7 +82155,7 @@ var init_interpolation = __esm({
 });
 
 // src/app/submissionCore.ts
-import { randomUUID as randomUUID2 } from "node:crypto";
+import { randomUUID as randomUUID3 } from "node:crypto";
 function markSubmitting() {
   patchUiState({ busy: true, status: "running\u2026" });
 }
@@ -82067,7 +82188,7 @@ function submitPrompt(text2, deps, showUserMessage = true, displayOverride, opts
       clarify_batch: true,
       session_id: liveSid,
       text: submitText,
-      submission_id: randomUUID2()
+      submission_id: randomUUID3()
     }).then((r) => {
       if (r?.voice_stopped) {
         patchUiState({ busy: false, status: "ready" });
@@ -87458,7 +87579,7 @@ var init_activeSessionSwitcher = __esm({
 });
 
 // src/components/billingOverlay.tsx
-import { randomUUID as randomUUID3 } from "node:crypto";
+import { randomUUID as randomUUID4 } from "node:crypto";
 function autoReloadLine(B, s) {
   if (!s.auto_reload) {
     return null;
@@ -87578,7 +87699,7 @@ function BuyScreen({ ctx, onPatch, s, t: t2 }) {
     });
   };
   const toConfirm = (amount) => {
-    onPatch({ pendingCharge: { amount, idempotencyKey: randomUUID3() }, screen: "confirm" });
+    onPatch({ pendingCharge: { amount, idempotencyKey: randomUUID4() }, screen: "confirm" });
   };
   const pickPreset = (i) => {
     const raw = (rawPresets[i] ?? presets[i] ?? "").replace(/^\$/, "").trim();
@@ -89351,7 +89472,7 @@ var init_skillsHub = __esm({
 });
 
 // src/components/subscriptionOverlay.tsx
-import { randomUUID as randomUUID4 } from "node:crypto";
+import { randomUUID as randomUUID5 } from "node:crypto";
 function SubscriptionOverlay({ onClose, onPatch, overlay, t: t2 }) {
   const { screen, state: s } = overlay;
   if (s.context === "team") {
@@ -89469,7 +89590,7 @@ function previewAndRoute(ctx, tierId, onPatch, allowStepUp = true) {
       return onPatch({ result: errorResult(p), screen: "result" });
     }
     const kind = p.effect === "charge_now" ? "upgrade" : "tier_change";
-    const pending = kind === "upgrade" ? { idempotencyKey: randomUUID4(), kind, preview: p, targetTierId: tierId } : { kind, preview: p, targetTierId: tierId };
+    const pending = kind === "upgrade" ? { idempotencyKey: randomUUID5(), kind, preview: p, targetTierId: tierId } : { kind, preview: p, targetTierId: tierId };
     onPatch({ pending, screen: "confirm" });
   });
 }
@@ -95470,6 +95591,10 @@ var GatewayClient = class extends EventEmitter {
   bufferedRequests = [];
   pendingExit;
   ready = false;
+  // The authority-advertised canonical session capability. The WebSocket authority sets
+  // `session_authority` on the first frame; the stdio sidecar never does, so a shell TUI
+  // only selects `session.mutate` against a backend that really serves it.
+  sessionAuthority = false;
   readyTimer = null;
   subscribed = false;
   drainGeneration = 0;
@@ -95496,9 +95621,14 @@ var GatewayClient = class extends EventEmitter {
   get attached() {
     return this.attachUrl !== null;
   }
+  /** True when the connected backend advertised the canonical `session.mutate` authority. */
+  get hasSessionAuthority() {
+    return this.sessionAuthority;
+  }
   publish(ev) {
     if (ev.type === "gateway.ready") {
       this.ready = true;
+      this.sessionAuthority = ev.payload?.session_authority === true;
       this.clearReconnect();
       this.reconnectAttempts = 0;
       if (this.readyTimer) {
