@@ -21583,3 +21583,14 @@ from .hud_routes import hud_routes as _hud_routes, hud_handlers as _hud_handlers
 for _m, _p, _h in _hud_routes():
     _r(_m, _p, _h)
 HANDLERS.update(_hud_handlers())
+
+# Qubit Workbench routes (see voicebridge/workbench/workbench_routes.py). Same
+# contract as the HUD block above: registered last, handler keys namespaced so
+# they cannot shadow an upstream handler, and a missing workbench package
+# answers a typed 503 rather than failing the whole listener at boot.
+from .workbench.workbench_routes import (workbench_routes as _wb_routes,
+                                         workbench_handlers as _wb_handlers)
+
+for _m, _p, _h in _wb_routes():
+    _r(_m, _p, _h)
+HANDLERS.update(_wb_handlers())

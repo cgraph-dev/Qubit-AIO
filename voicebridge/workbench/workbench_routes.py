@@ -191,6 +191,67 @@ def h_workbench_turn(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   model=body.get("model"), reasoning=body.get("reasoning"))
 
 
+def h_workbench_session(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/workbench/sessions/<id> -> one session with its messages.
+
+    The page reads a session as one object (header fields plus the transcript)
+    rather than fetching /messages separately, so this composes the two adapter
+    calls instead of making the browser do it. Both halves keep their own typed
+    failure: a missing session answers the adapter's MISSING untouched.
+    """
+    session_id = _p(p, "id")
+    status, payload = _serve("session", "adapters_sessions", "read_transcript",
+                             cfg, session_id,
+                             limit=_q(q, "limit", default="500"),
+                             offset=_q(q, "offset", default="0"))
+    if status != 200 or not isinstance(payload, dict):
+        return status, payload
+    merged = dict(payload)
+    merged.setdefault("id", session_id)
+    # Header fields the ring and title need, when the store already knows them.
+    rows = payload.get("sessions")
+    if isinstance(rows, list):
+        for row in rows:
+            if isinstance(row, dict) and str(row.get("id") or "") == session_id:
+                merged.setdefault("title", row.get("title"))
+                merged.setdefault("model", row.get("model"))
+                break
+    return 200, merged
+
+
+def h_workbench_turn_root(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Any]:
+    """POST /api/workbench/turn {session_id, text, model?, reasoning?}
+
+    The page posts a turn here, not to the per-session path: it sends with the
+    id in the body so a brand-new session has one call shape. ``session_id`` is
+    required — a turn with no session is refused rather than silently starting
+    a second store entry.
+    """
+    body = _b(b)
+    session_id = str(body.get("session_id") or "").strip()
+    if not session_id:
+        return 400, {"ok": False, "code": "SESSION_REQUIRED",
+                     "detail": "Send {\"session_id\": ...} with the turn."}
+    return _serve("turn", "adapters_sessions", "send_turn",
+                  cfg, session_id, body.get("text", ""),
+                  model=body.get("model"), reasoning=body.get("reasoning"))
+
+
+def h_workbench_file(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    """GET /api/workbench/workspace/file?path=&workspace=&max_chars=
+
+    Same adapter as the POST preview, reachable as a GET because the file pane
+    is a read: a viewer should not need a POST to look at a file.
+    """
+    return _serve("workspace-preview", "adapters_workspace", "preview_file",
+                  cfg, _q(q, "path"),
+                  workspace=_q(q, "workspace"),
+                  max_chars=int(_q(q, "max_chars", default="20000") or 20000))
+
+
 def h_workbench_tree(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Any]:
     """GET /api/workbench/workspace/tree?path="""
@@ -219,6 +280,9 @@ _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "h_workbench_turn": h_workbench_turn,
     "h_workbench_tree": h_workbench_tree,
     "h_workbench_preview": h_workbench_preview,
+    "h_workbench_session": h_workbench_session,
+    "h_workbench_turn_root": h_workbench_turn_root,
+    "h_workbench_file": h_workbench_file,
 }
 
 
@@ -226,13 +290,18 @@ def workbench_routes() -> List[Tuple[str, str, str]]:
     """The workbench's rows for the dashboard compat route table."""
     return [
         ("GET", r"/api/workbench/sessions", "h_workbench_sessions"),
+        # Specific sub-paths FIRST: an ordered table means the bare-id row below
+        # would otherwise match "/sessions/<id>/messages" too and shadow it.
         ("GET", r"/api/workbench/sessions/(?P<id>[^/]+)/messages",
          "h_workbench_transcript"),
         ("GET", r"/api/workbench/sessions/(?P<id>[^/]+)/timeline",
          "h_workbench_timeline"),
         ("POST", r"/api/workbench/sessions/(?P<id>[^/]+)/turn",
          "h_workbench_turn"),
+        ("GET", r"/api/workbench/sessions/(?P<id>[^/]+)", "h_workbench_session"),
+        ("POST", r"/api/workbench/turn", "h_workbench_turn_root"),
         ("GET", r"/api/workbench/workspace/tree", "h_workbench_tree"),
+        ("GET", r"/api/workbench/workspace/file", "h_workbench_file"),
         ("POST", r"/api/workbench/workspace/preview", "h_workbench_preview"),
     ]
 
