@@ -3898,6 +3898,23 @@ export interface ChatStreamEvent {
     task?: string;
     sources?: string[];
     reasoning_applied?: { level?: string; max_tokens?: number | null };
+    /**
+     * The turn's provider usage. The backend attaches this on the `done`
+     * frame (`voicebridge/chat_transport.py:4294-4302`, `:5307-5315`).
+     * `prompt_tokens` is THIS prompt's size — the only honest input to a
+     * context-window percentage (see `components/chat/ContextRing`).
+     */
+    usage?: {
+      provider?: string;
+      model?: string;
+      identity?: string;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      latency_ms?: number;
+      cost_usd_est?: number;
+      fallback?: boolean;
+      fallback_reason?: string | null;
+    };
   };
 }
 
