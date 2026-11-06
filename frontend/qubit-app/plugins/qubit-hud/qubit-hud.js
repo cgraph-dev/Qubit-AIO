@@ -85,10 +85,18 @@
  *
  * BRAND
  * -----
- * Every visible string is Qubit's. The one place upstream vocabulary can still
- * reach the screen is the plugin catalog's `provenance` blob (which records
- * where a third-party plugin came from); this page renders catalog LABELS and
- * counts only and never prints that blob, so no legacy name reaches the UI.
+ * Every string this file AUTHORS is Qubit's. It does not rename anything the
+ * payload names: `docs/BRAND.md` §2 keeps upstream model and provider names
+ * ("a product name is not a model name") and records the defect caused by
+ * replacing them — a blind replace once rewrote a correct model warning into a
+ * false claim about a product that does not exist. Provider labels, model ids,
+ * skill names and descriptions therefore render EXACTLY as the backend sent
+ * them.
+ *
+ * The one legacy-name vector this file deliberately withholds is the plugin
+ * catalog's third-party `provenance` blob (an internal attribution record, not
+ * product surface): the Plugins tab renders catalog labels and counts, never
+ * that blob. See §3a and §11.
  */
 (function () {
   var SDK = window.__QUBIT_PLUGIN_SDK__;
@@ -267,49 +275,33 @@
   }
 
   /* ======================================================================
-   * 3a. DISPLAY-NAME SANITIZER — zero legacy brand ON SCREEN.
+   * 3a. NAMES FROM THE PAYLOAD ARE PASSED THROUGH, NOT SCRUBBED.
    *
-   * Some payloads carry an upstream product name inside a display field: the
-   * model catalogue ships a provider whose `name` is another product's brand
-   * and whose `source` is its internal id, and a couple of bundled skills are
-   * still named after the runtime they shipped in. Those are VALUES from our
-   * own config and catalogs, not copy this file authored — but a reader of the
-   * HUD should never see another product's name on a Qubit surface
-   * (docs/BRAND.md). This is a DISPLAY transform applied to names and one-line
-   * descriptions only. Ids, slugs and paths are left byte-exact, because they
-   * are what an operator types into a CLI and must round-trip.
+   * An earlier revision of this file rewrote payload-supplied names to strip
+   * an upstream product word. That was wrong, and docs/BRAND.md §2 says why in
+   * so many words: an upstream MODEL family and a PROVIDER brand name the thing
+   * that actually runs and bills, and "a product name is not a model name". The
+   * documented precedent is a real defect — a blind replace once turned the
+   * warning "Nous Research Hermes 3 & 4 models are NOT agentic" into "Qubit 3 &
+   * 4 models" across six locale packs, which is not a rebrand but a false
+   * statement about a model that exists.
    *
-   * Nothing here invents a new label: the substitutions are neutral words for
-   * the thing the record actually is ("upstream provider", "upstream runtime",
-   * "upstream"), so no claim about the product is fabricated either.
+   * So: a provider label, a model id, a skill name and a skill description are
+   * shown EXACTLY as the backend sent them. The zero-legacy-brand rule is about
+   * copy THIS product authors (every string in this file is Qubit's), not about
+   * renaming someone else's product on a record that names it.
+   *
+   * What this file does NOT render, and why that is still a brand control:
+   * third-party `provenance` blobs from the plugin catalog, which are internal
+   * attribution records rather than product surface — the Plugins tab shows
+   * catalog labels and counts only (see §11).
    * ==================================================================== */
-  var BRAND_SEXPR = [
-    /* longest first: the compound product phrases before their bare tokens */
-    [/nous research/gi, "upstream"],
-    [/nous portal/gi, "upstream provider"],
-    [/nous-?research/gi, "upstream"],
-    [/hermes-?agent/gi, "upstream agent"],
-    [/hermes[\s_-]?cli/gi, "upstream CLI"],
-    [/hermes[\s_-]?desktop/gi, "upstream desktop"],
-    [/hermes-?hudui/gi, "upstream HUD"],
-    [/nous/gi, "upstream"],
-    [/hermes/gi, "upstream"]
-  ];
 
-  function scrub(v) {
-    var s = str(v);
-    if (!s) return s;
-    for (var i = 0; i < BRAND_SEXPR.length; i++) {
-      s = s.replace(BRAND_SEXPR[i][0], BRAND_SEXPR[i][1]);
-    }
-    return s;
-  }
-
-  /* Display form with the sanitizer applied and empties folded to the dash. */
+  /* Display form of a payload value: as-is, with empties folded to the dash.
+   * `text()` is the same thing; `label()` exists so the call sites that render
+   * a NAME say so, and so this decision is documented at the point of use. */
   function label(v) {
-    if (v === null || v === undefined || v === "") return DASH;
-    var s = scrub(v);
-    return s || DASH;
+    return text(v);
   }
 
   function isObj(v) {
@@ -783,9 +775,7 @@
   function sourceChip(source) {
     var s = str(source);
     if (!s) return null;
-    /* The chip is a LABEL, so it goes through the brand scrub; the raw id is
-     * still visible in the row's own id line where an operator needs it. */
-    return e(Chip, null, scrub(s));
+    return e(Chip, null, label(s));
   }
 
   function msgRoleTone(role) {
@@ -1532,6 +1522,7 @@
                             : null
                         );
                       } },
+                    { key: "slug", label: "Slug" },
                     { key: "authenticated", label: "Auth",
                       render: function (r) {
                         if (r.authenticated === true) {
@@ -1749,7 +1740,7 @@
                         str(sk.origin) ? e(Chip, null, str(sk.origin)) : null
                       ),
                       e("div", { className: "hud-row__desc" },
-                        clip(scrub(sk.description), 300))
+                        clip(sk.description, 300))
                     );
                   })
                 )
@@ -1827,7 +1818,7 @@
                       str(m && m.source) ? e(Chip, null, str(m.source)) : null
                     ),
                     e("div", { className: "hud-row__desc" },
-                      clip(scrub(m && m.description), 320)),
+                      clip(m && m.description, 320)),
                     e("div", { className: "hud-row__meta" },
                       "tab " + text(tab && tab.path) +
                       " \u00b7 entry " + text(m && m.entry) +
@@ -1939,7 +1930,7 @@
                         return DASH;
                       } },
                     { key: "description", label: "Description", trunc: true,
-                      render: function (r) { return clip(scrub(r.description), 120); } }
+                      render: function (r) { return clip(r.description, 120); } }
                   ],
                   rows: shown
                 }),
