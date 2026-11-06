@@ -159,13 +159,15 @@ def h_hud_costs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 
 _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
-    "health": h_hud_health,
-    "sessions": h_hud_sessions,
-    "cron": h_hud_cron,
-    "models": h_hud_models,
-    "skills": h_hud_skills,
-    "plugins": h_hud_plugins,
-    "costs": h_hud_costs,
+    f"h_hud_{panel}": fn for panel, fn in (
+        ("health", h_hud_health),
+        ("sessions", h_hud_sessions),
+        ("cron", h_hud_cron),
+        ("models", h_hud_models),
+        ("skills", h_hud_skills),
+        ("plugins", h_hud_plugins),
+        ("costs", h_hud_costs),
+    )
 }
 
 
