@@ -2,10 +2,20 @@
 card's later review handoff (#119070).
 
 Real processes end to end: every tick is a real ``hermes kanban dispatch`` process, every worker a
-real ``hermes chat -q`` process spawned by it, talking to the recording fake provider (the only
-fake — it stands in for the vendor HTTP API). The fake plays two roles, told apart structurally:
-the scratch home carries its own ``sdlc-review`` skill whose body holds a unique marker, and the
-review lane preloads that skill into the worker it spawns, so only a reviewer's prompt carries it.
+real worker-client process spawned by it, talking to the recording fake provider (the only fake — it
+stands in for the vendor HTTP API). The fake plays two roles, told apart structurally: the scratch
+home carries its own ``sdlc-review`` skill whose body holds a unique marker, and the review lane
+preloads that skill into the worker it spawns, so only a reviewer's prompt carries it.
+
+The board runs with ``kanban.dispatch_in_gateway: false``. Since the worker-admission migration the
+worker client submits its turn to a per-home gateway, and that gateway would otherwise run its own
+embedded dispatcher whose first tick (~5 s after boot) can claim the freshly handed-off ``review``
+row before this process's explicit tick does. That is the production architecture working (exactly
+one of the two dispatchers claims the run under the per-board lock), but it makes the tick the
+reviewer appears in nondeterministic: the reviewer can be spawned by the gateway rather than by the
+CLI tick this harness counts, so ``spawned`` reads 0 here and the reviewer still runs. Disabling the
+embedded dispatcher leaves exactly one dispatcher — the one this test drives — so the "next tick"
+assertions below measure the handoff itself, not which dispatcher won the race.
 
 Flow under test (``HERMES_KANBAN_RATE_LIMIT_COOLDOWN_SECONDS=0``, ``agent.api_max_retries: 1``):
 
@@ -46,6 +56,11 @@ REVIEW_SKILL = "sdlc-review"
 REVIEW_MARK = "E2E_REVIEW_LANE_SKILL_5d21c9"
 RATE_LIMIT_EXIT_CODE = 75  # KANBAN_RATE_LIMIT_EXIT_CODE — documented worker exit contract
 MAX_TICKS = 6  # a healthy rate-limited card is done on tick 3; the rest prove "forever"
+
+# This harness drives the dispatcher itself, so the worker-admission gateway must not also tick the
+# board (see the module docstring). Config, not the machine-wide env escape hatch: the embedded
+# dispatcher belongs to this scratch home only.
+CLI_DISPATCH_ONLY = "kanban:\n  dispatch_in_gateway: false\n"
 
 # Scenario -> (pattern, reason) for ``known_gate``; it only matches ``ReviewerNeverSpawned``.
 KNOWN: dict[str, tuple[str, str]] = {
@@ -170,7 +185,7 @@ def drive(board: Board, tid: str, model: TwoRoleModel, max_ticks: int = MAX_TICK
 def _flow(root: Path, rate_limited_attempts: int) -> Any:
     model = TwoRoleModel(rate_limited_attempts)
     with FakeLLMServer(model) as srv:
-        board = Board(root, srv.base_url)
+        board = Board(root, srv.base_url, extra_config=CLI_DISPATCH_ONLY)
         _seed_review_skill(board)
         tid = board.create(f"rate-limit review flow ({rate_limited_attempts} x 429)")
         try:
