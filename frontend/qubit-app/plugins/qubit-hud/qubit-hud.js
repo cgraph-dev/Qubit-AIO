@@ -1,6 +1,6 @@
 /* Qubit HUD — observability tabs, overlay plugin bundle (Qubit addition,
  * dependency-free IIFE). Uses only window.__QUBIT_PLUGIN_SDK__
- * (React, hooks, fetchJSON, utils).
+ * (React, hooks, fetchJSON).
  *
  * PROVENANCE — READ THIS BEFORE COMPARING THIS FILE TO ANYTHING UPSTREAM.
  * ---------------------------------------------------------------------------
@@ -106,7 +106,6 @@
   var useState = hooks.useState, useEffect = hooks.useEffect;
   var useCallback = hooks.useCallback, useMemo = hooks.useMemo;
   var useRef = hooks.useRef;
-  var UTILS = SDK.utils || {};
 
   /* ======================================================================
    * 1. ROUTES — the exact strings this page reads, each in one place.
