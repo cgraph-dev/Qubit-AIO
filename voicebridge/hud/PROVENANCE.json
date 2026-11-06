@@ -1,0 +1,150 @@
+{
+  "name": "voicebridge.hud",
+  "path": "voicebridge/hud",
+  "kind": "vendored-and-adapted",
+  "upstream": {
+    "repository": "https://github.com/joeynyc/hermes-hudui",
+    "commit": "be83208f48b7a1c67b7816837c8df71a61ef7edf",
+    "committed": "2026-10-11",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 Hermes HUD Contributors",
+    "survey_record": "docs/UPSTREAM_SURVEY_2026-11-06.md"
+  },
+  "licence_scope": "LICENSE at the repo root applies to original Qubit material only. The collectors in this directory are adapted from the MIT-licensed upstream named above; the upstream copyright line is preserved in every file header and here.",
+  "files": [
+    {
+      "here": "collectors_health.py",
+      "upstream": "backend/collectors/health.py",
+      "upstream_lines": 704,
+      "adapted": true,
+      "changes": [
+        "Home resolves through qubit_constants.get_qubit_home() (profiles are independent islands); no HERMES_HOME / legacy dot-home default.",
+        "Removed the `hermes --version` CLI shell-out; the build version is read from the checkout VERSION file and no subprocess is spawned.",
+        "Removed the second sqlite3 connection and the PRAGMA table_info schema walk over state.db; session/usage facts come from the QubitSessionStore authority (reload/list) and its analytics_usage rollup.",
+        "Service probes: gateway.pid + `systemctl --user is-active` + `pgrep llama-server` replaced by the <home>/state/gateway.heartbeat file and a loopback connect probe on the local-brain ports.",
+        "Feature rows for Sudo, Providers and Gateway dropped (their tabs are out of scope); Chat/Sessions/Model Analytics/Plugins/Cron rewired to Qubit dependencies; Skills and Gateway rows added from sources Qubit does expose.",
+        "API-key check list re-pointed at Qubit's provider registry env names plus the redacted credential-pool inventory (names only, never values).",
+        "Upstream's agent-schema baseline (VERIFIED_AGENT_VERSION / TESTED_SCHEMA_VERSIONS) removed: it described the upstream agent's state.db, not Qubit's.",
+        "Returned as a JSON-ready dict instead of a dataclass tree.",
+        "Borrowed helpers from backend/collectors/config.py (_config_summary) so the health and model tabs agree on the configured model."
+      ]
+    },
+    {
+      "here": "collectors_cron.py",
+      "upstream": "backend/collectors/cron.py",
+      "upstream_lines": 224,
+      "adapted": true,
+      "changes": [
+        "Reads jobs and execution history through voicebridge.cron_bridge (the live scheduler store) instead of parsing <home>/cron/jobs.json and opening notepad.db/executions.db itself.",
+        "Job shape follows cron_bridge.shape_job; monitor_script/monitor_url/continuity and the notepad preview are not published by that seam and are therefore absent rather than read behind its back.",
+        "Run preview honours the bridge's state/code/detail fields (an execution row's status column) instead of assuming a raw `status` key.",
+        "Summary counters (total/active/paused/has_errors) derived from the store's own effective_job_state.",
+        "Returned as a JSON-ready dict instead of dataclass trees."
+      ]
+    },
+    {
+      "here": "collectors_plugins.py",
+      "upstream": "backend/collectors/plugins.py",
+      "upstream_lines": 338,
+      "adapted": true,
+      "changes": [
+        "Runtime status is the PluginManager's own admit/error verdict from plugins.enabled/plugins.disabled, not an `enabled:` key read out of plugin.yaml.",
+        "Source set (bundled / user / entry-point / frontend overlay) comes from Qubit's plugin loader and dashboard discovery instead of a guessed parent-directory walk plus an untrusted project dir.",
+        "Dashboard half read from qubit_cli.web_server_dashboard discovery and frontend/qubit-app/plugins/*/manifest.json (the overlay the dashboard serves).",
+        "install_plugin / update_plugin (git clone/pull) and set_plugin_enabled / set_dashboard_plugin_hidden (manifest rewrites) are NOT ported: they are writers owned by `qubit plugins`, and a HUD tab must not be a second writer of plugin state.",
+        "Descriptions pass through voicebridge.hud.branding.rebrand_text at the served boundary.",
+        "Returned as a JSON-ready dict instead of dataclass trees."
+      ]
+    },
+    {
+      "here": "collectors_skills.py",
+      "upstream": "backend/collectors/skills.py",
+      "upstream_lines": 121,
+      "adapted": true,
+      "changes": [
+        "Skills come from tools.skills_tool._skill_catalog (Qubit's tier resolution, dedupe, platform/environment gates) instead of skills_dir.rglob('SKILL.md').",
+        "Frontmatter parsing delegated to the authority (the upstream hand-rolled key:value splitter is gone), so multi-line and quoted descriptions parse exactly as the agent sees them.",
+        "Category derived from the resolved relative_path rather than assuming <category>/<name>/SKILL.md.",
+        "is_custom from real provenance (profile dir not tracked by the bundled manifest) instead of a bulk-mtime heuristic; a new `source` field reports profile / bundled / external.",
+        "Upstream's 60s cache dropped: the catalog is already signature-cached by the skills tool.",
+        "Returned as a JSON-ready dict instead of dataclass trees."
+      ]
+    },
+    {
+      "here": "collectors_model_info.py",
+      "upstream": "backend/collectors/model_info.py",
+      "upstream_lines": 146,
+      "adapted": true,
+      "changes": [
+        "Catalog lookup goes through agent.models_dev.get_model_info (provider-id map, model_overrides, suffix/routing fallbacks, allow_network=False) instead of re-parsing models_dev_cache.json and scanning every provider.",
+        "Configured model/provider read through the same helper as collectors_health.",
+        "Capabilities expand the upstream five booleans with models.dev modalities, max input, cache-write cost and status.",
+        "Conversion table and effective_context_length rule (max(config, catalog)) preserved.",
+        "Returned as a JSON-ready dict instead of a dataclass."
+      ]
+    },
+    {
+      "here": "collectors_model_analytics.py",
+      "upstream": "backend/collectors/model_analytics.py",
+      "upstream_lines": 197,
+      "adapted": true,
+      "changes": [
+        "Reads voicebridge.qubit_session_store.analytics_usage (the authority's read-only rollup of the same sessions rows) instead of opening <home>/state.db with a second sqlite3 connection and a schema-spliced SELECT.",
+        "Per-session detail (upstream session_details) is not exposed by that rollup and is NOT fabricated; per-model totals, the daily series and last-use are kept.",
+        "Capability join onto usage rows removed; collectors_model_info owns capabilities so the two panels cannot disagree.",
+        "Window is bounded by the authority (1..365 days; days<=0 or None means 365) instead of an unbounded 'all' query.",
+        "Returned as a JSON-ready dict instead of dataclass trees."
+      ]
+    },
+    {
+      "here": "__init__.py",
+      "upstream": "backend/collectors/__init__.py",
+      "upstream_lines": null,
+      "adapted": true,
+      "changes": [
+        "Re-authored for Qubit: package docstring, the six ported modules, and one SKIP line per dropped HUD tab with the reason it has no truthful Qubit source.",
+        "Publishes the upstream pin, license and copyright constants."
+      ]
+    },
+    {
+      "here": "branding.py",
+      "upstream": null,
+      "upstream_lines": null,
+      "adapted": false,
+      "changes": [
+        "Qubit-authored. Carry-over of the rebrand convention (voicebridge/qubit_plugins.rebrand_catalog_text) as pure text helpers: legacy-product substitutions, tab labels for the seven in-scope tabs, surface title."
+      ]
+    }
+  ],
+  "upstream_api_reference": {
+    "note": "Response shapes were read from these upstream routers; no router code was copied and this package registers no route.",
+    "files": [
+      "backend/api/health.py",
+      "backend/api/cron.py",
+      "backend/api/plugins.py",
+      "backend/api/skills.py",
+      "backend/api/model_info.py",
+      "backend/api/serialize.py"
+    ],
+    "dropped_mutations": [
+      "POST /cron, POST /cron/{id}/pause|resume|run, DELETE /cron/{id} (the upstream router shelled the `hermes cron` CLI)",
+      "POST /plugins/rescan|install|{name}/enable|disable|show|hide|update (upstream plugin writers)"
+    ]
+  },
+  "dropped_tabs": {
+    "sudo_governance": "HUD classified sudo from gateway.log prose; Qubit keeps no structured sudo-approval ledger to read.",
+    "replay": "Upstream replayed state.db rows through its verified schema; Qubit's schema genuinely differs and the session authority exposes no replay/rewind read model.",
+    "corrections": "Qubit records no correction events.",
+    "patterns": "Qubit records no pattern-mining events.",
+    "verify": "HUD shelled `hermes verify`; Qubit has no verify command or verify artifact.",
+    "providers": "HUD shelled `hermes auth`; the credential facts Qubit does expose feed the health tab's credential-presence rows instead of a separate panel.",
+    "projects": "Qubit's projects.db has no single-writer public read seam.",
+    "profiles": "Qubit profiles are independent islands; a cross-profile aggregate would need a second home reader.",
+    "memory": "Memory providers are plugin-owned and expose no single read authority.",
+    "gateway": "Qubit gateway control is an operator/action surface (voicebridge.approvals), not a read-only collector.",
+    "live_chat": "Out of scope by owner decision; needs a websocket this package does not own.",
+    "live_model_capabilities": "Collapsed into collectors_model_info, which reads the real models.dev catalog Qubit ships."
+  },
+  "no_route_registered": true,
+  "recorded_by": "hudwave/hud-core backend pass, 2026-11-06"
+}
