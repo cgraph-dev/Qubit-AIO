@@ -21594,3 +21594,13 @@ from .workbench.workbench_routes import (workbench_routes as _wb_routes,
 for _m, _p, _h in _wb_routes():
     _r(_m, _p, _h)
 HANDLERS.update(_wb_handlers())
+
+# Workbench shim routes (see voicebridge/workbench_shim_routes.py). These back
+# the ported static UI at /wb/, which speaks upstream's wire shape. Namespaced
+# handlers, registered last, so they cannot shadow an upstream route.
+from .workbench_shim_routes import (workbench_shim_routes as _wb_shim_routes,
+                                    workbench_shim_handlers as _wb_shim_handlers)
+
+for _m, _p, _h in _wb_shim_routes():
+    _r(_m, _p, _h)
+HANDLERS.update(_wb_shim_handlers())

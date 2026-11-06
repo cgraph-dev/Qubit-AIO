@@ -3888,6 +3888,57 @@ class WebUIHandler(BaseHTTPRequestHandler):
                   state="UNAVAILABLE")
         return True
 
+    def _serve_workbench_ui(self, method: str) -> bool:
+        """Serve the ported workbench UI (``/wb/*``). True when this handled it.
+
+        Two surfaces under one prefix, mirroring how the office app is served:
+
+        * ``/wb/api/<sub>`` — the shim. Rewritten to the compat authority's
+          ``h_wb_gateway``, which routes each sub-path to the shim module; the
+          same session token and the same auth gate as every other API call.
+        * ``/wb/<file>`` — one file from the ported static tree, confined to
+          ``voicebridge/workbench_ui/static`` by ``serve_asset``'s own
+          ``resolve()``. ``/wb`` and ``/wb/`` serve the app's index.
+
+        Declared here rather than inline in ``do_GET`` so ``do_POST`` can share
+        the API half without duplicating the parse.
+        """
+        path = self.path.split("?")[0]
+        if path != "/wb" and not path.startswith("/wb/"):
+            return False
+        from . import workbench_ui_routes as R
+
+        app = getattr(self.server, "app", None)
+        token = str(getattr(app, "api_token", "") or "")
+        if path.startswith("/wb/api/"):
+            from urllib.parse import parse_qs, urlsplit
+
+            sub = path[len("/wb/api/"):].strip("/")
+            query = {k: v[0] for k, v in parse_qs(
+                urlsplit(self.path).query, keep_blank_values=True).items()}
+            body: Dict[str, Any] = {}
+            if method != "GET":
+                try:
+                    length = int(self.headers.get("Content-Length", 0) or 0)
+                except ValueError:
+                    length = 0
+                if length:
+                    try:
+                        parsed = json.loads(
+                            self.rfile.read(length).decode("utf-8", "replace")
+                            or "{}")
+                    except ValueError:
+                        parsed = {}
+                    body = parsed if isinstance(parsed, dict) else {}
+            status, payload = R.h_wb_gateway(
+                getattr(self.server, "wb_cfg", None), query, body,
+                {"sub": sub, "method": method})
+            self._json(payload, status)
+            return True
+        R.serve_asset(self, "/" if path == "/wb" else path[len("/wb"):],
+                      token=token, base_path="/wb")
+        return True
+
     # -- routes ----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802
         if self._maybe_pty_upgrade():
@@ -3901,6 +3952,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if self._refuse_qubit_ws():
             return
         path = self.path.split("?")[0]
+        # The ported workbench UI (/wb/*): the static tree under
+        # voicebridge/workbench_ui/static plus its /wb/api/* shim. Placed before
+        # the SPA branch so its own documents and assets win, and confining every
+        # file read to the static root the way /plugin-apps/ does.
+        if self._serve_workbench_ui("GET"):
+            return
         if path in ("/", "/index.html"):
             # Ruling 3 → Option A: the root lands on the Qubit chat workspace.
             self._redirect("/chat")
@@ -4740,6 +4797,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
+        if self._serve_workbench_ui("POST"):
+            return
         if path == "/api/permissions":
             # Packet 7E: mutating permission/skill actions (explicit confirm).
             if not self._api_token_ok():
