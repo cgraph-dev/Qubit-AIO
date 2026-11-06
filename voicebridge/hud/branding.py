@@ -26,6 +26,10 @@ _LEGACY_PRODUCT = "Her" + "mes"
 #: before the bare product word so a legacy path never becomes the nonsensical
 #: ``~/.Qubit``.
 _SUBS = (
+    # Env-var/symbol tokens first: a mechanical word swap would render
+    # ``HERMES_HOME`` as ``Qubit_HOME``, which is not a Qubit identifier.
+    (_LEGACY_PRODUCT.upper() + "_", "QUBIT_"),
+    (_LEGACY_PRODUCT + "_", "qubit_"),
     ("~/" + "." + _LEGACY_PRODUCT.lower(), "~/" + ".config/qubit-voicebridge"),
     (_LEGACY_PRODUCT + " HUD", SURFACE_NAME),
     (_LEGACY_PRODUCT + " Agent", PRODUCT_NAME),

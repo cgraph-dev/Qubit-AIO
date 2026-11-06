@@ -264,6 +264,22 @@ class _SessionFacts:
     totals: Dict[str, Any] = field(default_factory=dict)
 
 
+def _authority_db_path(cfg: Any) -> Optional[Path]:
+    """Resolve (read-only, no connection) the ``state.db`` the authority reads.
+
+    ``qubit_session_store.qubit_state_db_path`` is the authority's own path
+    resolver; it is called with no store construction, so asking where the data
+    lives never opens the database.
+    """
+    try:
+        _ensure_vendored()
+        from ..qubit_session_store import qubit_state_db_path
+
+        return Path(qubit_state_db_path(cfg))
+    except Exception:  # noqa: BLE001 - unknown path is reported as "the home's"
+        return None
+
+
 def _session_facts(cfg: Any) -> _SessionFacts:
     """Read-only session facts through the ONE chat-session authority.
 
@@ -441,10 +457,20 @@ def collect_health(home: Optional[Path] = None, cfg: Any = None) -> Dict[str, An
     root = _qubit_home(home)
     state_db = root / "state.db"
 
+    # The session authority answers for ITS home (``QUBIT_HOME`` / the profile
+    # island), which may be a different directory from an explicit ``home``
+    # argument. Which store is actually being read is reported below, so the
+    # filesystem rows here never claim to describe a store the authority reads.
+    authority_db = _authority_db_path(cfg)
+    session_db = authority_db or state_db
+
     readiness: List[Dict[str, Any]] = []
     for name, relpath, missing in _EXPECTED_DIRS:
-        readiness.append(_file_diag(name, root / relpath if relpath else root,
-                                    "readiness", missing))
+        path = root / relpath if relpath else root
+        if relpath == "state.db" and authority_db is not None:
+            path = authority_db
+            name = "State Database"
+        readiness.append(_file_diag(name, path, "readiness", missing))
     readiness.append(_layout_diag(root))
 
     version = _qubit_version()
@@ -466,8 +492,9 @@ def collect_health(home: Optional[Path] = None, cfg: Any = None) -> Dict[str, An
     if facts.available:
         database.append(_diag(
             "session authority", "ok",
-            f"{facts.session_count} session(s); {facts.detail}",
-            "database", depends_on=["state.db"],
+            f"{facts.session_count} session(s); {facts.detail}"
+            + (f"; store {session_db}" if authority_db else ""),
+            "database", depends_on=[str(session_db)],
         ))
     else:
         database.append(_diag(
@@ -587,8 +614,12 @@ def collect_health(home: Optional[Path] = None, cfg: Any = None) -> Dict[str, An
         "qubit_home": str(root),
         "qubit_home_exists": root.exists(),
         "qubit_version": version,
-        "state_db_exists": state_db.exists(),
-        "state_db_size": state_db.stat().st_size if state_db.exists() else 0,
+        # The store the authority actually reads (may differ from ``home`` when
+        # an explicit home was passed); ``None`` = the home argument's own file.
+        "session_store": str(authority_db) if authority_db else None,
+        "state_db_exists": session_db.exists(),
+        "state_db_size": (session_db.stat().st_size
+                          if session_db.exists() else 0),
         "config_model": config["model"],
         "config_provider": config["provider"],
         "session_count": facts.session_count,
