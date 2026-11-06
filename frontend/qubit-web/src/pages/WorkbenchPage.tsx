@@ -1,64 +1,65 @@
 /**
  * Qubit Workbench (route `/qubit-workbench`).
  *
- * The three-panel chat workspace: sessions on the left, transcript + composer in
- * the centre, workspace files on the right. It is a NEW surface and a sibling of
- * `/qubit-chat`, never a replacement: the voice path (push-to-talk, the
- * Right-Ctrl hotkey, the desktop-helper hand-off, read-aloud, the live voice
- * session follow) stays on `/qubit-chat` and nothing here references it.
+ * A four-region console, ported in structure from the absorbed upstream surface:
  *
- * Data comes only from `@/lib/workbench-api`, and only in one of three typed
- * states. A 404 from the `/api/workbench/*` seam renders "Backend not
- * available" — never an empty list, which would report "you have no sessions",
- * a different and false claim.
+ *   [ icon rail ][ conversation sidebar ][ chat ][ workspace panel ]
  *
- * This file is layout and wiring. Panels are small components under
- * `components/workbench/`; the composer's control cluster and the ring come from
- * there too. Layout is responsive: one panel at a time below `md`, all three
- * side by side from `md` up.
+ * It is a NEW surface and a sibling of `/qubit-chat`, never a replacement: the
+ * voice path (push-to-talk, the Right-Ctrl hotkey, the desktop-helper hand-off,
+ * read-aloud, the live voice session follow) stays on `/qubit-chat` and nothing
+ * here references it. The composer's mic button is drawn DISABLED with a title
+ * pointing there, rather than duplicated.
+ *
+ * Data comes only from `@/lib/workbench-api`, and only in one of four typed
+ * states (see that module). A 404 from the `/api/workbench/*` seam renders
+ * "Backend not available" — never an empty list, which would report "you have
+ * no sessions", a different and false claim. A mounted backend that says "no
+ * active project" renders that reason, not an empty folder.
+ *
+ * **Responsive order.** The workspace collapses first (its own close button,
+ * and automatically below `xl`), then the sidebar (below `md`), down to a
+ * single column whose header switches between them.
+ *
+ * This file is layout and wiring only. Panels live under
+ * `components/workbench/`, the grouping arithmetic under `session-groups.ts`,
+ * and the visual vocabulary under `workbench-theme.ts`.
  */
 
+import { PanelLeft, PanelRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { contextPercent } from "@/components/chat/contextRingMath";
-import { ControlCenter } from "@/components/workbench/ControlCenter";
-import { retire, startFetch, useFetchGuard } from "@/components/workbench/fetch-guard";
+import { api } from "@/lib/api";
 import { Composer } from "@/components/workbench/Composer";
+import { retire, startFetch, useFetchGuard } from "@/components/workbench/fetch-guard";
 import { FilePreview } from "@/components/workbench/FilePreview";
-import { SessionsList } from "@/components/workbench/SessionsList";
+import { ControlCenter } from "@/components/workbench/ControlCenter";
+import { SessionsList, type SourceFilter } from "@/components/workbench/SessionsList";
 import { Transcript } from "@/components/workbench/Transcript";
-import { WorkspaceTree } from "@/components/workbench/WorkspaceTree";
+import { WorkbenchRail } from "@/components/workbench/WorkbenchRail";
+import type { SessionGroupKey } from "@/components/workbench/session-groups";
+import { WorkspacePanel, type WorkspaceTab } from "@/components/workbench/WorkspacePanel";
 import {
   WORKBENCH_ROUTES,
+  getWorkspaceTree,
   getWorkbenchSession,
   getWorkbenchSessions,
-  getWorkspaceTree,
   postWorkbenchTurn,
   readWorkspaceFile,
+  resultData,
   type ApiResult,
   type RouteProbe,
   type WorkspaceFile,
   type WorkspaceTree as WorkspaceTreeData,
   type WorkbenchSessionDetail,
-  type WorkbenchSessionRow,
+  type WorkbenchSessionsPage,
   type WorkbenchTurn,
 } from "@/lib/workbench-api";
 
-/** Which panel a narrow viewport is showing. */
-type NarrowPane = "sessions" | "chat" | "workspace";
-
-const PANE_TAB: ReadonlyArray<{ id: NarrowPane; label: string }> = [
-  { id: "sessions", label: "Sessions" },
-  { id: "chat", label: "Chat" },
-  { id: "workspace", label: "Files" },
-];
-
-/**
- * Which pane a narrow viewport starts on. The conversation is the reason the
- * page exists; the sessions list and the workspace are one tap away.
- */
-const INITIAL_PANE: NarrowPane = "chat";
+/** Which single column a narrow viewport is showing. */
+type NarrowPane = "sessions" | "chat";
 
 /**
  * Whether the composer may send. Before any turn has been attempted this page
@@ -66,64 +67,65 @@ const INITIAL_PANE: NarrowPane = "chat";
  * reports what the route said; only a confirmed 404 turns sending off, with the
  * reason stated next to the input.
  */
-function composerGate(turn: ApiResult<WorkbenchTurn> | null): {
-  disabled: boolean;
-  reason: string | null;
-} {
+function composerGate(
+  turn: ApiResult<WorkbenchTurn> | null,
+  hasSession: boolean,
+): { disabled: boolean; reason: string | null } {
   if (turn?.state === "not_available") {
     return { disabled: true, reason: `Sending is off: ${WORKBENCH_ROUTES.turn} is not mounted yet.` };
   }
-  if (turn === null) {
-    return { disabled: false, reason: `Sending has not been exercised in this visit yet; the reply arrives from ${WORKBENCH_ROUTES.turn}.` };
+  if (turn?.state === "error") {
+    return {
+      disabled: false,
+      reason: `The last turn failed${turn.error.code ? ` (${turn.error.code})` : ""} — sending is still enabled.`,
+    };
+  }
+  if (!hasSession) {
+    // A turn needs a session id on this seam: `POST /turn` refuses one without
+    // it rather than silently starting a second store entry.
+    return { disabled: true, reason: "Open a conversation on the left to send a message here." };
   }
   return { disabled: false, reason: null };
 }
 
-/** Per-pane width, applied from `md` up (the three-panel layout). */
-const PANE_WIDTH: Record<NarrowPane, string> = {
-  sessions: "md:w-[16rem] md:border-r",
-  chat: "",
-  workspace: "md:w-[20rem] md:border-l",
-};
-
-/**
- * One pane's visibility. Above `md` all three sit side by side; below it the
- * switch decides which single pane is mounted, so a phone never has to scroll
- * three columns. (`hidden md:flex` is written literally — a computed class
- * list of competing flex variants is a coin flip on which rule wins.)
- */
-function paneVisibility(id: NarrowPane, pane: NarrowPane): string {
-  const base =
-    id === "chat"
-      ? "min-h-0 min-w-0 flex-1 flex-col"
-      : `min-h-0 w-full shrink-0 flex-col border-border ${PANE_WIDTH[id]}`;
-  return `${base} ${pane === id ? "flex" : "hidden"} md:flex`;
-}
-
 export default function WorkbenchPage() {
   const { setTitle } = usePageHeader();
-  const sessionsGuard = useFetchGuard<ApiResult<WorkbenchSessionRow[]>>();
+  const sessionsGuard = useFetchGuard<ApiResult<WorkbenchSessionsPage>>();
   const detailGuard = useFetchGuard<ApiResult<WorkbenchSessionDetail>>();
   const treeGuard = useFetchGuard<ApiResult<WorkspaceTreeData>>();
   const fileGuard = useFetchGuard<ApiResult<WorkspaceFile>>();
   const turnGuard = useFetchGuard<ApiResult<WorkbenchTurn>>();
 
-  const [sessions, setSessions] = useState<ApiResult<WorkbenchSessionRow[]> | null>(null);
+  const [sessions, setSessions] = useState<ApiResult<WorkbenchSessionsPage> | null>(null);
   const [detail, setDetail] = useState<ApiResult<WorkbenchSessionDetail> | null>(null);
   const [tree, setTree] = useState<ApiResult<WorkspaceTreeData> | null>(null);
   const [file, setFile] = useState<ApiResult<WorkspaceFile> | null>(null);
   const [turn, setTurn] = useState<ApiResult<WorkbenchTurn> | null>(null);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [treePath, setTreePath] = useState("");
+  // The tree lists one folder per call and starts at the workspace root (`""`);
+  // the value lives here so the Control Center can print the exact path read
+  // and the composer's workspace chip can name the root it resolved to.
+  const [treePath] = useState("");
   const [filePath, setFilePath] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("webui");
+  const [activeSource, setActiveSource] = useState("all");
+  const [pinned, setPinned] = useState<ReadonlySet<string>>(() => new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<SessionGroupKey>>(
+    () => new Set(),
+  );
+  const [openFolders, setOpenFolders] = useState<ReadonlySet<string>>(() => new Set());
+  const [fileSelection, setFileSelection] = useState<ReadonlySet<string>>(() => new Set());
+  const [tab, setTab] = useState<WorkspaceTab>("files");
+  const [workspaceOpen, setWorkspaceOpen] = useState(true);
+  const [workspaceWide, setWorkspaceWide] = useState(false);
+  const [controlsOpen, setControlsOpen] = useState(false);
+  const [pane, setPane] = useState<NarrowPane>("chat");
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(true);
-  const [controlsOpen, setControlsOpen] = useState(false);
-  const [pane, setPane] = useState<NarrowPane>(INITIAL_PANE);
   const [reloadKey, setReloadKey] = useState(0);
+  const [profileName, setProfileName] = useState<string | null>(null);
 
   // The route's own identity, so the header reads correctly even before the
   // owner registers the path in resolve-page-title.ts.
@@ -132,7 +134,7 @@ export default function WorkbenchPage() {
     return () => setTitle(null);
   }, [setTitle]);
 
-  // Sessions (left panel).
+  // Sessions (sidebar).
   useEffect(() => {
     startFetch(sessionsGuard, getWorkbenchSessions, (next) => {
       if (next !== undefined) setSessions(next);
@@ -140,7 +142,7 @@ export default function WorkbenchPage() {
     return () => retire(sessionsGuard);
   }, [sessionsGuard, reloadKey]);
 
-  // Workspace tree (right panel), keyed on the browsed path.
+  // Workspace root listing (right panel).
   useEffect(() => {
     startFetch(treeGuard, () => getWorkspaceTree(treePath), (next) => {
       if (next !== undefined) setTree(next);
@@ -148,7 +150,7 @@ export default function WorkbenchPage() {
     return () => retire(treeGuard);
   }, [treeGuard, reloadKey, treePath]);
 
-  // Selected session transcript (centre panel).
+  // Selected session transcript (centre).
   useEffect(() => {
     if (selectedId === null) return;
     startFetch(detailGuard, () => getWorkbenchSession(selectedId), (next) => {
@@ -159,7 +161,7 @@ export default function WorkbenchPage() {
     return () => retire(detailGuard);
   }, [detailGuard, reloadKey, selectedId]);
 
-  // Previewed file (right panel, below the listing).
+  // Previewed file.
   useEffect(() => {
     if (filePath === null) return;
     startFetch(fileGuard, () => readWorkspaceFile(filePath), (next) => {
@@ -168,9 +170,24 @@ export default function WorkbenchPage() {
     return () => retire(fileGuard);
   }, [fileGuard, filePath, reloadKey]);
 
-  const refreshAll = useCallback(() => {
-    setReloadKey((key) => key + 1);
+  // The active dashboard profile names the composer's profile chip. A failure
+  // leaves it at "—"; the chip is read-only, so a missing read costs nothing.
+  useEffect(() => {
+    let alive = true;
+    void api
+      .getActiveProfile()
+      .then((res) => {
+        if (alive) setProfileName(res.active ?? null);
+      })
+      .catch(() => {
+        if (alive) setProfileName(null);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
+
+  const refreshAll = useCallback(() => setReloadKey((key) => key + 1), []);
 
   const selectSession = useCallback((id: string) => {
     setSelectedId(id);
@@ -184,9 +201,53 @@ export default function WorkbenchPage() {
     setFile(null);
   }, []);
 
+  /**
+   * One directory listing for an expanded folder. The tree component calls
+   * this on first open; it deliberately does NOT route through the page's
+   * fetch guard, because the tree owns that result and a page-level guard would
+   * make every folder's answer overwrite the last one's.
+   */
+  const loadTree = useCallback((path: string) => getWorkspaceTree(path), []);
+
+  const togglePin = useCallback((id: string) => {
+    setPinned((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleGroup = useCallback((key: SessionGroupKey) => {
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
+
+  const toggleFolder = useCallback((path: string) => {
+    setOpenFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
+  const toggleFileSelection = useCallback((path: string) => {
+    setFileSelection((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }, []);
+
   const submit = useCallback(() => {
     const text = draft.trim();
-    if (!text || submitting) return;
+    if (!text || submitting || selectedId === null) return;
     setSubmitting(true);
     setTurn(null);
     startFetch(turnGuard, () => postWorkbenchTurn({ session_id: selectedId, text }), (next) => {
@@ -203,20 +264,28 @@ export default function WorkbenchPage() {
     });
   }, [draft, selectedId, submitting, turnGuard]);
 
-  const detailForRing = detail?.state === "ok" ? detail.data : null;
-  const ringPercent = detailForRing
-    ? contextPercent(detailForRing.prompt_tokens, detailForRing.context_window)
+  const detailData = resultData(detail);
+  const ringPercent = detailData
+    ? contextPercent(detailData.prompt_tokens, detailData.context_window)
     : null;
 
+  const treeData = resultData(tree);
+  const treeDataEmpty = tree?.state === "empty" ? tree : null;
+  const sessionsData = resultData(sessions);
+
+  const selectedRow = useMemo(
+    () => sessionsData?.rows.find((row) => row.id === selectedId) ?? null,
+    [sessionsData, selectedId],
+  );
+  const selectedTitle = selectedRow?.title ?? detailData?.title ?? null;
+  const selectedModel = selectedRow?.model ?? detailData?.model ?? null;
+
+  const workspaceName =
+    treeData?.root.trim() || treeDataEmpty?.data.root.trim() || null;
+  const workspaceWhy = treeDataEmpty?.reason.detail ?? null;
+
+  const gate = composerGate(turn, selectedId !== null);
   const turnUnavailable = turn?.state === "not_available";
-  const turnError = turn?.state === "error" ? turn.error : null;
-  const gate = composerGate(turn);
-  const turnNotMounted = turnUnavailable ? (
-    <p role="note" data-testid="workbench-turn-not-available" className="px-3 pb-2 text-[11px] text-warning">
-      {WORKBENCH_ROUTES.turn} is not mounted yet — the message was not sent and no
-      reply is being shown.
-    </p>
-  ) : null;
 
   const probes: RouteProbe[] = useMemo(
     () => [
@@ -226,10 +295,13 @@ export default function WorkbenchPage() {
         path: selectedId ? WORKBENCH_ROUTES.session(selectedId) : "/api/workbench/sessions/<id>",
         result: selectedId ? detail : null,
       },
+      { label: "Timeline", path: "/api/workbench/sessions/<id>/timeline", result: null },
       { label: "Workspace tree", path: `${WORKBENCH_ROUTES.workspaceTree}?path=${treePath}`, result: tree },
       {
         label: "Workspace file",
-        path: filePath ? WORKBENCH_ROUTES.workspaceFile(filePath) : "/api/workbench/workspace/file?path=<path>",
+        path: filePath
+          ? WORKBENCH_ROUTES.workspaceFile(filePath)
+          : "/api/workbench/workspace/file?path=<path>",
         result: filePath ? file : null,
       },
       { label: "Send turn", path: WORKBENCH_ROUTES.turn, result: turn },
@@ -237,56 +309,83 @@ export default function WorkbenchPage() {
     [detail, file, filePath, selectedId, sessions, tree, treePath, turn],
   );
 
-  const selectedTitle =
-    sessions?.state === "ok"
-      ? (sessions.data.find((row) => row.id === selectedId)?.title ?? null)
-      : null;
+  const turnNotMounted = turnUnavailable ? (
+    <p
+      role="note"
+      data-testid="workbench-turn-not-available"
+      className="px-3 pb-2 text-[11px] text-warning"
+    >
+      {WORKBENCH_ROUTES.turn} is not mounted yet — the message was not sent and no
+      reply is being shown.
+    </p>
+  ) : null;
+  const turnError = turn?.state === "error" ? turn.error : null;
 
   return (
     <div
       data-testid="workbench-page"
-      className="flex min-h-[70vh] w-full min-w-0 flex-col border border-border bg-background-base/40"
+      className="flex h-full min-h-[70vh] w-full min-w-0 flex-col overflow-hidden rounded-lg border border-border bg-background-base"
     >
-      {/* Narrow-viewport panel switch. Hidden once all three fit. */}
+      {/* Narrow-viewport switch. Hidden once the two columns fit side by side. */}
       <nav
         aria-label="Workbench panels"
         className="flex h-9 shrink-0 items-center gap-1 border-b border-border px-2 md:hidden"
       >
-        {PANE_TAB.map((tab) => (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => setPane(tab.id)}
-            aria-pressed={pane === tab.id}
-            data-testid={`workbench-pane-tab-${tab.id}`}
-            className={`px-2 py-1 text-xs transition-colors ${
-              pane === tab.id
-                ? "bg-primary/10 text-primary"
-                : "text-text-secondary hover:text-foreground"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+        <button
+          type="button"
+          onClick={() => setPane("sessions")}
+          aria-pressed={pane === "sessions"}
+          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${
+            pane === "sessions" ? "bg-primary/10 text-primary" : "text-text-secondary"
+          }`}
+        >
+          <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" /> Conversations
+        </button>
+        <button
+          type="button"
+          onClick={() => setPane("chat")}
+          aria-pressed={pane === "chat"}
+          className={`flex items-center gap-1 rounded px-2 py-1 text-xs ${
+            pane === "chat" ? "bg-primary/10 text-primary" : "text-text-secondary"
+          }`}
+        >
+          <PanelRight className="h-3.5 w-3.5" aria-hidden="true" /> Chat
+        </button>
       </nav>
 
       <div className="flex min-h-0 flex-1">
-        {/* Left: sessions */}
-        <div className={paneVisibility("sessions", pane)} data-testid="workbench-sessions-pane">
+        {/* The rail is the second collapse: above `md` it is always present
+            (icons only), and below `md` the header switch above is the way
+            between the two columns. */}
+        <WorkbenchRail />
+
+        <div className={pane === "sessions" ? "flex min-h-0 w-full md:w-auto" : "hidden min-h-0 md:flex"}>
           <SessionsList
             result={sessions}
             selectedId={selectedId}
             query={query}
             onQueryChange={setQuery}
+            sourceFilter={sourceFilter}
+            onSourceFilter={setSourceFilter}
+            activeSource={activeSource}
+            onActiveSource={setActiveSource}
+            pinned={pinned}
+            collapsed={collapsedGroups}
+            onToggleGroup={toggleGroup}
             onSelect={selectSession}
+            onTogglePin={togglePin}
+            onNewSession={() => setPane("chat")}
             onReload={refreshAll}
           />
         </div>
 
-        {/* Centre: transcript + composer */}
-        <div className={paneVisibility("chat", pane)} data-testid="workbench-chat-pane">
+        <div
+          data-testid="workbench-chat-pane"
+          className={`min-h-0 min-w-0 flex-1 flex-col ${pane === "chat" ? "flex" : "hidden md:flex"}`}
+        >
           <Transcript
             title={selectedTitle}
+            model={selectedModel}
             result={detail}
             draftReply={turn?.state === "ok" ? turn.data.reply : null}
             submitting={submitting}
@@ -300,19 +399,22 @@ export default function WorkbenchPage() {
                   disabled={gate.disabled}
                   disabledReason={gate.reason}
                   submitting={submitting}
+                  contextPercent={ringPercent}
+                  usedTokens={detailData?.prompt_tokens ?? null}
+                  windowTokens={detailData?.context_window ?? null}
+                  profileName={profileName}
+                  workspaceName={workspaceName}
+                  workspaceWhy={workspaceWhy}
+                  modelName={selectedModel}
+                  reasoningName={null}
                   workspaceOpen={workspaceOpen}
                   onToggleWorkspace={() => setWorkspaceOpen((open) => !open)}
-                  controlsOpen={controlsOpen}
-                  onToggleControls={() => setControlsOpen((open) => !open)}
-                  contextPercent={ringPercent}
-                  usedTokens={detailForRing?.prompt_tokens ?? null}
-                  windowTokens={detailForRing?.context_window ?? null}
                 />
                 {turnNotMounted}
                 {turnError ? (
                   <p role="alert" className="px-3 pb-2 text-[11px] text-destructive">
-                    Turn failed{turnError.status !== null ? ` (HTTP ${turnError.status})` : ""}:{" "}
-                    {turnError.message}
+                    Turn failed{turnError.status !== null ? ` (HTTP ${turnError.status})` : ""}:
+                    {turnError.code ? ` ${turnError.code} —` : ""} {turnError.message}
                   </p>
                 ) : null}
               </>
@@ -320,48 +422,62 @@ export default function WorkbenchPage() {
           />
         </div>
 
-        {/* Right: workspace browser, or the control center in its place */}
-        <div
-          data-testid="workbench-files-pane"
-          className={paneVisibility("workspace", pane)}
-        >
+        {/* Top-right toggle, shown when the panel is closed. */}
+        {!workspaceOpen ? (
+          <button
+            type="button"
+            onClick={() => setWorkspaceOpen(true)}
+            aria-label="Show workspace panel"
+            title="Show workspace panel"
+            data-testid="workbench-workspace-reopen"
+            className="hidden h-full w-7 shrink-0 items-center justify-center border-l border-border text-text-tertiary hover:bg-secondary/40 hover:text-foreground md:flex"
+          >
+            <PanelRight className="h-4 w-4" aria-hidden="true" />
+          </button>
+        ) : null}
+
+        {workspaceOpen ? (
+          <div
+            className={
+              workspaceWide ? "flex min-h-0 xl:w-[28rem]" : "flex min-h-0 xl:w-[20rem]"
+            }
+          >
           {controlsOpen ? (
             <ControlCenter
               probes={probes}
               workspaceOpen={workspaceOpen}
               onToggleWorkspace={() => setWorkspaceOpen((open) => !open)}
               onRefresh={refreshAll}
-            />
-          ) : workspaceOpen ? (
-            <WorkspaceTree
-              path={treePath}
-              result={tree}
-              selectedFile={filePath}
-              onNavigate={(next) => {
-                setTreePath(next);
-                setFilePath(null);
-                setFile(null);
-              }}
-              onOpenFile={openFile}
-              onReload={refreshAll}
-              preview={
-                <FilePreview path={filePath} result={file} onReload={refreshAll} />
-              }
+              onClose={() => setControlsOpen(false)}
             />
           ) : (
-            <div className="flex h-full flex-col items-start gap-2 px-3 py-3">
-              <p className="text-xs text-text-secondary">The workspace panel is hidden.</p>
-              <button
-                type="button"
-                onClick={() => setWorkspaceOpen(true)}
-                className="text-xs text-primary underline-offset-2 hover:underline"
-              >
-                Show workspace files
-              </button>
-            </div>
+            <WorkspacePanel
+              tab={tab}
+              onTab={setTab}
+              tree={tree}
+              treePath={treePath}
+              loadTree={loadTree}
+              onOpenFile={openFile}
+              onReload={refreshAll}
+              selected={fileSelection}
+              onToggleSelected={toggleFileSelection}
+              selectedCount={fileSelection.size}
+              openFolders={openFolders}
+              onToggleFolder={toggleFolder}
+              previewNode={
+                <FilePreview path={filePath} result={file} onReload={refreshAll} />
+              }
+              expanded={workspaceWide}
+              onToggleExpanded={() => setWorkspaceWide((wide) => !wide)}
+              onHide={() => setWorkspaceOpen(false)}
+              workspaceName={workspaceName}
+              workspaceWhy={workspaceWhy}
+            />
           )}
-        </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
+
