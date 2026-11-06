@@ -14,12 +14,12 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { ContextRing } from "./ContextRing";
 import {
-  ContextRing,
   contextPercent,
   contextPressure,
   contextRingLabel,
-} from "./ContextRing";
+} from "./contextRingMath";
 
 let container: HTMLDivElement;
 let root: Root;

@@ -90,6 +90,8 @@ import { useChatLiveEvents } from "@/hooks/useChatLiveEvents";
 import { type ChatSessionFrame } from "@/lib/chatLiveEvents";
 import { shouldRemountSessionList } from "@/components/chatLiveListPolicy";
 import { ChatWorkPanel } from "@/components/ChatWorkPanel";
+import { ContextRing } from "@/components/chat/ContextRing";
+import { contextPercent } from "@/components/chat/contextRingMath";
 import { PlateModuleHead } from "@/components/PlateModuleHead";
 import { ReadAloudButton } from "@/components/ReadAloudButton";
 import { CommandPalette } from "@/components/CommandPalette";
@@ -607,6 +609,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // gated on this real capability — offering it for a non-reasoning model would
   // be a dead control.
   const [supportsReasoning, setSupportsReasoning] = useState(false);
+  // Context-ring inputs. Both are display-only readings of data the page
+  // already fetches; neither is persisted, neither is a second source of
+  // truth for the session.
+  //   `contextWindow` — the model's effective window from
+  //     `GET /api/model/info` (`effective_context_length`); 0 = unknown.
+  //   `lastPromptTokens` — the size of the LAST prompt from the turn's
+  //     `done` receipt (`receipt.usage.prompt_tokens`); null = not measured.
+  // The percentage is `lastPromptTokens / contextWindow`. It is deliberately
+  // never derived from the session's cumulative `input_tokens`, which sum
+  // across every turn and would report past 100% on any long conversation.
+  const [contextWindow, setContextWindow] = useState(0);
+  const [lastPromptTokens, setLastPromptTokens] = useState<number | null>(null);
   // Reasoning selector: null = model default. Persisted per session on the
   // canonical session store (PATCH) and sent with every turn; the server
   // re-validates and receipts the applied budget.
@@ -938,10 +952,19 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         setSupportsReasoning(
           info.capabilities?.supports_reasoning === true,
         );
+        // Context ring denominator: the model's effective window, exactly as
+        // the backend resolved it. 0 means "unknown", which the ring renders
+        // as its no-measurement state rather than as an empty context.
+        setContextWindow(
+          Number(info.effective_context_length) ||
+            Number(info.capabilities?.context_window) ||
+            0,
+        );
       })
       .catch(() => {
         setModel("");
         setSupportsReasoning(false);
+        setContextWindow(0);
       });
   }, [scopedProfile]);
 
@@ -1127,6 +1150,14 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             // Authoritative settle: a done frame that no longer carries the
             // signal clears the banner; one that still carries it keeps it.
             setPendingConfirm(extractPendingConfirm(event));
+            // Context ring: the provider reports this prompt's real size on
+            // the done receipt. Absent when the turn ran without provider
+            // usage — then the ring keeps its honest no-measurement state
+            // instead of showing a stale figure.
+            const promptTokens = event.receipt?.usage?.prompt_tokens;
+            if (typeof promptTokens === "number" && promptTokens > 0) {
+              setLastPromptTokens(promptTokens);
+            }
             const route = event.receipt?.route ?? event.route;
             const sources = event.receipt?.sources ?? event.sources;
             const taskKey = event.receipt?.task ?? event.task;
@@ -2903,6 +2934,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 </select>
               </label>
             ) : null}
+            {/* Context ring: display-only. Fed from data this page already
+                holds (model window + last turn's prompt size) — it reads no
+                store, starts no request, and owns no timer. */}
+            <ContextRing
+              percent={contextPercent(lastPromptTokens, contextWindow || null)}
+              usedTokens={lastPromptTokens}
+              windowTokens={contextWindow || null}
+              className="shrink-0"
+            />
             {voice.interimText ? (
               <div
                 data-testid="voice-interim"
