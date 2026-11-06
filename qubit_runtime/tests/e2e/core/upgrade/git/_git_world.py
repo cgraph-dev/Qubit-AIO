@@ -260,7 +260,11 @@ def world(root: Path, *, base: str, installer_ref: str | None = None,
             _preclone(sb, preclone, w.git_env())
         script = sb.root / "install.sh"
         script.write_text(installer_script(installer_ref), encoding="utf-8")
-        cp = sb.run(["bash", str(script), "--non-interactive"], timeout=1800, input="")
+        # The sandbox origin publishes ``main`` and no release tags: force the main channel so a
+        # fresh-install release lookup never reaches the network (and never asks for a tag the
+        # fake origin cannot serve).
+        cp = sb.run(["bash", str(script), "--non-interactive"], timeout=1800, input="",
+                    env={**sb.env, "HERMES_INSTALL_CHANNEL": "main", "QUBIT_INSTALL_CHANNEL": "main"})
         assert cp.returncode == 0, f"install ({installer_ref or 'HEAD'} installer, base {base[:12]}) failed:\n{w.diag(cp)}"
         head = w.head()
         assert head == base, f"installer left HEAD at {head}, expected {base}\n{w.diag(cp)}"
