@@ -158,8 +158,9 @@ def test_failed_dependency_update_is_an_owed_followup(updated):
     sb = updated["sb"]
     before = P.selected_generation(sb)
     origin, scratch = updated["origin"], updated["root"]
-    lock = I.git("show", "main:uv.lock", cwd=origin) + '\n[[package]]\nname = "e2e-broken"\n'
-    target = I.publish_commit(origin, scratch, "release: e2e broken lockfile", {"uv.lock": lock})
+    rel = P.source_path("uv.lock")
+    lock = I.git("show", f"main:{rel}", cwd=origin) + '\n[[package]]\nname = "e2e-broken"\n'
+    target = I.publish_commit(origin, scratch, "release: e2e broken lockfile", {rel: lock})
     up = P.update(sb)
     receipt = json.loads(P.ok(sb.cli("pm", "status")).stdout)
     assert up.returncode == 0, (
