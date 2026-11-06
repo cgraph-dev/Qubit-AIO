@@ -116,3 +116,74 @@ management; updates; memory/skills/scripts panels.
    listener before dispatch; the shim reads no header.
 5. **Registration** — one block of lines delivered for
    `voicebridge/qubit_compat.py`, not edited by this branch.
+
+---
+
+## Implementation status (measured, not asserted)
+
+Implementation landing: `voicebridge/workbench_shim/` + `voicebridge/workbench_shim_routes.py`.
+
+### Route table as shipped
+
+| Surface | Rows | Delegating | Typed 501 |
+|---|---|---|---|
+| `voicebridge/workbench_shim/sessions.py` | 4 | 3 | `MID_TURN_STEER` |
+| `voicebridge/workbench_shim/workspace.py` | 4 | 2 | `BROKERED_WRITE` ×2 |
+| `voicebridge/workbench_shim/crons.py` | 11 | 11 | `CRON_OUTPUT_FILES` (`?output=1` only) |
+| `voicebridge/workbench_shim/approvals.py` | 4 | 2 | `SESSION_YOLO`, `CLARIFY_QUEUE` |
+| `voicebridge/workbench_shim/system.py` | 4 | 2 | `STATUS_RESPONSE_DIVERGES`, `BACKGROUND_AGENT` |
+| **Total** | **27** | **20** | **7 route-level + 2 conditional** |
+
+### Live evidence
+
+* `probe_live.py` — 33 live dispatches through `qubit_compat.dispatch` on the
+  real config: status distribution `{200: 14, 400: 4, 403: 1, 404: 2, 409: 3,
+  501: 9, 502: 1}` (the single 502 is a real transport refusal relayed typed).
+* Sessions: `GET sessions` strips 35 sidebar keys; detail honours `messages=0`
+  and `msg_limit`; unknown id → `404 {"error":"Session not found"}` (the ported
+  JS self-heals on 404); a REAL turn through `chat_transport.turn` answered
+  `200` with `{ok, stream_id:null, pending_started_at:null, turn_id:null,
+  effective_model:"deepseek-v4.1-flash", reply:"shim ok"}` and the detail route
+  read back 2 persisted messages.
+* Workspace: on a stale project the adapter's `EMPTY`/`PROJECT_HAS_NO_FOLDERS`
+  refusal is passed through (not disguised as an empty tree); on a live project
+  (isolated state dir) `list` returned 7 entries with upstream's keys and
+  `mtime_ns` as a string, `read` returned `{path,content,size,lines}` for a real
+  file, and both `../../../../etc/passwd` (400) and `/etc` (403) were refused.
+* Crons: `list` returned 6 jobs with upstream's full `CronJob` keys; `status`,
+  `history` (5 structured runs), `recent` (6 completions), `delivery-options`
+  (4 platforms) answered 200; every write staged the shared journal's real
+  `409 CONFIRM_REQUIRED` with a live `confirmation_id`, and an unknown id with
+  `confirm` settled to `404 {"error":"Job not found"}`.
+* Approvals: `pending` reported 3 live journal records; `respond` settled one
+  (`state:"executing"`); bad choice → 400; `yolo` → 501.
+* `workbench_shim_routes` verified: 27/27 rows resolve through
+  `qubit_compat.match` after registration, `(?P<id>…)` captures, and **no row
+  collides** with an existing compat route.
+
+### Grep proof (hard rule 2)
+
+AST-classified over every `.py` in the package and the route module:
+`sqlite3` / `state.db` appear on **2 lines, both module docstrings** explaining
+why the package must not open one. Executable hits: **0**.
+
+### The registration line (delivered, NOT applied — `qubit_compat.py` is not mine to edit)
+
+Insert as one block where the other standalone tables are registered:
+
+```python
+from .workbench_shim_routes import (workbench_shim_routes as _wb_shim_routes,
+                                    workbench_shim_handlers as _wb_shim_handlers)
+for _m, _p, _h in _wb_shim_routes():
+    _r(_m, _p, _h)
+HANDLERS.update(_wb_shim_handlers())
+```
+
+### One thing the porter must decide
+
+The adapter's confinement is **project folders registered in Qubit**, and this
+machine's live registry currently points its only chat-project folder at a
+directory that no longer exists — so a live `GET /api/wb/workspace/list` answers
+`PROJECT_HAS_NO_FOLDERS` (502, honest) until `qubit project add-folder` is run or
+a live project is active. That is the adapter's own contract, not a shim defect,
+and the ported tree pane should render it as an actionable empty state.
