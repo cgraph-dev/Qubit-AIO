@@ -250,7 +250,23 @@ export function useInputHandlers(ctx: InputHandlerContext): InputHandlerResult {
     }
 
     if (overlay.approval) {
-      respondToServerRequest(overlay.approval.requestId, { choice: 'deny' })
+      const approval = overlay.approval
+
+      if (approval.eventBased) {
+        const sid = getUiState().sid
+
+        if (sid) {
+          void gateway.rpc('approval.respond', {
+            choice: 'deny',
+            execution_generation: approval.executionGeneration,
+            prompt_id: approval.requestId,
+            session_id: sid
+          }).catch(() => undefined)
+        }
+      } else {
+        respondToServerRequest(approval.requestId, { choice: 'deny' })
+      }
+
       patchOverlayState({ approval: null })
       patchTurnState({ outcome: t('session.approval.denied') })
 

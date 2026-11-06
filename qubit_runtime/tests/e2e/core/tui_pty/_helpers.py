@@ -249,7 +249,11 @@ class TmuxTui:
                if not k.startswith(("QUBIT_", "TMUX", "OPENAI_", "OPENROUTER_", "ANTHROPIC_"))}
         env.update(HOME=str(self.home), QUBIT_HOME=str(self.qubit_home), PYTHONPATH=str(REPO_ROOT),
                    TMPDIR=str(root / "tmp"), LANG="C.UTF-8", LC_ALL="C.UTF-8", PYTHONUNBUFFERED="1",
-                   HERMES_STATE_DB_GUARD_BYPASS="1", QUBIT_STATE_DB_GUARD_BYPASS="1", QUBIT_TUI_INLINE="1" if inline else "0",
+                   HERMES_STATE_DB_GUARD_BYPASS="1", QUBIT_STATE_DB_GUARD_BYPASS="1",
+                   # The Ink renderer reads the upstream (never-renamed) HERMES_TUI_INLINE spelling
+                   # (ui-tui/src/config/env.ts); the QUBIT_* alias is a launcher convenience, so both
+                   # are seeded or `inline=True` silently runs the alternate-screen view.
+                   HERMES_TUI_INLINE="1" if inline else "0", QUBIT_TUI_INLINE="1" if inline else "0",
                    HERMES_NODE=shutil.which("node") or "node",
                    HERMES_TUI_DIR=str(tui_dir or private_tui_dir(root)), QUBIT_TUI_DIR=str(tui_dir or private_tui_dir(root)))
         env.update(env_extra or {})

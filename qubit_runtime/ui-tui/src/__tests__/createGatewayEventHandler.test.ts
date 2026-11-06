@@ -2425,3 +2425,58 @@ describe('createGatewayEventHandler', () => {
     })
   })
 })
+
+describe('event-sourced approval cards (attached gateway)', () => {
+  beforeEach(() => {
+    resetOverlayState()
+    resetUiState()
+    resetTurnState()
+    resetServerRequestsForTests()
+    turnController.fullReset()
+  })
+
+  it('opens the terminal approval card from approval.request with canonical choice order', () => {
+    const onEvent = createGatewayEventHandler(buildCtx([]))
+
+    onEvent({
+      payload: {
+        choices: ['once', 'deny', 'session', 'always'],
+        command: 'rm -rf /tmp/victim',
+        description: 'dangerous command',
+        execution_generation: 7,
+        prompt_id: 'ap-1',
+        session_id: 'sess'
+      },
+      session_id: 'sess',
+      type: 'approval.request'
+    } as any)
+
+    const req = getOverlayState().approval
+
+    expect(req).toMatchObject({
+      allowPermanent: true,
+      command: 'rm -rf /tmp/victim',
+      description: 'dangerous command',
+      eventBased: true,
+      executionGeneration: 7,
+      requestId: 'ap-1'
+    })
+    // The event payload is messaging-first; the terminal card keeps once/session/always/deny.
+    expect(req?.choices).toEqual(['once', 'session', 'always', 'deny'])
+  })
+
+  it('closes only the card its own approval.settled names', () => {
+    const onEvent = createGatewayEventHandler(buildCtx([]))
+
+    onEvent({
+      payload: { choices: ['once', 'deny'], execution_generation: 1, prompt_id: 'ap-1', session_id: 'sess' },
+      session_id: 'sess',
+      type: 'approval.request'
+    } as any)
+    onEvent({ payload: { execution_generation: 1, prompt_id: 'other' }, type: 'approval.settled' } as any)
+    expect(getOverlayState().approval?.requestId).toBe('ap-1')
+
+    onEvent({ payload: { execution_generation: 1, prompt_id: 'ap-1' }, type: 'approval.settled' } as any)
+    expect(getOverlayState().approval).toBeNull()
+  })
+})

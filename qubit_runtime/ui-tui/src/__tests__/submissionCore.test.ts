@@ -110,6 +110,30 @@ describe('submissionCore.submitPrompt — literal submissions (startup -q querie
     expect(calls).toContain('prompt.submit')
   })
 
+  it('declares the batch clarify capability on every submit', async () => {
+    const submitted: Array<Record<string, unknown>> = []
+
+    const gw = {
+      request: vi.fn((method: string, params?: Record<string, unknown>) => {
+        if (method === 'prompt.submit') {
+          submitted.push(params ?? {})
+        }
+
+        return Promise.resolve({ status: 'streaming' })
+      })
+    } as unknown as GatewayClient
+
+    submitPrompt('hello', makeDeps(gw), true, undefined, { skipDetectDrop: true })
+
+    await Promise.resolve()
+    await Promise.resolve()
+
+    // A shell TUI's turn runs in the attached gateway, which only sends the batch clarify card
+    // when the admission says this viewer answers the whole set.
+    expect(submitted).toHaveLength(1)
+    expect(submitted[0]).toMatchObject({ clarify_batch: true, text: 'hello' })
+  })
+
   it('literal text reaches prompt.submit verbatim', async () => {
     const submitted: string[] = []
 

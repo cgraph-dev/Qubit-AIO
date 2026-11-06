@@ -101,7 +101,14 @@ export interface ApprovalReq {
   choices?: string[]
   command: string
   description: string
-  /** Server→client request id; the answer is the response frame for it. */
+  /**
+   * An `approval.request` event from an attached gateway (a shell TUI's turn runs there), not a
+   * server→client request from the in-process bridge. The answer is then the `approval.respond`
+   * RPC fenced by `executionGeneration`, not the response frame for `requestId`.
+   */
+  eventBased?: boolean
+  executionGeneration?: number
+  /** Server→client request id (or the event's `prompt_id`); the card is keyed on it. */
   requestId: string
   smartDenied?: boolean
 }

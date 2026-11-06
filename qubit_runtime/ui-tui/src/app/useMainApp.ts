@@ -1150,19 +1150,42 @@ export function useMainApp(gw: GatewayClient) {
 
   const answerApproval = useCallback(
     (choice: string) => {
-      if (!overlay.approval) {
+      const approval = overlay.approval
+
+      if (!approval) {
         return
       }
 
-      respondWith(overlay.approval.requestId, { choice }, () => {
+      const done = () => {
         patchOverlayState({ approval: null })
         patchTurnState({
           outcome: choice === 'deny' ? t('session.approval.denied') : t('session.approval.approved', choice)
         })
         patchUiState({ status: 'running…' })
-      })
+      }
+
+      if (approval.eventBased) {
+        // The card came from an attached gateway's ``approval.request`` event; answer it with the
+        // generation-fenced RPC rather than a response frame that belongs to no open request.
+        const sid = getUiState().sid
+
+        if (sid) {
+          void rpc('approval.respond', {
+            choice,
+            execution_generation: approval.executionGeneration,
+            prompt_id: approval.requestId,
+            session_id: sid
+          }).catch(() => undefined)
+        }
+
+        done()
+
+        return
+      }
+
+      respondWith(approval.requestId, { choice }, done)
     },
-    [overlay.approval, respondWith]
+    [overlay.approval, respondWith, rpc]
   )
 
   const answerSudo = useCallback(
