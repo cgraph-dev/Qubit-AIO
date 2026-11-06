@@ -24,4 +24,11 @@ def compress_in_transaction(db, conn, session_id, payload, prepared):
     generation = conn.execute('SELECT runtime_generation FROM sessions WHERE id=?', (session_id,)).fetchone()[0]
     return affected, {'target_session_id': child, 'previous_target_session_id': target,
                    'execution_generation': generation, 'message_count': len(prepared['messages']),
-                   'summary': prepared.get('summary')}
+                   'summary': prepared.get('summary'),
+                   # Honest before/after figures from the prepared transcript (a noop/preview reports
+                   # the same messages on both sides); the compat adapter projects them into the
+                   # legacy Ink shape instead of inventing token counts.
+                   'before_messages': prepared.get('before_messages'),
+                   'after_messages': prepared.get('after_messages', len(prepared['messages'])),
+                   'before_tokens': prepared.get('before_tokens'),
+                   'after_tokens': prepared.get('after_tokens')}

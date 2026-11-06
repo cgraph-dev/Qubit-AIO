@@ -562,10 +562,13 @@ class AuthorityConnection:
         await self.ping(ref, params)
         from gateway.session_policy import CREATE_FIELDS, SURFACES
         from gateway.session_skin import resolved_skin
+        # ``session.compress.compat``: the deprecated Ink verb is served as an adapter over the
+        # canonical ``session.mutate(operation="compress")``; clients can require this to negotiate.
+        from gateway.session_tui_ops import SESSION_COMPRESS_COMPAT_CAPABILITY
         return {'instance_id': self.authority.instance_id, 'profile_id': self.authority.profile_id,
                 'authority_epoch': self.authority.epoch,
                 'capabilities': ['durable-admission-v1', 'event-replay-v1', 'local-cli-create-v1', 'acp-editor-policy-v1',
-                                 'acp-session-mcp-v1', 'clarify-batch-v1'],
+                                 'acp-session-mcp-v1', 'clarify-batch-v1', SESSION_COMPRESS_COMPAT_CAPABILITY],
                 'session_create': {'sources': sorted(SURFACES),
                                    'parameters': sorted(CREATE_FIELDS | {'title'})},
                 # Main's ``gateway.ready.skin``: the canonical client's own ready carries it.

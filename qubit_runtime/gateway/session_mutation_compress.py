@@ -56,10 +56,13 @@ async def prepare_compress(authority, live, payload, prepared):
             head = messages
     if request.preview:
         # Read-only: the report is the whole result; the caller commits nothing.
+        tokens = estimate_request_tokens_rough(messages)
         report = summarize_compress_preview(messages, request.partial, request.keep_last, request.focus_topic,
-                                            estimate_request_tokens_rough(messages))
+                                            tokens)
         return {'status': 'preview', 'lines': report['lines'], 'head_count': report['head_count'],
-                'tail_count': report['tail_count'], 'message_count': report['total']}
+                'tail_count': report['tail_count'], 'message_count': report['total'],
+                'before_messages': len(messages), 'after_messages': len(messages),
+                'before_tokens': tokens, 'after_tokens': tokens}
     # The session's resident agent owns its memory providers; give them the same pre-compress
     # turn (and the same best-effort contract) the in-process compressor does. No resident agent
     # (cold session, or a managed worker that runs out of process) means no provider to call.
@@ -100,9 +103,13 @@ async def prepare_compress(authority, live, payload, prepared):
         row = None if resident is not None else authority.db.get_session(snapshot['target'])  # resident: row unused
         tokens = _request_tokens(resident, messages, row)
         return {'status': 'noop', 'summary': summarize_manual_compression(
-            messages, messages, tokens, tokens, compression_state=compressor)}
-    summary = summarize_manual_compression(messages, compressed, estimate_request_tokens_rough(messages),
-                                           estimate_request_tokens_rough(compressed), compression_state=compressor)
+            messages, messages, tokens, tokens, compression_state=compressor),
+                'before_messages': len(messages), 'after_messages': len(messages),
+                'before_tokens': tokens, 'after_tokens': tokens}
+    before_tokens = estimate_request_tokens_rough(messages)
+    after_tokens = estimate_request_tokens_rough(compressed)
+    summary = summarize_manual_compression(messages, compressed, before_tokens, after_tokens,
+                                           compression_state=compressor)
     from agent.model_metadata import estimate_messages_tokens_rough
     hook = None if policy.safe_mode else {  # same rough basis as the agent path's compaction record
         'before_tokens': estimate_messages_tokens_rough(messages),
@@ -113,6 +120,8 @@ async def prepare_compress(authority, live, payload, prepared):
                                    _gateway_session_key=live.route,
                                    owned=resident is None and not isinstance(compressor, ContextCompressor))
     return dict(prepared, messages=compressed, summary=summary, post_compaction=hook, engine_owner=engine_owner,
+                before_messages=len(messages), after_messages=len(compressed),
+                before_tokens=before_tokens, after_tokens=after_tokens,
                 in_place=is_truthy_value(options.get('in_place'), default=True))
 
 

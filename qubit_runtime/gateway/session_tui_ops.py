@@ -20,6 +20,9 @@ from gateway.session_busy_controls import authorize
 from gateway.session_tui_reads import context_breakdown
 from qubit_state_runtime import RuntimeStoreError
 
+#: Advertised by ``runtime.describe`` so a client can negotiate the deprecated TUI compress verb.
+SESSION_COMPRESS_COMPAT_CAPABILITY = 'session.compress.compat'
+
 
 def handlers(connection):
     return {'session.save': partial(save_session, connection),
@@ -31,7 +34,11 @@ def handlers(connection):
             'rollback.restore': partial(rollback, connection, kind='restore'),
             'rollback.session_diff': partial(rollback, connection, kind='session_diff'),
             'session.context_breakdown': partial(context_breakdown, connection),
-            'session.history': partial(session_history, connection)}
+            'session.history': partial(session_history, connection),
+            # TEMPORARY/COMPAT: the legacy Ink verb, served only until every client uses
+            # ``session.mutate(operation="compress")``. It is a pure adapter, never a second
+            # compression implementation or session authority.
+            'session.compress': partial(compress_compat, connection)}
 
 
 def _profile_home(authority):
@@ -339,3 +346,114 @@ async def _rewind_last_turn(connection, ref):
     except MUTATION_GUARD_REFUSALS as exc:
         raise RuntimeStoreError('session_busy') from exc
     return int(result.get('rewound_count') or 0)
+
+
+# ---------------------------------------------------------------------------------------------
+# Legacy Ink ``session.compress`` — TEMPORARY COMPATIBILITY SHIM
+# ---------------------------------------------------------------------------------------------
+#
+# The shell TUI still sends ``session.compress`` (``ui-tui/src/app/slash/commands/session.ts``).
+# The canonical owner is ``session.mutate`` with ``operation="compress"``; this adapter builds that
+# mutation and projects the committed transcript back into the TUI's legacy result shape. It keeps
+# no compression logic and no session state of its own. Deprecated: remove once the TUI speaks
+# ``session.mutate`` directly (clients negotiate ``SESSION_COMPRESS_COMPAT_CAPABILITY``).
+
+_COMPRESS_FIELDS = frozenset({'session_id', 'profile', 'focus_topic'})
+
+
+async def compress_compat(connection, ref, params):
+    """``session.compress`` -> canonical ``session.mutate(operation="compress")``.
+
+    Deprecated compatibility adapter for the Ink TUI. It delegates the whole operation (prepare,
+    fence, commit, projection) to ``AuthorityConnection.mutate`` and only adapts the result. The
+    canonical result carries the honest counts/tokens; ``usage`` stays absent because the canonical
+    mutation does not expose the summarizer's provider usage. Nothing here is a second authority.
+    """
+    if set(params) - _COMPRESS_FIELDS:
+        raise RuntimeStoreError('invalid_params')
+    focus_topic = params.get('focus_topic')
+    if focus_topic is not None and not isinstance(focus_topic, str):
+        raise RuntimeStoreError('invalid_params')
+    authority = connection.authority
+    handle = authority._handle(ref)  # the same CAS tuple every native caller resumes for
+    payload = {'focus': focus_topic} if focus_topic is not None else {}
+    result = await connection.mutate(ref, {
+        'session_id': ref.session_id,
+        'request_id': uuid.uuid4().hex,
+        'expected_revision': handle.revision,
+        'expected_generation': handle.execution_generation,
+        'operation': 'compress',
+        'payload': payload})
+    return _compress_result(connection, ref, result)
+
+
+def _compress_result(connection, ref, result):
+    """Project the canonical mutation receipt into ``SessionCompressResult`` (extras allowed)."""
+    authority = connection.authority
+    result = result if isinstance(result, dict) else {}
+    summary = result.get('summary') if isinstance(result.get('summary'), dict) else None
+    status = result.get('status')
+    if status not in {'preview', 'noop', 'confirmation_required', 'cancelled', 'nothing'}:
+        status = 'aborted' if (summary or {}).get('aborted') else 'compressed'
+    before_messages = _int_or_none(result.get('before_messages'))
+    after_messages = _int_or_none(result.get('after_messages'))
+    if after_messages is None:
+        after_messages = _int_or_none(result.get('message_count'))
+    removed = (before_messages - after_messages
+               if before_messages is not None and after_messages is not None else None)
+    out = {
+        'session_id': ref.session_id,
+        'operation': 'compress',
+        'status': status,
+        'compressed': status == 'compressed',
+        'removed': removed,
+        'before_messages': before_messages,
+        'after_messages': after_messages,
+        'before_tokens': _int_or_none(result.get('before_tokens')),
+        'after_tokens': _int_or_none(result.get('after_tokens')),
+        'summary': summary,
+        'usage': result.get('usage') if isinstance(result.get('usage'), dict) else None,
+        'info': _committed_info(authority, ref),
+        'messages': _committed_messages(authority, ref),
+        # An explicit, machine-readable deprecation: the canonical verb is ``session.mutate``.
+        'compat': {
+            'capability': SESSION_COMPRESS_COMPAT_CAPABILITY,
+            'deprecated': True,
+            'method': 'session.compress',
+            'canonical': {'method': 'session.mutate', 'operation': 'compress'},
+        },
+    }
+    if status == 'preview':
+        lines = result.get('lines') if isinstance(result.get('lines'), list) else []
+        out['message'] = '\n'.join(str(line) for line in lines)
+        out['preview'] = {key: result[key] for key in ('lines', 'head_count', 'tail_count') if key in result}
+    return out
+
+
+def _int_or_none(value):
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _committed_messages(authority, ref):
+    """The committed display transcript after the mutation (resume's own projection)."""
+    try:
+        from gateway.session_local_recovery import local_history
+        rows = local_history(authority, ref)
+    except Exception:  # a committed compression must still answer if the display read fails
+        return None
+    try:
+        from gateway.session_controls import display_projection
+        return display_projection(rows, authority.profile_id)
+    except Exception:
+        return None
+
+
+def _committed_info(authority, ref):
+    try:
+        from gateway.session_local import local_session_info
+        info = local_session_info(authority, ref)
+    except Exception:
+        return None
+    # The wire model requires strings with ``""`` defaults; a lazy route can report None for a
+    # field it has not resolved yet. Omitting the key lets the declared default stand.
+    return {key: value for key, value in info.items() if value is not None} if isinstance(info, dict) else None
