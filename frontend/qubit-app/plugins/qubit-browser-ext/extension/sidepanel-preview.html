@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Qubit Browser Preview</title>
+    <link rel="icon" href="assets/icons/icon-32.png" />
+    <link rel="stylesheet" href="sidepanel.css" />
+    <link rel="stylesheet" href="lib/pixel-icons.css" />
+    <style>body{max-width:420px;margin:0 auto;box-shadow:0 0 0 1px #0000f2;}</style>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead" aria-label="Qubit Browser header">
+        <span>NOUS</span>
+        <span class="masthead-center">QUBIT<br />AGENT</span>
+        <button class="settings-button icon-button" type="button" title="Settings" aria-label="Open settings">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="settings-cog"><path d="M4 20h3v-2h4v4h2v-4h4v2h-2v4H9v-4H7v2H2v-5h2v3Zm18 2h-5v-2h3v-3h2v5ZM6 11H2v2h4v4H4v-2H0V9h4V7h2v4Zm14-2h4v6h-4v2h-2v-4h4v-2h-4V7h2v2Zm-6 7h-4v-2h4v2Zm-4-2H8v-4h2v4Zm6 0h-2v-4h2v4Zm-2-4h-4V8h4v2ZM7 4H4v3H2V2h5v2Zm8 0h2V2h5v5h-2V4h-3v2h-4V2h-2v4H7V4h2V0h6v4Z"/></svg>
+        </button>
+      </header>
+      <section class="hero-card" aria-label="Qubit Browser intro">
+        <div class="hero-copy">
+          <p class="eyebrow">LOCAL SIDECAR / CHROME PANEL</p>
+          <h1>QUBIT<br />BROWSER</h1>
+          <p class="intro">Ask about any page. Qubit sees the active tab, selected text, page context, and open tabs.</p>
+        </div>
+        <img class="hero-badge" src="assets/img/qubit-badge.webp" alt="Qubit badge" />
+      </section>
+      <section class="status-card" aria-live="polite">
+        <div class="status-label"><span class="status-dot ok"></span><span>ACTIVE TAB</span></div>
+        <div class="status-copy"><strong>Qubit | Nous Research</strong><span>https://qubit-agent.nousresearch.com/</span></div>
+      </section>
+      <section class="messages" aria-live="polite">
+        <article class="message user"><div class="message-role">user</div><div class="message-content">What am I looking at?</div></article>
+        <article class="message assistant">
+          <div class="message-role">Qubit</div>
+          <div class="message-content">You are on the Qubit homepage. The page is presenting Qubit as an open-source agent that lives across platforms, remembers context, schedules work, browses the web, and runs in isolated backends.</div>
+          <div class="message-tool-activity">
+            <div class="tool-activity tool-kind-file" role="status" aria-live="polite">
+              <div class="tool-activity-head">
+                <span class="tool-activity-glyph tool-kind-file" aria-hidden="true"></span>
+                <span class="tool-activity-label">Reading file</span>
+                <span class="tool-activity-name">read_file</span>
+              </div>
+              <div class="tool-activity-preview">extension/sidepanel.js · sanitized preview</div>
+              <div class="tool-activity-meter" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            </div>
+          </div>
+        </article>
+      </section>
+      <form class="composer">
+        <label class="composer-label" for="promptInput">ASK QUBIT</label>
+        <div class="composer-input-wrap">
+          <textarea id="promptInput" rows="3" placeholder="Ask Qubit about this page..."></textarea>
+          <button class="attach-menu-button composer-plus" type="button" aria-label="Attach context">+</button>
+          <button class="composer-command" type="button" aria-label="Open quick commands"><span aria-hidden="true">/</span><strong>commands</strong></button>
+        </div>
+        <div class="composer-actions"><button class="secondary" type="button">Refresh</button><button type="button" id="sendButton">Ask Qubit</button></div>
+      </form>
+    </main>
+  </body>
+</html>

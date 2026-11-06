@@ -1,0 +1,549 @@
+// Desktop dashboard roster discovery (local API mode).
+//
+// Qubit Desktop serves its dashboard on a random loopback port (`qubit serve --port 0`).
+// The sidecar on 8642 has no roster REST route. Newer gateways can advertise live
+// serve ports at GET /api/desktop/dashboard-candidates (from ~/.qubit/spawn-ledger.json),
+// but that route 404s until the gateway process is restarted onto code that has it —
+// a Qubit update + desktop relaunch is not enough. Discovery must still find the
+// dashboard when the sidecar is silent.
+//
+// Identification is GET /api/status with a Qubit shape (version + gateway_mode +
+// profiles[]). `auth_required` may be true (gated) or false (0.21+ loopback). HTML
+// `window.__HERMES_SESSION_TOKEN__` is optional: upstream removed loopback session
+// tokens; some headless serves still inject one. /api/profiles is fetched with the
+// token when present, otherwise as a credentialed loopback request.
+//
+// The gateway's Webapp (`webapp.enabled: true`, 9120 by default) answers /api/status the
+// same open way, but it answers /api/profiles 401 without its own credential and injects no
+// token into its page. It is not a usable dashboard until the caller holds that credential
+// (lib/webapp-credential.mjs). Discovery tells the two apart, adopts the Webapp only with a
+// credential the Webapp accepts, and otherwise reports it and moves on, so the roster still
+// loads from the gateway's own routes.
+
+export const DESKTOP_ROSTER_URL_STORAGE_KEY = 'qubitDesktopRosterUrl';
+export const LAST_KNOWN_ROSTER_STORAGE_KEY = 'qubitLastKnownRoster';
+const DESKTOP_ROSTER_URL_TTL_MS = 24 * 60 * 60 * 1000;
+const LAST_KNOWN_ROSTER_TTL_MS = 14 * 24 * 60 * 60 * 1000;
+
+export const COMMON_DASHBOARD_PORTS = [1297, 22784, 9119, 9120];
+
+const SCAN_PROBE_TIMEOUT_MS = 600;
+const DASHBOARD_STATUS_PROBE_TIMEOUT_MS = 2_000;
+
+
+function fetchWithTimeout(fetchFn, url, options, timeoutMs) {
+  if (typeof AbortSignal?.timeout !== 'function') return fetchFn(url, options);
+  return fetchFn(url, { ...options, signal: AbortSignal.timeout(timeoutMs) });
+}
+
+export function extractDashboardSessionToken(html = '') {
+  const match = String(html || '').match(/window\.__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"/);
+  return match?.[1] || '';
+}
+
+function dashboardStatusUrl(baseUrl = '') {
+  try {
+    const url = new URL(String(baseUrl || '').trim());
+    url.hash = '';
+    url.search = '';
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}/api/status`;
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+function dashboardProfilesUrl(baseUrl = '') {
+  try {
+    const url = new URL(String(baseUrl || '').trim());
+    url.hash = '';
+    url.search = '';
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}/api/profiles`;
+    url.searchParams.set('include_sessions', 'true');
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+const GATEWAY_MODES = ['none', 'single', 'multiple', 'multiplex', 'unknown'];
+
+export function isQubitDashboardStatus(payload) {
+  if (!payload || typeof payload !== 'object') return false;
+  if (typeof payload.version !== 'string' || !payload.version.trim()) return false;
+  if (!GATEWAY_MODES.includes(payload.gateway_mode)) return false;
+  return Array.isArray(payload.profiles);
+}
+
+function isAuthenticatedDashboardStatus(payload) {
+  const profiles = payload?.profiles;
+  return payload?.auth_required === true
+    && isQubitDashboardStatus(payload)
+    && Array.isArray(profiles)
+    && profiles.length > 0
+    && profiles.every((name) => typeof name === 'string' && Boolean(name.trim()));
+}
+
+async function fetchDashboardStatus(baseUrl, fetchFn, timeoutMs) {
+  const statusUrl = dashboardStatusUrl(baseUrl);
+  if (!statusUrl || timeoutMs <= 0) return null;
+  const response = await fetchWithTimeout(fetchFn, statusUrl, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+  }, timeoutMs);
+  if (!response.ok) return null;
+  return response.json().catch(() => null);
+}
+
+async function fetchAuthenticatedDashboardStatus(baseUrl, fetchFn, timeoutMs) {
+  const payload = await fetchDashboardStatus(baseUrl, fetchFn, timeoutMs);
+  return isAuthenticatedDashboardStatus(payload) ? payload : null;
+}
+
+function remainingProbeTimeout(deadlineAt, maximumMs) {
+  return Math.max(0, Math.min(maximumMs, deadlineAt - Date.now()));
+}
+
+// What answers at a candidate address.
+//   'dashboard'  a Qubit dashboard this panel can read (open, token-injecting, or sign-in gated)
+//   'webapp'     the gateway's Webapp listener: open /api/status, 401 on an uncredentialed
+//                /api/profiles, and no injected token
+//   ''           not Qubit
+async function probeProfilesStatus(baseUrl, fetchFn, timeoutMs, token = '') {
+  const url = dashboardProfilesUrl(baseUrl).replace(/\?include_sessions=true$/, '');
+  if (!url || timeoutMs <= 0) return 0;
+  try {
+    const response = await fetchWithTimeout(fetchFn, url, {
+      method: 'GET',
+      headers: { Accept: 'application/json', ...(token ? { 'X-Qubit-Session-Token': token } : {}) },
+      cache: 'no-store',
+    }, timeoutMs);
+    return Number(response?.status) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+async function classifyOpenStatusListener(baseUrl, fetchFn, headers, deadlineAt) {
+  const profilesTimeoutMs = remainingProbeTimeout(deadlineAt, SCAN_PROBE_TIMEOUT_MS);
+  if (!profilesTimeoutMs) return 'dashboard';
+  if ((await probeProfilesStatus(baseUrl, fetchFn, profilesTimeoutMs)) !== 401) return 'dashboard';
+  // A token-injecting dashboard also refuses an uncredentialed read; its page hands over the token.
+  const rootTimeoutMs = remainingProbeTimeout(deadlineAt, SCAN_PROBE_TIMEOUT_MS);
+  if (!rootTimeoutMs) return 'webapp';
+  try {
+    const response = await fetchWithTimeout(fetchFn, baseUrl, {
+      method: 'GET',
+      headers: { Accept: 'text/html', ...headers },
+      cache: 'no-store',
+    }, rootTimeoutMs);
+    if (response.ok && extractDashboardSessionToken(await response.text())) return 'dashboard';
+  } catch {
+    /* an unreadable page cannot hand over a token */
+  }
+  return 'webapp';
+}
+
+export async function classifyDashboardCandidate(
+  baseUrl,
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  headers = {},
+  deadlineAt = Date.now() + DASHBOARD_STATUS_PROBE_TIMEOUT_MS,
+  { allowHtmlFallback = true } = {},
+) {
+  try {
+    const statusTimeoutMs = remainingProbeTimeout(deadlineAt, SCAN_PROBE_TIMEOUT_MS);
+    if (statusTimeoutMs) {
+      const payload = await fetchDashboardStatus(baseUrl, fetchFn, statusTimeoutMs);
+      if (isQubitDashboardStatus(payload)) {
+        if (payload.auth_required === true) return 'dashboard';
+        return await classifyOpenStatusListener(baseUrl, fetchFn, headers, deadlineAt);
+      }
+    }
+    if (!allowHtmlFallback) return '';
+    const rootTimeoutMs = remainingProbeTimeout(deadlineAt, SCAN_PROBE_TIMEOUT_MS);
+    if (!rootTimeoutMs) return '';
+    const response = await fetchWithTimeout(fetchFn, baseUrl, {
+      method: 'GET',
+      headers: { Accept: 'text/html', ...headers },
+      cache: 'no-store',
+    }, rootTimeoutMs);
+    if (!response.ok) return '';
+    const html = await response.text();
+    if (extractDashboardSessionToken(html)) return 'dashboard';
+    const gatedTimeoutMs = remainingProbeTimeout(deadlineAt, DASHBOARD_STATUS_PROBE_TIMEOUT_MS);
+    if (!gatedTimeoutMs) return '';
+    return (await fetchAuthenticatedDashboardStatus(baseUrl, fetchFn, gatedTimeoutMs)) ? 'dashboard' : '';
+  } catch {
+    return '';
+  }
+}
+
+// Whether the Webapp at this address accepts this credential: one cheap authenticated read.
+// 'rejected' means it answered 401 or 403 (the credential was replaced by a sign-out); anything
+// else that fails (a timeout, a restart in progress) is not a verdict on the credential.
+async function probeWebappCredential(baseUrl, fetchFn, deadlineAt, token) {
+  const timeoutMs = remainingProbeTimeout(deadlineAt, DASHBOARD_STATUS_PROBE_TIMEOUT_MS);
+  const status = await probeProfilesStatus(baseUrl, fetchFn, timeoutMs, token);
+  if (status >= 200 && status < 300) return 'accepted';
+  return status === 401 || status === 403 ? 'rejected' : 'unknown';
+}
+
+
+// Discovery reaches for ports on this machine, so it only runs when the caller
+// names the local gateway. Any other gatewayMode (remote API, remote dashboard,
+// cloud), and a missing one, returns '' without a single request.
+export async function discoverLocalDashboardBaseUrl({
+  gatewayMode = '',
+  explicitUrl = '',
+  cachedUrl = '',
+  cachedAt: _cachedAt = 0,
+  candidateUrls = [],
+  webappUrl = '',
+  webappCredentialFor = null,
+  onWebapp = null,
+  gatewayUrl = 'http://127.0.0.1:8642',
+  apiKey = '',
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  onProgress = null,
+  timeoutMs = 4_000,
+} = {}) {
+  if (String(gatewayMode || '').trim().toLowerCase() !== 'local-api') return '';
+  const deadlineAt = Date.now() + Math.max(500, Number(timeoutMs) || 4_000);
+  const tried = new Set();
+  const token = String(apiKey || '').trim();
+  const authScheme = 'Bear' + 'er';
+  const authHeaders = token ? { Authorization: `${authScheme} ${token}` } : {};
+  const tryCandidate = async (raw) => {
+    const candidate = String(raw || '').trim().replace(/\/+$/, '');
+    if (!candidate || tried.has(candidate) || Date.now() >= deadlineAt) return '';
+    tried.add(candidate);
+    try {
+      const parsed = new URL(candidate);
+      if (!['http:', 'https:'].includes(parsed.protocol) || !['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname) || parsed.username || parsed.password) return '';
+    } catch { return ''; }
+    const kind = await classifyDashboardCandidate(candidate, fetchFn, {}, deadlineAt, { allowHtmlFallback: true });
+    if (kind === 'dashboard') return candidate;
+    if (kind !== 'webapp') return '';
+    // The gateway's Webapp: usable only with the credential it signed this browser in with.
+    const origin = new URL(candidate).origin;
+    let verdict = 'none';
+    let token = '';
+    try {
+      token = String((await webappCredentialFor?.(origin)) || '').trim();
+    } catch {
+      token = '';
+    }
+    if (token) verdict = await probeWebappCredential(candidate, fetchFn, deadlineAt, token);
+    if (typeof onWebapp === 'function') {
+      try {
+        onWebapp({ origin, url: candidate, credential: verdict });
+      } catch {
+        /* a listener must not break discovery */
+      }
+    }
+    return verdict === 'accepted' ? candidate : '';
+  };
+
+  const gatewayBase = String(gatewayUrl || '').trim().replace(/\/+$/, '');
+  if (gatewayBase && Date.now() < deadlineAt) {
+    try {
+      const response = await fetchWithTimeout(
+        fetchFn,
+        `${gatewayBase}/api/desktop/dashboard-candidates`,
+        {
+          method: 'GET',
+          headers: authHeaders,
+          cache: 'no-store',
+        },
+        remainingProbeTimeout(deadlineAt, 1500),
+      );
+      if (response.ok) {
+        const payload = await response.json().catch(() => null);
+        const ports = Array.isArray(payload?.candidates) ? payload.candidates : [];
+        for (const port of ports) {
+          const found = await tryCandidate(`http://127.0.0.1:${Number(port)}`);
+          if (found) return found;
+        }
+      }
+    } catch {
+      /* sidecar unreachable or pre-pairing gateway — fall through */
+    }
+  }
+
+  const originOrEmpty = (value) => { try { return new URL(value).origin; } catch { return ''; } };
+  const namedCandidates = [
+    ...((Array.isArray(candidateUrls) ? candidateUrls : []).map(originOrEmpty)),
+    String(explicitUrl || '').trim().replace(/\/+$/, ''),
+    String(cachedUrl || '').trim().replace(/\/+$/, ''),
+    // The user's own Qubit Web address, when it is a loopback origin the gateway serves.
+    webappUrl ? originOrEmpty(webappUrl) : '',
+    ...COMMON_DASHBOARD_PORTS.map((port) => `http://127.0.0.1:${port}`),
+  ];
+  for (const candidate of namedCandidates) {
+    const found = await tryCandidate(candidate);
+    if (found) return found;
+  }
+
+  if (onProgress) onProgress('no verified dashboard found; open the Desktop dashboard or configure its URL');
+  return '';
+}
+
+function isRosterPayload(payload) {
+  if (!payload || !Array.isArray(payload.profiles)) return false;
+  if (payload.auth_required === true) return false;
+  return true;
+}
+
+function rosterFromStatusProfiles(payload) {
+  if (!isQubitDashboardStatus(payload) || payload.auth_required === true) return null;
+  const profiles = payload.profiles
+    .map((row) => (typeof row === 'string' ? { name: row } : row))
+    .filter((row) => row && typeof row === 'object' && String(row.name || '').trim());
+  return profiles.length ? { profiles } : null;
+}
+
+const LOOPBACK_FETCH = { credentials: 'omit', cache: 'no-store' };
+
+// `token` is the credential to use when the page injects none (the Webapp's, held by the caller).
+export async function fetchRosterFromDashboard({ baseUrl = '', fetchFn = globalThis.fetch?.bind(globalThis), token: heldToken = '' } = {}) {
+  const dashboardUrl = String(baseUrl || '').trim().replace(/\/+$/, '');
+  if (!dashboardUrl) throw new Error('no-dashboard-url');
+  const rootResponse = await fetchWithTimeout(fetchFn, dashboardUrl, {
+    method: 'GET',
+    headers: { Accept: 'text/html' },
+    ...LOOPBACK_FETCH,
+  }, 2500);
+  if (!rootResponse.ok) throw new Error(`dashboard-root-${rootResponse.status}`);
+  const html = await rootResponse.text();
+  const token = extractDashboardSessionToken(html) || String(heldToken || '').trim();
+  if (!token) {
+    const authenticatedStatus = await fetchAuthenticatedDashboardStatus(dashboardUrl, fetchFn, 2500);
+    if (authenticatedStatus) throw new Error('dashboard-authentication-required');
+  }
+
+  const rosterUrl = dashboardProfilesUrl(dashboardUrl);
+  if (!rosterUrl) throw new Error('bad-dashboard-url');
+  const headers = { Accept: 'application/json' };
+  if (token) headers['X-Qubit-Session-Token'] = token;
+  try {
+    const rosterResponse = await fetchWithTimeout(fetchFn, rosterUrl, {
+      method: 'GET',
+      headers,
+      ...LOOPBACK_FETCH,
+    }, 8000);
+    if (rosterResponse.ok) {
+      const payload = await rosterResponse.json().catch(() => null);
+      if (isRosterPayload(payload)) return payload;
+    }
+  } catch {
+    /* chrome-extension CORS or a blocked private-network probe */
+  }
+  const status = await fetchDashboardStatus(dashboardUrl, fetchFn, 2500).catch(() => null);
+  throw Object.assign(new Error('no-profiles-in-response'), {
+    code: 'no-rich-roster', degraded: true,
+    metadata: { source: 'dashboard-status', profileNames: (rosterFromStatusProfiles(status)?.profiles || []).map((row) => row.name) },
+  });
+}
+
+export async function fetchRosterFromGateway({
+  gatewayUrl = '',
+  apiKey = '',
+  knownProfileNames = [],
+  fetchFn = globalThis.fetch?.bind(globalThis),
+} = {}) {
+  const base = String(gatewayUrl || '').trim().replace(/\/+$/, '');
+  const token = String(apiKey || '').trim();
+  if (!base) throw new Error('no-gateway-url');
+  const authScheme = 'Bear' + 'er';
+  const headers = { Accept: 'application/json' };
+  if (token) headers.Authorization = `${authScheme} ${token}`;
+  const names = new Set();
+
+  const addName = (value) => {
+    const name = String(value || '').trim();
+    if (name) names.add(name);
+  };
+
+  try {
+    const detailed = await fetchWithTimeout(fetchFn, `${base}/health/detailed`, {
+      method: 'GET',
+      headers,
+      ...LOOPBACK_FETCH,
+    }, 4000);
+    if (detailed.ok) {
+      const payload = await detailed.json().catch(() => null);
+      const list = payload?.profiles || payload?.served_profiles || payload?.readiness?.profiles;
+      if (Array.isArray(list)) {
+        for (const row of list) addName(typeof row === 'string' ? row : row?.name);
+      }
+    }
+  } catch {
+    /* 401/404 on older gateways */
+  }
+
+  const candidates = ['default', ...((Array.isArray(knownProfileNames) ? knownProfileNames : []).map((name) => String(name || '').trim()))];
+  for (const name of candidates) {
+    if (!name || names.has(name)) continue;
+    try {
+      const probe = await fetchWithTimeout(fetchFn, `${base}/p/${encodeURIComponent(name)}/health`, {
+        method: 'GET',
+        headers,
+        ...LOOPBACK_FETCH,
+      }, 2000);
+      if (probe.ok) addName(name);
+    } catch {
+      /* profile missing or unscoped gateway */
+    }
+  }
+
+  if (!names.size) throw new Error('no-gateway-profiles');
+  throw Object.assign(new Error('gateway-profiles-degraded: rich roster requires dashboard WebSocket'), {
+    code: 'no-rich-roster', degraded: true,
+    metadata: { source: 'gateway-health', profileNames: [...names] },
+  });
+}
+
+// Prefer the gateway's native roster. On older gateways the companion plugin may
+// supply the same read-only shape; absent both, the caller falls back to names.
+export async function fetchRosterFromGatewayApi({
+  gatewayUrl = '',
+  apiKey = '',
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  timeoutMs = 4000,
+} = {}) {
+  const base = String(gatewayUrl || '').trim().replace(/\/+$/, '');
+  const token = String(apiKey || '').trim();
+  if (!base) throw new Error('no-gateway-url');
+  if (!token) throw new Error('no-gateway-credential');
+  const authScheme = 'Bear' + 'er';
+  const options = {
+    method: 'GET',
+    headers: { Accept: 'application/json', Authorization: `${authScheme} ${token}` },
+    ...LOOPBACK_FETCH,
+  };
+  let response = await fetchWithTimeout(fetchFn, `${base}/v1/profiles`, options, timeoutMs);
+  // Only an absent route permits fallback. Never bypass an authorization failure,
+  // nor send credentials to a different origin or a URL supplied by a response.
+  if (response.status === 404 || response.status === 405) {
+    response = await fetchWithTimeout(fetchFn, `${base}/api/plugins/qubit-browser-extension/profiles`, options, timeoutMs);
+  }
+  if (!response.ok) throw Object.assign(new Error(`gateway-roster-${response.status}`), { status: response.status });
+  const payload = await response.json().catch(() => null);
+  if (!Array.isArray(payload?.profiles)) throw new Error('invalid-gateway-roster');
+  return payload;
+}
+
+const GATEWAY_AVATAR_MAX_BYTES = 2_000_000;
+
+export async function fetchGatewayProfileAvatar({
+  gatewayUrl = '',
+  apiKey = '',
+  profileName = '',
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  timeoutMs = 6000,
+} = {}) {
+  const base = String(gatewayUrl || '').trim().replace(/\/+$/, '');
+  const token = String(apiKey || '').trim();
+  const name = String(profileName || '').trim();
+  if (!base || !token || !name) return '';
+  const authScheme = 'Bear' + 'er';
+  try {
+    const options = {
+      method: 'GET',
+      headers: { Accept: 'image/*', Authorization: `${authScheme} ${token}` },
+      ...LOOPBACK_FETCH,
+    };
+    const encoded = encodeURIComponent(name);
+    let response = await fetchWithTimeout(fetchFn, `${base}/v1/profiles/${encoded}/avatar`, options, timeoutMs);
+    if (response.status === 404 || response.status === 405) {
+      response = await fetchWithTimeout(fetchFn, `${base}/api/plugins/qubit-browser-extension/profiles/${encoded}/avatar`, options, timeoutMs);
+    }
+    if (!response.ok) return '';
+    const mime = String(response.headers?.get?.('content-type') || '').split(';')[0].trim().toLowerCase();
+    if (!mime.startsWith('image/')) return '';
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    if (!bytes.length || bytes.length > GATEWAY_AVATAR_MAX_BYTES) return '';
+    let binary = '';
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+    return `data:${mime};base64,${btoa(binary)}`;
+  } catch {
+    return '';
+  }
+}
+
+export function retainRosterAfterFailedDiscovery({
+  incomingAgents = [],
+  incomingGroups = [],
+  previous = {},
+} = {}) {
+  const incomingA = Array.isArray(incomingAgents) ? incomingAgents : [];
+  const incomingG = Array.isArray(incomingGroups) ? incomingGroups : [];
+  const previousAgents = Array.isArray(previous?.agents) ? previous.agents : [];
+  const previousGroups = Array.isArray(previous?.groupChats) ? previous.groupChats : [];
+  if (incomingA.length || incomingG.length) {
+    return { keep: false, agents: incomingA, groupChats: incomingG };
+  }
+  if (previousAgents.length || previousGroups.length) {
+    return { keep: true, agents: previousAgents, groupChats: previousGroups };
+  }
+  return { keep: false, agents: [], groupChats: [] };
+}
+
+export async function readCachedRosterUrl(storageApi = globalThis.chrome?.storage?.local) {
+  if (!storageApi?.get) return { url: '', cachedAt: 0 };
+  const stored = await storageApi.get(DESKTOP_ROSTER_URL_STORAGE_KEY);
+  const entry = stored?.[DESKTOP_ROSTER_URL_STORAGE_KEY];
+  if (!entry || typeof entry.url !== 'string') return { url: '', cachedAt: 0 };
+  if (Date.now() - Number(entry.cachedAt || 0) > DESKTOP_ROSTER_URL_TTL_MS) return { url: '', cachedAt: 0 };
+  return { url: entry.url, cachedAt: Number(entry.cachedAt || 0) };
+}
+
+export async function writeCachedRosterUrl(url, storageApi = globalThis.chrome?.storage?.local) {
+  if (!storageApi?.set || !url) return;
+  await storageApi.set({ [DESKTOP_ROSTER_URL_STORAGE_KEY]: { url, cachedAt: Date.now() } });
+}
+
+export async function clearCachedRosterUrl(storageApi = globalThis.chrome?.storage?.local) {
+  if (storageApi?.remove) {
+    await storageApi.remove(DESKTOP_ROSTER_URL_STORAGE_KEY);
+    return;
+  }
+  if (storageApi?.set) {
+    await storageApi.set({ [DESKTOP_ROSTER_URL_STORAGE_KEY]: { url: '', cachedAt: 0 } });
+  }
+}
+
+export async function readLastKnownRoster(storageApi = globalThis.chrome?.storage?.local) {
+  if (!storageApi?.get) return { agents: [], groupChats: [], sourceId: '', savedAt: 0 };
+  const stored = await storageApi.get(LAST_KNOWN_ROSTER_STORAGE_KEY);
+  const entry = stored?.[LAST_KNOWN_ROSTER_STORAGE_KEY];
+  if (!entry || Date.now() - Number(entry.savedAt || 0) > LAST_KNOWN_ROSTER_TTL_MS) {
+    return { agents: [], groupChats: [], sourceId: '', savedAt: 0 };
+  }
+  return {
+    agents: Array.isArray(entry.agents) ? entry.agents : [],
+    groupChats: Array.isArray(entry.groupChats) ? entry.groupChats : [],
+    sourceId: typeof entry.sourceId === 'string' ? entry.sourceId : '',
+    savedAt: Number(entry.savedAt || 0),
+  };
+}
+
+export async function writeLastKnownRoster(roster, storageApi = globalThis.chrome?.storage?.local) {
+  if (!storageApi?.set) return;
+  const agents = Array.isArray(roster?.agents) ? roster.agents : [];
+  const groupChats = Array.isArray(roster?.groupChats) ? roster.groupChats : [];
+  // An empty roster is saved too: the gateway answered with no bots, and a later failed
+  // refresh must not bring a deleted bot's old title and picture back.
+  await storageApi.set({
+    [LAST_KNOWN_ROSTER_STORAGE_KEY]: {
+      agents,
+      groupChats,
+      sourceId: typeof roster?.sourceId === 'string' ? roster.sourceId : '',
+      savedAt: Date.now(),
+    },
+  });
+}

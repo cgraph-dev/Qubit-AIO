@@ -1,0 +1,72 @@
+/* Text zoom for extension surfaces whose own rules use absolute px.
+   This does not use the zoom property, so rules that already multiply
+   --qubit-text-zoom are not scaled twice. Host pages never load this file. */
+
+html[data-qubit-text-zoom] .permission-card,
+html[data-qubit-text-zoom] .voice-card {
+  font-size: calc(15px * var(--qubit-text-zoom, 1));
+}
+
+html[data-qubit-text-zoom] .permission-card h1,
+html[data-qubit-text-zoom] .voice-card h1 {
+  font-size: calc(28px * var(--qubit-text-zoom, 1));
+  font-family: var(--qubit-font-display, Georgia, serif);
+}
+
+html[data-qubit-text-zoom] .permission-card p,
+html[data-qubit-text-zoom] .voice-card p,
+html[data-qubit-text-zoom] .permission-card button,
+html[data-qubit-text-zoom] .voice-card button,
+html[data-qubit-text-zoom] #permissionStatus,
+html[data-qubit-text-zoom] #voiceStatus {
+  font-size: calc(14px * var(--qubit-text-zoom, 1));
+}
+
+html[data-qubit-text-zoom] .web-shell h1,
+html[data-qubit-text-zoom] .web-shell h2,
+html[data-qubit-text-zoom] .web-shell h3,
+html[data-qubit-text-zoom] .web-shell h4 {
+  font-family: var(--qubit-font-display, Georgia, serif);
+}
+html[data-qubit-text-zoom] .web-message-content h1,
+html[data-qubit-text-zoom] .web-message-content h2,
+html[data-qubit-text-zoom] .web-message-content h3,
+html[data-qubit-text-zoom] .web-message-content h4 {
+  font-family: var(--qubit-font-display, "QubitDisplay", Georgia, serif);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0.03em;
+  text-transform: none;
+}
+html[data-qubit-font-profile="signature"] .web-message-content :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--qubit-font-display);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  line-height: 0.92;
+  text-transform: none;
+}
+html[data-qubit-font-profile="cinzel"] .web-message-content :is(h1, h2, h3, h4, h5, h6) {
+  font-family: var(--qubit-font-display);
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+}
+
+.web-deprecation-banner {
+  grid-column: 1 / -1;
+  grid-row: 1;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  align-items: baseline;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--qubit-line, rgba(0, 0, 242, 0.24));
+  background: color-mix(in srgb, var(--qubit-paper, #fbfcff) 90%, transparent);
+  color: var(--qubit-ink, currentColor);
+  font: 600 calc(13px * var(--qubit-text-zoom, 1))/1.4 var(--qubit-font-ui, system-ui, sans-serif);
+}
+
+.web-deprecation-banner span {
+  color: var(--qubit-muted, currentColor);
+  font-weight: 400;
+}

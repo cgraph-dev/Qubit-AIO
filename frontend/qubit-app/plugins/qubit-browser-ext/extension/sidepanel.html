@@ -1,0 +1,1830 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self'; object-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src http: https: wss: ws://127.0.0.1:* ws://localhost:*;" />
+    <title data-i18n="manifest.extension_name">Qubit Browser Extension</title>
+    <link rel="icon" href="assets/icons/icon-32.png" />
+    <link rel="stylesheet" href="lib/fonts.css" />
+    <link rel="stylesheet" href="lib/branded-select.css" />
+    <link rel="stylesheet" href="sidepanel.css" />
+    <link rel="stylesheet" href="sidepanel-themes.css" />
+    <link rel="stylesheet" href="context-menu-editor.css" />
+    <link rel="stylesheet" href="lib/user-file-attachments.css" />
+    <link rel="stylesheet" href="lib/agent-prompt-card.css" />
+    <link rel="stylesheet" href="lib/effort-control.css" />
+    <link rel="stylesheet" href="lib/voice-wingbeat.css" />
+    <link rel="stylesheet" href="lib/pixel-icons.css" />
+    <link rel="stylesheet" href="lib/adaptive-ui.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar" aria-label="Qubit Browser Extension header" data-i18n-aria-label="a11y.extension_header">
+        <div class="brand-mini" aria-label="Qubit" data-i18n-aria-label="ui.qubit.agent"><span class="brand-mini-mark" aria-hidden="true"></span></div>
+        <button id="sessionMenuButton" class="session-menu-button" type="button" aria-haspopup="dialog" aria-expanded="false">
+          <span id="currentSessionName" data-i18n-runtime>Qubit Browser Extension</span>
+          <span aria-hidden="true">⌄</span>
+        </button>
+        <button id="newSessionButton" class="settings-button icon-button" type="button" title="New Qubit Browser Extension session" aria-label="New session" data-i18n-title="ui.new.qubit.browser.extension.session" data-i18n-aria-label="ui.new.session">
+          <svg class="new-session-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="plus"><path d="M13 11h7v2h-7v7h-2v-7H4v-2h7V4h2v7Z"/></svg>
+        </button>
+        <button id="botModeButton" class="settings-button icon-button bot-mode-button" type="button" data-i18n-title="bot_mode.open_title" data-i18n-aria-label="bot_mode.open_title" aria-label="Open Bot Mode" title="Open Bot Mode" aria-expanded="false" hidden>
+          <svg class="bot-mode-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="avatar-circle"><path d="M6 2h12v2H6zm0 18h12v2H6zM2 6h2v12H2zm18 0h2v12h-2zM6 18h2v2H6zm10 0h2v2h-2zm2-14h2v2h-2zM4 4h2v2H4zm0 14h2v2H4zm14 0h2v2h-2zM8 16h8v2H8zm2-4h4v2h-4zM8 8h2v4H8zm2-2h4v2h-4zm4 2h2v4h-2z"/></svg><span class="sr-only" data-i18n="bot_mode.title">Bot Mode</span>
+        </button>
+        <button id="openFullViewButton" class="settings-button icon-button" type="button" title="Open Qubit Web" aria-label="Qubit Web" data-i18n-title="webapp.open_title" data-i18n-aria-label="ui.qubit.web">
+          <svg class="web-view-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="globe"><path d="M6 2h12v2H6zm0 18h12v2H6zM4 4h2v2H4zm5 0h2v2H9zm0 14h2v2H9zm4 0h2v2h-2zM7 6h2v12H7zm8 0h2v12h-2zm-2-2h2v2h-2zm7 0h-2v2h2zM2 6h2v12H2zm20 0h-2v12h2zM4 18h2v2H4zm16 0h-2v2h2z"/><path d="M3 11h18v2H3z"/></svg>
+          <span class="sr-only" data-i18n="webapp.open_title">Open Qubit Web</span>
+        </button>
+        <button id="settingsButton" class="settings-button icon-button" type="button" title="Settings" aria-label="Open settings" data-i18n-title="ui.settings" data-i18n-aria-label="ui.open.settings">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="settings-cog"><path d="M4 20h3v-2h4v4h2v-4h4v2h-2v4H9v-4H7v2H2v-5h2v3Zm18 2h-5v-2h3v-3h2v5ZM6 11H2v2h4v4H4v-2H0V9h4V7h2v4Zm14-2h4v6h-4v2h-2v-4h4v-2h-4V7h2v2Zm-6 7h-4v-2h4v2Zm-4-2H8v-4h2v4Zm6 0h-2v-4h2v4Zm-2-4h-4V8h4v2ZM7 4H4v3H2V2h5v2Zm8 0h2V2h5v5h-2V4h-3v2h-4V2h-2v4H7V4h2V0h6v4Z"/></svg>
+          <span class="sr-only" data-i18n="ui.settings">Settings</span>
+        </button>
+        <button id="startupTestConnectionButton" class="startup-test-connection" type="button"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="cellular-signal-3"><path d="M4 14h2v4H4zm7-4h2v8h-2zm7-6h2v14h-2zM2 16h2v3H2zm7-4h2v6H9zm7-6h2v12h-2zM6 14h2v5H6zm7-4h2v8h-2zm7-6h2v14h-2z"/><path d="M2 18h6v2H2zm7 0h6v2H9zm7 0h6v2h-6z"/></svg><span class="settings-connection-test-label sr-only" data-i18n="ui.test.connection.f7dafbab">TEST CONNECTION</span></button>
+        <button id="startupConnectButton" class="startup-test-connection startup-connect-action" type="button" hidden><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="plug"><path d="M16 18h-3v4h-2v-4H8v-2h8v2Zm-8-2H6v-2h2v2Zm10 0h-2v-2h2v2Zm-8-9h4V2h2v5h5v2h-1v5h-2V9H6v5H4V9H3V7h5V2h2v5Z"/></svg><span data-i18n="ui.connect.to.qubit">Connect to Qubit</span></button>
+      </header>
+
+      <section id="sessionMenu" class="session-menu" role="dialog" aria-label="Open Qubit session" hidden data-i18n-aria-label="ui.open.qubit.session">
+        <div id="sessionMenuTabs" class="session-menu-tabs" role="group" aria-label="Sessions view" data-i18n-aria-label="projects.tab.label">
+          <button id="sessionMenuTabRecents" class="session-menu-tab" type="button" aria-pressed="true" data-i18n="projects.tab.recents">Recents</button>
+          <button id="sessionMenuTabProjects" class="session-menu-tab" type="button" aria-pressed="false" data-i18n="projects.tab.projects">Projects</button>
+        </div>
+        <input id="sessionSearchInput" type="search" placeholder="Search sessions" autocomplete="off" data-i18n-placeholder="ui.search.sessions" />
+        <div id="sessionMenuList" class="session-menu-list"></div>
+        <div id="projectsPanel" class="session-menu-list projects-panel" aria-live="off" hidden></div>
+        <footer id="sessionRecentsFooter">
+          <button id="createSessionButton" class="secondary" type="button" data-i18n="session.new_extension_session">＋ New Qubit Browser Extension Session</button>
+          <button id="refreshSessionsButton" class="secondary" type="button">
+            <span id="sessionRefreshIcon" class="session-refresh-icon" aria-hidden="true">↻</span>
+            <span id="refreshSessionsLabel">Refresh Sessions</span>
+          </button>
+        </footer>
+        <footer id="projectsFooter" hidden>
+          <button id="newProjectButton" class="secondary" type="button" data-i18n="projects.new">New project</button>
+          <button id="refreshProjectsButton" class="secondary" type="button" data-i18n="projects.refresh">Refresh Projects</button>
+        </footer>
+      </section>
+
+      <section id="botModePanel" class="bot-mode-panel" role="dialog" data-i18n-aria-label="bot_mode.dialog_label" aria-label="Bot Mode" hidden>
+        <header class="bot-mode-head">
+          <div class="bot-mode-head-copy">
+            <h2 data-i18n="bot_mode.title">Bot Mode</h2>
+            <p id="botModeStatus" role="status" aria-live="polite">Connect to load your Qubit agents.</p>
+          </div>
+          <div class="bot-mode-head-controls">
+            <button id="botModeRefreshButton" class="bot-mode-head-action" type="button" data-i18n-aria-label="ui.refresh" aria-label="Refresh">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="reload"><path d="M16 4h2v6h-2zm-2-2h2v2h-2zm0 2h2v8h-2zM4 8H2v5h2z"/><path d="M4 6h16v2H4zm4 14H6v-6h2zm2 2H8v-2h2zm0-2H8v-8h2zm10-4h2v-5h-2z"/><path d="M20 18H4v-2h16z"/></svg>
+            </button>
+            <button id="botModeCloseButton" class="bot-mode-head-action" type="button" data-i18n-aria-label="bot_mode.close" aria-label="Close Bot Mode">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="close"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg>
+            </button>
+          </div>
+        </header>
+                <div class="bot-mode-search-row">
+          <input id="botModeSearch" type="search" data-i18n-placeholder="bot_mode.search" data-i18n-aria-label="bot_mode.search" placeholder="Search agents" aria-label="Search agents" autocomplete="off" />
+          <div class="bot-mode-view-toggle" role="group" data-i18n-aria-label="bot_mode.view_toggle_label" aria-label="Roster view">
+            <button id="botModeViewAgents" class="bot-mode-view-tab" type="button" aria-pressed="true" data-i18n="bot_mode.agents">Agents</button>
+            <button id="botModeViewGroups" class="bot-mode-view-tab" type="button" aria-pressed="false" data-i18n="bot_mode.tab_groups">Group Chats</button>
+          </div>
+        </div>
+        <div id="botModeRoster" class="bot-mode-roster" role="listbox" data-i18n-aria-label="bot_mode.roster_label" aria-label="Qubit agents"></div>
+        <div id="botModeGroupList" class="bot-mode-roster bot-mode-group-list" role="listbox" data-i18n-aria-label="bot_mode.group_roster_label" aria-label="Qubit group chats" hidden></div>
+        <footer class="bot-mode-foot">
+          <span id="botModeVerify" class="bot-mode-verify" data-i18n="bot_mode.connected_instance">Current connected Qubit instance</span>
+          <div class="bot-mode-actions">
+            <button id="botModeEditButton" class="bot-mode-action" type="button" disabled data-i18n="bot_mode.edit_profile">Edit Profile</button>
+            <button id="botModeNewAgentButton" class="bot-mode-action" type="button" data-i18n="bot_mode.new_agent">New Agent</button>
+            <button id="botModeNewGroupButton" class="bot-mode-action primary full-width" type="button" data-i18n="bot_mode.new_group" hidden>+ Start A New Group Chat</button>
+            <button id="botModeOpenButton" class="bot-mode-action primary" type="button" disabled data-i18n="bot_mode.open_chat">Open Bot Chat</button>
+          </div>
+        </footer>
+      </section>
+
+      <section id="botModeSheet" class="bot-mode-sheet" role="dialog" aria-modal="true" data-i18n-aria-label="bot_mode.sheet_label" aria-label="Edit agent profile" hidden>
+        <header class="bot-mode-sheet-head">
+          <div>
+            <h2 id="botModeSheetTitle">Edit profile</h2>
+            <p id="botModeSheetMeta">Profile</p>
+          </div>
+          <button id="botModeSheetCloseButton" type="button" data-i18n-aria-label="bot_mode.close" aria-label="Close Bot Mode">&times;</button>
+        </header>
+        <nav class="bot-mode-sheet-tabs" id="botModeSheetTabs" data-i18n-aria-label="bot_mode.sheet_tabs_label" aria-label="Profile editor sections">
+                          <button class="bot-mode-sheet-tab on" type="button" data-sheet-tab="avatar" data-i18n="bot_mode.tab_bot">Bot</button>
+                          <button class="bot-mode-sheet-tab" type="button" data-sheet-tab="skills" data-i18n="bot_mode.tab_skills">Skills</button>
+                        </nav>
+        <div class="bot-mode-sheet-body">
+          <div class="bot-mode-sheet-pane" data-sheet-pane="avatar">
+            <div class="bot-mode-avatar-stage">
+                          <span class="bot-mode-sheet-label" data-i18n="bot_mode.avatar_preview">Avatar preview</span>
+                          <span id="botModeSheetAvatarPreview" class="bot-mode-avatar bot-mode-avatar-sheet"></span>
+                          <p class="hint" id="botModeSheetFaceHint" data-i18n-runtime>Face follows the name.</p>
+                                                    <div class="bot-mode-face-switch" role="group" data-i18n-aria-label="bot_mode.face_style" aria-label="Face style">
+                                                      <button id="botModeBlobFacesButton" class="on" type="button" aria-pressed="true" data-i18n="bot_mode.face_blobatar">Blobatar</button>
+                                                      <button id="botModeClassicShapesButton" type="button" aria-pressed="false" data-i18n="bot_mode.face_classic_shapes">Classic shapes</button>
+                                                    </div>
+                        </div>
+                        <div class="bot-mode-name-row">
+                          <label class="bot-mode-sheet-field" id="botModeSheetNameField" hidden>
+                            <span class="bot-mode-sheet-label" data-i18n="bot_mode.field_name">Profile name</span>
+                            <input id="botModeSheetNameInput" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="bot_mode.field_name" data-i18n-aria-label="bot_mode.field_name" aria-label="Profile name" />
+                          </label>
+                          <label class="bot-mode-sheet-field">
+                            <span class="bot-mode-sheet-label" data-i18n="bot_mode.field_title">Display title</span>
+                            <input id="botModeSheetTitleInput" type="text" autocomplete="off" spellcheck="false" data-i18n-placeholder="bot_mode.field_title" data-i18n-aria-label="bot_mode.field_title" aria-label="Display title" />
+                          </label>
+                        </div>
+                                    <label class="bot-mode-sheet-field">
+                          <span class="bot-mode-sheet-label" data-i18n="bot_mode.field_description">Description</span>
+                          <textarea id="botModeSheetDescriptionInput" rows="3" spellcheck="false" data-i18n-placeholder="bot_mode.field_description" data-i18n-aria-label="bot_mode.field_description" aria-label="Description"></textarea>
+                        </label>
+                        <div class="bot-mode-sheet-field">
+                          <span class="bot-mode-sheet-label" id="botModeSheetFaceLabel" data-i18n="bot_mode.blobatar_title">Official blobatar face</span>
+                          <div id="botModeSheetFaceGrid" class="bot-mode-face-grid" role="listbox" data-i18n-aria-label="bot_mode.blobatar_title" aria-label="Official blobatar face"></div>
+                          <div id="botModeClassicShapeGrid" class="bot-mode-face-grid" hidden></div>
+                                                    <div id="botModeClassicColorRow" class="bot-mode-color-row" hidden>
+                                                                                                          <div id="botModeClassicSwatches" class="bot-mode-swatches" role="group" data-i18n-aria-label="bot_mode.color_picker_label" aria-label="Shape color"></div>
+                                                                                                          <button id="botModeClassicNameColor" class="bot-mode-color-name" type="button" aria-pressed="true" data-i18n-aria-label="bot_mode.match_the_name" aria-label="Match the name">
+                                                                                                            <span class="bot-mode-color-name-glyph" aria-hidden="true"></span>
+                                                                                                            <span class="bot-mode-color-name-label" data-i18n="bot_mode.match_the_name">Match the name</span>
+                                                                                                          </button>
+                                                                                                        </div>
+                                                  </div>
+                        <details id="botModeCreateAdvanced" class="bot-mode-advanced">
+                                      <summary>
+                                                                              <span class="bot-mode-advanced-caret" aria-hidden="true"></span>
+                                                                              <span data-i18n="bot_mode.advanced">Advanced</span>
+                                                                            </summary>
+                                                                            <div class="bot-mode-advanced-panel">
+                                                                              <div class="bot-mode-face-switch" id="botModeAdvancedSwitch" role="group" data-i18n-aria-label="bot_mode.advanced_sections" aria-label="Advanced sections">
+                                                                                <button type="button" data-advanced-tab="general" class="on" aria-pressed="true" data-i18n="bot_mode.tab_general">General</button>
+                                                                                <button type="button" data-advanced-tab="capabilities" aria-pressed="false" data-i18n="ui.capabilities">Capabilities</button>
+                                                                              </div>
+                                        <div data-advanced-pane="general">
+                                          <label class="bot-mode-sheet-field" id="botModeCloneField" hidden>
+                                                                                      <span class="bot-mode-sheet-label" data-i18n="bot_mode.clone_from_profile">Clone from profile</span>
+                                                                                      <select id="botModeSheetCloneFrom" data-i18n-aria-label="bot_mode.clone_from_profile" aria-label="Clone from profile"></select>
+                                                                                    </label>
+                                          <div id="botModeModelFields" class="bot-mode-advanced-models" hidden>
+                                            <label class="bot-mode-sheet-field">
+                                                                                          <span class="bot-mode-sheet-label" data-i18n="ui.provider">Provider</span>
+                                                                                          <select id="botModeSheetProvider" data-i18n-aria-label="ui.provider" aria-label="Provider"></select>
+                                                                                        </label>
+                                                                                        <label class="bot-mode-sheet-field">
+                                                                                          <span class="bot-mode-sheet-label" data-i18n="ui.model.68c2cc7f">Model</span>
+                                                                                          <select id="botModeSheetModel" data-i18n-aria-label="ui.model.68c2cc7f" aria-label="Model"></select>
+                                                                                        </label>
+                                                                                        <p class="hint" data-i18n="bot_mode.clone_hint">Leave both on inherited to use the cloned profile. Pick a provider and model to pin this bot.</p>
+                                          </div>
+                                          <label class="bot-mode-sheet-field">
+                                                                                      <span class="bot-mode-sheet-label" data-i18n="bot_mode.soul_md">SOUL.md</span>
+                                                                                      <p class="hint" data-i18n="bot_mode.soul_optional_hint">Optional. Replaces the generated persona. Leave blank to build it from the name, title, and description.</p>
+                                                                                      <textarea id="botModeSheetSoulInput" rows="5" spellcheck="false" data-i18n-placeholder="bot_mode.soul_auto_placeholder" placeholder="Leave blank to auto-generate from the name, title, and description." data-i18n-aria-label="bot_mode.soul_md" aria-label="SOUL.md"></textarea>
+                                                                                    </label>
+                                          <div id="botModeCreateFlags" class="bot-mode-check-grid bot-mode-advanced-flags" hidden>
+                                                                                      <label class="bot-mode-check-item">
+                                                                                                                                                                              <input id="botModeSheetShareKeys" type="checkbox" checked />
+                                                                                                                                                                              <span data-i18n="bot_mode.share_keys">Share keys and accounts with the main profile</span>
+                                                                                                                                                                            </label>
+                                                                                                                                                                            <p class="hint" data-i18n="bot_mode.share_keys_hint">Subscriptions, OAuth logins, and API keys stay shared, not copied. Uncheck for an isolated copy.</p>
+                                                                                                                                                                            <label class="bot-mode-check-item">
+                                                                                                                                                                              <input id="botModeSheetNoSkills" type="checkbox" />
+                                                                                                                                                                              <span data-i18n="bot_mode.create_empty">Create empty (skip bundled skills)</span>
+                                                                                                                                                                            </label>
+                                                                                                                                                                            <p class="hint" data-i18n="bot_mode.create_empty_hint">A fresh bot with no bundled skills copied in.</p>
+                                                                                                                                </div>
+                                                                                                                              </div>
+                                                                                                                              <div data-advanced-pane="capabilities" hidden>
+                                          <p class="hint" id="botModeCapsGate" data-i18n="bot_mode.caps_gate_hint" hidden>Name the bot first. Capabilities save with the bot.</p>
+                                                                                    <div id="botModeCapsLists">
+                                                                                      <div class="bot-mode-sheet-field">
+                                                                                        <span class="bot-mode-sheet-label" data-i18n="bot_mode.toolsets">Toolsets</span>
+                                                                                        <div class="bot-mode-check-tools">
+                                                                                          <input id="botModeSheetToolsSearch" type="search" data-i18n-placeholder="bot_mode.search_tools" placeholder="Search tools" data-i18n-aria-label="bot_mode.search_tools" aria-label="Search tools" autocomplete="off" spellcheck="false">
+                                                                                          <span id="botModeSheetToolsCount" class="bot-mode-check-count"></span>
+                                                                                        </div>
+                                                                                        <div id="botModeSheetToolsList" class="bot-mode-check-grid"></div>
+                                                                                      </div>
+                                                                                      <div class="bot-mode-sheet-field">
+                                                                                        <span class="bot-mode-sheet-label" data-i18n="bot_mode.mcp_servers">MCP servers</span>
+                                                                                        <div class="bot-mode-check-tools">
+                                                                                          <input id="botModeSheetMcpSearch" type="search" data-i18n-placeholder="bot_mode.search_mcp" placeholder="Search MCP servers" data-i18n-aria-label="bot_mode.search_mcp" aria-label="Search MCP servers" autocomplete="off" spellcheck="false">
+                                                                                          <span id="botModeSheetMcpCount" class="bot-mode-check-count"></span>
+                                                                                        </div>
+                                                                                        <div id="botModeSheetMcpList" class="bot-mode-check-grid"></div>
+                                                                                      </div>
+                                                                                    </div>
+                                        </div>
+                                      </div>
+                                    </details>
+            <details class="bot-mode-pet-picker" id="botModePetPicker">
+                          <summary class="bot-mode-pet-summary">
+                            <span data-i18n="bot_mode.pet_title">Pet avatar</span>
+                                                        <span id="botModePetSummaryValue" data-i18n-runtime>None</span>
+                                                      </summary>
+                                                      <div class="bot-mode-pet-body">
+                                                        <input id="botModePetSearch" type="search" placeholder="Search pets" autocomplete="off" data-i18n-placeholder="bot_mode.pet_search" data-i18n-aria-label="bot_mode.pet_search" aria-label="Search pets" />
+                                                        <p class="hint" id="botModePetHint" data-i18n-runtime></p>
+                                                        <div id="botModePetGrid" class="bot-mode-pet-grid" role="listbox" data-i18n-aria-label="bot_mode.pet_grid_label" aria-label="Petdex pets"></div>
+                                                        <button id="botModePetApply" class="secondary" type="button" data-i18n="ui.apply" hidden>Apply</button>
+                                                        <button id="botModePetClear" class="bot-mode-action" type="button" data-i18n="bot_mode.pet_clear" hidden>Clear pet</button>
+                                                      </div>
+                        </details>
+            <div class="bot-mode-sheet-field">
+              <span class="bot-mode-sheet-label" data-i18n="bot_mode.custom_image">Custom image</span>
+              <button id="botModeSheetImageButton" class="bot-mode-upload-card" type="button">
+                              <span class="bot-mode-upload-text" id="botModeSheetUploadText">Choose an image…</span>
+                            </button>
+                            <input id="botModeSheetImageInput" class="bot-mode-sheet-file" type="file" accept="image/*" tabindex="-1" aria-hidden="true" />
+              <button id="botModeSheetAvatarClear" class="bot-mode-action" type="button" data-i18n="bot_mode.clear_avatar">Clear avatar</button>
+            </div>
+          </div>
+                    <div class="bot-mode-sheet-pane" data-sheet-pane="skills" hidden>
+            <div class="bot-mode-sheet-field">
+              <span class="bot-mode-sheet-label" data-i18n="bot_mode.installed_skills">Installed skills</span>
+              <p class="hint" data-i18n="bot_mode.installed_skills_hint">Active skills configured on this agent profile.</p>
+              <div class="bot-mode-check-tools">
+                <input id="botModeSheetSkillsSearch" type="search" placeholder="Search skills" autocomplete="off" data-i18n-placeholder="bot_mode.search_skills" data-i18n-aria-label="bot_mode.search_skills" aria-label="Search skills" />
+                <span id="botModeSheetSkillsCount" class="bot-mode-check-count" aria-live="polite"></span>
+              </div>
+              <div id="botModeSheetSkillsList" class="bot-mode-check-grid"></div>
+                          </div>
+                        </div>
+        </div>
+        <footer class="bot-mode-sheet-foot">
+          <p id="botModeSheetWarning" class="bot-mode-sheet-warning" role="status" aria-live="polite" hidden></p>
+          <button id="botModeSheetSaveButton" class="bot-mode-action primary" type="button" data-i18n="bot_mode.save_profile">Save changes</button>
+        </footer>
+      </section>
+
+      <section id="newGroupModal" class="new-group-modal" role="dialog" aria-modal="true" aria-label="New group chat" data-i18n-aria-label="bot_mode.group_sheet_label" hidden>
+        <header class="new-group-head">
+          <div class="new-group-title-row">
+            <h2 data-i18n="bot_mode.group_sheet_label">New group chat</h2>
+            <button id="newGroupCloseButton" class="group-settings-close" type="button" aria-label="Close" data-i18n-aria-label="ui.close">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="close"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg>
+            </button>
+          </div>
+          <p data-i18n="bot_mode.group_sheet_meta">Creates a bot group chat on this device</p>
+        </header>
+        <div class="new-group-body">
+          <input id="newGroupSearch" type="search" placeholder="Search agents" data-i18n-placeholder="bot_mode.search" autocomplete="off" />
+          <div id="newGroupBotList" class="new-group-bot-list" role="listbox"></div>
+          <div class="group-picture-section" data-i18n-runtime>
+            <div class="group-picture-preview-wrap">
+              <span id="newGroupIcon" class="group-picture-preview" aria-hidden="true"></span>
+            </div>
+            <div class="group-picture-controls">
+              <span class="group-picture-label">Room picture</span>
+              <div class="group-picture-btn-row">
+                <button id="newGroupIconUpload" type="button" class="new-group-secondary" data-i18n="ui.upload">Upload</button>
+                <button id="newGroupIconGenerate" type="button" class="new-group-secondary" data-i18n="bot_mode.group_generate">Generate</button>
+                <button id="newGroupIconRemove" type="button" class="new-group-secondary" hidden>Remove</button>
+              </div>
+              <input id="newGroupFileInput" type="file" accept="image/*" class="sr-only" aria-label="Upload room picture" />
+            </div>
+          </div>
+          <label class="new-group-field" data-i18n-runtime>
+            <span class="new-group-field-label">Group name</span>
+            <input id="newGroupNameInput" type="text" maxlength="64" placeholder="Browser launch room" data-i18n-placeholder="bot_mode.group_name_placeholder" autocomplete="off" spellcheck="false" />
+          </label>
+        </div>
+        <footer class="new-group-foot">
+          <button id="newGroupCancelButton" type="button" class="new-group-secondary" data-i18n="ui.cancel">Cancel</button>
+          <button id="newGroupCreateButton" type="button" class="new-group-primary" disabled>Create Group</button>
+        </footer>
+      </section>
+
+      <section id="groupSettingsModal" class="group-settings-modal" role="dialog" aria-modal="true" aria-label="Group settings" data-i18n-runtime hidden>
+        <div class="group-settings-card">
+          <header class="group-settings-head">
+            <div class="group-settings-title-row">
+              <h2 class="group-settings-title">Group settings</h2>
+              <button id="groupSettingsCloseButton" class="group-settings-close" type="button" aria-label="Close" data-i18n-aria-label="ui.close">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="close"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg>
+              </button>
+            </div>
+            <p class="group-settings-subtitle">Rename the group or set a room picture. Members and history are kept.</p>
+          </header>
+          <div class="group-settings-body">
+            <div class="group-picture-section">
+              <div class="group-picture-preview-wrap">
+                <span id="groupSettingsAvatarPreview" class="group-picture-preview" aria-hidden="true"></span>
+              </div>
+              <div class="group-picture-controls">
+                <span class="group-picture-label">Room picture</span>
+                <div class="group-picture-btn-row">
+                  <button id="groupSettingsUploadButton" type="button" class="group-settings-action-btn" data-i18n="ui.upload">Upload</button>
+                  <button id="groupSettingsGenerateButton" type="button" class="group-settings-action-btn" data-i18n="bot_mode.group_generate">Generate</button>
+                  <button id="groupSettingsRemoveImageButton" type="button" class="group-settings-action-btn remove" hidden>Remove</button>
+                </div>
+                <input id="groupSettingsFileInput" type="file" accept="image/*" class="sr-only" aria-label="Upload room picture" />
+              </div>
+            </div>
+            <label class="group-settings-field">
+              <span class="group-settings-field-label">Group name</span>
+              <input id="groupSettingsNameInput" class="group-settings-input" type="text" maxlength="64" placeholder="Group name" autocomplete="off" spellcheck="false" />
+            </label>
+          </div>
+          <footer class="group-settings-foot">
+            <button id="groupSettingsCancelButton" type="button" class="group-settings-btn-secondary" data-i18n="ui.cancel">Cancel</button>
+            <button id="groupSettingsSaveButton" type="button" class="group-settings-btn-primary">Save</button>
+          </footer>
+        </div>
+      </section>
+
+      <div id="botModeLoadingOverlay" class="bot-mode-loading-overlay" hidden aria-live="polite">
+        <div class="bot-mode-loading-card">
+          <span id="botModeLoadingAvatar" class="bot-mode-avatar bot-mode-avatar-loading" aria-hidden="true"></span>
+          <span class="session-history-loading-rail" aria-hidden="true"></span>
+          <strong id="botModeLoadingAgentTitle">OPENING BOT CHAT…</strong>
+          <span id="botModeLoadingAgentSubtitle" class="hint">Connecting profile session…</span>
+        </div>
+      </div>
+
+      <section id="appScroll" class="app-scroll" aria-label="Qubit Browser Extension conversation" data-i18n-aria-label="ui.qubit.browser.extension.conversation">
+        <section id="startupScreen" class="startup-screen" aria-live="polite">
+          <div class="startup-stage">
+            <div class="startup-brand-lockup">
+              <span class="startup-brand-icon" role="img" aria-label="Qubit Browser Extension" data-i18n-aria-label="manifest.extension_name"></span>
+            </div>
+            <div class="startup-copy">
+              <div class="startup-meta"><span id="startupCount" class="startup-count"></span><span id="startupState" class="startup-state"></span></div>
+              <p id="startupLabel" class="startup-label"></p>
+              <p id="startupDetail" class="startup-detail" data-i18n-runtime>Checking settings, gateway, capabilities, models, and sessions.</p>
+            </div>
+            <div class="startup-progress" aria-hidden="true"><span id="startupProgress"></span></div>
+            <ol id="startupStepList" class="startup-step-list sr-only" aria-label="Startup readiness checks" data-i18n-aria-label="ui.startup.readiness.checks"></ol>
+          </div>
+          <div id="startupActions" class="startup-actions" hidden></div>
+        </section>
+
+        <!-- Hidden while connected (updateConnectionPrompt); otherwise a
+             pop-up the user can dismiss until it is needed again. -->
+        <section id="connectPanel" class="connect-panel" role="dialog" aria-modal="true" aria-labelledby="connectPanelTitle" aria-describedby="connectPanelLead" hidden>
+          <div class="connect-panel-card">
+            <button id="connectPanelCloseButton" class="connect-panel-close" type="button" aria-label="Close" title="Close" data-i18n-aria-label="ui.close" data-i18n-title="ui.close">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="close"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg>
+            </button>
+            <h2 id="connectPanelTitle" data-i18n="ui.connect.to.qubit">Connect to Qubit</h2>
+            <p id="connectPanelLead" class="connect-panel-lead" data-i18n="onboarding.connect.body">Connect this panel to your Qubit agent. Approve pairing if your Qubit offers it, or use Manual setup with its address and API key. Then Qubit can see the page you are on and answer here.</p>
+            <ol>
+              <li data-i18n="ui.start.the.qubit.api.server.locally.or.on.a.reachable.remote.machine">Start the Qubit API server locally or on a reachable remote machine.</li>
+              <li data-i18n="ui.click.connect.to.qubit.or.use.manual.setup.with.a.local.remote.5b53a482">Click Connect to Qubit, or use Manual setup with a local/remote Gateway URL and token.</li>
+              <li><span data-i18n="connect.approve_or_paste">Approve pairing when available, or paste</span> <code data-i18n-invariant>API_SERVER_KEY</code> <span data-i18n="connect.manual_setup_suffix">for manual setup.</span></li>
+            </ol>
+            <!-- The gateway's approval page is shown here while pairing waits (lib/pairing-approval.mjs). -->
+            <div id="connectApprovalSlot" class="pairing-approval-slot"></div>
+            <div class="connect-actions">
+              <button id="connectButton" type="button" data-i18n="ui.connect.to.qubit">Connect to Qubit</button>
+              <button id="manualSettingsButton" class="secondary" type="button" data-i18n="ui.manual.setup">Manual setup</button>
+            </div>
+            <p id="connectStatus" class="hint">Public alpha: load unpacked, local or remote Qubit API server, full Qubit tools when the connected runtime supports them.</p>
+          </div>
+        </section>
+
+        <div id="botChatIntro" class="bot-chat-intro" hidden>
+          <div class="bot-chat-intro-avatar" id="botChatIntroAvatar"></div>
+          <h1 class="bot-chat-intro-title" id="botChatIntroTitle">ROXAS</h1>
+          <p class="bot-chat-intro-subtitle" id="botChatIntroSubtitle" data-i18n="bot_mode.chat_empty">Say something to get started.</p>
+          <div class="bot-chat-intro-actions">
+            <button id="botModeReturnButton" class="secondary bot-mode-return-button" type="button" data-i18n="bot_mode.return_to_sessions" data-i18n-title="bot_mode.return_to_sessions_title" data-i18n-aria-label="bot_mode.return_to_sessions_title">Regular Sessions</button>
+          </div>
+        </div>
+
+
+        <section id="onboardingFlow" class="onboarding" role="dialog" aria-modal="true" aria-label="Set up Qubit" data-i18n-aria-label="onboarding.aria" hidden></section>
+
+        <!-- A Bot Chat Qubit moved aside keeps the bot's earlier messages (lib/bot-chat-delivery.mjs movedAsideBotChat). -->
+        <details id="botChatEarlier" class="bot-chat-earlier" hidden>
+          <summary id="botChatEarlierSummary"></summary>
+          <p id="botChatEarlierNote" class="bot-chat-earlier-note"></p>
+          <div id="botChatEarlierList" class="bot-chat-earlier-list"></div>
+        </details>
+        <section id="messages" class="messages" aria-live="polite"></section>
+        <!-- One line under the thread while a group turn runs, cycling between the bots answering (lib/group-presence.mjs presenceLine). -->
+        <div id="groupWorkingLine" class="group-working-line" data-i18n-runtime hidden>
+          <span id="groupWorkingAvatars" class="group-working-avatars" aria-hidden="true"></span>
+          <span id="groupWorkingText" class="group-working-text" aria-hidden="true"></span>
+          <span id="groupWorkingStatus" class="sr-only" role="status" aria-live="polite"></span>
+        </div>
+      </section>
+
+      <footer class="bottom-dock" aria-label="Qubit Browser Extension controls" data-i18n-aria-label="a11y.extension_controls">
+        <!-- Floats just above the composer while the conversation is scrolled up. Hidden (and out of the tab order) at the bottom. -->
+        <button id="jumpToLatestButton" class="jump-to-latest" type="button" hidden aria-label="Jump to latest" title="Jump to latest" data-i18n-aria-label="chat.jump_to_latest" data-i18n-title="chat.jump_to_latest"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="chevron-down"><path d="M13 16h-2v-2h2v2Zm-2-2H9v-2h2v2Zm4 0h-2v-2h2v2Zm-6-2H7v-2h2v2Zm8 0h-2v-2h2v2ZM7 10H5V8h2v2Zm12 0h-2V8h2v2Z"/></svg><span id="jumpToLatestLabel" class="jump-to-latest-label" data-i18n="chat.jump_to_latest">Jump to latest</span></button>
+        <section id="taskStack" class="task-stack" data-expanded="true" aria-label="Qubit task status" hidden data-i18n-aria-label="ui.qubit.task.status">
+          <button id="taskStackToggle" class="task-stack-toggle" type="button" aria-expanded="true">
+            <span class="task-stack-title" data-i18n="ui.tasks">☑ TASKS</span>
+            <span id="taskStackSummary" class="task-stack-summary">0 complete · 0 active</span>
+            <span id="taskStackProgress" class="task-stack-progress" aria-hidden="true"><i></i></span>
+            <span class="task-stack-chevron" aria-hidden="true">↑</span>
+          </button>
+          <ol id="taskStackList" class="task-stack-list"></ol>
+        </section>
+        <section id="subagentStack" class="task-stack subagent-stack" data-expanded="true" aria-label="Qubit subagent status" data-i18n-aria-label="a11y.subagent_status" hidden>
+          <button id="subagentStackToggle" class="task-stack-toggle" type="button" aria-expanded="true">
+            <span class="task-stack-title"><span class="subagent-stack-spinner" aria-hidden="true"><span class="subagent-stack-spinner-strip"><span>⠋</span><span>⠙</span><span>⠹</span><span>⠸</span><span>⠼</span><span>⠴</span><span>⠦</span><span>⠧</span><span>⠇</span><span>⠏</span></span></span> <span data-i18n="ui.subagents">SUBAGENTS</span></span>
+            <span id="subagentStackSummary" class="task-stack-summary" aria-live="polite"></span>
+            <span class="task-stack-chevron" aria-hidden="true">↑</span>
+          </button>
+          <ol id="subagentStackList" class="task-stack-list subagent-stack-list" role="listbox" aria-label="Live subagents" data-i18n-aria-label="a11y.live_subagents"></ol>
+          <div id="subagentStackDetail" class="subagent-stack-detail" hidden></div>
+        </section>
+        <div id="groupThreadActiveBanner" class="group-thread-active-banner" data-i18n-runtime hidden>
+          <div class="group-thread-banner-copy">
+            <span class="group-thread-badge" id="groupThreadBadge">🧵 NEW THREAD</span>
+            <span class="group-thread-hint" id="groupThreadHint">Next message will start a new thread in this group</span>
+          </div>
+          <button id="groupThreadExitButton" class="group-thread-exit-btn" type="button" aria-label="Exit thread view" title="Exit thread view">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg>
+          </button>
+        </div>
+        <!-- A bot that could not reply in a group turn, with Retry. Who is answering shows under the thread (#groupWorkingLine). -->
+        <div id="groupPresence" class="group-presence" data-i18n-runtime role="list" hidden></div>
+        <div id="firstPromptChips" class="first-prompt-chips" role="group" aria-label="Try a first prompt" data-i18n-aria-label="onboarding.first_prompt" hidden>
+          <button id="firstPromptChip" class="first-prompt-chip" type="button" data-i18n="onboarding.preview.user">Summarise this page</button>
+        </div>
+        <form id="composer" class="composer">
+          <button id="statusStackToggle" class="status-stack-toggle" type="button" aria-expanded="true" aria-controls="composerStatusStack" title="Show or hide status" aria-label="Show or hide status" data-i18n-title="ui.show.or.hide.status" data-i18n-aria-label="ui.show.or.hide.status"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="chevron-down"><path d="M13 16h-2v-2h2v2Zm-2-2H9v-2h2v2Zm4 0h-2v-2h2v2Zm-6-2H7v-2h2v2Zm8 0h-2v-2h2v2ZM7 10H5V8h2v2Zm12 0h-2V8h2v2Z"/></svg></button>
+          <div class="composer-header" id="composerStatusStack">
+            <label class="composer-label sr-only" id="composerLabel" for="promptInput" data-i18n="ui.ask.qubit.36d55d5a">ASK QUBIT</label>
+            <button id="contextChip" class="context-chip" type="button" aria-expanded="false">
+              <span id="contextChipLabel" data-i18n-runtime>📎 Loading...</span>
+              <strong data-i18n-runtime data-i18n="ui.preview.1aa787fe">preview</strong>
+            </button>
+            <button id="contextScopeButton" class="context-scope-button" type="button" aria-haspopup="dialog" aria-expanded="false" title="Choose which tab Qubit reads and which open tabs appear in the prompt" data-i18n-title="ui.choose.which.tab.qubit.reads.and.which.open.tabs.appear.in.the.prompt">
+              <span id="contextScopeLabel">Follow active tab</span>
+            </button>
+          </div>
+          <div id="contextPreview" class="context-preview" data-i18n-runtime hidden></div>
+          <div id="explicitSiteCaptureWrap" class="context-explicit-capture-wrap" hidden>
+            <button id="explicitSiteCaptureButton" class="context-explicit-capture" type="button" hidden>
+              <strong data-i18n="ui.capture.visible.gmail.thread">Capture visible Gmail thread</strong>
+              <span data-i18n="ui.rendered.message.bodies.only.draft.and.input.values.stay.excluded">Rendered message bodies only. Draft and input values stay excluded.</span>
+            </button>
+            <button id="explicitSiteCaptureDismiss" class="context-explicit-capture-dismiss" type="button">✕</button>
+          </div>
+          <div id="contextScopeMenu" class="context-scope-menu" hidden></div>
+          <section id="agentPromptCard" class="agent-prompt-card" role="group" aria-live="polite" hidden></section>
+          <section id="localDocumentApprovalNotice" class="session-ownership-notice" aria-live="polite" hidden>
+            <div class="session-ownership-copy">
+              <span class="session-ownership-kicker" data-i18n="ui.local_document_access">LOCAL DOCUMENT ACCESS</span>
+              <strong id="localDocumentApprovalTitle">Local document detected</strong>
+              <span id="localDocumentApprovalDetail" data-i18n="browser_control.local_document_detail">Approve local document access to inspect this file, extract its slides or text, and let Qubit Control use its tab.</span>
+            </div>
+            <div class="session-ownership-actions">
+              <button id="localDocumentApproveButton" type="button" data-i18n="ui.approve_document_access">Approve document access</button>
+              <button id="localDocumentDismissButton" class="secondary" type="button" data-i18n="ui.keep_restricted">Keep restricted</button>
+            </div>
+          </section>
+          <section id="sessionOwnershipNotice" class="session-ownership-notice" aria-live="polite" hidden>
+            <div class="session-ownership-copy">
+              <span class="session-ownership-kicker" data-i18n="ui.shared.session">SHARED SESSION</span>
+              <strong id="sessionOwnershipTitle">Choose where to send</strong>
+              <span id="sessionOwnershipDetail"></span>
+            </div>
+            <div class="session-ownership-actions">
+              <button type="button" data-session-ownership-action="new-browser" data-i18n="ui.new.browser.chat">New chat</button>
+              <button class="secondary" type="button" data-session-ownership-action="continue" data-i18n="ui.continue.here">Continue here</button>
+            </div>
+          </section>
+          <section id="contextMenuRouteNotice" class="session-ownership-notice" aria-live="polite" hidden>
+            <div>
+              <strong data-i18n="ui.where.should.this.right.click.task.run">Where should this right-click task run?</strong>
+              <p data-i18n="ui.use.the.active.tab.s.current.session.create.a.new.browser.sessi.83e1cfd3">Use the active tab’s current session, start a new chat, or run separately.</p>
+            </div>
+            <div class="session-ownership-actions">
+              <button type="button" data-context-menu-route="current" data-i18n="ui.current.session">Current session</button>
+              <button type="button" data-context-menu-route="new" data-i18n="ui.new.session">New session</button>
+              <button type="button" data-context-menu-route="background" data-i18n="ui.background">Background</button>
+            </div>
+            <label><input id="contextMenuRememberRoute" type="checkbox" /> <span data-i18n="ui.remember.for.right.click.actions">Remember for right-click actions</span></label>
+          </section>
+          <div id="voiceActivity" class="voice-activity" hidden role="status" aria-live="polite">
+            <span class="voice-activity-dot" aria-hidden="true"></span>
+            <strong id="voiceActivityLabel">Dictating</strong>
+            <span id="voiceActivityTimer" class="voice-activity-timer">0:00</span>
+            <span id="voiceActivityBars" class="voice-activity-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          </div>
+          <div class="composer-input-wrap" id="composerDropZone">
+            <textarea id="promptInput" rows="3" placeholder="Ask Qubit about this page..." data-i18n-placeholder="ui.ask.qubit.about.this.page"></textarea>
+            <div class="composer-resize" aria-hidden="true"><span></span></div>
+            <div id="dropOverlay" class="drop-overlay" hidden data-i18n="ui.drop.files.to.attach">Drop files to attach</div>
+            <button id="attachMenuButton" class="attach-menu-button composer-plus" type="button" aria-haspopup="dialog" aria-expanded="false" aria-label="Attach context" title="Attach context" data-i18n-title="ui.attach.context" data-i18n-aria-label="ui.attach.context">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="attachment"><path d="M7 7v10H5V7zm12 0v12h-2V7zm-8 2v10H9V9zm4 0v8h-2V9zm0-6v2H9V3zm-2 4v2h-2V7zm4 12v2h-6v-2zm0-14v2h-2V5zM9 5v2H7V5z"/></svg>
+            </button>
+            <button id="modelMenuButton" class="model-menu-button composer-model-chip" type="button" aria-haspopup="dialog" aria-expanded="false">
+              <span class="model-button-copy"><span id="currentModelName">Select model</span><strong id="currentModelEffort" class="sr-only">Med</strong></span>
+              <span class="composer-model-caret" aria-hidden="true"></span>
+            </button>
+            <button id="wakeButton" class="composer-icon composer-wake" type="button" hidden aria-label="Turn on wake word" title="Turn on wake word" data-i18n-title="wake.turn_on" data-i18n-aria-label="wake.turn_on">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="headphone"><path d="M14 13h7v2h-7zm2 6h3v2h-3z"/><path d="M14 13h2v8h-2zm5-6h2v12h-2zM3 13h7v2H3zm2 6h3v2H5z"/><path d="M3 7h2v12H3zm5 6h2v8H8zM7 3h10v2H7zM5 5h2v2H5zm12 0h2v2h-2z"/></svg>
+            </button>
+            <button id="liveVoiceButton" class="composer-icon composer-live" type="button" hidden aria-pressed="false" data-i18n-runtime>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="audio-waveform"><path d="M3 7h2v5H3zm4 0h2v13H7zm4-3h2v16h-2zm4 0h2v13h-2zM5 5h2v2H5zm4 15h2v2H9zm4-18h2v2h-2zm4 15h2v2h-2zm2-5h2v5h-2zm2-2h2v2h-2zM1 12h2v2H1z"/></svg>
+            </button>
+            <button id="contextBarButton" class="composer-context-ring" type="button" aria-expanded="false" aria-controls="contextPopover" aria-label="Context window" data-i18n-aria-label="ui.context.window">
+              <span id="contextCompactLabel" hidden>0/∞</span>
+              <span class="context-track" aria-hidden="true"><span id="contextMeterFill"></span></span>
+              <strong id="contextPercentLabel">—</strong>
+            </button>
+            <button id="voiceButton" class="composer-icon composer-mic" type="button" aria-label="Start voice dictation" title="Start voice dictation" data-i18n-title="ui.start.voice.dictation" data-i18n-aria-label="ui.start.voice.dictation">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="mic"><path d="M10 2h4v2h-4zM8 4h2v10H8zm2 10h4v2h-4zm4-10h2v10h-2zM4 10h2v6H4zm2 6h2v2H6zm2 2h8v2H8zm8-2h2v2h-2zm2-6h2v6h-2zm-7 10h2v2h-2z"/></svg>
+            </button>
+            <button id="inlineSendButton" class="composer-icon composer-send" type="submit" aria-label="Send message" title="Send message" data-i18n-title="ui.send.message" data-i18n-aria-label="ui.send.message">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="send"><path d="M4 19h4v2H2v-8h2v6Zm8 0H8v-2h4v2Zm4-2h-4v-2h4v2Zm4-2h-4v-2h4v2Zm-10-2H4v-2h6v2Zm12 0h-2v-2h2v2ZM8 5H4v6H2V3h6v2Zm12 6h-4V9h4v2Zm-4-2h-4V7h4v2Zm-4-2H8V5h4v2Z"/></svg>
+            </button>
+            <button id="stopButton" class="composer-icon composer-stop" type="button" aria-label="Stop Qubit" title="Stop Qubit" hidden data-i18n-title="ui.stop.qubit" data-i18n-aria-label="ui.stop.qubit">■</button>
+            <button id="queueButton" class="composer-icon composer-queue" type="button" aria-label="Queue message" title="Queue message" hidden data-i18n-title="composer.queue_message" data-i18n-aria-label="composer.queue_message">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="bulletlist"><path d="M10 5h12v2H10zm0 4h8v2h-8zm0 4h12v2H10zm0 4h8v2h-8zm-4-6H4V9h2v2ZM4 9H2V7h2v2Zm4 0H6V7h2v2ZM6 7H4V5h2v2Zm-2 6h2v2H4zm0 4h2v2H4zm-2 0v-2h2v2zm4 0v-2h2v2z"/></svg>
+            </button>
+            <button id="steerButton" class="composer-icon composer-steer" type="button" aria-label="Steer the current run" title="Steer the current run" hidden data-i18n-title="ui.steer.the.current.run" data-i18n-aria-label="ui.steer.the.current.run">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="compass"><path d="M18 22H6V20H18V22ZM6 20H4V18H6V20ZM20 20H18V18H20V20ZM10 16H12V18H10V19H8V10H10V16ZM4 18H2V6H4V18ZM22 18H20V6H22V18ZM14 16H12V14H14V16ZM16 14H14V8H12V6H14V5H16V14ZM13 13H11V11H13V13ZM12 10H10V8H12V10ZM6 6H4V4H6V6ZM20 6H18V4H20V6ZM18 4H6V2H18V4Z"/></svg>
+            </button>
+            <section id="attachMenu" class="attach-menu" role="dialog" aria-label="Attach context" hidden data-i18n-aria-label="ui.attach.context">
+              <p class="attach-menu-heading" data-i18n="ui.attach">Attach</p>
+              <button type="button" data-attach="files" data-i18n="ui.files">▧ Files...</button>
+              <button type="button" data-attach="folder" data-i18n="ui.folder">▰ Folder...</button>
+              <button type="button" data-attach="images" data-i18n="ui.images">▧ Images...</button>
+              <button type="button" data-attach="paste-image" data-i18n="ui.paste.image">▣ Paste image</button>
+              <button type="button" data-attach="url" data-i18n="ui.url">↗ URL...</button>
+              <button type="button" data-attach="tab-screenshot" data-i18n="ui.tab.screenshot">▣ Tab screenshot</button>
+              <button type="button" data-attach="pick-element" data-i18n="ui.pick.page.element">◈ Pick page element</button>
+              <button type="button" data-attach="comment-page" id="commentPageAttachButton"><svg class="attach-menu-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="comment-text"><path d="M4 2h16v2H4zm0 14h14v2H4zm2-6h6v2H6zm0-4h12v2H6zM2 4h2v12H2zm18 0h2v18h-2zm-2 14h2v2h-2z"/></svg><span data-i18n="ui.comment.on.page">Comment on page</span></button>
+              <button type="button" data-attach="clear-pick" id="clearPickAttachButton" hidden data-i18n="ui.clear.picked.element">✕ Clear picked element</button>
+              <hr />
+              <button type="button" data-snippet="Summarize the attached context and call out the important takeaways." data-i18n="ui.prompt.snippets">▤ Prompt snippets...</button>
+            </section>
+          </div>
+          <div id="attachmentList" class="attachment-list" hidden></div>
+          <section id="pageAnnotationPanel" class="page-annotation-panel" hidden>
+            <div class="page-annotation-toolbar">
+              <p class="page-annotation-heading" data-i18n="ui.page.comments">Page comments</p>
+              <div class="page-annotation-modes" role="group" data-i18n-aria-label="ui.page.comments" aria-label="Page comments">
+                <button id="pageAnnotationElementButton" type="button" data-i18n="ui.select.element">Element</button>
+                <button id="pageAnnotationAreaButton" type="button" data-i18n="ui.select.area">Area</button>
+                <button id="pageAnnotationCancelButton" type="button" data-i18n="ui.cancel.selection">Cancel selection</button>
+              </div>
+            </div>
+            <p id="pageAnnotationStatus" class="page-annotation-status" aria-live="polite"></p>
+            <section id="pageAnnotationDraft" class="page-annotation-draft" hidden>
+              <p id="pageAnnotationDraftLabel" class="page-annotation-draft-label"></p>
+              <textarea id="pageAnnotationNote" rows="3" data-i18n-placeholder="ui.comment.note.placeholder" placeholder="Write a comment about this target"></textarea>
+              <div class="page-annotation-draft-actions">
+                <button id="pageAnnotationSaveButton" type="button" data-i18n="ui.save.comment">Save comment</button>
+                <button id="pageAnnotationDiscardButton" type="button" data-i18n="ui.discard.comment">Discard</button>
+              </div>
+            </section>
+            <div id="pageAnnotationList" class="page-annotation-list"></div>
+            <div class="page-annotation-actions">
+              <button id="pageAnnotationFlushButton" type="button" data-i18n="ui.add.comments.to.message">Add comments to message</button>
+              <button id="pageAnnotationQueueButton" type="button" data-i18n="ui.queue.comments">Queue comments</button>
+              <button id="pageAnnotationClearButton" type="button" data-i18n="ui.clear.comments">Clear comments</button>
+              <button id="pageAnnotationDoneButton" type="button" data-i18n="ui.done">Done</button>
+            </div>
+          </section>
+          <input id="fileInput" type="file" multiple hidden />
+          <input id="imageInput" type="file" accept="image/*" multiple hidden />
+          <input id="folderInput" type="file" webkitdirectory directory multiple hidden />
+          <section id="queueNotice" class="queue-notice" aria-live="polite" hidden></section>
+          <section id="gatewayQueueNotice" class="queue-notice gateway-queue-notice" aria-live="polite" hidden></section>
+          <section id="runControlRecovery" class="run-control-recovery" aria-live="polite" hidden>
+            <p id="runControlRecoveryDetail"></p>
+            <div>
+              <button id="retryRunStatusButton" type="button" data-i18n="ui.retry">Retry</button>
+              <button id="releaseRunButton" type="button" data-i18n="run.release" hidden>Release</button>
+              <button id="discardHeldQueueButton" type="button" data-i18n="ui.delete">Delete</button>
+            </div>
+          </section>
+          <div class="composer-actions">
+                        <button type="button" id="activeProfileIndicator" class="active-profile-indicator" data-i18n-title="bot_mode.switch_profile" title="Switch profile" hidden aria-haspopup="menu" aria-expanded="false"></button>
+            <button id="botModeThreadsButton" class="secondary bot-mode-threads-button" type="button" hidden aria-haspopup="dialog" aria-expanded="false" title="Threads" aria-label="Threads" data-i18n-title="bot_mode.threads_title" data-i18n-aria-label="bot_mode.threads_title">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="message"><path d="M20 2H4v2h16zm0 14H6v2h14zm2-12h-2v12h2zM4 4H2v18h2zm2 14H4v2h2z"/></svg>
+            </button>
+            <button id="botModeNewThreadButton" class="secondary bot-mode-new-thread-button" type="button" hidden data-i18n-runtime title="Start a new thread in this group" aria-label="Start a new thread in this group">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="message-reply"><path d="M4 18h2v2H4v2H2V4h2v14Zm6 0H6v-2h4v2Zm6-6h4v2h-4v4h-2v-2h-2v-2h-2v-2h2v-2h2V8h2v4Zm6 4h-2v-2h2v2Zm0-6h-2V4h2v6Zm-2-6H4V2h16v2Z"/></svg>
+            </button>
+            <button id="pageCommentTrayButton" class="secondary page-comment-tray-button" type="button" hidden aria-haspopup="dialog" aria-expanded="false" aria-controls="pageCommentTray" data-i18n="ui.page.comments">Comments</button>
+            <section id="pageCommentTray" class="page-comment-tray" hidden>
+              <div id="pageCommentTrayList"></div>
+              <button id="pageCommentTraySend" type="button" data-i18n="ui.send.comments">Send comments</button>
+            </section>
+            <span class="composer-commands">
+              <button id="commandMenuButton" class="composer-commands-button" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="quickMoreMenu" aria-label="Open quick commands" title="Open quick commands" data-i18n-title="ui.open.quick.commands" data-i18n-aria-label="ui.open.quick.commands"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="terminal"><path d="M4 2h16v2H4zm0 18h16v2H4zM2 4h2v16H2zm18 0h2v16h-2zM6 16h2v2H6zm2-2h2v2H8zm-2-2h2v2H6z"/></svg></button>
+            </span>
+            <button id="browserControlMenuButton" class="secondary browser-control-launcher" type="button" hidden aria-haspopup="dialog" aria-expanded="false" aria-controls="browserControlDialog" title="Qubit Control" aria-label="Qubit Control" data-i18n-runtime data-i18n-title="browser_control.kicker" data-i18n-aria-label="browser_control.kicker">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="pointer"><path d="M17 9h2v3h-2zm-4-2h2v4h-2zM9 3h2v8H9zM5 3h2v10H5zm14 6h2v2h-2zm-4-2h2v2h-2zm-4 0h2v2h-2zM7 1h2v2H7zM3 11h2v2H3zm-2 2h2v2H1zm0 2h2v2H1zm2 2h2v2H3zm2 2h2v2H5zm2 2h12v2H7zm12-2h2v2h-2zm2-8h2v8h-2zM5 13h2v2H5zm2 2h2v2H7z"/></svg>
+              <span class="browser-control-launcher-indicator" aria-hidden="true"></span>
+            </button>
+            <button id="sendButton" type="submit" data-i18n="ui.ask.qubit">Ask Qubit</button>
+          </div>
+        </form>
+
+
+
+        <section id="modelMenu" class="model-menu" role="dialog" aria-label="Choose Qubit model" hidden data-i18n-aria-label="ui.choose.qubit.model">
+          <header class="model-menu-head">
+            <strong id="modelMenuTitle">Choose Assist model</strong>
+            <button id="modelMenuCloseButton" type="button" aria-label="Close model picker" data-i18n-aria-label="ui.close.model.picker">×</button>
+          </header>
+          <input id="modelSearchInput" type="search" placeholder="Search all models" autocomplete="off" data-i18n-placeholder="ui.search.all.models" />
+          <div id="modelProviderList" class="model-provider-list" aria-label="Model providers" data-i18n-aria-label="ui.model.providers"></div>
+          <div id="modelMenuList" class="model-menu-list"></div>
+          <section id="modelOptionsList" class="model-options-list" aria-label="Model runtime options" data-i18n-aria-label="ui.model.runtime.options"></section>
+          <footer>
+            <button id="refreshModelsButton" class="secondary" type="button" title="Refresh model catalog" aria-busy="false" data-i18n-title="ui.refresh.model.catalog" data-i18n-runtime>↻ Refresh Models</button>
+            <button id="editModelsButton" class="secondary" type="button" data-i18n="ui.edit.models">⚙ Edit Models...</button>
+          </footer>
+          <p id="modelRefreshStatus" class="model-refresh-status" role="status" aria-live="polite" hidden></p>
+        </section>
+
+        <section id="contextPopover" class="context-popover" role="dialog" aria-label="Context window details" hidden data-i18n-aria-label="ui.context.window.details">
+          <header>
+            <span data-i18n="ui.context.window">CONTEXT WINDOW</span>
+            <button id="contextRefreshButton" class="context-refresh-button" type="button" aria-label="Refresh context" title="Refresh context" data-i18n-runtime>
+              <svg class="refresh-glyph" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="refresh"><path d="M13 20H9V18H13V20ZM19 16H21V18H19V20H17V18H15V16H17V8H19V16ZM9 18H7V16H9V18ZM7 6H9V8H7V16H5V8H3V6H5V4H7V6ZM15 16H13V14H15V16ZM23 16H21V14H23V16ZM3 10H1V8H3V10ZM11 10H9V8H11V10ZM17 8H15V6H17V8ZM15 6H11V4H15V6Z"/></svg>
+            </button>
+          </header>
+          <div id="contextUsageCard" class="context-usage-card" data-compact="true" data-i18n-runtime></div>
+          <div id="contextControlRow" class="context-control-row">
+            <span id="contextControlStatus" role="status">Native context controls unavailable.</span>
+            <div class="context-control-actions">
+              <button id="contextPageRefreshButton" class="secondary context-compact-button context-page-refresh-button" type="button" title="Refresh page context" aria-label="Refresh page context" data-i18n-runtime><svg class="refresh-glyph" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="refresh"><path d="M13 20H9V18H13V20ZM19 16H21V18H19V20H17V18H15V16H17V8H19V16ZM9 18H7V16H9V18ZM7 6H9V8H7V16H5V8H3V6H5V4H7V6ZM15 16H13V14H15V16ZM23 16H21V14H23V16ZM3 10H1V8H3V10ZM11 10H9V8H11V10ZM17 8H15V6H17V8ZM15 6H11V4H15V6Z"/></svg>Refresh</button>
+              <button id="contextCompactButton" class="secondary context-compact-button" type="button" aria-describedby="contextControlStatus" disabled>Compact context</button>
+            </div>
+          </div>
+        </section>
+      </footer>
+      <section id="skillMenu" class="skill-menu" role="listbox" aria-label="Qubit skill suggestions" hidden data-i18n-aria-label="ui.qubit.skill.suggestions"></section>
+      <section id="quickMoreMenu" class="quick-more-menu" hidden role="menu" aria-label="Quick commands" data-i18n-aria-label="ui.quick.commands"></section>
+      <section id="profileSwitchMenu" class="profile-switch-menu" hidden role="menu" data-i18n-aria-label="bot_mode.switch_profile" aria-label="Switch profile"></section>
+      <div id="roomMemberPopover" class="room-member-popover" role="dialog" aria-modal="false" aria-labelledby="roomMemberPopoverTitle" hidden>
+        <div class="room-member-popover-card">
+          <strong id="roomMemberPopoverTitle" class="room-member-popover-title" data-i18n="ui.room.bots.title">Bots in this room</strong>
+          <div id="roomMemberPopoverList" class="room-member-popover-list" role="list"></div>
+          <p class="room-member-popover-note" data-i18n="ui.room.model.note">Model changes apply to this room only.</p>
+        </div>
+      </div>
+    </main>
+
+    <section id="settingsDialog" class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" hidden>
+      <form id="settingsForm">
+        <header>
+          <div>
+            <h2 id="settingsTitle" data-i18n="ui.settings">Settings</h2>
+          </div>
+          <div class="settings-header-actions">
+            <button id="saveSettingsTopButton" class="settings-button" type="submit" title="Save settings" data-i18n-title="ui.save.settings" data-i18n="ui.save">Save</button>
+            <button id="testConnectionButton" class="settings-connection-test secondary" type="button" aria-busy="false" data-signal="none" title="Test the current Qubit connection" data-i18n-title="ui.test.the.current.qubit.connection">
+              <svg class="settings-connection-test-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="cellular-signal-3"><path d="M4 14h2v4H4zm7-4h2v8h-2zm7-6h2v14h-2zM2 16h2v3H2zm7-4h2v6H9zm7-6h2v12h-2zM6 14h2v5H6zm7-4h2v8h-2zm7-6h2v14h-2z"/><path d="M2 18h6v2H2zm7 0h6v2H9zm7 0h6v2h-6z"/></svg>
+              <span class="settings-connection-test-label sr-only" data-i18n="ui.test.984816fd">TEST</span>
+            </button>
+            <button id="closeSettingsButton" class="settings-button settings-close-icon" type="button" aria-label="Close settings" title="Close settings" data-i18n-aria-label="ui.close.settings" data-i18n-title="ui.close.settings">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="close"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg>
+            </button>
+          </div>
+          <p id="settingsSaveStatus" class="settings-save-status" role="status" aria-live="polite" data-i18n-runtime></p>
+        </header>
+
+        <section class="settings-section release-settings browser-release-card" aria-labelledby="releaseTitle">
+          <div class="release-sidecar" aria-label="Qubit Browser local sidecar" data-i18n-aria-label="ui.qubit.browser.local.sidecar">
+            <div class="release-sidecar-copy">
+              <p class="eyebrow" data-i18n="ui.local.sidecar.chrome.panel">LOCAL SIDECAR / CHROME PANEL</p>
+              <svg class="release-sidecar-wordmark release-sidecar-wordmark-ltr" viewBox="0 0 2918.77 1206.98" role="img" aria-label="Qubit Browser" data-i18n-aria-label="ui.qubit.browser">
+                <use href="assets/img/qubit-browser-logo-left.svg#Layer_1"></use>
+              </svg>
+              <svg class="release-sidecar-wordmark release-sidecar-wordmark-rtl" viewBox="0 0 2918.77 1206.98" role="img" aria-label="Qubit Browser" data-i18n-aria-label="ui.qubit.browser">
+                <use href="assets/img/qubit-browser-logo-right.svg#Layer_1"></use>
+              </svg>
+              <p data-i18n="ui.ask.about.any.page.qubit.sees.the.active.tab.selected.text.pag.b2a32c39">Ask about any page. Qubit sees the active tab, selected text, page context, and open tabs.</p>
+            </div>
+            <img class="release-sidecar-badge" src="assets/img/qubit-badge.webp" alt="Qubit badge" data-i18n-alt="ui.qubit.agent.badge" />
+          </div>
+          <div class="release-control">
+            <div class="release-row">
+              <div>
+                <h3 id="releaseTitle" data-i18n="ui.browser.updates">Extension updates</h3>
+                <p><span id="versionLabel" data-i18n-runtime data-i18n="ui.version.loading">version loading…</span> <span data-i18n="settings.public_alpha_load_unpacked">· public alpha / load unpacked</span></p>
+              </div>
+              <div class="release-actions">
+                <button id="checkUpdatesButton" class="secondary" type="button" data-i18n="ui.check">Check</button>
+                <button id="reviewUpdateButton" type="button" data-i18n="ui.update">Update</button>
+              </div>
+            </div>
+            <p id="updateStatus" class="hint">Updates are checked against the public GitHub repo.</p>
+            <div id="updateReloadPending" class="update-reload-pending" hidden>
+              <p id="updateReloadPendingText" class="update-reload-pending-text">A newer build is on disk. Reload to run it.</p>
+              <button id="reloadBuildButton" class="secondary" type="button">Reload now</button>
+            </div>
+          </div>
+        </section>
+        <nav id="settingsCategoryHome" class="settings-category-home" aria-labelledby="settingsCategoryHomeTitle">
+          <div class="settings-section-head compact"><div><h4 id="settingsCategoryHomeTitle" data-i18n="settings.categories.home_title">Choose a category</h4><p data-i18n="settings.categories.home_copy">Everything the Qubit Browser Extension can do, grouped by what it is for.</p></div></div>
+          <div class="settings-category-grid">
+            <button type="button" class="settings-category-card" data-settings-category="appearance" aria-describedby="settingsCategorySummary-appearance">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="brush"><path d="M7 2h10v2H7zM5 4h2v10H5zm12-2h2v12h-2z"/><path d="M13 2h2v6h-2zM9 2h2v4H9zm-4 8h14v2H5zm2 4h10v2H7zm2 2h2v4H9zm4 0h2v4h-2zm-4 4h6v2H9z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.appearance.title">Appearance &amp; Themes</strong><small id="settingsCategorySummary-appearance" data-i18n="settings.categories.appearance.summary">Colors, fonts, text size and background art.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="connections" aria-describedby="settingsCategorySummary-connections">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="link"><path d="M4 6h7v2H4zm0 10h7v2H4zM2 8h2v8H2zm18-2h-7v2h7zm0 10h-7v2h7zm2-8h-2v8h2zM7 11h10v2H7z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.connections.title">Connections</strong><small id="settingsCategorySummary-connections" data-i18n="settings.categories.connections.summary">Gateway, agent profile and how this browser reaches Qubit.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="agents" aria-describedby="settingsCategorySummary-agents">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="robot"><path d="M5 7h14v2H5zm0 12h14v2H5zM3 9h2v10H3zm16 0h2v10h-2zM1 13h2v2H1zm20 0h2v2h-2zM11 5h2v2h-2zM7 3h4v2H7zm1 9h2v4H8zm6 0h2v4h-2z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.agents.title">Agents &amp; Bot Mode</strong><small id="settingsCategorySummary-agents" data-i18n="settings.categories.agents.summary">Agent roster, Bot Chats and scheduled jobs.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="models" aria-describedby="settingsCategorySummary-models">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="cpu"><path d="M5 3h14v2H5zm0 16h14v2H5zM3 5h2v14H3zm16 0h2v14h-2zM9 7h6v2H9zm0 8h6v2H9zM7 9h2v6H7zm8 0h2v6h-2zm-4-8h2v2h-2zm0 20h2v2h-2zM1 11h2v2H1zm20 0h2v2h-2zm0-4h2v2h-2zm0 8h2v2h-2zM1 15h2v2H1zm0-8h2v2H1zm6-6h2v2H7zm8 0h2v2h-2zm0 20h2v2h-2zm-8 0h2v2H7z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.models.title">Models &amp; Runtime</strong><small id="settingsCategorySummary-models" data-i18n="settings.categories.models.summary">Which model answers, plus catalog refresh.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="sessions" aria-describedby="settingsCategorySummary-sessions">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="book-open"><path d="M2 3h9v2H2zM0 19h11v2H0zM13 3h9v2h-9zm0 16h11v2H13zM11 5h2v18h-2zM0 5h2v14H0zm22 0h2v14h-2zm-7 2h5v2h-5zm0 4h5v2h-5zm0 4h2v2h-2z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.sessions.title">Sessions &amp; Context</strong><small id="settingsCategorySummary-sessions" data-i18n="settings.categories.sessions.summary">Session names, page context and where the panel opens.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="permissions" aria-describedby="settingsCategorySummary-permissions">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="shield"><path d="M4 2h16v2H4zM2 4h2v10H2zm18 0h2v10h-2zM4 14h2v2H4zm2 2h2v2H6zm4 4h4v2h-4zm10-6h-2v2h2zm-2 2h-2v2h2zm-2 2h-2v2h2zm-6 0H8v2h2z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.permissions.title">Permissions &amp; Control</strong><small id="settingsCategorySummary-permissions" data-i18n="settings.categories.permissions.summary">Qubit Control, tab scope and page-sharing approval.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="assist" aria-describedby="settingsCategorySummary-assist">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="magic-edit"><path d="M16 2h4v2h-4zm2 2h2v2h-2zm-2 2h2v2h-2zm-2 2h2v2h-2zm-2 2h2v2h-2zm-2 2h2v2h-2zm-2 2h2v2H8zm-2 2h2v2H6zm-2 2h2v2H4zm-2-2h2v4H2zm2-2h2v2H4zm2-2h2v2H6zm2-2h2v2H8zm2-2h2v2h-2zm2-2h2v2h-2zm2-2h2v2h-2zm0 2h2v2h-2zm2-2h2v2h-2zm0 8h2v2h-2zm0 8h2v2h-2zm-4-4h2v2h-2zm8 0h2v2h-2zm-6-2h2v2h-2zm4 0h2v2h-2zm0 4h2v2h-2zm-4 0h2v2h-2zM4 2h2v2H4zM2 4h2v2H2zm2 2h2v2H4zm2-2h2v2H6zm14 6h2v2h-2zM8 20h2v2H8z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.assist.title">Assist &amp; Actions</strong><small id="settingsCategorySummary-assist" data-i18n="settings.categories.assist.summary">Inline Assist and the right-click actions.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="voice" aria-describedby="settingsCategorySummary-voice">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="mic"><path d="M10 2h4v2h-4zM8 4h2v10H8zm2 10h4v2h-4zm4-10h2v10h-2zM4 10h2v6H4zm2 6h2v2H6zm2 2h8v2H8zm8-2h2v2h-2zm2-6h2v6h-2zm-7 10h2v2h-2z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.voice.title">Voice &amp; Wake</strong><small id="settingsCategorySummary-voice" data-i18n="settings.categories.voice.summary">Wake word and spoken replies.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+            <button type="button" class="settings-category-card" data-settings-category="about" aria-describedby="settingsCategorySummary-about">
+              <span class="settings-category-icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="circle-info"><path d="M18 22H6V20H18V22ZM6 20H4V18H6V20ZM20 20H18V18H20V20ZM4 18H2V6H4V18ZM22 18H20V6H22V18ZM13 17H11V11H13V17ZM13 9H11V7H13V9ZM6 6H4V4H6V6ZM20 6H18V4H20V6ZM18 4H6V2H18V4Z"/></svg></span>
+              <span class="settings-category-copy"><strong data-i18n="settings.categories.about.title">About &amp; Diagnostics</strong><small id="settingsCategorySummary-about" data-i18n="settings.categories.about.summary">Compatibility, token safety and support reports.</small></span>
+              <span class="settings-category-edited" hidden data-i18n="settings.categories.edited">Edited</span>
+            </button>
+          </div>
+          <span class="nous-strip nous-strip-home" role="img" aria-label="Nous Research" data-i18n-invariant></span>
+        </nav>
+
+        <section id="settingsPane-appearance" class="settings-pane" data-settings-pane="appearance" data-settings-live aria-labelledby="settingsPaneTitle-appearance" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-appearance" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.appearance.title">Appearance &amp; Themes</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+        <section class="settings-section appearance-settings" aria-labelledby="appearanceTitle">
+          <div class="settings-section-head">
+            <div>
+              <h3 id="appearanceTitle" data-i18n="ui.appearance">Appearance</h3>
+              <p data-i18n="ui.mode.controls.brightness.theme.controls.the.accent.palette.and.0d9c3d47">Mode controls brightness. Theme controls the accent palette and chat surface styling.</p>
+            </div>
+          </div>
+
+          <div class="appearance-control-stack text-zoom-setting">
+            <div>
+              <strong data-i18n="appearance.text_zoom">Text zoom</strong>
+              <span data-i18n="ui.adjust.extension.text.without.changing.browser.zoom">Adjust text across the extension without changing browser zoom.</span>
+            </div>
+            <div id="textZoomPresetGrid" class="text-zoom-preset-grid" role="radiogroup" aria-label="Text zoom" data-i18n-aria-label="appearance.text_zoom">
+              <button type="button" data-text-zoom-percent="90" role="radio" aria-checked="false">90%</button>
+              <button type="button" data-text-zoom-percent="100" role="radio" aria-checked="true">100%</button>
+              <button type="button" data-text-zoom-percent="110" role="radio" aria-checked="false">110%</button>
+              <button type="button" data-text-zoom-percent="125" role="radio" aria-checked="false">125%</button>
+              <button type="button" data-text-zoom-percent="150" role="radio" aria-checked="false">150%</button>
+              <button type="button" data-text-zoom-percent="175" role="radio" aria-checked="false">175%</button>
+            </div>
+            <div class="text-zoom-stepper">
+              <button id="textZoomDecreaseButton" type="button" aria-label="Decrease text zoom" data-i18n-aria-label="appearance.decrease_text_zoom">−</button>
+              <label class="text-zoom-input-wrap" for="textZoomInput">
+                <span class="sr-only" data-i18n="appearance.custom_percentage">Custom percentage</span>
+                <input id="textZoomInput" type="number" min="75" max="200" step="1" inputmode="numeric" value="100" aria-label="Custom percentage" data-i18n-aria-label="appearance.custom_percentage" />
+                <span aria-hidden="true">%</span>
+              </label>
+              <button id="textZoomIncreaseButton" type="button" aria-label="Increase text zoom" data-i18n-aria-label="appearance.increase_text_zoom">+</button>
+            </div>
+          </div>
+
+          <div class="appearance-control-stack language-setting">
+            <label for="languageSelect">
+              <strong data-i18n="settings.language.label">Language</strong>
+              <span data-i18n="settings.language.description">Choose the interface language.</span>
+            </label>
+            <select id="languageSelect" class="language-select" data-language-select data-i18n-aria-label="settings.language.label" aria-label="Language">
+              <option value="en">English</option>
+              <option value="zh-CN">简体中文</option>
+            </select>
+          </div>
+
+          <div class="appearance-control-stack font-profile-setting">
+            <label for="fontProfileSelect">
+              <strong data-i18n="appearance.font_family">Font family</strong>
+            </label>
+            <select id="fontProfileSelect" aria-label="Font family" data-i18n-aria-label="appearance.font_family">
+              <option value="signature" data-i18n="appearance.font_signature">Qubit signature</option>
+              <option value="collapse" data-i18n="appearance.font_collapse">Qubit Legacy</option>
+              <option value="system-sans" data-i18n="appearance.font_system_sans">System sans</option>
+              <option value="times-new-roman" data-i18n="appearance.font_times">Times New Roman</option>
+              <option value="georgia" data-i18n="appearance.font_georgia">Georgia</option>
+              <option value="palatino" data-i18n="appearance.font_palatino">Palatino</option>
+              <option value="garamond" data-i18n="appearance.font_garamond">Garamond</option>
+              <option value="cambria" data-i18n="appearance.font_cambria">Cambria</option>
+              <option value="calibri" data-i18n="appearance.font_calibri">Calibri</option>
+              <option value="trebuchet" data-i18n="appearance.font_trebuchet">Trebuchet MS</option>
+              <option value="high-legibility" data-i18n="appearance.font_high_legibility">High legibility</option>
+              <option value="montserrat" data-i18n="appearance.font_montserrat">Montserrat</option>
+              <option value="source-sans-3" data-i18n="appearance.font_source_sans">Source Sans 3</option>
+              <option value="ibm-plex-sans" data-i18n="appearance.font_ibm_plex">IBM Plex Sans</option>
+              <option value="outfit" data-i18n="appearance.font_outfit">Outfit</option>
+              <option value="space-grotesk" data-i18n="appearance.font_space_grotesk">Space Grotesk</option>
+              <option value="playfair-display" data-i18n="appearance.font_playfair">Playfair Display</option>
+              <option value="libre-baskerville" data-i18n="appearance.font_libre_baskerville">Libre Baskerville</option>
+              <option value="fraunces" data-i18n="appearance.font_fraunces">Fraunces</option>
+              <option value="cinzel" data-i18n="appearance.font_cinzel">Cinzel</option>
+              <option value="mono" data-i18n="appearance.font_monospace">Monospace</option>
+              <option value="custom-local" data-i18n="appearance.font_installed_local">Installed local font</option>
+            </select>
+            <label id="customFontFamilyField" class="custom-font-family-field" for="customFontFamilyInput" hidden>
+              <strong data-i18n="appearance.local_font_family_name">Local font family name</strong>
+              <span data-i18n="appearance.local_font_fallback">The browser uses a fallback when the local font family is unavailable.</span>
+              <input id="customFontFamilyInput" type="text" maxlength="80" autocomplete="off" placeholder="Atkinson Hyperlegible" data-i18n-invariant />
+            </label>
+            <p id="signatureFontFallbackNote" class="appearance-signature-font-fallback-note" data-i18n="appearance.font_fallback_note" hidden>Rules signature font did not load — showing the bundled fallback face.</p>
+            <p id="appearanceSaveStatus" class="appearance-save-status" role="status" aria-live="polite"></p>
+          </div>
+
+          <div class="theme-setting">
+            <strong data-i18n="ui.theme">Theme</strong>
+            <span data-i18n="ui.same.desktop.palettes.minus.window.transparency">Choose a color palette for your workspace.</span>
+            <div class="segmented-control mode-switch" role="radiogroup" aria-label="Color mode" data-i18n-aria-label="ui.color.mode.588a2981">
+              <button class="mode-choice" type="button" data-color-mode="light" role="radio" aria-checked="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="sun"><path d="M13 22h-2v-3h2v3Zm-6-3H5v-2h2v2Zm12 0h-2v-2h2v2Zm-4-2H9v-2h6v2Zm-6-2H7V9h2v6Zm8 0h-2V9h2v6ZM5 13H2v-2h3v2Zm17 0h-3v-2h3v2Zm-7-4H9V7h6v2ZM7 7H5V5h2v2Zm12 0h-2V5h2v2Zm-6-2h-2V2h2v3Z"/></svg><span data-i18n="settings.mode.light">Light</span></button>
+              <button class="mode-choice" type="button" data-color-mode="dark" role="radio" aria-checked="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="moon"><path d="M18 22H8v-2h10v2ZM8 20H6v-2h2v2Zm12 0h-2v-2h2v2ZM6 18H4v-2h2v2Zm16 0h-2v-4h-2v-2h2v-2h2v8ZM4 16H2V6h2v10Zm14 0h-6v-2h6v2Zm-6-2h-2v-2h2v2Zm-2-2H8V6h2v6ZM6 6H4V4h2v2Zm8-2h-2v2h-2V4H6V2h8v2Z"/></svg><span data-i18n="settings.mode.dark">Dark</span></button>
+              <button class="mode-choice" type="button" data-color-mode="system" role="radio" aria-checked="false"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="monitor"><path d="M4 2h16v2H4zm0 14h16v2H4zM2 4h2v12H2zm18 0h2v12h-2zm-9 14h2v2h-2zm-3 2h8v2H8z"/></svg><span data-i18n="settings.mode.system">System</span></button>
+            </div>
+            <div id="themeGrid" class="theme-grid" role="radiogroup" aria-label="Theme" data-i18n-aria-label="ui.theme"></div>
+
+            <details id="customThemeManager" class="custom-theme-manager">
+              <summary class="custom-theme-summary" aria-describedby="customThemeHelp">
+                <span class="custom-theme-title"><span data-i18n="custom_theme.custom_themes">Custom themes</span><span class="help-dot" aria-hidden="true">?</span></span>
+                <span id="customThemeHelp" class="help-tip" role="tooltip" data-i18n="settings.custom_theme_help">Add more themes: browse VS Code themes, import a theme file, or have an agent design one. Installed themes appear in the grid above.</span>
+                <span class="custom-theme-summary-meta" data-i18n="custom_theme.user_installed">User-installed</span>
+              </summary>
+              <div class="custom-theme-manager-body">
+                <section class="marketplace-theme-browser" aria-labelledby="marketplaceThemeTitle">
+                  <div class="marketplace-theme-head"><div><strong id="marketplaceThemeTitle" data-i18n="marketplace.browse">Browse VS Code themes</strong><span data-i18n="marketplace.local_import_available">Local import remains available</span></div><span id="marketplaceThemeMode" data-i18n="marketplace.most_installed">Most installed</span></div>
+                  <label class="marketplace-theme-search" for="marketplaceThemeSearchInput"><span class="sr-only" data-i18n="marketplace.search">Search themes</span><input id="marketplaceThemeSearchInput" type="search" autocomplete="off" placeholder="Search themes" data-i18n-placeholder="marketplace.search" /><button id="marketplaceThemeSearchButton" type="button" data-i18n="marketplace.search">Search themes</button></label>
+                  <p id="marketplaceThemeStatus" class="appearance-save-status marketplace-theme-status" role="status" aria-live="polite"></p>
+                  <div id="marketplaceThemeResults" class="marketplace-theme-results" aria-live="polite"></div>
+                </section>
+                <div class="custom-theme-local-divider"><span data-i18n="agent_theme.create_your_own">Create your own</span></div>
+                <section class="agent-theme-studio" aria-labelledby="agentThemeTitle">
+                  <div class="agent-theme-head">
+                    <strong id="agentThemeTitle" data-i18n="agent_theme.create_with_qubit">Create with Qubit</strong>
+                    <span data-i18n="agent_theme.safe_semantic_tokens">Safe semantic tokens</span>
+                  </div>
+                  <div class="agent-theme-compose">
+                    <label class="sr-only" for="agentThemeDescription" data-i18n="agent_theme.describe">Describe your theme</label>
+                    <input id="agentThemeDescription" type="text" maxlength="300" autocomplete="off" placeholder="Matrix terminal, Spider-Man, retro Windows…" data-i18n-placeholder="agent_theme.placeholder" />
+                    <button id="agentThemeCreateButton" type="button" data-i18n="agent_theme.ask_qubit">Ask Qubit</button>
+                  </div>
+                  <p data-i18n="agent_theme.description">Qubit generates and applies a validated theme using the same appearance contract as the built-in themes.</p>
+                  <p id="agentThemeStatus" class="appearance-save-status agent-theme-status" role="status" aria-live="polite"></p>
+                </section>
+                <div class="custom-theme-local-divider"><span data-i18n="custom_theme.paste_theme_json">Paste theme JSON</span></div>
+                <label class="custom-theme-json-field" for="customThemeImportTextarea">
+                  <strong data-i18n="custom_theme.paste_theme_json">Paste theme JSON</strong>
+                  <span data-i18n="custom_theme.import_description">Import semantic colors only. CSS, URLs, and remote fonts are not accepted.</span>
+                  <textarea id="customThemeImportTextarea" rows="8" spellcheck="false" autocomplete="off" placeholder="{&#10;  &quot;schemaVersion&quot;: 1,&#10;  &quot;name&quot;: &quot;My theme&quot;&#10;}" data-i18n-invariant></textarea>
+                </label>
+                <div class="custom-theme-import-actions">
+                  <label class="custom-theme-file-control" for="customThemeFileInput">
+                    <span data-i18n="custom_theme.choose_theme_file">Choose theme file</span>
+                    <input id="customThemeFileInput" type="file" accept=".json,application/json" />
+                  </label>
+                  <button id="customThemePreviewButton" type="button" data-i18n="custom_theme.preview_theme">Preview theme</button>
+                </div>
+                <section id="customThemePreview" class="custom-theme-preview-card" aria-label="Theme preview" data-i18n-aria-label="custom_theme.preview_theme" hidden></section>
+                <div class="custom-theme-install-row">
+                  <button id="customThemeInstallButton" type="button" disabled data-i18n="custom_theme.install_theme">Install theme</button>
+                  <button id="customThemeResetButton" type="button" class="danger-action" hidden data-i18n="custom_theme.reset_storage">Reset custom theme storage</button>
+                </div>
+                <p id="customThemeImportStatus" class="appearance-save-status custom-theme-status" role="status" aria-live="polite"></p>
+              </div>
+            </details>
+          </div>
+
+          <div class="presentation-setting response-style-setting">
+            <strong data-i18n="responses.style.label">Response style</strong>
+            <span data-i18n="responses.style.description">How Qubit draws its replies.</span>
+            <div id="responseStyleChoices" class="presentation-choices" role="radiogroup" aria-label="Response style" data-i18n-aria-label="responses.style.label"></div>
+          </div>
+
+          <div class="presentation-setting chat-layout-setting">
+            <strong data-i18n="responses.layout.label">Chat layout</strong>
+            <span data-i18n="responses.layout.description">Where messages sit in the chat.</span>
+            <div id="messageLayoutChoices" class="presentation-choices" role="radiogroup" aria-label="Chat layout" data-i18n-aria-label="responses.layout.label"></div>
+          </div>
+
+          <button id="rerunOnboardingButton" class="settings-setup-row" type="button">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="reload"><path d="M16 4h2v6h-2zm-2-2h2v2h-2zm0 2h2v8h-2zM4 8H2v5h2z"/><path d="M4 6h16v2H4zm4 14H6v-6h2zm2 2H8v-2h2zm0-2H8v-8h2zm10-4h2v-5h-2z"/><path d="M20 18H4v-2h16z"/></svg>
+            <span class="settings-setup-copy"><strong data-i18n="responses.setup_again">Run first-time setup again</strong><small data-i18n="responses.setup_again_description">Step through theme, response style and chat layout again.</small></span>
+          </button>
+        </section>
+        </section>
+
+        <section id="settingsPane-connections" class="settings-pane" data-settings-pane="connections" aria-labelledby="settingsPaneTitle-connections" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-connections" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.connections.title">Connections</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+        <section class="settings-section connection-settings" aria-labelledby="connectionTitle">
+          <div class="settings-section-head">
+            <div>
+              <h3 id="connectionTitle" data-i18n="ui.gateway.connection">Gateway Connection</h3>
+              <p data-i18n="ui.choose.where.this.browser.session.reaches.qubit">Choose where the extension reaches Qubit.</p>
+            </div>
+          </div>
+
+        <div class="gateway-mode" role="radiogroup" aria-label="Connection mode" data-i18n-aria-label="ui.connection.mode">
+          <button class="conn-mode-card" type="button" data-connection-mode="local" role="radio" aria-checked="true">
+            <span class="conn-mode-head"><span class="conn-mode-title" data-i18n="ui.local.gateway">Local gateway</span><span class="conn-mode-check" aria-hidden="true"></span></span>
+            <span class="conn-mode-desc" data-i18n="ui.qubit.on.this.machine.default.and.offline.capable">Qubit on this machine. Default and offline-capable.</span>
+          </button>
+          <button class="conn-mode-card" type="button" data-connection-mode="cloud" role="radio" aria-checked="false">
+            <span class="conn-mode-head"><span class="conn-mode-title" data-i18n="ui.qubit.cloud.preview">Qubit Cloud Preview</span><span class="conn-mode-check" aria-hidden="true"></span></span>
+            <span class="conn-mode-desc" data-i18n="ui.attach.the.active.signed.in.qubit.cloud.agent.tab.with.a.one.use.ticket">Attach the active signed-in Qubit Cloud agent tab with a one-use ticket.</span>
+          </button>
+          <button class="conn-mode-card" type="button" data-connection-mode="remote" role="radio" aria-checked="false">
+            <span class="conn-mode-head"><span class="conn-mode-title" data-i18n="ui.remote.gateway">Remote gateway</span><span class="conn-mode-check" aria-hidden="true"></span></span>
+            <span class="conn-mode-desc" data-i18n="ui.self.hosted.api.or.dashboard.api.can.use.trusted.lan.http.dashb.152b7f4c">Self-hosted API or dashboard. API can use trusted LAN http; dashboard uses https.</span>
+          </button>
+          <select id="connectionModeInput" name="connectionMode" hidden>
+            <option value="local" data-i18n="ui.local.gateway">Local gateway</option>
+            <option value="cloud" data-i18n="ui.qubit.cloud">Qubit Cloud</option>
+            <option value="remote" data-i18n="ui.remote.gateway">Remote gateway</option>
+          </select>
+          <select id="gatewayModeInput" data-settings-live name="gatewayMode" hidden>
+            <option value="local-api" data-i18n="ui.local.api.server">Local API server</option>
+            <option value="remote-api" data-i18n="ui.remote.api.server">Remote API server</option>
+            <option value="remote-dashboard" data-i18n="ui.remote.dashboard.websocket">Remote dashboard (WebSocket)</option>
+          </select>
+        </div>
+
+        <label id="gatewayUrlField">
+          <span data-i18n="ui.gateway.url">Gateway URL</span>
+          <input id="gatewayUrlInput" name="gatewayUrl" type="url" placeholder="http://127.0.0.1:8642" />
+        </label>
+        <p id="cloudPreviewHelp" class="hint" hidden data-i18n="ui.open.the.signed.in.qubit.cloud.agent.in.the.active.tab.wait.fo.b7be52ec">Open the signed-in Qubit Cloud agent in the active tab, wait for it to finish loading, then choose Connect to Qubit. No API token or localhost fallback is used.</p>
+        <p id="gatewayHelp" class="hint">Local setup: keep Qubit Gateway/API Server running on this machine.</p>
+
+        <label id="apiKeyField">
+          <span data-i18n="ui.api.key.browser.token">API key / browser token</span>
+          <input id="apiKeyInput" name="apiKey" type="password" autocomplete="off" placeholder="API key (blank = dashboard)" data-i18n-placeholder="ui.api.key.blank.dashboard" />
+        </label>
+
+        <p class="hint connection-flow-note" data-i18n="ui.public.flow.connect.to.qubit.creates.a.scoped.browser.token.wh.9184ad4d">Public flow: Connect to Qubit creates a scoped browser token when the API server supports pairing. For remote hosts, set API_SERVER_CORS_ORIGINS to this extension origin and use a strong API_SERVER_KEY or scoped token.</p>
+
+        <label id="qubitWebAddressField">
+          <span data-i18n="webapp.setting_label">Qubit Web address</span>
+          <input id="qubitWebAddressInput" name="qubitWebAddress" type="url" autocomplete="off" spellcheck="false" placeholder="http://127.0.0.1:9120" data-i18n-invariant />
+        </label>
+        <p id="qubitWebAddressHint" class="hint" data-i18n="webapp.setting_hint">Leave this empty on a local connection to use http://127.0.0.1:9120 automatically. For a remote gateway, enter the address where it serves Qubit Web.</p>
+
+        <label class="settings-toggle-card" id="webappKeepSignedInField">
+          <span class="settings-toggle-copy">
+            <strong data-i18n="webapp.keep_signed_in_label">Keep Qubit Web signed in from the panel</strong>
+            <small data-i18n="webapp.keep_signed_in_hint">On a Qubit that pairs with the Qubit Browser Extension, Qubit Web, Projects and bot profiles are signed in for you, with nothing to run. Otherwise the panel keeps this browser's Qubit Web sign-in until you close the browser, after one qubit webapp. qubit webapp --sign-out ends it.</small>
+          </span>
+          <input id="webappKeepSignedInInput" class="settings-switch-input" type="checkbox" />
+          <span class="settings-switch" aria-hidden="true"></span>
+        </label>
+
+        <div class="settings-toggle-card qubit-account-row" id="hermesAccountRow" hidden>
+          <span class="settings-toggle-copy">
+            <strong data-i18n="account.label">Qubit account</strong>
+            <small id="hermesAccountStatus" role="status" aria-live="polite" data-i18n-runtime>Checking whether this gateway takes a Qubit account sign-in.</small>
+            <small data-i18n="account.hint">The same sign-in the Qubit phone app uses. It opens Projects, Session authority, Context compaction and the full bot roster on a gateway that asks for sign-in, with nothing to run. Sign out forgets it on this browser.</small>
+          </span>
+          <span class="qubit-account-actions">
+            <button id="hermesAccountSignIn" class="secondary" type="button" hidden data-i18n="account.sign_in">Sign in with your Qubit account</button>
+            <button id="hermesAccountSignOut" class="secondary" type="button" hidden data-i18n="account.sign_out">Sign out</button>
+          </span>
+        </div>
+        </section>
+
+        <section class="settings-section remote-diagnostics-panel" id="remoteDiagnosticsPanel" hidden>
+          <div class="settings-section-head compact">
+            <div>
+              <h4 data-i18n="ui.remote.setup.diagnostics">Remote setup diagnostics</h4>
+              <p data-i18n="ui.use.this.when.a.remote.dashboard.url.bearer.token.or.cors.origi.9956db87">Use this when a remote dashboard URL, bearer token, or CORS origin is misconfigured.</p>
+            </div>
+          </div>
+          <dl class="remote-diagnostics-list" id="remoteDiagnosticsList"></dl>
+          <pre id="remoteEnvBlock" class="remote-env-block" aria-label="Remote API server environment variables" data-i18n-aria-label="ui.remote.api.server.environment.variables"></pre>
+          <button type="button" id="copyRemoteEnvButton" class="secondary" data-i18n="ui.copy.server.env">Copy server env</button>
+        </section>
+
+        <section class="settings-section profile-settings" aria-labelledby="profileTitle">
+          <div class="settings-section-head">
+            <div>
+              <h3 id="profileTitle" data-i18n="ui.agent.profile">Agent Profile</h3>
+              <p data-i18n="ui.choose.which.qubit.agent.profile.the.browser.should.use.when.t.3d3ae401">Choose which Qubit agent profile the extension should use when the local gateway exposes profiles.</p>
+            </div>
+          </div>
+          <section class="settings-section agent-profile-card">
+            <div class="settings-row profile-control-stack">
+              <label>
+                <span data-i18n="ui.active.profile">Active profile</span>
+                <select id="profileSelect" data-settings-live name="profileSelect">
+                  <option value="" data-i18n="ui.detect.from.qubit.gateway">Detect from Qubit gateway</option>
+                </select>
+              </label>
+              <div class="profile-action-row">
+                <button id="refreshProfilesButton" class="secondary" type="button" title="Refresh profiles" data-i18n-title="profile.refresh_title" aria-label="Refresh profiles" data-i18n-aria-label="profile.refresh_title">
+                  <span class="session-refresh-icon" aria-hidden="true">↻</span>
+                  <span data-i18n="bot_mode.profiles_title">Profiles</span>
+                </button>
+                <span id="profileVerifiedCount" class="profile-verified-count" aria-live="polite"></span>
+              </div>
+            </div>
+            <p id="profileStatus" class="hint">Profiles sync after connecting to Qubit.</p>
+            <div id="profileRosterPreview" class="agent-roster-preview" role="list" aria-label="Verified Qubit agents" data-i18n-aria-label="bot_mode.roster_label"></div>
+          </section>
+
+
+        </section>
+
+        <section class="settings-section agent-connected-card" aria-labelledby="connectedAgentTitle">
+          <div class="settings-section-head">
+            <div>
+              <h3 id="connectedAgentTitle" data-i18n="ui.connected.agent">Connected agent</h3>
+              <p id="agentPickerStatus" class="agent-status-line" data-i18n-runtime data-i18n="ui.agent.discovery.has.not.run.yet">Agent discovery has not run yet.</p>
+            </div>
+          </div>
+          <div id="agentList" class="agent-list" role="list" aria-label="Discovered Qubit agents" data-i18n-aria-label="ui.discovered.qubit.agents"></div>
+          <div class="agent-scan-row">
+            <button id="refreshAgentsButton" class="agent-scan-action" type="button" data-i18n="agent.scan">↻ Scan agents</button>
+            <button id="scanAgentRosterButton" class="agent-scan-action secondary" type="button" data-i18n="bot_mode.refresh_agents">↻ Sync live roster</button>
+          </div>
+          <p class="agent-scan-note settings-prose" data-i18n="ui.scans.a.trusted.qubit.api.host.for.running.gateways.use.localh.7f61d655">Scans a trusted Qubit API host for running sidecar gateways on 8642-8646. This is for Local/Remote API mode only. In Remote dashboard mode Dashboard Attach connects over the dashboard WebSocket (port 443), so this scan is skipped and its status never reflects Dashboard Attach availability.</p>
+          <details class="agent-discovery-advanced">
+            <summary data-i18n="ui.agent.host">Agent host</summary>
+            <div class="agent-host-fields">
+              <label>
+                <span data-i18n="ui.agent.host">Agent host</span>
+                <input id="agentHostInput" data-settings-live type="text" autocomplete="off" placeholder="127.0.0.1 or macbook.tailnet.ts.net" data-i18n-invariant />
+              </label>
+              <label>
+                <span data-i18n="ui.agent.scheme">Agent scheme</span>
+                <select id="agentSchemeInput" data-settings-live>
+                  <option value="http">http</option>
+                  <option value="https">https</option>
+                </select>
+              </label>
+              <label>
+                <span data-i18n="ui.agent.ports.comma.separated.default.8642.8646">Agent ports (comma-separated, default 8642-8646)</span>
+                <input id="agentPortsInput" data-settings-live type="text" inputmode="numeric" placeholder="8642,8643,8644,8645,8646" />
+              </label>
+            </div>
+          </details>
+        </section>
+
+        <div class="connection-security" aria-labelledby="connectionSecurityTitle">
+          <div class="settings-section-head">
+            <div>
+              <h4 id="connectionSecurityTitle" data-i18n="ui.connection.security">Connection security</h4>
+              <p data-i18n="ui.tokens.are.stored.in.chrome.storage.local.and.never.displayed.after.save">Tokens are stored in chrome.storage.local and never displayed after save.</p>
+            </div>
+          </div>
+          <div id="connectionSecuritySummary" class="connection-security-summary"></div>
+          <button id="clearTokenButton" class="secondary" type="button" data-i18n="ui.clear.stored.token">Clear stored token</button>
+        </div>
+        </section>
+<section id="settingsPane-agents" class="settings-pane" data-settings-pane="agents" data-settings-live aria-labelledby="settingsPaneTitle-agents" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-agents" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.agents.title">Agents &amp; Bot Mode</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+        <section class="settings-section bot-mode-settings" aria-labelledby="botModeSettingsTitle">
+          <div class="settings-section-head"><div><h3 id="botModeSettingsTitle" data-i18n="bot_mode.settings_title">Agents &amp; Bot Mode</h3><p data-i18n="bot_mode.settings_copy_sidepanel">Turn on the optional profile roster and canonical Bot Chat navigator for this browser.</p></div></div>
+          <label class="settings-toggle-card bot-mode-toggle-card" for="botModeEnabledInput">
+            <input id="botModeEnabledInput" class="settings-switch-input" type="checkbox" role="switch" />
+            <span class="bot-mode-toggle-copy settings-toggle-copy">
+              <strong data-i18n="bot_mode.enable_label">Enable Bot Mode</strong>
+              <small data-i18n="bot_mode.off_hint_sidepanel">Off by default. Uses the currently connected Qubit instance.</small>
+            </span>
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+          <label class="bot-mode-density-row" for="botModeDisplayDensity"><span data-i18n="bot_mode.density">Roster density</span><select id="botModeDisplayDensity"><option value="comfortable" data-i18n="bot_mode.density_comfortable">Comfortable</option><option value="compact" data-i18n="bot_mode.density_compact">Compact</option></select></label>
+          <label class="bot-mode-density-row" for="botModeAnimateAvatars"><span data-i18n="bot_mode.animate_avatars">Animate avatars</span><select id="botModeAnimateAvatars"><option value="off">Off</option><option value="on">On</option></select></label>
+          <p class="hint" data-i18n="bot_mode.pet_picker_moved">Profile pictures (petdex pets, custom images) are edited per agent in Bot Mode via Edit Profile.</p>
+          <details class="bot-mode-cron-card" id="botModeCronCard">
+            <summary class="bot-mode-cron-head">
+              <div class="bot-mode-cron-title">
+                <h4 data-i18n="bot_mode.cron_title">Active Cron Jobs</h4>
+                <small data-i18n="bot_mode.cron_copy">Scheduled tasks running on this agent's profile (review-watch, scouts, digests).</small>
+              </div>
+              <button id="botModeCronRefreshButton" class="icon-button bot-mode-cron-refresh" type="button" title="Refresh cron jobs" data-i18n-title="profile.refresh_title" aria-label="Refresh cron jobs" data-i18n-aria-label="profile.refresh_title">
+                <span class="session-refresh-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="reload"><path d="M16 4h2v6h-2zm-2-2h2v2h-2zm0 2h2v8h-2zM4 8H2v5h2z"/><path d="M4 6h16v2H4zm4 14H6v-6h2zm2 2H8v-2h2zm0-2H8v-8h2zm10-4h2v-5h-2z"/><path d="M20 18H4v-2h16z"/></svg>
+                </span>
+              </button>
+            </summary>
+            <div class="bot-mode-cron-body">
+              <ul id="botModeCronList" class="bot-mode-cron-list" aria-live="polite"></ul>
+              <p id="botModeCronStatus" class="hint" role="status">Cron schedule loads when Qubit is connected.</p>
+            </div>
+          </details>
+          <p id="botModeSettingsStatus" class="hint" role="status" aria-live="polite">Bot Mode is off.</p>
+        </section>
+        </section>
+
+        <section id="settingsPane-models" class="settings-pane" data-settings-pane="models" aria-labelledby="settingsPaneTitle-models" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-models" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.models.title">Models &amp; Runtime</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+          <section class="settings-section models-settings" aria-labelledby="modelsSettingsTitle">
+            <div class="settings-section-head"><div><h3 id="modelsSettingsTitle" data-i18n="settings.models.title">Active model</h3><p data-i18n="settings.models.copy">The model answering this chat. Change it here or from the top bar.</p></div></div>
+            <button id="settingsOpenModelPickerButton" type="button" class="models-select-card" aria-haspopup="dialog" title="Open model picker" data-i18n-title="settings.models.open_picker">
+              <span class="models-select-copy">
+                <small class="models-select-label" data-i18n="settings.models.current">Current model</small>
+                <strong id="settingsCurrentModel" class="models-select-name" data-i18n-runtime>&mdash;</strong>
+                <span id="settingsCurrentModelMeta" class="models-select-meta" data-i18n-runtime></span>
+              </span>
+              <span class="models-select-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="chevron-down"><path d="M13 16h-2v-2h2v2Zm-2-2H9v-2h2v2Zm4 0h-2v-2h2v2Zm-6-2H7v-2h2v2Zm8 0h-2v-2h2v2ZM7 10H5V8h2v2Zm12 0h-2V8h2v2Z"/></svg></span>
+            </button>
+          </section>
+          <section class="settings-section models-runtime-settings" aria-labelledby="modelsRuntimeTitle">
+            <div class="settings-section-head"><div><h3 id="modelsRuntimeTitle" data-i18n="settings.models.runtime_title">Runtime</h3><p data-i18n="settings.models.runtime_copy">How the model reasons. Changes apply immediately.</p></div></div>
+            <div class="models-runtime-toggles">
+              <button type="button" class="settings-toggle-card runtime-toggle" role="switch" aria-checked="false" data-runtime-toggle="thinking">
+                <span class="settings-toggle-copy"><strong data-i18n="ui.thinking">Thinking</strong><small data-i18n="settings.models.thinking_hint">Let the model reason before it answers.</small></span>
+                <span class="settings-switch" aria-hidden="true"></span>
+              </button>
+              <button type="button" class="settings-toggle-card runtime-toggle" role="switch" aria-checked="false" data-runtime-toggle="fast">
+                <span class="settings-toggle-copy"><strong data-i18n="ui.fast.mode">Fast mode</strong><small data-i18n="settings.models.fast_hint">Prioritize speed when the provider supports it.</small></span>
+                <span class="settings-switch" aria-hidden="true"></span>
+              </button>
+            </div>
+            <div class="settings-choice-group" role="radiogroup" aria-labelledby="modelsEffortLegend">
+              <span id="modelsEffortLegend" class="models-legend" data-i18n="ui.reasoning.effort">Reasoning effort</span>
+              <div class="settings-choice-grid models-effort-grid">
+              <button type="button" class="settings-choice-card runtime-effort" role="radio" aria-checked="false" data-runtime-effort="minimal"><span class="settings-choice-copy"><strong data-i18n="settings.models.effort.minimal">Minimal</strong></span><span class="settings-choice-mark" aria-hidden="true"></span></button>
+              <button type="button" class="settings-choice-card runtime-effort" role="radio" aria-checked="false" data-runtime-effort="low"><span class="settings-choice-copy"><strong data-i18n="settings.models.effort.low">Low</strong></span><span class="settings-choice-mark" aria-hidden="true"></span></button>
+              <button type="button" class="settings-choice-card runtime-effort" role="radio" aria-checked="false" data-runtime-effort="medium"><span class="settings-choice-copy"><strong data-i18n="settings.models.effort.medium">Medium</strong></span><span class="settings-choice-mark" aria-hidden="true"></span></button>
+              <button type="button" class="settings-choice-card runtime-effort" role="radio" aria-checked="false" data-runtime-effort="high"><span class="settings-choice-copy"><strong data-i18n="settings.models.effort.high">High</strong></span><span class="settings-choice-mark" aria-hidden="true"></span></button>
+              <button type="button" class="settings-choice-card runtime-effort" role="radio" aria-checked="false" data-runtime-effort="xhigh"><span class="settings-choice-copy"><strong data-i18n="settings.models.effort.xhigh">Extra high</strong></span><span class="settings-choice-mark" aria-hidden="true"></span></button>
+              <button type="button" class="settings-choice-card runtime-effort" role="radio" aria-checked="false" data-runtime-effort="max"><span class="settings-choice-copy"><strong data-i18n="settings.models.effort.max">Max</strong></span><span class="settings-choice-mark" aria-hidden="true"></span></button>
+              <button type="button" class="settings-choice-card runtime-effort" role="radio" aria-checked="false" data-runtime-effort="ultra"><span class="settings-choice-copy"><strong data-i18n="settings.models.effort.ultra">Ultra</strong></span><span class="settings-choice-mark" aria-hidden="true"></span></button>
+              </div>
+            </div>
+          </section>
+          <section class="settings-section models-catalog-settings" aria-labelledby="modelsCatalogTitle">
+            <div class="settings-section-head"><div><h3 id="modelsCatalogTitle" data-i18n="settings.models.catalog_title">Model catalog</h3><p id="settingsModelCatalogCount" data-i18n-runtime>&mdash;</p></div></div>
+            <button id="settingsRefreshModelsButton" type="button" class="secondary models-refresh-row"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="reload"><path d="M16 4h2v6h-2zm-2-2h2v2h-2zm0 2h2v8h-2zM4 8H2v5h2z"/><path d="M4 6h16v2H4zm4 14H6v-6h2zm2 2H8v-2h2zm0-2H8v-8h2zm10-4h2v-5h-2z"/><path d="M20 18H4v-2h16z"/></svg><span data-i18n="settings.models.refresh">Refresh models</span></button>
+            <p id="settingsModelRefreshStatus" class="settings-prose" role="status" aria-live="polite" hidden></p>
+            <p class="hint settings-prose" data-i18n="settings.models.desktop_hint">Add or remove models in Qubit Desktop or with the Qubit model command, then refresh here.</p>
+          </section>
+          <section class="settings-section model-sources-settings" aria-labelledby="modelSourcesTitle">
+            <div class="settings-section-head"><div><h3 id="modelSourcesTitle" data-i18n="ui.custom.model.source.urls">Custom model source URLs</h3><p class="settings-prose" data-i18n="ui.optional.discovery.only.browser.probes.each.openai.compatible.v.ae9c41a6">Optional discovery only: the extension probes each OpenAI-compatible `/v1/models` endpoint and shows matches in the model picker. Runtime routing still comes from the connected Qubit gateway.</p></div></div>
+            <textarea id="customModelSourcesInput" class="model-sources-input" rows="4" spellcheck="false" placeholder="http://wimpy:8080/v1&#10;http://192.168.1.50:11434/v1" autocomplete="off" aria-label="Custom model source URLs" data-i18n-aria-label="ui.custom.model.source.urls" data-i18n-invariant></textarea>
+          </section>
+        </section>
+
+        <section id="settingsPane-sessions" class="settings-pane" data-settings-pane="sessions" aria-labelledby="settingsPaneTitle-sessions" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-sessions" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.sessions.title">Sessions &amp; Context</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+        <label>
+          <span data-i18n="ui.session.id">Session ID</span>
+          <input id="sessionIdInput" name="sessionId" type="text" placeholder="qubit-browser-extension" data-i18n-invariant />
+        </label>
+
+        <label>
+          <span data-i18n="ui.session.title">Session title</span>
+          <input id="sessionTitleInput" name="sessionTitle" type="text" placeholder="Qubit Browser Extension" data-i18n-placeholder="manifest.extension_name" />
+        </label>
+
+        <section class="settings-subsection browser-behavior-settings" aria-labelledby="browserBehaviorTitle">
+          <div class="settings-section-head compact">
+            <div>
+              <h4 id="browserBehaviorTitle" data-i18n="ui.browser.behavior">Browser Behavior</h4>
+              <p data-i18n="ui.session.naming.prompt.context.and.side.panel.residency.live.together">Session naming, prompt context, and side-panel residency live together.</p>
+            </div>
+          </div>
+
+          <label class="settings-toggle-card auto-name-toggle">
+            <span class="settings-toggle-copy">
+              <strong data-i18n="ui.auto.name.browser.sessions">Auto-name browser sessions</strong>
+              <small data-i18n="ui.rename.a.fresh.browser.session.from.the.first.real.message">Rename a fresh browser session from the first real message.</small>
+            </span>
+            <input id="autoNameSessionsInput" class="settings-switch-input" type="checkbox" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+
+          <label class="settings-toggle-card auto-name-toggle">
+            <span class="settings-toggle-copy">
+              <strong data-i18n="ui.show.message.times">Show message times</strong>
+              <small data-i18n="ui.show.message.times.hint">Show the time on your messages when you hover or tap them.</small>
+            </span>
+            <input id="showMessageTimesInput" class="settings-switch-input" type="checkbox" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+
+          <div class="settings-control-group" aria-label="Prompt context settings" data-i18n-aria-label="ui.prompt.context.settings">
+            <div class="settings-control-group-head">
+              <strong data-i18n="ui.prompt.context">Prompt context</strong>
+              <small data-i18n="ui.choose.what.browser.context.is.allowed.into.each.prompt">Choose what browser context is allowed into each prompt.</small>
+            </div>
+            <div class="settings-toggle-grid settings-toggle-grid-three">
+              <label class="settings-toggle-card compact-toggle">
+                <span class="settings-toggle-copy"><strong data-i18n="ui.open.tabs">Open tabs</strong><small data-i18n="ui.window.tab.list">Window tab list</small></span>
+                <input id="includeTabsInput" class="settings-switch-input" type="checkbox" />
+                <span class="settings-switch" aria-hidden="true"></span>
+              </label>
+              <label class="settings-toggle-card compact-toggle">
+                <span class="settings-toggle-copy"><strong data-i18n="ui.page.text">Page text</strong><small data-i18n="ui.readable.dom.text">Readable DOM text</small></span>
+                <input id="includePageTextInput" class="settings-switch-input" type="checkbox" />
+                <span class="settings-switch" aria-hidden="true"></span>
+              </label>
+              <label class="settings-toggle-card compact-toggle">
+                <span class="settings-toggle-copy"><strong data-i18n="ui.selection">Selection</strong><small data-i18n="ui.highlighted.text">Highlighted text</small></span>
+                <input id="includeSelectedTextInput" class="settings-switch-input" type="checkbox" />
+                <span class="settings-switch" aria-hidden="true"></span>
+              </label>
+            </div>
+            <fieldset id="contextDepthOptions" class="settings-choice-group context-depth-options">
+              <legend data-i18n="ui.page.context.depth">Page context depth</legend>
+              <div class="settings-choice-grid settings-choice-grid-three">
+                <label class="settings-choice-card compact-choice">
+                  <input type="radio" name="contextDepth" value="minimal" />
+                  <span class="settings-choice-copy"><strong data-i18n="settings.context_depth.minimal">Minimal</strong><small data-i18n="settings.context_depth.minimal_hint">Selection and a short excerpt</small></span>
+                  <span class="settings-choice-mark" aria-hidden="true"></span>
+                </label>
+                <label class="settings-choice-card compact-choice">
+                  <input type="radio" name="contextDepth" value="normal" />
+                  <span class="settings-choice-copy"><strong data-i18n="settings.context_depth.normal">Normal</strong><small data-i18n="settings.context_depth.normal_hint">Good default</small></span>
+                  <span class="settings-choice-mark" aria-hidden="true"></span>
+                </label>
+                <label class="settings-choice-card compact-choice">
+                  <input type="radio" name="contextDepth" value="full" />
+                  <span class="settings-choice-copy"><strong data-i18n="settings.context_depth.full">Full</strong><small data-i18n="settings.context_depth.full_hint">Largest page payload</small></span>
+                  <span class="settings-choice-mark" aria-hidden="true"></span>
+                </label>
+              </div>
+            </fieldset>
+            <fieldset id="transcriptModeOptions" class="settings-choice-group transcript-mode-options">
+              <legend data-i18n="settings.transcript.title">YouTube transcripts</legend>
+              <div class="settings-choice-grid settings-choice-grid-three">
+                <label class="settings-choice-card compact-choice">
+                  <input type="radio" name="transcriptMode" value="default" />
+                  <span class="settings-choice-copy"><strong data-i18n="settings.transcript.auto">Automatic</strong><small data-i18n="settings.transcript.auto_hint">YouTube captions, then the page</small></span>
+                  <span class="settings-choice-mark" aria-hidden="true"></span>
+                </label>
+                <label class="settings-choice-card compact-choice">
+                  <input type="radio" name="transcriptMode" value="off" />
+                  <span class="settings-choice-copy"><strong data-i18n="ui.off">Off</strong><small data-i18n="settings.transcript.off_hint">Never fetch transcripts</small></span>
+                  <span class="settings-choice-mark" aria-hidden="true"></span>
+                </label>
+                <label class="settings-choice-card compact-choice">
+                  <input type="radio" name="transcriptMode" value="custom" />
+                  <span class="settings-choice-copy"><strong data-i18n="settings.transcript.custom">Custom</strong><small data-i18n="settings.transcript.custom_hint">Your own service</small></span>
+                  <span class="settings-choice-mark" aria-hidden="true"></span>
+                </label>
+              </div>
+              <label id="transcriptProviderField" class="transcript-provider-field" hidden>
+                <span data-i18n="settings.transcript.url">Service URL</span>
+                <input id="transcriptProviderInput" name="transcriptProvider" type="url" inputmode="url" placeholder="https://provider.example/transcript?video_id={video_id}" data-i18n-invariant />
+                <small data-i18n="settings.transcript.url_hint">Qubit adds the video ID to this address.</small>
+              </label>
+            </fieldset>
+          </div>
+
+          <fieldset id="panelResidencyOptions" class="panel-residency-options settings-choice-group">
+            <legend data-i18n="ui.panel.opening">Panel opening</legend>
+            <p id="panelResidencySidebarNote" class="hint" hidden data-i18n="ui.sidebar.stays.open.across.tabs">This browser keeps the Qubit sidebar open on every tab in the window. Click the Qubit toolbar button again to close it.</p>
+            <div class="settings-choice-grid">
+              <label class="settings-choice-card">
+                <input type="radio" name="panelResidencyMode" value="tab-attached" />
+                <span class="settings-choice-copy">
+                  <strong data-i18n="ui.attach.to.current.tab">Attach to current tab</strong>
+                  <small data-i18n="ui.qubit.appears.only.on.tabs.where.you.open.it">Qubit appears only on tabs where you open it.</small>
+                </span>
+                <span class="settings-choice-mark" aria-hidden="true"></span>
+              </label>
+              <label class="settings-choice-card">
+                <input type="radio" name="panelResidencyMode" value="global" />
+                <span class="settings-choice-copy">
+                  <strong data-i18n="ui.keep.open.across.tabs">Keep open across tabs</strong>
+                  <small data-i18n="ui.existing.attached.panels.stay.as.they.are.other.and.new.tabs.us.fb9a0ba6">Existing attached panels stay as they are. Other and new tabs use the shared panel.</small>
+                </span>
+                <span class="settings-choice-mark" aria-hidden="true"></span>
+              </label>
+            </div>
+          </fieldset>
+        </section>
+        <section class="settings-subsection context-window-settings" aria-labelledby="settingsContextTitle">
+          <div class="settings-section-head compact">
+            <div>
+              <h4 id="settingsContextTitle" data-i18n="ui.context.window">Context window</h4>
+              <p id="settingsContextSession" class="settings-context-session" data-i18n-runtime></p>
+              <p id="settingsContextSummary"></p>
+            </div>
+          </div>
+          <div id="settingsContextUsage" class="context-usage-card" data-i18n-runtime></div>
+          <details class="context-window-details">
+            <summary data-i18n="ui.details">Details</summary>
+            <p class="context-section-label" data-i18n="ui.session.runtime">Session runtime</p>
+            <dl id="settingsContextRuntime" class="context-runtime-breakdown"></dl>
+            <p class="context-section-label" data-i18n="ui.next.prompt.payload">Next prompt payload</p>
+            <dl id="settingsContextPayload"></dl>
+          </details>
+        </section>
+
+        </section>
+
+        <section id="settingsPane-permissions" class="settings-pane" data-settings-pane="permissions" aria-labelledby="settingsPaneTitle-permissions" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-permissions" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.permissions.title">Permissions &amp; Control</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+          <section class="settings-section permissions-settings" aria-labelledby="permissionsSettingsTitle">
+            <div class="settings-section-head"><div><h3 id="permissionsSettingsTitle" data-i18n="settings.permissions.title">Control and approvals</h3><p data-i18n="settings.permissions.copy">What Qubit may operate in your browser, and which connections may see page context.</p></div></div>
+          <section id="statusCard" class="status-card settings-active-tab" aria-live="polite" aria-label="Active tab status" data-i18n-aria-label="ui.active.tab.status">
+            <div class="status-label">
+              <span class="status-dot" id="statusDot"></span>
+              <span data-i18n="ui.active.tab.2bc454c2">ACTIVE TAB</span>
+            </div>
+            <div class="status-copy">
+              <strong id="activeTitle">No tab detected</strong>
+              <span id="activeUrl">Open a normal http/https tab, then refresh context.</span>
+            </div>
+            <div id="statusActions" class="status-actions" hidden>
+              <button id="statusRetryProbeButton" class="secondary tiny" type="button" hidden></button>
+              <button id="statusCopyDiagnosticsButton" class="secondary tiny" type="button" data-i18n="ui.copy.diagnostics">Copy Diagnostics</button>
+            </div>
+          </section>
+
+          <section id="browserControlCard" class="browser-control-card" aria-labelledby="browserControlTitle">
+            <div class="browser-control-card-head">
+              <span class="browser-control-kicker" data-i18n="browser_control.kicker">QUBIT CONTROL</span>
+              <div class="browser-control-title-row">
+                <h5 id="browserControlTitle" data-i18n="browser_control.title">Qubit Control</h5>
+                <span id="browserControlState" class="browser-control-state">OFF</span>
+              </div>
+              <p id="browserControlCardDetail">Qubit can read approved context but cannot operate tabs.</p>
+            </div>
+            <div class="browser-control-config">
+              <label class="browser-control-field">
+                <span id="browserControlScopeLabel" data-i18n="browser_control.scope">Control scope</span>
+                <select id="browserControlScopeInput" data-settings-live aria-labelledby="browserControlScopeLabel" aria-describedby="browserControlScopeHelp browserControlScopeLock">
+                  <option value="this-tab" data-i18n="browser_control.this_tab">This tab</option>
+                  <option value="selected-tabs" data-i18n="browser_control.selected_tabs">Selected tabs</option>
+                  <option value="task-set" data-i18n="browser_control.task_set">Task set</option>
+                </select>
+                <small id="browserControlScopeHelp" data-i18n-runtime data-i18n="browser_control.help_scope_this_tab">Control only the current tab. Other tabs are not included.</small>
+                <small id="browserControlScopeLock" data-i18n-runtime data-i18n="browser_control.scope_help_locked" hidden>Turn off Qubit Control to change the tabs it can use.</small>
+              </label>
+            </div>
+            <div id="firefoxScreenshotSetting" class="browser-control-config firefox-screenshot-setting" hidden>
+              <div class="browser-control-field">
+                <span id="firefoxScreenshotTitle" data-i18n="firefox_screenshots.title">Model screenshots on Firefox</span>
+                <small id="firefoxScreenshotDetail" data-i18n-runtime data-i18n="firefox_screenshots.detail_missing">Firefox needs an extra permission before Qubit can take a screenshot of the tab. Qubit asks for it only when you click Allow; until then it reads the page text instead.</small>
+                <button id="firefoxScreenshotButton" class="browser-control-action secondary" type="button" data-i18n-runtime data-i18n="firefox_screenshots.allow">Allow screenshots on Firefox</button>
+              </div>
+            </div>
+            <div class="browser-control-card-actions">
+              <button id="browserControlEnableButton" class="browser-control-action" type="button" data-i18n="browser_control.enable">Enable control</button>
+              <button id="browserControlDetachButton" class="browser-control-action secondary" type="button" hidden data-i18n="browser_control.turn_off">Turn off</button>
+              <button id="browserControlShowTabButton" class="browser-control-action secondary" type="button" hidden aria-label="Show the tab Qubit is using" data-i18n-aria-label="browser_control.show_tab_aria" data-i18n="browser_control.show_tab">Show tab</button>
+            </div>
+            <p class="browser-control-note" data-i18n="browser_control.note">Chromium grants this extension debugger access when it is installed or updated. Qubit uses the debugger only on tabs you attach, never brings a browser window to the front, and blocks credentials, MFA, payment fields, and secret text.</p>
+          </section>
+
+          <label id="browserContextConsentControl" class="settings-toggle-card browser-context-consent" hidden>
+            <span class="settings-toggle-copy">
+              <strong data-i18n="context_consent.share_label">Share page context with this connection</strong>
+              <small data-i18n="context_consent.share_detail">Chat only until you approve this exact connection. Consent is isolated by endpoint, account, profile, and Browser controller.</small>
+              <small id="browserContextConsentIdentity" class="browser-context-consent-identity" data-i18n-runtime>Verifying connection identity…</small>
+            </span>
+            <input id="browserContextConsentInput" data-settings-live class="settings-switch-input" type="checkbox" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+          </section>
+
+        </section>
+
+        <section id="settingsPane-assist" class="settings-pane" data-settings-pane="assist" aria-labelledby="settingsPaneTitle-assist" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-assist" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.assist.title">Assist &amp; Actions</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+        <section class="settings-section inline-assist-settings" aria-labelledby="inlineAssistTitle">
+          <div class="settings-section-head">
+            <div>
+              <h3 id="inlineAssistTitle" data-i18n="ui.qubit.assist">Qubit Assist</h3>
+              <p data-i18n="ui.control.the.field.launcher.and.where.assist.runs.by.default">Control the field launcher and where Assist runs by default.</p>
+            </div>
+          </div>
+          <label class="settings-toggle-card">
+            <span class="settings-toggle-copy">
+              <strong data-i18n="ui.show.qubit.assist.in.writing.fields">Show Qubit Assist in writing fields</strong>
+              <small data-i18n="ui.turn.the.field.bound.launcher.on.or.off.across.normal.web.pages">Turn the field-bound launcher on or off across normal web pages.</small>
+            </span>
+            <input id="inlineAssistEnabled" class="settings-switch-input" type="checkbox" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+          <fieldset id="inlineAssistIconOptions" class="inline-assist-icon-options settings-choice-group">
+            <legend data-i18n="ui.button.icon">Button icon</legend>
+            <div class="settings-choice-grid assist-icon-grid">
+              <label class="settings-choice-card compact-choice assist-icon-card">
+                <input type="radio" name="inlineAssistIcon" value="wing" />
+                <span class="assist-icon-preview" data-icon="wing" aria-hidden="true"><i class="assist-icon-swatch assist-icon-swatch-dark"></i><i class="assist-icon-swatch assist-icon-swatch-light"></i></span>
+                <span class="settings-choice-copy">
+                  <strong data-i18n="ui.wing">Wing</strong>
+                  <small data-i18n="ui.clean.at.any.size">Clean at any size</small>
+                </span>
+                <span class="settings-choice-mark" aria-hidden="true"></span>
+              </label>
+              <label class="settings-choice-card compact-choice assist-icon-card">
+                <input type="radio" name="inlineAssistIcon" value="staff" />
+                <span class="assist-icon-preview" data-icon="staff" aria-hidden="true"><i class="assist-icon-swatch assist-icon-swatch-dark"></i><i class="assist-icon-swatch assist-icon-swatch-light"></i></span>
+                <span class="settings-choice-copy">
+                  <strong data-i18n="ui.staff">Staff</strong>
+                  <small data-i18n="ui.the.caduceus">The caduceus</small>
+                </span>
+                <span class="settings-choice-mark" aria-hidden="true"></span>
+              </label>
+              <label class="settings-choice-card compact-choice assist-icon-card">
+                <input type="radio" name="inlineAssistIcon" value="girl" />
+                <span class="assist-icon-preview" data-icon="girl" aria-hidden="true"><i class="assist-icon-swatch assist-icon-swatch-dark"></i><i class="assist-icon-swatch assist-icon-swatch-light"></i></span>
+                <span class="settings-choice-copy">
+                  <strong data-i18n="ui.nous.girl">Nous girl</strong>
+                  <small data-i18n="ui.the.extension.logo">The extension logo</small>
+                </span>
+                <span class="settings-choice-mark" aria-hidden="true"></span>
+              </label>
+            </div>
+          </fieldset>
+          <fieldset id="inlineAssistOpenModeOptions" class="inline-assist-open-options settings-choice-group">
+            <legend data-i18n="ui.when.you.click.it">When you click it</legend>
+            <div class="settings-choice-grid assist-open-grid">
+              <label class="settings-choice-card compact-choice assist-open-card">
+                <input type="radio" name="inlineAssistOpenMode" value="quick" />
+                <span class="assist-open-thumb assist-open-thumb-quick" aria-hidden="true"><i class="thumb-circle"></i><i class="thumb-menu"><b></b><b></b><b></b><b></b></i></span>
+                <span class="settings-choice-copy">
+                  <strong data-i18n="ui.quick.menu">Quick menu</strong>
+                  <small data-i18n="ui.a.small.menu.at.the.circle.type.or.pick.an.action.the.draft.goes.straight.into.the.field">A small menu at the circle. Type or pick an action; the draft goes straight into the field.</small>
+                </span>
+                <span class="settings-choice-mark" aria-hidden="true"></span>
+              </label>
+              <label class="settings-choice-card compact-choice assist-open-card">
+                <input type="radio" name="inlineAssistOpenMode" value="panel" />
+                <span class="assist-open-thumb assist-open-thumb-panel" aria-hidden="true"><i class="thumb-circle"></i><i class="thumb-panel"><b></b><b></b><b></b><b></b></i></span>
+                <span class="settings-choice-copy">
+                  <strong data-i18n="ui.full.panel">Full panel</strong>
+                  <small data-i18n="ui.every.action.tool.and.option.at.once.with.a.preview.before.anything.changes">Every action, tool and option at once, with a preview before anything changes.</small>
+                </span>
+                <span class="settings-choice-mark" aria-hidden="true"></span>
+              </label>
+            </div>
+          </fieldset>
+          <!-- Each row: what it is on the left, its control on the right. -->
+          <div class="assist-setting-rows">
+            <label class="assist-setting-row">
+              <span class="settings-toggle-copy">
+                <strong data-i18n="ui.where.it.runs">Where it runs</strong>
+                <small data-i18n="ui.asked.once.then.remembered">Asked once, then remembered</small>
+              </span>
+              <select id="inlineAssistDefaultRoute">
+                <option value="ask" data-i18n="ui.ask.every.time">Ask every time</option>
+                <option value="current" data-i18n="ui.continue.current.chat">Continue current chat</option>
+                <option value="new" data-i18n="ui.start.new.assist.session">Start new Assist session</option>
+                <option value="background" data-i18n="ui.run.in.background">Run in background</option>
+              </select>
+            </label>
+            <div class="assist-setting-row inline-assist-model-setting">
+              <span class="settings-toggle-copy">
+                <strong data-i18n="ui.model.68c2cc7f">Model</strong>
+                <small data-i18n="ui.used.only.by.assist">Used only by Assist</small>
+              </span>
+              <button id="inlineAssistModelButton" class="model-menu-button" type="button" aria-haspopup="dialog" aria-expanded="false" title="Choose the model used by Qubit Assist" disabled data-i18n-title="ui.choose.the.model.used.by.qubit.assist">
+                <span id="inlineAssistModelLabel">Choose Assist model</span><span aria-hidden="true">⌄</span>
+              </button>
+              <input id="inlineAssistModel" type="hidden" />
+            </div>
+            <label class="assist-setting-row">
+              <span class="settings-toggle-copy">
+                <strong data-i18n="ui.replace.text.automatically">Replace text automatically</strong>
+                <small data-i18n="ui.undo.is.always.one.click.away">Undo is always one click away</small>
+              </span>
+              <input id="inlineAssistAutoReplace" class="settings-switch-input" type="checkbox" />
+              <span class="settings-switch" aria-hidden="true"></span>
+            </label>
+            <label class="assist-setting-row">
+              <span class="settings-toggle-copy">
+                <strong data-i18n="ui.keep.assist.chats">Keep Assist chats</strong>
+                <small data-i18n="ui.kept.under.inline.assist.in.your.history">Kept under Inline assist in your history</small>
+              </span>
+              <select id="inlineAssistSessionRetention">
+                <option value="keep" data-i18n="ui.keep.assist.sessions">Keep Assist sessions</option>
+                <option value="delete" data-i18n="ui.delete.after.the.draft.returns">Delete after the draft returns</option>
+              </select>
+            </label>
+          </div>
+          <div class="inline-assist-sites" data-settings-live>
+            <span class="settings-toggle-copy">
+              <strong data-i18n="ui.sites">Sites</strong>
+              <small data-i18n="ui.where.assist.reads.the.thread.and.where.the.circle.stays.hidden">Where Assist reads the thread, and where the circle stays hidden.</small>
+            </span>
+            <div class="inline-assist-sites-chips">
+              <ul id="inlineAssistSites" class="inline-assist-sites-list" hidden></ul>
+              <div class="inline-assist-site-new">
+                <input id="inlineAssistSiteInput" type="text" autocomplete="off" spellcheck="false" placeholder="Add a site, like facebook.com" data-i18n-placeholder="ui.add.a.site.like.facebook.com" aria-label="Add a site" data-i18n-aria-label="ui.add.a.site" />
+                <button id="inlineAssistAddTyped" class="inline-assist-site-add-typed" type="button" data-i18n="ui.add">Add</button>
+              </div>
+              <button id="inlineAssistAddSite" class="inline-assist-site-add" type="button" data-i18n="ui.add.this.site" hidden>+ Add this site</button>
+            </div>
+            <p id="inlineAssistSiteInputHint" class="hint" data-i18n="ui.type.a.web.address.like.facebook.com.or.a.site.name.like.gmail" hidden>Type a web address, like facebook.com, or a site name, like Gmail.</p>
+            <p id="inlineAssistSitesLegend" class="hint" data-i18n="ui.sites.legend">Reads thread: Assist also reads the conversation on screen. This field only: only what is in the field. Circle hidden: no circle on that site. Changes save right away.</p>
+            <p id="inlineAssistSitesEmpty" class="hint" data-i18n="ui.no.sites.yet.change.one.from.the.assist.panel.on.a.page.or.add.the.site.you.have.open">No sites yet. Change one from the Assist panel on a page, or add the site you have open.</p>
+            <p id="inlineAssistSitesHint" class="hint" data-i18n="ui.open.a.web.page.first.then.add.it.here" hidden>Open a web page first, then add it here.</p>
+            <input id="inlineAssistSitesValue" type="hidden" />
+          </div>
+          <p id="assistModelCapabilityHint" class="hint">Choose any available model for Qubit Assist. If the gateway cannot enforce that exact model, Assist transparently falls back to the gateway default and labels the result.</p>
+        </section>
+
+        <section class="settings-section context-menu-settings" aria-labelledby="contextMenuSettingsTitle">
+          <div class="settings-section-head"><div><h3 id="contextMenuSettingsTitle" data-i18n="ui.right.click.actions">Right-click actions</h3><p data-i18n="ui.choose.where.ask.explain.improve.and.summarize.selection.tasks.run">Choose where Ask, Explain, Improve, and Summarize selection tasks run.</p></div></div>
+          <label>
+            <span data-i18n="ui.default.right.click.route">Default right-click route</span>
+            <select id="contextMenuDefaultRoute">
+              <option value="ask" data-i18n="ui.ask.every.time">Ask every time</option>
+              <option value="current" data-i18n="ui.use.current.tab.session">Use current tab session</option>
+              <option value="new" data-i18n="ui.start.new.browser.session">Start a new chat</option>
+              <option value="background" data-i18n="ui.run.in.background">Run in background</option>
+            </select>
+          </label>
+          <p class="hint" data-i18n="ui.context.menu.editor.opening.behavior">Actions that open Qubit use the side panel when available and the extension full view as a confirmed fallback.</p>
+          <details id="contextMenuActionsDisclosure" class="context-menu-actions-disclosure">
+            <summary class="context-menu-actions-summary" aria-controls="contextMenuEditor">
+              <span data-i18n="ui.configure">Configure</span>
+            </summary>
+            <div id="contextMenuEditor" data-context-menu-surface="side-panel"></div>
+          </details>
+          <label class="settings-toggle-card compact-toggle-card">
+            <span class="settings-toggle-copy"><strong id="gmailCaptureToggleTitle"></strong><small id="gmailCaptureToggleHint"></small></span>
+            <input id="gmailCaptureEnabledInput" data-settings-live class="settings-switch-input" type="checkbox" role="switch" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+        </section>
+        </section>
+
+        <section id="settingsPane-voice" class="settings-pane" data-settings-pane="voice" aria-labelledby="settingsPaneTitle-voice" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-voice" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.voice.title">Voice &amp; Wake</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+        <section class="settings-section wake-word-settings" aria-labelledby="wakeWordTitle">
+          <div class="settings-section-head">
+            <div>
+              <h3 id="wakeWordTitle" data-i18n="ui.wake.word">Wake word</h3>
+              <p data-i18n="ui.say.hey.qubit.for.a.hands.free.one.turn.voice.request.always.o.cd7ebfae">Say “Hey Qubit” for a hands-free, one-turn voice request. Always-on detection stays on this machine.</p>
+            </div>
+          </div>
+          <label class="settings-toggle-card">
+            <span class="settings-toggle-copy">
+              <strong data-i18n="ui.enable.wake.word">Enable wake word</strong>
+              <small data-i18n="ui.prefers.qubit.native.wake.engine.locally.and.uses.chromium.on.42c1439e">Prefers Qubit’ native wake engine locally and uses available on-device browser speech for Cloud Preview.</small>
+            </span>
+            <input id="wakeWordEnabledInput" class="settings-switch-input" type="checkbox" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+          <label>
+            <span data-i18n="ui.browser.fallback.phrase">Browser fallback phrase</span>
+            <input id="wakeWordPhraseInput" type="text" maxlength="64" autocomplete="off" placeholder="hey qubit" data-i18n-invariant />
+          </label>
+          <label class="settings-toggle-card compact-toggle-card">
+            <span class="settings-toggle-copy"><strong data-i18n="ui.browser.local.fallback">Browser-local fallback</strong><small data-i18n="ui.required.for.cloud.preview.and.older.qubit.builds.it.refuses.c.f0bdad5b">Required for Cloud Preview and older Qubit builds. It refuses cloud speech recognition.</small></span>
+            <input id="wakeWordBrowserFallbackInput" class="settings-switch-input" type="checkbox" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+          <label class="settings-toggle-card compact-toggle-card">
+            <span class="settings-toggle-copy"><strong data-i18n="ui.speak.wake.replies">Speak wake replies</strong><small data-i18n="ui.uses.qubit.tts.on.the.native.path.and.local.browser.speech.on.acf402bd">Uses Qubit TTS on the native path and local browser speech on the fallback path.</small></span>
+            <input id="wakeWordSpeakRepliesInput" class="settings-switch-input" type="checkbox" />
+            <span class="settings-switch" aria-hidden="true"></span>
+          </label>
+          <p id="wakeWordStatus" class="hint" role="status" aria-live="polite">Wake word is off.</p>
+        </section>
+        </section>
+
+        <section id="settingsPane-about" class="settings-pane" data-settings-pane="about" aria-labelledby="settingsPaneTitle-about" hidden>
+          <div class="settings-pane-bar">
+            <button type="button" class="settings-pane-back" data-settings-back aria-label="Back to categories" title="Back to categories" data-i18n-aria-label="settings.categories.back_to" data-i18n-title="settings.categories.back_to"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-left"><path d="M20 11v2H4v-2zM8 13v2H6v-2zm2 2v2H8v-2zm2 2v2h-2v-2zm-4-6V9H6v2z"/><path d="M10 15V7H8v8zm2 2V5h-2v12z"/></svg></button>
+            <div class="settings-pane-heading"><span class="settings-pane-crumb" aria-hidden="true" data-i18n="ui.settings">Settings</span><h3 id="settingsPaneTitle-about" class="settings-pane-title" tabindex="-1" data-i18n="settings.categories.about.title">About &amp; Diagnostics</h3></div>
+            <span class="settings-pane-flags"><span class="settings-pane-edited" hidden data-i18n="settings.categories.edited_hint">Unsaved edits</span><span class="settings-pane-saved" role="status" aria-live="polite" hidden></span></span>
+          </div>
+        <details id="compatibilityPanel" class="compatibility-panel" aria-labelledby="compatibilityTitle">
+          <summary class="compatibility-summary" aria-controls="compatibilityList">
+            <span class="compatibility-summary-copy">
+              <span id="compatibilityTitle" class="compatibility-title" data-i18n="ui.qubit.compatibility">Qubit compatibility</span>
+              <span id="compatibilityStatus" class="hint compatibility-status">Connect or test your Gateway to see supported features.</span>
+            </span>
+            <span class="compatibility-toggle" aria-hidden="true"></span>
+          </summary>
+          <ul id="compatibilityList" class="compatibility-list"></ul>
+        </details>
+
+        <div class="support-diagnostics" aria-labelledby="supportDiagnosticsTitle">
+          <div class="settings-section-head">
+            <div>
+              <h4 id="supportDiagnosticsTitle" data-i18n="ui.support.diagnostics">Support diagnostics</h4>
+              <p data-i18n="ui.copy.a.redacted.compatibility.report.it.excludes.tokens.cookies.ab0019e3">Copy a redacted compatibility report. It excludes tokens, cookies, page text, selected text, tab titles, and full URLs.</p>
+            </div>
+          </div>
+          <button id="copyDiagnosticsButton" class="secondary" type="button" data-i18n="ui.copy.diagnostics">Copy Diagnostics</button>
+          <p id="diagnosticsCopyStatus" class="hint">Use this when filing GitHub issues or support reports.</p>
+        </div>
+        <span class="nous-strip nous-strip-pane" role="img" aria-label="Nous Research" data-i18n-invariant></span>
+        </section>
+
+        <button id="settingsBackToTop" class="settings-back-to-top" type="button" hidden aria-label="Back to top" data-i18n-aria-label="settings.back_to_top"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="arrow-up"><path d="M11 20h2V4h-2zm2-12h2V6h-2zm2 2h2V8h-2zm2 2h2v-2h-2zm-6-4H9V6h2z"/><path d="M15 10H7V8h8zm2 2H5v-2h12z"/></svg><span data-i18n="settings.back_to_top">Back to top</span></button>
+      </form>
+    </section>
+
+    <section id="updateDialog" class="update-dialog" role="dialog" aria-modal="true" aria-labelledby="updateDialogTitle" aria-hidden="true" hidden>
+      <div class="update-dialog-card">
+        <button id="closeUpdateDialogButton" class="update-dialog-close" type="button" aria-label="Close update review" data-i18n-aria-label="ui.close.update.review">×</button>
+        <span class="update-dialog-mark" aria-hidden="true"></span>
+        <p class="eyebrow" data-i18n="ui.qubit.browser.update.channel">QUBIT BROWSER / UPDATE CHANNEL</p>
+        <h2 id="updateDialogTitle">Checking the extension's main branch…</h2>
+        <p id="updateDialogSummary" class="update-dialog-summary">Comparing this loaded build with the public GitHub repository.</p>
+        <div id="updateChangeGroups" class="update-change-groups" aria-live="polite"></div>
+        <div class="update-dialog-actions">
+          <button id="updateNowButton" type="button" hidden data-i18n="ui.update.now">Update now</button>
+          <button id="maybeLaterButton" class="secondary" type="button">Maybe later</button>
+        </div>
+        <p id="updateInstallNote" class="update-install-note">Load-unpacked installs update through a guarded Qubit agent turn, then reload the built dist/ folder.</p>
+        <p id="updateReleaseFallback" class="update-install-note"><span data-i18n="update.no_local_checkout">No local checkout of the repository on this machine?</span> <a id="updateReleaseLink" class="update-release-link" href="https://github.com/abundantbeing/qubit-browser-extension/releases/latest" target="_blank" rel="noreferrer noopener">Download the latest release</a>.</p>
+      </div>
+    </section>
+
+    <section id="operationToast" class="operation-toast" role="status" aria-live="polite" aria-atomic="true" hidden>
+      <span class="operation-toast-signal" aria-hidden="true"><svg class="icon-ok" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="check"><path d="M10 18H8v-2h2v2Zm-2-2H6v-2h2v2Zm4-2v2h-2v-2h2Zm-6 0H4v-2h2v2Zm8 0h-2v-2h2v2Zm2-2h-2v-2h2v2Zm2-2h-2V8h2v2Zm2-2h-2V6h2v2Z"/></svg><svg class="icon-warn" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="warning-diamond"><path d="M2 10h2v2H2zm0 4h2v-2H2zm20-4h-2v2h2zm0 4h-2v-2h2zM4 8h2v2H4zm0 8h2v-2H4zm16-8h-2v2h2zm0 8h-2v-2h2zM6 6h2v2H6zm0 12h2v-2H6zM18 6h-2v2h2zm0 12h-2v-2h2zM8 4h2v2H8zm0 16h2v-2H8zm8-16h-2v2h2zm0 16h-2v-2h2zM10 2h2v2h-2zm0 20h2v-2h-2zm4-20h-2v2h2zm0 20h-2v-2h2zm-3-5h2v-2h-2zm0-4h2V7h-2z"/></svg><svg class="icon-error" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="square-alert"><path d="M4 2h16v2H4zm0 18h16v2H4zM20 4h2v16h-2zM2 4h2v16H2zm9 2h2v8h-2zm0 10h2v2h-2z"/></svg></span>
+      <div>
+        <strong id="operationToastTitle">Qubit Browser</strong>
+        <span id="operationToastDetail"></span>
+      </div>
+      <button id="closeOperationToastButton" type="button" aria-label="Dismiss notification" data-i18n-aria-label="ui.dismiss.notification"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="close"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg></button>
+    </section>
+
+    <template id="messageTemplate">
+      <div class="message-row">
+        <article class="message" tabindex="0">
+          <div class="message-role"></div>
+          <div class="message-content"></div>
+        </article>
+      </div>
+    </template>
+
+    <dialog id="browserControlDialog" class="browser-control-dialog" aria-labelledby="browserControlDialogTitle" aria-describedby="browserControlStripDetail">
+      <span class="browser-control-energy" aria-hidden="true"></span>
+      <span class="browser-control-flare" aria-hidden="true"></span>
+      <div class="browser-control-titlebar">
+        <h2 id="browserControlDialogTitle" class="browser-control-dialog-title" tabindex="-1" autofocus data-i18n="browser_control.kicker">QUBIT CONTROL</h2>
+        <span id="browserControlLight" class="browser-control-light" role="img" tabindex="0" data-state="off" data-control-help="status" data-help-as-name>
+          <span class="browser-control-light-dot" aria-hidden="true"></span>
+          <span id="browserControlLightWord" class="browser-control-light-word" aria-hidden="true" data-i18n-runtime data-i18n="browser_control.state_off">Off</span>
+        </span>
+        <button id="browserControlDismissButton" class="browser-control-dismiss" type="button" data-control-help="close" aria-label="Close" data-i18n-aria-label="ui.close">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="close"><path d="M7 19H5V17H7V19ZM19 19H17V17H19V19ZM9 15V17H7V15H9ZM17 17H15V15H17V17ZM11 15H9V13H11V15ZM15 15H13V13H15V15ZM13 13H11V11H13V13ZM11 11H9V9H11V11ZM15 11H13V9H15V11ZM9 9H7V7H9V9ZM17 9H15V7H17V9ZM7 7H5V5H7V7ZM19 7H17V5H19V7Z"/></svg>
+        </button>
+      </div>
+        <section id="browserControlStrip" class="browser-control-strip" aria-live="polite" hidden>
+          <div class="browser-control-strip-copy">
+            <strong id="browserControlStripTitle" data-i18n-runtime data-i18n="browser_control.control_ready">Control ready</strong>
+            <span id="browserControlStripDetail" data-i18n-runtime data-i18n="browser_control.waiting">Waiting for Qubit.</span>
+          </div>
+          <div class="browser-control-strip-actions">
+            <button id="browserControlDialogShowTabButton" class="browser-control-action secondary" type="button" hidden data-control-help="show-tab" aria-label="Show the tab Qubit is using" data-i18n-aria-label="browser_control.show_tab_aria" data-i18n="browser_control.show_tab">Show tab</button>
+            <button id="browserControlScreenshotPermissionButton" class="browser-control-action" type="button" hidden data-i18n="firefox_screenshots.allow">Allow screenshots on Firefox</button>
+            <button id="browserControlAuthorizeButton" class="browser-control-action" type="button" hidden data-control-help="authorize" data-i18n="browser_control.authorize">Authorize control</button>
+            <button id="browserControlAttachButton" data-control-help="attach" class="browser-control-action" type="button" hidden data-i18n-runtime data-i18n="ui.attach">Attach</button>
+            <button id="browserControlOffButton" data-control-help="off" class="browser-control-action secondary" type="button" data-i18n="browser_control.turn_off">Turn off</button>
+            <button id="browserControlPauseButton" class="browser-control-action secondary" type="button" data-control-help="pause" aria-label="Pause" data-i18n-aria-label="browser_control.pause">
+              <svg class="glyph-pause" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="pause"><path d="M10 20H4V4h6v16Zm8-16v16h-6V4h6Zm-4 2v12h2V6h-2ZM6 18h2V6H6v12Z"/></svg>
+              <svg class="glyph-play" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="play" hidden><path d="M15 11h-2V9h2zm0 4h-2v-2h2zm-2 2h-2v-2h2zm0-8h-2V7h2zm-2-2H9V5h2zM9 21H7V3h2zm6-8h2v-2h-2zm-6 4h2v2H9z"/></svg>
+              <span id="browserControlPauseLabel" data-i18n-runtime data-i18n="browser_control.pause">Pause</span>
+            </button>
+            <button id="browserControlStopButton" class="browser-control-action secondary" type="button" data-control-help="stop" hidden aria-label="Stop" data-i18n-aria-label="browser_control.stop">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="stop"><path d="M20 20H4V4H20V20ZM6 18H18V6H6V18ZM14 14H10V10H14V14Z"/></svg>
+              <span data-i18n="browser_control.stop">Stop</span>
+            </button>
+            <button id="browserControlApproveButton" class="browser-control-action" type="button" hidden data-control-help="approve" data-i18n="browser_control.approve_once">Approve once</button>
+            <button id="browserControlRejectButton" class="browser-control-action secondary" type="button" hidden data-control-help="reject" data-i18n="browser_control.reject">Reject</button>
+          </div>
+          <div class="browser-control-dialog-config browser-control-config">
+            <label class="browser-control-field">
+              <span id="browserControlDialogScopeLabel" data-i18n="browser_control.scope">Control scope</span>
+              <select id="browserControlDialogScopeInput" data-control-help="scope" aria-labelledby="browserControlDialogScopeLabel" aria-describedby="browserControlDialogScopeHelp browserControlDialogScopeHint">
+                <option value="this-tab" data-i18n="browser_control.this_tab">This tab</option>
+                <option value="selected-tabs" data-i18n="browser_control.selected_tabs">Selected tabs</option>
+                <option value="task-set" data-i18n="browser_control.task_set">Task set</option>
+              </select>
+              <small id="browserControlDialogScopeHelp" data-i18n-runtime data-i18n="browser_control.help_scope_this_tab">Control only the current tab. Other tabs are not included.</small>
+              <small id="browserControlDialogScopeHint" role="status" data-i18n-runtime data-i18n="browser_control.scope_locked">Choose the scope here, then apply. Multiple tabs must be selected explicitly.</small>
+            </label>
+            <fieldset id="browserControlDialogTabs" class="browser-control-tabs" hidden>
+              <legend data-i18n="browser_control.scope_tabs">Tabs in this scope</legend>
+              <div id="browserControlDialogTabList" class="browser-control-tab-list"></div>
+            </fieldset>
+            <button id="browserControlDialogApplyScope" class="browser-control-action secondary browser-control-apply-scope" type="button" data-control-help="apply" data-i18n="ui.apply">Apply</button>
+          </div>
+        </section>
+      <p id="browserControlTooltip" class="browser-control-tooltip" role="tooltip" popover="manual"></p>
+    </dialog>
+
+    <section id="profileSwitchDialog" class="profile-switch-dialog" role="dialog" aria-modal="true" aria-labelledby="profileSwitchTitle" aria-describedby="profileSwitchDetail" tabindex="-1" hidden>
+      <div class="profile-switch-card">
+        <span class="session-ownership-kicker" data-i18n="profile_switch.kicker">PROFILE CHANGE</span>
+        <h2 id="profileSwitchTitle" data-i18n="profile_switch.title">Start a new Qubit session?</h2>
+        <p id="profileSwitchDetail"></p>
+        <div class="profile-switch-actions">
+          <button id="profileSwitchCarryButton" type="button" data-i18n="profile_switch.carry">Continue with prior context</button>
+          <button id="profileSwitchCleanButton" class="secondary" type="button" data-i18n="profile_switch.clean">Start clean session</button>
+          <button id="profileSwitchCancelButton" class="ghost" type="button" data-i18n="profile_switch.cancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+    <section id="botModeLeaveDialog" class="profile-switch-dialog bot-mode-leave-dialog" role="dialog" aria-modal="true" aria-labelledby="botModeLeaveTitle" aria-describedby="botModeLeaveDetail" tabindex="-1" hidden>
+      <div class="profile-switch-card">
+        <span class="session-ownership-kicker" data-i18n="bot_mode.leave_kicker">REGULAR SESSIONS</span>
+        <h2 id="botModeLeaveTitle" data-i18n="bot_mode.leave_title">Exit Bot Mode?</h2>
+        <p id="botModeLeaveDetail" data-i18n="bot_mode.leave_detail">Starting a new extension session will return you to your regular workspace.</p>
+        <div class="profile-switch-actions">
+          <button id="botModeLeaveConfirmButton" class="primary" type="button" data-i18n="bot_mode.leave_confirm">Return to Regular Sessions</button>
+          <button id="botModeLeaveCancelButton" class="ghost" type="button" data-i18n="ui.cancel">Cancel</button>
+        </div>
+      </div>
+    </section>
+
+        <section id="modelSwitchDialog" class="profile-switch-dialog" role="dialog" aria-modal="true" aria-labelledby="modelSwitchTitle" aria-describedby="modelSwitchDetail" tabindex="-1" hidden>
+          <div class="profile-switch-card">
+            <span class="session-ownership-kicker" data-i18n="bot_mode.model_switch_kicker">MODEL SWITCH</span>
+                        <h2 id="modelSwitchTitle">Switch models?</h2>
+                        <p id="modelSwitchDetail"></p>
+                        <div class="profile-switch-actions">
+                          <button id="modelSwitchConfirmButton" class="primary" type="button" data-i18n="bot_mode.model_switch_confirm">Switch anyway</button>
+              <button id="modelSwitchCancelButton" class="ghost" type="button" data-i18n="ui.cancel">Cancel</button>
+            </div>
+          </div>
+        </section>
+
+        <section id="webappDialog" class="profile-switch-dialog" role="dialog" aria-modal="true" aria-labelledby="webappDialogTitle" aria-describedby="webappDialogDetail" tabindex="-1" hidden>
+      <div class="profile-switch-card webapp-dialog-card">
+        <span class="session-ownership-kicker" data-i18n="ui.qubit.web">Qubit Web</span>
+        <h2 id="webappDialogTitle" data-i18n="webapp.dialog_title">Qubit Web is not available</h2>
+        <p id="webappDialogDetail" data-i18n="webapp.dialog_body">Your gateway serves Qubit Web once it is turned on. On the computer that runs Qubit, run these commands.</p>
+        <p data-webapp-reason="unreachable" data-i18n="webapp.reason_unreachable" hidden>Nothing answered at this address:</p>
+        <p data-webapp-reason="permission-denied" data-i18n="webapp.reason_permission" hidden>The browser did not allow the Qubit Browser Extension to reach this address:</p>
+        <p id="webappDialogNeedsAddress" data-webapp-reason="needs-address" data-i18n="webapp.reason_needs_address" hidden>This connection is remote, so there is no address to try. Enter the Qubit Web address in Settings.</p>
+        <p data-webapp-reason="invalid-address" data-i18n="webapp.reason_invalid_address" hidden>The Qubit Web address in Settings is not a valid http or https address.</p>
+        <code id="webappDialogAddress" class="webapp-address" data-i18n-invariant hidden></code>
+        <ol class="webapp-commands">
+          <li class="webapp-command">
+            <code id="webappCommand0" data-i18n-invariant>qubit config set webapp.enabled true</code>
+            <button type="button" class="webapp-copy" data-webapp-copy="qubit config set webapp.enabled true" aria-describedby="webappCommand0" aria-label="Copy command" title="Copy command" data-i18n-aria-label="webapp.copy_command" data-i18n-title="webapp.copy_command"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="copy"><path d="M8 6h12v2H8zM4 2h12v2H4zm2 6h2v12H6zM2 4h2v12H2zm6 16h12v2H8zM20 8h2v12h-2zm-4-4h2v2h-2zM4 16h2v2H4z"/></svg></button>
+          </li>
+          <li class="webapp-command">
+            <code id="webappCommand1" data-i18n-invariant>qubit gateway restart</code>
+            <button type="button" class="webapp-copy" data-webapp-copy="qubit gateway restart" aria-describedby="webappCommand1" aria-label="Copy command" title="Copy command" data-i18n-aria-label="webapp.copy_command" data-i18n-title="webapp.copy_command"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="copy"><path d="M8 6h12v2H8zM4 2h12v2H4zm2 6h2v12H6zM2 4h2v12H2zm6 16h12v2H8zM20 8h2v12h-2zm-4-4h2v2h-2zM4 16h2v2H4z"/></svg></button>
+          </li>
+          <li class="webapp-command" data-webapp-sign-in>
+            <code id="webappCommand2" data-i18n-invariant>qubit webapp</code>
+            <button type="button" class="webapp-copy" data-webapp-copy="qubit webapp" aria-describedby="webappCommand2" aria-label="Copy command" title="Copy command" data-i18n-aria-label="webapp.copy_command" data-i18n-title="webapp.copy_command"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true" data-icon="copy"><path d="M8 6h12v2H8zM4 2h12v2H4zm2 6h2v12H6zM2 4h2v12H2zm6 16h12v2H8zM20 8h2v12h-2zm-4-4h2v2h-2zM4 16h2v2H4z"/></svg></button>
+          </li>
+        </ol>
+        <span id="webappCopyStatus" class="sr-only" role="status" aria-live="polite"></span>
+        <a id="webappDocsLink" class="webapp-docs-link" href="https://qubit-agent.nousresearch.com/docs/user-guide/desktop#use-the-desktop-workspace-from-a-browser" target="_blank" rel="noopener noreferrer" data-i18n="webapp.docs_link">Read the Qubit Web guide</a>
+        <div class="profile-switch-actions">
+          <button id="webappDialogRetry" class="primary" type="button" data-i18n="webapp.try_again">Check again</button>
+          <button id="webappDialogClose" class="ghost" type="button" data-i18n="ui.close">Close</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>

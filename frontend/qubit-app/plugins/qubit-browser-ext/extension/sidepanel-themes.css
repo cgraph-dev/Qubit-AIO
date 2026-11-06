@@ -1,0 +1,708 @@
+/* Canonical Qubit palettes for the Browser sidepanel. Loaded after sidepanel.css. */
+
+/* Qubit Control status light. Fixed per mode rather than per theme: the window sits on each
+   theme's paper, so each mode needs a dot colour that holds 3:1 on every built-in paper in it. */
+:root { --control-on: #3ddc84; --control-off: #ff6b6b; }
+html[data-qubit-mode="light"] { --control-on: #166534; --control-off: #b42318; }
+
+html[data-qubit-theme="nous"][data-qubit-mode="light"] {
+  --qubit-user-bg: #0000f2;
+  --qubit-user-fg: #0000f2;
+  --qubit-user-border: rgba(0, 0, 242, 0.55);
+}
+
+html[data-qubit-theme="nous"][data-qubit-mode="light"] ::selection {
+  background: #EDFF45;
+  color: #0000f2;
+}
+
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .model-provider-option {
+  color: var(--qubit-ink);
+}
+
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .model-provider-option.selected {
+  background: #0000f2;
+  border-color: #0000f2;
+  color: #ffffff;
+}
+
+html[data-qubit-theme="midnight"][data-qubit-mode="light"] {
+  --qubit-user-bg: #2a1a69;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #2a1a69;
+  --qubit-card-bg: #ffffff;
+}
+
+html[data-qubit-theme="ember"][data-qubit-mode="light"] {
+  --qubit-user-bg: #651b00;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #651b00;
+  --qubit-card-bg: #fffaf6;
+}
+
+html[data-qubit-theme="mono"][data-qubit-mode="light"] {
+  --qubit-user-bg: #1d1d1d;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #1d1d1d;
+  --qubit-card-bg: #ffffff;
+}
+
+html[data-qubit-theme="cyberpunk"][data-qubit-mode="light"] {
+  --qubit-user-bg: #005e25;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #005e25;
+  --qubit-card-bg: #fbfffc;
+}
+
+html[data-qubit-theme="slate"][data-qubit-mode="light"] {
+  --qubit-user-bg: #1d3848;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #1d3848;
+  --qubit-card-bg: #ffffff;
+  --qubit-app-bg: #ffffff;
+  --qubit-paper: #ffffff;
+  --qubit-fg: #18303f;
+  --qubit-fg-rgb: 24, 48, 63;
+  --qubit-ink: #1d3848;
+  --qubit-ink-rgb: 29, 56, 72;
+}
+
+html[data-qubit-theme="senter-space"][data-qubit-mode="dark"] {
+  --qubit-blue: #071614;
+  --qubit-blue-deep: #040b0a;
+  --qubit-paper: #10221f;
+  --qubit-fg: #d5eee7;
+  --qubit-ink: #e8d3a8;
+  --qubit-accent: #64b7a5;
+  --qubit-bg-rgb: 7, 22, 20;
+  --qubit-panel-rgb: 16, 34, 31;
+  --qubit-paper-rgb: 16, 34, 31;
+  --qubit-fg-rgb: 213, 238, 231;
+  --qubit-ink-rgb: 232, 211, 168;
+  --qubit-accent-rgb: 100, 183, 165;
+  --qubit-menu-bg: #10221f;
+}
+
+html[data-qubit-theme="senter-space"][data-qubit-mode="light"] {
+  --qubit-blue: #174f48;
+  --qubit-blue-deep: #103b35;
+  --qubit-paper: #fbf8ef;
+  --qubit-app-bg: #fbf8ef;
+  --qubit-fg: #174f48;
+  --qubit-ink: #174f48;
+  --qubit-accent: #b77c38;
+  --qubit-bg-rgb: 23, 79, 72;
+  --qubit-panel-rgb: 251, 248, 239;
+  --qubit-paper-rgb: 251, 248, 239;
+  --qubit-fg-rgb: 23, 79, 72;
+  --qubit-ink-rgb: 23, 79, 72;
+  --qubit-accent-rgb: 183, 124, 56;
+  --qubit-menu-bg: #fbf8ef;
+  --qubit-primary-fg: #f3ead9;
+  --qubit-user-fg: #f3ead9;
+}
+
+html[data-qubit-theme="aurora"][data-qubit-mode="dark"] {
+  --qubit-blue: #3b0928;
+  --qubit-blue-deep: #210416;
+  --qubit-paper: #24111d;
+  --qubit-fg: #fff0f7;
+  --qubit-ink: #ffe3ef;
+  --qubit-accent: #ff4fa3;
+  --qubit-bg-rgb: 59, 9, 40;
+  --qubit-panel-rgb: 36, 17, 29;
+  --qubit-paper-rgb: 36, 17, 29;
+  --qubit-fg-rgb: 255, 240, 247;
+  --qubit-ink-rgb: 255, 227, 239;
+  --qubit-accent-rgb: 255, 79, 163;
+  --qubit-menu-bg: #24111d;
+}
+
+html[data-qubit-theme="aurora"][data-qubit-mode="light"] {
+  --qubit-blue: #b51c67;
+  --qubit-blue-deep: #801044;
+  --qubit-paper: #fff7fb;
+  --qubit-app-bg: #fff7fb;
+  --qubit-fg: #42142f;
+  --qubit-ink: #42142f;
+  --qubit-accent: #e8358b;
+  --qubit-bg-rgb: 181, 28, 103;
+  --qubit-panel-rgb: 255, 247, 251;
+  --qubit-paper-rgb: 255, 247, 251;
+  --qubit-fg-rgb: 66, 20, 47;
+  --qubit-ink-rgb: 66, 20, 47;
+  --qubit-accent-rgb: 232, 53, 139;
+  --qubit-menu-bg: #fff7fb;
+  --qubit-primary-fg: #fff5fa;
+  --qubit-user-fg: #fff5fa;
+}
+
+html[data-qubit-theme="solstice"][data-qubit-mode="dark"] {
+  --qubit-blue: #181715;
+  --qubit-blue-deep: #0d0c0b;
+  --qubit-paper: #28231b;
+  --qubit-fg: #f7ebd7;
+  --qubit-ink: #f0dfbb;
+  --qubit-accent: #e2b366;
+  --qubit-bg-rgb: 24, 23, 21;
+  --qubit-panel-rgb: 40, 35, 27;
+  --qubit-paper-rgb: 40, 35, 27;
+  --qubit-fg-rgb: 247, 235, 215;
+  --qubit-ink-rgb: 240, 223, 187;
+  --qubit-accent-rgb: 226, 179, 102;
+  --qubit-menu-bg: #28231b;
+}
+
+html[data-qubit-theme="solstice"][data-qubit-mode="light"] {
+  --qubit-blue: #6b4d22;
+  --qubit-blue-deep: #513a1b;
+  --qubit-paper: #fffbf3;
+  --qubit-app-bg: #fffbf3;
+  --qubit-fg: #58401f;
+  --qubit-ink: #58401f;
+  --qubit-accent: #bd7d2d;
+  --qubit-bg-rgb: 107, 77, 34;
+  --qubit-panel-rgb: 255, 251, 243;
+  --qubit-paper-rgb: 255, 251, 243;
+  --qubit-fg-rgb: 88, 64, 31;
+  --qubit-ink-rgb: 88, 64, 31;
+  --qubit-accent-rgb: 189, 125, 45;
+  --qubit-menu-bg: #fffbf3;
+  --qubit-primary-fg: #f7ebd5;
+  --qubit-user-fg: #f7ebd5;
+}
+
+/* Shared light-mode message treatment (every light theme).
+   User bubbles are a soft tint of the theme colour with a clear outline and
+   dark ink, never a solid dark slab, so "What Qubit saw", code and the
+   outline stay readable. Assistant bubbles stay opaque white cards. System
+   notices get an opaque surface so the background art never runs through
+   the text. */
+html[data-qubit-mode="light"] {
+  --_user-tint: color-mix(in srgb, var(--qubit-user-bg) 10%, #ffffff);
+}
+html[data-qubit-mode="light"] .message.user {
+  background: var(--_user-tint) !important;
+  color: var(--qubit-ink);
+  border: 1px solid color-mix(in srgb, var(--qubit-user-bg) 60%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 2px 8px rgba(var(--qubit-ink-rgb), 0.10);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+html[data-qubit-mode="light"] .message.user .message-content,
+html[data-qubit-mode="light"] .message.user .message-role {
+  color: var(--qubit-ink);
+}
+html[data-qubit-mode="light"] .message.user .message-content code,
+html[data-qubit-mode="light"] .message.user .message-content pre {
+  border-color: rgba(var(--qubit-ink-rgb), 0.24);
+  background: rgba(255, 255, 255, 0.7);
+}
+html[data-qubit-mode="light"] .message.user .message-content th { background: rgba(var(--qubit-ink-rgb), 0.08); }
+html[data-qubit-mode="light"] .message.user .md-table-wrap { border-color: rgba(var(--qubit-ink-rgb), 0.24); }
+html[data-qubit-mode="light"] .message.user .context-receipt {
+  border-top-color: rgba(var(--qubit-ink-rgb), 0.22);
+  color: rgba(var(--qubit-ink-rgb), 0.86);
+}
+html[data-qubit-mode="light"] .message.user .context-receipt summary {
+  color: var(--qubit-ink);
+  font-weight: 700;
+}
+html[data-qubit-mode="light"] .message.user .context-receipt dt {
+  color: rgba(var(--qubit-ink-rgb), 0.66);
+}
+html[data-qubit-mode="light"] .message.user .context-receipt dd {
+  color: var(--qubit-ink);
+}
+html[data-qubit-mode="light"] .message.system {
+  background: linear-gradient(var(--qubit-system-bg), var(--qubit-system-bg)), #ffffff;
+  color: var(--qubit-system-fg);
+  border: 1px solid rgba(var(--qubit-ink-rgb), 0.28);
+  box-shadow: 0 1px 6px rgba(var(--qubit-ink-rgb), 0.08);
+}
+html[data-qubit-mode="light"] .message.system .message-role,
+html[data-qubit-mode="light"] .message.system .message-content {
+  color: var(--qubit-system-fg);
+  opacity: 1;
+}
+
+/* Glass tokens: every built-in theme stays opaque in light (the v0.2.0 recipe).
+   Loaded after sidepanel.css so a light theme can never inherit dark glass. */
+html[data-qubit-mode="light"] {
+  --qubit-bubble-user-alpha: 100%;
+  --qubit-bubble-assistant-alpha: 100%;
+  --qubit-bubble-blur: 0px;
+  --qubit-bubble-saturate: 1;
+}
+
+/* Nous light pins the assistant bubble to opaque white with !important, so the
+   room tint rides an inset shadow that survives the forced background. */
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .message-row.room-message > .message.assistant {
+  box-shadow: inset 0 0 0 999px color-mix(in srgb, var(--bot-tint, transparent) 6%, transparent);
+}
+
+/* Keep the Settings banner's original blue treatment separate from the intro. */
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .release-sidecar {
+  color: #f8faff;
+  --qubit-fg: #f8faff;
+  --qubit-fg-rgb: 248, 250, 255;
+  --qubit-ink: #0505e8;
+  --qubit-ink-rgb: 5, 5, 232;
+  --qubit-accent: #dbe6ff;
+  --qubit-accent-rgb: 219, 230, 255;
+  --qubit-panel-rgb: 5, 5, 232;
+  --qubit-bg-rgb: 5, 5, 232;
+  --qubit-app-bg: #0505e8;
+  --qubit-shadow-rgb: 0, 0, 0;
+}
+
+/* Front intro stays on paper; brand ink and grayscale artwork carry the theme. */
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .hero-card {
+  --qubit-fg: #0000f2;
+  --qubit-fg-rgb: 0, 0, 242;
+  --qubit-ink: #0000f2;
+  --qubit-ink-rgb: 0, 0, 242;
+  --qubit-panel-rgb: 255, 255, 255;
+  --qubit-bg-rgb: 255, 255, 255;
+  --qubit-app-bg: #ffffff;
+}
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .hero-card {
+  --qubit-fg: #d4182d;
+  --qubit-fg-rgb: 212, 24, 45;
+  --qubit-ink: #d4182d;
+  --qubit-ink-rgb: 212, 24, 45;
+  --qubit-panel-rgb: 255, 255, 255;
+  --qubit-bg-rgb: 255, 255, 255;
+  --qubit-app-bg: #ffffff;
+}
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .hero-card,
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .hero-card {
+  background:
+    linear-gradient(90deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.9) 55%, rgba(255,255,255,0.68) 100%),
+    var(--sidecar-art, url("assets/img/qubit-browse.webp")) center / cover no-repeat,
+    var(--qubit-app-bg);
+}
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .hero-badge,
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .hero-badge { background: var(--qubit-paper); }
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .hero-dismiss,
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .hero-dismiss { color: var(--qubit-fg); }
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .hero-dismiss:hover,
+html[data-qubit-theme="nous"][data-qubit-mode="light"] .hero-dismiss:focus-visible,
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .hero-dismiss:hover,
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .hero-dismiss:focus-visible {
+  border-color: var(--qubit-fg);
+  background: var(--qubit-fg);
+  color: var(--qubit-paper);
+}
+
+/* Everforest and Classic use the Desktop palette seeds. Muted text is
+   lifted where needed for small Browser labels. Anti-Nous is first-party. */
+html[data-qubit-theme="everforest"][data-qubit-mode="dark"] {
+  color-scheme: dark;
+  --qubit-blue: #2d353b;
+  --qubit-blue-deep: #232a2e;
+  --qubit-blue-rgb: 45, 53, 59;
+  --qubit-app-bg: #2d353b;
+  --qubit-app-bg-deep: #232a2e;
+  --qubit-canvas: #2d353b;
+  --qubit-paper: #2d353b;
+  --qubit-card-bg: #2d353b;
+  --qubit-ink: #d3c6aa;
+  --qubit-fg: #d3c6aa;
+  --qubit-muted: #a4ada1;
+  --qubit-accent: #a7c080;
+  --qubit-trim: #dbbc7f;
+  --qubit-shell-fg: #d3c6aa;
+  --qubit-shell-fg-rgb: 211, 198, 170;
+  --qubit-white: #d3c6aa;
+  --qubit-white-rgb: 211, 198, 170;
+  --qubit-bg-rgb: 45, 53, 59;
+  --qubit-panel-rgb: 45, 53, 59;
+  --qubit-paper-rgb: 45, 53, 59;
+  --qubit-fg-rgb: 211, 198, 170;
+  --qubit-ink-rgb: 211, 198, 170;
+  --qubit-accent-rgb: 167, 192, 128;
+  --qubit-shadow-rgb: 35, 42, 46;
+  --qubit-menu-bg: #2d353b;
+  --qubit-panel-bg: #2d353b;
+  --qubit-panel-border: #536457;
+  --qubit-line: #536457;
+  --qubit-line-strong: #a7c080;
+  --qubit-blue-line: rgba(211, 198, 170, 0.34);
+  --qubit-blue-muted: #d3c6aa;
+  --qubit-control-bg: #232a2e;
+  --qubit-control-fg: #d3c6aa;
+  --qubit-control-border: #536457;
+  --qubit-input-bg: #232a2e;
+  --qubit-primary-bg: #a7c080;
+  --qubit-primary-fg: #20291b;
+  --qubit-primary-border: #a7c080;
+  --qubit-user-bg: #4b5f36;
+  --qubit-user-fg: #fdf6e3;
+  --qubit-user-border: #a7c080;
+  --qubit-system-bg: #2d353b;
+  --qubit-system-fg: #d3c6aa;
+  --qubit-pill-bg: #232a2e;
+  --qubit-pill-fg: #d3c6aa;
+  --qubit-pill-border: #536457;
+  --qubit-pill-ok-bg: #232a2e;
+  --qubit-pill-ok-fg: #a7c080;
+  --qubit-pill-ok-border: #a7c080;
+  --qubit-meter-fill: #a7c080;
+  --qubit-danger: #f29897;
+  --qubit-on-danger: #2d353b;
+  --qubit-success: #a7c080;
+  --qubit-warning: #dbbc7f;
+  --danger: #f29897;
+  --ok: #a7c080;
+}
+
+html[data-qubit-theme="everforest"][data-qubit-mode="light"] {
+  color-scheme: light;
+  --qubit-blue: #586b35;
+  --qubit-blue-deep: #586b35;
+  --qubit-blue-rgb: 88, 107, 53;
+  --qubit-app-bg: #fdf6e3;
+  --qubit-app-bg-deep: #e6e3cb;
+  --qubit-canvas: #fdf6e3;
+  --qubit-paper: #fdf6e3;
+  --qubit-card-bg: #fdf6e3;
+  --qubit-ink: #5c6a72;
+  --qubit-fg: #5c6a72;
+  --qubit-muted: #65705f;
+  --qubit-accent: #586b35;
+  --qubit-trim: #957433;
+  --qubit-shell-fg: #fdf6e3;
+  --qubit-shell-fg-rgb: 253, 246, 227;
+  --qubit-white: #fdf6e3;
+  --qubit-white-rgb: 253, 246, 227;
+  --qubit-bg-rgb: 88, 107, 53;
+  --qubit-panel-rgb: 253, 246, 227;
+  --qubit-paper-rgb: 253, 246, 227;
+  --qubit-fg-rgb: 92, 106, 114;
+  --qubit-ink-rgb: 92, 106, 114;
+  --qubit-accent-rgb: 88, 107, 53;
+  --qubit-shadow-rgb: 230, 227, 203;
+  --qubit-menu-bg: #fdf6e3;
+  --qubit-panel-bg: #fdf6e3;
+  --qubit-panel-border: #a8ad91;
+  --qubit-line: #a8ad91;
+  --qubit-line-strong: #586b35;
+  --qubit-blue-line: rgba(253, 246, 227, 0.34);
+  --qubit-blue-muted: #fdf6e3;
+  --qubit-control-bg: #f7f0de;
+  --qubit-control-fg: #5c6a72;
+  --qubit-control-border: #a8ad91;
+  --qubit-input-bg: #f7f0de;
+  --qubit-primary-bg: #586b35;
+  --qubit-primary-fg: #ffffff;
+  --qubit-primary-border: #586b35;
+  --qubit-user-bg: #586b35;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #586b35;
+  --qubit-system-bg: #fdf6e3;
+  --qubit-system-fg: #5c6a72;
+  --qubit-pill-bg: #f7f0de;
+  --qubit-pill-fg: #5c6a72;
+  --qubit-pill-border: #a8ad91;
+  --qubit-pill-ok-bg: #f7f0de;
+  --qubit-pill-ok-fg: #48632e;
+  --qubit-pill-ok-border: #48632e;
+  --qubit-meter-fill: #586b35;
+  --qubit-danger: #b63836;
+  --qubit-on-danger: #fdf6e3;
+  --qubit-success: #48632e;
+  --qubit-warning: #8a6500;
+  --danger: #b63836;
+  --ok: #48632e;
+}
+
+html[data-qubit-theme="classic"][data-qubit-mode="dark"] {
+  color-scheme: dark;
+  --qubit-blue: #1a1a2e;
+  --qubit-blue-deep: #121221;
+  --qubit-blue-rgb: 26, 26, 46;
+  --qubit-app-bg: #1a1a2e;
+  --qubit-app-bg-deep: #121221;
+  --qubit-canvas: #1a1a2e;
+  --qubit-paper: #232335;
+  --qubit-card-bg: #232335;
+  --qubit-ink: #fff8dc;
+  --qubit-fg: #fff8dc;
+  --qubit-muted: #b8860b;
+  --qubit-accent: #ffbf00;
+  --qubit-trim: #cd7f32;
+  --qubit-shell-fg: #fff8dc;
+  --qubit-shell-fg-rgb: 255, 248, 220;
+  --qubit-white: #fff8dc;
+  --qubit-white-rgb: 255, 248, 220;
+  --qubit-bg-rgb: 26, 26, 46;
+  --qubit-panel-rgb: 35, 35, 53;
+  --qubit-paper-rgb: 35, 35, 53;
+  --qubit-fg-rgb: 255, 248, 220;
+  --qubit-ink-rgb: 255, 248, 220;
+  --qubit-accent-rgb: 255, 191, 0;
+  --qubit-shadow-rgb: 18, 18, 33;
+  --qubit-menu-bg: #232335;
+  --qubit-panel-bg: #232335;
+  --qubit-panel-border: #805336;
+  --qubit-line: #805336;
+  --qubit-line-strong: #ffbf00;
+  --qubit-blue-line: rgba(255, 248, 220, 0.34);
+  --qubit-blue-muted: #fff8dc;
+  --qubit-control-bg: #1a1a2e;
+  --qubit-control-fg: #fff8dc;
+  --qubit-control-border: #805336;
+  --qubit-input-bg: #1a1a2e;
+  --qubit-primary-bg: #ffbf00;
+  --qubit-primary-fg: #161616;
+  --qubit-primary-border: #ffbf00;
+  --qubit-user-bg: #6b4f00;
+  --qubit-user-fg: #fff8dc;
+  --qubit-user-border: #ffbf00;
+  --qubit-system-bg: #232335;
+  --qubit-system-fg: #fff8dc;
+  --qubit-pill-bg: #1a1a2e;
+  --qubit-pill-fg: #fff8dc;
+  --qubit-pill-border: #805336;
+  --qubit-pill-ok-bg: #1a1a2e;
+  --qubit-pill-ok-fg: #a7c080;
+  --qubit-pill-ok-border: #a7c080;
+  --qubit-meter-fill: #ffbf00;
+  --qubit-danger: #ef7770;
+  --qubit-on-danger: #1a1a2e;
+  --qubit-success: #a7c080;
+  --qubit-warning: #e8bb67;
+  --danger: #ef7770;
+  --ok: #a7c080;
+}
+
+html[data-qubit-theme="classic"][data-qubit-mode="light"] {
+  color-scheme: light;
+  --qubit-blue: #825d02;
+  --qubit-blue-deep: #825d02;
+  --qubit-blue-rgb: 130, 93, 2;
+  --qubit-app-bg: #f5f5f5;
+  --qubit-app-bg-deep: #e5e0d3;
+  --qubit-canvas: #f5f5f5;
+  --qubit-paper: #f0f0ef;
+  --qubit-card-bg: #f0f0ef;
+  --qubit-ink: #2b2109;
+  --qubit-fg: #2b2109;
+  --qubit-muted: #74634b;
+  --qubit-accent: #825d02;
+  --qubit-trim: #956025;
+  --qubit-shell-fg: #fff8dc;
+  --qubit-shell-fg-rgb: 255, 248, 220;
+  --qubit-white: #fff8dc;
+  --qubit-white-rgb: 255, 248, 220;
+  --qubit-bg-rgb: 130, 93, 2;
+  --qubit-panel-rgb: 240, 240, 239;
+  --qubit-paper-rgb: 240, 240, 239;
+  --qubit-fg-rgb: 43, 33, 9;
+  --qubit-ink-rgb: 43, 33, 9;
+  --qubit-accent-rgb: 130, 93, 2;
+  --qubit-shadow-rgb: 229, 224, 211;
+  --qubit-menu-bg: #f0f0ef;
+  --qubit-panel-bg: #f0f0ef;
+  --qubit-panel-border: #b59265;
+  --qubit-line: #b59265;
+  --qubit-line-strong: #825d02;
+  --qubit-blue-line: rgba(255, 248, 220, 0.34);
+  --qubit-blue-muted: #fff8dc;
+  --qubit-control-bg: #f5f5f5;
+  --qubit-control-fg: #2b2109;
+  --qubit-control-border: #b59265;
+  --qubit-input-bg: #f5f5f5;
+  --qubit-primary-bg: #825d02;
+  --qubit-primary-fg: #ffffff;
+  --qubit-primary-border: #825d02;
+  --qubit-user-bg: #825d02;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #825d02;
+  --qubit-system-bg: #f0f0ef;
+  --qubit-system-fg: #2b2109;
+  --qubit-pill-bg: #f5f5f5;
+  --qubit-pill-fg: #2b2109;
+  --qubit-pill-border: #b59265;
+  --qubit-pill-ok-bg: #f5f5f5;
+  --qubit-pill-ok-fg: #48632e;
+  --qubit-pill-ok-border: #48632e;
+  --qubit-meter-fill: #825d02;
+  --qubit-danger: #c62828;
+  --qubit-on-danger: #f5f5f5;
+  --qubit-success: #48632e;
+  --qubit-warning: #825d02;
+  --danger: #c62828;
+  --ok: #48632e;
+}
+
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] {
+  color-scheme: dark;
+  --qubit-blue: #8a1a2d;
+  --qubit-blue-deep: #07101e;
+  --qubit-blue-rgb: 138, 26, 45;
+  --qubit-app-bg: #0b1425;
+  --qubit-app-bg-deep: #07101e;
+  --qubit-canvas: #0b1425;
+  --qubit-paper: #101b30;
+  --qubit-card-bg: #101b30;
+  --qubit-ink: #f5ece6;
+  --qubit-fg: #f5ece6;
+  --qubit-muted: #ada7ad;
+  --qubit-accent: #ff4d4d;
+  --qubit-trim: #d4af6c;
+  --qubit-shell-fg: #f5ece6;
+  --qubit-shell-fg-rgb: 245, 236, 230;
+  --qubit-white: #f5ece6;
+  --qubit-white-rgb: 245, 236, 230;
+  --qubit-bg-rgb: 138, 26, 45;
+  --qubit-panel-rgb: 16, 27, 48;
+  --qubit-paper-rgb: 16, 27, 48;
+  --qubit-fg-rgb: 245, 236, 230;
+  --qubit-ink-rgb: 245, 236, 230;
+  --qubit-accent-rgb: 255, 77, 77;
+  --qubit-shadow-rgb: 7, 16, 30;
+  --qubit-menu-bg: #101b30;
+  --qubit-panel-bg: #101b30;
+  --qubit-panel-border: #63434b;
+  --qubit-line: #63434b;
+  --qubit-line-strong: #ff4d4d;
+  --qubit-blue-line: rgba(245, 236, 230, 0.34);
+  --qubit-blue-muted: #f5ece6;
+  --qubit-control-bg: #0b1425;
+  --qubit-control-fg: #f5ece6;
+  --qubit-control-border: #63434b;
+  --qubit-input-bg: #0b1425;
+  --qubit-primary-bg: #d42a40;
+  --qubit-primary-fg: #fff7f0;
+  --qubit-primary-border: #ff4d4d;
+  --qubit-user-bg: #d42a40;
+  --qubit-user-fg: #fff7f0;
+  --qubit-user-border: #ff4d4d;
+  --qubit-system-bg: #101b30;
+  --qubit-system-fg: #f5ece6;
+  --qubit-pill-bg: #0b1425;
+  --qubit-pill-fg: #f5ece6;
+  --qubit-pill-border: #63434b;
+  --qubit-pill-ok-bg: #0b1425;
+  --qubit-pill-ok-fg: #a4c5a0;
+  --qubit-pill-ok-border: #a4c5a0;
+  --qubit-meter-fill: #ff4d4d;
+  --qubit-danger: #ffad82;
+  --qubit-on-danger: #0b1425;
+  --qubit-success: #a4c5a0;
+  --qubit-warning: #e4c98d;
+  --danger: #ffad82;
+  --ok: #a4c5a0;
+}
+
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] {
+  color-scheme: light;
+  --qubit-blue: #d4182d;
+  --qubit-blue-deep: #d4182d;
+  --qubit-blue-rgb: 212, 24, 45;
+  --qubit-app-bg: #ffffff;
+  --qubit-app-bg-deep: #fff1f0;
+  --qubit-canvas: #ffffff;
+  --qubit-paper: #ffffff;
+  --qubit-card-bg: #ffffff;
+  --qubit-ink: #d4182d;
+  --qubit-fg: #d4182d;
+  --qubit-muted: #a13a46;
+  --qubit-accent: #d4182d;
+  --qubit-trim: #8d681d;
+  --qubit-shell-fg: #fff7f0;
+  --qubit-shell-fg-rgb: 255, 247, 240;
+  --qubit-white: #fff7f0;
+  --qubit-white-rgb: 255, 247, 240;
+  --qubit-bg-rgb: 212, 24, 45;
+  --qubit-panel-rgb: 255, 255, 255;
+  --qubit-paper-rgb: 255, 255, 255;
+  --qubit-fg-rgb: 212, 24, 45;
+  --qubit-ink-rgb: 212, 24, 45;
+  --qubit-accent-rgb: 212, 24, 45;
+  --qubit-shadow-rgb: 255, 241, 240;
+  --qubit-menu-bg: #ffffff;
+  --qubit-panel-bg: #ffffff;
+  --qubit-panel-border: #e8838d;
+  --qubit-line: #e8838d;
+  --qubit-line-strong: #d4182d;
+  --qubit-blue-line: rgba(255, 247, 240, 0.34);
+  --qubit-blue-muted: #fff7f0;
+  --qubit-control-bg: #fff8f7;
+  --qubit-control-fg: #d4182d;
+  --qubit-control-border: #e8838d;
+  --qubit-input-bg: #fff8f7;
+  --qubit-primary-bg: #d4182d;
+  --qubit-primary-fg: #ffffff;
+  --qubit-primary-border: #d4182d;
+  --qubit-user-bg: #d4182d;
+  --qubit-user-fg: #ffffff;
+  --qubit-user-border: #d4182d;
+  --qubit-system-bg: #ffffff;
+  --qubit-system-fg: #d4182d;
+  --qubit-pill-bg: #fff8f7;
+  --qubit-pill-fg: #d4182d;
+  --qubit-pill-border: #e8838d;
+  --qubit-pill-ok-bg: #fff8f7;
+  --qubit-pill-ok-fg: #38684a;
+  --qubit-pill-ok-border: #38684a;
+  --qubit-meter-fill: #d4182d;
+  --qubit-danger: #9d3516;
+  --qubit-on-danger: #ffffff;
+  --qubit-success: #38684a;
+  --qubit-warning: #8d681d;
+  --danger: #9d3516;
+  --ok: #38684a;
+}
+
+/* Red chrome surrounds navy reading areas. Brass is reserved for key edges. */
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .topbar,
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .settings-dialog > form > header {
+  background: #8a1a2d;
+  border-bottom-color: var(--qubit-trim);
+}
+/* The Settings header sits inside the form's 14px inset. Its red runs to the
+   panel edges, so it doesn't read as a block floating on the navy; the
+   contents keep their place over the divider. */
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .settings-dialog > form > header {
+  max-width: none;
+  margin-inline: -14px;
+  padding-inline: 14px;
+}
+/* The scrollbar column sits outside the form, so the dialog paints the same
+   band behind it (fixed while the dialog scrolls) and the thumb runs over it. */
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .settings-dialog {
+  background:
+    linear-gradient(#8a1a2d calc(100% - 1px), var(--qubit-trim) 0) 0 0 / 100% var(--settings-header-height, 0px) no-repeat,
+    var(--qubit-paper);
+}
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .settings-section h3 {
+  color: var(--qubit-accent);
+}
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .brand-mini-mark {
+  background-color: #ffffff;
+}
+html[data-qubit-theme="anti-nous"] .composer {
+  border-top-color: var(--qubit-trim);
+}
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .message.user {
+  border-color: #a64b58;
+}
+html[data-qubit-theme="anti-nous"][data-qubit-mode="dark"] .message.assistant {
+  border-color: #3c4d66;
+}
+html[data-qubit-theme="anti-nous"] :focus-visible {
+  outline-color: var(--qubit-trim);
+}
+html[data-qubit-theme="anti-nous"] ::selection {
+  background: var(--qubit-primary-bg);
+  color: var(--qubit-primary-fg);
+}
+/* Match Nous Light's opaque white cards and crisp branded startup treatment. */
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .message.assistant,
+html[data-qubit-theme="anti-nous"][data-qubit-mode="light"] .composer {
+  background: #ffffff;
+  backdrop-filter: none;
+}
