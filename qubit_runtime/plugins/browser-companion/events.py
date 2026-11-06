@@ -1,10 +1,4 @@
-"""Runtime event names for the browser-companion plugin.
-
-Ported from the companion plugin of ``hermes-browser-extension``
-(https://github.com/abundantbeing/hermes-browser-extension) at pin
-16d42430ff45d5833cb6176b401db867b591c2f2, MIT, Copyright (c) 2026 Jon Komet.
-See PROVENANCE.json beside this file. Local divergence: rebranding only.
-"""
+"""Runtime event names for the Qubit Browser Extension plugin."""
 
 RUN_STARTED = "run.started"
 RUN_COMPLETED = "run.completed"
@@ -20,20 +14,18 @@ BROWSER_CONTROL_DETACHED = "browser.control.detached"
 
 CONTROL_EVENTS_ENABLED = False
 
-# Upstream emitted ``hermes.browser.control.*``; this port speaks ``qubit.browser.control.*``.
-_CONTROL_EVENTS = {
-    "qubit.browser.control.available": BROWSER_CONTROL_AVAILABLE,
-    "qubit.browser.control.unavailable": BROWSER_CONTROL_UNAVAILABLE,
-    "qubit.browser.control.approval_requested": BROWSER_CONTROL_APPROVAL_REQUESTED,
-    "qubit.browser.control.detached": BROWSER_CONTROL_DETACHED,
-}
-
 
 def normalize_event_name(name: str) -> str:
-    """Normalize a raw event name to a canonical browser-companion event name."""
+    """Normalize a raw event name to a canonical companion event name."""
     raw = str(name or "")
-    if raw in _CONTROL_EVENTS:
-        return _CONTROL_EVENTS[raw]
+    control_events = {
+        "qubit.browser.control.available": BROWSER_CONTROL_AVAILABLE,
+        "qubit.browser.control.unavailable": BROWSER_CONTROL_UNAVAILABLE,
+        "qubit.browser.control.approval_requested": BROWSER_CONTROL_APPROVAL_REQUESTED,
+        "qubit.browser.control.detached": BROWSER_CONTROL_DETACHED,
+    }
+    if raw in control_events:
+        return control_events[raw]
     if "control" in raw.lower():
         return "runtime.unknown"
     if raw == "qubit.tool.progress":

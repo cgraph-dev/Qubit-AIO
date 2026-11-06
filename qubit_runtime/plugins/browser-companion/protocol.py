@@ -1,11 +1,4 @@
-"""Browser Context Protocol (BCP v2) envelope for the browser-companion plugin.
-
-Ported from the companion plugin of ``hermes-browser-extension``
-(https://github.com/abundantbeing/hermes-browser-extension) at pin
-16d42430ff45d5833cb6176b401db867b591c2f2, MIT, Copyright (c) 2026 Jon Komet.
-See PROVENANCE.json beside this file. Local divergence: rebranding only
-(``hermes.browser.context.v1`` -> ``qubit.browser.context.v1``).
-"""
+"""Browser Context Protocol helpers for the companion prototype."""
 
 from __future__ import annotations
 

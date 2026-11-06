@@ -1,0 +1,1193 @@
+import {
+  buildSidePanelPath,
+  DEFAULT_PANEL_RESIDENCY_MODE,
+  normalizePanelResidencyMode,
+  PANEL_RESIDENCY_MODES,
+} from './lib/panel-residency.mjs';
+import {
+  detectBrowserId,
+  detectBrowserProduct,
+  openNativeSidebar,
+  openSidePanelWithConfirmation,
+  setActionClickPanelBehavior as setPanelBehaviorForBrowser,
+  setActionIconForBrowser,
+} from './lib/browser-runtime.mjs';
+import {
+  normalizeTranscriptPayload,
+  parseTimedTextXml,
+  parseYoutubeJson3,
+  providerUrlForVideo,
+} from './lib/transcript.mjs';
+import {
+  INLINE_DRAFT_ROUTES,
+  buildInlineDraftPrompt,
+  normalizeInlineDraftRequest,
+  sanitizeInlineDraftResult,
+} from './lib/inline-draft-policy.mjs';
+import { CONTEXT_CONSENT_STORAGE_KEY } from './lib/context-consent.mjs';
+import { gateInlineDraftRequestContext } from './lib/inline-draft-consent.mjs';
+import { createQubitClient } from './lib/qubit-client.mjs';
+import { isLocalGatewayConnection, openQubitWebapp } from './lib/qubit-webapp.mjs';
+import { resolveWebappTarget } from './lib/qubit-webapp.mjs';
+import { createWebappCredentialStore, keepSignedInEnabled } from './lib/webapp-credential.mjs';
+import { createWebappGatewayTickets } from './lib/webapp-gateway-tickets.mjs';
+import { QUBIT_WEB_LAUNCH_LOOK_MESSAGE, QUBIT_WEB_OPENING_MESSAGES, createQubitWebOpening } from './lib/qubit-web-opening.mjs';
+import { INLINE_ASSIST_FONT_REQUEST, createInlineAssistFontServer } from './lib/inline-assist-font-server.mjs';
+import { createInlineAssistModelServer } from './lib/inline-assist-models.mjs';
+import { assistSessionTitle, handOffInlineDraftToSidePanel, openSidePanelInClick } from './lib/inline-assist-handoff.mjs';
+import { restSessionCreateSource } from './lib/session-materialization.mjs';
+import { normalizeGatewayCapabilities } from './lib/capabilities.mjs';
+import {
+  assertAssistModelSelectionAcknowledged,
+  assistEffortRequest,
+  assistModelFallbackNotice,
+  buildAssistModelRouteRequest,
+} from './lib/assist-model-contract.mjs';
+import { createWakeBackgroundController } from './lib/wake-background.mjs';
+import { WAKE_MESSAGES } from './lib/wake-word.mjs';
+import { initI18n, subscribeLocale, translateUiText } from './lib/i18n.mjs';
+import {
+  CONTEXT_MENU_CONFIG_GET,
+  CONTEXT_MENU_CONFIG_MUTATE,
+  CONTEXT_MENU_REQUEST_CLAIM,
+  createContextMenuController,
+} from './lib/context-menu-controller.mjs';
+import { createVscodeMarketplaceClient } from './lib/vscode-marketplace.mjs';
+import { createThemeMarketplaceController } from './lib/theme-marketplace-controller.mjs';
+import { resolveBrowserApi } from './lib/browser-api.mjs';
+import { installLoopbackCorsRules, handleLoopbackFetchMessage, LOOPBACK_FETCH_MESSAGE } from './lib/loopback-cors.mjs';
+import {
+  CONTROLLER_HEARTBEAT_ALARM,
+  CONTROLLER_RECONCILE_ALARM,
+} from './lib/controller-lifecycle.mjs';
+import { createControllerConnector } from './lib/controller-connector.mjs';
+import { FORBIDDEN_SENDER_RESPONSE, isExtensionPageSender } from './lib/message-sender.mjs';
+import {
+  CONTROLLER_WORKER_MESSAGES,
+  createControllerServiceWorker,
+} from './lib/controller-service-worker.mjs';
+import { createBrowserControlRuntime } from './lib/browser-control-runtime.mjs';
+import {
+  createBrowserControlArtifactClient,
+  createBrowserControlArtifactHttpTransport,
+} from './lib/browser-control-artifacts.mjs';
+
+const browserApiResolution = resolveBrowserApi();
+const browserApi = browserApiResolution.api;
+const browserProduct = detectBrowserProduct({
+  userAgent: globalThis.navigator?.userAgent || '',
+  brands: globalThis.navigator?.userAgentData?.brands || [],
+  braveApi: globalThis.navigator?.brave || null,
+  extensionUrl: browserApi.runtime.getURL(''),
+});
+const browserControlRuntime = createBrowserControlRuntime({
+  browserApi,
+  product: browserProduct,
+  artifactClientFactory: (settings = {}) => {
+    const baseUrl = String(settings.gatewayUrl || '').trim();
+    const apiKey = String(settings.apiKey || '').trim();
+    if (settings.browserControlArtifactTransport !== true || !baseUrl || !apiKey) return null;
+    return createBrowserControlArtifactClient({
+      transport: createBrowserControlArtifactHttpTransport({
+        fetchImpl: globalThis.fetch?.bind(globalThis),
+        baseUrl,
+        apiKey,
+      }),
+    });
+  },
+});
+// The Qubit Web sign-in kept for this browser (lib/webapp-credential.mjs), shared with the panel
+// through storage.session. The setting is read from storage each time, so the panel's Save applies here.
+async function readStoredSettings() {
+  try {
+    return (await browserApi.storage.local.get('qubitBrowserSettings'))?.qubitBrowserSettings || {};
+  } catch {
+    return {};
+  }
+}
+const webappCredentials = createWebappCredentialStore({
+  storageSession: browserApi.storage?.session,
+  scriptingApi: browserApi.scripting,
+  tabsApi: browserApi.tabs,
+  fetchImpl: (...args) => globalThis.fetch(...args),
+  isEnabled: async () => keepSignedInEnabled(await readStoredSettings()),
+});
+// The paired gateway's Qubit Web tickets (lib/webapp-gateway-tickets.mjs): a gateway with the pairing routes
+// signs a new Qubit Web tab in for the paired token, so opening it from an Assist card needs no terminal.
+const webappGatewayTickets = createWebappGatewayTickets({
+  getConnection: async () => {
+    const stored = await readStoredSettings();
+    return { gatewayUrl: stored.gatewayUrl || 'http://127.0.0.1:8642', token: stored.apiKey, local: isLocalGatewayConnection(stored) };
+  },
+  fetchImpl: (...args) => globalThis.fetch(...args),
+});
+// The branded "Opening Qubit Web" hand-off (lib/qubit-web-opening.mjs). It lives here, not in the panel, so it keeps
+// watching the launch tab if the panel closes. The panel asks for it with a runtime message, never with the ticket in a URL.
+// A run of the gateway is its process: a restart (or another gateway) shows the opening page once more, and later
+// Qubit Web tabs in the same run open with nothing in between. /health/detailed names the pid for the paired token;
+// a gateway that does not answer it is treated as one run per browser session.
+async function qubitWebRuntimeIdentity() {
+  const stored = await readStoredSettings();
+  const base = String(stored.gatewayUrl || 'http://127.0.0.1:8642').trim().replace(/\/+$/, '');
+  const token = typeof stored.apiKey === 'string' ? stored.apiKey.trim() : '';
+  try {
+    const response = await globalThis.fetch(`${base}/health/detailed`, {
+      headers: token ? { Accept: 'application/json', Authorization: `Bearer ${token}` } : { Accept: 'application/json' },
+      credentials: 'omit',
+      cache: 'no-store',
+      redirect: 'error',
+    });
+    const pid = response.ok ? Number((await response.json())?.pid) : NaN;
+    if (Number.isInteger(pid) && pid > 0) return `${base}#pid:${pid}`;
+  } catch {
+    /* no process id from this gateway */
+  }
+  try {
+    const key = 'qubitWebBrowserSession';
+    let nonce = (await browserApi.storage.session.get(key))?.[key];
+    if (typeof nonce !== 'string' || !nonce) {
+      nonce = globalThis.crypto.randomUUID();
+      await browserApi.storage.session.set({ [key]: nonce });
+    }
+    return `${base}#session:${nonce}`;
+  } catch {
+    return '';
+  }
+}
+const qubitWebOpening = createQubitWebOpening({
+  tabsApi: browserApi.tabs,
+  windowsApi: browserApi.windows,
+  runtimeApi: browserApi.runtime,
+  storageSession: browserApi.storage?.session,
+  storageLocal: browserApi.storage?.local,
+  runtimeIdentity: qubitWebRuntimeIdentity,
+});
+const qubitWebOpener = { open: (request) => qubitWebOpening.start(request) };
+let cachedPanelResidencyMode = DEFAULT_PANEL_RESIDENCY_MODE;
+let panelResidencyHydrated = false;
+
+const controllerConnector = createControllerConnector({
+  fetchImpl: globalThis.fetch?.bind(globalThis),
+  WebSocketImpl: globalThis.WebSocket,
+  tabsApi: browserApi.tabs,
+  scriptingApi: browserApi.scripting,
+});
+const extensionOrigin = (() => {
+  try {
+    const parsed = new URL(browserApi.runtime.getURL(''));
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return '';
+  }
+})();
+const controllerWorker = typeof browserApi.storage?.local?.set === 'function'
+  ? createControllerServiceWorker({
+      storageArea: browserApi.storage.local,
+      connector: controllerConnector,
+      product: browserProduct,
+      extensionOrigin,
+      supportsTabGroups: Boolean(browserApi.tabGroups),
+      approvalStore: browserControlRuntime.approvals,
+      getControllerCapabilities: async (settings) => (await browserControlRuntime.status(settings)).capabilities,
+      executeBrowserCommand: (frame, context) => browserControlRuntime.execute(frame, context, context.settings),
+      releaseTabDebugger: (tabId) => browserControlRuntime.releaseTab(tabId),
+      getTab: (tabId) => browserApi.tabs.get(tabId),
+    })
+  : null;
+browserControlRuntime.setDebuggerDetachHandler((event) => {
+  controllerWorker?.handleDebuggerDetach(event)
+    .catch((error) => console.warn('[Qubit Browser] Debugger detach reconciliation failed:', error));
+});
+const CONTROLLER_WORKER_MESSAGE_TYPES = new Set(Object.values(CONTROLLER_WORKER_MESSAGES));
+
+function startControllerAlarms() {
+  if (typeof browserApi?.alarms?.create !== 'function') return false;
+  browserApi.alarms.create(CONTROLLER_HEARTBEAT_ALARM, { periodInMinutes: 1 });
+  browserApi.alarms.create(CONTROLLER_RECONCILE_ALARM, { periodInMinutes: 5 });
+  return true;
+}
+
+// A gateway without extension control answers registration with a terminal
+// result; the alarms would only wake the worker to say the same thing again.
+function stopControllerAlarms() {
+  if (typeof browserApi?.alarms?.clear !== 'function') return false;
+  browserApi.alarms.clear(CONTROLLER_HEARTBEAT_ALARM);
+  browserApi.alarms.clear(CONTROLLER_RECONCILE_ALARM);
+  return true;
+}
+
+function syncControllerAlarms(result) {
+  return result?.terminal === true ? stopControllerAlarms() : startControllerAlarms();
+}
+
+// A restarted or suspended service worker loses the idle-detach timers of the
+// debugger sessions it opened; this removes any attachment it no longer tracks.
+function sweepDebuggerOrphans() {
+  browserControlRuntime.sweepOrphanSessions().catch(() => {});
+}
+sweepDebuggerOrphans();
+
+browserApi.alarms?.onAlarm?.addListener?.((alarm) => {
+  if (!alarm?.name) return;
+  if (alarm.name === CONTROLLER_HEARTBEAT_ALARM || alarm.name === CONTROLLER_RECONCILE_ALARM) {
+    sweepDebuggerOrphans();
+    controllerWorker?.reconcile({ reason: alarm.name })
+      .catch((error) => console.warn('[Qubit Browser] Controller alarm reconcile failed:', error));
+  }
+});
+
+async function bootControllerWorker() {
+  if (!controllerWorker) return { ok: false, connected: false, dormant: true };
+  const result = await controllerWorker.boot();
+  syncControllerAlarms(result);
+  return result;
+}
+
+async function reconcileControllerWorker(reason) {
+  if (!controllerWorker) return { ok: false, connected: false, dormant: true };
+  const result = await controllerWorker.reconcile({ reason });
+  syncControllerAlarms(result);
+  return result;
+}
+
+bootControllerWorker().catch((error) => {
+  console.warn('[Qubit Browser] Controller worker initialization failed:', error);
+});
+const INLINE_DRAFT_STORAGE_KEY = 'qubitBrowserInlineDraftRequest';
+const INLINE_SESSION_STATE_KEY = 'qubitBrowserInlineSessionState';
+const OPEN_SESSION_STORAGE_KEY = 'qubitBrowserOpenSessionRequest';
+const INLINE_DRAFT_TTL_MS = 5 * 60 * 1000;
+
+const WAKE_BACKGROUND_MESSAGE_TYPES = new Set([
+  WAKE_MESSAGES.claimTurn,
+  WAKE_MESSAGES.getState,
+  WAKE_MESSAGES.setEnabled,
+  WAKE_MESSAGES.localDetected,
+  WAKE_MESSAGES.localState,
+  WAKE_MESSAGES.turnReply,
+]);
+const wakeController = createWakeBackgroundController({
+  chromeApi: browserApi,
+  openPanel: (tab, options) => openQubitPanel(tab, options),
+  webappCredentials,
+});
+const contextMenuController = createContextMenuController({
+  chromeApi: browserApi,
+  openQubitSurface: (tab) => openQubitPanelFromContextGesture(tab),
+  translate: (_key, fallback) => translateUiText(fallback),
+});
+// Fonts for the Qubit Assist panel, which a web page may not load from the extension directly.
+const handleInlineAssistFontRequest = createInlineAssistFontServer({ runtime: browserApi.runtime });
+// The model picker in Assist on a page: the verified model list, and saving the one picked.
+const inlineAssistModels = createInlineAssistModelServer({ runtime: browserApi.runtime, storage: browserApi.storage.local });
+const themeMarketplaceController = createThemeMarketplaceController({
+  client: createVscodeMarketplaceClient(),
+  storageArea: browserApi.storage.local,
+});
+function restoreWakeController() {
+  if (!browserApi.runtime?.sendMessage || !browserApi.storage?.local?.get) return;
+  wakeController.restore().catch((error) => console.warn('[Qubit Browser] Wake initialization failed:', error));
+}
+restoreWakeController();
+
+function assistSessionId() {
+  const entropy = globalThis.crypto?.randomUUID?.().replace(/-/g, '').slice(0, 12)
+    || Math.random().toString(36).slice(2, 14);
+  return `qubit-assist-${Date.now().toString(36)}-${entropy}`;
+}
+
+function assistantText(payload = {}) {
+  return String(
+    payload?.content
+      || payload?.message?.content
+      || payload?.response
+      || payload?.assistant?.content
+      || payload?.data?.content
+      || '',
+  );
+}
+
+function pageKey(value = '') {
+  try {
+    const url = new URL(String(value || ''));
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '';
+  }
+}
+
+async function sendDirectInlineResult(tabId, request, result) {
+  return browserApi.tabs.sendMessage(tabId, {
+    type: 'QUBIT_INLINE_DRAFT_RESULT',
+    requestId: request.requestId,
+    documentId: request.documentId,
+    ...result,
+  }).catch(() => null);
+}
+
+async function deleteUnacknowledgedAssistSession(client, sessionId) {
+  const response = await client.fetch(`/api/sessions/${encodeURIComponent(sessionId)}`, { method: 'DELETE' });
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Qubit returned ${response.status} while deleting the unacknowledged Assist session.`);
+  }
+}
+
+async function loadAssistGatewayCapabilities(client) {
+  try {
+    const response = await client.fetch('/v1/capabilities');
+    const payload = await client.readJson(response);
+    return normalizeGatewayCapabilities(response.ok ? payload : null, {
+      healthOk: response.ok,
+      warning: response.ok ? '' : `GET /v1/capabilities failed (${response.status})`,
+    });
+  } catch (error) {
+    return normalizeGatewayCapabilities(null, {
+      healthOk: false,
+      warning: `GET /v1/capabilities failed (${error?.message || String(error)})`,
+    });
+  }
+}
+
+async function runInlineDraftInServiceWorker(request, sender, tabId) {
+  try {
+    const tab = await browserApi.tabs.get(tabId).catch(() => null);
+    if (!tab || pageKey(tab.url || tab.pendingUrl) !== pageKey(request.pageUrl)) {
+      throw new Error('The originating page changed before Qubit could draft.');
+    }
+    const stored = await browserApi.storage.local.get('qubitBrowserSettings');
+    const settings = stored?.qubitBrowserSettings || {};
+    const client = createQubitClient({
+      getConnection: () => ({
+        gatewayUrl: settings.gatewayUrl || settings.agentApiUrl || '',
+        apiKey: settings.apiKey || settings.agentToken || '',
+        activeProfile: settings.activeProfile || settings.profile || '',
+      }),
+    });
+    const gatewayCapabilities = await loadAssistGatewayCapabilities(client);
+    const { policy: assistPolicy, request: routeRequest } = buildAssistModelRouteRequest(
+      settings,
+      gatewayCapabilities,
+    );
+    const requestedSelection = assistPolicy.selection || assistPolicy.requestedSelection || null;
+    let attemptSelection = assistPolicy.selection;
+    let attemptRouteRequest = routeRequest;
+    let modelNotice = assistPolicy.mode === 'gateway-default-fallback'
+      ? assistModelFallbackNotice(requestedSelection, 'this gateway does not advertise exact model routing')
+      : '';
+    let resolvedSessionId = '';
+    let resolvedTitle = '';
+    let text = '';
+    let contextWithheld = false;
+
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      let createdThisAttempt = false;
+      // A fresh id for each attempt: Qubit never reuses the id of a session it deleted.
+      const sessionId = assistSessionId();
+      const sessionTitle = assistSessionTitle(request, { suffix: sessionId.slice(-4) });
+      resolvedSessionId = sessionId;
+      resolvedTitle = sessionTitle;
+      try {
+        const createResponse = await client.fetch('/api/sessions', {
+          method: 'POST',
+          body: JSON.stringify({
+            id: sessionId,
+            title: sessionTitle,
+            // Qubit runs API-server turns only on api_server/bot_room sessions.
+            source: restSessionCreateSource(),
+            ...attemptRouteRequest,
+          }),
+        });
+        const created = await client.readJson(createResponse);
+        if (!createResponse.ok) {
+          throw new Error(created?.error?.message || created?.error || `Could not create Qubit Assist session (${createResponse.status}).`);
+        }
+        createdThisAttempt = true;
+        resolvedSessionId = String(created?.session?.id || created?.id || sessionId);
+        resolvedTitle = String(created?.session?.title || created?.title || sessionTitle);
+        assertAssistModelSelectionAcknowledged(created, attemptSelection);
+
+        const consentStored = await browserApi.storage.local.get([CONTEXT_CONSENT_STORAGE_KEY]);
+        const gatedRequest = await gateInlineDraftRequestContext({
+          request,
+          settings,
+          ledger: consentStored[CONTEXT_CONSENT_STORAGE_KEY] || null,
+          controller: String(browserApi.runtime.id || 'qubit-browser'),
+        });
+        contextWithheld = Boolean(request.pageContext) && !gatedRequest.allowed;
+        const chatResponse = await client.fetch(`/api/sessions/${encodeURIComponent(resolvedSessionId)}/chat`, {
+          method: 'POST',
+          body: JSON.stringify({
+            ...attemptRouteRequest,
+            message: buildInlineDraftPrompt(gatedRequest.request),
+          }),
+        });
+        const chatPayload = await client.readJson(chatResponse);
+        if (!chatResponse.ok) {
+          throw new Error(chatPayload?.error?.message || chatPayload?.error || `Qubit Assist failed (${chatResponse.status}).`);
+        }
+        text = sanitizeInlineDraftResult(assistantText(chatPayload));
+        try {
+          assertAssistModelSelectionAcknowledged(chatPayload, attemptSelection);
+        } catch (modelError) {
+          if (!text) throw modelError;
+          modelNotice = assistModelFallbackNotice(attemptSelection, 'the gateway returned the draft without acknowledging the selected model');
+        }
+        if (!text) throw new Error('Qubit returned an empty draft.');
+        break;
+      } catch (error) {
+        if (!attemptSelection || attempt > 0) throw error;
+        if (createdThisAttempt) {
+          try {
+            await deleteUnacknowledgedAssistSession(client, resolvedSessionId);
+          } catch (cleanupError) {
+            console.error('[Qubit Browser] Assist fallback cleanup failed:', cleanupError);
+            throw new Error(`${error?.message || String(error)} Cleanup also failed: ${cleanupError?.message || String(cleanupError)}`);
+          }
+        }
+        modelNotice = assistModelFallbackNotice(attemptSelection, error?.message || 'the selected route was rejected');
+        attemptSelection = null;
+        attemptRouteRequest = assistEffortRequest(settings);
+      }
+    }
+
+    let retainedSessionId = resolvedSessionId;
+    let retainedSessionTitle = resolvedTitle;
+    if (settings.inlineAssistSessionRetention === 'delete' && request.route === INLINE_DRAFT_ROUTES.BACKGROUND) {
+      const deleteResponse = await client.fetch(`/api/sessions/${encodeURIComponent(resolvedSessionId)}`, { method: 'DELETE' });
+      if (deleteResponse.ok || deleteResponse.status === 404) {
+        retainedSessionId = '';
+        retainedSessionTitle = 'Qubit Assist · deleted after run';
+      } else {
+        console.warn('[Qubit Browser] Assist session cleanup failed:', deleteResponse.status);
+      }
+    }
+    await sendDirectInlineResult(tabId, request, {
+      ok: true,
+      text,
+      contextWithheld,
+      sessionId: retainedSessionId,
+      sessionTitle: retainedSessionTitle,
+      modelNotice,
+    });
+    return { ok: true, requestId: request.requestId, background: request.route === INLINE_DRAFT_ROUTES.BACKGROUND, sessionId: retainedSessionId };
+  } catch (error) {
+    const reason = error?.message || String(error);
+    await sendDirectInlineResult(tabId, request, { ok: false, reason });
+    return { ok: false, requestId: request.requestId, reason };
+  }
+}
+
+// Synchronous up to the side panel's open call: the click on the page counts only until the first await.
+function queueInlineDraftRequest(message, sender) {
+  const tabId = Number(sender?.tab?.id);
+  if (!Number.isFinite(tabId) || tabId <= 0 || Number(sender?.frameId || 0) !== 0) {
+    return Promise.resolve({ ok: false, reason: 'Inline draft requests must come from the top-level active page.' });
+  }
+  const request = normalizeInlineDraftRequest(message?.request);
+  if (!request) return Promise.resolve({ ok: false, reason: 'Inline draft request failed validation.' });
+  if (request.route === INLINE_DRAFT_ROUTES.BACKGROUND) return runInlineDraftInServiceWorker(request, sender, tabId);
+  if (!browserApi.storage?.session) return Promise.resolve({ ok: false, reason: 'Session-only draft handoff is unavailable in this browser.' });
+  // Continue current chat and Start new Assist session run in the side panel, where the user sees the turn.
+  return handOffInlineDraftToSidePanel({
+    queued: {
+      ...request,
+      tabId,
+      windowId: Number(sender?.tab?.windowId) || null,
+      expiresAt: Date.now() + INLINE_DRAFT_TTL_MS,
+    },
+    storageKey: INLINE_DRAFT_STORAGE_KEY,
+    sessionStorage: browserApi.storage.session,
+    openSidePanel: () => openAssistSidePanelFromGesture(sender.tab),
+    sidePanelIsOpen,
+  });
+}
+
+// The real side panel for Assist, opened inside the page click (the same scope as openQubitPanelFromGesture).
+// Resolves whether it opened; never falls back to a full tab or a popup window.
+function openAssistSidePanelFromGesture(tab) {
+  const browserId = detectBrowserId();
+  if (browserId === 'opera' || browserId === 'firefox') {
+    return Promise.resolve(openNativeSidebar({ windowId: tab?.windowId ?? null })).then(Boolean, () => false);
+  }
+  const tabId = Number(tab?.id);
+  const useTabAttached = cachedPanelResidencyMode === PANEL_RESIDENCY_MODES.TAB_ATTACHED && Number.isFinite(tabId) && tabId > 0;
+  return openSidePanelInClick(browserApi.sidePanel, useTabAttached ? { tabId } : { windowId: Number(tab?.windowId) });
+}
+
+// Whether a Qubit side panel is open in any window (Chrome 116+; elsewhere it reads as closed).
+async function sidePanelIsOpen() {
+  try {
+    const contexts = await browserApi.runtime.getContexts?.({ contextTypes: ['SIDE_PANEL'] });
+    return Array.isArray(contexts) && contexts.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function inlineSessionStatus() {
+  const stored = await browserApi.storage.local.get(['qubitBrowserSettings', INLINE_SESSION_STATE_KEY]);
+  const settings = stored?.qubitBrowserSettings || {};
+  const state = stored?.[INLINE_SESSION_STATE_KEY] || {};
+  const sessionId = String(state.sessionId || settings.sessionId || '').trim();
+  return {
+    ok: true,
+    hasActiveSession: Boolean(sessionId),
+    sessionId,
+    title: String(state.title || settings.sessionTitle || 'Current chat').slice(0, 160),
+    messageCount: Math.max(0, Number(state.messageCount || 0)),
+  };
+}
+
+async function queueOpenSessionRequest(message, sender) {
+  const sessionId = String(message?.sessionId || '').trim();
+  if (!/^[A-Za-z0-9_.:-]{8,200}$/.test(sessionId)) return { ok: false, reason: 'Invalid session binding.' };
+  const surface = message?.surface === 'web' ? 'web' : 'sidepanel';
+  if (surface === 'web') {
+    // Qubit Web is the Webapp the user's own gateway serves. It cannot be opened on one
+    // session, so this opens (or focuses) it and the session is found in its own list.
+    const stored = await browserApi.storage.local.get('qubitBrowserSettings');
+    const result = await openQubitWebapp({
+      settings: stored?.qubitBrowserSettings || {},
+      tabsApi: browserApi.tabs,
+      windowsApi: browserApi.windows,
+      permissionsApi: browserApi.permissions,
+      storageArea: browserApi.storage.local,
+      permissionMode: 'contains',
+      credentials: webappCredentials,
+      tickets: webappGatewayTickets,
+      opener: qubitWebOpener,
+    });
+    if (result.status === 'opened' || result.status === 'focused') {
+      return { ok: true, sessionId, surface, webapp: result.status, hint: result.hint || '' };
+    }
+    return { ok: false, webapp: result.status, address: result.address || '', reason: 'Qubit Web is not available.' };
+  }
+
+  const tab = sender?.tab || (await browserApi.tabs.query({ active: true, currentWindow: true }))[0];
+  await browserApi.storage.session.set({
+    [OPEN_SESSION_STORAGE_KEY]: {
+      sessionId,
+      createdAt: Date.now(),
+      expiresAt: Date.now() + INLINE_DRAFT_TTL_MS,
+    },
+  });
+  // An open side panel opens the session itself.
+  if (await sidePanelIsOpen()) return { ok: true, sessionId, surface };
+  const opened = await openQubitPanel(tab, { allowFallback: false });
+  if (opened === false) {
+    await browserApi.storage.session.remove(OPEN_SESSION_STORAGE_KEY);
+    return { ok: false, reason: 'The extension\'s side panel could not open. If your gateway serves Qubit Web, you can open that instead.' };
+  }
+  return { ok: true, sessionId, surface };
+}
+
+async function configureInstalledSurfaces({ controllerReason = 'extension-installed' } = {}) {
+  await Promise.all([configureSidePanel(), contextMenuController.configure()]);
+  await reconcileControllerWorker(controllerReason);
+}
+
+function defaultSidePanelPath() {
+  return browserApi.runtime.getManifest().side_panel?.default_path || 'sidepanel.html';
+}
+
+function panelResidencyModeFromStorage(stored = {}) {
+  return normalizePanelResidencyMode(
+    stored?.qubitBrowserSettings?.panelResidencyMode
+      || stored?.panelResidencyMode
+      || DEFAULT_PANEL_RESIDENCY_MODE,
+  );
+}
+
+async function refreshPanelResidencyModeFromStorage() {
+  try {
+    const stored = await browserApi.storage.local.get(['qubitBrowserSettings', 'panelResidencyMode']);
+    cachedPanelResidencyMode = panelResidencyModeFromStorage(stored);
+  } catch (error) {
+    console.warn('[Qubit Browser] Could not read panel residency setting:', error);
+    cachedPanelResidencyMode = DEFAULT_PANEL_RESIDENCY_MODE;
+  } finally {
+    panelResidencyHydrated = true;
+  }
+  return cachedPanelResidencyMode;
+}
+
+async function setActionClickSidePanelBehavior() {
+  await setPanelBehaviorForBrowser();
+}
+
+async function activeBrowserTabId() {
+  try {
+    const [tab] = await browserApi.tabs.query({ active: true, currentWindow: true });
+    const tabId = Number(tab?.id);
+    return Number.isFinite(tabId) && tabId > 0 ? tabId : null;
+  } catch {
+    return null;
+  }
+}
+
+async function applyPanelResidencyMode(mode = cachedPanelResidencyMode, { tabId = null } = {}) {
+  const panelResidencyMode = normalizePanelResidencyMode(mode);
+  const defaultPanelPath = defaultSidePanelPath();
+  const cleanTabId = Number(tabId);
+  const useTabAttached = panelResidencyMode === PANEL_RESIDENCY_MODES.TAB_ATTACHED && Number.isFinite(cleanTabId) && cleanTabId > 0;
+
+  await setActionClickSidePanelBehavior();
+  if (!browserApi.sidePanel?.setOptions) return;
+
+  if (panelResidencyMode === PANEL_RESIDENCY_MODES.TAB_ATTACHED) {
+    // Disable the shared default only when it is still on. Doing it on every
+    // tab switch toggles the panel off and on, which closes an open panel when
+    // a helper tab (such as Voice Dictation) closes and focus returns.
+    const sharedOptions = await browserApi.sidePanel.getOptions?.({}).catch?.(() => null);
+    if (sharedOptions?.enabled !== false) {
+      await browserApi.sidePanel.setOptions({ enabled: false });
+    }
+    if (useTabAttached) {
+      const tabPath = buildSidePanelPath({
+        mode: panelResidencyMode,
+        tabId: cleanTabId,
+        defaultPath: defaultPanelPath,
+      });
+      // A tab that already has this exact panel enabled is left untouched, so
+      // returning to it never recreates or closes its open panel.
+      const tabOptions = await browserApi.sidePanel.getOptions?.({ tabId: cleanTabId }).catch?.(() => null);
+      if (tabOptions?.enabled === true && String(tabOptions.path || '').endsWith(tabPath)) return;
+      await browserApi.sidePanel.setOptions({
+        tabId: cleanTabId,
+        path: tabPath,
+        enabled: true,
+      });
+    }
+    return;
+  }
+
+  // Update only the global default. Existing tab-scoped overrides intentionally
+  // keep their attached panel documents and sessions; untouched and new tabs
+  // resolve to this shared panel path.
+  await browserApi.sidePanel.setOptions({
+    path: buildSidePanelPath({
+      mode: panelResidencyMode,
+      defaultPath: defaultPanelPath,
+    }),
+    enabled: true,
+  });
+}
+
+async function configureSidePanel() {
+  try {
+    const panelResidencyMode = await refreshPanelResidencyModeFromStorage();
+    const tabId = await activeBrowserTabId();
+    // No popup for any browser — background.js handles the click.
+    await browserApi.action.setPopup({ popup: '' });
+    // Brave-only Nous Girl action icon; best-effort and never blocks panel setup.
+    await setActionIconForBrowser();
+    await applyPanelResidencyMode(panelResidencyMode, { tabId });
+  } catch (error) {
+    console.warn('[Qubit Browser] Unable to set side panel behavior:', error);
+  }
+}
+
+function reapplyPanelResidencyForTab(tabId) {
+  // The worker starts with the tab-attached default. Do not overwrite an
+  // existing global panel while its persisted residency mode is still loading.
+  if (!panelResidencyHydrated) {
+    return refreshPanelResidencyModeFromStorage()
+      .then(() => reapplyPanelResidencyForTab(tabId));
+  }
+  // A global panel has one default path for the window. Reapplying identical
+  // options for every activated tab can recreate that document in Edge, which
+  // restarts the sidepanel startup sequence on every tab switch.
+  if (cachedPanelResidencyMode === PANEL_RESIDENCY_MODES.GLOBAL) return;
+  return applyPanelResidencyMode(cachedPanelResidencyMode, { tabId })
+    .catch((error) => console.warn('[Qubit Browser] Could not apply panel residency setting:', error));
+}
+
+const pendingPanelTabOpens = new Map();
+
+async function openOrFocusPanelTab(panelUrl) {
+  const pendingOpen = pendingPanelTabOpens.get(panelUrl);
+  if (pendingOpen) return pendingOpen;
+
+  const openOperation = (async () => {
+    let existingTab = null;
+    try {
+      const candidates = await browserApi.tabs.query({});
+      existingTab = candidates.find((candidate) => (
+        candidate.url === panelUrl || candidate.pendingUrl === panelUrl
+      )) || null;
+    } catch (queryError) {
+      console.warn('[Qubit Browser] Could not search for an existing fallback tab:', queryError);
+    }
+
+    if (Number.isFinite(existingTab?.id)) {
+      try {
+        const activatedTab = await browserApi.tabs.update(existingTab.id, { active: true });
+        if (Number.isFinite(existingTab.windowId) && browserApi.windows?.update) {
+          try {
+            await browserApi.windows.update(existingTab.windowId, { focused: true });
+          } catch (focusError) {
+            console.warn('[Qubit Browser] Could not focus the existing fallback window:', focusError);
+          }
+        }
+        return activatedTab || existingTab;
+      } catch (activateError) {
+        console.warn('[Qubit Browser] Existing fallback tab disappeared before activation:', activateError);
+      }
+    }
+
+    return browserApi.tabs.create({ url: panelUrl, active: true });
+  })();
+
+  pendingPanelTabOpens.set(panelUrl, openOperation);
+  try {
+    return await openOperation;
+  } finally {
+    if (pendingPanelTabOpens.get(panelUrl) === openOperation) {
+      pendingPanelTabOpens.delete(panelUrl);
+    }
+  }
+}
+
+async function openQubitPanel(tab, { allowFallback = true } = {}) {
+  await refreshPanelResidencyModeFromStorage();
+  const panelResidencyMode = cachedPanelResidencyMode;
+  const tabId = Number(tab?.id);
+  const useTabAttached = panelResidencyMode === PANEL_RESIDENCY_MODES.TAB_ATTACHED && Number.isFinite(tabId) && tabId > 0;
+  const defaultPanelPath = defaultSidePanelPath();
+  const panelPath = buildSidePanelPath({
+    mode: panelResidencyMode,
+    tabId: useTabAttached ? tabId : null,
+    defaultPath: defaultPanelPath,
+  });
+  const panelUrl = browserApi.runtime.getURL(panelPath);
+
+  // Try Opera/Firefox native sidebar first.
+  const opened = await openNativeSidebar({ windowId: tab?.windowId ?? null });
+  if (opened) return;
+
+  // Chrome/Edge/Comet sidePanel API
+  const sidePanelCanOpen = Boolean(browserApi.sidePanel?.open);
+  const browserId = detectBrowserId();
+
+  try {
+    if (sidePanelCanOpen) {
+      await applyPanelResidencyMode(panelResidencyMode, { tabId: useTabAttached ? tabId : null });
+      let attemptedWindowScope = false;
+      if (useTabAttached) {
+        try {
+          const panelOpened = await openSidePanelWithConfirmation({
+            sidePanelApi: browserApi.sidePanel,
+            runtimeApi: browserApi.runtime,
+            openOptions: { tabId },
+            panelUrl,
+          });
+          if (panelOpened) return;
+        } catch (tabOpenError) {
+          if (!tab?.windowId) throw tabOpenError;
+          const { windowId } = tab;
+          attemptedWindowScope = true;
+          console.warn('[Qubit Browser] Tab side panel open failed, retrying window side panel:', tabOpenError);
+          const panelOpened = await openSidePanelWithConfirmation({
+            sidePanelApi: browserApi.sidePanel,
+            runtimeApi: browserApi.runtime,
+            openOptions: { windowId },
+            panelUrl,
+          });
+          if (panelOpened) return;
+        }
+      }
+      if (tab?.windowId && !attemptedWindowScope) {
+        const { windowId } = tab;
+        const panelOpened = await openSidePanelWithConfirmation({
+          sidePanelApi: browserApi.sidePanel,
+          runtimeApi: browserApi.runtime,
+          openOptions: { windowId },
+          panelUrl,
+        });
+        if (panelOpened) return;
+      }
+      console.warn('[Qubit Browser] Side panel open was not confirmed; using the extension fallback.');
+    }
+  } catch (error) {
+    console.warn('[Qubit Browser] Side panel open failed:', error);
+  }
+
+  if (!allowFallback) {
+    console.warn('[Qubit Browser] Strict side-panel open failed; refusing to open a fallback tab.');
+    return false;
+  }
+
+  // Opera/Firefox: open as a narrow popup window that acts like a sidebar panel.
+  // Opera's sidebarAction API is not available in MV3, so we use windows.create
+  // with type: popup, a narrow width, and leftmost position.
+  if (browserId === 'opera' || browserId === 'firefox') {
+    try {
+      await browserApi.windows.create({
+        url: browserApi.runtime.getURL(panelPath),
+        type: 'popup',
+        width: 420,
+        height: 800,
+        left: 0,
+        top: 0,
+      });
+      return;
+    } catch (popupError) {
+      console.warn('[Qubit Browser] Popup window creation failed:', popupError);
+    }
+  }
+
+  // Last resort: reuse the matching extension tab or create it once.
+  await openOrFocusPanelTab(panelUrl);
+}
+
+function openQubitPanelFromGesture(tab) {
+  const browserId = detectBrowserId();
+  const panelResidencyMode = cachedPanelResidencyMode;
+  const tabId = Number(tab?.id);
+  const useTabAttached = panelResidencyMode === PANEL_RESIDENCY_MODES.TAB_ATTACHED
+    && Number.isFinite(tabId)
+    && tabId > 0;
+  const panelUrl = browserApi.runtime.getURL(buildSidePanelPath({
+    mode: panelResidencyMode,
+    tabId: useTabAttached ? tabId : null,
+    defaultPath: defaultSidePanelPath(),
+  }));
+
+  // Opera/Firefox: the single synchronous open attempt is the native sidebar.
+  // It must be initiated in the listener stack before any await so the user
+  // gesture (toolbar click, context menu, Alt+H) is not consumed by storage
+  // hydration, setOptions, or detection probes.
+  if (browserId === 'opera' || browserId === 'firefox') {
+    try {
+      const nativeAttempt = openNativeSidebar({ windowId: tab?.windowId ?? null });
+      return Promise.resolve(nativeAttempt)
+        .then((opened) => (opened ? true : openQubitPanelFallback(tab, browserId, panelUrl)))
+        .catch(() => openQubitPanelFallback(tab, browserId, panelUrl));
+    } catch {
+      return openQubitPanelFallback(tab, browserId, panelUrl);
+    }
+  }
+
+  if (!browserApi.sidePanel?.open) return openQubitPanelFallback(tab, browserId, panelUrl);
+
+  // Chromium-family: one correctly scoped sidePanel attempt, opened
+  // synchronously. A resolved native request owns the gesture even when the
+  // visibility event is missed; opening a fallback tab in that state can show
+  // both the side panel and a duplicate Qubit tab.
+  const openOptions = useTabAttached
+    ? { tabId }
+    : { windowId: Number(tab?.windowId) };
+
+  try {
+    const panelAttempt = openSidePanelWithConfirmation({
+      sidePanelApi: browserApi.sidePanel,
+      runtimeApi: browserApi.runtime,
+      openOptions,
+      panelUrl,
+    });
+    return Promise.resolve(panelAttempt)
+      .then((opened) => {
+        if (!opened) {
+          console.warn('[Qubit Browser] Side panel open resolved without visibility confirmation; not opening a fallback tab.');
+        }
+        return true;
+      })
+      .catch((error) => {
+        console.warn('[Qubit Browser] Native side panel open rejected; preserving the browser-owned side-panel action instead of opening a full tab:', error);
+        return true;
+      });
+  } catch (error) {
+    console.warn('[Qubit Browser] Native side panel open threw; preserving the browser-owned side-panel action instead of opening a full tab:', error);
+    return true;
+  }
+}
+
+async function openQubitPanelFallback(tab, browserId, panelUrl) {
+  // Gesture-free fallbacks only: never re-attempt a native sidebar or
+  // sidePanel open after the initiating gesture window is spent.
+  if (browserId === 'opera' || browserId === 'firefox') {
+    try {
+      await browserApi.windows.create({
+        url: panelUrl,
+        type: 'popup',
+        width: 420,
+        height: 800,
+        left: 0,
+        top: 0,
+      });
+      return true;
+    } catch (popupError) {
+      console.warn('[Qubit Browser] Popup window creation failed:', popupError);
+    }
+  }
+  await openOrFocusPanelTab(panelUrl);
+  return true;
+}
+
+// Backward-compatible entry name for the context-menu controller wiring.
+const openQubitPanelFromContextGesture = openQubitPanelFromGesture;
+
+function timeoutSignal(ms = 5000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  return { controller, done: () => clearTimeout(timeout) };
+}
+
+async function fetchUserConfiguredTranscript(videoId, provider) {
+  const url = providerUrlForVideo(provider, videoId);
+  if (!url) return { ok: false, reason: 'custom_provider_not_configured', source: 'custom' };
+  const { controller, done } = timeoutSignal();
+  try {
+    const response = await fetch(url, { signal: controller.signal, redirect: 'error', headers: { Accept: 'application/json, text/plain;q=0.9' } });
+    const text = await response.text();
+    if (!response.ok) return { ok: false, reason: `custom_provider_${response.status}`, source: 'custom' };
+    try {
+      return normalizeTranscriptPayload(JSON.parse(text), 'custom');
+    } catch {
+      return normalizeTranscriptPayload({ text }, 'custom');
+    }
+  } finally {
+    done();
+  }
+}
+
+async function fetchDefaultTimedTextTranscript(videoId) {
+  const attempts = [
+    `https://video.google.com/timedtext?fmt=json3&lang=en&v=${encodeURIComponent(videoId)}`,
+    `https://video.google.com/timedtext?fmt=json3&lang=en&kind=asr&v=${encodeURIComponent(videoId)}`,
+    `https://video.google.com/timedtext?lang=en&v=${encodeURIComponent(videoId)}`,
+    `https://video.google.com/timedtext?lang=en&kind=asr&v=${encodeURIComponent(videoId)}`,
+  ];
+  for (const url of attempts) {
+    const { controller, done } = timeoutSignal();
+    try {
+      const response = await fetch(url, { signal: controller.signal, credentials: 'omit', redirect: 'error' });
+      if (!response.ok) continue;
+      const text = await response.text();
+      if (!text.trim()) continue;
+      let segments = [];
+      if (url.includes('fmt=json3')) {
+        try {
+          segments = parseYoutubeJson3(JSON.parse(text));
+        } catch {
+          segments = [];
+        }
+      } else {
+        segments = parseTimedTextXml(text);
+      }
+      if (segments.length) {
+        return normalizeTranscriptPayload({ segments, language: 'en' }, 'default-timedtext');
+      }
+    } catch (_error) {
+      // Try next shape.
+    } finally {
+      done();
+    }
+  }
+  return { ok: false, reason: 'default_timedtext_unavailable', source: 'default-timedtext' };
+}
+
+async function fetchDomTranscript(tabId) {
+  if (!tabId) return { ok: false, reason: 'no_active_tab', source: 'page-dom' };
+  try {
+    return normalizeTranscriptPayload(
+      await browserApi.tabs.sendMessage(tabId, { type: 'QUBIT_GET_YOUTUBE_TRANSCRIPT_DOM' }),
+      'page-dom',
+    );
+  } catch (error) {
+    return { ok: false, reason: error?.message || String(error), source: 'page-dom' };
+  }
+}
+
+async function getYoutubeTranscript({ videoId, tabId, provider = 'default' } = {}) {
+  const cleanVideoId = String(videoId || '').trim();
+  const mode = String(provider || 'default').trim();
+  if (!cleanVideoId) return { ok: false, reason: 'missing_video_id' };
+  if (mode.toLowerCase() === 'off') return { ok: false, reason: 'transcripts_disabled' };
+
+  const attempts = [];
+  if (/^https?:\/\//i.test(mode)) attempts.push(() => fetchUserConfiguredTranscript(cleanVideoId, mode));
+  attempts.push(() => fetchDefaultTimedTextTranscript(cleanVideoId));
+  attempts.push(() => fetchDomTranscript(tabId));
+
+  const failures = [];
+  for (const attempt of attempts) {
+    const result = await attempt();
+    if (result?.ok && (result.text || result.segments?.length)) return { ...result, videoId: cleanVideoId };
+    failures.push({ source: result?.source || 'unknown', reason: result?.reason || 'unavailable' });
+  }
+  return { ok: false, videoId: cleanVideoId, reason: failures.map((item) => `${item.source}:${item.reason}`).join('; ') || 'transcript_unavailable' };
+}
+
+subscribeLocale(() => contextMenuController.configure().catch((error) => {
+  console.warn('[Qubit Browser] Localized context menus could not be configured:', error);
+}));
+void initI18n().catch((error) => {
+  console.warn('[Qubit Browser] Localization initialization failed:', error);
+});
+
+void installLoopbackCorsRules().catch((error) => {
+  console.warn('[Qubit Browser] Loopback CORS session rule cleanup failed:', error);
+});
+browserApi.runtime.onInstalled.addListener((details) => {
+  void installLoopbackCorsRules().catch((error) => {
+    console.warn('[Qubit Browser] Loopback CORS session rule cleanup failed:', error);
+  });
+  return configureInstalledSurfaces(details);
+});
+browserApi.runtime.onStartup.addListener(async () => {
+  await installLoopbackCorsRules().catch((error) => {
+    console.warn('[Qubit Browser] Loopback CORS session rule cleanup failed:', error);
+  });
+  await configureInstalledSurfaces({ controllerReason: 'browser-startup' });
+  restoreWakeController();
+});
+// Firefox's sidebar is per window, so the toolbar button toggles it: one click
+// opens Qubit, the next closes it on every tab. toggle() must run inside the
+// click listener before any await, or Firefox rejects it as not user input.
+function handleActionClick(tab) {
+  const sidebar = browserApi.sidebarAction;
+  if (!browserApi.sidePanel && typeof sidebar?.toggle === 'function') {
+    try {
+      return Promise.resolve(sidebar.toggle()).catch(() => openQubitPanelFromGesture(tab));
+    } catch {
+      return openQubitPanelFromGesture(tab);
+    }
+  }
+  return openQubitPanelFromGesture(tab);
+}
+browserApi.action.onClicked.addListener(handleActionClick);
+browserApi.contextMenus?.onClicked?.addListener?.((info, tab) => {
+  return contextMenuController.handleClick(info, tab)
+    .catch((error) => console.warn('[Qubit Browser] Context menu action failed:', error));
+});
+browserApi.tabs?.onActivated?.addListener?.(({ tabId }) => reapplyPanelResidencyForTab(tabId));
+browserApi.tabs?.onUpdated?.addListener?.((tabId, changeInfo) => {
+  controllerWorker?.handleTabUpdated(tabId, changeInfo)
+    .catch((error) => console.warn('[Qubit Browser] Could not invalidate controller document authority:', error));
+});
+// A tab one of Qubit's actions opened (a link to a new tab, a page's window.open) becomes one Qubit can act in.
+browserApi.tabs?.onCreated?.addListener?.((tab) => {
+  controllerWorker?.handleTabCreated(tab)
+    .catch((error) => console.warn('[Qubit Browser] Could not adopt a tab Qubit Control opened:', error));
+});
+// The Qubit Web launch tab finished loading the Webapp itself: show it and close the "Opening Qubit Web" page.
+browserApi.tabs?.onUpdated?.addListener?.((tabId, changeInfo, tab) => {
+  qubitWebOpening.handleTabUpdated(tabId, changeInfo, tab)
+    .catch((error) => console.warn('[Qubit Browser] Could not finish opening Qubit Web:', error));
+});
+// A signed-in Qubit Web tab is the only place its sign-in lives. Read it while the tab is open, so
+// closing the tab does not mean running `qubit webapp` again. Only a finished load of a loopback page
+// is looked at, and only the configured Webapp address is read from (and only when the setting is on).
+browserApi.tabs?.onUpdated?.addListener?.((tabId, changeInfo, tab) => {
+  if (changeInfo?.status !== 'complete' || !/^http:\/\/(?:127\.0\.0\.1|localhost|\[::1\])(?::\d+)?\//i.test(String(tab?.url || ''))) return;
+  void (async () => {
+    const settings = await readStoredSettings();
+    if (!keepSignedInEnabled(settings)) return;
+    const target = resolveWebappTarget(settings);
+    if (!target.ok) return;
+    await webappCredentials.capture(target, { tab });
+  })().catch(() => undefined);
+});
+browserApi.tabs?.onRemoved?.addListener?.((tabId) => {
+  qubitWebOpening.handleTabRemoved(tabId)
+    .catch((error) => console.warn('[Qubit Browser] Could not clean up the Qubit Web opening page:', error));
+  controllerWorker?.handleTabRemoved(tabId)
+    .catch((error) => console.warn('[Qubit Browser] Could not release removed controller tab state:', error));
+});
+browserApi.storage?.onChanged?.addListener?.((changes, areaName) => {
+  if (areaName !== 'local') return;
+  contextMenuController.handleStorageChanged(changes, areaName)
+    .catch((error) => console.warn('[Qubit Browser] Context menu refresh failed:', error));
+  if (changes.qubitBrowserSettings?.newValue && controllerWorker) {
+    controllerWorker.syncSettings(changes.qubitBrowserSettings.newValue)
+      .then((result) => syncControllerAlarms(result))
+      .catch((error) => console.warn('[Qubit Browser] Controller settings rebind failed:', error));
+  }
+  let changed = false;
+  if (Object.hasOwn(changes, 'qubitBrowserSettings')) {
+    const previousMode = cachedPanelResidencyMode;
+    cachedPanelResidencyMode = normalizePanelResidencyMode(changes.qubitBrowserSettings?.newValue?.panelResidencyMode);
+    changed = cachedPanelResidencyMode !== previousMode;
+  } else if (Object.hasOwn(changes, 'panelResidencyMode')) {
+    const previousMode = cachedPanelResidencyMode;
+    cachedPanelResidencyMode = normalizePanelResidencyMode(changes.panelResidencyMode?.newValue);
+    changed = cachedPanelResidencyMode !== previousMode;
+  }
+  if (changed) {
+    return activeBrowserTabId()
+      .then((tabId) => applyPanelResidencyMode(cachedPanelResidencyMode, { tabId }))
+      .catch((error) => console.warn('[Qubit Browser] Could not apply changed panel residency setting:', error));
+  }
+});
+const EXTENSION_PAGE_ONLY_MESSAGE_TYPES = new Set([
+  ...WAKE_BACKGROUND_MESSAGE_TYPES,
+  CONTEXT_MENU_CONFIG_GET,
+  CONTEXT_MENU_CONFIG_MUTATE,
+  CONTEXT_MENU_REQUEST_CLAIM,
+  'QUBIT_GET_YOUTUBE_TRANSCRIPT',
+  LOOPBACK_FETCH_MESSAGE,
+  ...Object.values(QUBIT_WEB_OPENING_MESSAGES),
+]);
+function isExtensionPageOnlyMessageType(type) {
+  return EXTENSION_PAGE_ONLY_MESSAGE_TYPES.has(type) || themeMarketplaceController.handles(type);
+}
+browserApi.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // SECURITY BOUNDARY: Untrusted Input — `message` arrives from extension
+  // pages, content scripts, or (via forwarded events) web page code. Never
+  // trust its fields; validate types and treat string payloads as
+  // attacker-controlled until they pass through the sanitizer at render time.
+  // Types below are sent only by this extension's own pages. Content scripts
+  // (page-reachable) never send them, so a tab sender is refused outright.
+  // Content-script types (inline Assist, controller document-ready) keep their
+  // own sender checks further down.
+  if (isExtensionPageOnlyMessageType(message?.type) && !isExtensionPageSender(sender, browserApi.runtime)) {
+    sendResponse({ ...FORBIDDEN_SENDER_RESPONSE });
+    return false;
+  }
+  const action = CONTROLLER_WORKER_MESSAGE_TYPES.has(message?.type)
+    ? controllerWorker
+      ? controllerWorker.handleMessage(message, sender)
+      : Promise.resolve({ ok: false, error: 'controller_worker_unavailable' })
+    : WAKE_BACKGROUND_MESSAGE_TYPES.has(message?.type)
+    ? wakeController.handleMessage(message)
+    : [CONTEXT_MENU_CONFIG_GET, CONTEXT_MENU_CONFIG_MUTATE, CONTEXT_MENU_REQUEST_CLAIM].includes(message?.type)
+      ? contextMenuController.handleMessage(message)
+      : themeMarketplaceController.handles(message?.type)
+        ? themeMarketplaceController.handleMessage(message)
+    : qubitWebOpening.handles(message?.type)
+      ? qubitWebOpening.handleMessage(message, sender)
+    // From the content script on the gateway's hand-off page: it only learns how to cover the page.
+    : message?.type === QUBIT_WEB_LAUNCH_LOOK_MESSAGE
+      ? qubitWebOpening.handleLaunchLook(sender)
+    : message?.type === INLINE_ASSIST_FONT_REQUEST
+      ? handleInlineAssistFontRequest(message, sender)
+    : inlineAssistModels.handles(message?.type)
+      ? inlineAssistModels.handle(message, sender)
+    : message?.type === 'QUBIT_INLINE_DRAFT_REQUEST'
+      ? queueInlineDraftRequest(message, sender)
+      : message?.type === 'QUBIT_INLINE_SESSION_STATUS'
+      ? inlineSessionStatus()
+      : message?.type === 'QUBIT_INLINE_OPEN_SESSION'
+        ? queueOpenSessionRequest(message, sender)
+        : message?.type === 'QUBIT_GET_YOUTUBE_TRANSCRIPT'
+          ? getYoutubeTranscript(message)
+          : message?.type === LOOPBACK_FETCH_MESSAGE
+            ? handleLoopbackFetchMessage(message)
+            : null;
+  if (!action) return false;
+  action
+    .then(sendResponse)
+    .catch((error) => sendResponse({ ok: false, reason: error?.message || String(error) }));
+  return true;
+});
+
+initI18n().catch((error) => {
+  console.warn('[Qubit Browser] Localization initialization failed:', error);
+  return contextMenuController.configure();
+}).catch((error) => {
+  console.warn('[Qubit Browser] Default context menus could not be configured:', error);
+});
+refreshPanelResidencyModeFromStorage().catch((error) => {
+  console.warn('[Qubit Browser] Panel residency initialization failed:', error);
+});

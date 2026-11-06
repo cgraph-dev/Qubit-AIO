@@ -1,9 +1,4 @@
-"""Deterministic, standard-library text utilities for the browser companion.
-
-Ported from the companion plugin of ``hermes-browser-extension``
-(https://github.com/abundantbeing/hermes-browser-extension) at pin
-16d42430ff45d5833cb6176b401db867b591c2f2, MIT, Copyright (c) 2026 Jon Komet.
-See PROVENANCE.json beside this file. Local divergence: rebranding only.
+"""Deterministic, standard-library text utilities for the Qubit Browser Extension.
 
 These helpers intentionally do not call a model, network service, or browser API.
 They are bounded so tool arguments cannot turn a convenience operation into an

@@ -1,0 +1,627 @@
+import {
+  AUDIO_TRANSCRIBE_ENDPOINT,
+  DEFAULT_SETTINGS,
+  buildAudioTranscriptionBody,
+  dashboardVoiceFailureMessage,
+  normalizeGatewayMode,
+  normalizeGatewayUrl,
+  prepareOnDeviceSpeechRecognition,
+  shouldFallbackToWebSpeechForTranscription,
+  shouldOpenVoiceDictationPageForSpeechError,
+  shouldUseLocalDashboardAudioTranscription,
+} from './lib/common.mjs';
+import { initI18n, t, translateUiText } from './lib/i18n.mjs';
+import { applyStoredPanelAppearance } from './lib/apply-stored-appearance.mjs';
+import { createVoiceWingbeat, createVoiceLevelSource } from './lib/voice-wingbeat.mjs';
+import { formatVoiceElapsed } from './lib/voice-capture.mjs';
+import { normalizeAppearanceTheme, normalizeColorMode, resolveColorMode } from './lib/appearance-themes.mjs';
+import { customThemeSelection, customThemePaletteForMode, customThemeEffectiveMode, themeCssVariables } from './lib/custom-themes.mjs';
+import { readCustomThemeStore } from './lib/custom-theme-store.mjs';
+import {
+  DEFAULT_GATEWAY_CAPABILITIES,
+  normalizeGatewayCapabilities,
+} from './lib/capabilities.mjs';
+import {
+  fetchDashboardSessionToken,
+  resolveDashboardTranscriptionBaseUrl,
+  transcribeAudioViaDashboard,
+} from './lib/model-discovery.mjs';
+import { discoverLocalDashboardBaseUrl, readCachedRosterUrl } from './lib/desktop-roster.mjs';
+import { getBrowserApi } from './lib/browser-api.mjs';
+import { createWebappCredentialStore, keepSignedInEnabled } from './lib/webapp-credential.mjs';
+import { browserMicrophoneSettingsUrl, browserSpeechCloudFallbackAllowed, detectBrowserProduct } from './lib/browser-runtime.mjs';
+
+const browserApi = getBrowserApi();
+const extensionUrl = browserApi?.runtime?.getURL?.('/') || '';
+const browserProduct = detectBrowserProduct({
+  userAgent: navigator.userAgent,
+  brands: navigator.userAgentData?.brands,
+  braveApi: navigator.brave,
+  extensionUrl,
+});
+const startButton = document.getElementById('startVoiceButton');
+const settingsButton = document.getElementById('openMicSettingsButton');
+const closeButton = document.getElementById('closeVoiceButton');
+const statusEl = document.getElementById('voiceStatus');
+const statusTitleEl = document.getElementById('voiceStatusTitle');
+const activityEl = document.getElementById('voiceActivity');
+const activityLabelEl = document.getElementById('voiceActivityLabel');
+const activityTimerEl = document.getElementById('voiceActivityTimer');
+let activityStartedAt = 0;
+let activityTimer = 0;
+let voiceLevelSource = null;
+const voiceWingbeat = createVoiceWingbeat(document.getElementById('voiceGlow'), {
+  level: () => voiceLevelSource?.level() || 0,
+  analyser: () => voiceLevelSource?.analyser || null,
+});
+
+const VOICE_DRAFT_STORAGE_KEY = 'hermesVoiceDraft';
+const VOICE_AUDIO_MIME_TYPES = Object.freeze([
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/mp4',
+  'audio/ogg;codecs=opus',
+  'audio/ogg',
+  'audio/wav',
+]);
+
+let settings = { ...DEFAULT_SETTINGS };
+// The Qubit Web sign-in the panel holds (storage.session, this browser run only) stands in for the
+// token a legacy dashboard injects into its page; the Webapp injects none. Read only, same origin only.
+const webappCredentials = createWebappCredentialStore({
+  storageSession: browserApi?.storage?.session,
+  isEnabled: () => keepSignedInEnabled(settings),
+});
+async function dashboardTokenFor(baseUrl = '') {
+  try {
+    return await webappCredentials.tokenFor(baseUrl, '');
+  } catch {
+    return '';
+  }
+}
+let capabilities = { ...DEFAULT_GATEWAY_CAPABILITIES };
+let recorder = null;
+let stream = null;
+let chunks = [];
+let recording = false;
+let speechRecognition = null;
+let speechFinalText = '';
+let speechInterimText = '';
+let speechActive = false;
+let speechRecognitionError = '';
+let dashboardTranscriptionBaseUrl = '';
+
+// The Desktop dashboard is served on a discovered random loopback port. Resolve
+// it once per page so STT targets the live dashboard instead of the legacy
+// fixed port; the resolver keeps the fixed port as a last-resort fallback.
+async function resolveVoicePageDashboardBaseUrl() {
+  if (dashboardTranscriptionBaseUrl) return dashboardTranscriptionBaseUrl;
+  dashboardTranscriptionBaseUrl = await resolveDashboardTranscriptionBaseUrl({
+    gatewayMode: settings.gatewayMode,
+    gatewayUrl: settings.gatewayUrl,
+    discover: async () => {
+      const cached = await readCachedRosterUrl().catch(() => ({ url: '' }));
+      return discoverLocalDashboardBaseUrl({
+        gatewayMode: normalizeGatewayMode(settings.gatewayMode),
+        cachedUrl: cached?.url || '',
+        cachedAt: Number(cached?.cachedAt || 0),
+        gatewayUrl: normalizeGatewayUrl(settings.gatewayUrl),
+        apiKey: settings.apiKey,
+        timeoutMs: 3_000,
+      });
+    },
+  });
+  return dashboardTranscriptionBaseUrl;
+}
+
+async function applyVoiceTheme() {
+  const root = document.documentElement;
+  const store = await readCustomThemeStore(browserApi?.storage?.local);
+  const selection = customThemeSelection(settings.appearanceTheme, store.themes);
+  const colorMode = normalizeColorMode(settings.colorMode);
+  const mode = resolveColorMode(colorMode, window.matchMedia('(prefers-color-scheme: dark)').matches);
+  if (selection.kind === 'custom') {
+    const variables = themeCssVariables(customThemePaletteForMode(selection.document, mode));
+    for (const [property, value] of Object.entries(variables)) root.style.setProperty(property, value);
+  }
+  root.dataset.qubitTheme = selection.kind === 'custom' ? selection.id : normalizeAppearanceTheme(settings.appearanceTheme);
+  root.dataset.qubitColorMode = colorMode;
+  root.dataset.qubitMode = mode;
+  const effectiveMode = selection.kind === 'custom' ? customThemeEffectiveMode(selection.document, mode) : mode;
+  root.dataset.qubitEffectiveMode = effectiveMode;
+  root.style.colorScheme = effectiveMode;
+}
+
+// Composite statuses read "Headline\n\nDetail" in every locale. The headline
+// becomes the small label above the detail, so the box never shows a wall of text.
+function setStatus(message) {
+  const text = String(translateUiText(message) ?? '');
+  const split = text.indexOf('\n\n');
+  const title = split > 0 ? text.slice(0, split) : '';
+  if (statusTitleEl) {
+    statusTitleEl.textContent = title;
+    statusTitleEl.hidden = !title;
+  }
+  if (statusEl) statusEl.textContent = title ? text.slice(split + 2) : text;
+}
+
+function renderActivityTimer() {
+  const elapsed = formatVoiceElapsed((Date.now() - activityStartedAt) / 1000);
+  if (activityTimerEl && activityTimerEl.textContent !== elapsed) activityTimerEl.textContent = elapsed;
+}
+
+// One place drives the glow and the dictation strip, the same pair the side
+// panel shows. The timer ticks once a second and only while recording.
+function showVoiceState(active, processing = false) {
+  voiceWingbeat.set({ active, processing });
+  const listening = active && !processing;
+  if (activityEl) {
+    activityEl.hidden = !(active || processing);
+    activityEl.classList.toggle('recording', listening);
+    activityEl.classList.toggle('transcribing', processing);
+  }
+  const label = translateUiText(processing ? 'Transcribing' : 'Dictating');
+  if (activityLabelEl && activityLabelEl.textContent !== label) activityLabelEl.textContent = label;
+  if (listening && !activityTimer) {
+    activityStartedAt = Date.now();
+    renderActivityTimer();
+    activityTimer = setInterval(renderActivityTimer, 1000);
+  } else if (!listening && activityTimer) {
+    clearInterval(activityTimer);
+    activityTimer = 0;
+  }
+}
+
+function setRecording(value, label = '') {
+  recording = Boolean(value);
+  document.body.classList.toggle('recording', recording);
+  showVoiceState(recording);
+  if (startButton) startButton.textContent = recording
+    ? `${translateUiText('Stop')}${label ? ` ${label}` : ''}`
+    : translateUiText('Start dictation');
+}
+
+function microphoneSettingsUrl() {
+  return browserMicrophoneSettingsUrl({ product: browserProduct, extensionUrl });
+}
+
+async function openMicrophoneSettings() {
+  const url = microphoneSettingsUrl();
+  if (!url) {
+    setStatus(t('permissions.state', { state: 'blocked' }));
+    return;
+  }
+  try {
+    await browserApi.tabs.create({ url, active: true });
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
+function preferredVoiceMimeType() {
+  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') return '';
+  return VOICE_AUDIO_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || '';
+}
+
+function speechRecognitionConstructor() {
+  return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+function browserSpeechAvailable() {
+  return Boolean(speechRecognitionConstructor());
+}
+
+function canUseBrowserSpeechFallback() {
+  return browserSpeechAvailable() && browserSpeechCloudFallbackAllowed({ product: browserProduct });
+}
+
+function canRecordVoiceAudio() {
+  return Boolean(navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== 'undefined');
+}
+
+function canUseQubitStt() {
+  return Boolean(settings.apiKey && capabilities.audioTranscription && canRecordVoiceAudio());
+}
+
+function canUseLocalDashboardStt() {
+  return shouldUseLocalDashboardAudioTranscription({
+    gatewayMode: settings.gatewayMode,
+    recordingAvailable: canRecordVoiceAudio(),
+  });
+}
+
+function stopStream() {
+  voiceLevelSource?.close();
+  voiceLevelSource = null;
+  stream?.getTracks?.().forEach((track) => track.stop());
+  stream = null;
+}
+
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(reader.error || new Error('Could not read voice recording'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function loadSettings() {
+  const storage = browserApi?.storage?.local;
+  if (!storage?.get) return false;
+  const stored = await storage.get(['qubitBrowserSettings']);
+  settings = { ...DEFAULT_SETTINGS, ...(stored.qubitBrowserSettings || {}) };
+  return true;
+}
+
+function authHeaders({ json = false } = {}) {
+  const headers = json ? { 'Content-Type': 'application/json' } : {};
+  if (settings.apiKey) headers.Authorization = `Bearer ${settings.apiKey}`;
+  if (settings.activeProfile) headers['X-Qubit-Profile'] = settings.activeProfile;
+  return headers;
+}
+
+async function apiFetch(path, options = {}) {
+  const base = normalizeGatewayUrl(settings.gatewayUrl);
+  const hasBody = typeof options.body !== 'undefined';
+  return fetch(`${base}${path}`, {
+    ...options,
+    redirect: 'error',
+    headers: {
+      ...authHeaders({ json: hasBody }),
+      ...(options.headers || {}),
+    },
+  });
+}
+
+async function apiFetchWithTimeout(path, options = {}, timeoutMs = 120000) {
+  if (typeof AbortController === 'undefined') return apiFetch(path, options);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), Math.max(1, Number(timeoutMs) || 120000));
+  try {
+    return await apiFetch(path, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+async function readJsonResponse(response) {
+  const text = await response.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text };
+  }
+}
+
+async function loadCapabilities() {
+  if (!settings.apiKey) {
+    capabilities = normalizeGatewayCapabilities(null, { healthOk: false, hasApiKey: false, warning: 'No API token stored.' });
+    return capabilities;
+  }
+  try {
+    const response = await apiFetch('/v1/capabilities', { method: 'GET', cache: 'no-store' });
+    const payload = await readJsonResponse(response);
+    if (!response.ok) throw new Error(`GET /v1/capabilities failed (${response.status})`);
+    capabilities = normalizeGatewayCapabilities(payload, { healthOk: true, hasApiKey: true });
+  } catch (error) {
+    capabilities = normalizeGatewayCapabilities(null, {
+      healthOk: true,
+      hasApiKey: Boolean(settings.apiKey),
+      warning: error?.message || String(error),
+    });
+  }
+  return capabilities;
+}
+
+async function transcribeVoiceRecording(blob) {
+  const canUseApiTranscription = canUseQubitStt();
+  const canUseDashboardTranscription = canUseLocalDashboardStt();
+  if (!canUseApiTranscription && !canUseDashboardTranscription) {
+    const error = new Error('Qubit audio transcription is unavailable on this gateway.');
+    error.fallbackToWebSpeech = true;
+    throw error;
+  }
+  const dataUrl = await blobToDataUrl(blob);
+  if (canUseDashboardTranscription && !canUseApiTranscription) {
+    const baseUrl = await resolveVoicePageDashboardBaseUrl();
+    const result = await transcribeAudioViaDashboard({
+      baseUrl,
+      profile: settings.activeProfile,
+      dataUrl,
+      mimeType: blob.type || 'audio/webm',
+      dashboardToken: await dashboardTokenFor(baseUrl),
+    });
+    if (!result.ok) {
+      const error = new Error(dashboardVoiceFailureMessage(result));
+      error.status = result.status;
+      error.fallbackToWebSpeech = shouldFallbackToWebSpeechForTranscription(result.status);
+      throw error;
+    }
+    return result.transcript;
+  }
+  const response = await apiFetch(AUDIO_TRANSCRIBE_ENDPOINT, {
+    method: 'POST',
+    body: JSON.stringify(buildAudioTranscriptionBody(dataUrl, blob.type || 'audio/webm')),
+  });
+  if (!response.ok) {
+    const body = await response.text().catch(() => '');
+    const error = new Error(body || `Qubit voice transcription failed (${response.status})`);
+    error.status = response.status;
+    error.fallbackToWebSpeech = shouldFallbackToWebSpeechForTranscription(response.status);
+    throw error;
+  }
+  const payload = await response.json();
+  return String(payload?.transcript || '').trim();
+}
+
+async function publishTranscript(transcript, source = 'voice-dictation-page') {
+  const payload = {
+    type: 'QUBIT_VOICE_TRANSCRIPT',
+    transcript,
+    source,
+    ts: Date.now(),
+  };
+  try {
+    await browserApi?.storage?.local?.set?.({ [VOICE_DRAFT_STORAGE_KEY]: payload });
+  } catch {
+    // The runtime message is still useful when storage is unavailable or
+    // throws in a Chromium fork; do not lose a finished transcript.
+  }
+  try {
+    await browserApi?.runtime?.sendMessage?.(payload);
+  } catch {
+    // Storage is the durable cross-surface return path; runtime messaging is an immediate optimization.
+  }
+}
+
+function isMicrophoneBlocked(error) {
+  const text = `${error?.name || ''} ${error?.message || error || ''}`.toLowerCase();
+  return /notallowed|permission|denied|dismissed|blocked|not-readable|notreadable/.test(text);
+}
+
+function ensureBrowserSpeech() {
+  if (speechRecognition) return speechRecognition;
+  const Recognition = speechRecognitionConstructor();
+  if (!Recognition) return null;
+  const recognition = new Recognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = navigator.language || 'en-US';
+  recognition.onresult = (event) => {
+    speechInterimText = '';
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index]?.[0]?.transcript || '';
+      if (event.results[index]?.isFinal) speechFinalText = `${speechFinalText} ${transcript}`.trim();
+      else speechInterimText = `${speechInterimText} ${transcript}`.trim();
+    }
+    const preview = [speechFinalText, speechInterimText].filter(Boolean).join(' ');
+    setStatus(t('voice.browser.preview', { preview: preview || translateUiText('Listening… speak now, then click Stop.') }));
+  };
+  recognition.onerror = (event) => {
+    if (shouldOpenVoiceDictationPageForSpeechError(event)) {
+      speechRecognitionError = event?.error || 'speech service unavailable';
+      speechActive = false;
+      setRecording(false);
+      startButton.disabled = false;
+      setStatus('Browser speech service unavailable. Start again to use Qubit audio transcription instead.');
+      return;
+    }
+    setStatus(t('voice.browser.stopped', { error: event.error || translateUiText('Speech recognition error') }));
+  };
+  recognition.onend = async () => {
+    if (speechRecognitionError) {
+      const error = speechRecognitionError;
+      speechRecognitionError = '';
+      speechActive = false;
+      setRecording(false);
+      startButton.disabled = false;
+      setStatus(`Browser speech service unavailable (${error}). Use Qubit audio transcription from this tab instead.`);
+      return;
+    }
+    const transcript = [speechFinalText, speechInterimText].filter(Boolean).join(' ').trim();
+    speechActive = false;
+    setRecording(false);
+    startButton.disabled = false;
+    if (!transcript) {
+      setStatus('Voice mode: Browser speech fallback\n\nNo speech detected. Click Start dictation and try again.');
+      return;
+    }
+    await publishTranscript(transcript, 'browser-speech-fallback');
+    setStatus(t('voice.transcript_sent', { transcript }));
+    setTimeout(() => window.close(), 1600);
+  };
+  speechRecognition = recognition;
+  return speechRecognition;
+}
+
+async function startBrowserSpeechFallback() {
+  const recognition = ensureBrowserSpeech();
+  if (!recognition) {
+    setStatus('Voice mode unavailable. This browser does not expose Qubit STT or Web Speech fallback.');
+    return false;
+  }
+  speechFinalText = '';
+  speechInterimText = '';
+  speechRecognitionError = '';
+  try {
+    startButton.disabled = false;
+    const preparation = await prepareOnDeviceSpeechRecognition({
+      Recognition: speechRecognitionConstructor(),
+      recognition,
+      language: recognition.lang,
+      onStatus: () => setStatus('Voice mode: On-device speech\n\nDownloading the browser language pack once…'),
+    });
+    if (preparation.mode !== 'local' && !canUseBrowserSpeechFallback()) {
+      const error = new Error('This Chromium browser exposes Web Speech but not Chrome’s Google speech service.');
+      error.voiceDictationPageFallback = true;
+      throw error;
+    }
+    recognition.start();
+    speechActive = true;
+    setRecording(true, 'speech');
+    setStatus(preparation.mode === 'local'
+      ? 'Voice mode: On-device speech\n\nListening locally… speak now, then click Stop.'
+      : 'Voice mode: Browser speech fallback\n\nListening… speak now, then click Stop.');
+    return true;
+  } catch (error) {
+    speechActive = false;
+    setRecording(false);
+    setStatus(t('voice.browser.start_failed', { error: error?.message || String(error) }));
+    return false;
+  }
+}
+
+function stopBrowserSpeechFallback() {
+  if (!speechActive) return false;
+  startButton.disabled = true;
+  setStatus('Stopping browser speech fallback…');
+  try {
+    speechRecognition?.stop?.();
+  } catch (error) {
+    startButton.disabled = false;
+    speechActive = false;
+    setRecording(false);
+    setStatus(t('voice.browser.stop_failed', { error: error?.message || String(error) }));
+  }
+  return true;
+}
+
+async function startRecording() {
+  startButton.disabled = true;
+  setStatus('Voice mode: Qubit STT\n\nRequesting microphone access…');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+    voiceLevelSource = createVoiceLevelSource(stream);
+    chunks = [];
+    const mimeType = preferredVoiceMimeType();
+    recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    recorder.ondataavailable = (event) => {
+      if (event.data?.size > 0) chunks.push(event.data);
+    };
+    recorder.onerror = (event) => {
+      setRecording(false);
+      stopStream();
+      setStatus(event?.error?.message || 'Voice recording failed.');
+    };
+    recorder.onstop = async () => {
+      const recordingType = recorder?.mimeType || mimeType || 'audio/webm';
+      const recordingChunks = chunks;
+      recorder = null;
+      chunks = [];
+      stopStream();
+      setRecording(false);
+      if (!recordingChunks.length) {
+        setStatus('No speech captured. Click Start dictation and try again.');
+        return;
+      }
+      try {
+        startButton.disabled = true;
+        showVoiceState(true, true);
+        setStatus('Transcribing through your local Qubit gateway…');
+        const transcript = await transcribeVoiceRecording(new Blob(recordingChunks, { type: recordingType }));
+        if (!transcript) {
+          setStatus('No speech detected. Click Start dictation and try again.');
+          return;
+        }
+        await publishTranscript(transcript, 'qubit-stt');
+        setStatus(t('voice.transcript_sent', { transcript }));
+        setTimeout(() => window.close(), 1600);
+      } catch (error) {
+        if (error?.fallbackToWebSpeech && await startBrowserSpeechFallback()) return;
+        setStatus(t('voice.transcription_failed', { error: error?.message || String(error) }));
+      } finally {
+        showVoiceState(recording);
+        startButton.disabled = false;
+      }
+    };
+    recorder.start();
+    setRecording(true, '+ transcribe');
+    setStatus('Voice mode: Qubit STT\n\nRecording… speak now, then click Stop + transcribe.');
+  } catch (error) {
+    setRecording(false);
+    stopStream();
+    if (isMicrophoneBlocked(error)) {
+      setStatus(t('voice.permission_blocked', { error: error?.message || String(error) }));
+    } else if (await startBrowserSpeechFallback()) {
+      return;
+    } else {
+      setStatus(t('voice.start_failed', { error: error?.message || String(error) }));
+    }
+  } finally {
+    startButton.disabled = false;
+  }
+}
+
+function stopRecording() {
+  if (!recorder || recorder.state === 'inactive') return false;
+  startButton.disabled = true;
+  setStatus('Stopping recording…');
+  recorder.stop();
+  return true;
+}
+
+// Mirror of the side panel's preflight: never record audio the Desktop
+// dashboard cannot transcribe; use on-device speech when it is unreachable.
+let dashboardSttProbe = { at: 0, ok: false };
+async function dashboardSttReachable() {
+  if (Date.now() - dashboardSttProbe.at < 30_000) return dashboardSttProbe.ok;
+  let ok = false;
+  try {
+    const baseUrl = await resolveVoicePageDashboardBaseUrl();
+    ok = Boolean(baseUrl) && Boolean(await fetchDashboardSessionToken({ baseUrl, timeoutMs: 1_500, dashboardToken: await dashboardTokenFor(baseUrl) }));
+  } catch {
+    ok = false;
+  }
+  dashboardSttProbe = { at: Date.now(), ok };
+  return ok;
+}
+
+async function startBestVoiceMode() {
+  await loadCapabilities();
+  if (canUseQubitStt() || (canUseLocalDashboardStt() && await dashboardSttReachable())) {
+    await startRecording();
+    return;
+  }
+  if (await startBrowserSpeechFallback()) return;
+  if (!settings.apiKey) {
+    setStatus('Voice mode unavailable. Connect Qubit for STT, or use a browser build that supports speech fallback.');
+  } else {
+    setStatus('Voice mode unavailable. This Qubit runtime has no audio transcription route and this browser exposes no Web Speech fallback.');
+  }
+}
+
+await initI18n();
+await applyStoredPanelAppearance(document.documentElement);
+
+startButton?.addEventListener('click', () => {
+  if (recording) {
+    if (stopRecording()) return;
+    if (stopBrowserSpeechFallback()) return;
+  } else {
+    startBestVoiceMode().catch((error) => setStatus(t('voice.start_failed', { error: error?.message || String(error) })));
+  }
+});
+settingsButton?.addEventListener('click', openMicrophoneSettings);
+closeButton?.addEventListener('click', () => window.close());
+window.addEventListener('pagehide', stopStream);
+
+try {
+  const loadedFromExtensionStorage = await loadSettings();
+  await applyVoiceTheme();
+  await loadCapabilities();
+  if (!loadedFromExtensionStorage) {
+    setStatus('Preview mode: load this page from the installed Qubit Browser Extension to use connected Qubit settings and voice dictation.');
+  } else if (canUseQubitStt() || canUseLocalDashboardStt()) {
+    setStatus('Voice mode: Qubit STT\n\nAudio is sent once to your local Qubit transcription endpoint when you stop recording.');
+  } else if (canUseBrowserSpeechFallback()) {
+    setStatus('Voice mode: Browser speech fallback\n\nQubit STT is unavailable on this gateway. Speech recognition runs in Google Chrome; only the transcript is sent back to the side panel.');
+  } else if (!canRecordVoiceAudio()) {
+    startButton.disabled = true;
+    setStatus('This browser does not expose MediaRecorder/getUserMedia to extension pages, and Web Speech fallback is unavailable.');
+  } else if (!settings.apiKey) {
+    setStatus('Qubit is not connected yet. Browser speech fallback is unavailable here; connect the side panel to Qubit, then use voice dictation.');
+  }
+} catch (error) {
+  setStatus(t('voice.settings_load_failed', { error: error?.message || String(error) }));
+}

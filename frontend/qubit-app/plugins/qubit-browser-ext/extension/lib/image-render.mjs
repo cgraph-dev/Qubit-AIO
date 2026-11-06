@@ -1,0 +1,472 @@
+import {
+  classifyMediaKind,
+  extractImageRefs,
+  extractMediaTagPaths,
+  extractVisionCachePaths,
+} from './media-persistence.mjs';
+
+import { normalizeUserFileAttachments } from './user-file-attachments.mjs';
+
+const RASTER_DATA_URL_RE = /^data:image\/(?:png|jpe?g|gif|webp|bmp);base64,[a-z0-9+/]+={0,2}$/i;
+
+export const IMAGE_ASPECT_RATIOS = Object.freeze({
+  landscape: 16 / 9,
+  square: 1,
+  portrait: 9 / 16,
+});
+
+export function normalizeImageAspectRatio(value = '') {
+  const normalized = String(value || '').trim().toLowerCase();
+  return Object.hasOwn(IMAGE_ASPECT_RATIOS, normalized) ? normalized : 'landscape';
+}
+
+function stripWrappingQuotes(value = '') {
+  const text = String(value || '').trim();
+  if (text.length >= 2 && ['"', "'", '`'].includes(text[0]) && text.at(-1) === text[0]) {
+    return text.slice(1, -1).trim();
+  }
+  return text;
+}
+
+/**
+ * Return a browser-safe source for a generated raster image, or null.
+ * Deliberately excludes file:, blob:, svg data URLs, and arbitrary schemes.
+ */
+export function resolveImageSource(value = '') {
+  const source = stripWrappingQuotes(value);
+  if (!source) return null;
+  if (RASTER_DATA_URL_RE.test(source)) return source;
+  try {
+    const url = new URL(source);
+    return url.protocol === 'https:' ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function imageResultRecord(value) {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value;
+  if (typeof value !== 'string' || !value.trim()) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function resolvedGeneratedImageSourcesFromResult(result) {
+  const record = imageResultRecord(result);
+  if (!record || record.success === false) return [];
+  const candidates = [record.host_image, record.image, record.agent_visible_image, record.url]
+    .filter((value) => typeof value === 'string' && value.trim());
+  const seen = new Set();
+  return candidates
+    .map((value) => resolveImageSource(value))
+    .filter((source) => {
+      if (!source || seen.has(source)) return false;
+      seen.add(source);
+      return true;
+    });
+}
+
+/**
+ * Media candidates from an image_generate tool result, in source order, with
+ * local paths kept. `resolvedGeneratedImageSourcesFromResult` can only accept
+ * browser-safe sources (https/data URLs), but the gateway reports finished
+ * generations as local file paths; the panel resolves those through the
+ * dashboard media route at DOM time, which is what lets a finished generation
+ * dissolve into the real picture instead of parked forever in its animation.
+ */
+export function rawGeneratedImageCandidatesFromResult(result) {
+  const record = imageResultRecord(result);
+  if (!record || record.success === false) return [];
+  const seen = new Set();
+  return [record.host_image, record.image, record.agent_visible_image, record.url]
+    .filter((value) => typeof value === 'string' && value.trim())
+    .map((value) => stripWrappingQuotes(value))
+    .filter((candidate) => {
+      if (!candidate || seen.has(candidate)) return false;
+      if (!resolveImageSource(candidate) && classifyMediaKind(candidate) !== 'image') return false;
+      seen.add(candidate);
+      return true;
+    });
+}
+
+export function resolvedGeneratedImageSourcesFromMessages(messages = []) {
+  if (!Array.isArray(messages)) return [];
+  const found = [];
+  const seen = new Set();
+  const visit = (message) => {
+    if (!message || typeof message !== 'object') return;
+    const toolNames = [
+      message.tool_name,
+      message.toolName,
+      message.name,
+      message.tool_call?.name,
+      ...(Array.isArray(message.tool_calls) ? message.tool_calls.flatMap((call) => [call?.name, call?.function?.name]) : []),
+    ].map((value) => String(value || '').trim());
+    if (toolNames.some((toolName) => /image_generate/i.test(toolName))) {
+      const results = [message.result, message.output, message.content];
+      if (Array.isArray(message.tool_calls)) {
+        results.push(...message.tool_calls.flatMap((call) => [call?.result, call?.function?.result, call?.function?.arguments]));
+      }
+      for (const result of results) {
+        for (const source of resolvedGeneratedImageSourcesFromResult(result)) {
+        if (!seen.has(source)) {
+          seen.add(source);
+          found.push(source);
+        }
+      }
+    }
+    }
+    if (Array.isArray(message.content)) message.content.forEach(visit);
+    if (Array.isArray(message.parts)) message.parts.forEach(visit);
+  };
+  messages.forEach(visit);
+  return found;
+}
+export function appendGeneratedImageSourcesToMessages(messages = [], sources = []) {
+  const safeSources = [...new Set((Array.isArray(sources) ? sources : [])
+    .map((source) => resolveImageSource(source))
+    .filter(Boolean))];
+  if (!safeSources.length) return Array.isArray(messages) ? messages : [];
+  const next = Array.isArray(messages) ? messages.map((message) => ({ ...message })) : [];
+  let assistantIndex = -1;
+  for (let index = next.length - 1; index >= 0; index -= 1) {
+    if (String(next[index]?.role || '').toLowerCase() === 'assistant') {
+      assistantIndex = index;
+      break;
+    }
+  }
+  const currentContent = assistantIndex >= 0 ? String(next[assistantIndex].content || '') : '';
+  const missing = safeSources.filter((source) => !currentContent.includes(source));
+  if (!missing.length) return next;
+  const markdown = missing.map((source) => `![Generated image](${source})`).join('\n');
+  if (assistantIndex >= 0) {
+    next[assistantIndex] = {
+      ...next[assistantIndex],
+      content: [currentContent, markdown].filter(Boolean).join('\n\n'),
+    };
+  } else {
+    next.push({ role: 'assistant', content: markdown, ts: Date.now() });
+  }
+  return next;
+}
+
+export function normalizeUserImageAttachments(attachments = []) {
+  if (!Array.isArray(attachments)) return [];
+  const previews = [];
+  const seen = new Set();
+  for (const attachment of attachments) {
+    if (!attachment || typeof attachment !== 'object') continue;
+    const kind = String(attachment.kind || '').trim().toLowerCase();
+    const mime = String(attachment.mime || attachment.type || '').trim().toLowerCase();
+    if (kind && kind !== 'image' && !mime.startsWith('image/')) continue;
+    const source = resolveImageSource(attachment.dataUrl || attachment.source || attachment.url || '');
+    if (!source || seen.has(source)) continue;
+    seen.add(source);
+    previews.push({
+      name: String(attachment.name || 'Attached image').trim().slice(0, 180) || 'Attached image',
+      source,
+    });
+    if (previews.length >= 8) break;
+  }
+  return previews;
+}
+
+function mediaFileName(filePath = '', fallback = 'Attached image') {
+  const base = String(filePath || '').split(/[\\/]/).pop() || '';
+  return base.trim().slice(0, 180) || fallback;
+}
+
+function pushExtractedMedia(found, seen, value, name = 'Attached image') {
+  const source = resolveImageSource(value);
+  if (!source || seen.has(source)) return;
+  seen.add(source);
+  found.push({
+    kind: 'image',
+    name: String(name || 'Attached image').trim().slice(0, 180) || 'Attached image',
+    dataUrl: source,
+  });
+}
+
+function pushExtractedPathRefs(found, seen, text = '') {
+  const filePaths = [
+    ...extractVisionCachePaths(text),
+    ...extractImageRefs(text).map((item) => item.path),
+    ...extractMediaTagPaths(text).filter((item) => item.kind === 'image').map((item) => item.path),
+  ];
+  for (const filePath of filePaths) {
+    if (!filePath || seen.has(`path:${filePath}`)) continue;
+    seen.add(`path:${filePath}`);
+    found.push({
+      kind: 'image',
+      name: mediaFileName(filePath),
+      pathRef: filePath,
+    });
+  }
+}
+
+function visitHistoryMedia(value, found, seen) {
+  if (!value) return;
+  if (Array.isArray(value)) {
+    value.forEach((item) => visitHistoryMedia(item, found, seen));
+    return;
+  }
+  if (typeof value === 'string') {
+    pushExtractedMedia(found, seen, value);
+    return;
+  }
+  if (typeof value !== 'object') return;
+  const name = value.name || value.label || value.filename || 'Attached image';
+  const inlineSource = value.dataUrl || value.source || value.url || value.image || value.image_url?.url || value.imageUrl;
+  pushExtractedMedia(found, seen, inlineSource, name);
+  if (!inlineSource) {
+    // Browser turn envelopes carry finished attachments as local disk paths
+    // (`attachment_context.items[].local_path`), not inline sources. Keep them
+    // as path refs so media hydration can serve the Qubit-managed ones —
+    // without this, every Desktop-attached image vanished from the transcript.
+    const localPath = String(value.local_path || value.localPath || value.pathRef || value.path || '').trim();
+    const kind = classifyMediaKind(localPath);
+    if (localPath && (kind === 'image' || kind === 'video') && !seen.has(`path:${localPath}`)) {
+      seen.add(`path:${localPath}`);
+      found.push({
+        kind,
+        name: mediaFileName(localPath) || name,
+        pathRef: localPath,
+        ...(value.detail ? { detail: String(value.detail) } : {}),
+      });
+    }
+  }
+  visitHistoryMedia(value.content, found, seen);
+  visitHistoryMedia(value.parts, found, seen);
+  visitHistoryMedia(value.attachments, found, seen);
+  visitHistoryMedia(value.image_url, found, seen);
+}
+
+// Current Qubit stores a browser turn as the JSON envelope followed by plain
+// "[Image attached at: <path>]" lines, so the whole string is not valid JSON.
+// Read the leading envelope object and leave the trailing lines to the callers.
+export function parseTurnEnvelope(content = '') {
+  const raw = String(content ?? '');
+  if (!raw.trimStart().startsWith('{')) return null;
+  try {
+    const whole = JSON.parse(raw);
+    return whole && typeof whole === 'object' ? whole : null;
+  } catch {
+    // Fall through to the first-line form.
+  }
+  const firstLine = raw.split(/\r?\n/, 1)[0];
+  try {
+    const head = JSON.parse(firstLine);
+    return head && typeof head === 'object' ? head : null;
+  } catch {
+    return null;
+  }
+}
+
+const ATTACHED_IMAGE_LINE_RE = /^\s*\[Image attached at:\s*(.+?)\s*\]\s*$/gim;
+
+function pushAttachedImageLines(found, seen, text = '') {
+  const raw = String(text || '');
+  let match;
+  ATTACHED_IMAGE_LINE_RE.lastIndex = 0;
+  while ((match = ATTACHED_IMAGE_LINE_RE.exec(raw)) !== null) {
+    const filePath = stripWrappingQuotes(match[1]);
+    if (!filePath || seen.has(`path:${filePath}`) || classifyMediaKind(filePath) !== 'image') continue;
+    seen.add(`path:${filePath}`);
+    found.push({ kind: 'image', name: mediaFileName(filePath), pathRef: filePath });
+  }
+}
+
+export function extractHistoryMediaAttachments(message = {}) {
+  const found = [];
+  const seen = new Set();
+  visitHistoryMedia(message?.content, found, seen);
+  visitHistoryMedia(message?.parts, found, seen);
+  visitHistoryMedia(message?.attachments, found, seen);
+  visitHistoryMedia(message?.attachment_context, found, seen);
+  if (typeof message?.content === 'string') {
+    pushExtractedPathRefs(found, seen, message.content);
+    pushAttachedImageLines(found, seen, message.content);
+    const envelope = parseTurnEnvelope(message.content);
+    if (envelope) {
+      visitHistoryMedia(envelope.attachment_context, found, seen);
+      visitHistoryMedia(envelope.attachments, found, seen);
+      visitHistoryMedia(envelope.human_input?.attachments, found, seen);
+    }
+  }
+  return found.slice(0, 8);
+}
+
+function userMessageMatchText(content = '') {
+  const raw = String(content ?? '');
+  const envelope = parseTurnEnvelope(raw);
+  const text = envelope?.human_input?.text;
+  if (envelope?.protocol && String(envelope.protocol).startsWith('qubit.browser.turn') && typeof text === 'string') {
+    return String(text).replace(/\r\n/g, '\n').replace(/[\t ]+/g, ' ').trim();
+  }
+  return raw
+    .replace(/\r\n/g, '\n')
+    .replace(/[\t ]+/g, ' ')
+    .replace(/\n\n\[ATTACHMENTS\][\s\S]*$/i, '')
+    .trim();
+}
+
+function attachmentMessageKey(message = {}) {
+  return userMessageMatchText(message?.content);
+}
+
+function matchingUserMessageContent(remoteContent = '', localContent = '') {
+  const remote = userMessageMatchText(remoteContent);
+  const local = userMessageMatchText(localContent);
+  if (!remote || !local) return false;
+  if (remote === local) return true;
+  return remote.startsWith(local) || local.startsWith(remote);
+}
+
+export function preserveUserImageAttachments(refreshedMessages = [], localMessages = []) {
+  if (!Array.isArray(refreshedMessages) || !Array.isArray(localMessages)) return Array.isArray(refreshedMessages) ? refreshedMessages : [];
+  const localCandidates = localMessages
+    .map((message, index) => ({ message, index, key: attachmentMessageKey(message) }))
+    .filter(({ message, key }) => String(message?.role || '').toLowerCase() === 'user'
+      && key
+      && (normalizeUserImageAttachments(message.attachments).length || normalizeUserFileAttachments(message.attachments).length));
+  const claimed = new Set();
+
+  const preserved = [...refreshedMessages];
+  for (let index = preserved.length - 1; index >= 0; index -= 1) {
+    const message = preserved[index];
+    if (String(message?.role || '').toLowerCase() !== 'user') continue;
+    const key = attachmentMessageKey(message);
+    const candidate = localCandidates.findLast(({ index, key: localKey }) => !claimed.has(index) && matchingUserMessageContent(key, localKey));
+    if (!candidate) continue;
+    claimed.add(candidate.index);
+    const currentImages = normalizeUserImageAttachments(message.attachments);
+    const files = normalizeUserFileAttachments(candidate.message.attachments);
+    if (currentImages.length && !files.length) continue;
+    // Historical export name retained for callers; generic original-file refs
+    // now survive the same immediate reconciliation as image previews.
+    preserved[index] = { ...message, attachments: currentImages.length
+      ? [...message.attachments, ...files.filter(file => !(message.attachments || []).some(item => item.blobId && item.blobId === file.blobId))]
+      : candidate.message.attachments };
+  }
+  return preserved;
+}
+
+export function appendUserImageAttachments(container, attachments = [], { onOpen } = {}) {
+  const previews = normalizeUserImageAttachments(attachments);
+  const doc = container?.ownerDocument || globalThis.document;
+  if (!container || !doc?.createElement || !previews.length) return null;
+  const group = doc.createElement('div');
+  group.className = `user-message-images${previews.length > 1 ? ' multiple' : ''}`;
+  for (const preview of previews) {
+    const button = doc.createElement('button');
+    button.type = 'button';
+    button.className = 'user-message-image-open';
+    button.setAttribute('aria-label', `Open attached image ${preview.name}`);
+    const image = doc.createElement('img');
+    image.src = preview.source;
+    image.alt = preview.name;
+    image.loading = 'lazy';
+    const caption = doc.createElement('span');
+    caption.className = 'user-message-image-name';
+    caption.textContent = preview.name;
+    button.append(image, caption);
+    if (typeof onOpen === 'function') button.addEventListener('click', () => onOpen(image, preview));
+    group.append(button);
+  }
+  container.append(group);
+  return group;
+}
+
+/**
+ * Extract full-line MEDIA tags without treating local paths as browser URLs.
+ */
+export function extractMediaTags(text = '') {
+  const media = [];
+  const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  const remaining = [];
+  for (const line of lines) {
+    const match = /^\s*["'`]?MEDIA:\s*(.+?)\s*["'`]?\s*$/i.exec(line);
+    if (!match) {
+      remaining.push(line);
+      continue;
+    }
+    const source = stripWrappingQuotes(match[1]);
+    if (source) media.push({ source, raw: line });
+  }
+  return {
+    media,
+    text: remaining.join('\n').replace(/\n{3,}/g, '\n\n').trim(),
+  };
+}
+
+/**
+ * Resolve the first browser-safe generated image from an assistant response.
+ */
+export function firstResolvedImageSource(text = '') {
+  return resolvedGeneratedImageSources(text)[0] || '';
+}
+
+/**
+ * Resolve every browser-safe generated raster image in an assistant response.
+ * Qubit tool output can use either MEDIA tags or Markdown image syntax; keep
+ * both in source order and de-duplicate repeated delivery receipts.
+ */
+export function resolvedGeneratedImageSources(text = '') {
+  const raw = String(text || '');
+  const { media } = extractMediaTags(raw);
+  const candidates = media.map((item) => item.source);
+  const markdownImage = /^\s*!\[[^\]]*\]\((?:<)?([^>\s)]+)(?:>)?(?:\s+['"][^'"]*['"])?\)\s*$/gim;
+  let match;
+  while ((match = markdownImage.exec(raw)) !== null) candidates.push(match[1]);
+
+  const seen = new Set();
+  return candidates
+    .map((candidate) => resolveImageSource(candidate))
+    .filter((source) => {
+      if (!source || seen.has(source)) return false;
+      seen.add(source);
+      return true;
+    });
+}
+
+/**
+ * Remove repeated generated-image references once an image is rendered separately.
+ *
+ * Never interpolate image sources into a RegExp: persisted data URLs can be
+ * several megabytes long and exceed the JavaScript engine's regex limit.
+ */
+export function stripGeneratedImageEchoes(text = '', imageSources = []) {
+  const sources = new Set(
+    imageSources
+      .map((value) => String(value || '').trim())
+      .filter(Boolean),
+  );
+  if (!sources.size) return String(text || '').replace(/\n{3,}/g, '\n\n').trim();
+
+  const lines = String(text || '').replace(/\r\n/g, '\n').split('\n');
+  const remaining = lines.filter((line) => {
+    const trimmed = stripWrappingQuotes(line);
+    if (sources.has(trimmed)) return false;
+
+    if (trimmed.slice(0, 6).toLowerCase() === 'media:') {
+      const mediaSource = stripWrappingQuotes(trimmed.slice(6));
+      if (sources.has(mediaSource)) return false;
+    }
+
+    if (trimmed.startsWith('![') && trimmed.endsWith(')')) {
+      const sourceStart = trimmed.indexOf('](');
+      if (sourceStart > 1) {
+        const markdownSource = trimmed.slice(sourceStart + 2, -1).trim();
+        if (sources.has(markdownSource)) return false;
+      }
+    }
+
+    return true;
+  });
+
+  return remaining.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}

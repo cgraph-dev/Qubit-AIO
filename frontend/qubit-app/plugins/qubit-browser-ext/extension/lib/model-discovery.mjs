@@ -1,0 +1,1170 @@
+// model-discovery.mjs
+// Discover real model names from /api/sessions when /v1/models only returns
+// the synthetic `qubit-agent` alias. Used as a fallback for multi-provider
+// setups where the gateway's OpenAI-compat /v1/models doesn't reflect the
+// real model registry.
+//
+// The actual model used per turn is stored in /api/sessions[*].model, so we
+// can reconstruct a useful model picker from session history.
+
+const SESSION_HISTORY_LIMIT = 100;
+const LOCAL_DASHBOARD_URL = 'http://127.0.0.1:9119';
+export const QUBIT_CANONICAL_MODEL_CATALOG_URL = 'https://raw.githubusercontent.com/NousResearch/qubit-agent/main/website/static/api/model-catalog.json';
+export const NOUS_LIVE_MODEL_CATALOG_URL = 'https://inference-api.nousresearch.com/v1/models';
+export const MODEL_CATALOG_CACHE_STORAGE_KEY = 'qubitBrowserModelCatalogCache';
+
+export function modelCatalogCacheKey({ gatewayMode = 'local-api', gatewayUrl = '', profile = '' } = {}) {
+  const mode = String(gatewayMode || 'local-api').trim() || 'local-api';
+  const url = String(gatewayUrl || '').trim().replace(/\/$/, '') || (mode === 'local-api' ? 'local-api' : 'unknown');
+  const activeProfile = String(profile || '').trim() || 'default';
+  return `${mode}|${url}|${activeProfile}`;
+}
+
+// Profile-independent cache slot: the union of every profile's verified
+// catalog for this gateway. Switching agents must never shrink the model
+// selector back to a single profile's subset.
+export const MODEL_CATALOG_SHARED_CACHE_PROFILE = '__shared__';
+
+export function globalModelCatalogCacheKey({ gatewayMode = 'local-api', gatewayUrl = '' } = {}) {
+  return modelCatalogCacheKey({ gatewayMode, gatewayUrl, profile: MODEL_CATALOG_SHARED_CACHE_PROFILE });
+}
+
+/**
+ * Union every cached catalog entry (all profiles) into one deduped list.
+ * `cache` is the raw storage map: { [cacheKey]: { savedAt, models } }.
+ * Rows dedupe by rawModelId (preferred) then id; the freshest entry wins so
+ * metadata (context tokens, provider labels) stays current.
+ */
+export function unionCachedModelCatalogs(cache = {}) {
+  if (!cache || typeof cache !== 'object') return [];
+  const byKey = new Map();
+  const entries = Object.values(cache)
+    .filter((entry) => entry && typeof entry === 'object')
+    .sort((a, b) => (Number(a?.savedAt) || 0) - (Number(b?.savedAt) || 0));
+  for (const entry of entries) {
+    const rows = Array.isArray(entry?.models) ? entry.models : [];
+    for (const model of rows) {
+      if (!model || typeof model !== 'object') continue;
+      const id = String(model.rawModelId || model.id || '').trim();
+      if (!id) continue;
+      byKey.set(id, model);
+    }
+  }
+  return [...byKey.values()];
+}
+
+export function normalizeCachedModelCatalog(payload = []) {
+  const rows = Array.isArray(payload) ? payload : [];
+  return rows
+    .filter((model) => model
+      && typeof model === 'object'
+      && String(model.id || '').trim()
+      && model.gatewayAlias !== true)
+    .map((model) => ({
+      ...model,
+      source: 'cache',
+      runtimeSelectable: model.runtimeSelectable !== false,
+    }));
+}
+
+export function selectModelCatalogFallback({ registryModels = [], cachedModels = [], sessionModels = [] } = {}) {
+  if (Array.isArray(registryModels) && registryModels.length) {
+    return { models: registryModels, source: 'registry' };
+  }
+  if (Array.isArray(cachedModels) && cachedModels.length) {
+    return { models: cachedModels, source: 'cache' };
+  }
+  if (Array.isArray(sessionModels) && sessionModels.length) {
+    return { models: sessionModels, source: 'sessions' };
+  }
+  return { models: [], source: '' };
+}
+
+const KNOWN_PROVIDER_PREFIXES = [
+  // Order matters: most specific first.
+  // Provider names that appear as substrings (e.g. `openai-codex/gpt-5.4`).
+  ['openai-codex', 'openai-codex'],
+  ['openai', 'openai'],
+  ['minimax', 'minimax'],
+  ['kimi', 'moonshot'],
+  ['moonshot', 'moonshot'],
+  ['qwen', 'alibaba'],
+  ['glm', 'zhipu'],
+  ['deepseek', 'deepseek'],
+  ['grok', 'xai'],
+  ['gemini', 'google'],
+  ['claude', 'anthropic'],
+];
+
+// Brand prefixes that don't contain the provider name as a substring.
+const KNOWN_PROVIDER_BRANDS = [
+  ['gpt-', 'openai'],
+  ['gpt5', 'openai'],
+  ['gpt4', 'openai'],
+  ['o1', 'openai'],
+  ['o3', 'openai'],
+  ['o4', 'openai'],
+];
+
+export function deriveProviderFromModelId(modelId = '') {
+  const lower = String(modelId || '').toLowerCase();
+  if (!lower) return '';
+  for (const [prefix, provider] of KNOWN_PROVIDER_PREFIXES) {
+    if (lower.startsWith(prefix) || lower.includes(`/${prefix}`) || lower.includes(`-${prefix}`)) {
+      return provider;
+    }
+  }
+  for (const [brand, provider] of KNOWN_PROVIDER_BRANDS) {
+    if (lower.startsWith(brand) || lower.includes(`-${brand}`) || lower.includes(`/${brand}`)) {
+      return provider;
+    }
+  }
+  return '';
+}
+
+const CONTEXT_TOKEN_KEYS = Object.freeze([
+  'context_length',
+  'contextTokens',
+  'context_tokens',
+  'contextWindow',
+  'context_window',
+  'max_context_tokens',
+  'maxContextTokens',
+  'max_context',
+  'context',
+]);
+
+function firstPositiveNumber(...values) {
+  for (const value of values) {
+    const number = Number(value);
+    if (Number.isFinite(number) && number > 0) return number;
+  }
+  return 0;
+}
+
+function contextTokensFromObject(source = {}) {
+  if (!source || typeof source !== 'object') return 0;
+  const direct = firstPositiveNumber(...CONTEXT_TOKEN_KEYS.map((key) => source?.[key]));
+  if (direct) return direct;
+  return firstPositiveNumber(
+    ...CONTEXT_TOKEN_KEYS.map((key) => source?.metadata?.[key]),
+    ...CONTEXT_TOKEN_KEYS.map((key) => source?.limits?.[key]),
+    source?.limits?.context?.tokens,
+    source?.limits?.context?.max,
+    source?.context?.tokens,
+    source?.context?.max,
+  );
+}
+
+export function modelsFromModelOptionsPayload(payload = {}) {
+  const providers = Array.isArray(payload?.providers) ? payload.providers : [];
+  const models = [];
+  const seen = new Set();
+  for (const provider of providers) {
+    const slug = String(provider?.slug || provider?.id || provider?.provider || '').trim();
+    const providerLabel = String(provider?.name || provider?.label || slug || 'Qubit').trim();
+    const entries = Array.isArray(provider?.models) ? provider.models : [];
+    const caps = provider?.capabilities && typeof provider.capabilities === 'object' ? provider.capabilities : {};
+    const unavailable = new Set(Array.isArray(provider?.unavailable_models) ? provider.unavailable_models : []);
+    for (const entry of entries) {
+      const modelId = String(
+        typeof entry === 'string'
+          ? entry
+          : entry?.id || entry?.name || entry?.model || ''
+      ).trim();
+      if (!modelId) continue;
+      const dedupeKey = `${slug || deriveProviderFromModelId(modelId) || providerLabel}::${modelId}`.toLowerCase();
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      const modelCaps = caps[modelId] || {};
+      const uiId = slug ? `${slug}::${modelId}` : modelId;
+      const entryContext = contextTokensFromObject(entry);
+      const capsContext = contextTokensFromObject(modelCaps);
+      models.push({
+        id: uiId,
+        rawModelId: modelId,
+        label: typeof entry === 'object' ? (entry.label || entry.name || modelId) : modelId,
+        provider: slug || deriveProviderFromModelId(modelId),
+        providerLabel,
+        description: provider?.warning || provider?.source || '',
+        contextTokens: entryContext || capsContext || 0,
+        hermesContextTokens: entryContext || capsContext || 0,
+        fast: typeof modelCaps.fast === 'boolean' ? modelCaps.fast : undefined,
+        reasoning: typeof modelCaps.reasoning === 'boolean' ? modelCaps.reasoning : undefined,
+        authenticated: provider?.authenticated !== false,
+        current: provider?.is_current === true || provider?.isCurrent === true,
+        available: !unavailable.has(modelId),
+        source: 'registry',
+        runtimeSelectable: true,
+      });
+    }
+  }
+  return models;
+}
+
+export function gatewayVirtualModelRows(payload = {}) {
+  const rows = Array.isArray(payload?.data) ? payload.data : [];
+  const seen = new Set();
+  const models = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    if (row.object && String(row.object).trim().toLowerCase() !== 'model') continue;
+    const id = String(row.id || '').trim();
+    const owner = String(row.owned_by || '').trim().toLowerCase();
+    if (!id || /\s/.test(id) || id.startsWith('-') || !['qubit', 'qubit-agent', 'configured'].includes(owner)) continue;
+    const key = id.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const parent = String(row.parent || '').trim();
+    const gatewayDefault = ['qubit', 'qubit-agent'].includes(owner) && !parent;
+    models.push({
+      id,
+      rawModelId: id,
+      label: gatewayDefault ? `${id} (gateway default)` : id,
+      provider: '',
+      providerLabel: 'Qubit gateway',
+      description: gatewayDefault
+        ? 'Live default alias advertised by this Qubit gateway'
+        : `Live route alias advertised by this Qubit gateway${parent ? ` · ${parent}` : ''}`,
+      contextTokens: contextTokensFromObject(row),
+      authenticated: true,
+      current: gatewayDefault,
+      available: true,
+      gatewayAlias: true,
+      gatewayDefault,
+      source: 'gateway',
+      runtimeSelectable: true,
+    });
+  }
+  return models;
+}
+
+export async function discoverGatewayVirtualModels({ apiFetch, readJsonResponse } = {}) {
+  if (typeof apiFetch !== 'function' || typeof readJsonResponse !== 'function') {
+    return { ok: false, models: [], error: 'no-fetch', source: 'gateway' };
+  }
+  try {
+    const response = await apiFetch('/v1/models', { method: 'GET' });
+    const payload = await readJsonResponse(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        models: [],
+        error: payload?.error?.message || payload?.error || `status-${response.status}`,
+        source: 'gateway',
+      };
+    }
+    return { ok: true, models: gatewayVirtualModelRows(payload), error: '', source: 'gateway' };
+  } catch (error) {
+    return { ok: false, models: [], error: error?.message || 'error', source: 'gateway' };
+  }
+}
+
+export function mergeVirtualModelRows({ registryModels = [], virtualModels = [] } = {}) {
+  const registry = Array.isArray(registryModels) ? registryModels.filter(Boolean) : [];
+  const virtual = Array.isArray(virtualModels) ? virtualModels.filter(Boolean) : [];
+  const registryRawIds = new Set(
+    registry
+      .map((model) => String(model?.rawModelId || model?.model || model?.id || '').trim().toLowerCase())
+      .filter(Boolean),
+  );
+  const seen = new Set();
+  const merged = [];
+  const append = (model) => {
+    const rawModelId = String(model?.rawModelId || model?.model || model?.id || '').trim();
+    const provider = String(model?.provider || '').trim().toLowerCase();
+    const key = `${provider}::${rawModelId.toLowerCase()}`;
+    if (!rawModelId || seen.has(key)) return;
+    seen.add(key);
+    merged.push(model);
+  };
+  for (const model of virtual.filter((item) => item?.gatewayDefault === true)) append(model);
+  for (const model of virtual.filter((item) => item?.gatewayDefault !== true)) {
+    const rawModelId = String(model?.rawModelId || model?.model || model?.id || '').trim().toLowerCase();
+    if (!registryRawIds.has(rawModelId)) append(model);
+  }
+  for (const model of registry) append(model);
+  return merged;
+}
+
+// Desktop parity: /api/model/options carries the profile's own default model +
+// provider (what `qubit <profile>` uses). Extract it so agent switches can
+// pin the session model to the Bot's configured default.
+export function profileDefaultModelFromOptions(payload = {}) {
+  const model = String(payload?.model || '').trim();
+  const provider = String(payload?.provider || '').trim();
+  if (!model) return null;
+  return { model, provider };
+}
+
+export function resolveProfileSessionModel({
+  rosterModel = '',
+  rosterProvider = '',
+  optionsPayload = null,
+} = {}) {
+  const fromOptions = profileDefaultModelFromOptions(optionsPayload || {});
+  if (fromOptions) return fromOptions;
+  const model = String(rosterModel || '').trim();
+  if (!model) return null;
+  return { model, provider: String(rosterProvider || '').trim() };
+}
+
+export function modelRowsFromGatewayOptions(payload = {}) {
+  const providerModels = modelsFromModelOptionsPayload(payload);
+  if (providerModels.length || Array.isArray(payload?.providers)) return providerModels;
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload?.models)) return payload.models;
+  return [];
+}
+
+export async function discoverModelsFromRegistry({
+  apiFetch,
+  readJsonResponse,
+  refresh = false,
+} = {}) {
+  if (typeof apiFetch !== 'function' || typeof readJsonResponse !== 'function') {
+    return { ok: false, error: 'no-fetch', models: [] };
+  }
+  try {
+    const suffix = refresh ? '?refresh=true' : '';
+    const response = await apiFetch(`/api/model/options${suffix}`, { method: 'GET' });
+    const payload = await readJsonResponse(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: payload?.error?.message || payload?.error || `status-${response.status}`,
+        models: [],
+      };
+    }
+    return { ok: true, models: modelsFromModelOptionsPayload(payload), error: '' };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'error', models: [] };
+  }
+}
+
+async function fetchWithTimeout(fetchFn, url, options = {}, timeoutMs = 5000) {
+  if (typeof fetchFn !== 'function') throw new Error('no-fetch');
+  if (typeof AbortController === 'undefined' || !timeoutMs) {
+    return fetchFn(url, { ...options, redirect: 'error' });
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetchFn(url, { ...options, signal: controller.signal, redirect: 'error' });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function canonicalProviderModels(payload = {}, registryModels = [], enrichProviders = null) {
+  const providers = payload?.providers && typeof payload.providers === 'object' ? payload.providers : {};
+  const templates = new Map();
+  for (const model of Array.isArray(registryModels) ? registryModels : []) {
+    const provider = String(model?.provider || '').trim().toLowerCase();
+    if (!provider || model?.authenticated === false || templates.has(provider)) continue;
+    templates.set(provider, model);
+  }
+
+  const extras = [];
+  for (const [provider, template] of templates) {
+    // Only catalog-backed providers (Nous Portal and OpenRouter) may be
+    // enriched from the canonical catalog. Direct provider rows that the
+    // gateway advertises as authenticated (DeepSeek with a local API key,
+    // OpenAI, Anthropic, ...) are authoritative: their raw model ids are
+    // already in gateway format, and injecting catalog rows would shadow or
+    // confuse the request with ids the gateway does not recognize (issue #61).
+    if (enrichProviders && !enrichProviders.has(provider)) continue;
+    const entries = Array.isArray(providers?.[provider]?.models) ? providers[provider].models : [];
+    for (const entry of entries) {
+      const rawModelId = String(typeof entry === 'string' ? entry : entry?.id || entry?.model || entry?.name || '').trim();
+      if (!rawModelId) continue;
+      extras.push({
+        id: `${provider}::${rawModelId}`,
+        rawModelId,
+        label: typeof entry === 'object' ? (entry.label || entry.name || rawModelId) : rawModelId,
+        provider,
+        providerLabel: template.providerLabel || template.provider_label || provider,
+        description: typeof entry === 'object' ? (entry.description || '') : '',
+        contextTokens: contextTokensFromObject(entry),
+        authenticated: template.authenticated,
+        available: true,
+        source: 'canonical',
+        runtimeSelectable: true,
+      });
+    }
+  }
+  return mergeModelsByRawId([registryModels, extras]);
+}
+
+export function shouldEnrichCanonicalProviderCatalog(source = '') {
+  return ['registry', 'dashboard', 'cache'].includes(String(source || '').trim().toLowerCase());
+}
+
+function nousProviderKeys(registryModels = []) {
+  const keys = new Set();
+  for (const model of Array.isArray(registryModels) ? registryModels : []) {
+    const provider = String(model?.provider || '').trim().toLowerCase();
+    const label = String(model?.providerLabel || model?.provider_label || model?.providerName || '').trim().toLowerCase();
+    if (provider === 'nous' || /\bnous\s+(?:portal|research)\b/.test(label)) keys.add(provider);
+  }
+  return [...keys].filter(Boolean);
+}
+
+function catalogWithNousAliases(payload = {}, providerKeys = []) {
+  const providers = payload?.providers && typeof payload.providers === 'object' ? payload.providers : {};
+  const nous = providers.nous;
+  if (!nous || !providerKeys.length) return payload;
+  return {
+    ...payload,
+    providers: {
+      ...providers,
+      ...Object.fromEntries(providerKeys.map((provider) => [provider, nous])),
+    },
+  };
+}
+
+export async function discoverCanonicalProviderCatalog({
+  registryModels = [],
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  timeoutMs = 3000,
+  catalogUrl = QUBIT_CANONICAL_MODEL_CATALOG_URL,
+} = {}) {
+  const currentModels = Array.isArray(registryModels) ? registryModels : [];
+  const nousProviders = nousProviderKeys(currentModels);
+  const hasCanonicalProvider = nousProviders.length > 0
+    || currentModels.some((model) => String(model?.provider || '').trim().toLowerCase() === 'openrouter');
+  if (!hasCanonicalProvider) return { ok: true, models: currentModels, error: '', source: 'not-applicable' };
+  if (typeof fetchFn !== 'function') return { ok: false, models: currentModels, error: 'no-fetch', source: 'registry' };
+
+  // Catalog-backed providers only: Nous Portal aliases plus OpenRouter.
+  // Direct provider rows advertised by the gateway are authoritative and are
+  // never overlaid with canonical catalog rows (issue #61).
+  const enrichProviders = new Set(nousProviders);
+  if (currentModels.some((model) => String(model?.provider || '').trim().toLowerCase() === 'openrouter')) {
+    enrichProviders.add('openrouter');
+  }
+
+  const errors = [];
+  let models = currentModels;
+  let liveNousLoaded = false;
+  let staticCatalogLoaded = false;
+
+  // The two reads are independent: both go out now (live Nous first) and their
+  // answers are applied in the same order as before.
+  const requestCatalog = (url) => fetchWithTimeout(fetchFn, url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    credentials: 'omit',
+  }, timeoutMs).then((response) => ({ response }), (error) => ({ error }));
+  const liveRequest = nousProviders.length ? requestCatalog(NOUS_LIVE_MODEL_CATALOG_URL) : null;
+  const staticRequest = requestCatalog(catalogUrl);
+
+  if (liveRequest) {
+    try {
+      const { response, error: requestError } = await liveRequest;
+      if (requestError) throw requestError;
+      if (!response.ok) throw new Error(`status-${response.status}`);
+      const payload = await response.json();
+      if (!Array.isArray(payload?.data)) throw new Error('invalid-live-nous-catalog');
+      const providers = Object.fromEntries(nousProviders.map((provider) => [provider, { models: payload.data }]));
+      models = canonicalProviderModels({ providers }, models, enrichProviders);
+      liveNousLoaded = true;
+    } catch (error) {
+      errors.push(error?.name === 'AbortError' ? 'nous-live-timeout' : (error?.message || 'nous-live-error'));
+    }
+  }
+
+  try {
+    const { response, error: requestError } = await staticRequest;
+    if (requestError) throw requestError;
+    if (!response.ok) throw new Error(`status-${response.status}`);
+    const payload = catalogWithNousAliases(await response.json(), nousProviders);
+    models = canonicalProviderModels(payload, models, enrichProviders);
+    staticCatalogLoaded = true;
+  } catch (error) {
+    errors.push(error?.name === 'AbortError' ? 'canonical-timeout' : (error?.message || 'canonical-error'));
+  }
+
+  return {
+    ok: liveNousLoaded || staticCatalogLoaded,
+    models,
+    error: liveNousLoaded || staticCatalogLoaded ? '' : errors.join(' · '),
+    source: liveNousLoaded ? 'canonical-live' : (staticCatalogLoaded ? 'canonical' : 'registry'),
+  };
+}
+
+export function dashboardModelDiscoveryBaseUrl({ gatewayMode = 'local-api', gatewayUrl = '', localDashboardUrl = LOCAL_DASHBOARD_URL } = {}) {
+  if (gatewayMode === 'local-api') return localDashboardUrl;
+  if (gatewayMode === 'remote-dashboard') return String(gatewayUrl || '').trim();
+  return '';
+}
+
+// The Desktop dashboard lives on a random loopback port discovered through
+// /api/desktop/dashboard-candidates and cached per profile, so local
+// transcription must target the DISCOVERED port. The legacy constant is only
+// a last-resort fallback for setups that still bind the fixed port.
+export async function resolveDashboardTranscriptionBaseUrl({
+  desktopDashboardUrl = '',
+  gatewayMode = 'local-api',
+  gatewayUrl = '',
+  discover = null,
+} = {}) {
+  // A discovered or cached Desktop dashboard is a loopback address; it only
+  // applies to the local gateway. Remote modes use their configured URL (or
+  // none) and never trigger discovery.
+  if (gatewayMode !== 'local-api') return dashboardModelDiscoveryBaseUrl({ gatewayMode, gatewayUrl });
+  const known = String(desktopDashboardUrl || '').trim().replace(/\/+$/, '');
+  if (known) return known;
+  if (typeof discover === 'function') {
+    try {
+      const discovered = String((await discover()) || '').trim().replace(/\/+$/, '');
+      if (discovered) return discovered;
+    } catch {
+      /* discovery is best-effort; the constant fallback still applies */
+    }
+  }
+  return dashboardModelDiscoveryBaseUrl({ gatewayMode, gatewayUrl });
+}
+
+export function extractDashboardSessionToken(html = '') {
+  const match = String(html || '').match(/window\.__HERMES_SESSION_TOKEN__\s*=\s*"([^"]+)"/);
+  return match?.[1] || '';
+}
+
+export function dashboardMediaUrl(baseUrl = '', filePath = '') {
+  try {
+    const url = new URL(String(baseUrl || '').trim());
+    url.hash = '';
+    url.search = '';
+    url.pathname = '/api/media';
+    url.searchParams.set('path', String(filePath || ''));
+    return url.toString();
+  } catch {
+    return `${String(baseUrl || '').replace(/\/+$/, '')}/api/media?path=${encodeURIComponent(String(filePath || ''))}`;
+  }
+}
+
+// The stream URL carries only the file path. The dashboard refuses the session
+// token in a query string on this route, and it must never sit in a URL anyway,
+// so the bytes are fetched with the header (see fetchDashboardFileStreamObjectUrl).
+export function dashboardFileStreamUrl(baseUrl = '', filePath = '') {
+  try {
+    const url = new URL(String(baseUrl || '').trim());
+    url.hash = '';
+    url.search = '';
+    url.pathname = '/api/files/stream';
+    url.searchParams.set('path', String(filePath || ''));
+    return url.toString();
+  } catch {
+    return `${String(baseUrl || '').replace(/\/+$/, '')}/api/files/stream?${new URLSearchParams({ path: String(filePath || '') })}`;
+  }
+}
+
+// Blob URLs handed to <video> elements. A blob stays alive until it is revoked,
+// so a URL whose element has left the transcript is released after a grace
+// period. Fresh URLs are never released, so a video being mounted is safe.
+const STREAM_BLOB_GRACE_MS = 60_000;
+const streamBlobUrls = new Map(); // blob URL -> { createdAt, element }
+
+export function releaseDashboardStreamBlob(objectUrl = '') {
+  if (!objectUrl || !streamBlobUrls.has(objectUrl)) return;
+  streamBlobUrls.delete(objectUrl);
+  try {
+    globalThis.URL?.revokeObjectURL?.(objectUrl);
+  } catch {
+    /* already revoked */
+  }
+}
+
+function releaseDetachedStreamBlobs(now = Date.now()) {
+  for (const [objectUrl, entry] of [...streamBlobUrls]) {
+    if (now - entry.createdAt < STREAM_BLOB_GRACE_MS) continue;
+    if (entry.element?.isConnected) continue;
+    releaseDashboardStreamBlob(objectUrl);
+  }
+}
+
+export function attachDashboardStreamBlob(objectUrl = '', element = null) {
+  const entry = streamBlobUrls.get(objectUrl);
+  if (entry) entry.element = element;
+}
+
+// Managed videos are fetched with the dashboard session header and played from
+// a blob URL, because a <video> element cannot send headers itself. Resolves to
+// '' whenever the file cannot be read; never to a URL that carries the token.
+export async function fetchDashboardFileStreamObjectUrl({
+  baseUrl = '',
+  filePath = '',
+  token = '',
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  timeoutMs = 300_000,
+} = {}) {
+  const dashboardUrl = String(baseUrl || '').trim();
+  const pathRef = String(filePath || '').trim();
+  if (!dashboardUrl || !pathRef || typeof fetchFn !== 'function') return '';
+  const sessionToken = token || await fetchDashboardSessionToken({ baseUrl: dashboardUrl, fetchFn });
+  if (!sessionToken) return '';
+  let response;
+  try {
+    response = await fetchWithTimeout(fetchFn, dashboardFileStreamUrl(dashboardUrl, pathRef), {
+      method: 'GET',
+      headers: { Accept: '*/*', 'X-Qubit-Session-Token': sessionToken },
+      credentials: 'include',
+      cache: 'no-store',
+    }, timeoutMs);
+  } catch {
+    return '';
+  }
+  if (!response?.ok) return '';
+  const blob = await response.blob().catch(() => null);
+  if (!blob || !(blob.size > 0)) return '';
+  const objectUrl = String(globalThis.URL?.createObjectURL?.(blob) || '');
+  if (!objectUrl.startsWith('blob:')) return '';
+  releaseDetachedStreamBlobs();
+  streamBlobUrls.set(objectUrl, { createdAt: Date.now(), element: null });
+  return objectUrl;
+}
+
+// `dashboardToken` stands in when the page injects none: the gateway's Webapp injects no token,
+// and the caller holds the credential it signed this browser in with (lib/webapp-credential.mjs).
+export async function fetchDashboardSessionToken({
+  baseUrl = '',
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  timeoutMs = 2500,
+  dashboardToken = '',
+} = {}) {
+  const dashboardUrl = String(baseUrl || '').trim();
+  if (!dashboardUrl || typeof fetchFn !== 'function') return '';
+  const fallback = String(dashboardToken || '').trim();
+  const rootResponse = await fetchWithTimeout(fetchFn, dashboardUrl, {
+    method: 'GET',
+    headers: { Accept: 'text/html' },
+    credentials: 'include',
+    cache: 'no-store',
+  }, timeoutMs);
+  if (!rootResponse.ok) return fallback;
+  return extractDashboardSessionToken(await rootResponse.text()) || fallback;
+}
+
+export async function fetchDashboardMediaDataUrl({
+  baseUrl = '',
+  filePath = '',
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  token = '',
+  timeoutMs = 20000,
+} = {}) {
+  const dashboardUrl = String(baseUrl || '').trim();
+  const pathRef = String(filePath || '').trim();
+  if (!dashboardUrl || !pathRef || typeof fetchFn !== 'function') return '';
+  const sessionToken = token || await fetchDashboardSessionToken({ baseUrl: dashboardUrl, fetchFn });
+  if (!sessionToken) return '';
+  const response = await fetchWithTimeout(fetchFn, dashboardMediaUrl(dashboardUrl, pathRef), {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+      'X-Qubit-Session-Token': sessionToken,
+    },
+    credentials: 'include',
+    cache: 'no-store',
+  }, timeoutMs);
+  if (!response.ok) return '';
+  const payload = await response.json().catch(() => null);
+  const dataUrl = String(payload?.data_url || '').trim();
+  return dataUrl.startsWith('data:image/') ? dataUrl : '';
+}
+
+export function dashboardModelOptionsUrl(baseUrl = '', refresh = false, profile = '') {
+  try {
+    const url = new URL(String(baseUrl || '').trim());
+    url.hash = '';
+    url.search = '';
+    if (refresh) url.searchParams.set('refresh', 'true');
+    const profileName = String(profile || '').trim();
+    if (profileName) url.searchParams.set('profile', profileName);
+    url.pathname = `${url.pathname.replace(/\/+$/, '')}/api/model/options`;
+    return url.toString();
+  } catch {
+    const params = new URLSearchParams();
+    if (refresh) params.set('refresh', 'true');
+    const profileName = String(profile || '').trim();
+    if (profileName) params.set('profile', profileName);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    return `${String(baseUrl || '').replace(/\/+$/, '')}/api/model/options${suffix}`;
+  }
+}
+
+// GPT-Live voice chat (see lib/voice-live.mjs). The Qubit dashboard creates the
+// live session so the OpenAI key stays on the host. The status probe lives here,
+// beside dashboard transcription, so checking it never loads the voice module.
+export const VOICE_LIVE_STATUS_PATH = '/api/audio/voice-live/status';
+export const VOICE_LIVE_SESSION_PATH = '/api/audio/voice-live/session';
+
+export function normalizeVoiceLiveStatus(payload = null) {
+  if (!payload || typeof payload !== 'object' || payload.ok === false) return null;
+  const mode = String(payload.mode || '').trim().toLowerCase().replace(/_/g, '-') === 'gpt-live' ? 'gpt-live' : 'chained';
+  return {
+    mode,
+    available: payload.available === true,
+    reason: payload.reason ? String(payload.reason) : '',
+    model: String(payload.model || 'gpt-live-1'),
+    voice: String(payload.voice || ''),
+  };
+}
+
+function dashboardEndpointUrl(baseUrl = '', pathname = '/', profile = '') {
+  const url = new URL(String(baseUrl || '').trim());
+  url.hash = '';
+  url.search = '';
+  url.pathname = pathname;
+  const profileName = String(profile || '').trim();
+  if (profileName) url.searchParams.set('profile', profileName);
+  return url.toString();
+}
+
+/** JSON call to a session-token route on the Qubit dashboard. Throws with the server's detail. */
+export async function dashboardAudioJson({
+  baseUrl = '',
+  path: pathname = '/',
+  profile = '',
+  method = 'GET',
+  body = null,
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  timeoutMs = 8000,
+  dashboardToken = '',
+} = {}) {
+  const dashboardUrl = String(baseUrl || '').trim().replace(/\/+$/, '');
+  if (!dashboardUrl) throw new Error('The Qubit dashboard is not reachable from this panel.');
+  const token = await fetchDashboardSessionToken({ baseUrl: dashboardUrl, fetchFn, dashboardToken });
+  if (!token) throw new Error('The Qubit dashboard did not provide a session token.');
+  const response = await fetchWithTimeout(fetchFn, dashboardEndpointUrl(dashboardUrl, pathname, profile), {
+    method,
+    headers: {
+      Accept: 'application/json',
+      ...(body ? { 'Content-Type': 'application/json' } : {}),
+      'X-Qubit-Session-Token': token,
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+    credentials: 'include',
+    cache: 'no-store',
+  }, timeoutMs);
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail = payload?.detail;
+    const error = new Error(String((typeof detail === 'string' && detail) || payload?.error?.message || payload?.error || `Qubit dashboard request failed (${response.status}).`));
+    error.status = response.status;
+    throw error;
+  }
+  return payload;
+}
+
+/** Which voice chat mode the profile selected and whether GPT-Live can start. Null when unknown. */
+export async function fetchVoiceLiveStatus({ baseUrl = '', profile = '', fetchFn, dashboardToken = '' } = {}) {
+  try {
+    return normalizeVoiceLiveStatus(await dashboardAudioJson({ baseUrl, path: VOICE_LIVE_STATUS_PATH, profile, fetchFn, timeoutMs: 4000, dashboardToken }));
+  } catch {
+    // An older Qubit without the route, or no dashboard: no live voice.
+    return null;
+  }
+}
+
+export function dashboardAudioTranscriptionUrl(baseUrl = LOCAL_DASHBOARD_URL, profile = '') {
+  try {
+    const url = new URL(String(baseUrl || LOCAL_DASHBOARD_URL).trim());
+    url.hash = '';
+    url.search = '';
+    url.pathname = '/api/audio/transcribe';
+    const profileName = String(profile || '').trim();
+    if (profileName) url.searchParams.set('profile', profileName);
+    return url.toString();
+  } catch {
+    const profileName = String(profile || '').trim();
+    const suffix = profileName ? `?profile=${encodeURIComponent(profileName)}` : '';
+    return `${String(baseUrl || LOCAL_DASHBOARD_URL).replace(/\/+$/, '')}/api/audio/transcribe${suffix}`;
+  }
+}
+
+export async function transcribeAudioViaDashboard({
+  baseUrl = LOCAL_DASHBOARD_URL,
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  profile = '',
+  dataUrl = '',
+  mimeType = 'audio/webm',
+  rootTimeoutMs = 2500,
+  transcriptionTimeoutMs = 120000,
+  dashboardToken = '',
+} = {}) {
+  const dashboardUrl = String(baseUrl || '').trim();
+  if (!dashboardUrl) return { ok: false, transcript: '', provider: '', error: 'no-dashboard-url', status: 0 };
+  if (!String(dataUrl || '').startsWith('data:')) {
+    return { ok: false, transcript: '', provider: '', error: 'invalid-audio-payload', status: 0 };
+  }
+  try {
+    const rootResponse = await fetchWithTimeout(fetchFn, dashboardUrl, {
+      method: 'GET',
+      headers: { Accept: 'text/html' },
+      credentials: 'include',
+      cache: 'no-store',
+    }, rootTimeoutMs);
+    if (!rootResponse.ok) {
+      return {
+        ok: false,
+        transcript: '',
+        provider: '',
+        error: `dashboard-root-${rootResponse.status}`,
+        status: rootResponse.status,
+      };
+    }
+    const token = extractDashboardSessionToken(await rootResponse.text()) || String(dashboardToken || '').trim();
+    if (!token) {
+      return { ok: false, transcript: '', provider: '', error: 'no-dashboard-session-token', status: 0 };
+    }
+    const response = await fetchWithTimeout(fetchFn, dashboardAudioTranscriptionUrl(dashboardUrl, profile), {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Qubit-Session-Token': token,
+      },
+      credentials: 'include',
+      body: JSON.stringify({
+        data_url: String(dataUrl || ''),
+        mime_type: String(mimeType || 'audio/webm'),
+      }),
+    }, transcriptionTimeoutMs);
+    const text = await response.text();
+    let payload = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { error: text.slice(0, 500) };
+    }
+    if (!response.ok) {
+      return {
+        ok: false,
+        transcript: '',
+        provider: '',
+        error: payload?.detail || payload?.error?.message || payload?.error || `dashboard-transcription-${response.status}`,
+        status: response.status,
+      };
+    }
+    return {
+      ok: true,
+      transcript: String(payload?.transcript || '').trim(),
+      provider: String(payload?.provider || ''),
+      error: '',
+      status: response.status,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      transcript: '',
+      provider: '',
+      error: error?.name === 'AbortError' ? 'dashboard-transcription-timeout' : (error?.message || 'dashboard-transcription-error'),
+      status: 0,
+    };
+  }
+}
+
+export async function discoverModelsFromDashboard({
+  baseUrl = LOCAL_DASHBOARD_URL,
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  refresh = false,
+  profile = '',
+  rootTimeoutMs = 2500,
+  optionsTimeoutMs = refresh ? 18000 : 6000,
+  dashboardToken = '',
+} = {}) {
+  const dashboardUrl = String(baseUrl || '').trim();
+  if (!dashboardUrl) return { ok: false, error: 'no-dashboard-url', models: [] };
+  try {
+    const rootResponse = await fetchWithTimeout(fetchFn, dashboardUrl, {
+      method: 'GET',
+      headers: { Accept: 'text/html' },
+      credentials: 'include',
+    }, rootTimeoutMs);
+    if (!rootResponse.ok) return { ok: false, error: `dashboard-root-${rootResponse.status}`, models: [] };
+    const html = await rootResponse.text();
+    const token = extractDashboardSessionToken(html) || String(dashboardToken || '').trim();
+    if (!token) return { ok: false, error: 'no-dashboard-session-token', models: [] };
+    const optionsResponse = await fetchWithTimeout(fetchFn, dashboardModelOptionsUrl(dashboardUrl, refresh, profile), {
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+        'X-Qubit-Session-Token': token,
+      },
+      credentials: 'include',
+    }, optionsTimeoutMs);
+    const text = await optionsResponse.text();
+    let payload = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      payload = { error: text.slice(0, 500) };
+    }
+    if (!optionsResponse.ok) {
+      return {
+        ok: false,
+        error: payload?.detail || payload?.error?.message || payload?.error || `dashboard-options-${optionsResponse.status}`,
+        models: [],
+      };
+    }
+    return { ok: true, models: modelsFromModelOptionsPayload(payload), error: '', source: 'dashboard' };
+  } catch (error) {
+    return { ok: false, error: error?.name === 'AbortError' ? 'dashboard-timeout' : (error?.message || 'error'), models: [] };
+  }
+}
+
+export async function discoverModelsFromSessions({
+  apiFetch,
+  readJsonResponse,
+  limit = SESSION_HISTORY_LIMIT,
+} = {}) {
+  if (typeof apiFetch !== 'function' || typeof readJsonResponse !== 'function') {
+    return { ok: false, error: 'no-fetch', models: [] };
+  }
+  try {
+    const response = await apiFetch(`/api/sessions?limit=${encodeURIComponent(limit)}`, { method: 'GET' });
+    const payload = await readJsonResponse(response);
+    if (!response.ok) {
+      return {
+        ok: false,
+        error: payload?.error?.message || `status-${response.status}`,
+        models: [],
+      };
+    }
+    const rows = Array.isArray(payload?.data) ? payload.data : [];
+    const buckets = new Map();
+    for (const row of rows) {
+      const modelId = String(row?.model || '').trim();
+      if (!modelId || modelId === 'qubit-agent') continue;
+      const lastSeen = Number(row?.last_active || row?.started_at || 0);
+      const bucket = buckets.get(modelId) || {
+        id: modelId,
+        label: modelId,
+        provider: deriveProviderFromModelId(modelId),
+        contextTokens: 0,
+        lastSeen: 0,
+        sessionCount: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+      };
+      bucket.sessionCount += 1;
+      bucket.lastSeen = Math.max(bucket.lastSeen, lastSeen);
+      bucket.inputTokens += Number(row?.input_tokens || 0);
+      bucket.outputTokens += Number(row?.output_tokens || 0);
+      buckets.set(modelId, bucket);
+    }
+    const models = Array.from(buckets.values())
+      .map((bucket) => ({
+        id: bucket.id,
+        label: bucket.label,
+        provider: bucket.provider,
+        providerLabel: bucket.provider,
+        description: `Observed in ${bucket.sessionCount} session${bucket.sessionCount === 1 ? '' : 's'} · ${(bucket.inputTokens + bucket.outputTokens).toLocaleString()} tokens`,
+        contextTokens: 0,
+        source: 'sessions',
+        runtimeSelectable: false,
+        lastSeen: bucket.lastSeen,
+        sessionCount: bucket.sessionCount,
+      }))
+      .sort((a, b) => b.lastSeen - a.lastSeen);
+    return { ok: true, models, error: '' };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'error', models: [] };
+  }
+}
+
+export function shouldTrySessionModelFallback({ registryModels = [], registrySource = '', defaultModelId = 'qubit-agent' } = {}) {
+  if (registrySource === 'cache') return false;
+  const advertisedModels = registryModels.filter((model) => model?.source !== 'selected');
+  const includesDefaultAlias = advertisedModels.some((model) => model?.id === defaultModelId)
+    || registryModels.some((model) => model?.id === defaultModelId);
+  if (registrySource === 'v1') {
+    // API-server /v1/models may expose only the active OpenAI-compatible row,
+    // or that row plus the default qubit-agent alias. Both are sparse and
+    // should keep searching session history rather than freezing the picker at
+    // one provider.
+    return advertisedModels.length <= 2;
+  }
+  const nonDefaultAdvertised = advertisedModels.filter((model) => model?.id !== defaultModelId);
+  return includesDefaultAlias && nonDefaultAdvertised.length <= 1;
+}
+
+export function modelCatalogRefreshDecision({ previousSelectedModel = '', discoveredModels = [], refresh = false } = {}) {
+  const models = Array.isArray(discoveredModels) ? discoveredModels : [];
+  const fallbackIds = new Set(['qubit-agent', 'nous']);
+  const onlyFallback = models.length > 0 && models.every((model) => {
+    const id = String(model?.id || model?.name || model?.label || '').trim().toLowerCase();
+    return fallbackIds.has(id);
+  });
+  if (refresh && previousSelectedModel && onlyFallback) {
+    return {
+      keepPreviousSelection: true,
+      selectedModel: previousSelectedModel,
+      warning: 'fallback-only',
+    };
+  }
+  return {
+    keepPreviousSelection: false,
+    selectedModel: models[0]?.id || previousSelectedModel,
+    warning: '',
+  };
+}
+
+function modelDedupeKey(model = {}) {
+  const rawId = String(model?.rawModelId || model?.id || '').trim().toLowerCase();
+  if (!rawId) return '';
+  const provider = String(model?.provider || model?.providerLabel || model?.source || '').trim().toLowerCase();
+  return `${provider || 'models'}::${rawId}`;
+}
+
+export function mergeModelsByRawId(arrays = []) {
+  const seen = new Map();
+  const merged = [];
+  for (const models of arrays) {
+    if (!Array.isArray(models)) continue;
+    for (const model of models) {
+      const key = modelDedupeKey(model);
+      if (!key) continue;
+      const existing = seen.get(key);
+      const incomingContext = Number(model?.contextTokens || model?.context_length || 0);
+      if (existing) {
+        const existingContext = Number(existing.contextTokens || existing.context_length || 0);
+        if (!(existingContext > 0) && incomingContext > 0) existing.contextTokens = incomingContext;
+        continue;
+      }
+      seen.set(key, model);
+      merged.push(model);
+    }
+  }
+  return merged;
+}
+
+export function mergeModelsWithRegistry({ registryModels = [], sessionModels = [] } = {}) {
+  const out = [];
+  const seen = new Set();
+  // Registry first (these are the gateway-blessed models)
+  for (const model of registryModels) {
+    const key = modelDedupeKey(model);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...model, source: model.source || 'registry' });
+  }
+  // Then session-discovered models, marking them as such
+  for (const model of sessionModels) {
+    const key = modelDedupeKey(model);
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    out.push({ ...model, source: 'sessions' });
+  }
+  return out;
+}
+
+export const MODEL_DISCOVERY_DEFAULTS = Object.freeze({
+  limit: SESSION_HISTORY_LIMIT,
+});
+
+export function externalModelsUrlForSource(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return '';
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return '';
+  if (!parsed.hostname || parsed.username || parsed.password) return '';
+  parsed.hash = '';
+  parsed.search = '';
+  parsed.pathname = parsed.pathname
+    .replace(/\/+$/, '')
+    .replace(/\/v1\/models$/i, '')
+    .replace(/\/models$/i, '')
+    .replace(/\/v1$/i, '');
+  parsed.pathname = `${parsed.pathname.replace(/\/+$/, '')}/v1/models`;
+  return parsed.toString();
+}
+
+export function normalizeExternalModelSourceList(sourceUrls = []) {
+  const seen = new Set();
+  const normalized = [];
+  for (const value of Array.isArray(sourceUrls) ? sourceUrls : []) {
+    const url = externalModelsUrlForSource(value);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    normalized.push(url);
+  }
+  return normalized;
+}
+
+function externalProviderLabel(modelsUrl = '') {
+  try {
+    const parsed = new URL(modelsUrl);
+    return parsed.port ? `${parsed.hostname}:${parsed.port}` : parsed.hostname;
+  } catch {
+    return 'custom';
+  }
+}
+
+export async function discoverModelsFromExternalSources({
+  sourceUrls = [],
+  fetchFn = globalThis.fetch?.bind(globalThis),
+  timeoutMs = 5000,
+} = {}) {
+  const urls = normalizeExternalModelSourceList(sourceUrls);
+  if (!urls.length) return { ok: true, models: [], results: [] };
+  if (typeof fetchFn !== 'function') return { ok: false, error: 'no-fetch', models: [], results: [] };
+
+  const results = [];
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(fetchFn, url, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+      }, timeoutMs);
+      if (!response.ok) {
+        results.push({ url, ok: false, error: `status-${response.status}`, models: [] });
+        continue;
+      }
+      const payload = await response.json();
+      const rows = Array.isArray(payload)
+        ? payload
+        : Array.isArray(payload?.data)
+          ? payload.data
+          : Array.isArray(payload?.models)
+            ? payload.models
+            : [];
+      const providerLabel = externalProviderLabel(url);
+      const provider = `custom:${providerLabel}`;
+      const models = rows
+        .map((entry) => {
+          const rawModelId = String(typeof entry === 'string' ? entry : entry?.id || entry?.model || entry?.name || '').trim();
+          if (!rawModelId) return null;
+          return {
+            id: `${provider}::${rawModelId}`,
+            rawModelId,
+            label: typeof entry === 'object' ? (entry.label || entry.name || rawModelId) : rawModelId,
+            provider,
+            providerLabel,
+            description: `Discovered from ${url}`,
+            contextTokens: contextTokensFromObject(entry),
+            source: 'external',
+            runtimeSelectable: false,
+          };
+        })
+        .filter(Boolean);
+      results.push({ url, ok: true, models });
+    } catch (error) {
+      results.push({
+        url,
+        ok: false,
+        error: error?.name === 'AbortError' ? 'timeout' : (error?.message || 'error'),
+        models: [],
+      });
+    }
+  }
+  return { ok: results.some((result) => result.ok), models: mergeModelsByRawId(results.map((result) => result.models)), results };
+}

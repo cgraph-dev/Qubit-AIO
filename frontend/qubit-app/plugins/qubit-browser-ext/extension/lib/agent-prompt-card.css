@@ -1,0 +1,136 @@
+/* Approval and clarify card (lib/prompt-card.mjs). Shared by the side panel and
+   the full view, so it uses only the shared design tokens. */
+.agent-prompt-card {
+  margin: 2px 0 8px;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--qubit-accent, currentColor) 55%, transparent);
+  border-left: 3px solid var(--qubit-accent, currentColor);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--qubit-accent, currentColor) 14%, transparent), transparent 58%),
+    var(--qubit-paper, Canvas);
+  color: var(--qubit-ink, CanvasText);
+  box-shadow: 0 8px 24px color-mix(in srgb, currentColor 10%, transparent);
+  min-width: 0;
+}
+.agent-prompt-card[hidden] { display: none; }
+.agent-prompt-body { display: grid; gap: 8px; min-width: 0; }
+.agent-prompt-head { display: grid; gap: 3px; }
+.agent-prompt-kicker {
+  color: var(--qubit-accent, currentColor);
+  font-family: var(--qubit-font-ui);
+  font-size: calc(9px * var(--qubit-text-zoom, 1));
+  line-height: 1;
+  letter-spacing: 0.16em;
+}
+.agent-prompt-title {
+  font-family: var(--qubit-font-ui);
+  font-size: calc(13px * var(--qubit-text-zoom, 1));
+  font-weight: 500;
+  line-height: 1.2;
+}
+.agent-prompt-command {
+  display: block;
+  padding: 7px 9px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  font-family: var(--qubit-font-mono);
+  font-size: calc(11px * var(--qubit-text-zoom, 1));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 10em;
+  overflow-y: auto;
+  text-align: left;
+  unicode-bidi: plaintext;
+}
+.agent-prompt-reason,
+.agent-prompt-hint,
+.agent-prompt-note,
+.agent-prompt-countdown,
+.agent-prompt-queue {
+  color: color-mix(in srgb, currentColor 70%, transparent);
+  font-family: var(--qubit-font-ui);
+  font-size: calc(10.5px * var(--qubit-text-zoom, 1));
+  line-height: 1.35;
+}
+.agent-prompt-reason:empty { display: none; }
+.agent-prompt-countdown { font-variant-numeric: tabular-nums; }
+.agent-prompt-error {
+  color: var(--qubit-danger, #b3261e);
+  font-family: var(--qubit-font-ui);
+  font-size: calc(11px * var(--qubit-text-zoom, 1));
+  line-height: 1.35;
+}
+.agent-prompt-edit summary {
+  cursor: pointer;
+  font-family: var(--qubit-font-ui);
+  font-size: calc(11px * var(--qubit-text-zoom, 1));
+  overflow-wrap: anywhere;
+}
+.agent-prompt-diff {
+  margin: 6px 0 0;
+  padding: 6px 0;
+  max-height: 14em;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 6%, transparent);
+  font-family: var(--qubit-font-mono);
+  font-size: calc(10.5px * var(--qubit-text-zoom, 1));
+  text-align: left;
+}
+.agent-prompt-diff-row {
+  display: block;
+  padding: 0 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  unicode-bidi: plaintext;
+}
+.agent-prompt-diff-row.is-added { background: color-mix(in srgb, #1a7f37 22%, transparent); }
+.agent-prompt-diff-row.is-removed { background: color-mix(in srgb, #cf222e 22%, transparent); }
+.agent-prompt-diff-row.is-gap { opacity: 0.55; }
+.agent-prompt-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-prompt-actions button,
+.agent-prompt-card .agent-prompt-choice,
+.agent-prompt-card .agent-prompt-body > button {
+  min-height: 28px;
+  padding: 6px 9px;
+  font-size: calc(9px * var(--qubit-text-zoom, 1));
+  letter-spacing: 0.1em;
+}
+.agent-prompt-deny { border-style: dashed; }
+.agent-prompt-deny:focus-visible,
+.agent-prompt-actions button:focus-visible,
+.agent-prompt-choice:focus-visible,
+.agent-prompt-input:focus-visible {
+  outline: 2px solid var(--qubit-accent, currentColor);
+  outline-offset: 2px;
+}
+.agent-prompt-question { display: grid; gap: 6px; min-width: 0; }
+.agent-prompt-question-text {
+  margin: 0;
+  font-family: var(--qubit-font-ui);
+  font-size: calc(12px * var(--qubit-text-zoom, 1));
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.agent-prompt-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.agent-prompt-choice.is-selected {
+  border-color: var(--qubit-accent, currentColor);
+  background: color-mix(in srgb, var(--qubit-accent, currentColor) 16%, transparent);
+}
+.agent-prompt-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: calc(12px * var(--qubit-text-zoom, 1));
+}
+.agent-prompt-card button:disabled,
+.agent-prompt-input:disabled { opacity: 0.5; cursor: default; }

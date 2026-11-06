@@ -1,0 +1,62 @@
+.user-file-attachments { display: grid; gap: 8px; margin-block: 12px 2px; max-width: 100%; }
+.user-file-card {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, currentColor 5%, transparent);
+  color: inherit;
+}
+.user-file-kind {
+  display: grid; place-items: center; width: 34px; height: 42px;
+  border: 1px solid color-mix(in srgb, currentColor 32%, transparent);
+  border-radius: 5px;
+  font: 650 calc(9px * var(--qubit-text-zoom, 1))/1 var(--qubit-font-mono);
+  letter-spacing: .025em;
+}
+.user-file-info { display: grid; gap: 4px; min-width: 0; }
+.user-file-info strong { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font: 600 calc(12px * var(--qubit-text-zoom, 1))/1.35 var(--qubit-font-ui); text-transform: none; letter-spacing: 0; }
+.user-file-info small { font: 400 calc(10.5px * var(--qubit-text-zoom, 1))/1.25 var(--qubit-font-ui); opacity: .72; }
+.user-file-actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
+.user-file-actions button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: auto; min-width: 0; min-height: 30px; padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: 6px;
+  background: transparent; color: inherit; box-shadow: none;
+  font: 550 calc(11px * var(--qubit-text-zoom, 1))/1.2 var(--qubit-font-ui);
+  letter-spacing: 0; text-transform: none; cursor: pointer;
+}
+.user-file-actions button:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.user-file-actions button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.user-file-actions button:disabled { opacity: .4; cursor: default; }
+.user-file-viewer {
+  position: fixed; inset: 0; margin: auto; box-sizing: border-box;
+  width: min(780px, calc(100vw - 32px)); max-height: calc(100dvh - 32px);
+  overflow: auto; padding: 20px;
+  background: var(--qubit-paper); color: var(--qubit-ink);
+  border: 1px solid var(--qubit-line-strong); border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(var(--qubit-shadow-rgb, 0, 0, 0), .3);
+  font: 400 calc(13px * var(--qubit-text-zoom, 1))/1.55 var(--qubit-font-ui);
+  scrollbar-width: thin; scrollbar-color: var(--qubit-muted) transparent;
+}
+.user-file-viewer:not([open]) { display: none; }
+.user-file-viewer::backdrop { background: rgba(var(--qubit-shadow-rgb, 0, 0, 0), .3); backdrop-filter: blur(6px); }
+.user-file-viewer header { display: flex; align-items: center; gap: 14px; margin-block-end: 18px; }
+.user-file-viewer header strong { flex: 1; min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
+.user-file-viewer button {
+  width: auto; min-height: 34px; padding: 7px 12px; border-radius: 7px;
+  border: 1px solid var(--qubit-line-strong); background: var(--qubit-paper); color: var(--qubit-ink);
+  font: 550 calc(12px * var(--qubit-text-zoom, 1))/1.2 var(--qubit-font-ui);
+  text-transform: none; letter-spacing: 0; cursor: pointer;
+}
+.user-file-viewer button:focus-visible { outline: 2px solid var(--qubit-ink); outline-offset: 2px; }
+.user-file-viewer button:disabled { opacity: .4; }
+.user-file-viewer-body { max-height: 62dvh; overflow: auto; margin-block-end: 18px; }
+.user-file-viewer pre { margin: 0; padding: 14px; white-space: pre-wrap; overflow-wrap: anywhere; color: inherit; background: color-mix(in srgb, var(--qubit-ink) 4%, transparent); border: 1px solid var(--qubit-line); border-radius: 8px; font: 400 calc(12px * var(--qubit-text-zoom, 1))/1.55 var(--qubit-font-mono); }
+.user-file-viewer video, .user-file-viewer audio { display: block; width: 100%; max-height: 58dvh; }
+.attachment-open { min-height: 0; padding: 0; border: 0; background: transparent; color: inherit; text-transform: none; letter-spacing: 0; cursor: pointer; font: inherit; }
+.attachment-open:focus-visible { outline: 2px solid currentColor; outline-offset: 3px; }

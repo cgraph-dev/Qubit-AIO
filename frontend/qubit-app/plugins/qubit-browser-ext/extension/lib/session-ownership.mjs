@@ -1,0 +1,100 @@
+export const SESSION_SURFACE_SOURCES = Object.freeze({
+  SIDE_PANEL: 'qubit_browser',
+  FULL_TAB: 'qubit_web',
+});
+
+function clean(value = '') {
+  return String(value || '').trim();
+}
+
+function normalized(value = '') {
+  return clean(value).toLowerCase();
+}
+
+function sessionObject(session) {
+  return session && typeof session === 'object' ? session : {};
+}
+
+export function sessionMessageCount(session = {}) {
+  const value = sessionObject(session);
+  const direct = [value.message_count, value.messageCount, value.messages_count]
+    .map(Number)
+    .find((value) => Number.isInteger(value) && value >= 0);
+  if (direct !== undefined) return direct;
+  if (Array.isArray(value.messages)) return value.messages.length;
+  return null;
+}
+
+export function foreignSessionSourceLabel(session = {}) {
+  const value = sessionObject(session);
+  const source = normalized(value.source);
+  const label = clean(value.sourceLabel || value.source);
+  const known = {
+    api: 'API',
+    api_server: 'API',
+    cli: 'CLI',
+    dashboard: 'Dashboard',
+    qubit_browser: 'Qubit Browser Extension',
+    qubit_web: 'Qubit Web',
+    webui: 'Qubit Web',
+  };
+  return known[source] || label || 'another Qubit surface';
+}
+
+// Ids the side panel's surfaces mint: its own chats and Qubit Assist drafts
+// (background.js assistSessionId). Over the API server these sessions are stored
+// as api_server, so the id is what marks them as the Browser's.
+export function isSidePanelSessionId(sessionId = '') {
+  const id = normalized(sessionId);
+  return id === 'qubit-browser-extension'
+    || id.startsWith('qubit-browser-extension-')
+    || id.startsWith('qubit-assist-');
+}
+
+export function sessionOwnedBySurface(session = {}, expectedSource = '') {
+  const value = sessionObject(session);
+  const sessionId = normalized(value.id);
+  const source = normalized(value.source);
+  const expected = normalized(expectedSource);
+  if (!sessionId || !expected) return false;
+  if (source === expected || source === 'qubit_bot_mode' || source === 'bot_mode') return true;
+  if (sessionId.startsWith('canonical_') || sessionId.startsWith('bot_') || sessionId.startsWith('room-')) return true;
+  if (expected === SESSION_SURFACE_SOURCES.SIDE_PANEL) return isSidePanelSessionId(sessionId);
+  if (expected === SESSION_SURFACE_SOURCES.FULL_TAB) {
+    return sessionId.startsWith('qubit-web-');
+  }
+  return false;
+}
+
+export function requiresSessionOwnershipConfirmation({
+  session = {},
+  expectedSource = '',
+  approvedSessionIds = [],
+} = {}) {
+  const value = sessionObject(session);
+  const sessionId = clean(value.id);
+  if (!sessionId || sessionOwnedBySurface(value, expectedSource)) return false;
+  if (approvedSessionIds instanceof Set) return !approvedSessionIds.has(sessionId);
+  return !Array.from(approvedSessionIds || []).some((id) => clean(id) === sessionId);
+}
+
+export function sessionOwnershipNotice({ session = {}, expectedSource = '' } = {}) {
+  const sourceLabel = foreignSessionSourceLabel(session);
+  const count = sessionMessageCount(session);
+  const countDetail = count === null
+    ? 'Its message count is unavailable.'
+    : count === 1
+      ? 'It already contains 1 message.'
+      : `It already contains ${count} messages.`;
+  const newChatLabel = normalized(expectedSource) === SESSION_SURFACE_SOURCES.FULL_TAB
+    ? 'New Qubit Web chat'
+    : 'New chat';
+  return Object.freeze({
+    sourceLabel,
+    messageCount: count,
+    title: `${sourceLabel} session selected`,
+    detail: `${countDetail} Two apps writing to the same session can overwrite or reorder each other’s updates. Start a new chat, or continue here intentionally.`,
+    newChatLabel,
+    continueLabel: `Continue in ${sourceLabel}`,
+  });
+}
