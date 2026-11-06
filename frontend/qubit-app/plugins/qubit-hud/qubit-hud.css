@@ -43,6 +43,9 @@
   --hud-border: 1px solid rgba(255, 255, 255, 0.12);
   --hud-border-strong: 1px solid rgba(255, 255, 255, 0.24);
   --hud-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+  /* hover lifts, so a hover state is a token like any other surface */
+  --hud-hover: rgba(255, 255, 255, 0.03);
+  --hud-hover-border: rgba(255, 255, 255, 0.24);
 
   /* spacing scale: 4px base */
   --hud-s1: 4px;
@@ -366,7 +369,7 @@
 }
 
 .hud__table tr:hover td {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--hud-hover);
 }
 
 .hud__num {
@@ -413,7 +416,7 @@
 }
 
 .hud-row--button:hover {
-  border-color: rgba(255, 255, 255, 0.24);
+  border-color: var(--hud-hover-border);
 }
 
 .hud-row--button:focus-visible {
