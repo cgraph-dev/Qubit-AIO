@@ -457,6 +457,7 @@ def prepare_launch(project_root: Path, argv: list[str]) -> Path | None:
 
     from qubit_cli._parser import command_argv
     from qubit_cli.steward import read_install_stamp
+    from qubit_cli.update_cmd_common import checkout_root
 
     command = command_argv(argv)
     if (command[:1] == ["pm"]
@@ -466,7 +467,7 @@ def prepare_launch(project_root: Path, argv: list[str]) -> Path | None:
             # leaves the user without the fence diagnosis or a usable restart remedy.
             or _is_read_only_gateway_status(command)
             or os.environ.get("HERMES_DISABLE_LAZY_INSTALLS", "").lower() in ("1", "true", "yes")
-            or not (root / ".git").exists()
+            or not (checkout_root(root) / ".git").exists()
             or not (root / "pyproject.toml").is_file()):
         return None
     stamp = read_install_stamp(root)

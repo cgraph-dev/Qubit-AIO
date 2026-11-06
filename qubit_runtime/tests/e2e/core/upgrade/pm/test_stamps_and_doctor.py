@@ -107,7 +107,7 @@ def test_doctor_on_a_healthy_pm_install_reports_no_command_installation_problem(
     assert section, "doctor printed no Command Installation section:\n" + I.describe(cp)
     bad = [line for line in section if line.lstrip().startswith(("⚠", "✗"))]
     assert not bad, f"qubit doctor reports a launcher problem on a healthy PM install: {bad}\n" + I.describe(cp)
-    assert f"Qubit entry point exists ({sb.checkout / 'hermes'})" in cp.stdout, "\n".join(section)
+    assert f"Qubit entry point exists ({sb.runtime / '.qubit' / 'bin' / 'qubit'})" in cp.stdout, "\n".join(section)
 
 
 def test_pm_status_receipt_reports_the_successful_update(updated):
