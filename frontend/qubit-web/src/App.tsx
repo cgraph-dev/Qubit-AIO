@@ -510,6 +510,13 @@ const BUILTIN_NAV_REST: NavItem[] = [
   { path: "/canvas", labelKey: "canvas", label: "Qubit Canvas", icon: Eye },
   { path: "/qubit-bot", labelKey: "qubitBot", label: "Qubit Bot", icon: Bot },
   { path: "/qubit-harness-router", labelKey: "harnessRouter", label: "Harness Router", icon: Workflow },
+  // Qubit HUD is a hidden-tab plugin: its manifest keeps `"hidden": true` so the
+  // plugin loader does not auto-generate a second, duplicate tab, and the route
+  // is still mounted by buildRoutes()'s hidden-tab pass. That left it with no
+  // sidebar row at all, so it is listed here as a builtin entry pointing at the
+  // plugin's path — the same pattern /qubit-office uses. The label comes from
+  // ROUTE_TITLES, and sidebar-sections.ts groups it under System.
+  { path: "/qubit-hud", label: "Qubit HUD", icon: Activity },
   { path: "/qubit-office", labelKey: "office", label: "Qubit Office", icon: Users, exactEnd: true },
   // `/qubit-office2` (Agent Quest) and `/qubit-office3` (Voice Chat) are no
   // longer listed: office2 duplicates the Office roster under a colliding
