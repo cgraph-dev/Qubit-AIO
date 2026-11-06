@@ -15,7 +15,13 @@
   var mount=window.__QUBIT_WB_MOUNT__||'/wb', api=window.__QUBIT_API_PREFIX__||'/agent';
   var base;
   if(window.__QUBIT_SESSION_TOKEN__!==undefined||window.__QUBIT_WB_MOUNT__){
-    base=location.origin+api+mount+'/';
+    // The page and its assets are served by OUR listener at <mount>/, so the
+    // base is the mount alone. Upstream prepended their API prefix here because
+    // their server served the app under it; Qubit's /wb branch serves files
+    // directly at /wb/static/... and the shim separately at /wb/api/..., so
+    // composing them ('/agent'+'/wb' = '/agent/wb') pointed every script,
+    // stylesheet and favicon at a path nothing answers.
+    base=location.origin+mount+'/';
   }else{
     var path=location.pathname,marker='/session/',i=path.indexOf(marker),p;
     i>=0?p=(path.slice(0,i+1)||'/'):p=(path.endsWith('/')?path:(path.replace(/\/[^\/]*$/,'/')||'/'));

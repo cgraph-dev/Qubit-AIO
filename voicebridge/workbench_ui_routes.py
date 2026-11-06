@@ -156,6 +156,19 @@ _INJECT_MARKER = "<!--qubit-wb-globals-->"
 
 
 def _inject_globals(html: str, token: str, base_path: str) -> str:
+    # Upstream's document is a TEMPLATE: its server rewrote __WEBUI_VERSION__ and
+    # __MAX_UPLOAD_BYTES__ on every request (api/routes.py:16631). Our injector
+    # only added globals, so the served page still carried the literal
+    # "static/style.css?v=__WEBUI_VERSION__" — a query string the asset resolver
+    # could not match, so every stylesheet answered with the wrong MIME type and
+    # the browser refused it. The page rendered unstyled.
+    version = str(globals().get("WEBUI_VERSION") or "0.0.0")
+    html = html.replace("__WEBUI_VERSION__", version)
+    # Upstream's own upload cap, taken from the value it publishes in its JS.
+    # The document only echoes it into a bootstrap constant; nothing in the
+    # Qubit shim enforces it (the shim's own limits do), so this must not
+    # claim a larger number than the server would accept.
+    html = html.replace("__MAX_UPLOAD_BYTES__", str(25 * 1024 * 1024))
     payload = (
         "<script>window.__QUBIT_SESSION_TOKEN__=%s;"
         "window.__QUBIT_API_PREFIX__=%s;"
@@ -164,6 +177,18 @@ def _inject_globals(html: str, token: str, base_path: str) -> str:
         % (json.dumps(token or ""), json.dumps("/agent"),
            json.dumps(base_path or ""), json.dumps(MOUNT))
     )
+    # The globals MUST precede everything that reads them. Upstream's document
+    # computes its `<base href>` in the <head> before any other markup, and that
+    # script reads __QUBIT_WB_MOUNT__; injecting at </head> put the definitions
+    # 130 lines too late, so the mount was undefined, the base fell back to the
+    # origin, and every relative asset resolved to /static/* and 404'd. Insert
+    # immediately after <head> so the definitions exist before the first reader.
+    for opener in ("<head>", "<head ", "<HEAD>", "<HEAD "):
+        idx = html.find(opener)
+        if idx != -1:
+            end = html.find(">", idx)
+            if end != -1:
+                return html[:end + 1] + payload + html[end + 1:]
     if _INJECT_MARKER in html:
         return html.replace(_INJECT_MARKER, payload, 1)
     if "</head>" in html:
