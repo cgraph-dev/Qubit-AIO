@@ -36,4 +36,8 @@ export const PANEL_COPY = {
     region: "File preview",
     purpose: "this panel previews a workspace file.",
   },
+  timeline: {
+    region: "Timeline",
+    purpose: "this panel shows the session's recent turns and activity events.",
+  },
 } as const satisfies Record<string, PanelCopy>;

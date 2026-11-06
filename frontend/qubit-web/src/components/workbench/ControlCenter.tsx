@@ -1,23 +1,29 @@
 /**
  * ControlCenter — the workbench's "Preferences, conversation tools, and system
- * controls" drawer (the vocabulary hermes-webui's Control Center used; this is
- * the grouping only, none of its code or state model).
+ * controls" drawer.
+ *
+ * The grouping vocabulary — Preferences / conversation tools / system controls —
+ * is the one the absorbed console used (`static/index.html:385-397`). None of
+ * its code or client-state model is ported.
  *
  * Scope is deliberately small: it reports what this page knows and lets you
  * drive this page's own panels. It does NOT re-home the dashboard's settings
- * surfaces — `/config`, `/env` and friends remain the settings homes, and the
- * links here just point at them.
+ * surfaces — `/config` and friends remain the settings homes, and the links
+ * here only point at them.
  *
  * It also carries the honest route table: every endpoint the workbench reads is
  * listed with its live state, so a half-landed backend is legible at a glance
- * instead of showing up as four unrelated empty panels.
+ * instead of showing up as several unrelated empty panels.
  */
 
+import { X } from "lucide-react";
 import { Link } from "react-router";
 
 import { Badge } from "@nous-research/ui/ui/components/badge";
 
 import type { ApiResult, RouteProbe } from "@/lib/workbench-api";
+
+import { HEAD_ICON_BUTTON, PANEL_HEAD_LABEL } from "./workbench-theme";
 
 function probeTone(result: ApiResult<unknown> | null): {
   tone: "success" | "warning" | "destructive" | "outline";
@@ -25,6 +31,7 @@ function probeTone(result: ApiResult<unknown> | null): {
 } {
   if (result === null) return { tone: "outline", text: "not read" };
   if (result.state === "ok") return { tone: "success", text: "live" };
+  if (result.state === "empty") return { tone: "warning", text: "empty · named" };
   if (result.state === "not_available") return { tone: "warning", text: "not mounted" };
   return { tone: "destructive", text: "error" };
 }
@@ -34,26 +41,38 @@ export function ControlCenter({
   workspaceOpen,
   onToggleWorkspace,
   onRefresh,
+  onClose,
 }: {
   probes: readonly RouteProbe[];
   workspaceOpen: boolean;
   onToggleWorkspace: () => void;
   onRefresh: () => void;
+  /** Return the column to the workspace panel. */
+  onClose: () => void;
 }) {
   return (
     <aside
       aria-label="Control center"
       data-testid="workbench-control-center"
-      className="flex h-full min-h-0 flex-col overflow-y-auto border-l border-border"
+      className="flex h-full min-h-0 w-full flex-col overflow-y-auto border-l border-border bg-background-base/40"
     >
-      <div className="border-b border-border px-3 py-2">
-        <h2 className="font-mondwest normal-case text-xs font-semibold tracking-wide text-text-secondary">
-          Control center
-        </h2>
-        <p className="mt-0.5 text-[11px] text-text-tertiary">
-          Preferences, conversation tools, and system controls.
-        </p>
+      <div className="flex min-h-[2.5rem] shrink-0 items-center justify-between gap-2 border-b border-border px-3">
+        <h2 className={PANEL_HEAD_LABEL}>Control center</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Back to workspace panel"
+          title="Back to workspace panel"
+          data-testid="workbench-controls-close"
+          className={HEAD_ICON_BUTTON}
+        >
+          <X aria-hidden="true" />
+        </button>
       </div>
+
+      <p className="border-b border-border px-3 py-2 text-[11px] text-text-tertiary">
+        Preferences, conversation tools, and system controls.
+      </p>
 
       <section className="border-b border-border px-3 py-2" aria-label="Conversation tools">
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-text-tertiary">
@@ -87,14 +106,17 @@ export function ControlCenter({
           {probes.map((probe) => {
             const { tone, text } = probeTone(probe.result);
             return (
-              <li key={probe.path} className="flex flex-col gap-0.5 text-xs">
+              <li key={`${probe.label}:${probe.path}`} className="flex flex-col gap-0.5 text-xs">
                 <span className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate text-text-secondary">{probe.label}</span>
                   <Badge tone={tone} className="shrink-0 text-[10px]">
                     {text}
                   </Badge>
                 </span>
-                <span className="truncate font-mono-ui text-[10px] text-text-tertiary" title={probe.path}>
+                <span
+                  className="truncate font-mono-ui text-[10px] text-text-tertiary"
+                  title={probe.path}
+                >
                   {probe.path}
                 </span>
               </li>
