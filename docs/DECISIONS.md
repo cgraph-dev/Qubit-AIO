@@ -133,3 +133,24 @@ done
     → Provenance: owner session 2026-10-27; measure/decision pack in
     `docs/PHASE8-SIGNOFF-PACK.md`.
 
+
+13. **`/qubit-chat` is absorbed, not replaced (2026-11-06).** The owner asked for
+    hermes-webui to fully replace `/qubit-chat`. Investigated against both
+    codebases (`docs/CHAT_REPLACE_SCOPE.md`), a drop-in replacement was refused
+    because it would break three things the product is built on:
+    (a) hermes-webui has **no speech recognition and no TTS anywhere** — the
+    entire voice path (`useTranscriptionController`, `startVoice`/`stopVoice`/
+    `toggleVoice`, the `ControlRight` listener, `useDesktopVoiceHelper`,
+    `ReadAloudButton`) lives only in `ChatPage.tsx`;
+    (b) it **eagerly imports `run_agent.AIAgent`** (`api/streaming.py`);
+    (c) it opens **`state.db` read-write** (`api/routes.py`), a second writer
+    beside `CHAT_SESSION_AUTHORITY` (`QubitSessionStore`) — the exact corruption
+    class the single-authority rule exists to prevent.
+    What shipped instead: the context-token ring absorbed into the existing
+    React surface (997 insertions, **zero deletions**; 142 tests over 16 files;
+    mutation-proved). `ChatPage.tsx` was deliberately NOT deleted, and must not
+    be: it IS the replacement surface.
+    → Provenance: owner session 2026-11-06 ("2. full replace"); refusal
+    evidence and file:line citations in `docs/CHAT_REPLACE_SCOPE.md`.
+    A future agent must not read "full replace" as authority to delete the
+    voice path; re-raise with the owner if the voice requirement changes.
