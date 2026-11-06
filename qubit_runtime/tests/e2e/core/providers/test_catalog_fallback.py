@@ -51,21 +51,25 @@ def _drive(primary: Row, fallback: Row, root: Path) -> dict:
             "fallback_providers": [{"provider": fallback.name, "model": "catalog-model-a",
                                     "base_url": alive.origin + fallback.base_path}]})
         proc = run_hermes(home, project, {**keys, **dead.proxy_env()}, "-z", "Read canary.txt and report.")
-        dead_reqs, alive_reqs = dead.inference(), alive.inference()
+        # Inference = a request the fake answered in a chat dialect. A local provider's native
+        # pre-flight (LM Studio POST /api/v1/models/load) is an auxiliary probe, not the turn's
+        # inference call and carries no credential, so it must not decide these cells.
+        dialect_reqs = lambda fake: [r for r in fake.inference() if r.dialect in ("chat", "anthropic", "responses")]  # noqa: E731
+        dead_reqs, alive_reqs = dialect_reqs(dead), dialect_reqs(alive)
         egress = dead.egress_hosts()
-    pk, fk = keys[primary.key_env or ""], keys[fallback.key_env or ""]
+    pk, fk = keys.get(primary.key_env or "", ""), keys.get(fallback.key_env or "", "")
     return {
         "rc": proc.returncode, "stdout": proc.stdout[-400:], "stderr": proc.stderr[-1200:], "egress": egress,
         "alive_inference": len(alive_reqs), "dead_paths": [f"{r.path} [{r.dialect}]" for r in dead_reqs],
         "alive_paths": [f"{r.path} [{r.dialect}]" for r in alive_reqs],
         "cells": {
-            "primary_tried_first": bool(dead_reqs) and dead_reqs[0].dialect != "unknown" and pk in dead_reqs[0].headers.get(
+            "primary_tried_first": bool(dead_reqs) and pk in dead_reqs[0].headers.get(
                 AUTH_HEADER_OF_DIALECT[dead_reqs[0].dialect], ""),
             "fallback_answered": proc.returncode == 0 and FINAL in proc.stdout,
             "fallback_tool_round_trip": any(canary in json.dumps(r.body) for r in alive_reqs),
             # Every fallback call hit its exact configured route with ITS key in the dialect's header.
             "fallback_used_own_key": bool(alive_reqs) and all(
-                r.dialect != "unknown" and fk in r.headers.get(AUTH_HEADER_OF_DIALECT[r.dialect], "") for r in alive_reqs),
+                fk in r.headers.get(AUTH_HEADER_OF_DIALECT[r.dialect], "") for r in alive_reqs),
             "primary_key_not_sent_to_fallback": pk == fk or not any(
                 pk in v for r in alive_reqs for v in r.headers.values()),
         },

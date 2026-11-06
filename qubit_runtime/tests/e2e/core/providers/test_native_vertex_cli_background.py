@@ -6,7 +6,7 @@ boundaries on loopback: the OAuth token endpoint (the real ``google-auth`` signs
 JWT) and the Vertex OpenAI-compatible endpoint (reached through ``HTTPS_PROXY`` with a test CA).
 No request leaves the machine and no real credential exists.
 
-* ``/config`` names the credential "Google OAuth (Vertex AI)", never Azure's "Microsoft Entra ID",
+* ``/config`` names the credential with the Vertex OAuth label, never Azure's "Microsoft Entra ID",
   and showing it mints no token.
 * ``/bg <prompt>`` runs in the gateway on the session's Vertex route: the side agent's request
   reaches Vertex with a bearer the token endpoint minted, the answer prints in the CLI, and the
@@ -28,6 +28,8 @@ import pytest
 
 pytest.importorskip("google.auth", reason="Vertex minting needs google-auth (CI installs it)")
 
+from agent.i18n import t
+from qubit_cli.observability.shared_metrics_consent import OFFER_VERSION
 from tests.e2e.core.cli_tmux._classic import kill_home_processes, require_tmux
 from tests.e2e.core.providers._native_helpers import make_home, messages
 from tests.fakes.providers.vertex import PROJECT, REGION, SA_EMBEDDED_PROJECT, FakeVertex, Say, hermes_setup
@@ -53,7 +55,13 @@ def _respond(record: dict[str, Any]) -> Say:
 
 
 def _drive(fake: FakeVertex, tmp_path: Path):
-    nh = make_home(tmp_path / "h", **hermes_setup(fake, extra_config={"display": {"interface": "cli"}}))
+    # An interactive --cli session asks the first-run shared-metrics question before it paints;
+    # seed the answer so the test exercises the Vertex route, not onboarding (the same
+    # ``telemetry.shared_metrics`` block the cli_tmux harness writes).
+    nh = make_home(tmp_path / "h", **hermes_setup(
+        fake, extra_config={"display": {"interface": "cli"},
+                            "telemetry": {"shared_metrics": {
+                                "enabled": False, "send": False, "offer_version": OFFER_VERSION}}}))
     sock = f"hermes-e2e-vertex-{uuid.uuid4().hex[:8]}"
     env = nh.env({**fake.child_env(), "TERM": "xterm-256color"})
 
@@ -95,8 +103,8 @@ def _drive(fake: FakeVertex, tmp_path: Path):
 
         mints_before_config = len(fake.token_requests)
         submit("/config")
-        config_screen = wait_for("Google OAuth (Vertex AI)", timeout=30)
-        assert "Microsoft Entra ID" not in config_screen
+        config_screen = wait_for(t("cli.config.google_vertex_oauth"), timeout=30)
+        assert t("cli.config.microsoft_entra_id") not in config_screen
         assert len(fake.token_requests) == mints_before_config, "/config minted a Vertex token to display it"
 
         submit(f"/bg {BG_MARK} compute something")

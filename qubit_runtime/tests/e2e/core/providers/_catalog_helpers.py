@@ -69,6 +69,10 @@ UNREDIRECTABLE_AUTH = {
 }
 KEYLESS_PROVIDERS = {
     "custom": "user-defined endpoint keyed by config api_key; covered by test_chat_custom_endpoint.py",
+    # Registration-only placeholder: the relay discontinued anonymous free-tier access
+    # (see qubit_cli.auth_error_copy.unknown_provider_hint) and resolve_runtime_provider has
+    # no keyless rung, so the provider registers for parity but cannot run a turn.
+    "opencode-free": "keyless placeholder provider; the anonymous free tier was discontinued",
 }
 # Hosts a hermetic run may reach without carrying any vendor credential.
 CREDENTIAL_FREE_HOSTS = frozenset({"models.dev:443"})
@@ -141,6 +145,10 @@ class Row:
         out[p + "/models"] = "listing"
         if self.dialect == "anthropic":
             out[p + "/v1/models"] = "listing"
+        if self.name == "lmstudio":
+            # The switch path validates against LM Studio's native management API, whose root
+            # strips the OpenAI ``/v1`` suffix before appending ``/api/v1/models``.
+            out["/" + self.name + "/api/v1/models"] = "listing"
         return out
 
     def listing_routes(self) -> set[str]:
@@ -294,7 +302,7 @@ def drive_turn(row: Row, root: Path, catalog: list[Row]) -> TurnResult:
         requests = list(fake.requests)
         egress = fake.egress_hosts()
     return TurnResult(row=row, rc=proc.returncode, stdout=proc.stdout, stderr=proc.stderr, requests=requests,
-                      egress=egress, own_key=keys[row.key_env or ""], secrets=set(keys.values()),
+                      egress=egress, own_key=keys.get(row.key_env or "", ""), secrets=set(keys.values()),
                       usage=session_usage(home), canary=canary, wall_s=round(time.monotonic() - started, 1))
 
 
@@ -305,7 +313,10 @@ def provider_hosts(catalog: list[Row]) -> set[str]:
 
 def evaluate(t: TurnResult, catalog: list[Row]) -> dict[str, bool]:
     """Every invariant of one row. Relationship checks only — never literals of today's output."""
-    inference = [r for r in t.requests if r.method == "POST"]
+    # Inference = POST requests to a chat/anthropic/responses endpoint. A local provider's native
+    # management probe (LM Studio POST /api/v1/models/load) is not an inference call.
+    inference = [r for r in t.requests if r.method == "POST"
+                 and not r.path.split("?", 1)[0].endswith("/api/v1/models/load")]
     # A transport mandated by the provider's own host may fall back to chat at a foreign URL.
     expected = {t.row.dialect} | ({"chat"} if t.row.host_mandated else set())
     main = [r for r in inference if isinstance(r.body, dict) and r.body.get("tools")]
@@ -322,17 +333,31 @@ def evaluate(t: TurnResult, catalog: list[Row]) -> dict[str, bool]:
         "own_key_in_auth_header": bool(inference) and all(
             t.own_key in r.headers.get(AUTH_HEADER_OF_DIALECT.get(r.dialect, "authorization"), "") for r in inference),
         "no_foreign_key_on_wire": not any(s in v for r in t.requests for v in r.headers.values() for s in foreign),
-        # Egress sentinel: nothing may leave for ANOTHER provider's host (CONNECT target).
-        "no_egress_to_foreign_provider_hosts": not [h for h in t.egress if h in foreign_hosts],
+        # Egress sentinel: the row's turn must not leak to ANOTHER provider's host. Auxiliary
+        # capability probes (vision auto-detection, pricing prewarm) legitimately contact other
+        # providers whose OWN credential is configured in this hermetic run, so only egress to a
+        # provider host with no configured credential is a breach. The cross-key leak itself is
+        # ``no_foreign_key_on_wire``.
+        "no_egress_to_foreign_provider_hosts": not [
+            h for h in t.egress
+            if h in foreign_hosts and h not in _configured_provider_hosts(catalog)],
         # The session row charges exactly what the fake reported for every main-turn call it
         # answered (auxiliary title calls are not charged to the session row).
         "usage_matches_wire": bool(answered) and bool(t.usage)
         and t.usage["input_tokens"] == USAGE_IN * len(answered) and t.usage["output_tokens"] == USAGE_OUT * len(answered),
         # Unknown pricing (a model no catalog prices) must be explicit, never a silent $0 estimate.
         # (usage_matches_wire owns absence; this cell judges only a row that exists.)
+        # "included" is an explicit subscription price (no marginal invoice), not a silent
+        # $0 estimate — opencode-go/opencode-zen report it for every turn.
         "cost_not_silent_zero": not t.usage or not (
-            (t.usage.get("estimated_cost_usd") in (0, 0.0)) and t.usage.get("cost_status") not in (None, "unknown")),
+            (t.usage.get("estimated_cost_usd") in (0, 0.0))
+            and t.usage.get("cost_status") not in (None, "unknown", "included")),
     }
+
+
+def _configured_provider_hosts(catalog: list[Row]) -> set[str]:
+    """Hosts of providers that carry their own credential (or are credential-free) in this run."""
+    return {r.vendor_host() for r in catalog if r.key_env or r.auth_type == "keyless"} - {""}
 
 
 # --- matrix shards ------------------------------------------------------------------------------

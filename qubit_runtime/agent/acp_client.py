@@ -385,7 +385,11 @@ class ACPClient:
         )
         completion = SimpleNamespace(
             choices=[SimpleNamespace(message=message, finish_reason="tool_calls" if tool_calls else "stop")],
-            usage=SimpleNamespace(prompt_tokens=0, completion_tokens=0, total_tokens=0, prompt_tokens_details=SimpleNamespace(cached_tokens=0)),
+            # ACP has no token-usage channel: report no usage rather than a truthy all-zero
+            # object. ``record_response_usage`` treats an all-zero object as a REAL reading,
+            # which makes the compressor wait for usage that never arrives and disables
+            # automatic compaction; ``None`` lets it fall back to rough estimation (#2153).
+            usage=None,
             model=model or self.placeholder_model,
         )
         return _completion_to_stream_chunks(completion) if stream else completion
