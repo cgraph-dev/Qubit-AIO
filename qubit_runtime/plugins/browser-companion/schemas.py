@@ -1,12 +1,4 @@
-"""Qubit/OpenAI function schemas for the browser-companion tools.
-
-Ported from the companion plugin of ``hermes-browser-extension``
-(https://github.com/abundantbeing/hermes-browser-extension) at pin
-16d42430ff45d5833cb6176b401db867b591c2f2, MIT, Copyright (c) 2026 Jon Komet.
-See PROVENANCE.json beside this file. Local divergence: ``SCHEMA_EVENT_LOG``,
-``SCHEMA_JOURNAL`` and ``SCHEMA_CONTROL_STATUS`` are not carried — those tools
-are dropped in this port (``docs/EXT_COLLISION_NOTE.md``).
-"""
+"""Qubit/OpenAI function schema definitions for companion plugin tools."""
 
 _EMPTY_PARAMETERS = {
     "type": "object",
@@ -28,7 +20,7 @@ SCHEMA_GET_CONTEXT = {
         "properties": {
             "context_id": {
                 "type": "string",
-                "description": "Opaque browser context capability ID supplied by the companion context notice.",
+                "description": "Opaque Browser context capability ID supplied by the companion context notice.",
                 "minLength": 32,
                 "maxLength": 32,
                 "pattern": "^[a-f0-9]{32}$",
@@ -43,4 +35,82 @@ SCHEMA_CLEAR_CONTEXT = {
     "name": "browser_clear_context",
     "description": "Clear the cached browser context. The next extension prompt will re-populate it.",
     "parameters": _EMPTY_PARAMETERS,
+}
+
+SCHEMA_EVENT_LOG = {
+    "name": "browser_event_log",
+    "description": "Return recent browser companion events for diagnostics.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of recent events to return (1–50, default 20).",
+                "minimum": 1,
+                "maximum": 50,
+                "default": 20,
+            },
+        },
+        "additionalProperties": False,
+    },
+}
+
+SCHEMA_CONTROL_STATUS = {
+    "name": "browser_control_status",
+    "description": (
+        "Return historical owner-scoped Browser control envelope metadata. "
+        "This is not a live broker query and cannot authorize an action."
+    ),
+    "parameters": _EMPTY_PARAMETERS,
+}
+
+SCHEMA_JOURNAL = {
+    "name": "browser_context_journal",
+    "description": (
+        "Return the bounded owner-scoped metadata-only journal of stored "
+        "browser-context deliveries (timestamps, opaque ids, scope, control "
+        "metadata). Never includes page text or payloads and never "
+        "authorizes browser_get_context."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of recent journal rows to return (1–500, default 50).",
+                "minimum": 1,
+                "maximum": 500,
+                "default": 50,
+            },
+        },
+        "additionalProperties": False,
+    },
+}
+
+SCHEMA_TEXT_UTILITY = {
+    "name": "browser_text_utility",
+    "description": "Run a bounded deterministic text operation locally without a model or network call.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["clean_formatting", "make_bullets", "text_stats", "diff"],
+                "description": "Local operation to perform.",
+            },
+            "text": {
+                "type": "string",
+                "maxLength": 50000,
+                "description": "Source text. Limited to 50,000 characters.",
+            },
+            "compare_text": {
+                "type": "string",
+                "maxLength": 50000,
+                "description": "Revised text for the diff action.",
+                "default": "",
+            },
+        },
+        "required": ["action", "text"],
+        "additionalProperties": False,
+    },
 }
