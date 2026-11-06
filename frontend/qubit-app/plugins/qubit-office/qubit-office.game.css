@@ -299,6 +299,55 @@
   overflow: auto;
 }
 
+/* The framed HUD: a same-origin iframe of /qubit-hud filling the dock below
+   its head. The frame is the panel surface — nothing is laid out on top of it,
+   so a scroll inside the HUD never fights a scroll in the office. */
+.office-game__frameWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.office-game__hudFrame {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  display: block;
+  background: var(--office-void);
+}
+
+/* The escape hatch stays visible: the route is the authority, the frame is the
+   convenience. A reader whose browser refused the frame is never stranded. */
+.office-game__hudDirect {
+  margin: 0;
+  padding: var(--office-s1) var(--office-s3);
+  font-size: var(--office-fs-xs);
+  color: var(--office-muted);
+  border-top: var(--office-border);
+}
+
+.office-game__hudLink {
+  color: var(--office-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.office-game__hudLink:hover,
+.office-game__hudLink:focus-visible {
+  text-decoration: underline;
+}
+
+/* A named state, never an empty panel: the frame is still loading (or was
+   refused) and the reader is told which. */
+.office-game__hudNote {
+  margin: var(--office-s3);
+  color: var(--office-muted);
+  font-size: var(--office-fs-sm);
+}
+
 .office-game__hud > .office-game__panel {
   margin: var(--office-s3);
 }

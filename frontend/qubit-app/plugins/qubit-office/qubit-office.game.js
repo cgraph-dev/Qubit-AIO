@@ -192381,99 +192381,77 @@ create: function(game) {
 	function samePlace(a, b) {
 		return a.kind === b.kind && a.building === b.building && a.floor === b.floor && a.room === b.room;
 	}
-	var HUD_SCRIPT = `/dashboard-plugins/qubit-hud/qubit-hud.js`;
+	// ../qubit-app/plugins/qubit-office/game/ui/HudPanel.ts
+	/** The HUD's own dashboard route. Framed by the dock; also the fallback link. */
+	var HUD_PATH = "/qubit-hud";
+	/** A same-origin frame's height inside a side sheet. */
+	var HUD_FRAME_HEIGHT = "100%";
+	/** The frame's title: what a screen reader announces for the region. */
+	var HUD_FRAME_TITLE = "Qubit HUD";
 	/**
-	* The dock's host wiring, set ONCE by `entry.ts` before any component renders.
+	* The dashboard's base path, read from the host's injected global — the same
+	* seam `office-app.ts::hostBasePath` uses. A deployment behind a subpath must
+	* frame `<base>/qubit-hud`, not `/qubit-hud`.
+	*/
+	function hostBasePath$1() {
+		if (typeof window === "undefined") return "";
+		const raw = window.__QUBIT_BASE_PATH__;
+		if (!raw) return "";
+		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
+	}
+	/**
+	* The URL the dock frames: `HUD_PATH`, rebased if the dashboard is.
 	*
-	* WHY MODULE STATE AND NOT A PROP: the plugin contract renders a registered
-	* component with NO props (`PluginPage.tsx`), and `createOfficeApp(R, H)` is the
-	* factory the entry's own test pins by signature. A module the bundle already
-	* contains is the seam that costs neither: there is one office page per
-	* document, so there is nothing to disambiguate.
+	* An OMITTED base falls back to the host's injected global — `undefined or ""`
+	* must resolve the same way `office-app.ts::officeAppSrc` does, or a subpath
+	* deployment frames `/qubit-hud` at the domain root and gets the wrong page.
+	* An explicit empty string means "served at the root" and is honoured.
 	*/
-	var dockProps = {};
-	function setHudDockProps(props) {
-		dockProps = props;
+	function hudFrameSrc(base) {
+		const raw = base === void 0 ? hostBasePath$1() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${HUD_PATH}`;
 	}
-	function hudDockProps() {
-		return dockProps;
-	}
-	/**
-	* Watch a registry for the HUD's registration, without changing what the host
-	* receives. Idempotent: the wrapper installs once, installs no second copy, and
-	* re-points at this tap so a later page load captures into the live state.
-	*/
-	function watchHudRegistration(registry, tap) {
-		if (!registry || typeof registry.register !== "function") return tap;
-		const current = registry.register;
-		if (current.__hudTap) {
-			current.__hudTap.listeners = tap.listeners;
-			return current.__hudTap;
-		}
-		const real = current;
-		const wrapped = ((name, component) => {
-			if (name === "qubit-hud") {
-				wrapped.__hudTap.component = component;
-				wrapped.__hudTap.listeners.forEach((fn) => fn());
-			}
-			real(name, component);
-		});
-		wrapped.__hudTap = tap;
-		try {
-			registry.register = wrapped;
-		} catch {}
-		return tap;
-	}
-	/**
-	* Wrap the host's `fetchJSON` so only a body-less GET gets through.
-	*
-	* A refusal is an Error with a `disabled: true` marker rather than a silent
-	* resolve: a tab that tried to write must SAY so, not paint an empty success.
-	*/
-	function readOnlyFetch(inner) {
-		const blocked = (what) => Object.assign(/* @__PURE__ */ new Error(`The office HUD is read-only: ${what} is not sent from this page.`), { disabled: true });
-		return (url, init) => {
-			const method = String(init?.method ?? "GET").toUpperCase();
-			if (method !== "GET") throw blocked(`a ${method} request`);
-			if (init?.body !== void 0 && init?.body !== null) throw blocked("a GET carrying a request body");
-			return inner(url, init);
-		};
-	}
-	/**
-	* The HUD as a docked panel, with the states that can lie made visible: a HUD
-	* that never registered, and a page with no read client, are each NAMED.
-	*/
-	function createHudPanel(args) {
-		const { React: R, hooks, fetchJSON, tap } = args;
-		const read = fetchJSON ? readOnlyFetch(fetchJSON) : null;
-		return function HudPanel() {
-			const [, force] = hooks.useState(0);
-			hooks.useEffect(() => {
-				const bump = () => force((n) => n + 1);
-				tap.listeners.add(bump);
-				return () => {
-					tap.listeners.delete(bump);
-				};
-			}, []);
-			const Hud = args.component ?? tap.component;
-			const note = (id, text, role = "status") => R.createElement("div", {
+	/** The dock's body: the framed HUD, with its refusals named. */
+	function createHudDock(args) {
+		const { React: R, hooks, base } = args;
+		const src = hudFrameSrc(base ?? hostBasePath$1());
+		return function HudDock() {
+			const [loaded, setLoaded] = hooks.useState(false);
+			const note = (id, text) => R.createElement("div", {
 				key: id,
-				className: "office-game__panel",
+				className: "office-game__panel office-game__hudNote",
 				"data-testid": id,
-				role,
+				role: "status",
 				"aria-live": "polite"
 			}, text);
-			const box = (state, child) => R.createElement("div", {
-				className: "office-game__hud",
-				"data-testid": "office-game-hud-panel",
-				"data-state": state
-			}, child);
-			if (!Hud) return box("error", note("office-game-hud-error", `The HUD is not available on this page: its bundle (${HUD_SCRIPT}) has not registered. Its panels are not shown rather than shown empty.`, "alert"));
-			if (!read) return box("error", note("office-game-hud-error", "The HUD needs the dashboard's read client, and none is available on this page. Its panels are not shown rather than shown empty.", "alert"));
-			return box("ready", R.createElement(Hud, {
-				key: "hud",
-				fetchJSON: read
-			}));
+			return R.createElement("div", {
+				className: "office-game__frameWrap",
+				"data-testid": "office-game-hud-frame-wrap",
+				"data-state": loaded ? "ready" : "loading"
+			}, [
+				R.createElement("iframe", {
+					key: "frame",
+					"data-testid": "office-game-hud-frame",
+					className: "office-game__hudFrame",
+					title: HUD_FRAME_TITLE,
+					src,
+					height: HUD_FRAME_HEIGHT,
+					referrerPolicy: "same-origin",
+					onLoad: () => setLoaded(true)
+				}),
+				R.createElement("p", {
+					key: "direct",
+					className: "office-game__hudDirect"
+				}, [R.createElement("a", {
+					key: "a",
+					className: "office-game__hudLink",
+					"data-testid": "office-game-hud-open",
+					href: src,
+					target: "_blank",
+					rel: "noopener"
+				}, "Open HUD in its own tab")]),
+				!loaded ? note("office-game-hud-loading", `Loading the HUD from ${src}\u2026 If it does not appear, open it in its own tab instead.`) : null
+			]);
 		};
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/office-app.ts
@@ -192973,19 +192951,10 @@ create: function(game) {
 			const [failed, setFailed] = useState(null);
 			const [panelOpen, setPanelOpen] = useState(false);
 			const [hudOpen, setHudOpen] = useState(false);
-			const hud = hudDockProps();
-			const hudTapRef = useRef(null);
-			if (!hudTapRef.current) hudTapRef.current = hud.hudTap ?? {
-				component: null,
-				listeners: /* @__PURE__ */ new Set()
-			};
-			/** Non-null by the assignment above; the local names it so TS agrees. */
-			const hudTap = hudTapRef.current;
-			const HudPanel = createHudPanel({
+			const HudDock = createHudDock({
 				React: R,
 				hooks,
-				fetchJSON: hud.fetchJSON,
-				tap: hudTap
+				base: props.base
 			});
 			const frameRef = useRef(null);
 			const SeatModelPanel = createSeatModelPanel(R, hooks);
@@ -193140,14 +193109,23 @@ create: function(game) {
 			}, [R.createElement("div", {
 				key: "head",
 				className: "office-game__dockHead"
-			}, [R.createElement("span", { key: "t" }, "HUD"), R.createElement("button", {
-				key: "x",
-				type: "button",
-				className: "office-game__btn",
-				"data-testid": "office-game-hud-close",
-				"aria-label": "Close HUD",
-				onClick: () => setHudOpen(false)
-			}, "Close")]), R.createElement(HudPanel, { key: "body" })]));
+			}, [
+				R.createElement("span", { key: "t" }, "HUD"),
+				R.createElement("a", {
+					key: "open",
+					className: "office-game__hudLink",
+					"data-testid": "office-game-hud-open-link",
+					href: hudFrameSrc(props.base)
+				}, "Open HUD"),
+				R.createElement("button", {
+					key: "x",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "office-game-hud-close",
+					"aria-label": "Close HUD",
+					onClick: () => setHudOpen(false)
+				}, "Close")
+			]), R.createElement(HudDock, { key: "body" })]));
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				className: "office-game"
@@ -193329,13 +193307,6 @@ create: function(game) {
 		const wantShell = params.has("shell") && !params.has("app");
 		const R = SDK.React;
 		const H = SDK.hooks;
-		setHudDockProps({
-			hudTap: watchHudRegistration(window.__QUBIT_PLUGINS__, {
-				component: null,
-				listeners: /* @__PURE__ */ new Set()
-			}),
-			fetchJSON: SDK.fetchJSON
-		});
 		const Office = wantShell ? createOfficeComponent(R, H, liveData) : createOfficeWithSeatRouting(R, H);
 		window.__QUBIT_PLUGINS__?.register("qubit-office", Office);
 	}
