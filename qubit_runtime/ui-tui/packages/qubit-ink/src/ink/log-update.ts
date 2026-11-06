@@ -312,6 +312,15 @@ export class LogUpdate {
     // First pass: render changes to existing rows (rows < prev.screen.height)
     let needsFullReset = false
     let resetTriggerY = -1
+    // Main-screen: rows above the viewport live in the terminal's scrollback,
+    // which a relative-move diff cannot rewrite. A pure scrollback-only change
+    // is safe to ignore (see below), but when the SAME frame also changes
+    // visible rows the content has shifted: patching only the visible part
+    // splices old and new rows together and duplicates transcript text. A
+    // layout shift that moves content across the scrollback boundary must be
+    // re-rendered from a clean frame instead.
+    let mainScrollbackChanged = false
+    let mainVisibleChanged = false
     diffEach(prev.screen, next.screen, (x, y, removed, added) => {
       // Skip new rows - we'll render them directly after
       if (growing && y >= prev.screen.height) {
@@ -345,6 +354,8 @@ export class LogUpdate {
       // physical buffer. Shrink-to-visible cases are handled above.
       if (y < viewportY) {
         if (!altScreen) {
+          mainScrollbackChanged = true
+
           return
         }
 
@@ -354,6 +365,7 @@ export class LogUpdate {
         return true // early exit
       }
 
+      mainVisibleChanged = true
       moveCursorTo(screen, x, y)
 
       if (added) {
@@ -410,6 +422,14 @@ export class LogUpdate {
         prevLine: readLine(prev.screen, resetTriggerY),
         nextLine: readLine(next.screen, resetTriggerY)
       })
+    }
+
+    // Main-screen shift across the scrollback boundary (see the flags above).
+    // Repaint the whole frame: the rows above the viewport are immutable in
+    // the terminal, so a partial diff cannot keep them coherent with the
+    // shifted visible rows.
+    if (!altScreen && mainScrollbackChanged && (mainVisibleChanged || growing)) {
+      return fullResetSequence_CAUSES_FLICKER(next, 'offscreen', stylePool)
     }
 
     // Reset styles before rendering new rows (they'll set their own styles)

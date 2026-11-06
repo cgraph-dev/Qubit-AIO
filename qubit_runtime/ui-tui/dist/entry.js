@@ -63961,6 +63961,8 @@ var init_log_update = __esm({
         let currentHyperlink = void 0;
         let needsFullReset = false;
         let resetTriggerY = -1;
+        let mainScrollbackChanged = false;
+        let mainVisibleChanged = false;
         diffEach(prev.screen, next.screen, (x, y, removed, added) => {
           if (growing && y >= prev.screen.height) {
             return;
@@ -63976,12 +63978,14 @@ var init_log_update = __esm({
           }
           if (y < viewportY) {
             if (!altScreen) {
+              mainScrollbackChanged = true;
               return;
             }
             needsFullReset = true;
             resetTriggerY = y;
             return true;
           }
+          mainVisibleChanged = true;
           moveCursorTo(screen, x, y);
           if (added) {
             if (removed && removed.width === 0 /* Narrow */ && added.width === 0 /* Narrow */ && removed.char !== added.char && (hasMultipleCodepoints(removed.char) || hasMultipleCodepoints(added.char)) && // An unwritten prev cell arrives as removed={' ', Narrow}; nothing to clear.
@@ -64015,6 +64019,9 @@ var init_log_update = __esm({
             prevLine: readLine(prev.screen, resetTriggerY),
             nextLine: readLine(next.screen, resetTriggerY)
           });
+        }
+        if (!altScreen && mainScrollbackChanged && (mainVisibleChanged || growing)) {
+          return fullResetSequence_CAUSES_FLICKER(next, "offscreen", stylePool);
         }
         currentStyleId = transitionStyle(screen.diff, stylePool, currentStyleId, stylePool.none);
         currentHyperlink = transitionHyperlink(screen.diff, currentHyperlink, void 0);
