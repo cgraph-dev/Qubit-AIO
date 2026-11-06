@@ -87,6 +87,7 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
     paths: [
       "/system",
       "/qubit-hud",
+      "/qubit-workbench",
       "/config",
       "/env",
       "/profiles",
