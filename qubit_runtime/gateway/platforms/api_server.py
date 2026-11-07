@@ -1395,7 +1395,10 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             profile = get_active_profile_name()  # launch profile, pre-identity (advertised model name)
             if profile and profile not in {"default", "custom"}:
                 profile_name = profile
-        return resolve_effective_model(explicit, profile_name, "hermes-agent")
+        # ``qubit-agent`` is the canonical virtual model name (compat alias:
+        # ``hermes-agent``). This literal reaches clients as the advertised id in
+        # /v1/models, so it must be the Qubit one — the browser extension shows it.
+        return resolve_effective_model(explicit, profile_name, "qubit-agent")
 
     def _cors_headers_for_origin(self, origin: str) -> Optional[Dict[str, str]]:
         """Return CORS headers for an allowed browser origin."""
@@ -2421,7 +2424,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         model_name = self._resolve_model_name("") if _api_request_profile.get() else self._model_name
 
         def _model(mid: str, root: str, parent) -> Dict[str, Any]:
-            return {"id": mid, "object": "model", "created": now, "owned_by": "hermes", "permission": [],
+            return {"id": mid, "object": "model", "created": now, "owned_by": "qubit", "permission": [],
                     "root": root, "parent": parent}
         models = [_model(model_name, model_name, None)]
         models.extend(
