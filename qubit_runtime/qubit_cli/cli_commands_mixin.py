@@ -1070,40 +1070,51 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
         from gateway.slash_commands_branch_thread import parse_branch_args
         _, branch_name = parse_branch_args(_command_arg(cmd_original))
         now = datetime.now()
-        new_session_id = mint_session_id(now)
         branch_title = branch_name or self._session_db.get_next_title_in_lineage(
             self._session_db.get_session_title(self.session_id) or "branch")
         parent_session_id = self.session_id
-        # Create the child BEFORE ending the parent: a failed create_session must leave the session the
-        # user is still on open, not ended with end_reason="branched" and no branch (#11030).
-        # The stable ``_branched_from`` marker keeps the branch visible in /resume + /sessions
-        # even after the parent is re-ended with a different end_reason.
-        # The child sends the parent's exact system prompt: a row without one makes the branch's first
-        # turn rebuild (re-probing the workspace), so the warm cache the copied transcript buys is
-        # lost at byte 0 whenever the repo moved since the parent's session start.
-        parent_prompt = getattr(self.agent, "_cached_system_prompt", None)
-        if not isinstance(parent_prompt, str) or not parent_prompt:
+        from qubit_cli.gateway_session_store import GatewaySessionStore
+        if (isinstance(self._session_db, GatewaySessionStore)
+                and getattr(self, "_gateway_session_open", False)):
+            # The gateway owns the row: /branch is ``session.mutate branch`` (the child is forked
+            # from the live transcript and this viewer attaches to it). A bare local mint here
+            # would leave a row the gateway never created, so the next turn is refused.
+            try:
+                new_session_id = self._new_session_id(now, branch_of=parent_session_id, title=branch_title)
+            except Exception as e:
+                return _cp(f"  {_gt('branch.create_failed', error=e)}")
+        else:
+            new_session_id = mint_session_id(now)
+            # Create the child BEFORE ending the parent: a failed create_session must leave the session the
+            # user is still on open, not ended with end_reason="branched" and no branch (#11030).
+            # The stable ``_branched_from`` marker keeps the branch visible in /resume + /sessions
+            # even after the parent is re-ended with a different end_reason.
+            # The child sends the parent's exact system prompt: a row without one makes the branch's first
+            # turn rebuild (re-probing the workspace), so the warm cache the copied transcript buys is
+            # lost at byte 0 whenever the repo moved since the parent's session start.
+            parent_prompt = getattr(self.agent, "_cached_system_prompt", None)
+            if not isinstance(parent_prompt, str) or not parent_prompt:
+                with suppress(Exception):
+                    parent_prompt = (self._session_db.get_session(parent_session_id) or {}).get("system_prompt")
+            try:
+                self._session_db.create_session(
+                    session_id=new_session_id, source=os.environ.get("HERMES_SESSION_SOURCE", "cli"),
+                    model=self.model, parent_session_id=parent_session_id, system_prompt=parent_prompt or None,
+                    model_config={"max_iterations": self.max_turns, "reasoning_config": self.reasoning_config,
+                                  "_branched_from": parent_session_id})
+            except Exception as e:
+                return _cp(f"  {_gt('branch.create_failed', error=e)}")
+            _end_current_session(self, "branched")
+            # Best-effort chunked copy (a failed copy still yields a usable branch); the api_content
+            # sidecar lets the branch's first turn replay the parent's exact wire bytes (warm cache).
             with suppress(Exception):
-                parent_prompt = (self._session_db.get_session(parent_session_id) or {}).get("system_prompt")
-        try:
-            self._session_db.create_session(
-                session_id=new_session_id, source=os.environ.get("HERMES_SESSION_SOURCE", "cli"),
-                model=self.model, parent_session_id=parent_session_id, system_prompt=parent_prompt or None,
-                model_config={"max_iterations": self.max_turns, "reasoning_config": self.reasoning_config,
-                              "_branched_from": parent_session_id})
-        except Exception as e:
-            return _cp(f"  {_gt('branch.create_failed', error=e)}")
-        _end_current_session(self, "branched")
-        # Best-effort chunked copy (a failed copy still yields a usable branch); the api_content
-        # sidecar lets the branch's first turn replay the parent's exact wire bytes (warm cache).
-        with suppress(Exception):
-            self._session_db.append_messages_batch(new_session_id, [
-                {"role": msg.get("role", "user"), "tool_name": msg.get("tool_name") or msg.get("name"),
-                 "api_content": extract_api_content_sidecar(msg),
-                 **{k: msg.get(k) for k in _BRANCH_COPY_KEYS}, **message_identity(msg, with_tool_uids=True)}
-                for msg in self.conversation_history], chunk_rows=500)
-        with suppress(Exception):
-            self._session_db.set_session_title(new_session_id, branch_title)
+                self._session_db.append_messages_batch(new_session_id, [
+                    {"role": msg.get("role", "user"), "tool_name": msg.get("tool_name") or msg.get("name"),
+                     "api_content": extract_api_content_sidecar(msg),
+                     **{k: msg.get(k) for k in _BRANCH_COPY_KEYS}, **message_identity(msg, with_tool_uids=True)}
+                    for msg in self.conversation_history], chunk_rows=500)
+            with suppress(Exception):
+                self._session_db.set_session_title(new_session_id, branch_title)
         # Switch to the new session
         self._transfer_session_yolo(self.session_id, new_session_id)
         self.session_id, self.session_start, self._pending_title = new_session_id, now, None
@@ -2268,19 +2279,45 @@ class CLICommandsMixin(CLICommandsSessionToolsMixin):
 
     # ---- side-session handlers: /bg, /btw -------------------------------------------------
     def _handle_background_command(self, cmd: str):
-        """Handle /bg <prompt> — run a prompt in a separate background session (its own AIAgent
-        on a thread); the result prints here without touching the active history."""
+        """Handle /bg <prompt> — run a prompt in a separate background session. On the shared
+        gateway the side task runs there (``prompt.background``, like Ink's) and its answer
+        arrives on the session event stream; off it, a local AIAgent on a thread."""
         from cli import set_approval_callback, set_secret_capture_callback, set_sudo_password_callback
         from run_agent import AIAgent
+        from qubit_cli.gateway_side import connection_for, start as start_side_task
         prompt = _command_arg(cmd)
         if not prompt:
             return _cp(*_lines(_t("background.usage")))
         self._background_task_counter += 1
         task_num = self._background_task_counter
+        preview = _ellipsize(prompt, 60)
+        connection = connection_for(self)
+        if connection is not None:
+            try:
+                task_id, wait = start_side_task(connection, self.session_id, "background", prompt)
+            except Exception as e:
+                return _cp(f"  {_t('side_result.failed', label=_t('background.label', number=task_num), error=e)}")
+            _cp(f"  {_t('background.started', number=task_num, preview=preview)}",
+                f"  {_t('background.task_id', task_id=task_id)}",
+                f"  {_t('background.keep_chatting')}\n")
+
+            def gateway_done():
+                self._background_tasks.pop(task_id, None)
+                if not self._agent_running:  # clear spinner only if no foreground agent owns it
+                    self._spinner_text = ""
+
+            thread = self._side_worker(
+                wait, name=f"bg-task-{task_id}", fail_label=_t("background.label", number=task_num),
+                header_lines=[f"  {_t('background.complete', number=task_num)}",
+                              f"  {_t('background.prompt', preview=preview)}"],
+                title_suffix=_t("background.title_suffix", number=task_num),
+                empty_note=f"  {_t('background.no_response')}", bell=True, on_done=gateway_done)
+            self._background_tasks[task_id] = thread
+            thread.start()
+            return
         task_id = f"bg_{datetime.now().strftime('%H%M%S')}_{uuid.uuid4().hex[:6]}"
         if not self._ensure_runtime_credentials():
             return _cp(f"  {_t('background.no_credentials')}")
-        preview = _ellipsize(prompt, 60)
         _cp(f"  {_t('background.started', number=task_num, preview=preview)}",
             f"  {_t('background.task_id', task_id=task_id)}", f"  {_t('background.keep_chatting')}\n")
         turn_route = self._resolve_turn_agent_config(prompt)

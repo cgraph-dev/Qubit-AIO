@@ -150,6 +150,11 @@ def test_resizes_keep_each_transcript_line_once_in_tmux_scrollback(tmp_path: Pat
     expected = {f"t{t}w{i:03d}" for t, n in WORDS.items() for i in range(n)}
     assert sorted(w for w in expected if words[w] != 1) == [], final
     assert [final.count(f"zq{t}q") for t in WORDS] == [1, 1, 1], final
-    assert sum(1 for line in final.split("\n") if line.lstrip().startswith("❯")) == 1, final
+    # The glyph layout echoes every submitted turn with the prompt glyph, so the pane holds one
+    # ``❯`` row per question plus exactly one live composer row — a duplicated or stray prompt
+    # row is the reflow damage this checks for.
+    prompt_rows = [line for line in final.split("\n") if line.lstrip().startswith("❯")]
+    assert len(prompt_rows) == 1 + len(WORDS), final
+    assert sum(1 for line in prompt_rows if "zq" not in line) == 1, final
     blank_runs = [len(run) for run in re.findall(r"(?:^[ \t]*\n)+", final, flags=re.M)]
     assert max(blank_runs, default=0) <= 2, final  # the reply panel's own spacing, nothing more
