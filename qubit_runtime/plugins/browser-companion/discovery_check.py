@@ -28,20 +28,21 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]  # <repo>/qubit_runtime/plugins/browser-companion/x.py
 RUNTIME = REPO / "qubit_runtime"
 
-home = tempfile.mkdtemp(prefix="qubit-home-browser-companion-")
-os.environ["QUBIT_HOME"] = home
-os.environ.setdefault("QUBIT_SKIP_TELEMETRY", "1")
-sys.path.insert(0, str(RUNTIME))
-
-from qubit_cli.plugins import discover_plugins  # noqa: E402
-
-discover_plugins(force=True)
-
-from qubit_cli.plugins import get_plugin_manager  # noqa: E402
-from tools.registry import registry  # noqa: E402
-
-
 def main() -> int:
+    # Keep every side effect inside main(): this file lives in a shipped plugin
+    # package, so importing it (the packaging import-graph smoke) must be inert.
+    home = tempfile.mkdtemp(prefix="qubit-home-browser-companion-")
+    os.environ["QUBIT_HOME"] = home
+    os.environ.setdefault("QUBIT_SKIP_TELEMETRY", "1")
+    sys.path.insert(0, str(RUNTIME))
+
+    from qubit_cli.plugins import discover_plugins
+
+    discover_plugins(force=True)
+
+    from qubit_cli.plugins import get_plugin_manager
+    from tools.registry import registry
+
     manager = get_plugin_manager()
     loaded = {p.manifest.name: p for p in manager._plugins.values() if getattr(p, "manifest", None)}
     entry = loaded.get("browser-companion")
