@@ -143,7 +143,12 @@ class TestAuthorization:
         event = make_event(platform, "/help")
         adapter.send.reset_mock()
         await adapter.handle_message(event)
-        await asyncio.sleep(0.3)
+        # The auth path hops to a worker thread (pairing-store I/O), so completion
+        # latency varies; poll like ``send_and_capture`` instead of a fixed sleep.
+        for _ in range(40):
+            if adapter.send.called:
+                break
+            await asyncio.sleep(0.05)
 
         # The adapter.send is called directly by the authorization path
         # (not via _send_with_retry), so check it was called with a pairing message
