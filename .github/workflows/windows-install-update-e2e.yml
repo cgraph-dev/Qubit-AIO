@@ -36,7 +36,7 @@ jobs:
           HERMES_E2E_ARTIFACTS: ${{ runner.temp }}/qubit-e2e-artifacts
           QUBIT_E2E_WINDOWS_INSTALL: "1"
         run: >
-          python -m pytest -q -p no:cacheprovider -m "platforms('windows')"
+          python -m pytest -q -p no:cacheprovider -m platforms
           tests/e2e/core/windows_update/
       - name: Every crash cell ran
         env:
