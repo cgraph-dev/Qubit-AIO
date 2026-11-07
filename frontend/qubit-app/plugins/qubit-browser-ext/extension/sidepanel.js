@@ -6172,6 +6172,7 @@ function launchBrowserUpdateWithQubit() {
 async function checkForUpdates({ openReview = false, silent = false } = {}) {
   // silent: the automatic once-a-day check. No dialog, no toast, no button
   // churn, and a failure leaves the manual Check path exactly as it was.
+  if (!UPDATE_PACKAGE_URL) return null;  // no upstream to compare against (see the URL block)
   if (!silent) {
     if (!els.checkUpdatesButton) return;
     els.checkUpdatesButton.disabled = true;
@@ -9027,11 +9028,17 @@ function syncActiveSessionRuntimeFromList() {
 const TEXT_ATTACHMENT_LIMIT = 12_000;
 const IMAGE_ATTACHMENT_TOKEN_ESTIMATE = 1_200;
 const BROWSER_IMAGE_UPLOAD_ENDPOINT = '/api/browser-extension/uploads/images';
-const UPDATE_PACKAGE_URL = 'https://raw.githubusercontent.com/abundantbeing/qubit-browser-extension/main/package.json';
-const UPDATE_MAIN_COMMIT_URL = 'https://api.github.com/repos/abundantbeing/qubit-browser-extension/commits/main';
-const UPDATE_MAIN_TREE_URL = 'https://api.github.com/repos/abundantbeing/qubit-browser-extension/git/trees';
-const UPDATE_COMPARE_URL = 'https://api.github.com/repos/abundantbeing/qubit-browser-extension/compare';
-const REPO_URL = 'https://github.com/abundantbeing/qubit-browser-extension';
+// The update check compared this build against the upstream repository it was
+// ported from. That repository does not exist under this name, so every check
+// 404'd, and after the port this build is Qubit's own code with no upstream to
+// diff against. The check is disabled by leaving these empty; checkForUpdates
+// returns early instead of reporting a network failure for a comparison that
+// cannot exist.
+const UPDATE_PACKAGE_URL = '';
+const UPDATE_MAIN_COMMIT_URL = '';
+const UPDATE_MAIN_TREE_URL = '';
+const UPDATE_COMPARE_URL = '';
+const REPO_URL = '';
 const runtimeManifest = browserApi?.runtime?.getManifest?.() || {};
 const CURRENT_EXTENSION_VERSION = normalizeExtensionVersion(runtimeManifest, els.versionLabel?.textContent);
 
@@ -19829,7 +19836,10 @@ async function renameSessionViaDashboardRest(sessionId, title) {
       body: { title, ...(profile ? { profile } : {}), ...sessionMutationFence(snapshot) },
     });
     const payload = await readJsonResponse(response);
-    return { ok: true, title: String(payload?.title || '').trim() || title };
+    // Qubit's session PATCH answers {"object": "...", "session": {"title": ...}};
+    // a flatter gateway answers {"title": ...}. Read both — reading only the flat
+    // shape is what made every rename report "not confirmed" against a 200.
+    return { ok: true, title: String(payload?.session?.title || payload?.title || '').trim() || title };
   } catch (error) {
     return { ok: false, reason: `dashboard-rest-${error?.status || 'error'}`, detail: error?.message || '' };
   }

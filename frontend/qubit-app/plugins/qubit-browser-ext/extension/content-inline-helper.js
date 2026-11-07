@@ -14,6 +14,10 @@
   const appearancePreferences = globalThis.QubitAppearancePreferences;
   const overlayScrollbar = globalThis.QubitOverlayScrollbar;
   if (!policy?.classifyEditable || !policy?.buildInlineDraftRequest || !policy?.applyResult || !appearance?.resolveInlineAssistTheme || !i18n?.ready) return;
+  // The extension API is what makes the launcher's mark resolvable (runtime.getURL)
+  // and what the draft round-trip needs. On a page where the content script ran
+  // without it, continuing threw from assetUrl on every load; stop here instead.
+  if (!browserApi?.runtime?.getURL) return;
   await i18n.ready;
   if (globalThis.__HERMES_INLINE_HELPER_GENERATION__ !== generation) return;
   const translateUiText = (value) => i18n.translateText(value);
