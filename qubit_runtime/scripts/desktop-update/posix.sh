@@ -1139,18 +1139,26 @@ start_ui
 
 # Current installs publish an installation-bound launcher. Only pre-PM
 # checkouts use the old shim/TCC rescue; a damaged PM install must not retarget.
+# Qubit vendors the runtime one level below the checkout (qubit_runtime/), so
+# the code probes below resolve that subtree; INSTALL_ROOT still names the git
+# checkout the update must run from.
+RUNTIME_ROOT="$INSTALL_ROOT"
+if [ -f "$INSTALL_ROOT/qubit_runtime/pyproject.toml" ]; then
+  RUNTIME_ROOT="$INSTALL_ROOT/qubit_runtime"
+fi
 LEGACY_INSTALL=0
-[ -d "$INSTALL_ROOT/pm" ] || LEGACY_INSTALL=1
+[ -d "$RUNTIME_ROOT/pm" ] || LEGACY_INSTALL=1
 select_update_invoke() {
   HERMES_BIN="$INSTALL_ROOT/.hermes/bin/hermes"
   if [ -x "$HERMES_BIN" ]; then
     UPDATE_INVOKE=("$HERMES_BIN")
     return 0
   fi
-  if [ -f "$INSTALL_ROOT/qubit_cli/_launchers.py" ]; then
+  if [ -f "$RUNTIME_ROOT/qubit_cli/_launchers.py" ]; then
     local candidate version reported expected
     expected="$(cd "$INSTALL_ROOT" && pwd -P)" || return 1
-    for candidate in "$HOME/.local/bin/hermes" "$QUBIT_HOME/bin/hermes"; do
+    for candidate in "$HOME/.local/bin/qubit" "$QUBIT_HOME/bin/qubit" \
+                     "$HOME/.local/bin/hermes" "$QUBIT_HOME/bin/hermes"; do
       [ -x "$candidate" ] || continue
       version="$(run_bounded 60 "$candidate" --version)" || continue
       reported="$(printf '%s\n' "$version" | sed -n 's/^Install directory: //p')"
