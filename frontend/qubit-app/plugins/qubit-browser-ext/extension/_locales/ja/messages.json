@@ -2624,7 +2624,7 @@
     "description": "Runtime interface message marketplace.unsupported_archive"
   },
   "runtime_onboarding_aria": {
-    "message": "Hermesをセットアップ",
+    "message": "Qubitをセットアップ",
     "description": "Runtime interface message onboarding.aria"
   },
   "runtime_onboarding_back": {
@@ -2632,11 +2632,11 @@
     "description": "Runtime interface message onboarding.back"
   },
   "runtime_onboarding_connect_body": {
-    "message": "このパネルをあなたのHermesエージェントに接続します。Hermesがペアリングに対応していれば一度承認し、対応していなければアドレスとAPIキーで手動セットアップを使います。接続すると、Hermesは開いているページを見てここで答えます。",
+    "message": "このパネルをあなたのQubitエージェントに接続します。Qubitがペアリングに対応していれば一度承認し、対応していなければアドレスとAPIキーで手動セットアップを使います。接続すると、Qubitは開いているページを見てここで答えます。",
     "description": "Runtime interface message onboarding.connect.body"
   },
   "runtime_onboarding_connect_connected": {
-    "message": "Hermesに接続済み",
+    "message": "Qubitに接続済み",
     "description": "Runtime interface message onboarding.connect.connected"
   },
   "runtime_onboarding_connect_later": {
@@ -2648,11 +2648,11 @@
     "description": "Runtime interface message onboarding.connect.not_paired"
   },
   "runtime_onboarding_connect_other_hint": {
-    "message": "別のコンピューター、サーバー、またはHermes CloudのHermesですか？手動セットアップを選んでその接続を設定してください。",
+    "message": "別のコンピューター、サーバー、またはQubit CloudのQubitですか？手動セットアップを選んでその接続を設定してください。",
     "description": "Runtime interface message onboarding.connect.other_hint"
   },
   "runtime_onboarding_connect_title": {
-    "message": "Hermesに接続",
+    "message": "Qubitに接続",
     "description": "Runtime interface message onboarding.connect.title"
   },
   "runtime_onboarding_first_prompt": {
@@ -2660,7 +2660,7 @@
     "description": "Runtime interface message onboarding.first_prompt"
   },
   "runtime_onboarding_font_body": {
-    "message": "パネルとHermesの回答に使う書体です。",
+    "message": "パネルとQubitの回答に使う書体です。",
     "description": "Runtime interface message onboarding.font.body"
   },
   "runtime_onboarding_font_title": {
@@ -2680,7 +2680,7 @@
     "description": "Runtime interface message onboarding.language.title"
   },
   "runtime_onboarding_layout_body": {
-    "message": "メッセージとHermesの回答を配置する場所です。",
+    "message": "メッセージとQubitの回答を配置する場所です。",
     "description": "Runtime interface message onboarding.layout.body"
   },
   "runtime_onboarding_layout_title": {
@@ -2728,7 +2728,7 @@
     "description": "Runtime interface message onboarding.step_count"
   },
   "runtime_onboarding_style_body": {
-    "message": "Hermesが回答を表示する方法です。",
+    "message": "Qubitが回答を表示する方法です。",
     "description": "Runtime interface message onboarding.style.body"
   },
   "runtime_onboarding_style_title": {
@@ -3408,7 +3408,7 @@
     "description": "Runtime interface message responses.layout.bubbles"
   },
   "runtime_responses_layout_bubbles_hint": {
-    "message": "あなたとHermesの発言をそれぞれ吹き出しに表示します。メッセージアプリのような表示です。",
+    "message": "あなたとQubitの発言をそれぞれ吹き出しに表示します。メッセージアプリのような表示です。",
     "description": "Runtime interface message responses.layout.bubbles_hint"
   },
   "runtime_responses_layout_description": {
@@ -3424,7 +3424,7 @@
     "description": "Runtime interface message responses.layout.user_bubble"
   },
   "runtime_responses_layout_user_bubble_hint": {
-    "message": "あなたのメッセージは吹き出し、Hermesの回答は通常の文章で表示します。",
+    "message": "あなたのメッセージは吹き出し、Qubitの回答は通常の文章で表示します。",
     "description": "Runtime interface message responses.layout.user_bubble_hint"
   },
   "runtime_responses_setup_again": {
@@ -3436,7 +3436,7 @@
     "description": "Runtime interface message responses.setup_again_description"
   },
   "runtime_responses_style_description": {
-    "message": "Hermesが回答を表示する方法です。",
+    "message": "Qubitが回答を表示する方法です。",
     "description": "Runtime interface message responses.style.description"
   },
   "runtime_responses_style_label": {
@@ -7824,7 +7824,7 @@
     "description": "Runtime interface message ui.stop"
   },
   "runtime_ui_stop_qubit": {
-    "message": "Hermesを停止します",
+    "message": "Qubitを停止します",
     "description": "Runtime interface message ui.stop.qubit"
   },
   "runtime_ui_stop_the_active_run_before_switching_sessions": {
@@ -7836,7 +7836,7 @@
     "description": "Runtime interface message ui.stop.this.subagent"
   },
   "runtime_ui_stopping_qubit": {
-    "message": "Hermesを停止中",
+    "message": "Qubitを停止中",
     "description": "Runtime interface message ui.stopping.qubit"
   },
   "runtime_ui_stopping_recording": {

@@ -4840,11 +4840,11 @@
     "description": "Runtime interface message ui.connected.agent.1e63a585"
   },
   "runtime_ui_connected_to_qubit_this_draft_will_create_a_new_qubit_web_ses_59e2faf2": {
-    "message": "متصل بHermes. ستؤدي هذه المسودة إلى إنشاء جلسة Qubit Web جديدة عند إرسالها.",
+    "message": "متصل بQubit. ستؤدي هذه المسودة إلى إنشاء جلسة Qubit Web جديدة عند إرسالها.",
     "description": "Runtime interface message ui.connected.to.qubit.this.draft.will.create.a.new.qubit.web.ses.59e2faf2"
   },
   "runtime_ui_connected_to_qubit_you_can_start_chatting_with_page_context": {
-    "message": "متصل بHermes. يمكنك البدء في الدردشة مع سياق الصفحة.",
+    "message": "متصل بQubit. يمكنك البدء في الدردشة مع سياق الصفحة.",
     "description": "Runtime interface message ui.connected.to.qubit.you.can.start.chatting.with.page.context"
   },
   "runtime_ui_connecting": {

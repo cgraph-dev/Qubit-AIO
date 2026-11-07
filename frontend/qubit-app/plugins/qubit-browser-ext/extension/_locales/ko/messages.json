@@ -100,7 +100,7 @@
     "description": "Runtime interface message account.signed_in_generic"
   },
   "runtime_account_signed_in_title": {
-    "message": "Hermes에 로그인했습니다",
+    "message": "Qubit에 로그인했습니다",
     "description": "Runtime interface message account.signed_in_title"
   },
   "runtime_account_status_checking": {
@@ -116,7 +116,7 @@
     "description": "Runtime interface message account.status_waiting"
   },
   "runtime_account_unavailable_no_native_flow": {
-    "message": "이 게이트웨이는 로그인을 요구하지만 앱 로그인을 제공하지 않습니다. 이를 제공하는 버전으로 Hermes를 업데이트하세요.",
+    "message": "이 게이트웨이는 로그인을 요구하지만 앱 로그인을 제공하지 않습니다. 이를 제공하는 버전으로 Qubit를 업데이트하세요.",
     "description": "Runtime interface message account.unavailable.no_native_flow"
   },
   "runtime_account_unavailable_no_origin": {
@@ -460,7 +460,7 @@
     "description": "Runtime interface message bot_mode.cron_copy"
   },
   "runtime_bot_mode_cron_refresh": {
-    "message": "Hermes에서 크론 일정 다시 읽기",
+    "message": "Qubit에서 크론 일정 다시 읽기",
     "description": "Runtime interface message bot_mode.cron_refresh"
   },
   "runtime_bot_mode_cron_title": {
@@ -500,7 +500,7 @@
     "description": "Runtime interface message bot_mode.earlier_messages_loading"
   },
   "runtime_bot_mode_earlier_messages_note": {
-    "message": "Hermes가 {name}와(과)의 이전 채팅을 “{title}”(으)로 옮겨 두고 이 채팅을 시작했기 때문에, {name}은(는) 여기서 이 메시지들을 보지 않습니다.",
+    "message": "Qubit가 {name}와(과)의 이전 채팅을 “{title}”(으)로 옮겨 두고 이 채팅을 시작했기 때문에, {name}은(는) 여기서 이 메시지들을 보지 않습니다.",
     "description": "Runtime interface message bot_mode.earlier_messages_note"
   },
   "runtime_bot_mode_edit_profile": {
@@ -560,7 +560,7 @@
     "description": "Runtime interface message bot_mode.group_create"
   },
   "runtime_bot_mode_group_delivery_unknown": {
-    "message": "Hermes가 응답하지 않아 이 메시지를 이미 받았을 수 있습니다. 다시 보내기 전에 방을 확인하세요.",
+    "message": "Qubit가 응답하지 않아 이 메시지를 이미 받았을 수 있습니다. 다시 보내기 전에 방을 확인하세요.",
     "description": "Runtime interface message bot_mode.group_delivery_unknown"
   },
   "runtime_bot_mode_group_delivery_unknown_draft": {
@@ -708,7 +708,7 @@
     "description": "Runtime interface message bot_mode.pet_gallery_empty"
   },
   "runtime_bot_mode_pet_gallery_failed": {
-    "message": "Hermes가 펫 갤러리를 불러오지 못했습니다. 연결을 유지하고 다시 여세요.",
+    "message": "Qubit가 펫 갤러리를 불러오지 못했습니다. 연결을 유지하고 다시 여세요.",
     "description": "Runtime interface message bot_mode.pet_gallery_failed"
   },
   "runtime_bot_mode_pet_grid_label": {
@@ -984,7 +984,7 @@
     "description": "Runtime interface message browser_control.detach"
   },
   "runtime_browser_control_detached_detail": {
-    "message": "브라우저 작업을 중지했습니다. Hermes는 연결된 탭을 더 이상 사용할 수 없습니다.",
+    "message": "브라우저 작업을 중지했습니다. Qubit는 연결된 탭을 더 이상 사용할 수 없습니다.",
     "description": "Runtime interface message browser_control.detached_detail"
   },
   "runtime_browser_control_detached_toast": {
@@ -1056,23 +1056,23 @@
     "description": "Runtime interface message browser_control.error_session_enable"
   },
   "runtime_browser_control_error_unsupported": {
-    "message": "이 Hermes에서는 Qubit 제어를 사용할 수 없습니다. 브라우저 확장 프로그램 제어를 지원하는 Hermes가 필요합니다.",
+    "message": "이 Qubit에서는 Qubit 제어를 사용할 수 없습니다. 브라우저 확장 프로그램 제어를 지원하는 Qubit가 필요합니다.",
     "description": "Runtime interface message browser_control.error_unsupported"
   },
   "runtime_browser_control_help_apply": {
-    "message": "선택한 범위를 Hermes가 제어할 수 있는 탭에 적용합니다.",
+    "message": "선택한 범위를 Qubit가 제어할 수 있는 탭에 적용합니다.",
     "description": "Runtime interface message browser_control.help_apply"
   },
   "runtime_browser_control_help_approve": {
-    "message": "대기 중인 이 브라우저 동작을 한 번 허용합니다. Hermes는 다음 동작에서 다시 묻습니다.",
+    "message": "대기 중인 이 브라우저 동작을 한 번 허용합니다. Qubit는 다음 동작에서 다시 묻습니다.",
     "description": "Runtime interface message browser_control.help_approve"
   },
   "runtime_browser_control_help_attach": {
-    "message": "이전에 연결된 탭을 대체하고 Hermes가 이 탭을 제어하도록 허용합니다.",
+    "message": "이전에 연결된 탭을 대체하고 Qubit가 이 탭을 제어하도록 허용합니다.",
     "description": "Runtime interface message browser_control.help_attach"
   },
   "runtime_browser_control_help_authorize": {
-    "message": "이 브라우저가 Hermes에서 제어 토큰을 받아 탭을 조작할 수 있게 합니다.",
+    "message": "이 브라우저가 Qubit에서 제어 토큰을 받아 탭을 조작할 수 있게 합니다.",
     "description": "Runtime interface message browser_control.help_authorize"
   },
   "runtime_browser_control_help_close": {
@@ -1088,7 +1088,7 @@
     "description": "Runtime interface message browser_control.help_pause"
   },
   "runtime_browser_control_help_reject": {
-    "message": "대기 중인 이 브라우저 동작을 한 번 거부합니다. Hermes가 실행하지 않습니다.",
+    "message": "대기 중인 이 브라우저 동작을 한 번 거부합니다. Qubit가 실행하지 않습니다.",
     "description": "Runtime interface message browser_control.help_reject"
   },
   "runtime_browser_control_help_resume": {
@@ -1096,7 +1096,7 @@
     "description": "Runtime interface message browser_control.help_resume"
   },
   "runtime_browser_control_help_scope": {
-    "message": "Hermes가 조작할 탭을 고르세요. 적용을 눌러 확인합니다.",
+    "message": "Qubit가 조작할 탭을 고르세요. 적용을 눌러 확인합니다.",
     "description": "Runtime interface message browser_control.help_scope"
   },
   "runtime_browser_control_help_scope_selected_tabs": {
@@ -1108,7 +1108,7 @@
     "description": "Runtime interface message browser_control.help_scope_tab"
   },
   "runtime_browser_control_help_scope_task_set": {
-    "message": "아래에서 선택한 탭만 하나의 공유 작업으로 제어합니다. Hermes는 브라우저에서 이 탭들을 그룹화할 수 있습니다. 열려 있는 다른 탭은 포함되지 않습니다.",
+    "message": "아래에서 선택한 탭만 하나의 공유 작업으로 제어합니다. Qubit는 브라우저에서 이 탭들을 그룹화할 수 있습니다. 열려 있는 다른 탭은 포함되지 않습니다.",
     "description": "Runtime interface message browser_control.help_scope_task_set"
   },
   "runtime_browser_control_help_scope_this_tab": {
@@ -1116,7 +1116,7 @@
     "description": "Runtime interface message browser_control.help_scope_this_tab"
   },
   "runtime_browser_control_help_show_tab": {
-    "message": "Hermes가 사용 중인 탭으로 전환합니다. Hermes는 자동으로 탭을 바꾸지 않습니다.",
+    "message": "Qubit가 사용 중인 탭으로 전환합니다. Qubit는 자동으로 탭을 바꾸지 않습니다.",
     "description": "Runtime interface message browser_control.help_show_tab"
   },
   "runtime_browser_control_help_stop": {
@@ -1132,23 +1132,23 @@
     "description": "Runtime interface message browser_control.local_document_detail"
   },
   "runtime_browser_control_note": {
-    "message": "Chromium은 이 확장 프로그램을 설치하거나 업데이트할 때 디버거 액세스 권한을 부여합니다. Hermes는 연결한 탭에서만 디버거를 사용하며, 브라우저 창을 앞으로 가져오지 않고, 자격 증명, MFA, 결제 필드, 비밀 텍스트를 차단합니다.",
+    "message": "Chromium은 이 확장 프로그램을 설치하거나 업데이트할 때 디버거 액세스 권한을 부여합니다. Qubit는 연결한 탭에서만 디버거를 사용하며, 브라우저 창을 앞으로 가져오지 않고, 자격 증명, MFA, 결제 필드, 비밀 텍스트를 차단합니다.",
     "description": "Runtime interface message browser_control.note"
   },
   "runtime_browser_control_note_action_frame": {
-    "message": "Hermes가 그곳에서 동작하지 않았습니다: 그 위치는 Hermes가 읽을 수 없는 페이지의 프레임 안에 있습니다.",
+    "message": "Qubit가 그곳에서 동작하지 않았습니다: 그 위치는 Qubit가 읽을 수 없는 페이지의 프레임 안에 있습니다.",
     "description": "Runtime interface message browser_control.note_action_frame"
   },
   "runtime_browser_control_note_screenshot_frame": {
-    "message": "Hermes가 스크린샷을 찍지 않았습니다: 이 페이지의 프레임이 Hermes가 읽을 수 없는 페이지에 있습니다.",
+    "message": "Qubit가 스크린샷을 찍지 않았습니다: 이 페이지의 프레임이 Qubit가 읽을 수 없는 페이지에 있습니다.",
     "description": "Runtime interface message browser_control.note_screenshot_frame"
   },
   "runtime_browser_control_note_screenshot_page": {
-    "message": "Hermes가 스크린샷을 찍지 않았습니다: 페이지가 Hermes가 캡처하지 않는 페이지로 이동했습니다.",
+    "message": "Qubit가 스크린샷을 찍지 않았습니다: 페이지가 Qubit가 캡처하지 않는 페이지로 이동했습니다.",
     "description": "Runtime interface message browser_control.note_screenshot_page"
   },
   "runtime_browser_control_note_screenshot_permission": {
-    "message": "Hermes가 스크린샷을 찍지 않았습니다. Firefox의 추가 권한이 필요합니다. 'Firefox에서 스크린샷 허용'을 사용하세요.",
+    "message": "Qubit가 스크린샷을 찍지 않았습니다. Firefox의 추가 권한이 필요합니다. 'Firefox에서 스크린샷 허용'을 사용하세요.",
     "description": "Runtime interface message browser_control.note_screenshot_permission"
   },
   "runtime_browser_control_pause": {
@@ -1204,7 +1204,7 @@
     "description": "Runtime interface message browser_control.show_tab"
   },
   "runtime_browser_control_show_tab_aria": {
-    "message": "Hermes가 사용 중인 탭 보기",
+    "message": "Qubit가 사용 중인 탭 보기",
     "description": "Runtime interface message browser_control.show_tab_aria"
   },
   "runtime_browser_control_state_active": {
@@ -1300,15 +1300,15 @@
     "description": "Runtime interface message browser_control.turn_off"
   },
   "runtime_browser_control_unsupported": {
-    "message": "이 Hermes에서는 Qubit 제어를 사용할 수 없습니다",
+    "message": "이 Qubit에서는 Qubit 제어를 사용할 수 없습니다",
     "description": "Runtime interface message browser_control.unsupported"
   },
   "runtime_browser_control_unsupported_detail": {
-    "message": "브라우저 확장 프로그램 제어를 지원하는 Hermes가 필요합니다.",
+    "message": "브라우저 확장 프로그램 제어를 지원하는 Qubit가 필요합니다.",
     "description": "Runtime interface message browser_control.unsupported_detail"
   },
   "runtime_browser_control_waiting": {
-    "message": "Hermes를 기다리는 중입니다.",
+    "message": "Qubit를 기다리는 중입니다.",
     "description": "Runtime interface message browser_control.waiting"
   },
   "runtime_browser_control_waiting_detail": {
@@ -1576,7 +1576,7 @@
     "description": "Runtime interface message capability.reason.operation_ok"
   },
   "runtime_capability_reason_operation_refused": {
-    "message": "Hermes가 마지막 시도를 거부했습니다: {detail}.",
+    "message": "Qubit가 마지막 시도를 거부했습니다: {detail}.",
     "description": "Runtime interface message capability.reason.operation_refused"
   },
   "runtime_capability_reason_rest_chat": {
@@ -1628,7 +1628,7 @@
     "description": "Runtime interface message capability.source.extension"
   },
   "runtime_capability_source_method_not_found": {
-    "message": "Hermes의 거부",
+    "message": "Qubit의 거부",
     "description": "Runtime interface message capability.source.method_not_found"
   },
   "runtime_capability_source_none": {
@@ -1696,7 +1696,7 @@
     "description": "Runtime interface message chat.jump_to_latest_count_aria"
   },
   "runtime_chat_rewind_unsent": {
-    "message": "Hermes가 이 턴을 삭제했을 수 있으며 새 메시지는 전송되지 않았습니다. 대화에는 이제 Hermes에 있는 내용이 표시되고, 입력한 텍스트는 입력창으로 돌아왔습니다.",
+    "message": "Qubit가 이 턴을 삭제했을 수 있으며 새 메시지는 전송되지 않았습니다. 대화에는 이제 Qubit에 있는 내용이 표시되고, 입력한 텍스트는 입력창으로 돌아왔습니다.",
     "description": "Runtime interface message chat.rewind_unsent"
   },
   "runtime_clarify_expired": {
@@ -1800,19 +1800,19 @@
     "description": "Runtime interface message compact.button_recommended"
   },
   "runtime_compact_result_aborted": {
-    "message": "Hermes가 세션을 요약하지 못해 아무것도 바꾸지 않았습니다.",
+    "message": "Qubit가 세션을 요약하지 못해 아무것도 바꾸지 않았습니다.",
     "description": "Runtime interface message compact.result.aborted"
   },
   "runtime_compact_result_blocked": {
-    "message": "Hermes가 지금은 이 세션을 압축하지 않습니다 ({reason}).",
+    "message": "Qubit가 지금은 이 세션을 압축하지 않습니다 ({reason}).",
     "description": "Runtime interface message compact.result.blocked"
   },
   "runtime_compact_result_busy": {
-    "message": "세션이 사용 중이어서 Hermes가 거부했습니다. 아무것도 바꾸지 않았습니다.",
+    "message": "세션이 사용 중이어서 Qubit가 거부했습니다. 아무것도 바꾸지 않았습니다.",
     "description": "Runtime interface message compact.result.busy"
   },
   "runtime_compact_result_busy_compressing": {
-    "message": "Hermes가 이미 이 세션을 압축하고 있습니다.",
+    "message": "Qubit가 이미 이 세션을 압축하고 있습니다.",
     "description": "Runtime interface message compact.result.busy_compressing"
   },
   "runtime_compact_result_busy_turn": {
@@ -1820,19 +1820,19 @@
     "description": "Runtime interface message compact.result.busy_turn"
   },
   "runtime_compact_result_compacted": {
-    "message": "Hermes가 이 세션을 압축했고 다시 읽어서 확인했습니다. {detail}",
+    "message": "Qubit가 이 세션을 압축했고 다시 읽어서 확인했습니다. {detail}",
     "description": "Runtime interface message compact.result.compacted"
   },
   "runtime_compact_result_denied": {
-    "message": "Hermes가 이 계정 또는 프로필의 압축을 거부했습니다.",
+    "message": "Qubit가 이 계정 또는 프로필의 압축을 거부했습니다.",
     "description": "Runtime interface message compact.result.denied"
   },
   "runtime_compact_result_failed": {
-    "message": "Hermes가 압축을 완료하지 못했습니다. {detail}",
+    "message": "Qubit가 압축을 완료하지 못했습니다. {detail}",
     "description": "Runtime interface message compact.result.failed"
   },
   "runtime_compact_result_indeterminate": {
-    "message": "응답이 사라졌고 세션이 이미 진행되었습니다. Hermes가 압축했을 수 있으며, 다시 보내지는 않았습니다.",
+    "message": "응답이 사라졌고 세션이 이미 진행되었습니다. Qubit가 압축했을 수 있으며, 다시 보내지는 않았습니다.",
     "description": "Runtime interface message compact.result.indeterminate"
   },
   "runtime_compact_result_noop": {
@@ -1840,15 +1840,15 @@
     "description": "Runtime interface message compact.result.noop"
   },
   "runtime_compact_result_not_committed": {
-    "message": "응답이 사라졌고 Hermes는 세션이 그대로라고 표시합니다. 같은 요청을 보내려면 압축을 다시 누르세요.",
+    "message": "응답이 사라졌고 Qubit는 세션이 그대로라고 표시합니다. 같은 요청을 보내려면 압축을 다시 누르세요.",
     "description": "Runtime interface message compact.result.not_committed"
   },
   "runtime_compact_result_not_sent": {
-    "message": "먼저 세션을 읽으려 했지만 Hermes에 연결할 수 없었습니다. 아무것도 보내지 않았습니다.",
+    "message": "먼저 세션을 읽으려 했지만 Qubit에 연결할 수 없었습니다. 아무것도 보내지 않았습니다.",
     "description": "Runtime interface message compact.result.not_sent"
   },
   "runtime_compact_result_rotated": {
-    "message": "세션은 ID를 유지하며, Hermes가 새 저장 구간에서 이어 갑니다.",
+    "message": "세션은 ID를 유지하며, Qubit가 새 저장 구간에서 이어 갑니다.",
     "description": "Runtime interface message compact.result.rotated"
   },
   "runtime_compact_result_stale": {
@@ -1856,7 +1856,7 @@
     "description": "Runtime interface message compact.result.stale"
   },
   "runtime_compact_result_unconfirmed": {
-    "message": "Hermes가 압축을 받아들였지만 세션을 다시 읽어도 확인되지 않았습니다. 의존하기 전에 새로 고치세요.",
+    "message": "Qubit가 압축을 받아들였지만 세션을 다시 읽어도 확인되지 않았습니다. 의존하기 전에 새로 고치세요.",
     "description": "Runtime interface message compact.result.unconfirmed"
   },
   "runtime_compact_status_no_session": {
@@ -1900,7 +1900,7 @@
     "description": "Runtime interface message composer.chat_label"
   },
   "runtime_composer_connect_first": {
-    "message": "먼저 Hermes에 연결하세요.",
+    "message": "먼저 Qubit에 연결하세요.",
     "description": "Runtime interface message composer.connect_first"
   },
   "runtime_composer_other_session_running": {
@@ -1936,7 +1936,7 @@
     "description": "Runtime interface message connect.status.checking"
   },
   "runtime_connect_status_degraded": {
-    "message": "Hermes에 연결되었지만 런타임 경고가 있습니다. {detail}",
+    "message": "Qubit에 연결되었지만 런타임 경고가 있습니다. {detail}",
     "description": "Runtime interface message connect.status.degraded"
   },
   "runtime_connect_status_failed": {
@@ -1952,7 +1952,7 @@
     "description": "Runtime interface message connect.status.loopback_only"
   },
   "runtime_connect_status_ready": {
-    "message": "{title}. 'Hermes에 연결'을 클릭하거나 수동 설정을 사용하세요.",
+    "message": "{title}. 'Qubit에 연결'을 클릭하거나 수동 설정을 사용하세요.",
     "description": "Runtime interface message connect.status.ready"
   },
   "runtime_connect_title_local_api": {
@@ -1988,11 +1988,11 @@
     "description": "Runtime interface message context.card.no_socket"
   },
   "runtime_context_card_not_held": {
-    "message": "Hermes가 세션 소켓에서 이 세션을 보유하고 있지 않아 카테고리를 측정하지 못했습니다.",
+    "message": "Qubit가 세션 소켓에서 이 세션을 보유하고 있지 않아 카테고리를 측정하지 못했습니다.",
     "description": "Runtime interface message context.card.not_held"
   },
   "runtime_context_card_not_reported": {
-    "message": "Hermes가 이 세션의 카테고리별 내역을 아직 보고하지 않았습니다.",
+    "message": "Qubit가 이 세션의 카테고리별 내역을 아직 보고하지 않았습니다.",
     "description": "Runtime interface message context.card.not_reported"
   },
   "runtime_context_card_sign_in": {
@@ -2188,7 +2188,7 @@
     "description": "Runtime interface message diagnostic.api_authorization_title"
   },
   "runtime_diagnostic_api_rejected_detail": {
-    "message": "Hermes가 이 요청을 거부했습니다. API 키/브라우저 토큰을 확인하고 URL이 Dashboard SSO 엔드포인트가 아닌 API 서버를 가리키는지 확인하세요.",
+    "message": "Qubit가 이 요청을 거부했습니다. API 키/브라우저 토큰을 확인하고 URL이 Dashboard SSO 엔드포인트가 아닌 API 서버를 가리키는지 확인하세요.",
     "description": "Runtime interface message diagnostic.api_rejected_detail"
   },
   "runtime_diagnostic_auth_detail": {
@@ -2236,7 +2236,7 @@
     "description": "Runtime interface message diagnostic.network_title"
   },
   "runtime_diagnostic_network_user": {
-    "message": "요청이 네트워크/CORS 계층에서 실패하여 확장 프로그램이 Hermes에 연결할 수 없습니다.",
+    "message": "요청이 네트워크/CORS 계층에서 실패하여 확장 프로그램이 Qubit에 연결할 수 없습니다.",
     "description": "Runtime interface message diagnostic.network_user"
   },
   "runtime_diagnostic_remote_setup_title": {
@@ -2248,7 +2248,7 @@
     "description": "Runtime interface message diagnostic.remote_unclassified_detail"
   },
   "runtime_diagnostic_route_detail": {
-    "message": "이 런타임에서는 Qubit 게이트웨이 경로를 사용할 수 없습니다. Hermes를 업데이트/재시작하거나, 사용 가능한 경우 문서화된 대체 모드를 사용하세요.",
+    "message": "이 런타임에서는 Qubit 게이트웨이 경로를 사용할 수 없습니다. Qubit를 업데이트/재시작하거나, 사용 가능한 경우 문서화된 대체 모드를 사용하세요.",
     "description": "Runtime interface message diagnostic.route_detail"
   },
   "runtime_diagnostic_route_title": {
@@ -2336,7 +2336,7 @@
     "description": "Runtime interface message exec_approval.sent_detail"
   },
   "runtime_exec_approval_title": {
-    "message": "Hermes가 명령을 실행하려고 합니다",
+    "message": "Qubit가 명령을 실행하려고 합니다",
     "description": "Runtime interface message exec_approval.title"
   },
   "runtime_exec_approval_waiting": {
@@ -2356,11 +2356,11 @@
     "description": "Runtime interface message firefox_screenshots.denied"
   },
   "runtime_firefox_screenshots_detail_granted": {
-    "message": "Hermes는 Qubit Control의 나머지 기능과 같은 안전 한도 안에서 연결된 탭의 스크린샷을 찍을 수 있습니다. 권한은 언제든지 철회할 수 있습니다.",
+    "message": "Qubit는 Qubit Control의 나머지 기능과 같은 안전 한도 안에서 연결된 탭의 스크린샷을 찍을 수 있습니다. 권한은 언제든지 철회할 수 있습니다.",
     "description": "Runtime interface message firefox_screenshots.detail_granted"
   },
   "runtime_firefox_screenshots_detail_missing": {
-    "message": "Hermes가 탭의 스크린샷을 찍으려면 Firefox의 추가 권한이 필요합니다. Hermes는 허용을 클릭할 때만 권한을 요청하며, 그전까지는 페이지 텍스트를 읽습니다.",
+    "message": "Qubit가 탭의 스크린샷을 찍으려면 Firefox의 추가 권한이 필요합니다. Qubit는 허용을 클릭할 때만 권한을 요청하며, 그전까지는 페이지 텍스트를 읽습니다.",
     "description": "Runtime interface message firefox_screenshots.detail_missing"
   },
   "runtime_firefox_screenshots_failed": {
@@ -2420,7 +2420,7 @@
     "description": "Runtime interface message gateway_queue.lost"
   },
   "runtime_gateway_queue_lost_detail": {
-    "message": "이 턴이 실행되는 동안 Hermes가 재시작되었습니다. 완료하거나 안전하게 반복할 수 없으며, 뒤에 대기 중인 턴은 이 턴을 버릴 때까지 기다립니다. 메시지는 대화 기록에 남아 있으므로 다시 보낼 수 있습니다.",
+    "message": "이 턴이 실행되는 동안 Qubit가 재시작되었습니다. 완료하거나 안전하게 반복할 수 없으며, 뒤에 대기 중인 턴은 이 턴을 버릴 때까지 기다립니다. 메시지는 대화 기록에 남아 있으므로 다시 보낼 수 있습니다.",
     "description": "Runtime interface message gateway_queue.lost_detail"
   },
   "runtime_gateway_queue_queued": {
@@ -2432,7 +2432,7 @@
     "description": "Runtime interface message gateway_queue.save"
   },
   "runtime_gateway_queue_unsupported": {
-    "message": "이 Hermes는 이 턴에 대해 해당 기능을 제공하지 않습니다.",
+    "message": "이 Qubit는 이 턴에 대해 해당 기능을 제공하지 않습니다.",
     "description": "Runtime interface message gateway_queue.unsupported"
   },
   "runtime_haui_ask_hint": {
@@ -2480,7 +2480,7 @@
     "description": "Runtime interface message image.generated_preview"
   },
   "runtime_image_generating": {
-    "message": "Hermes가 이미지를 생성하는 중입니다",
+    "message": "Qubit가 이미지를 생성하는 중입니다",
     "description": "Runtime interface message image.generating"
   },
   "runtime_image_meta_active": {
@@ -2632,11 +2632,11 @@
     "description": "Runtime interface message onboarding.back"
   },
   "runtime_onboarding_connect_body": {
-    "message": "이 패널을 Qubit 에이전트에 연결하세요. Hermes가 페어링을 지원하면 한 번 승인하고, 아니면 주소와 API 키로 수동 설정을 사용하세요. 그러면 Hermes가 보고 있는 페이지를 보고 여기서 답합니다.",
+    "message": "이 패널을 Qubit 에이전트에 연결하세요. Qubit가 페어링을 지원하면 한 번 승인하고, 아니면 주소와 API 키로 수동 설정을 사용하세요. 그러면 Qubit가 보고 있는 페이지를 보고 여기서 답합니다.",
     "description": "Runtime interface message onboarding.connect.body"
   },
   "runtime_onboarding_connect_connected": {
-    "message": "Hermes에 연결됨",
+    "message": "Qubit에 연결됨",
     "description": "Runtime interface message onboarding.connect.connected"
   },
   "runtime_onboarding_connect_later": {
@@ -2648,11 +2648,11 @@
     "description": "Runtime interface message onboarding.connect.not_paired"
   },
   "runtime_onboarding_connect_other_hint": {
-    "message": "다른 컴퓨터, 서버 또는 Qubit Cloud의 Hermes인가요? 수동 설정을 선택해 그 연결을 설정하세요.",
+    "message": "다른 컴퓨터, 서버 또는 Qubit Cloud의 Qubit인가요? 수동 설정을 선택해 그 연결을 설정하세요.",
     "description": "Runtime interface message onboarding.connect.other_hint"
   },
   "runtime_onboarding_connect_title": {
-    "message": "Hermes에 연결",
+    "message": "Qubit에 연결",
     "description": "Runtime interface message onboarding.connect.title"
   },
   "runtime_onboarding_first_prompt": {
@@ -2680,7 +2680,7 @@
     "description": "Runtime interface message onboarding.language.title"
   },
   "runtime_onboarding_layout_body": {
-    "message": "내 메시지와 Hermes의 답변이 놓일 위치입니다.",
+    "message": "내 메시지와 Qubit의 답변이 놓일 위치입니다.",
     "description": "Runtime interface message onboarding.layout.body"
   },
   "runtime_onboarding_layout_title": {
@@ -2728,7 +2728,7 @@
     "description": "Runtime interface message onboarding.step_count"
   },
   "runtime_onboarding_style_body": {
-    "message": "Hermes가 답변을 표시하는 방식입니다.",
+    "message": "Qubit가 답변을 표시하는 방식입니다.",
     "description": "Runtime interface message onboarding.style.body"
   },
   "runtime_onboarding_style_title": {
@@ -2912,7 +2912,7 @@
     "description": "Runtime interface message projects.create.idea_generating"
   },
   "runtime_projects_create_idea_hint": {
-    "message": "선택 사항입니다. 프로젝트가 만들어지면 첫 번째 폴더에서 세션이 열리고 이 텍스트가 준비되어, Hermes가 IDEA.md로 저장할 수 있습니다.",
+    "message": "선택 사항입니다. 프로젝트가 만들어지면 첫 번째 폴더에서 세션이 열리고 이 텍스트가 준비되어, Qubit가 IDEA.md로 저장할 수 있습니다.",
     "description": "Runtime interface message projects.create.idea_hint"
   },
   "runtime_projects_create_idea_placeholder": {
@@ -2932,7 +2932,7 @@
     "description": "Runtime interface message projects.create.path"
   },
   "runtime_projects_create_path_hint": {
-    "message": "이 경로는 Hermes가 실행 중인 컴퓨터({host})에 있으며 이 컴퓨터에 있지 않습니다. 찾아보거나 경로를 입력하세요.",
+    "message": "이 경로는 Qubit가 실행 중인 컴퓨터({host})에 있으며 이 컴퓨터에 있지 않습니다. 찾아보거나 경로를 입력하세요.",
     "description": "Runtime interface message projects.create.path_hint"
   },
   "runtime_projects_create_path_placeholder": {
@@ -2972,7 +2972,7 @@
     "description": "Runtime interface message projects.dismiss"
   },
   "runtime_projects_empty_text": {
-    "message": "프로젝트는 Hermes가 실행 중인 컴퓨터의 폴더 안에서 실행되는 세션을 묶어 줍니다. 하나 만들어 시작하세요.",
+    "message": "프로젝트는 Qubit가 실행 중인 컴퓨터의 폴더 안에서 실행되는 세션을 묶어 줍니다. 하나 만들어 시작하세요.",
     "description": "Runtime interface message projects.empty.text"
   },
   "runtime_projects_empty_title": {
@@ -2980,23 +2980,23 @@
     "description": "Runtime interface message projects.empty.title"
   },
   "runtime_projects_error_disconnected": {
-    "message": "Hermes와의 연결이 끊어졌습니다.",
+    "message": "Qubit와의 연결이 끊어졌습니다.",
     "description": "Runtime interface message projects.error.disconnected"
   },
   "runtime_projects_error_gateway_error": {
-    "message": "Hermes가 요청을 완료하지 못했습니다.",
+    "message": "Qubit가 요청을 완료하지 못했습니다.",
     "description": "Runtime interface message projects.error.gateway_error"
   },
   "runtime_projects_error_invalid_argument": {
-    "message": "Hermes가 해당 값을 거부했습니다.",
+    "message": "Qubit가 해당 값을 거부했습니다.",
     "description": "Runtime interface message projects.error.invalid_argument"
   },
   "runtime_projects_error_malformed": {
-    "message": "Hermes가 이 확장 프로그램이 이해하지 못하는 응답을 보냈습니다.",
+    "message": "Qubit가 이 확장 프로그램이 이해하지 못하는 응답을 보냈습니다.",
     "description": "Runtime interface message projects.error.malformed"
   },
   "runtime_projects_error_not_created": {
-    "message": "Hermes가 생성하라고 요청받은 프로젝트를 반환하지 않았습니다.",
+    "message": "Qubit가 생성하라고 요청받은 프로젝트를 반환하지 않았습니다.",
     "description": "Runtime interface message projects.error.not_created"
   },
   "runtime_projects_error_not_found": {
@@ -3008,7 +3008,7 @@
     "description": "Runtime interface message projects.error.profile_unavailable"
   },
   "runtime_projects_error_timeout": {
-    "message": "Hermes가 제때 응답하지 않았습니다.",
+    "message": "Qubit가 제때 응답하지 않았습니다.",
     "description": "Runtime interface message projects.error.timeout"
   },
   "runtime_projects_error_title": {
@@ -3036,7 +3036,7 @@
     "description": "Runtime interface message projects.idea.discard"
   },
   "runtime_projects_idea_pending_text": {
-    "message": "아이디어가 준비된 상태로 {folder}에서 세션을 엽니다. 보내면 Hermes가 그곳에 IDEA.md를 작성합니다.",
+    "message": "아이디어가 준비된 상태로 {folder}에서 세션을 엽니다. 보내면 Qubit가 그곳에 IDEA.md를 작성합니다.",
     "description": "Runtime interface message projects.idea.pending_text"
   },
   "runtime_projects_idea_pending_title": {
@@ -3080,11 +3080,11 @@
     "description": "Runtime interface message projects.move.already_there"
   },
   "runtime_projects_move_busy": {
-    "message": "세션이 사용 중이라 Hermes가 이동을 거부했습니다. 턴이 끝날 때까지 기다리거나 중지한 뒤 다시 시도하세요.",
+    "message": "세션이 사용 중이라 Qubit가 이동을 거부했습니다. 턴이 끝날 때까지 기다리거나 중지한 뒤 다시 시도하세요.",
     "description": "Runtime interface message projects.move.busy"
   },
   "runtime_projects_move_busy_compressing": {
-    "message": "세션을 압축하는 중이라 Hermes가 이동을 거부했습니다. 끝난 뒤 다시 시도하세요.",
+    "message": "세션을 압축하는 중이라 Qubit가 이동을 거부했습니다. 끝난 뒤 다시 시도하세요.",
     "description": "Runtime interface message projects.move.busy_compressing"
   },
   "runtime_projects_move_check_again": {
@@ -3096,7 +3096,7 @@
     "description": "Runtime interface message projects.move.check_folder"
   },
   "runtime_projects_move_checking": {
-    "message": "Hermes에 묻는 중…",
+    "message": "Qubit에 묻는 중…",
     "description": "Runtime interface message projects.move.checking"
   },
   "runtime_projects_move_conflict": {
@@ -3112,7 +3112,7 @@
     "description": "Runtime interface message projects.move.current_folder"
   },
   "runtime_projects_move_denied": {
-    "message": "Hermes가 로그인 또는 프로필에 대해 이 이동을 허용하지 않았습니다.",
+    "message": "Qubit가 로그인 또는 프로필에 대해 이 이동을 허용하지 않았습니다.",
     "description": "Runtime interface message projects.move.denied"
   },
   "runtime_projects_move_destination": {
@@ -3120,7 +3120,7 @@
     "description": "Runtime interface message projects.move.destination"
   },
   "runtime_projects_move_done": {
-    "message": "이동했습니다. Hermes가 보고한 세션 폴더는 {cwd}입니다.",
+    "message": "이동했습니다. Qubit가 보고한 세션 폴더는 {cwd}입니다.",
     "description": "Runtime interface message projects.move.done"
   },
   "runtime_projects_move_explainer": {
@@ -3128,7 +3128,7 @@
     "description": "Runtime interface message projects.move.explainer"
   },
   "runtime_projects_move_failed": {
-    "message": "Hermes가 세션을 이동하지 못했습니다. {detail}",
+    "message": "Qubit가 세션을 이동하지 못했습니다. {detail}",
     "description": "Runtime interface message projects.move.failed"
   },
   "runtime_projects_move_folder_in_project": {
@@ -3144,7 +3144,7 @@
     "description": "Runtime interface message projects.move.folder_path"
   },
   "runtime_projects_move_indeterminate": {
-    "message": "Hermes가 확인하기 전에 연결이 끊어졌습니다. 이동이 이루어졌을 수도 아닐 수도 있으니, 무언가를 이동하기 전에 다시 확인하세요.",
+    "message": "Qubit가 확인하기 전에 연결이 끊어졌습니다. 이동이 이루어졌을 수도 아닐 수도 있으니, 무언가를 이동하기 전에 다시 확인하세요.",
     "description": "Runtime interface message projects.move.indeterminate"
   },
   "runtime_projects_move_invalid": {
@@ -3152,7 +3152,7 @@
     "description": "Runtime interface message projects.move.invalid"
   },
   "runtime_projects_move_live_confirm": {
-    "message": "그래도 Hermes에 이동을 요청",
+    "message": "그래도 Qubit에 이동을 요청",
     "description": "Runtime interface message projects.move.live_confirm"
   },
   "runtime_projects_move_live_title": {
@@ -3160,7 +3160,7 @@
     "description": "Runtime interface message projects.move.live_title"
   },
   "runtime_projects_move_live_turn": {
-    "message": "이동하면 명령이 실행되는 폴더가 바뀌며, 턴이 활성 상태인 동안 Hermes는 이동을 거부합니다. 아직 아무것도 변경되지 않았습니다.",
+    "message": "이동하면 명령이 실행되는 폴더가 바뀌며, 턴이 활성 상태인 동안 Qubit는 이동을 거부합니다. 아직 아무것도 변경되지 않았습니다.",
     "description": "Runtime interface message projects.move.live_turn"
   },
   "runtime_projects_move_moving": {
@@ -3168,11 +3168,11 @@
     "description": "Runtime interface message projects.move.moving"
   },
   "runtime_projects_move_not_committed": {
-    "message": "Hermes가 아직 이동을 적용하지 않았습니다. 다시 확인하여 세션을 읽으세요. 아무것도 적용되지 않았을 때만 이동을 다시 시도합니다.",
+    "message": "Qubit가 아직 이동을 적용하지 않았습니다. 다시 확인하여 세션을 읽으세요. 아무것도 적용되지 않았을 때만 이동을 다시 시도합니다.",
     "description": "Runtime interface message projects.move.not_committed"
   },
   "runtime_projects_move_not_sent": {
-    "message": "Hermes를 읽을 수 없어 아무것도 보내지 않았습니다.",
+    "message": "Qubit를 읽을 수 없어 아무것도 보내지 않았습니다.",
     "description": "Runtime interface message projects.move.not_sent"
   },
   "runtime_projects_move_other_folder": {
@@ -3208,7 +3208,7 @@
     "description": "Runtime interface message projects.move.title"
   },
   "runtime_projects_move_unconfirmed": {
-    "message": "Hermes가 이동을 수락했지만 세션 폴더가 요청한 폴더가 아니라 {cwd}(으)로 읽혔습니다. 신뢰하기 전에 세션을 확인하세요.",
+    "message": "Qubit가 이동을 수락했지만 세션 폴더가 요청한 폴더가 아니라 {cwd}(으)로 읽혔습니다. 신뢰하기 전에 세션을 확인하세요.",
     "description": "Runtime interface message projects.move.unconfirmed"
   },
   "runtime_projects_new": {
@@ -3228,7 +3228,7 @@
     "description": "Runtime interface message projects.new_session.failed"
   },
   "runtime_projects_new_session_not_started": {
-    "message": "Hermes가 세션을 시작하지 않았습니다.",
+    "message": "Qubit가 세션을 시작하지 않았습니다.",
     "description": "Runtime interface message projects.new_session.not_started"
   },
   "runtime_projects_new_session_started": {
@@ -3272,7 +3272,7 @@
     "description": "Runtime interface message projects.picker.go"
   },
   "runtime_projects_picker_hint": {
-    "message": "Hermes가 실행 중인 컴퓨터({host})의 폴더이며, 이 컴퓨터의 폴더가 아닙니다.",
+    "message": "Qubit가 실행 중인 컴퓨터({host})의 폴더이며, 이 컴퓨터의 폴더가 아닙니다.",
     "description": "Runtime interface message projects.picker.hint"
   },
   "runtime_projects_picker_home": {
@@ -3376,7 +3376,7 @@
     "description": "Runtime interface message projects.unavailable.method_not_found"
   },
   "runtime_projects_unavailable_no_authority": {
-    "message": "이 Qubit 게이트웨이가 세션 권한을 알리지 않아 프로젝트와 세션 이동을 사용할 수 없습니다. 표준 세션 변경을 지원하는 빌드로 Hermes를 업데이트하세요.",
+    "message": "이 Qubit 게이트웨이가 세션 권한을 알리지 않아 프로젝트와 세션 이동을 사용할 수 없습니다. 표준 세션 변경을 지원하는 빌드로 Qubit를 업데이트하세요.",
     "description": "Runtime interface message projects.unavailable.no_authority"
   },
   "runtime_projects_unavailable_not_connected": {
@@ -3408,7 +3408,7 @@
     "description": "Runtime interface message responses.layout.bubbles"
   },
   "runtime_responses_layout_bubbles_hint": {
-    "message": "나와 Hermes가 각각 메신저 앱처럼 말풍선에 표시됩니다.",
+    "message": "나와 Qubit가 각각 메신저 앱처럼 말풍선에 표시됩니다.",
     "description": "Runtime interface message responses.layout.bubbles_hint"
   },
   "runtime_responses_layout_description": {
@@ -3436,7 +3436,7 @@
     "description": "Runtime interface message responses.setup_again_description"
   },
   "runtime_responses_style_description": {
-    "message": "Hermes가 답변을 표시하는 방식입니다.",
+    "message": "Qubit가 답변을 표시하는 방식입니다.",
     "description": "Runtime interface message responses.style.description"
   },
   "runtime_responses_style_label": {
@@ -3472,7 +3472,7 @@
     "description": "Runtime interface message run.release"
   },
   "runtime_run_release_detail": {
-    "message": "Hermes가 중지를 확인하지 않은 상태에서 확장 프로그램이 입력창을 해제했습니다. 다른 메시지를 보내기 전에 세션을 확인하세요.",
+    "message": "Qubit가 중지를 확인하지 않은 상태에서 확장 프로그램이 입력창을 해제했습니다. 다른 메시지를 보내기 전에 세션을 확인하세요.",
     "description": "Runtime interface message run.release_detail"
   },
   "runtime_run_stop": {
@@ -3492,7 +3492,7 @@
     "description": "Runtime interface message run.stop_controller_unreachable"
   },
   "runtime_run_stop_unconfirmed_no_run_id": {
-    "message": "Hermes가 이번 턴의 실행 ID를 보고하지 않아 확장 프로그램이 실행이 중지되었는지 확인할 수 없습니다. Hermes가 최종 상태를 확인할 때까지 세션 작성자와 대기 중인 메시지는 보류됩니다.",
+    "message": "Qubit가 이번 턴의 실행 ID를 보고하지 않아 확장 프로그램이 실행이 중지되었는지 확인할 수 없습니다. Qubit가 최종 상태를 확인할 때까지 세션 작성자와 대기 중인 메시지는 보류됩니다.",
     "description": "Runtime interface message run.stop_unconfirmed_no_run_id"
   },
   "runtime_run_stop_unconfirmed_title": {
@@ -3508,7 +3508,7 @@
     "description": "Runtime interface message session.legacy_continue_copy"
   },
   "runtime_session_legacy_copy_failed": {
-    "message": "Hermes가 이 채팅을 복사하지 못해 메시지가 전송되지 않았습니다. 새 채팅을 시작해 계속하세요. 메시지는 입력창에 남아 있습니다.",
+    "message": "Qubit가 이 채팅을 복사하지 못해 메시지가 전송되지 않았습니다. 새 채팅을 시작해 계속하세요. 메시지는 입력창에 남아 있습니다.",
     "description": "Runtime interface message session.legacy_copy_failed"
   },
   "runtime_session_legacy_copying": {
@@ -3600,7 +3600,7 @@
     "description": "Runtime interface message settings.categories.back_to"
   },
   "runtime_settings_categories_connections_summary": {
-    "message": "게이트웨이, 에이전트 프로필, 이 브라우저가 Hermes에 연결하는 방식.",
+    "message": "게이트웨이, 에이전트 프로필, 이 브라우저가 Qubit에 연결하는 방식.",
     "description": "Runtime interface message settings.categories.connections.summary"
   },
   "runtime_settings_categories_connections_title": {
@@ -3788,7 +3788,7 @@
     "description": "Runtime interface message settings.models.title"
   },
   "runtime_settings_permissions_copy": {
-    "message": "Hermes가 브라우저에서 조작할 수 있는 항목과 페이지 컨텍스트를 볼 수 있는 연결.",
+    "message": "Qubit가 브라우저에서 조작할 수 있는 항목과 페이지 컨텍스트를 볼 수 있는 연결.",
     "description": "Runtime interface message settings.permissions.copy"
   },
   "runtime_settings_permissions_title": {
@@ -3812,11 +3812,11 @@
     "description": "Runtime interface message settings.save.ports_invalid"
   },
   "runtime_settings_save_saved_connected": {
-    "message": "저장했습니다. Hermes에 연결되어 있습니다.",
+    "message": "저장했습니다. Qubit에 연결되어 있습니다.",
     "description": "Runtime interface message settings.save.saved_connected"
   },
   "runtime_settings_save_saved_offline": {
-    "message": "저장했지만 Hermes에 연결할 수 없습니다: {detail}",
+    "message": "저장했지만 Qubit에 연결할 수 없습니다: {detail}",
     "description": "Runtime interface message settings.save.saved_offline"
   },
   "runtime_settings_save_sources_invalid": {
@@ -3852,7 +3852,7 @@
     "description": "Runtime interface message settings.transcript.url"
   },
   "runtime_settings_transcript_url_hint": {
-    "message": "Hermes가 이 주소에 동영상 ID를 추가합니다.",
+    "message": "Qubit가 이 주소에 동영상 ID를 추가합니다.",
     "description": "Runtime interface message settings.transcript.url_hint"
   },
   "runtime_status_connection_not_responding": {
@@ -3868,7 +3868,7 @@
     "description": "Runtime interface message status.model_discovery_limited"
   },
   "runtime_status_model_lock_failed_detail": {
-    "message": "{error}. Hermes가 전역 모델로 대체할 수 있으므로 전송하지 않습니다.",
+    "message": "{error}. Qubit가 전역 모델로 대체할 수 있으므로 전송하지 않습니다.",
     "description": "Runtime interface message status.model_lock_failed_detail"
   },
   "runtime_status_model_registry_fallback": {
@@ -4140,7 +4140,7 @@
     "description": "Runtime interface message ui.ask"
   },
   "runtime_ui_ask_about_any_page_qubit_sees_the_active_tab_selected_text_pag_b2a32c39": {
-    "message": "모든 페이지에 대해 질문하세요. Hermes는 활성 탭, 선택한 텍스트, 페이지 컨텍스트, 열려 있는 탭을 확인할 수 있습니다.",
+    "message": "모든 페이지에 대해 질문하세요. Qubit는 활성 탭, 선택한 텍스트, 페이지 컨텍스트, 열려 있는 탭을 확인할 수 있습니다.",
     "description": "Runtime interface message ui.ask.about.any.page.qubit.sees.the.active.tab.selected.text.pag.b2a32c39"
   },
   "runtime_ui_ask_every_time": {
@@ -4148,7 +4148,7 @@
     "description": "Runtime interface message ui.ask.every.time"
   },
   "runtime_ui_ask_qubit": {
-    "message": "Hermes에게 질문",
+    "message": "Qubit에게 질문",
     "description": "Runtime interface message ui.ask.qubit"
   },
   "runtime_ui_ask_qubit_36d55d5a": {
@@ -4156,23 +4156,23 @@
     "description": "Runtime interface message ui.ask.qubit.36d55d5a"
   },
   "runtime_ui_ask_qubit_about_the_active_page_context": {
-    "message": "활성 페이지의 컨텍스트에 대해 Hermes에게 질문합니다.",
+    "message": "활성 페이지의 컨텍스트에 대해 Qubit에게 질문합니다.",
     "description": "Runtime interface message ui.ask.qubit.about.the.active.page.context"
   },
   "runtime_ui_ask_qubit_about_this_page": {
-    "message": "이 페이지에 대해 Hermes에게 질문...",
+    "message": "이 페이지에 대해 Qubit에게 질문...",
     "description": "Runtime interface message ui.ask.qubit.about.this.page"
   },
   "runtime_ui_ask_qubit_about_this_selection": {
-    "message": "이 선택에 대해 Hermes에게 문의하세요.",
+    "message": "이 선택에 대해 Qubit에게 문의하세요.",
     "description": "Runtime interface message ui.ask.qubit.about.this.selection"
   },
   "runtime_ui_ask_qubit_anything": {
-    "message": "무엇이든 Hermes에게 질문…",
+    "message": "무엇이든 Qubit에게 질문…",
     "description": "Runtime interface message ui.ask.qubit.anything"
   },
   "runtime_ui_ask_qubit_ellipsis": {
-    "message": "Hermes에게 묻기…",
+    "message": "Qubit에게 묻기…",
     "description": "Runtime interface message ui.ask.qubit.ellipsis"
   },
   "runtime_ui_asked_once_then_remembered": {
@@ -4188,7 +4188,7 @@
     "description": "Runtime interface message ui.assist.change.it.anytime.in.settings"
   },
   "runtime_ui_assist_could_not_create_this_draft": {
-    "message": "Hermes가 이 초안을 만들지 못했습니다.",
+    "message": "Qubit가 이 초안을 만들지 못했습니다.",
     "description": "Runtime interface message ui.assist.could.not.create.this.draft"
   },
   "runtime_ui_assist_could_not_run": {
@@ -4204,7 +4204,7 @@
     "description": "Runtime interface message ui.assist.model.routing"
   },
   "runtime_ui_assist_no_models_yet": {
-    "message": "아직 모델이 없습니다. Hermes가 목록을 가져올 수 있도록 사이드 패널을 한 번 여세요.",
+    "message": "아직 모델이 없습니다. Qubit가 목록을 가져올 수 있도록 사이드 패널을 한 번 여세요.",
     "description": "Runtime interface message ui.assist.no.models.yet"
   },
   "runtime_ui_assist_options": {
@@ -4232,11 +4232,11 @@
     "description": "Runtime interface message ui.assist.use.visible.site.context"
   },
   "runtime_ui_assist_what_should_qubit_do_on_site": {
-    "message": "{site}에서 Hermes가 무엇을 할까요?",
+    "message": "{site}에서 Qubit가 무엇을 할까요?",
     "description": "Runtime interface message ui.assist.what.should.qubit.do.on.site"
   },
   "runtime_ui_assist_what_should_qubit_do_on_this_site": {
-    "message": "이 사이트에서 Hermes가 무엇을 할까요?",
+    "message": "이 사이트에서 Qubit가 무엇을 할까요?",
     "description": "Runtime interface message ui.assist.what.should.qubit.do.on.this.site"
   },
   "runtime_ui_assistant": {
@@ -4468,7 +4468,7 @@
     "description": "Runtime interface message ui.chat.only.3b155e99"
   },
   "runtime_ui_chat_only_mode_is_active_qubit_will_not_read_or_attach_browser_13891aa3": {
-    "message": "채팅 전용 모드가 활성화되어 있습니다. 이번 턴에서는 Hermes가 브라우저 컨텍스트를 읽거나 첨부하지 않습니다.",
+    "message": "채팅 전용 모드가 활성화되어 있습니다. 이번 턴에서는 Qubit가 브라우저 컨텍스트를 읽거나 첨부하지 않습니다.",
     "description": "Runtime interface message ui.chat.only.mode.is.active.qubit.will.not.read.or.attach.browser.13891aa3"
   },
   "runtime_ui_chats": {
@@ -4540,7 +4540,7 @@
     "description": "Runtime interface message ui.choose.where.ask.explain.improve.and.summarize.selection.tasks.run"
   },
   "runtime_ui_choose_where_this_browser_session_reaches_qubit": {
-    "message": "확장 프로그램이 Hermes에 도달하는 위치를 선택하세요.",
+    "message": "확장 프로그램이 Qubit에 도달하는 위치를 선택하세요.",
     "description": "Runtime interface message ui.choose.where.this.browser.session.reaches.qubit"
   },
   "runtime_ui_choose_where_to_send": {
@@ -4552,11 +4552,11 @@
     "description": "Runtime interface message ui.choose.which.qubit.agent.profile.the.browser.should.use.when.t.3d3ae401"
   },
   "runtime_ui_choose_which_tab_qubit_reads_and_which_open_tabs_appear_in_the_prompt": {
-    "message": "Hermes가 읽을 탭과 프롬프트에 표시할 열려 있는 탭을 선택하세요",
+    "message": "Qubit가 읽을 탭과 프롬프트에 표시할 열려 있는 탭을 선택하세요",
     "description": "Runtime interface message ui.choose.which.tab.qubit.reads.and.which.open.tabs.appear.in.the.prompt"
   },
   "runtime_ui_chrome_can_suppress_microphone_prompts_inside_extension_side_pa_79f6cc35": {
-    "message": "일부 브라우저에서는 확장 사이드바 내부에 마이크 프롬프트가 표시되지 않습니다. 이 임시 확장 페이지는 브라우저에 마이크 액세스를 요청한 다음 다시 Hermes로 보냅니다.",
+    "message": "일부 브라우저에서는 확장 사이드바 내부에 마이크 프롬프트가 표시되지 않습니다. 이 임시 확장 페이지는 브라우저에 마이크 액세스를 요청한 다음 다시 Qubit로 보냅니다.",
     "description": "Runtime interface message ui.chrome.can.suppress.microphone.prompts.inside.extension.side.pa.79f6cc35"
   },
   "runtime_ui_chromium_can_block_microphone_capture_inside_extension_side_pan_88bae971": {
@@ -4604,7 +4604,7 @@
     "description": "Runtime interface message ui.click.any.element.on.the.page.press.esc.to.cancel"
   },
   "runtime_ui_click_connect_to_qubit_or_use_manual_setup_with_a_local_remote_5b53a482": {
-    "message": "'Hermes에 연결'을 클릭하거나, 로컬/원격 게이트웨이 URL과 토큰으로 수동 설정을 사용하세요.",
+    "message": "'Qubit에 연결'을 클릭하거나, 로컬/원격 게이트웨이 URL과 토큰으로 수동 설정을 사용하세요.",
     "description": "Runtime interface message ui.click.connect.to.qubit.or.use.manual.setup.with.a.local.remote.5b53a482"
   },
   "runtime_ui_click_start_dictation_to_grant_microphone_access_and_record": {
@@ -4764,11 +4764,11 @@
     "description": "Runtime interface message ui.composer.ask_bot_label"
   },
   "runtime_ui_composer_ask_qubit": {
-    "message": "Hermes에게 질문",
+    "message": "Qubit에게 질문",
     "description": "Runtime interface message ui.composer.ask_qubit"
   },
   "runtime_ui_composer_ask_qubit_label": {
-    "message": "HERMES에게 질문",
+    "message": "Qubit에게 질문",
     "description": "Runtime interface message ui.composer.ask_qubit_label"
   },
   "runtime_ui_composer_bot_running": {
@@ -4812,7 +4812,7 @@
     "description": "Runtime interface message ui.connect.first"
   },
   "runtime_ui_connect_qubit": {
-    "message": "Hermes에 연결",
+    "message": "Qubit에 연결",
     "description": "Runtime interface message ui.connect.qubit"
   },
   "runtime_ui_connect_or_test_your_gateway_to_see_supported_features": {
@@ -4820,11 +4820,11 @@
     "description": "Runtime interface message ui.connect.or.test.your.gateway.to.see.supported.features"
   },
   "runtime_ui_connect_to_qubit": {
-    "message": "Hermes에 연결",
+    "message": "Qubit에 연결",
     "description": "Runtime interface message ui.connect.to.qubit"
   },
   "runtime_ui_connect_to_qubit_then_send_the_prepared_update_request": {
-    "message": "Hermes에 접속한 후 준비된 업데이트 요청을 보냅니다.",
+    "message": "Qubit에 접속한 후 준비된 업데이트 요청을 보냅니다.",
     "description": "Runtime interface message ui.connect.to.qubit.then.send.the.prepared.update.request"
   },
   "runtime_ui_connected": {
@@ -4840,11 +4840,11 @@
     "description": "Runtime interface message ui.connected.agent.1e63a585"
   },
   "runtime_ui_connected_to_qubit_this_draft_will_create_a_new_qubit_web_ses_59e2faf2": {
-    "message": "Hermes에 연결되었습니다. 이 초안은 전송 시 새 Qubit Web 세션을 생성합니다.",
+    "message": "Qubit에 연결되었습니다. 이 초안은 전송 시 새 Qubit Web 세션을 생성합니다.",
     "description": "Runtime interface message ui.connected.to.qubit.this.draft.will.create.a.new.qubit.web.ses.59e2faf2"
   },
   "runtime_ui_connected_to_qubit_you_can_start_chatting_with_page_context": {
-    "message": "Hermes에 연결되었습니다. 페이지 컨텍스트와 함께 채팅을 시작할 수 있습니다.",
+    "message": "Qubit에 연결되었습니다. 페이지 컨텍스트와 함께 채팅을 시작할 수 있습니다.",
     "description": "Runtime interface message ui.connected.to.qubit.you.can.start.chatting.with.page.context"
   },
   "runtime_ui_connecting": {
@@ -5360,7 +5360,7 @@
     "description": "Runtime interface message ui.draft.ready.this.managed.editor.stays.untouched"
   },
   "runtime_ui_draft_reply_with_qubit": {
-    "message": "Hermes를 사용한 초안 답장",
+    "message": "Qubit를 사용한 초안 답장",
     "description": "Runtime interface message ui.draft.reply.with.qubit"
   },
   "runtime_ui_draft_saved_when_sent": {
@@ -5712,7 +5712,7 @@
     "description": "Runtime interface message ui.group.working.wrapping"
   },
   "runtime_ui_handing_update_to_qubit": {
-    "message": "Hermes에 대한 업데이트 처리 중",
+    "message": "Qubit에 대한 업데이트 처리 중",
     "description": "Runtime interface message ui.handing.update.to.qubit"
   },
   "runtime_ui_hash": {
@@ -5740,7 +5740,7 @@
     "description": "Runtime interface message ui.qubit.api.unavailable"
   },
   "runtime_ui_qubit_appears_only_on_tabs_where_you_open_it": {
-    "message": "Hermes는 직접 연 탭에만 표시됩니다.",
+    "message": "Qubit는 직접 연 탭에만 표시됩니다.",
     "description": "Runtime interface message ui.qubit.appears.only.on.tabs.where.you.open.it"
   },
   "runtime_ui_qubit_assist": {
@@ -5828,7 +5828,7 @@
     "description": "Runtime interface message ui.qubit.gateway.unavailable"
   },
   "runtime_ui_qubit_has_not_acknowledged_this_session_model_pair_yet_retryin_c39a64e1": {
-    "message": "Hermes가 아직 이 세션/모델 쌍을 확인하지 않았습니다. 전송 전에 잠금을 재시도하고 있습니다.",
+    "message": "Qubit가 아직 이 세션/모델 쌍을 확인하지 않았습니다. 전송 전에 잠금을 재시도하고 있습니다.",
     "description": "Runtime interface message ui.qubit.has.not.acknowledged.this.session.model.pair.yet.retryin.c39a64e1"
   },
   "runtime_ui_qubit_image_synthesis": {
@@ -5844,19 +5844,19 @@
     "description": "Runtime interface message ui.qubit.is.drafting"
   },
   "runtime_ui_qubit_is_not_connected_yet_browser_speech_fallback_is_unavaila_2a5064db": {
-    "message": "Hermes가 아직 연결되지 않았습니다. 여기서는 브라우저 음성 폴백을 사용할 수 없습니다. 측면 패널을 Hermes에 연결한 다음 음성 받아쓰기를 사용하세요.",
+    "message": "Qubit가 아직 연결되지 않았습니다. 여기서는 브라우저 음성 폴백을 사용할 수 없습니다. 측면 패널을 Qubit에 연결한 다음 음성 받아쓰기를 사용하세요.",
     "description": "Runtime interface message ui.qubit.is.not.connected.yet.browser.speech.fallback.is.unavaila.2a5064db"
   },
   "runtime_ui_qubit_is_not_currently_running_send_or_queue_the_message_instead": {
-    "message": "Hermes가 현재 실행 중이 아닙니다. 대신 메시지를 보내거나 대기열에 추가하세요.",
+    "message": "Qubit가 현재 실행 중이 아닙니다. 대신 메시지를 보내거나 대기열에 추가하세요.",
     "description": "Runtime interface message ui.qubit.is.not.currently.running.send.or.queue.the.message.instead"
   },
   "runtime_ui_qubit_is_thinking_brainstorming_contemplating_reasoning_proces_3e8d81c0": {
-    "message": "Hermes가 생각 중입니다. 브레인스토밍, 숙고, 추론, 처리, 분석, 성찰, 검토, 심의 및 구상 중",
+    "message": "Qubit가 생각 중입니다. 브레인스토밍, 숙고, 추론, 처리, 분석, 성찰, 검토, 심의 및 구상 중",
     "description": "Runtime interface message ui.qubit.is.thinking.brainstorming.contemplating.reasoning.proces.3e8d81c0"
   },
   "runtime_ui_qubit_is_working": {
-    "message": "Hermes가 작업 중…",
+    "message": "Qubit가 작업 중…",
     "description": "Runtime interface message ui.qubit.is.working"
   },
   "runtime_ui_qubit_message_composer": {
@@ -5916,7 +5916,7 @@
     "description": "Runtime interface message ui.qubit.refused.to.start.the.wake.listener"
   },
   "runtime_ui_qubit_returned_only_fallback_model_data_keeping_your_selected_128b9943": {
-    "message": "Hermes가 폴백 모델 데이터만 반환했습니다. 실제 카탈로그를 사용할 수 있을 때까지 선택한 모델을 유지합니다.",
+    "message": "Qubit가 폴백 모델 데이터만 반환했습니다. 실제 카탈로그를 사용할 수 있을 때까지 선택한 모델을 유지합니다.",
     "description": "Runtime interface message ui.qubit.returned.only.fallback.model.data.keeping.your.selected.128b9943"
   },
   "runtime_ui_qubit_session": {
@@ -5980,27 +5980,27 @@
     "description": "Runtime interface message ui.qubit.web.settings"
   },
   "runtime_ui_qubit_will_consume_it_if_the_current_turn_reaches_an_injection_0fb01647": {
-    "message": "현재 턴이 삽입 지점에 도달하면 Hermes가 이를 사용하고, 그렇지 않으면 초안이 여기로 반환됩니다.",
+    "message": "현재 턴이 삽입 지점에 도달하면 Qubit가 이를 사용하고, 그렇지 않으면 초안이 여기로 반환됩니다.",
     "description": "Runtime interface message ui.qubit.will.consume.it.if.the.current.turn.reaches.an.injection.0fb01647"
   },
   "runtime_ui_qubit_will_consume_the_queued_text_if_the_current_turn_reaches_bd527e1e": {
-    "message": "현재 턴이 삽입 지점에 도달하면 Hermes가 대기열의 텍스트를 사용합니다.",
+    "message": "현재 턴이 삽입 지점에 도달하면 Qubit가 대기열의 텍스트를 사용합니다.",
     "description": "Runtime interface message ui.qubit.will.consume.the.queued.text.if.the.current.turn.reaches.bd527e1e"
   },
   "runtime_ui_qubit_will_never_replace_or_switch_an_existing_conversation_wi_7e65804d": {
-    "message": "Hermes는 이 선택 없이 기존 대화를 대체하거나 전환하지 않습니다.",
+    "message": "Qubit는 이 선택 없이 기존 대화를 대체하거나 전환하지 않습니다.",
     "description": "Runtime interface message ui.qubit.will.never.replace.or.switch.an.existing.conversation.wi.7e65804d"
   },
   "runtime_ui_qubit_will_send_it_after_the_current_turn_finishes_or_stops": {
-    "message": "현재 턴이 끝나거나 중지된 후 Hermes가 전송합니다.",
+    "message": "현재 턴이 끝나거나 중지된 후 Qubit가 전송합니다.",
     "description": "Runtime interface message ui.qubit.will.send.it.after.the.current.turn.finishes.or.stops"
   },
   "runtime_ui_qubit_will_stop_before_changing_a_dirty_checkout": {
-    "message": "Hermes는 더티 체크아웃을 변경하기 전에 중지됩니다.",
+    "message": "Qubit는 더티 체크아웃을 변경하기 전에 중지됩니다.",
     "description": "Runtime interface message ui.qubit.will.stop.before.changing.a.dirty.checkout"
   },
   "runtime_ui_qubit_wrote_this_without_the_page": {
-    "message": "Hermes가 페이지 없이 작성했습니다. 이 연결에서 페이지 컨텍스트가 꺼져 있습니다. 대화를 포함하려면 사이드 패널에서 켜세요.",
+    "message": "Qubit가 페이지 없이 작성했습니다. 이 연결에서 페이지 컨텍스트가 꺼져 있습니다. 대화를 포함하려면 사이드 패널에서 켜세요.",
     "description": "Runtime interface message ui.qubit.wrote.this.without.the.page"
   },
   "runtime_ui_hide": {
@@ -6016,7 +6016,7 @@
     "description": "Runtime interface message ui.hide.the.circle.on.this.site"
   },
   "runtime_ui_hide_what_qubit_reads": {
-    "message": "Hermes가 읽는 내용 숨기기",
+    "message": "Qubit가 읽는 내용 숨기기",
     "description": "Runtime interface message ui.hide.what.qubit.reads"
   },
   "runtime_ui_high": {
@@ -6052,7 +6052,7 @@
     "description": "Runtime interface message ui.image.attached.from.clipboard"
   },
   "runtime_ui_image_pasted_into_qubit": {
-    "message": "Hermes에 이미지를 붙여넣었습니다",
+    "message": "Qubit에 이미지를 붙여넣었습니다",
     "description": "Runtime interface message ui.image.pasted.into.qubit"
   },
   "runtime_ui_image_ready_for_qubit_vision": {
@@ -6736,7 +6736,7 @@
     "description": "Runtime interface message ui.open.the.side.panel.configure.a.qubit.connection.then.open.ful.47648857"
   },
   "runtime_ui_open_the_signed_in_qubit_cloud_agent_in_the_active_tab_wait_fo_b7be52ec": {
-    "message": "활성 탭에서 로그인된 Qubit Cloud 에이전트를 열고 로드가 완료될 때까지 기다린 다음 Hermes에 연결을 선택합니다. API 토큰 또는 localhost 대체가 사용되지 않습니다.",
+    "message": "활성 탭에서 로그인된 Qubit Cloud 에이전트를 열고 로드가 완료될 때까지 기다린 다음 Qubit에 연결을 선택합니다. API 토큰 또는 localhost 대체가 사용되지 않습니다.",
     "description": "Runtime interface message ui.open.the.signed.in.qubit.cloud.agent.in.the.active.tab.wait.fo.b7be52ec"
   },
   "runtime_ui_opened_directly_in_full_view": {
@@ -6772,7 +6772,7 @@
     "description": "Runtime interface message ui.options"
   },
   "runtime_ui_or_tell_qubit_exactly_what_you_need": {
-    "message": "또는 Hermes에게 필요한 것이 무엇인지 정확하게 알려주십시오.",
+    "message": "또는 Qubit에게 필요한 것이 무엇인지 정확하게 알려주십시오.",
     "description": "Runtime interface message ui.or.tell.qubit.exactly.what.you.need"
   },
   "runtime_ui_origin": {
@@ -6956,7 +6956,7 @@
     "description": "Runtime interface message ui.profile.sync.unavailable"
   },
   "runtime_ui_profiles_sync_after_connecting_to_qubit": {
-    "message": "Hermes에 연결한 후 프로필이 동기화됩니다.",
+    "message": "Qubit에 연결한 후 프로필이 동기화됩니다.",
     "description": "Runtime interface message ui.profiles.sync.after.connecting.to.qubit"
   },
   "runtime_ui_prompt": {
@@ -7000,7 +7000,7 @@
     "description": "Runtime interface message ui.public.alpha.load.unpacked.local.or.remote.qubit.api.server.fu.f39d96e3"
   },
   "runtime_ui_public_flow_connect_to_qubit_creates_a_scoped_browser_token_wh_9184ad4d": {
-    "message": "공용 흐름: Hermes에 연결하면 API 서버가 페어링을 지원할 때 범위가 지정된 브라우저 토큰이 생성됩니다. 원격 호스트의 경우 API_SERVER_CORS_ORIGINS를 이 확장 원본으로 설정하고 강력한 API_SERVER_KEY 또는 범위가 지정된 토큰을 사용합니다.",
+    "message": "공용 흐름: Qubit에 연결하면 API 서버가 페어링을 지원할 때 범위가 지정된 브라우저 토큰이 생성됩니다. 원격 호스트의 경우 API_SERVER_CORS_ORIGINS를 이 확장 원본으로 설정하고 강력한 API_SERVER_KEY 또는 범위가 지정된 토큰을 사용합니다.",
     "description": "Runtime interface message ui.public.flow.connect.to.qubit.creates.a.scoped.browser.token.wh.9184ad4d"
   },
   "runtime_ui_public_setup": {
@@ -7456,7 +7456,7 @@
     "description": "Runtime interface message ui.security"
   },
   "runtime_ui_see_what_qubit_reads": {
-    "message": "Hermes가 읽는 내용 보기",
+    "message": "Qubit가 읽는 내용 보기",
     "description": "Runtime interface message ui.see.what.qubit.reads"
   },
   "runtime_ui_select": {
@@ -8048,7 +8048,7 @@
     "description": "Runtime interface message ui.this.managed.editor.is.not.mutated.until.insertion.is.verified"
   },
   "runtime_ui_this_model_was_discovered_from_a_custom_endpoint_but_qubit_mus_a557ebc1": {
-    "message": "이 모델은 사용자 지정 엔드포인트에서 검색되었지만 확장 프로그램이 요청을 라우팅하려면 Hermes가 연결된 런타임을 통해 해당 모델을 제공해야 합니다.",
+    "message": "이 모델은 사용자 지정 엔드포인트에서 검색되었지만 확장 프로그램이 요청을 라우팅하려면 Qubit가 연결된 런타임을 통해 해당 모델을 제공해야 합니다.",
     "description": "Runtime interface message ui.this.model.was.discovered.from.a.custom.endpoint.but.qubit.mus.a557ebc1"
   },
   "runtime_ui_this_request_is_bound_to_the_selected_browser_session": {
@@ -8316,7 +8316,7 @@
     "description": "Runtime interface message ui.voice.mode.on.device.speech.downloading.the.browser.language.pack.once"
   },
   "runtime_ui_voice_mode_unavailable_connect_qubit_for_stt_or_use_a_chromium_08a02bbb": {
-    "message": "음성 모드를 사용할 수 없습니다. STT를 사용하려면 Hermes에 연결하거나 브라우저 음성 폴백을 지원하는 Chromium 빌드를 사용하세요.",
+    "message": "음성 모드를 사용할 수 없습니다. STT를 사용하려면 Qubit에 연결하거나 브라우저 음성 폴백을 지원하는 Chromium 빌드를 사용하세요.",
     "description": "Runtime interface message ui.voice.mode.unavailable.connect.qubit.for.stt.or.use.a.chromium.08a02bbb"
   },
   "runtime_ui_voice_mode_unavailable_this_browser_does_not_expose_qubit_stt_fcc04044": {
@@ -8420,7 +8420,7 @@
     "description": "Runtime interface message ui.where.it.runs"
   },
   "runtime_ui_where_should_qubit_work": {
-    "message": "Hermes는 어디에서 작동하나요?",
+    "message": "Qubit는 어디에서 작동하나요?",
     "description": "Runtime interface message ui.where.should.qubit.work"
   },
   "runtime_ui_where_should_this_right_click_task_run": {
@@ -8564,7 +8564,7 @@
     "description": "Runtime interface message webapp.copy_command"
   },
   "runtime_webapp_dialog_body": {
-    "message": "게이트웨이는 켜져 있을 때 Qubit Web을 제공합니다. Hermes가 실행 중인 컴퓨터에서 다음 명령을 실행하세요.",
+    "message": "게이트웨이는 켜져 있을 때 Qubit Web을 제공합니다. Qubit가 실행 중인 컴퓨터에서 다음 명령을 실행하세요.",
     "description": "Runtime interface message webapp.dialog_body"
   },
   "runtime_webapp_dialog_title": {
@@ -8592,7 +8592,7 @@
     "description": "Runtime interface message webapp.hint_signed_in"
   },
   "runtime_webapp_keep_signed_in_hint": {
-    "message": "Qubit Browser Extension과 페어링되는 Hermes에서는 Qubit Web, 프로젝트, 봇 프로필에 자동으로 로그인되며 실행할 것이 없습니다. 그렇지 않으면 qubit webapp를 한 번 실행한 뒤 브라우저를 닫을 때까지 패널이 이 브라우저의 Qubit Web 로그인을 유지합니다. qubit webapp --sign-out으로 종료합니다.",
+    "message": "Qubit Browser Extension과 페어링되는 Qubit에서는 Qubit Web, 프로젝트, 봇 프로필에 자동으로 로그인되며 실행할 것이 없습니다. 그렇지 않으면 qubit webapp를 한 번 실행한 뒤 브라우저를 닫을 때까지 패널이 이 브라우저의 Qubit Web 로그인을 유지합니다. qubit webapp --sign-out으로 종료합니다.",
     "description": "Runtime interface message webapp.keep_signed_in_hint"
   },
   "runtime_webapp_keep_signed_in_label": {
