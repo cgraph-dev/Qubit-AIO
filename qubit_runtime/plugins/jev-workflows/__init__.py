@@ -1298,7 +1298,7 @@ def register(ctx: Any) -> None:
     ctx.register_command("jev", _jev_command, description="Jev status and switches",
                          args_hint="[routing|skills|notice|screen on|shadow|off [all]] [gate off|shadow] [decide_tools on|off] [vision off|shadow] [vision_cloud off|shadow]")
     rule = _RULE + (_RULE_ESCALATION if ((route.load_config().get("escalation") or {}).get("enabled")) else "")
-    ctx.register_system_prompt_section("jev", rule, max_chars=1400)
+    ctx.register_system_prompt_section("jev-workflows", rule, max_chars=1400)
     # The thirteen workflow skills ship INSIDE the plugin and resolve as
     # `jev:<name>` via skill_view. They are not copied into the skills dir and
     # not in the system prompt's <available_skills>: a plugin skill is loaded on
