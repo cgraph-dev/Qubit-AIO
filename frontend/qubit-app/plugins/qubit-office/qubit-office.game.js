@@ -192393,7 +192393,7 @@ create: function(game) {
 	* seam `office-app.ts::hostBasePath` uses. A deployment behind a subpath must
 	* frame `<base>/qubit-hud`, not `/qubit-hud`.
 	*/
-	function hostBasePath$1() {
+	function hostBasePath$2() {
 		if (typeof window === "undefined") return "";
 		const raw = window.__QUBIT_BASE_PATH__;
 		if (!raw) return "";
@@ -192408,13 +192408,13 @@ create: function(game) {
 	* An explicit empty string means "served at the root" and is honoured.
 	*/
 	function hudFrameSrc(base) {
-		const raw = base === void 0 ? hostBasePath$1() : base;
+		const raw = base === void 0 ? hostBasePath$2() : base;
 		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${HUD_PATH}`;
 	}
 	/** The dock's body: the framed HUD, with its refusals named. */
 	function createHudDock(args) {
 		const { React: R, hooks, base } = args;
-		const src = hudFrameSrc(base ?? hostBasePath$1());
+		const src = hudFrameSrc(base ?? hostBasePath$2());
 		return function HudDock() {
 			const [loaded, setLoaded] = hooks.useState(false);
 			const note = (id, text) => R.createElement("div", {
@@ -192480,14 +192480,14 @@ create: function(game) {
 	* into index.html (`window.__QUBIT_BASE_PATH__`) is the same seam the dashboard
 	* itself uses, so there is one source of truth for the base, not two.
 	*/
-	function hostBasePath() {
+	function hostBasePath$1() {
 		if (typeof window === "undefined") return "";
 		const raw = window.__QUBIT_BASE_PATH__;
 		if (!raw) return "";
 		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
 	}
 	function officeAppSrc(opts = {}) {
-		const url = officeAppUrl(opts.base ?? hostBasePath());
+		const url = officeAppUrl(opts.base ?? hostBasePath$1());
 		const query = new URLSearchParams();
 		if (opts.mock) query.set("mock", "1");
 		const suffix = query.toString();
@@ -192808,6 +192808,239 @@ create: function(game) {
 			}, children);
 		};
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/agents-panel.ts
+	/** The Office API prefix: the server serves the compat family under `/agent`. */
+	var API_PREFIX = "/agent";
+	/**
+	* The panel's route. Named after the resource it reads (`agents/panel`), so it
+	* sits under the office family the api-bridge already owns and cannot be
+	* confused with the general API.
+	*/
+	var AGENTS_PANEL_PATH = "/api/office/habblaud/agents/panel";
+	/** The full URL, rebased onto the host's base path when the SPA is served one. */
+	function agentsPanelUrl(base) {
+		const raw = base === void 0 ? hostBasePath() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${AGENTS_PANEL_PATH}`;
+	}
+	/** The dashboard's base path, from the host's injected global (may be absent). */
+	function hostBasePath() {
+		if (typeof window === "undefined") return "";
+		const raw = window.__QUBIT_BASE_PATH__;
+		if (!raw) return "";
+		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
+	}
+	/**
+	* The session token. The office document is served with its own copy; when it
+	* is the embedded app the parent has one and `win.parent` can be read
+	* (same origin). Never a query parameter — the server rejects those outright.
+	*/
+	function readToken(win) {
+		const w = win ?? (typeof window === "undefined" ? null : window);
+		if (!w) return "";
+		if (typeof w.__QUBIT_SESSION_TOKEN__ === "string" && w.__QUBIT_SESSION_TOKEN__) return w.__QUBIT_SESSION_TOKEN__;
+		try {
+			const parent = w.parent;
+			return parent && parent.__QUBIT_SESSION_TOKEN__ || "";
+		} catch {
+			return "";
+		}
+	}
+	/** A human label for a seat type. The raw value when it is not one we know. */
+	function seatTypeLabel(seatType) {
+		switch (seatType) {
+			case "ceo": return "CEO";
+			case "director_functional": return "Functional director";
+			case "director_portfolio": return "Portfolio director";
+			case "manager": return "Manager";
+			case "worker": return "Worker";
+			default: return seatType || "Unclassified seat";
+		}
+	}
+	/** The one-line summary a reader sees before the list. Counts only. */
+	function summaryLine(counts) {
+		if (!counts) return "";
+		const divs = counts.divisions;
+		const head = counts.headcount;
+		const rooms = counts.rooms;
+		const board = counts.boardroom_seats;
+		return `${head} seats · ${divs} divisions · ${rooms} rooms` + (board ? ` · ${board} in the boardroom` : "");
+	}
+	/**
+	* Grouping check: the buckets must account for every seat exactly once. A
+	* mismatch is NAMED, never rendered as a shorter list that looks complete.
+	*/
+	function groupingProblem(data) {
+		const rows = data.seats ?? [];
+		const counted = (data.divisions ?? []).reduce((n, g) => n + (g.seats?.length ?? 0), 0);
+		if (counted !== rows.length) return `the panel groups ${counted} seats but the route served ${rows.length}`;
+		const claimed = data.counts?.headcount;
+		if (typeof claimed === "number" && claimed !== rows.length) return `the route's headcount (${claimed}) disagrees with its seat list (${rows.length})`;
+		return "";
+	}
+	/**
+	* Fetch the panel. Throws nothing: a failure is returned as a named error so
+	* the component always has something true to say.
+	*/
+	async function fetchAgentPanel(opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		const url = agentsPanelUrl(opts.base);
+		const token = readToken(opts.win);
+		const headers = { Accept: "application/json" };
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		try {
+			const res = await f(url, {
+				headers,
+				credentials: "same-origin",
+				signal: opts.signal
+			});
+			if (res.status === 401) return {
+				kind: "error",
+				message: `The agents panel was refused (HTTP 401); the office session token was not accepted. Reload the page to refresh it.`
+			};
+			if (res.status === 404) return {
+				kind: "error",
+				message: `The agents panel route is not served here (HTTP 404: ${url}). This server does not expose the office roster.`
+			};
+			const body = await res.json().catch(() => null);
+			if (!body || typeof body !== "object") return {
+				kind: "error",
+				message: `The agents panel answered HTTP ${res.status} with no JSON body.`
+			};
+			if (body.ok !== true) return {
+				kind: "error",
+				message: body.detail || body.code ? `The agents panel could not be built: ${body.detail || body.code}` : `The agents panel answered not-ok (HTTP ${res.status}).`
+			};
+			const problem = groupingProblem(body);
+			if (problem) return {
+				kind: "error",
+				message: `The agents panel data is inconsistent: ${problem}.`
+			};
+			return {
+				kind: "ready",
+				data: body
+			};
+		} catch (err) {
+			return {
+				kind: "error",
+				message: `The agents panel could not be reached: ${err instanceof Error ? err.message : String(err)}`
+			};
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/AgentsPanel.tsx
+	/** One seat row: emoji, persona name, type, room, supervisor. */
+	function seatRow(R, seat, index) {
+		const meta = [seatTypeLabel(seat.seat_type)];
+		if (seat.room) meta.push(seat.room === "boardroom" ? "Boardroom" : seat.room);
+		if (seat.supervisor) meta.push(`reports to ${seat.supervisor}`);
+		return R.createElement("li", {
+			key: `${seat.slug}:${index}`,
+			className: "agents-panel__seat",
+			"data-testid": "agents-panel-seat",
+			"data-seat-slug": seat.slug,
+			"data-seat-type": seat.seat_type
+		}, [
+			R.createElement("span", {
+				key: "e",
+				className: "agents-panel__emoji",
+				"aria-hidden": "true"
+			}, seat.emoji || "•"),
+			R.createElement("span", {
+				key: "n",
+				className: "agents-panel__name"
+			}, seat.name),
+			R.createElement("span", {
+				key: "m",
+				className: "agents-panel__meta"
+			}, meta.join(" · "))
+		]);
+	}
+	/** One division: a heading with its REAL headcount, then its seats. */
+	function divisionGroup(R, division, open) {
+		const boardroom = division.slug === "";
+		const heading = `${division.label} \u2014 ${division.headcount} ` + (division.headcount === 1 ? "seat" : "seats");
+		return R.createElement("details", {
+			key: division.slug || "boardroom",
+			className: "agents-panel__division",
+			"data-testid": "agents-panel-division",
+			"data-division": division.slug,
+			"data-headcount": String(division.headcount),
+			open
+		}, [R.createElement("summary", {
+			key: "s",
+			className: "agents-panel__divisionHead"
+		}, [R.createElement("span", {
+			key: "l",
+			className: "agents-panel__divisionLabel"
+		}, heading), division.floor !== null && !boardroom ? R.createElement("span", {
+			key: "f",
+			className: "agents-panel__divisionMeta"
+		}, `Floor ${division.floor}${division.kind ? ` \u00b7 ${division.kind}` : ""}`) : R.createElement("span", {
+			key: "f",
+			className: "agents-panel__divisionMeta"
+		}, boardroom ? "Above every division" : division.kind)]), R.createElement("ul", {
+			key: "u",
+			className: "agents-panel__seats"
+		}, division.seats.map((seat, i) => seatRow(R, seat, i)))]);
+	}
+	function createAgentsPanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function AgentsPanel(props) {
+			const [state, setState] = useState({ kind: "loading" });
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				fetchAgentPanel({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then((next) => {
+					if (live) setState(next);
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [props.base]);
+			if (state.kind === "loading") return R.createElement("div", {
+				className: "agents-panel",
+				"data-testid": "agents-panel",
+				"data-state": "loading",
+				role: "status",
+				"aria-live": "polite"
+			}, "Loading the roster…");
+			if (state.kind === "error") return R.createElement("div", {
+				className: "agents-panel agents-panel__error",
+				"data-testid": "agents-panel",
+				"data-state": "error",
+				role: "alert"
+			}, state.message);
+			const { data } = state;
+			const counts = data.counts;
+			const groups = data.divisions ?? [];
+			const boardroom = groups.find((g) => g.slug === "");
+			const divisions = groups.filter((g) => g.slug !== "");
+			return R.createElement("div", {
+				className: "agents-panel",
+				"data-testid": "agents-panel",
+				"data-state": "ready",
+				"data-seats": String(counts?.headcount ?? 0),
+				"data-divisions": String(counts?.divisions ?? divisions.length)
+			}, [
+				R.createElement("div", {
+					key: "summary",
+					className: "agents-panel__summary",
+					"data-testid": "agents-panel-summary"
+				}, summaryLine(counts)),
+				boardroom ? divisionGroup(R, boardroom, false) : null,
+				...divisions.map((d) => divisionGroup(R, d, false)),
+				counts ? R.createElement("div", {
+					key: "types",
+					className: "agents-panel__types",
+					"data-testid": "agents-panel-types"
+				}, Object.entries(counts.seat_types).map(([type, n]) => `${n} ${seatTypeLabel(type).toLowerCase()}`).join(" · ")) : null
+			]);
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/office-api.ts
 	var ROUTES = [
 		{
@@ -192951,11 +193184,13 @@ create: function(game) {
 			const [failed, setFailed] = useState(null);
 			const [panelOpen, setPanelOpen] = useState(false);
 			const [hudOpen, setHudOpen] = useState(false);
+			const [agentsOpen, setAgentsOpen] = useState(false);
 			const HudDock = createHudDock({
 				React: R,
 				hooks,
 				base: props.base
 			});
+			const AgentsPanel = createAgentsPanel(R, hooks);
 			const frameRef = useRef(null);
 			const SeatModelPanel = createSeatModelPanel(R, hooks);
 			useEffect(() => {
@@ -193090,6 +193325,36 @@ create: function(game) {
 					}));
 				}
 			}
+			children.push(R.createElement("button", {
+				key: "agents-toggle",
+				type: "button",
+				className: "office-game__agentsToggle",
+				"data-testid": "office-game-agents-btn",
+				"aria-expanded": agentsOpen,
+				"aria-controls": "office-game-agents-dock",
+				onClick: () => setAgentsOpen(!agentsOpen)
+			}, agentsOpen ? "Hide agents" : "Agents"));
+			if (agentsOpen) children.push(R.createElement("div", {
+				key: "agents-dock",
+				id: "office-game-agents-dock",
+				className: "office-game__dock office-game__agentsDock office-game__panel",
+				"data-testid": "office-game-agents-dock",
+				role: "region",
+				"aria-label": "Office agents"
+			}, [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead"
+			}, [R.createElement("span", { key: "t" }, "Agents"), R.createElement("button", {
+				key: "x",
+				type: "button",
+				className: "office-game__btn",
+				"data-testid": "office-game-agents-close",
+				"aria-label": "Close agents",
+				onClick: () => setAgentsOpen(false)
+			}, "Close")]), R.createElement(AgentsPanel, {
+				key: "body",
+				base: props.base
+			})]));
 			children.push(R.createElement("button", {
 				key: "hud-toggle",
 				type: "button",

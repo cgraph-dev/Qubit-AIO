@@ -10,6 +10,7 @@ import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
 import { createSeatModelPanel } from "./SeatModelPanel";
+import { createAgentsPanel } from "./AgentsPanel";
 import {
   POLL_INTERVAL_MS, SNAPSHOT_ROUTE, STREAM_ROUTE,
   bindingSummary, bindingVerdict,
@@ -92,7 +93,15 @@ export function createOfficeApp(
     // panel that appears is the real HUD — its bundle, its client, its seven
     // GET tabs — and this page issues no request of its own.
     const [hudOpen, setHudOpen] = useState(false);
+    // The agents panel: the roster's seats, grouped by division. It is part of
+    // THIS document (the shell around the frame), because the embedded app has
+    // no Qubit hook and its bridge refuses every write — the panel reads the
+    // real route with the host session token, exactly as the seat-model panel
+    // does. See app/AgentsPanel.tsx for why that is the only mechanism that
+    // can cross the document boundary.
+    const [agentsOpen, setAgentsOpen] = useState(false);
     const HudDock = createHudDock({ React: R, hooks, base: props.base });
+    const AgentsPanel = createAgentsPanel(R, hooks);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // Built unconditionally (hooks must not be conditional) but only rendered
     // when a seat is chosen, so the default view is still just the game.
@@ -263,6 +272,39 @@ export function createOfficeApp(
           seatLabel: props.seatLabel,
         }));
       }
+    }
+
+    // THE AGENTS PANEL, OPENED FROM INSIDE THE OFFICE. Every seat the building
+    // plan places, grouped by division, from the roster on disk. It sits on the
+    // LEFT so it never covers the HUD dock or the HUD button on the right.
+    children.push(R.createElement("button", {
+      key: "agents-toggle",
+      type: "button",
+      className: "office-game__agentsToggle",
+      "data-testid": "office-game-agents-btn",
+      "aria-expanded": agentsOpen,
+      "aria-controls": "office-game-agents-dock",
+      onClick: () => setAgentsOpen(!agentsOpen),
+    }, agentsOpen ? "Hide agents" : "Agents"));
+    if (agentsOpen) {
+      children.push(R.createElement("div", {
+        key: "agents-dock",
+        id: "office-game-agents-dock",
+        className: "office-game__dock office-game__agentsDock office-game__panel",
+        "data-testid": "office-game-agents-dock",
+        role: "region",
+        "aria-label": "Office agents",
+      }, [
+        R.createElement("div", { key: "head", className: "office-game__dockHead" }, [
+          R.createElement("span", { key: "t" }, "Agents"),
+          R.createElement("button", {
+            key: "x", type: "button", className: "office-game__btn",
+            "data-testid": "office-game-agents-close", "aria-label": "Close agents",
+            onClick: () => setAgentsOpen(false),
+          }, "Close"),
+        ]),
+        R.createElement(AgentsPanel as never, { key: "body", base: props.base }),
+      ]));
     }
 
     // THE HUD, OPENED FROM INSIDE THE OFFICE. The page's own link to
