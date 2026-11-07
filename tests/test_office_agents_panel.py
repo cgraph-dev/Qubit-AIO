@@ -195,7 +195,10 @@ def test_the_panel_renders_every_seat_from_the_real_route():
     in 19 buckets with every persona name on screen.
 
     A probe defect (no toolchain, a compile error) is a FAILURE here, never a
-    skip: this is the assertion the panel exists to satisfy.
+    skip: this is the assertion the panel exists to satisfy. A missing
+    ``node_modules`` in a fresh worktree is MADE first — it is a checkout
+    artifact, not a missing capability — and the link is removed afterwards so
+    the tree is left exactly as found.
     """
     import os
     import subprocess
@@ -204,15 +207,26 @@ def test_the_panel_renders_every_seat_from_the_real_route():
 
     repo = Path(__file__).resolve().parent.parent
     web = repo / "frontend" / "qubit-web"
+    link = web / "node_modules"
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from _office_toolchain import node_path  # noqa: E402
 
-    if not node_path() or not (web / "node_modules" / "jsdom").is_dir():
-        pytest.fail("no node/jsdom toolchain: the panel's DOM proof cannot run")
-    run = subprocess.run(
-        [sys.executable, str(repo / "tests" / "_probe_agents_panel_dom.py")],
-        cwd=str(repo), text=True, capture_output=True, timeout=600,
-        env={**os.environ, "PYTHONPATH": str(repo)})
+    made_link = False
+    if not link.exists():
+        source = _node_modules_source(repo)
+        if source is not None:
+            link.symlink_to(source, target_is_directory=True)
+            made_link = True
+    try:
+        if not node_path() or not (web / "node_modules" / "jsdom").is_dir():
+            pytest.fail("no node/jsdom toolchain: the panel's DOM proof cannot run")
+        run = subprocess.run(
+            [sys.executable, str(repo / "tests" / "_probe_agents_panel_dom.py")],
+            cwd=str(repo), text=True, capture_output=True, timeout=600,
+            env={**os.environ, "PYTHONPATH": str(repo)})
+    finally:
+        if made_link and link.is_symlink():
+            link.unlink()
     assert run.returncode == 0, (
         f"the panel DOM check failed\nstdout:\n{run.stdout[-4000:]}\n"
         f"stderr:\n{run.stderr[-2000:]}")
@@ -222,3 +236,26 @@ def test_the_panel_renders_every_seat_from_the_real_route():
         f"the panel did not list every seat:\n{out[-3000:]}")
     assert "the tokenless request is refused (HTTP 401)" in out, (
         f"the probe did not exercise the session-token gate:\n{out[-2000:]}")
+
+
+def _node_modules_source(repo):
+    """A `node_modules` tree this checkout can borrow.
+
+    A fresh `git worktree` has no dependencies of its own, and the dashboard
+    package is not part of what this test proves. The two places the repo
+    already keeps a full tree are checked, in order; nothing is downloaded.
+    """
+    from pathlib import Path
+
+    candidates = [
+        Path("/home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules"),
+        repo.parent / "qubit-web" / "node_modules",
+        repo / "frontend" / "qubit-dist" / "node_modules",
+    ]
+    for candidate in candidates:
+        try:
+            if (candidate / "jsdom").is_dir() and (candidate / "vite").is_dir():
+                return candidate.resolve()
+        except OSError:
+            continue
+    return None
