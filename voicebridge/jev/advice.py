@@ -124,16 +124,19 @@ def advise(text: str, decided: Dict[str, Any], cfg: Any,
             out["reason"] = "not a candidate"
             return out
         # Imported lazily: a host without the jev package still routes turns.
-        from . import client as jev_client
+        from . import zen as zen_backend
 
-        ask = jev_client if client is None else client
+        ask = zen_backend if client is None else client
         out["asked"] = True
         question = question_for(text, decided)
         # The client takes state and questions separately; the state lives on
         # the question record so the verdict can quote what it was asked about.
-        result = ask.judge({"utterance": question["state"]["utterance"]},
-                           [question],
-                           cfg=cfg)
+        #
+        # Zen is the default door: it answers the same decision contract at
+        # cost 0 with no credential (see voicebridge/jev/zen.py). The OpenRouter
+        # alpha path in .client needs a paid key and is reached only when a
+        # caller passes that client explicitly.
+        result = ask.judge(question["state"]["utterance"], [question])
         if not dict(result or {}).get("ok"):
             # Typed refusal (JEV_KEY_ABSENT / JEV_TIMEOUT / ...): keep local.
             out["reason"] = str((result or {}).get("code")

@@ -53,7 +53,7 @@ class _Pick:
         self.escalate, self._ok, self._code = escalate, ok, code
         self.calls = 0
 
-    def judge(self, state, questions, cfg=None):
+    def judge(self, state, questions, **kw):
         self.calls += 1
         if not self._ok:
             return {"ok": False, "code": self._code}
