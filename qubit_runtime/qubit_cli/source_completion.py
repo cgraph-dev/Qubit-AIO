@@ -92,6 +92,8 @@ def _publish_pending_identity(root: Path) -> None:
     on the next launch, which writes the completed stamp once the tail is done."""
     from qubit_cli.source_stamp import write_source_stamp
 
+    if not (Path(root) / ".git").exists():
+        return
     try:
         write_source_stamp(root, adopted=True)
     except (OSError, ValueError) as exc:

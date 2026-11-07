@@ -342,6 +342,17 @@ def _prepare(request: dict, request_path: Path, result_path: Path) -> int:
     # The foreign-owned-venv refusal runs in the parent BEFORE the swap (update_cmd_commit
     # .preflight_refusal); the tail was armed there too, so this re-arm is an idempotent backstop.
     arm_completion(root)
+    # The checkout has moved: publish its identity now, identity-only (adoptedAt), so a gateway
+    # this update restarts -- or one a killed update's next launch replays -- reports the commit
+    # it actually runs. The completed stamp is still withheld until the tail finishes, so an owed
+    # build/maintenance step keeps retrying.
+    if (root / ".git").exists():
+        try:
+            from qubit_cli.source_stamp import write_source_stamp
+
+            write_source_stamp(root, adopted=True)
+        except (OSError, ValueError) as exc:
+            print(f"  ⚠ Could not publish the new commit's identity: {exc}", flush=True)
     from qubit_cli.gitlock import convert_treeless_checkout_first
     convert_treeless_checkout_first(root)
     with receipt.worker_context(update_id):

@@ -320,3 +320,37 @@ def test_both_completion_children_run_in_utf8_mode(tmp_path, monkeypatch):
     assert len(calls) == 2
     for command in calls:
         assert command[command.index("-I"):].count("utf8") == 1 and "-X" in command, command
+
+
+def test_prepare_publishes_the_new_identity_before_syncing_dependencies(tmp_path, monkeypatch):
+    """A killed update leaves a checkout whose identity still names the replaced commit.
+
+    The completion bootstrap is the first process in the new tree after the checkout moved.
+    It must publish the new commit's identity (identity-only, ``adopted=True``) before the
+    dependency sync: a gateway the next launch replays on an owed tree then reports the commit
+    it actually runs, and an owed tail is still retried because an adopted stamp never reads as
+    completed.
+    """
+    import pm
+    from pm import client, environments, receipt
+    from qubit_cli import gitlock, source_stamp, update_completion, venv_sync
+
+    events: list[tuple] = []
+    monkeypatch.setattr(source_stamp, "write_source_stamp",
+                        lambda root, adopted=False: events.append(("stamp", adopted)))
+    monkeypatch.setattr(gitlock, "convert_treeless_checkout_first", lambda root: None)
+    monkeypatch.setattr(venv_sync, "arm_completion", lambda root: events.append(("arm",)))
+    monkeypatch.setattr(venv_sync, "collect_superseded_generations", lambda root: None)
+    monkeypatch.setattr(client, "ensure_tools_for_sync", lambda: events.append(("tools",)))
+    monkeypatch.setattr(pm, "sync_venv", lambda **kwargs: events.append(("sync",)))
+    monkeypatch.setattr(receipt, "last_for_update", lambda *args, **kwargs: None)
+    monkeypatch.setattr(environments, "project_python", lambda root: "python")
+    monkeypatch.setattr(environments, "activation_environment", lambda root: {})
+    monkeypatch.setattr(subprocess, "call", lambda *args, **kwargs: 0)
+    monkeypatch.setattr(update_completion, "_settle_after_commit", lambda *args: 0)
+
+    (tmp_path / ".git").mkdir()
+    request = {"source": str(tmp_path), "receipt": {"update_id": "u1"}, "bytecode_cache": str(tmp_path / "bc")}
+    update_completion._prepare(request, tmp_path / "request.json", tmp_path / "result.json")
+
+    assert events[:3] == [("arm",), ("stamp", True), ("tools",)], events
