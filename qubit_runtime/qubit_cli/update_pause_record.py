@@ -568,10 +568,18 @@ def sync(token: dict) -> None:
 
 def _live_update_elsewhere() -> bool:
     """A live update other than the one this process belongs to. The update tree holding the
-    checkout lock (this process plus the partner whose marker it adopted) is not "elsewhere"."""
+    checkout lock (this process plus the partner whose marker it adopted) is not "elsewhere";
+    neither is a marker this very process published before it took the checkout lock — the
+    updater claims the marker first (``cmd_update``) and only the completion child takes the
+    checkout lock, so a retrying ``qubit update`` must still adopt a set an earlier one paused."""
     from qubit_cli import update_lock
     root = install_root()
-    return not update_lock.holds_checkout_lock(root) and update_lock.update_in_progress(root)
+    if update_lock.holds_checkout_lock(root):
+        return False
+    holder = update_lock.read_live_update(install_root=root)
+    if holder is not None:
+        return not (holder.pid == os.getpid() and not holder.held)
+    return update_lock.checkout_lock_held(root)
 
 
 def _claims(path: Path) -> list[Path]:

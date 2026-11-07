@@ -938,3 +938,35 @@ def test_an_autostashed_edit_vouches_only_for_its_own_bytes(tmp_path, monkeypatc
     _git(root, "checkout", "-q", "--", "a.py")
     _git(root, "stash", "pop", "-q")  # the user's own edit back, byte for byte
     assert pause_record.tree_is_whole(token, root) == (True, "")
+
+
+def test_a_retrying_update_adopts_the_set_it_paused_while_holding_only_the_marker(tmp_path, monkeypatch):
+    """``qubit update`` claims the MARKER first and only its completion child takes the checkout
+    lock. An adoption probe that required the checkout lock already held therefore saw the
+    updater as "another live update" and adopted nothing -- a retrying no-op update never
+    relaunched the gateways an earlier run paused."""
+    root = tmp_path / "checkout"
+    root.mkdir()
+    _git(root, "init", "-q")
+    (root / "a.py").write_text("v1\n", encoding="utf-8")
+    _git(root, "add", ".")
+    _git(root, "commit", "-qm", "v1")
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
+    monkeypatch.setattr(pause_record, "install_root", lambda: root)
+    pause_record.write(pause_record.stamp_tree({"resume_needed": True, "profiles": {"default": 4242}}),
+                       owner=pause_record.UNOWNED)
+    assert pause_record.orphans(), "premise: the dead owner's set is an orphan"
+
+    from qubit_cli import update_lock
+
+    lock = update_lock.UpdateLock()  # the marker only, exactly as `qubit update` claims it
+    assert lock.acquire(), "premise: nothing else holds this test home's marker"
+    try:
+        adopted, claims = pause_record.adopt_orphans()
+    finally:
+        lock.release()
+    try:
+        assert adopted is not None, "the updater's own live marker was mistaken for another update"
+        assert adopted["profiles"] == {"default": 4242}
+    finally:
+        pause_record.release_claims(claims)
