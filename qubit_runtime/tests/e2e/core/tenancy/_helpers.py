@@ -190,6 +190,14 @@ def write_tenant_home(t: Tenant, extra_config: dict[str, Any] | None = None,
         "model": {"provider": "custom", "base_url": t.srv.base_url, "default": t.model,
                   "key_env": PROVIDER_KEY_ENV, "context_length": 128000},
         "agent": {"api_max_retries": 1},
+        # The provider is a loopback fake, so a request should take milliseconds — but this suite
+        # runs one pytest process per file under the parallel E2E runner, and the OpenAI client's
+        # DEFAULT 5s CONNECT timeout aborted otherwise-correct cron turns when the host was
+        # oversubscribed (`qubit_bootstrap._happy_eyeballs_create_connection` raised
+        # TimeoutError("timed out") before the fake server's thread was scheduled). A generous
+        # explicit timeout removes that harness/environment race without touching isolation: a real
+        # hang still fails the turn, and `gateway.chat`/`await_cron` bound the wait.
+        "providers": {"custom": {"request_timeout_seconds": 120, "stale_timeout_seconds": 120}},
         "terminal": {"backend": "local", "cwd": str(t.workdir)},
         "memory": {"memory_enabled": True},
         "compression": {"enabled": False},
@@ -349,6 +357,52 @@ def cron_requests(t: Tenant) -> int:
     """Provider requests driven by the tenant's cron job (its prompt canary is in the user turn)."""
     assert t.srv is not None
     return sum(t.cron_prompt.split(":")[0] in json.dumps(r["body"]) for r in list(t.srv.requests))
+
+
+#: How long a tenancy scenario waits for a profile's cron store to fire ``fires`` times. The
+#: multiplexed ticker's interval is 60s, but after a cycle that overran it re-anchors the next tick
+#: a full interval out (cron/scheduler_provider.py, #114467); under the parallel E2E runner (one
+#: pytest process per file, many gateways competing) a single cycle has taken minutes. 300s is five
+#: intervals and still fails if a fire never happens. Override with ``HERMES_E2E_CRON_WAIT_S``.
+CRON_WAIT_S = float(os.environ.get("HERMES_E2E_CRON_WAIT_S", "300"))
+
+
+def _cron_store_state(t: Tenant) -> str:
+    """Bounded, non-raising snapshot of a tenant's cron store and ticker markers for a timeout."""
+    cron_dir = t.home / "cron"
+    try:
+        raw = json.loads((cron_dir / "jobs.json").read_text(encoding="utf-8"))
+        jobs = raw if isinstance(raw, list) else raw.get("jobs", [])
+        described = [
+            {k: j.get(k) for k in ("name", "state", "next_run_at", "last_run_at", "last_error")}
+            for j in jobs
+        ]
+    except Exception as exc:  # noqa: BLE001 - diagnostics must never mask the wait failure
+        described = f"<unreadable: {exc}>"
+    markers: dict[str, Any] = {}
+    for name in ("ticker_heartbeat", "ticker_last_success", "ticker_last_error"):
+        path = cron_dir / name
+        try:
+            markers[name] = path.read_text(encoding="utf-8-sig").strip()[:300]
+        except OSError:
+            markers[name] = None
+    return (f"{t.name}: provider cron requests={cron_requests(t)}, jobs={described}, "
+            f"markers={markers}")
+
+
+def await_cron(tenants: dict[str, Tenant], fires: int) -> None:
+    """Wait until EVERY profile's cron store has fired ``fires`` times.
+
+    A fire is two provider requests (the tool call and its follow-up), so this waits for
+    ``2 * fires``. On timeout it reports each tenant's store/ticker state, so a starved ticker is
+    distinguishable from a job that was never due.
+    """
+    what = f"cron fire #{fires} in every profile"
+    try:
+        poll(lambda: all(cron_requests(t) >= 2 * fires for t in tenants.values()), CRON_WAIT_S, what)
+    except AssertionError as exc:
+        detail = "\n  ".join(_cron_store_state(t) for t in tenants.values())
+        raise AssertionError(f"{exc}\n  {detail}") from None
 
 
 # Processes -----------------------------------------------------------------------------------------

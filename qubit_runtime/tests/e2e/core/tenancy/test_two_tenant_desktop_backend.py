@@ -95,8 +95,7 @@ def _start(root: Path, tenants: dict[str, H.Tenant], backends: list[H.ServeBacke
 
 
 def _await_cron(tenants: dict[str, H.Tenant], fires: int) -> None:
-    H.poll(lambda: all(H.cron_requests(t) >= 2 * fires for t in tenants.values()), 150,
-           f"cron fire #{fires} in every profile")
+    H.await_cron(tenants, fires)
 
 
 def test_desktop_backend_never_crosses_tenants(fleet, request: pytest.FixtureRequest) -> None:
