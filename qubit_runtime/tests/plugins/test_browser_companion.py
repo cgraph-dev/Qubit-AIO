@@ -43,8 +43,12 @@ def _bcp_turn(scope: str = "page") -> str:
 @pytest.fixture()
 def companion(monkeypatch, tmp_path):
     """Discover plugins with an isolated home, and return the loaded plugin module."""
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home"))
-    monkeypatch.setattr("qubit_cli.plugins.PluginManager.home_path", tmp_path / "home", raising=False)
+    home = tmp_path / "home"
+    home.mkdir(parents=True, exist_ok=True)
+    # A bundled standalone plugin is opt-in; enable it exactly as the operator does.
+    (home / "config.yaml").write_text("plugins:\n  enabled:\n    - browser-companion\n", encoding="utf-8")
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    monkeypatch.setattr("qubit_cli.plugins.PluginManager.home_path", home, raising=False)
     from qubit_cli.plugins import discover_plugins, get_plugin_manager
 
     discover_plugins(force=True)

@@ -729,12 +729,14 @@ class BrowserContextStore:
         now = self._now()
         with self._lock:
             self._prune_expired_locked(now)
+            removed = 0
             for context_id, record in list(self._records.items()):
                 if record.owner == owner:
                     record.payload = None
                     del self._records[context_id]
+                    removed += 1
             self._record_event_locked("browser.context.cleared", {}, owner, now)
-        return dict(_UNAVAILABLE)
+        return {"available": True, "cleared": removed}
 
     def _record_event_locked(self, name: str, data: dict[str, Any], owner: ContextOwner, now: float) -> None:
         self._events.append(_StoredEvent(name=name, data=deepcopy(data), owner=owner, ts=now))
