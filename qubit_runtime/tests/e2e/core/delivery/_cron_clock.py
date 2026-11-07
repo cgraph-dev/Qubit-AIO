@@ -34,6 +34,7 @@ import contextvars
 import datetime as _dt
 import json
 import os
+import re
 import signal
 import sqlite3
 import subprocess
@@ -64,6 +65,7 @@ HOLD_DEADLINE_SECONDS = 300.0
 
 _CURRENT_EXECUTION: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "c13_current_execution", default=None)
+_EXEC_IN_TEXT = re.compile(r"exec=([0-9a-f]{32})")
 
 
 def wait_until(predicate: Callable[[], Any], what: str, timeout: float = DEADLINE_SECONDS):
@@ -188,25 +190,30 @@ class FakeAgent:
 
     def __call__(self, job, *, execution_id=None, **_kwargs):
         name = job.get("name") or job["id"]
-        _CURRENT_EXECUTION.set(execution_id)
-        record = {
-            "event": "start", "exec": execution_id, "job_id": job["id"], "name": name,
-            "instant": job.get("_scheduled_instant"), "fired_at": self.clock.now_ts(),
-            "pid": os.getpid(),
-        }
-        _append_jsonl(self.control.runs, record)
-        behavior = self.control.behavior(name)
-        hold = self.control.hold_file(name)
-        if hold.exists():
-            _atomic_write(self.control.gates / f"{name}.entered", str(execution_id))
-            deadline = _real_time.monotonic() + HOLD_DEADLINE_SECONDS
-            while hold.exists() and _real_time.monotonic() < deadline:
-                _real_time.sleep(POLL_SECONDS)
-        _append_jsonl(self.control.runs, dict(record, event="end", ended_at=self.clock.now_ts()))
-        output = f"# {name}\n\nexec={execution_id}\n"
-        if behavior.get("agent") == "fail":
-            return False, output, "", f"simulated provider outage exec={execution_id}"
-        return True, output, f"report for {name} exec={execution_id}", None
+        token = _CURRENT_EXECUTION.set(execution_id)
+        try:
+            record = {
+                "event": "start", "exec": execution_id, "job_id": job["id"], "name": name,
+                "instant": job.get("_scheduled_instant"), "fired_at": self.clock.now_ts(),
+                "pid": os.getpid(),
+            }
+            _append_jsonl(self.control.runs, record)
+            behavior = self.control.behavior(name)
+            hold = self.control.hold_file(name)
+            if hold.exists():
+                _atomic_write(self.control.gates / f"{name}.entered", str(execution_id))
+                deadline = _real_time.monotonic() + HOLD_DEADLINE_SECONDS
+                while hold.exists() and _real_time.monotonic() < deadline:
+                    _real_time.sleep(POLL_SECONDS)
+            _append_jsonl(self.control.runs, dict(record, event="end", ended_at=self.clock.now_ts()))
+            output = f"# {name}\n\nexec={execution_id}\n"
+            if behavior.get("agent") == "fail":
+                return False, output, "", f"simulated provider outage exec={execution_id}"
+            return True, output, f"report for {name} exec={execution_id}", None
+        finally:
+            # Do not let a finished run's id leak into a later send on this thread (the gateway
+            # drain sends off-run context; the body carries the true ``exec=`` token).
+            _CURRENT_EXECUTION.reset(token)
 
 
 class FakeSink:
@@ -230,7 +237,12 @@ class FakeSink:
                        media_files=None, **_kwargs):
         import asyncio
 
-        execution_id = _CURRENT_EXECUTION.get()
+        # The fake agent stamps "exec=<id>" into the body, which is the authoritative attribution
+        # even when a gateway drain sends from its own thread (the run's contextvar is absent
+        # there, and on a reused worker thread it may still hold a previous run's id). Fall back
+        # to the contextvar only for a body that carries no token.
+        match = _EXEC_IN_TEXT.search(message or "")
+        execution_id = match.group(1) if match else _CURRENT_EXECUTION.get()
         behavior = self._behavior_for(message)
         if behavior.get("delivery") == "slow":
             await asyncio.sleep(0.25)
