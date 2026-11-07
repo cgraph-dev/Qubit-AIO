@@ -57,15 +57,28 @@ class MultiplexGateway:
 
     def start(self) -> None:
         # free_port() only reserves the port until its probe socket closes; under a parallel run another
-        # process can take it before the gateway binds (it then exits 78 "already in use"). Re-pick.
-        for _ in range(3):
+        # process can take it before the gateway binds. Re-pick a fresh port when that happens.
+        for _ in range(4):
             offset = self.log_path.stat().st_size if self.log_path.exists() else 0
             self._spawn()
-            H.poll(lambda: self.healthy() or self._died(), 120, "multiplexed gateway /health")
-            if self.proc.poll() is None or "already in use" not in self.tail(offset=offset):
-                break
-            self._rebind(H.free_port())
+            # A lost bind race does NOT exit the gateway: the api_server is PARKED and the process
+            # keeps serving cron, so `_died()` never fires and `/health` can never answer OUR port.
+            # Watch the log too, else the whole 120s budget is burned before `start` can rebind.
+            H.poll(lambda: self.healthy() or self._died() or self._port_conflict(offset),
+                   120, "multiplexed gateway /health")
+            if self._port_conflict(offset):
+                # Our port was taken (whether the gateway parked and stayed alive, or exited):
+                # this process can never serve the test's port, so reap it and rebind.
+                self.stop()
+                self._rebind(H.free_port())
+                continue
+            break
         assert self.proc.poll() is None, f"gateway exited rc={self.proc.returncode}: {self.tail()}"
+        assert self.healthy(), f"gateway never became healthy on port {self.port}: {self.tail()}"
+
+    def _port_conflict(self, offset: int) -> bool:
+        """The spawned gateway logged that our free_port() was taken before it could bind."""
+        return "already in use" in self.tail(offset=offset)
 
     def _spawn(self) -> None:
         log = open(self.log_path, "a", encoding="utf-8")  # noqa: SIM115 - handed to the child
@@ -170,8 +183,7 @@ def _turns(gw: MultiplexGateway, tenants: dict[str, H.Tenant], order: list[str])
 
 def _await_cron(tenants: dict[str, H.Tenant], at_least: int) -> None:
     # tool call + follow-up per fire; the ticker's first tick runs right after boot.
-    H.poll(lambda: all(H.cron_requests(t) >= 2 * at_least for t in tenants.values()), 150,
-           f"cron fire #{at_least} in every profile")
+    H.await_cron(tenants, at_least)
 
 
 def test_multiplexed_gateway_never_crosses_tenants(fleet, request: pytest.FixtureRequest) -> None:
