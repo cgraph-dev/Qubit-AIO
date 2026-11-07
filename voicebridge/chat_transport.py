@@ -5397,8 +5397,26 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     final_reply = ""
     identity_res = None
     try:
+        deadline = (time.monotonic() + float(timeout_s)) if timeout_s else None
         while True:
-            item = out.get()
+            try:
+                # A blocking get() is how a stalled provider used to hang the
+                # caller forever: timeout_s was accepted and never applied, so
+                # a worker that never put anything left the turn "active" with
+                # no events indefinitely. Poll with a bound and turn the miss
+                # into a terminal event the client can render.
+                item = out.get(timeout=0.25)
+            except queue.Empty:
+                if deadline is not None and time.monotonic() > deadline:
+                    _audit("stream_timeout", session=sid,
+                           timeout_s=float(timeout_s))
+                    yield {"event": "error", "code": "TURN_TIMEOUT",
+                           "detail": ("the provider produced no output within "
+                                      f"{float(timeout_s):.1f}s; the turn was "
+                                      "abandoned rather than left hanging"),
+                           "session_id": sid}
+                    return
+                continue
             if item is done:
                 break
             kind, value = item
@@ -5614,13 +5632,29 @@ def pty_session(cfg: Any, session_id: str = DEFAULT_SESSION, *,
     except Exception:
         scope = "global"
     key = f"{scope}\0{sid}"
+    if not reset:
+        # Fast path: a session already built needs no constructor and no lock
+        # held across one. Reading under the lock is cheap.
+        with _pty_lock:
+            existing = _pty_sessions.get(key)
+        if existing is not None:
+            return existing
+    # Build OUTSIDE the lock. AgentPtySession can take a long time (it touches
+    # the agent runtime), and holding a module-wide lock across that blocks
+    # EVERY other turn in the process — measured as turns sitting active with
+    # no events while the worker thread waited in futex_do_wait.
+    fresh = AgentPtySession(cfg, sid, model=model)
     with _pty_lock:
-        if reset or key not in _pty_sessions:
-            _pty_sessions[key] = AgentPtySession(cfg, sid, model=model)
-            if len(_pty_sessions) > _PTY_MAX:
-                oldest = next(iter(_pty_sessions))
-                _pty_sessions.pop(oldest, None)
-        return _pty_sessions[key]
+        # Double-check: another thread may have built this key while we did.
+        # Whoever installed first wins, so both callers share one session.
+        current = _pty_sessions.get(key)
+        if current is not None and not reset:
+            return current
+        _pty_sessions[key] = fresh
+        if len(_pty_sessions) > _PTY_MAX:
+            oldest = next(iter(_pty_sessions))
+            _pty_sessions.pop(oldest, None)
+        return fresh
 
 
 def pty_feed(cfg: Any, session_id: str, data_b64: str, *,
