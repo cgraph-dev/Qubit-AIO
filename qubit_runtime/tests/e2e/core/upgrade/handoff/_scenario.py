@@ -398,7 +398,8 @@ class HandoffProperties:
         try:
             yield run(self.column, root)
         finally:
-            shutil.rmtree(root, ignore_errors=True)
+            if not os.environ.get("HERMES_E2E_KEEP_ROOT"):
+                shutil.rmtree(root, ignore_errors=True)
 
     def _relaunched(self, o) -> None:
         with known_gate(X.RELAUNCH_GATES, o.column):
