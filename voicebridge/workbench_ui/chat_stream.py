@@ -65,7 +65,11 @@ from ..workbench_shim import UPSTREAM_PIN, e_stopped, str_param
 
 #: How long a finished run stays addressable for a late ``/chat/stream`` (upstream's
 #: replay window; the client's own reconnect ladder tops out at ~50 s).
+#: Retention for a finished run (replay window).
 _RETAIN_S = 120.0
+#: Absolute ceiling on a run's life. A turn that has produced nothing by now is
+#: never going to; expires it so it cannot answer 'active' forever.
+_HARD_MAX_S = 600.0
 #: How long a ``/chat/stream`` reader waits between liveness checks.
 _POLL_S = 0.25
 #: Hard cap on one SSE connection's lifetime. The client reconnects on close and
@@ -151,6 +155,14 @@ def _gc() -> None:
                 # return it forever, so every later /chat/start for that session
                 # is refused 409 SESSION_BUSY — a session permanently locked out
                 # by one crashed turn. Observed exactly that before this fix.
+                dead.append(sid)
+            elif not r.done and now - r.started_at > _HARD_MAX_S:
+                # ABSOLUTE BACKSTOP. The checks above miss two shapes: a run
+                # whose pump never started (thread is None) and one whose thread
+                # died before ident was assigned. Both write nothing and can
+                # never settle, so the run answered 'active' forever — no
+                # watchdog in the pump can fire, because there is no pump. Age
+                # is the only fact every run has, so expire on it.
                 dead.append(sid)
         for sid in dead:
             _RUNS.pop(sid, None)
@@ -328,7 +340,7 @@ def chat_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         args=(run, cfg, message),
         kwargs={"model": model,
                 "reasoning": reasoning if isinstance(reasoning, str) else None,
-                "timeout_s": None})
+                "timeout_s": float(os.environ.get("QU_WB_TURN_MAX_S", "180"))})
     run.thread.start()
     return 200, {
         "ok": True,
