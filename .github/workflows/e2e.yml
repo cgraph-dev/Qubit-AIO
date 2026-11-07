@@ -45,6 +45,15 @@ jobs:
           # release roots); the tag-based suites skip without them. The public
           # seed is a single root commit, so its N-1 cells skip with that evidence.
           fetch-depth: 2
+      - name: Deepen a checkout that has real history
+        run: |
+          # The release seed is a single root commit: leave it alone. A PR or
+          # fork checkout with an actual parent gets full history (and its tags)
+          # so the N-1 cells have a meaningful range.
+          if [ "$(git rev-parse --is-shallow-repository)" = "true" ] \
+             && git rev-parse --verify --quiet HEAD^ >/dev/null; then
+            git fetch --unshallow --tags --quiet origin
+          fi
       - name: Install E2E system tools
         run: |
           sudo apt-get update -qq
