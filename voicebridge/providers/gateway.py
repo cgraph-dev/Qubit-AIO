@@ -40,6 +40,41 @@ def _default_local_model(cfg: Any) -> str:
         return DEFAULT_ALIAS
 
 
+def _opencode_session_headers(provider: str, base_url: str,
+                              session_id: str, fallback_key: str,
+                              profile_id: str = "") -> dict:
+    """The extra affinity headers an OpenCode relay requires, else ``{}``.
+
+    Split out of :func:`_opencode_session_transport` so the streaming client
+    (which builds its own request headers) applies exactly the same contract as
+    the blocking transport. Without it a streamed OpenCode turn fails
+    ``MissingSessionID`` while the blocking one succeeds.
+    """
+    try:
+        from .. import qubit_runtime
+        qubit_runtime.ensure_path()
+        from agent.opencode_affinity import (
+            is_opencode_target, opencode_session_headers)
+        if not is_opencode_target(provider, base_url):
+            return {}
+        sid = (str(session_id or "").strip()
+               or str(fallback_key or "").strip()
+               or str(profile_id or "").strip())
+        if not sid:
+            import uuid as _uuid
+            sid = _uuid.uuid4().hex
+        return dict(opencode_session_headers(provider, base_url, sid) or {})
+    except Exception:  # noqa: BLE001 - dependency-free fallback below
+        low = f"{provider} {base_url}".lower()
+        if "opencode" not in low:
+            return {}
+        import uuid as _uuid
+        sid = (str(session_id or "").strip()
+               or str(fallback_key or "").strip()
+               or str(profile_id or "").strip() or _uuid.uuid4().hex)
+        return {"x-opencode-session": sid}
+
+
 def _opencode_session_transport(base: Any, provider: str, base_url: str,
                                 session_id: str, fallback_key: str,
                                 profile_id: str = "") -> Any:
@@ -52,30 +87,8 @@ def _opencode_session_transport(base: Any, provider: str, base_url: str,
     conversation: the resolved session id first, then the request idempotency
     key, then the profile id. Non-OpenCode targets are returned untouched.
     """
-    extra: dict = {}
-    try:
-        from .. import qubit_runtime
-        qubit_runtime.ensure_path()
-        from agent.opencode_affinity import (
-            is_opencode_target, opencode_session_headers)
-        if not is_opencode_target(provider, base_url):
-            return base
-        sid = (str(session_id or "").strip()
-               or str(fallback_key or "").strip()
-               or str(profile_id or "").strip())
-        if not sid:
-            import uuid as _uuid
-            sid = _uuid.uuid4().hex
-        extra = opencode_session_headers(provider, base_url, sid)
-    except Exception:  # noqa: BLE001 - dependency-free fallback below
-        low = f"{provider} {base_url}".lower()
-        if "opencode" not in low:
-            return base
-        import uuid as _uuid
-        sid = (str(session_id or "").strip()
-               or str(fallback_key or "").strip()
-               or str(profile_id or "").strip() or _uuid.uuid4().hex)
-        extra = {"x-opencode-session": sid}
+    extra = _opencode_session_headers(provider, base_url, session_id,
+                                      fallback_key, profile_id)
     if not extra:
         return base
 
@@ -583,7 +596,8 @@ def run(req: ProviderRequest, cfg: Any,
         reasoning: Optional[str] = None,
         num_ctx: Optional[int] = None,
         profile_id: str = "",
-        session_id: str = "") -> ProviderResult:
+        session_id: str = "",
+        _on_delta: Optional[Callable[[str], None]] = None) -> ProviderResult:
     """Run one request through the 8Q policy. Never raises; typed results.
 
     The local route uses one of the shared local adapters: ``chat`` (default,
@@ -860,7 +874,23 @@ def run(req: ProviderRequest, cfg: Any,
         # vision path (OpenAI content-block shape with the image data URL); it
         # is passed through verbatim so the image is never dropped. Text-only
         # callers pass ``None`` and the client builds its default body.
-        res = client.complete(req, eg.sanitized, est_cost=est, messages=messages)
+        #
+        # ``_on_delta`` selects the streaming client method (:func:`run_stream`
+        # is its only caller). Every policy gate, credential resolution, egress
+        # check, governor slot and typed failure below is identical either way:
+        # only the HTTP shape differs, so a streaming turn can never bypass
+        # or reinterpret the rules a blocking one obeys.
+        if _on_delta is not None:
+            res = client.complete_stream(req, eg.sanitized, est_cost=est,
+                                         messages=messages,
+                                         on_delta=_on_delta,
+                                         extra_headers=_opencode_session_headers(
+                                             provider, base_url, session_id,
+                                             str(req.idempotency_key or ""),
+                                             profile_id))
+        else:
+            res = client.complete(req, eg.sanitized, est_cost=est,
+                                  messages=messages)
     except Exception as exc:
         gov.release(provider, False)
         return ProviderResult(ok=False, code="PROVIDER_OUTAGE",
@@ -921,4 +951,29 @@ def run(req: ProviderRequest, cfg: Any,
             log_event("frontier.auto_fallback", reason=reason)
             return fb
         return res
+    return res
+
+
+def run_stream(req: ProviderRequest, cfg: Any,
+               on_delta: Callable[[str], None],
+               **kwargs: Any) -> ProviderResult:
+    """:func:`run` with real token streaming for an OpenAI-compatible provider.
+
+    ``on_delta`` is called once per SSE chunk with ONLY that chunk's
+    incremental content, as it arrived. The returned result is the same
+    ``ProviderResult`` :func:`run` would produce for the same request, plus
+    ``details["streaming"]``: ``True`` only when chunks really streamed.
+
+    Every gate — enablement, allowlist, catalog capability, egress, credential,
+    governor, budget, disclosure, dead-model — is performed by :func:`run`, so
+    this function cannot relax or reinterpret any of them.
+
+    Only the ``frontier``/``remote`` HTTP route streams here. A ``local``
+    route keeps its own adapter's ``on_sentence`` streaming path; this entry
+    point does not drive it (pass ``on_sentence`` to :func:`run` for that) and
+    simply returns the blocking local result with ``streaming`` unset.
+    """
+    res = run(req, cfg, _on_delta=on_delta, **kwargs)
+    if res.ok:
+        res.details.setdefault("streaming", False)
     return res
