@@ -52,13 +52,18 @@ def _path_lines(sb: I.Sandbox) -> dict[str, int]:
     return out
 
 
-def _login_shell_hermes(sb: I.Sandbox) -> str:
-    """Resolve `hermes` the way a new login shell would: PATH comes only from the rc files."""
+def _login_shell_command(sb: I.Sandbox) -> str:
+    """Resolve the canonical command the way a new login shell would.
+
+    PATH comes only from the rc files the installer edited. The fork publishes ``qubit``
+    (the ``hermes`` spelling is a read-old alias that is not installed), so probing
+    ``hermes`` would always fail on a correct install.
+    """
     env = dict(sb.env)
     env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
     bash = shutil.which("bash")
     assert bash is not None, "bash required for install.sh and the login-shell probe"
-    cp = H.run([bash, "-lic", "command -v hermes"], env=env, cwd=sb.root, writable=[sb.root], timeout=60)
+    cp = H.run([bash, "-lic", "command -v qubit"], env=env, cwd=sb.root, writable=[sb.root], timeout=60)
     assert cp.returncode == 0, H.describe(cp)
     return cp.stdout.strip()
 
@@ -126,7 +131,7 @@ def test_fresh_install_serves_head_and_runs_a_turn(installed, provider):
     for line in probe.stdout.split():
         imported = Path(line)
         assert imported.is_relative_to(workspace), f"installed PM environment imports code from outside the selected workspace: {line}"
-        assert imported.read_bytes() == (sb.checkout / imported.relative_to(workspace)).read_bytes(), (
+        assert imported.read_bytes() == (sb.runtime / imported.relative_to(workspace)).read_bytes(), (
             f"installed PM workspace does not match the checkout: {line}")
     for rel in ("config.yaml", ".env", "SOUL.md"):
         assert (sb.qubit_home / rel).is_file(), f"installer did not seed ~/.hermes/{rel}"
@@ -136,7 +141,7 @@ def test_fresh_install_serves_head_and_runs_a_turn(installed, provider):
     assert db["integrity"] == [("ok",)] and len(db["sessions"]) == 1 and db["n_messages"] >= 2, db
     # A new login shell finds the command through the rc files the installer edited.
     assert all(n >= 1 for n in _path_lines(sb).values()), f"PATH not wired into the shell rc: {_path_lines(sb)}"
-    assert _login_shell_hermes(sb) == sb.hermes, "a new shell does not resolve `hermes` to the installed launcher"
+    assert _login_shell_command(sb) == sb.qubit, "a new shell does not resolve `qubit` to the installed launcher"
 
 
 def test_rerunning_the_installer_is_idempotent(installed, provider):
@@ -158,4 +163,4 @@ def test_rerunning_the_installer_is_idempotent(installed, provider):
     db = I.db_state(sb.qubit_home / "state.db")
     assert set(before["db"]["sessions"]) < set(db["sessions"]), "earlier session lost or new turn not persisted"
     assert _path_lines(sb) == rc_before, f"PATH line appended again: {rc_before} -> {_path_lines(sb)}"
-    assert _login_shell_hermes(sb) == sb.hermes
+    assert _login_shell_command(sb) == sb.qubit

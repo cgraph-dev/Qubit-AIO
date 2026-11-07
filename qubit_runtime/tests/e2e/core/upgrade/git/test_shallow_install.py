@@ -32,10 +32,10 @@ ORPHAN = "orphan divergence"
 
 
 def _depth1(root) -> dict:
-    # A legacy depth-1 user checkout, seeded directly: Qubit's vendored bootstrap in N-1 does not
-    # make a shallow clone (every Qubit release is treeless), so the installer cannot produce one.
-    cm, w = G.start_world(root / "depth1", base=G.n1_base(), preclone=["--depth", "1"])
-    run = {"cm": cm, "w": w, "shape0": w.install_shape}
+    # A legacy depth-1 user checkout, seeded after the install: the shared install tail heals
+    # shallow history (fetch_full_commit_graph), so an installer run cannot leave one behind.
+    cm, w = G.start_world(root / "depth1", base=G.n1_base())
+    run = {"cm": cm, "w": w, "shape0": G.reshallow_checkout(w)}
     w.set_main(I.head_sha())
     run["mark1"] = w.srv.mark()
     run["cp1"], run["head1"] = w.update(), w.head()

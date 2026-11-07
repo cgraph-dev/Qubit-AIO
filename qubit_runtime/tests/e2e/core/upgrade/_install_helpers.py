@@ -36,6 +36,49 @@ def real_uv() -> str | None:
     return cand if cand and Path(cand).exists() else None
 
 
+def _link_or_copy(src: str, dst: str) -> str:
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+    return dst
+
+
+def _pinned_uv_entry() -> Path | None:
+    """The host store's already-provisioned pinned uv entry, or None.
+
+    A fresh sandbox would otherwise download the ~15 MB pinned artifact for every
+    scenario. Reusing the host's store slot keeps the suite offline and fast; only the
+    pinned ``uv-<version>-<target>`` directory is copied, never the live store itself.
+    """
+    try:
+        from pm.paths import store_root
+        from pm.store import current_target
+        lock = json.loads((H.WORKTREE / "pm" / "lock.json").read_text(encoding="utf-8"))
+        entry = store_root() / f"uv-{lock['packages']['uv']['version']}-{current_target()}"
+    except (ImportError, KeyError, OSError, RuntimeError, ValueError):
+        return None
+    return entry if (entry / "uv").is_file() else None
+
+
+def seed_pinned_uv(sb: "Sandbox") -> None:
+    """Stage the host's pinned uv artifact into the sandbox store slot the installer checks.
+
+    ``install.sh::ensure_uv`` uses ``$QUBIT_HOME/tools/uv-<version>-<target>/uv`` when it
+    already exists and otherwise downloads the sha256-pinned tarball. Seeding that exact
+    slot is the offline equivalent of a warm download cache: the installer still runs its
+    own pinned-artifact path, and this fixture never points at (or mutates) the live store.
+    """
+    src = _pinned_uv_entry()
+    if src is None:
+        return
+    dst = sb.qubit_home / "tools" / src.name
+    if (dst / "uv").exists():
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dst, dirs_exist_ok=True, copy_function=_link_or_copy)
+
+
 def git(*args: str, cwd: Path, check: bool = True, env: dict | None = None) -> str:
     cp = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True,
                         env=env or {**os.environ, "GIT_TERMINAL_PROMPT": "0"})
@@ -173,7 +216,9 @@ def new_sandbox(root: Path, origin: Path | None = None, *, pythonpath: Path | No
         "done\n"
         f'exec "{real_git}" "$@"\n', encoding="utf-8")
     shim.chmod(0o755)
-    return Sandbox(root=root, env=env)
+    sb = Sandbox(root=root, env=env)
+    seed_pinned_uv(sb)
+    return sb
 
 
 def run_installer(sb: Sandbox, *, timeout: float = 1800) -> subprocess.CompletedProcess:

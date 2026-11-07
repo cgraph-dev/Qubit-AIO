@@ -6,9 +6,12 @@ themselves (a full clone). Each shape is seeded as that clone of N-1 over smart 
 N-1's own ``scripts/install.sh``, then updated twice: to HEAD (N-1's updater hands off to HEAD's),
 and to one more upstream release (HEAD's updater end to end). The three installs run concurrently.
 
-Property: both updates land and the install runs, and the clone keeps its shape: a partial clone
-keeps its filter, and a full clone stays full. Converting a full clone to ``tree:0`` re-arms the
+Property: both updates land and the install runs, and the clone stays in its class: a partial clone
+stays partial and a full clone stays full. Converting a full clone to ``tree:0`` re-arms the
 ``pack-objects ... should_include_obj`` fetch crash for every later update (#124272, #124323).
+The one documented intra-partial conversion is ``tree:0`` -> ``blob:none``: a treeless checkout
+cannot lazy-fetch blobs, so ``qubit_cli/gitlock.py::convert_treeless_checkout`` upgrades it to
+``blob:none`` (still partial) on the first update.
 """
 
 from __future__ import annotations
@@ -51,6 +54,18 @@ def runs(tmp_path_factory):
             res["cm"].__exit__(None, None, None)
 
 
+def _same_class(shape: str, before: dict, after: dict) -> bool:
+    """A clone may stay as it was, or a treeless clone may become blobless (documented).
+
+    Full <-> partial is always a failure: it is the shape change that re-arms the fetch crash.
+    """
+    if before == after:
+        return True
+    return (shape == "tree0" and before["filter"] == "tree:0" and after["filter"] == "blob:none"
+            and before["shallow"] == after["shallow"] == "false"
+            and before["promisor"] == after["promisor"] == "true")
+
+
 @pytest.mark.parametrize("shape", list(SHAPES))
 def test_updates_land_and_the_clone_keeps_its_shape(runs, shape):
     run = runs[shape]
@@ -62,10 +77,11 @@ def test_updates_land_and_the_clone_keeps_its_shape(runs, shape):
         f"seeded the wrong clone shape for {shape}: {run['shape0']}"
     assert cp1.returncode == 0 and run["head1"] == I.head_sha(), f"N-1 -> HEAD update failed:\n{w.diag(cp1)}"
     assert G.TRACEBACK not in G.output(cp1), f"N-1 -> HEAD update printed a traceback:\n{w.diag(cp1)}"
-    assert run["shape1"] == run["shape0"], (
+    assert _same_class(shape, run["shape0"], run["shape1"]), (
         f"{'the full clone was converted to a partial clone' if shape == 'full' else 'the clone changed shape'} "
         f"by the N-1 -> HEAD update: {run['shape0']} -> {run['shape1']}\n{w.diag(cp1)}")
     assert cp2.returncode == 0 and run["head2"] == run["target2"], f"HEAD -> next update failed:\n{w.diag(cp2)}"
-    assert run["shape2"] == run["shape0"], f"the clone changed shape: {run['shape0']} -> {run['shape2']}\n{w.diag(cp2)}"
+    assert _same_class(shape, run["shape0"], run["shape2"]), (
+        f"the clone changed shape: {run['shape0']} -> {run['shape2']}\n{w.diag(cp2)}")
     version = run["version"]
     assert version.returncode == 0 and G.TRACEBACK not in G.output(version), w.diag(version)
