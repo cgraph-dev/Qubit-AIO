@@ -80,6 +80,25 @@ def complete_source_checkout(
         lock.release()
 
 
+def _publish_pending_identity(root: Path) -> None:
+    """Publish the new tree's identity before a gateway boots on it.
+
+    ``before_build`` restarts the gateways this update paused. A gateway stamps its code
+    identity into the runtime status record at boot by reading ``install-stamp.json``; the
+    completed stamp is written only after the builds and maintenance, so one restarted here
+    would otherwise announce the replaced commit, and the post-update fleet restart would drain
+    it as stale. ``adopted=True`` publishes identity only (``adoptedAt``), so this provisional
+    stamp is never mistaken for a finished tail: an owed build or maintenance step still retries
+    on the next launch, which writes the completed stamp once the tail is done."""
+    from qubit_cli.source_stamp import write_source_stamp
+
+    try:
+        write_source_stamp(root, adopted=True)
+    except (OSError, ValueError) as exc:
+        print(f"⚠ Could not publish the new commit's identity before restarting gateways: {exc}",
+              file=sys.stderr)
+
+
 def _complete_locked(
     root: Path,
     *,
@@ -122,6 +141,7 @@ def _complete_locked(
 
     step("launchers", lambda: publish_launchers(root))
     if before_build is not None:
+        _publish_pending_identity(root)
         before_build()  # never raises: a failed restart stays owed and is retried after the build
     step("build", lambda: build_update_products(root, desktop=desktop))
     if announce:

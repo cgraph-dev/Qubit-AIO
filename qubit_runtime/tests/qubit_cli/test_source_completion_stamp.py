@@ -233,3 +233,52 @@ def test_unsafe_sqlite_withholds_success_but_not_the_finished_tail(tmp_path, mon
     assert not complete_source_checkout(root, desktop=False, assume_yes=True, followups=owed)
     assert owed == []
     assert (root / "install-stamp.json").is_file()
+
+
+def test_gateway_restart_sees_the_new_commit_identity(tmp_path, monkeypatch):
+    """The gateways a source update paused restart before the builds.
+
+    A gateway stamps its code identity from ``install-stamp.json`` at boot, and that stamp is
+    only written after the tail; one restarted here would announce the replaced commit and the
+    post-update fleet restart would drain it as stale. The new identity must be published as
+    identity-only (``adoptedAt``) before ``before_build`` runs, and the completed stamp must
+    replace it when the tail finishes.
+    """
+    root = _repo(tmp_path)
+    _completion_dependencies(monkeypatch, lambda **_kwargs: True)
+    from qubit_cli.version_info import _git_version_info
+
+    head = _git_version_info(root).commit
+    seen: dict = {}
+
+    def before_build():
+        stamp = json.loads((root / "install-stamp.json").read_text(encoding="utf-8"))
+        seen["commit"] = stamp.get("commit")
+        seen["adopted"] = "adoptedAt" in stamp
+
+    assert complete_source_checkout(root, desktop=False, assume_yes=True, before_build=before_build)
+    assert seen == {"commit": head, "adopted": True}
+    final = json.loads((root / "install-stamp.json").read_text(encoding="utf-8"))
+    assert final["commit"] == head
+    assert "adoptedAt" not in final, "a finished tail publishes the completed stamp"
+
+
+def test_provisional_identity_keeps_a_failed_tail_owed(tmp_path, monkeypatch):
+    """Identity published for the restart must never read as a finished tail (#123376 sibling):
+    a build that fails afterwards still retries on the next launch."""
+    root = _repo(tmp_path)
+    _completion_dependencies(monkeypatch, lambda **_kwargs: True)
+
+    def broken_build(root, *, desktop):
+        raise RuntimeError("web UI build: npm exited 1")
+
+    monkeypatch.setattr("qubit_cli.source_build.build_update_products", broken_build)
+    owed: list = []
+    assert not complete_source_checkout(root, desktop=False, assume_yes=True,
+                                        before_build=lambda: None, followups=owed)
+    assert [step for step, _ in owed] == ["build"]
+    stamp = json.loads((root / "install-stamp.json").read_text(encoding="utf-8"))
+    assert "adoptedAt" in stamp
+    from qubit_cli.venv_sync import _tree_matches_completed_stamp
+
+    assert not _tree_matches_completed_stamp(root), "an owed tail must not be cleared as complete"
