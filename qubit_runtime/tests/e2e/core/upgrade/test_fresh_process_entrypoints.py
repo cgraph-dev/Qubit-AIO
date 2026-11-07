@@ -119,7 +119,10 @@ _POST_PURGE_IMPORTS = (
 # What the pre-hand-off ``qubit update`` process had imported before the pull.
 _OLD_UPDATER_GRAPH = ("qubit_cli.main", "qubit_cli.update_cmd", "qubit_cli.config", "qubit_cli.gateway")
 
-_READY_RE = re.compile(r"^HERMES_(?:BACKEND|DASHBOARD)_READY port=(\d+)", re.M)  # electron/backend-ready.ts
+# The product announces QUBIT_*; the Desktop parser still accepts the legacy
+# HERMES_* spelling (electron/backend-ready.ts). Match both so this stays a
+# readiness check, not a stale-brand check.
+_READY_RE = re.compile(r"^(?:QUBIT|HERMES)_(?:BACKEND|DASHBOARD)_READY port=(\d+)", re.M)
 
 
 # --------------------------------------------------------------------------- packaging model

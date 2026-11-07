@@ -710,8 +710,14 @@ include = [
   "pm.*",
   "connectors",
   "connectors.*",
-  "evals",
-  "evals.*",
+  # The offline bench/optimizer libraries the CLI imports (qubit_cli/evals_cmd.py,
+  # qubit_cli/optimize_cmd.py). The rest of `evals/` is developer probe scripts that
+  # run argparse/sys.argv at import time, so they are not shipped; they stay in the
+  # source tree. `evals` itself is a PEP 420 namespace here, not a package marker.
+  "evals.bench",
+  "evals.bench.*",
+  "evals.optimize",
+  "evals.optimize.*",
   "recipes",
   "recipes.*",
   "roles",

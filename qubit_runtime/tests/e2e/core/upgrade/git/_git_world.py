@@ -241,6 +241,31 @@ def _preclone(sb: I.Sandbox, args: list[str], env: dict[str, str]) -> None:
     assert cp.returncode == 0, f"pre-clone {args} failed: {cp.stderr[-2000:]}"
 
 
+def reshallow_checkout(w: "World", depth: int = 1) -> dict[str, str]:
+    """Replace an installed checkout's ``.git`` with a genuine depth-limited clone.
+
+    The shared install tail heals shallow history (``fetch_full_commit_graph``), so an
+    install cannot leave a stale depth-1 checkout behind. A legacy user checkout is
+    seeded after the install: same commit and working tree, but a real shallow boundary
+    and genuinely missing history. Returns the resulting clone shape.
+    """
+    seed = w.root / "depth-seed"
+    if seed.exists():
+        shutil.rmtree(seed)
+    cp = subprocess.run(
+        ["git", "clone", "-q", f"--depth={depth}", "--branch", "main", I.OFFICIAL_HTTPS, str(seed)],
+        capture_output=True, text=True, env=w.git_env(), timeout=900,
+    )
+    assert cp.returncode == 0, f"depth-{depth} seed clone failed: {cp.stderr[-2000:]}"
+    healed = w.root / "healed-git"
+    if healed.exists():
+        shutil.rmtree(healed)
+    shutil.move(str(w.checkout / ".git"), str(healed))
+    shutil.move(str(seed / ".git"), str(w.checkout / ".git"))
+    shutil.rmtree(seed)
+    return w.shape()
+
+
 @contextlib.contextmanager
 def world(root: Path, *, base: str, installer_ref: str | None = None,
           preclone: list[str] | None = None) -> Iterator[World]:
