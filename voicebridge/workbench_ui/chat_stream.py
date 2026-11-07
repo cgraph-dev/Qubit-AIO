@@ -399,8 +399,13 @@ def chat_stream_frames(stream_id: str, after_seq: int = 0) -> Iterator[str]:
                                               "window; reconnect with after_seq "
                                               "to resume")})
             return
+        # Wait for the pump to push. `run.changed` owns `run.lock`, and
+        # `snapshot()` acquires that same non-reentrant Lock — calling it here
+        # deadlocked the reader against itself on every turn: the stream sat on
+        # ': connected' forever while the pump kept pushing events nobody could
+        # read. Read the raw fields under the condition instead.
         with run.changed:
-            if not run.snapshot(cursor)[0] and not run.done:
+            if not run.done and run.seq <= cursor:
                 run.changed.wait(_POLL_S)
 
 
