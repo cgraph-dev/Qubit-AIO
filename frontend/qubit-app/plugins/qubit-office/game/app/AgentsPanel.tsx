@@ -81,6 +81,11 @@ function divisionGroup(
     key: division.slug || "boardroom",
     className: "agents-panel__division",
     "data-testid": "agents-panel-division",
+    // An id as well as the testid: the dock is a SCOPING ANCHOR, and CSS
+    // [id=...] is the one attribute selector that reliably compiles in every
+    // engine (the testid is unquoted, so `[data-testid=x]` is only safe until
+    // the value needs quoting).
+    id: `agents-panel-division-${division.slug || "boardroom"}`,
     "data-division": division.slug,
     "data-headcount": String(division.headcount),
     open,

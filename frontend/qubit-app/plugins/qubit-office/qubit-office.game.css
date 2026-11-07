@@ -504,12 +504,19 @@
   outline-offset: 2px;
 }
 
-/* A side sheet on the LEFT edge, mirroring the HUD dock on the right. */
-.office-game__agentsDock {
+/* A side sheet on the LEFT edge, mirroring the HUD dock on the right.
+   WHY `.office-game__dock.office-game__agentsDock` (specificity 0,2,0): the dock
+   element also carries `.office-game__panel`, whose `padding`/`border`/`radius`
+   rules come LATER in this file and would win over a single-class `.office-game
+   __agentsDock` — measured: the sheet collapsed to a 39px-tall bar. The HUD dock
+   escapes it because it sets no padding of its own. */
+.office-game__dock.office-game__agentsDock {
   right: auto;
   left: 0;
+  border: 0;
   border-right: var(--office-border);
-  border-left: 0;
+  border-radius: 0;
+  box-shadow: var(--office-shadow);
 }
 
 .agents-panel {

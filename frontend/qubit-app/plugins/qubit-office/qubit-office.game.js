@@ -192962,6 +192962,7 @@ create: function(game) {
 			key: division.slug || "boardroom",
 			className: "agents-panel__division",
 			"data-testid": "agents-panel-division",
+			id: `agents-panel-division-${division.slug || "boardroom"}`,
 			"data-division": division.slug,
 			"data-headcount": String(division.headcount),
 			open
