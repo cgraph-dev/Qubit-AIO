@@ -29,7 +29,9 @@ from websockets.sync.client import connect as ws_connect
 from tests.fakes.fake_llm_provider import FakeLLMServer, write_qubit_home
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-READY_RE = re.compile(r"HERMES_BACKEND_READY port=(\d+)")
+# ``qubit serve`` announces the canonical QUBIT_BACKEND_READY sentinel (the legacy HERMES_ spelling
+# is kept as a read-old fallback so this harness cannot be stranded by a partially renamed build).
+READY_RE = re.compile(r"(?:QUBIT|HERMES)_BACKEND_READY port=(\d+)")
 
 
 class RpcError(AssertionError):

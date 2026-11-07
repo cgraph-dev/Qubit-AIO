@@ -14,6 +14,7 @@ from __future__ import annotations
 import fcntl
 import os
 import re
+import shutil
 import signal
 import sqlite3
 import struct
@@ -34,6 +35,12 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 _SCROLLBAR = "│┃║▐▕█░▒▓"
 _WS = re.compile(r"\s+")
 _DIGITS = re.compile(r"\d")
+# The status bar's first cell once the startup session is live: "─ ready │ …".
+_TUI_STATUS_READY = re.compile(r"─ ready │")
+# A throwaway E2E home's auto-started gateway is a detached daemon. With the shipped 600 s default it
+# outlives the client long past the test (and the terminal suite asserts the PTY child's tree is gone
+# after /exit), so let it idle-exit promptly instead of hiding it from the assertion.
+_BASE_EXTRA_CONFIG = "gateway:\n  unmanaged_idle_exit_seconds: 2\n"
 
 _SESSION_LEADER = (
     "import fcntl, os, sys, termios\n"
@@ -99,6 +106,26 @@ def cmdline(pid: int) -> str:
         return "?"
 
 
+def _private_tui_dir(root: Path) -> Path:
+    """A private copy of the prebuilt Ink bundle for ``HERMES_TUI_DIR``.
+
+    A checkout launch of ``qubit --tui`` re-runs esbuild on ``ui-tui/dist/entry.js`` every time,
+    non-atomically, so a TUI started by another E2E worker while it rebuilds can read a half-written
+    bundle and die with a Node SyntaxError before the UI takes the terminal. The prebuilt-bundle path
+    runs the same file without rebuilding; a copy that ``node --check`` accepts is immune to
+    concurrent rebuilds of the shared one.
+    """
+    src = REPO_ROOT / "ui-tui" / "dist" / "entry.js"
+    dest = root / "tui" / "dist" / "entry.js"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(20):
+        shutil.copyfile(src, dest)
+        if subprocess.run(["node", "--check", str(dest)], capture_output=True, timeout=60).returncode == 0:
+            return dest.parent.parent
+        time.sleep(0.5)  # caught a rebuild mid-write; take another copy
+    raise AssertionError(f"{src} never parsed (a rebuild kept rewriting it?)")
+
+
 class PtyHermes:
     """One interactive ``hermes`` process on a PTY with an emulated screen."""
 
@@ -107,10 +134,11 @@ class PtyHermes:
         self.root = root
         self.home = root / "home"
         self.qubit_home = self.home / ".hermes"
+        self.tui = "--tui" in argv_tail
         operator = (_operator_home() / ".hermes").resolve()
         assert operator not in (self.qubit_home.resolve(), *self.qubit_home.resolve().parents), (
             f"sandbox {self.qubit_home} sits inside the operator's Hermes home")
-        write_qubit_home(self.qubit_home, llm.base_url, extra_config=extra_config)
+        write_qubit_home(self.qubit_home, llm.base_url, extra_config=_BASE_EXTRA_CONFIG + extra_config)
         self.llm = llm
         self.screen = Screen(rows, cols)
         self.raw = bytearray()
@@ -122,7 +150,15 @@ class PtyHermes:
             HOME=str(self.home), QUBIT_HOME=str(self.qubit_home), PYTHONPATH=str(REPO_ROOT),
             TMPDIR=str(root / "tmp"), TERM="xterm-256color", COLORTERM="truecolor",
             PYTHONUNBUFFERED="1", HERMES_STATE_DB_GUARD_BYPASS="1",
+            # The Ink renderer reads the upstream (never-renamed) HERMES_TUI_INLINE spelling; the
+            # alternate-screen view is what the VT emulator (and the transcript assertions) expect.
+            HERMES_TUI_INLINE="0",
         )
+        if self.tui and shutil.which("node"):
+            # A private prebuilt bundle: a checkout launch re-runs esbuild non-atomically and a
+            # concurrent E2E worker can read a half-written entry.js (see _private_tui_dir).
+            env["HERMES_TUI_DIR"] = str(_private_tui_dir(root))
+            env["HERMES_NODE"] = shutil.which("node") or "node"
         master, slave = os.openpty()
         self._set_winsize(master, rows, cols)
         self.master = master
@@ -192,10 +228,33 @@ class PtyHermes:
             raise AssertionError(f"{exc}\n--- screen ---\n{self.dump()}") from None
         assert self.proc.poll() is None, f"hermes exited ({self.proc.returncode}) waiting for {needle[:40]!r}\n{self.dump()}"
 
+    def _tui_ready(self) -> bool:
+        """The Ink status bar's first cell reads ``ready`` (the session is live and no turn runs)."""
+        return any(_TUI_STATUS_READY.search(line) for line in self.lines())
+
     def wait_quiet(self, idle: float = 1.0, timeout: float = 30.0) -> None:
-        """Wait for a settled frame: the screen has not changed for ``idle`` seconds, ignoring
-        digits (status-bar clocks such as elapsed/since-last-turn tick every second while idle;
-        a busy spinner or a still-streaming reply changes non-digit cells and keeps us waiting)."""
+        """Pace after a turn until the UI is idle.
+
+        The classic CLI has no continuous animation, so a byte-identical frame (ignoring status-bar
+        clock digits) is the strongest signal: a busy spinner or a still-streaming reply changes
+        non-digit cells and keeps us waiting.
+
+        The Ink TUI's startup hero is a deliberately continuous ghost animation, so no frame is ever
+        still (the tmux suite's ``tui_pty/_helpers.py`` replaced this same wait with a bounded pause).
+        Its synchronization is the status bar returning to ``ready`` once the persisted turn has
+        finished; a bounded pause then paces input without burning the timeout. Transcript
+        assertions are unaffected — they still read the settled screen after this returns."""
+        if self.tui:
+            try:
+                poll(lambda: self._dead() or self._tui_ready(), timeout=timeout,
+                     what="the TUI status bar to settle on ready", interval=0.1)
+            except AssertionError as exc:
+                with self._lock:
+                    tail = bytes(self.raw[-600:])
+                raise AssertionError(f"{exc}\n--- screen ---\n{self.dump()}\n--- last bytes ---\n{tail!r}") from None
+            time.sleep(min(max(idle, 0.2), 1.0))
+            return
+
         def frame() -> str:
             return _DIGITS.sub("#", "\n".join(self.lines()))
         state = {"frame": frame(), "since": time.monotonic()}
