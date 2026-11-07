@@ -16,6 +16,8 @@ These tests pin the due-scan grace gate:
   - re-triggered  -> due again (the Run button still works)
 """
 
+import json
+
 import pytest
 from datetime import datetime, timedelta, timezone
 
@@ -126,3 +128,54 @@ class TestOneShotGraceDueScan:
         due = get_due_jobs()
         # Recurring stale handling still executes once now (existing behavior).
         assert [d["id"] for d in due] == ["int"]
+
+
+class TestUpdateDispatchPause:
+    """A one-shot due while a gateway was drained for an update is skipped, not missed.
+
+    The drain can outlast ``ONESHOT_GRACE_SECONDS`` (an in-flight worker, a slow pull), and cron
+    dispatch is paused for its whole duration. The gateway records that window; the relaunched
+    gateway must fire the job once instead of retiring it.
+    """
+
+    def _window(self, cron_store, *, due_at, since, until):
+        path = cron_store / "cron" / ".dispatch-pause.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({"since": since.timestamp(), "until": until.timestamp()}),
+                        encoding="utf-8")
+        return path
+
+    def test_due_inside_an_update_pause_runs_once_and_clears_the_window(self, cron_store):
+        from cron import dispatch_pause
+
+        due_at = FIXED_NOW - timedelta(minutes=10)  # far beyond the 120s one-shot grace
+        save_jobs([_oneshot("paused", due_at)])
+        path = self._window(cron_store, due_at=due_at,
+                            since=due_at - timedelta(seconds=30), until=due_at + timedelta(seconds=60))
+
+        due = get_due_jobs()
+
+        assert [d["id"] for d in due] == ["paused"], "the update pause ate the one-shot"
+        assert [j["id"] for j in load_jobs()] == ["paused"]
+        assert not dispatch_pause.marker_path(cron_store / "cron").exists(), "the used window must not linger"
+
+    def test_a_run_outside_the_window_is_still_retired(self, cron_store):
+        due_at = FIXED_NOW - timedelta(hours=3)
+        save_jobs([_oneshot("ancient", due_at)])
+        # A pause that ended hours before this job came due covers nothing.
+        self._window(cron_store, due_at=due_at,
+                     since=due_at - timedelta(hours=1), until=due_at - timedelta(minutes=30))
+
+        assert get_due_jobs() == []
+        assert load_jobs() == [], "a job outside the pause must keep the will-never-fire contract"
+
+    def test_the_window_binds_its_end_and_never_covers_hours_later(self, cron_store):
+        from cron import dispatch_pause
+
+        cron_dir = cron_store / "cron"
+        dispatch_pause.note(cron_dir, now=1000.0)
+        since, until = dispatch_pause.window(cron_dir)
+        assert since == 1000.0
+        assert until <= 1000.0 + dispatch_pause.MAX_WINDOW_SECONDS
+        assert dispatch_pause.covers(cron_dir, 1100.0)
+        assert not dispatch_pause.covers(cron_dir, until + 1)

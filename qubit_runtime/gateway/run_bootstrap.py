@@ -349,6 +349,14 @@ async def _start_gateway_start_control_socket(runner):
                 _drain = float(_get_restart_drain_timeout())
             except Exception:
                 _drain = 30.0
+            # Dispatch stops while we drain (the ticker's can_dispatch gate). Record the window so
+            # the gateway relaunched on the new code runs a one-shot that came due meanwhile instead
+            # of retiring it as missed (a drain can outlast the one-shot grace window).
+            try:
+                from cron.dispatch_pause import note_for_gateway
+                note_for_gateway(runner.config)
+            except Exception:  # health: allow BLE001 -- an advisory marker must not refuse the pause
+                logger.debug("Could not record the update cron dispatch window", exc_info=True)
             accepted_box: list[bool] = []
             _done = threading.Event()
 

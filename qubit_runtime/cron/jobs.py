@@ -2863,6 +2863,9 @@ class _DueScan:
     now: datetime
     needs_save: bool = False
     removed: set[str] = field(default_factory=set)
+    # A one-shot was due inside a gateway update's dispatch pause: the save below must clear that
+    # window once this scan has run it, so a later outage is not covered by the same pause.
+    used_dispatch_pause: bool = False
     # Miss/catch-up metrics, emitted once the save that persists the scan's repairs lands: an
     # unwritable store re-finds the same miss every tick, so counting before the save over-counts.
     on_saved: list[Callable[[], None]] = field(default_factory=list)
@@ -3131,6 +3134,14 @@ def _retire_expired_oneshot(d: _DueJob) -> bool:
     # Due during an outage of its store: it was skipped, not missed; fire it once on recovery.
     if store_health.outage_covers(_current_cron_store().cron_dir, d.next_run_dt.timestamp(), ONESHOT_GRACE_SECONDS):
         return False
+    # Due inside the window a gateway was paused for an update: cron dispatch was held for the
+    # drain (which can outlast this grace), so the job was skipped, not missed. The relaunched
+    # gateway fires it once; the scan clears the window afterwards.
+    from cron.dispatch_pause import covers as dispatch_pause_covers
+
+    if dispatch_pause_covers(_current_cron_store().cron_dir, d.next_run_dt.timestamp()):
+        d.scan.used_dispatch_pause = True
+        return False
     claim = d.job.get("run_claim")
     # An outage-covered claim that never reached its fire claim never started: it stays covered.
     if isinstance(claim, dict) and claim.get("outage") and not d.job.get("fire_claim"):
@@ -3341,6 +3352,10 @@ def _get_due_jobs_locked() -> list[dict[str, Any]]:
             return due
     # Only now is a skipped one-shot claimed or durably due on disk: normal grace applies again.
     store_health.end_recovery_window(_current_cron_store().cron_dir)
+    if scan.used_dispatch_pause:
+        from cron.dispatch_pause import clear as clear_dispatch_pause
+
+        clear_dispatch_pause(_current_cron_store().cron_dir)
     for emit in scan.on_saved:
         emit()
     return due
