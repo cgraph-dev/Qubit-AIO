@@ -240,6 +240,7 @@ jobs:
         # The tag is bound to pyproject/__version__ only on a real v* tag.
         run: |
           set -o pipefail
+          mkdir -p dist
           args=(--build --install --reproduce --unsigned-ok --json
                 --out dist/release)
           case "${GITHUB_REF_NAME:-}" in
@@ -256,6 +257,8 @@ jobs:
           import pathlib
 
           path = pathlib.Path("dist/release-report.json")
+          if not path.is_file():
+              path = pathlib.Path("dist/release/release-report.json")
           if not path.is_file():
               print("no release report produced")
               raise SystemExit(1)
