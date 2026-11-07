@@ -346,7 +346,9 @@ def _prepare(request: dict, request_path: Path, result_path: Path) -> int:
     # this update restarts -- or one a killed update's next launch replays -- reports the commit
     # it actually runs. The completed stamp is still withheld until the tail finishes, so an owed
     # build/maintenance step keeps retrying.
-    if (root / ".git").exists():
+    from qubit_cli.update_cmd_common import checkout_root
+
+    if (checkout_root(root) / ".git").exists():
         try:
             from qubit_cli.source_stamp import write_source_stamp
 

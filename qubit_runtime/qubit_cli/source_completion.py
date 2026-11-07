@@ -91,8 +91,9 @@ def _publish_pending_identity(root: Path) -> None:
     stamp is never mistaken for a finished tail: an owed build or maintenance step still retries
     on the next launch, which writes the completed stamp once the tail is done."""
     from qubit_cli.source_stamp import write_source_stamp
+    from qubit_cli.update_cmd_common import checkout_root
 
-    if not (Path(root) / ".git").exists():
+    if not (checkout_root(root) / ".git").exists():
         return
     try:
         write_source_stamp(root, adopted=True)
