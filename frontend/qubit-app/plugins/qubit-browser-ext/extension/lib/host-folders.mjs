@@ -55,7 +55,7 @@ function trimTrailing(path) {
   return value.replace(/[\\/]+$/, '') || value.slice(0, 1);
 }
 
-/** `/home/ana/code` -> [{label:'/', path:'/'}, {label:'home', path:'/home'}, …]; a drive or share is the root. */
+/** `~/code` -> [{label:'/', path:'/'}, {label:'home', path:'/home'}, …]; a drive or share is the root. */
 export function breadcrumbs(path = '') {
   const value = clean(path);
   if (!value) return [];

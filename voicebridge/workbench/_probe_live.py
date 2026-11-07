@@ -6,8 +6,8 @@ Prints real numbers from the live home (no fixture, no mock):
   * the shape of each adapter's refusal when handed bad input
 
 Run:
-  PYTHONPATH=/home/trick/Projects/Repos/Qubit/qubit_runtime \
-    /home/trick/Projects/Repos/Qubit/.venv/bin/python \
+  PYTHONPATH=$QUBIT_REPO/qubit_runtime \
+    $QUBIT_REPO/.venv/bin/python \
     voicebridge/workbench/_probe_live.py
 """
 from __future__ import annotations

@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Nyt projekt",
   "projects.create.name": "Projektnavn",
   "projects.create.path": "Mappe på gateway-værten",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Denne sti ligger på maskinen, der kører Qubit ({host}), ikke på denne computer. Gennemse for at finde den, eller skriv stien.",
   "projects.create.the_gateway": "gatewayen",
   "projects.create.submit": "Opret projekt",

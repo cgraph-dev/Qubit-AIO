@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "مشروع جديد",
   "projects.create.name": "اسم المشروع",
   "projects.create.path": "المجلد على مضيف البوابة",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "هذا المسار على الجهاز الذي يشغّل Qubit ({host}) وليس على هذا الكمبيوتر. تصفّح للوصول إليه أو اكتب المسار.",
   "projects.create.the_gateway": "البوابة",
   "projects.create.submit": "إنشاء المشروع",

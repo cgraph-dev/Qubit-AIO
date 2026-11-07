@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Nieuw project",
   "projects.create.name": "Projectnaam",
   "projects.create.path": "Map op de gateway-host",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Dit pad staat op de machine waarop Qubit draait ({host}), niet op deze computer. Blader ernaartoe of typ het pad.",
   "projects.create.the_gateway": "de gateway",
   "projects.create.submit": "Project maken",

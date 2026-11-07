@@ -1909,7 +1909,7 @@ export default Object.freeze({
   "projects.create.title": "新建项目",
   "projects.create.name": "项目名称",
   "projects.create.path": "网关主机上的文件夹",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "此路径位于运行 Qubit 的机器（{host}）上，而不在这台电脑上。请浏览查找或输入路径。",
   "projects.create.the_gateway": "网关",
   "projects.create.submit": "创建项目",

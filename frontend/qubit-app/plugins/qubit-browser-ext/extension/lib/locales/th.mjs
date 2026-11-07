@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "โปรเจกต์ใหม่",
   "projects.create.name": "ชื่อโปรเจกต์",
   "projects.create.path": "โฟลเดอร์บนโฮสต์เกตเวย์",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "พาธนี้อยู่บนเครื่องที่รัน Qubit ({host}) ไม่ใช่บนคอมพิวเตอร์เครื่องนี้ เรียกดูเพื่อหา หรือพิมพ์พาธ",
   "projects.create.the_gateway": "เกตเวย์",
   "projects.create.submit": "สร้างโปรเจกต์",

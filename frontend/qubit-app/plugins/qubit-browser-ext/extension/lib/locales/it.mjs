@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Nuovo progetto",
   "projects.create.name": "Nome del progetto",
   "projects.create.path": "Cartella sull'host del gateway",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Questo percorso si trova sulla macchina su cui gira Qubit ({host}), non su questo computer. Sfoglialo o scrivi il percorso.",
   "projects.create.the_gateway": "il gateway",
   "projects.create.submit": "Crea progetto",

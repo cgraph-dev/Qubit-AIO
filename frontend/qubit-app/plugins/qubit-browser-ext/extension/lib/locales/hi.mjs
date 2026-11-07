@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "नया प्रोजेक्ट",
   "projects.create.name": "प्रोजेक्ट का नाम",
   "projects.create.path": "गेटवे होस्ट पर फ़ोल्डर",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "यह पथ उस मशीन पर है जिस पर Qubit चल रहा है ({host}), इस कंप्यूटर पर नहीं। इसे ब्राउज़ करें या पथ लिखें।",
   "projects.create.the_gateway": "गेटवे",
   "projects.create.submit": "प्रोजेक्ट बनाएँ",

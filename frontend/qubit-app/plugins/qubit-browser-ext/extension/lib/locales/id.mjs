@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Proyek baru",
   "projects.create.name": "Nama proyek",
   "projects.create.path": "Folder di host gateway",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Jalur ini ada di mesin yang menjalankan Qubit ({host}), bukan di komputer ini. Telusuri atau ketik jalurnya.",
   "projects.create.the_gateway": "gateway",
   "projects.create.submit": "Buat proyek",

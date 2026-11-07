@@ -86,7 +86,7 @@ frontend/qubit-dist/
 # scripts/route_e2e_audit.py CONSUMES parity_inventory.json and requires it to
 # exist, so regenerate before running it (see
 # docs/generated/ parity notes in AGENTS.md / the skill):
-#   QUBIT_PARITY_REF_HOME=/home/example/upstream .venv/bin/python scripts/parity_inventory.py
+#   QUBIT_PARITY_REF_HOME=$HOME/upstream .venv/bin/python scripts/parity_inventory.py
 docs/generated/
 
 # Runtime state artifacts that must never be committed (created under CWD by

@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Yeni proje",
   "projects.create.name": "Proje adı",
   "projects.create.path": "Ağ geçidi ana makinesindeki klasör",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Bu yol Qubit’in çalıştığı makinede ({host}), bu bilgisayarda değil. Göz atarak bul ya da yolu yaz.",
   "projects.create.the_gateway": "ağ geçidi",
   "projects.create.submit": "Proje oluştur",

@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Новий проєкт",
   "projects.create.name": "Назва проєкту",
   "projects.create.path": "Тека на хості шлюзу",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Цей шлях розташований на комп’ютері, де працює Qubit ({host}), а не на цьому комп’ютері. Знайдіть його в огляді або введіть шлях.",
   "projects.create.the_gateway": "шлюз",
   "projects.create.submit": "Створити проєкт",

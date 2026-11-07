@@ -18,7 +18,7 @@ This machine runs two Qubit homes:
 | Home | What uses it |
 |---|---|
 | `~/.qubit` | interactive CLI, the `qubit` command you type |
-| `/home/trick/.local/state/qubit-voicebridge/runtime` | **the gateway daemon** (see `QUBIT_HOME` in `systemctl --user show qubit-gateway.service`) |
+| `$HOME/.local/state/qubit-voicebridge/runtime` | **the gateway daemon** (see `QUBIT_HOME` in `systemctl --user show qubit-gateway.service`) |
 
 Config edits must go to the **gateway's** home or the daemon never sees them.
 `qubit config set` here is the *voice* config command, not the agent's; use
@@ -43,7 +43,7 @@ Secrets live in the gateway home's `.env` (mode 0600): `API_SERVER_KEY`,
 Source folder (already ported and rebranded, 474 files):
 
 ```
-/home/trick/Projects/Repos/Qubit/frontend/qubit-app/plugins/qubit-browser-ext/extension
+$HOME/Projects/Repos/Qubit/frontend/qubit-app/plugins/qubit-browser-ext/extension
 ```
 
 1. `chrome://extensions` → enable **Developer mode**.
@@ -59,7 +59,7 @@ load time — that is why CORS is a wildcard rather than a pinned origin.
 ## Verifying without a browser
 
 ```bash
-GH=/home/trick/.local/state/qubit-voicebridge/runtime
+GH=$HOME/.local/state/qubit-voicebridge/runtime
 KEY=$(grep '^API_SERVER_KEY=' $GH/.env | cut -d= -f2)
 curl -s http://127.0.0.1:8642/v1/models -H "Authorization: Bearer $KEY"
 curl -s http://127.0.0.1:8642/api/plugins/browser-companion/status -H "Authorization: Bearer $KEY"

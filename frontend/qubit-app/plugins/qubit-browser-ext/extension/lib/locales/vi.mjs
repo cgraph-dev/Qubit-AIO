@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Dự án mới",
   "projects.create.name": "Tên dự án",
   "projects.create.path": "Thư mục trên máy chủ gateway",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Đường dẫn này nằm trên máy đang chạy Qubit ({host}), không phải trên máy tính này. Hãy duyệt để tìm hoặc nhập đường dẫn.",
   "projects.create.the_gateway": "gateway",
   "projects.create.submit": "Tạo dự án",

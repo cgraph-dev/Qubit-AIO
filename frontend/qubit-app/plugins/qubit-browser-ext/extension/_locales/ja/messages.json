@@ -2936,7 +2936,7 @@
     "description": "Runtime interface message projects.create.path_hint"
   },
   "runtime_projects_create_path_placeholder": {
-    "message": "/home/you/code/my-project",
+    "message": "~/code/my-project",
     "description": "Runtime interface message projects.create.path_placeholder"
   },
   "runtime_projects_create_primary": {

@@ -12,7 +12,7 @@ licence, and local changes.
 | Repository | `github.com/msitarzewski/agency-agents` |
 | Commit pin | `b859c515d813efcfc4755d3471dd9e7686c7706d` |
 | Licence | MIT — *Copyright (c) 2025 AgentLand Contributors* |
-| Source tree | `/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch/repo-survey/agency-agents/` (read-only copy) |
+| Source tree | `$HOME/.local/state/qubit-voicebridge/runtime/cache/scratch/repo-survey/agency-agents/` (read-only copy) |
 | Ported into | `qubit_runtime/skills/agency/<division>/<persona>/SKILL.md` |
 | Org-chart data | `voicebridge/office/agency_org.py` |
 

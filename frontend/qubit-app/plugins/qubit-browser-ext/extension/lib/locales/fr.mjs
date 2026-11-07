@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "Nouveau projet",
   "projects.create.name": "Nom du projet",
   "projects.create.path": "Dossier sur l'hôte de la passerelle",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "Ce chemin se trouve sur la machine qui exécute Qubit ({host}), pas sur cet ordinateur. Parcourez-le ou saisissez le chemin.",
   "projects.create.the_gateway": "la passerelle",
   "projects.create.submit": "Créer le projet",

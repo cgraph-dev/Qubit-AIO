@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "新增專案",
   "projects.create.name": "專案名稱",
   "projects.create.path": "閘道主機上的資料夾",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "此路徑位於執行 Qubit 的機器（{host}）上，而不在這台電腦上。請瀏覽尋找或輸入路徑。",
   "projects.create.the_gateway": "閘道",
   "projects.create.submit": "建立專案",

@@ -1910,7 +1910,7 @@ export default Object.freeze({
   "projects.create.title": "새 프로젝트",
   "projects.create.name": "프로젝트 이름",
   "projects.create.path": "게이트웨이 호스트의 폴더",
-  "projects.create.path_placeholder": "/home/you/code/my-project",
+  "projects.create.path_placeholder": "~/code/my-project",
   "projects.create.path_hint": "이 경로는 Qubit가 실행 중인 컴퓨터({host})에 있으며 이 컴퓨터에 있지 않습니다. 찾아보거나 경로를 입력하세요.",
   "projects.create.the_gateway": "게이트웨이",
   "projects.create.submit": "프로젝트 만들기",
