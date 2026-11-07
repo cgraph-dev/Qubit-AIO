@@ -27,6 +27,10 @@ jobs:
           # instead of a partial runtime-only environment.
           python -m pip install -e ".[test]"
           python -m pip install pytest-asyncio
+          # The ConPTY case drives the classic CLI through pywinpty. The runtime only
+          # declares it for Python >= 3.14; this lane runs 3.12, so install the same pin
+          # the Windows install-E2E lane uses.
+          python -m pip install "pywinpty==3.0.5"
       - name: Collect the core Windows e2e suites
         working-directory: qubit_runtime
         run: >
@@ -46,6 +50,13 @@ jobs:
         working-directory: qubit_runtime
         env:
           QUBIT_E2E_WINDOWS_INSTALL: "0"
+          # GitHub-hosted Windows runs every step inside a Job Object that denies
+          # CREATE_BREAKAWAY_FROM_JOB (WinError 5), so the strict unmanaged-gateway spawn
+          # would refuse to start at all. That job outlives this suite, so the contained
+          # gateway is correct here; the flag is off by default and the strict contract
+          # still holds on a normal Windows host. This enables the real suite; it does not
+          # skip or relax any test.
+          HERMES_WINDOWS_GATEWAY_ALLOW_BREAKAWAY_FALLBACK: "1"
         run: >
           python -m pytest -q -m platforms -p no:cacheprovider
           tests/e2e/core/windows

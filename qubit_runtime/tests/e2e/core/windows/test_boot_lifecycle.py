@@ -112,7 +112,11 @@ def _serve_ready(home: WinHome) -> tuple[subprocess.Popen, int]:
         for raw in proc.stdout:
             line = raw.decode("utf-8", errors="replace")
             seen.append(line)
-            m = None if announced else re.search(r"HERMES_BACKEND_READY port=(\d+)", line)
+            # ``qubit serve`` announces the canonical QUBIT_BACKEND_READY sentinel; the legacy
+            # spelling stays readable for a pre-rename build (same contract as the terminal
+            # harness, tests/e2e/core/terminal/_gateway_client.py::READY_RE).
+            m = None if announced else re.search(
+                r"(?:QUBIT|HERMES)_BACKEND_READY port=(\d+)", line)
             if m:
                 announced = True
                 found.put(int(m.group(1)))

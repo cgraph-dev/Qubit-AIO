@@ -40,6 +40,10 @@ _PASSTHROUGH_ENV = frozenset({
     "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "CommonProgramFiles",
     "CommonProgramFiles(x86)", "CommonProgramW6432", "USERNAME", "USERDOMAIN", "COMPUTERNAME",
     "PSModulePath", "LANG", "TZ",
+    # Hosted CI runs every step inside a Job Object that denies CREATE_BREAKAWAY_FROM_JOB; its
+    # job outlives this suite, so the contained (no-breakaway) gateway spawn is correct there.
+    # Unset on a normal Windows host, where the strict breakaway contract still applies.
+    "HERMES_WINDOWS_GATEWAY_ALLOW_BREAKAWAY_FALLBACK",
 })
 _SECRET_SUFFIXES = ("_API_KEY", "_TOKEN", "_SECRET", "_ACCESS_KEY")
 
