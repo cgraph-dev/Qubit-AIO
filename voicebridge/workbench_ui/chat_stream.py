@@ -183,11 +183,26 @@ def _new_run(session_id: str) -> _Run:
 
 
 def live_run_for_session(session_id: str) -> Optional[_Run]:
-    """The unfinished run for a session, if one is still producing events."""
+    """The unfinished run for a session, if one is still producing events.
+
+    A run whose pump thread has already exited without settling is NOT live:
+    answering with it makes every later ``/chat/start`` for that session a
+    ``409 SESSION_BUSY`` forever, so one crashed turn locks the session out.
+    ``_gc()`` owns the reaping; this asks it first, then applies the same test
+    to what it kept.
+    """
+    _gc()
     with _RUNS_LOCK:
         for run in _RUNS.values():
-            if run.session_id == session_id and not run.done:
-                return run
+            if run.session_id != session_id or run.done:
+                continue
+            # thread is None: the pump was never created (still a live shape
+            # until _HARD_MAX_S expires it). ident None: not yet started.
+            # is_alive() false with an ident: it started and died.
+            if (run.thread is not None and run.thread.ident is not None
+                    and not run.thread.is_alive()):
+                continue
+            return run
     return None
 
 
