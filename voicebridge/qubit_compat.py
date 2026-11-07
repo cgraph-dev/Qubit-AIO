@@ -6142,6 +6142,33 @@ def h_office_habblaud_agents(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                detail="real seated agents from the office tower")
 
 
+def h_office_habblaud_agents_panel(cfg: Any, q: Dict[str, str],
+                                   b: Dict[str, Any], p: Dict[str, str]
+                                   ) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/habblaud/agents/panel -> the roster, seats by division.
+
+    The agents panel the Office front-end renders when the drawer is open. It is
+    a READ and writes nothing: it projects ``voicebridge.office.agency_org``'s
+    building plan (which seats exist, of what type, in which room) onto the
+    roster's own divisions, and copies the persona name, division and count
+    straight from those two structures. Nothing is synthesised — a roster the
+    plan refuses is answered ``ok:false`` with the plan's own reason, never
+    with an empty panel that would read as a quiet org.
+
+    It is reachable from the embedded office document through the literal
+    ``/api/agents/panel`` front door (``_serve_office_client_api`` rewrites it
+    onto ``/agent/api/office/habblaud/agents/panel``) and from the dashboard
+    shell by that exact path. Registered BEFORE the ``agents/<id>`` read, which
+    would otherwise resolve ``panel`` as an agent id.
+    """
+    from .office import agent_panel as PANEL
+
+    out = PANEL.panel()
+    if not out.get("ok"):
+        return 503, out
+    return _ok(**out)
+
+
 def h_office_habblaud_snapshot(cfg: Any, q: Dict[str, str],
                                b: Dict[str, Any], p: Dict[str, str]
                                ) -> Tuple[int, Dict[str, Any]]:
@@ -11904,6 +11931,11 @@ _r("GET", r"/api/office/habblaud/status", "h_office_habblaud_status")
 _r("GET", r"/api/office/habblaud/snapshot", "h_office_habblaud_snapshot")
 _r("GET", r"/api/office/habblaud/rooms", "h_office_habblaud_rooms")
 _r("GET", r"/api/office/habblaud/agents", "h_office_habblaud_agents")
+# The agents panel (seats grouped by division, from agency_org). Registered
+# BEFORE the ``agents/<id>`` read below, which would otherwise resolve
+# ``panel`` as an agent id and 404 it as a missing seat.
+_r("GET", r"/api/office/habblaud/agents/panel",
+   "h_office_habblaud_agents_panel")
 _r("GET", r"/api/office/habblaud/permissions", "h_office_habblaud_permissions")
 _r("GET", r"/api/office/habblaud/messages", "h_office_habblaud_messages")
 _r("POST", r"/api/office/habblaud/spawn", "h_office_habblaud_spawn")
@@ -20395,6 +20427,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_office_habblaud_snapshot": h_office_habblaud_snapshot,
     "h_office_habblaud_rooms": h_office_habblaud_rooms,
     "h_office_habblaud_agents": h_office_habblaud_agents,
+    "h_office_habblaud_agents_panel": h_office_habblaud_agents_panel,
     "h_office_habblaud_permissions": h_office_habblaud_permissions,
     "h_office_habblaud_messages": h_office_habblaud_messages,
     "h_office_habblaud_spawn": h_office_habblaud_spawn,
