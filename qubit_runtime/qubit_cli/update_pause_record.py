@@ -214,14 +214,23 @@ def stamp_tree(token: dict, root: Path | None = None) -> dict:
     return token
 
 
+def _checkout(root: Path) -> Path:
+    """The git worktree owning *root*: this repo vendors the runtime one level below it."""
+    from qubit_cli.update_cmd_common import checkout_root
+
+    return checkout_root(root)
+
+
 def tree_state(root: Path) -> dict | None:
     """HEAD, the tracked changes and their bytes now; ``None`` when *root* is not a git checkout."""
-    if not (root / ".git").exists():
+    checkout = _checkout(root)
+    if not (checkout / ".git").exists():
         return None
     dirty = tracked_changes(root)
     # The bytes, not just the names: an autostashed edit and git's half-written bytes share a path.
+    # git reports repo-relative paths; join them to the worktree, never to a nested runtime root.
     return {"pre_sha": head_sha(root), "dirty_at_pause": dirty,
-            "dirty_digests": {path: _digest(root / path) for path in dirty or []}}
+            "dirty_digests": {path: _digest(checkout / path) for path in dirty or []}}
 
 
 def _digest(path: Path) -> str | None:
@@ -284,7 +293,7 @@ def _seen_at_pause(root: Path, baseline: dict, path: str) -> bool:
     if path not in (baseline.get("dirty_at_pause") or []):
         return False
     digests = baseline.get("dirty_digests")
-    return digests is None or digests.get(path) == _digest(root / path)
+    return digests is None or digests.get(path) == _digest(_checkout(root) / path)
 
 
 def _half_written(root: Path, changes: list[str], at_head: list[dict]) -> list[str]:
@@ -344,7 +353,7 @@ def _deps_hold_resume(root: Path) -> bool:
     either — the restarted gateway's own launch syncs or reports the remedy.
     """
     if (os.environ.get("HERMES_DISABLE_LAZY_INSTALLS", "").lower() in ("1", "true", "yes")
-            or not (root / ".git").exists() or not (root / "pyproject.toml").is_file()):
+            or not (_checkout(root) / ".git").exists() or not (root / "pyproject.toml").is_file()):
         return False  # prepare_launch skips the sync: waiting would never end
     try:
         from qubit_cli.steward import read_install_stamp
@@ -374,7 +383,7 @@ def tree_is_whole(token: dict, root: Path | None = None) -> tuple[bool, str]:
     """May paused gateways start on this checkout now? ``(verdict, reason when not)``."""
     from qubit_cli._early_recovery import interrupted_pull_marker
     root = root or install_root()
-    if (root / ".git").exists():
+    if (_checkout(root) / ".git").exists():
         if interrupted_pull_marker(root).exists():
             return False, "the checkout is mid-pull (interrupted-pull marker present)"
         head = head_sha(root)

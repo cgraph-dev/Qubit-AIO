@@ -98,3 +98,37 @@ def test_a_move_the_updater_died_before_judging_is_judged_at_resume(parked):
     git(root, "checkout", "-q", "main")  # exits 0 with "unable to unlink old 'locked/z.py'"
     assert git(root, "rev-parse", "HEAD") == b and (root / "locked" / "z.py").read_text() == "Z=1\n"
     assert gate(root) is False, "an unjudged move to a recorded target was admitted torn"
+
+
+def test_a_nested_runtime_root_finds_the_worktree_and_holds_on_stale_deps(tmp_path, monkeypatch):
+    """Qubit vendors the runtime one level below the git worktree.
+
+    ``pause_record.install_root()`` is that runtime dir, so a ``PROJECT_ROOT/.git`` probe (and a
+    digest joined to it) silently found no worktree: no baseline was stamped, and the dependency
+    hold always passed -- a paused set restarted on a tree whose dependencies were still stale.
+    """
+    checkout = tmp_path / "checkout"
+    runtime = checkout / "qubit_runtime"
+    runtime.mkdir(parents=True)
+    git(checkout, "init", "-q", "-b", "main")
+    git(checkout, "config", "user.name", "Fixture")
+    git(checkout, "config", "user.email", "fixture@example.com")
+    (runtime / "pyproject.toml").write_text("[project]\nname = \"fixture\"\n", encoding="utf-8")
+    a = commit(checkout, "A", **{"tracked.py": "A=1\n"})
+    monkeypatch.setattr(pause_record, "install_root", lambda: runtime)
+
+    token = pause_record.stamp_tree({"resume_needed": True, "profiles": {"default": 999999}}, runtime)
+    assert token["baselines"], "the gate must find the worktree above a nested runtime root"
+    assert token["baselines"][0]["pre_sha"] == a
+
+    b = commit(checkout, "B", **{"tracked.py": "A=2\n"})
+    pause_record.mark_move(token, b)  # the commit this run's checkout move goes to
+    assert git(checkout, "rev-parse", "HEAD") == b
+
+    monkeypatch.setattr("pm.client.venv_is_current", lambda **kwargs: False)
+    monkeypatch.setattr("qubit_cli.steward.read_install_stamp",
+                        lambda root: {"updateMechanism": "self"})
+    monkeypatch.delenv("HERMES_DISABLE_LAZY_INSTALLS", raising=False)
+
+    whole, why = pause_record.tree_is_whole(token, runtime)
+    assert not whole and "dependencies" in why, (whole, why)
