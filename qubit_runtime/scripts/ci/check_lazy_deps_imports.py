@@ -67,7 +67,7 @@ def _tracked_python_files(root: Path) -> list[str]:
         n.replace("\\", "/")
         for n in names
         if n.endswith(".py") and n not in removed
-        and not n.replace("\\", "/").startswith("tests/")
+        and not ({"tests", "tmp"} & set(PurePosixPath(n).parts))
     )
     if not files:
         sys.stderr.write(

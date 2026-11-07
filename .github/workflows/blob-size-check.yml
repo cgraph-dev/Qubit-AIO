@@ -29,4 +29,13 @@ jobs:
           # The merge commit and its first parent (the base branch tip).
           fetch-depth: 2
       - name: Judge files added or modified against the base branch tip
-        run: python3 qubit_runtime/scripts/ci/check_blob_size.py --base HEAD^1
+        run: |
+          set -euo pipefail
+          base="$(git rev-parse --verify HEAD^1 2>/dev/null || true)"
+          if [ -z "$base" ]; then
+            # A seeded release branch is a single commit with no parent. There is
+            # no base-to-head delta to judge; PRs always have one.
+            echo "::notice::single-commit branch: no blob-size base to diff"
+            exit 0
+          fi
+          python3 qubit_runtime/scripts/ci/check_blob_size.py --base "$base"
