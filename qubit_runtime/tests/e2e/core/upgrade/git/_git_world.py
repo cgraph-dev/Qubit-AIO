@@ -183,7 +183,25 @@ class World:
             elif p.exists():
                 p.unlink()
         self.git("checkout", "-q", "-f", "main")
-        self.git("reset", "-q", "--hard", "refs/remotes/origin/main")
+        # Start from the commit the install stamp names while it is reachable from the fetched
+        # tip. A cell that was killed after its fetch but before its checkout move leaves
+        # ``refs/remotes/origin/main`` ahead of HEAD and of the stamp; resetting to that tip would
+        # move the checkout without publishing its identity, so the gateway a later cell starts
+        # would honestly report the stamp's (older) commit and ``_start_gateway`` could never match
+        # it. The next update still sees (and moves to) the newer tip.
+        target = "refs/remotes/origin/main"
+        try:
+            stamp = json.loads((self.runtime / "install-stamp.json").read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            stamp = {}
+        commit = stamp.get("commit") if isinstance(stamp, dict) else None
+        if isinstance(commit, str) and commit:
+            reachable = subprocess.run(
+                ["git", "-C", str(self.checkout), "merge-base", "--is-ancestor", commit, target],
+                env=self.git_env(), capture_output=True)
+            if reachable.returncode == 0:
+                target = commit
+        self.git("reset", "-q", "--hard", target)
         self.git("clean", "-fdq")
         self.git("stash", "clear")
         for ref in self.refs("refs/qubit-update-backups", "refs/tags/pre-update-*"):
