@@ -1,5 +1,5 @@
 (function() {
-	//#region ../../../../Projects/Repos/qubit-voicebridge/frontend/qubit-web/node_modules/phaser/dist/phaser.esm.js
+	// ../../../../home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules/phaser/dist/phaser.esm.js
 	var __webpack_modules__ = {
 		50792(module) {
 			var has = Object.prototype.hasOwnProperty, prefix = "~";
@@ -189420,8 +189420,7 @@ create: function(game) {
 	__webpack_exports__.xv;
 	__webpack_exports__.CB;
 	var __webpack_exports__default = __webpack_exports__.Ay;
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts
+	// ../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts
 	/**
 	* Phaser 4 boots into a container element. The drawing itself stays in the
 	* SAME `RenderModel.draw` a Canvas2D context would receive — Phaser supplies a
@@ -189576,8 +189575,7 @@ create: function(game) {
 	function createPhaserHost() {
 		return new PhaserOfficeHost();
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/input.ts
+	// ../qubit-app/plugins/qubit-office/game/input.ts
 	/** Innermost last. A key is offered in reverse order and stops at the first taker. */
 	var CONTEXT_ORDER = [
 		"world",
@@ -189762,8 +189760,7 @@ create: function(game) {
 		if (state.active.includes(c)) return state;
 		return { active: [...state.active, c] };
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/navigation.ts
+	// ../qubit-app/plugins/qubit-office/game/navigation.ts
 	/** The exterior district: the root of the graph. */
 	var EXTERIOR = { kind: "exterior" };
 	function same(a, b) {
@@ -190015,8 +190012,7 @@ create: function(game) {
 			}
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/colour.ts
+	// ../qubit-app/plugins/qubit-office/game/art/colour.ts
 	/** '#rgb', '#rrggbb', '#rrggbbaa'. Unknown or non-hex input returns magenta.
 	*
 	* Magenta-on-failure is deliberate: a typo'd colour must be LOUD. Returning
@@ -190211,8 +190207,7 @@ create: function(game) {
 			return s / 4294967296;
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/surfaces.ts
+	// ../qubit-app/plugins/qubit-office/game/art/surfaces.ts
 	var THEMES$1 = [
 		{
 			carpet: "#6b7688",
@@ -190519,8 +190514,7 @@ create: function(game) {
 		widthTiles: 16
 	};
 	ROOM.wallFaceTiles + ROOM.floorTiles + ROOM.southTiles;
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/room.ts
+	// ../qubit-app/plugins/qubit-office/game/art/room.ts
 	var THEMES = [
 		{
 			carpet: "#8fa0b8",
@@ -190930,8 +190924,7 @@ create: function(game) {
 		standees.sort((a, b) => a.key - b.key);
 		for (const s of standees) s.draw();
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/scene-adapter.ts
+	// ../qubit-app/plugins/qubit-office/game/art/scene-adapter.ts
 	function occupantsOf(room) {
 		return room.occupants.map((c) => ({
 			agentId: c.agent_id,
@@ -190965,8 +190958,7 @@ create: function(game) {
 			rooms
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/art/fittings.ts
+	// ../qubit-app/plugins/qubit-office/game/art/fittings.ts
 	function poly(f, pts) {
 		const { ctx, cam } = f;
 		ctx.beginPath();
@@ -191142,8 +191134,7 @@ create: function(game) {
 			for (let i = 0; i < tiles; i++) fill(f, tileDiamond(gx + i, gy + Math.floor(tiles / 2)), mix(r.hi, "#ffffff", .1));
 		});
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/scenes.ts
+	// ../qubit-app/plugins/qubit-office/game/scenes.ts
 	/** Qubit Office's palette. Base colours only — the ramps are derived. */
 	var PALETTE = {
 		void: "#161320",
@@ -191516,8 +191507,7 @@ create: function(game) {
 				text(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 		}
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/InteractionController.ts
+	// ../qubit-app/plugins/qubit-office/game/InteractionController.ts
 	/**
 	* The hotspots for a place. DERIVED from the same geometry the scene painter
 	* uses, so a click always lands on a door that is actually drawn — the classic
@@ -191787,8 +191777,7 @@ create: function(game) {
 			refused: true
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/ui/settings.ts
+	// ../qubit-app/plugins/qubit-office/game/ui/settings.ts
 	/** The settings the shell owns. Ids are stable — they are storage keys. */
 	var SETTINGS = {
 		/** Text zoom. LOCAL: it scales the UI, nothing else. */
@@ -191920,8 +191909,7 @@ create: function(game) {
 			"data-office-scale": String(values.textScale)
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/OfficeGameShell.tsx
+	// ../qubit-app/plugins/qubit-office/game/OfficeGameShell.tsx
 	/**
 	* Build the component the plugin registry wants, bound to the host's React.
 	*
@@ -192216,7 +192204,14 @@ create: function(game) {
 					if (settingsModal) setSettingsModal(false);
 					else setSettingsDrawer(!settingsDrawer);
 				}
-			}, "Settings")
+			}, "Settings"),
+			R.createElement("a", {
+				key: "hud",
+				className: "office-game__btn",
+				href: "/qubit-hud",
+				"data-testid": "office-game-open-hud",
+				"aria-label": "Open HUD"
+			}, "Open HUD")
 		]);
 		const attrs = shellAttributes(settings);
 		const scenes = [];
@@ -192386,8 +192381,80 @@ create: function(game) {
 	function samePlace(a, b) {
 		return a.kind === b.kind && a.building === b.building && a.floor === b.floor && a.room === b.room;
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/office-app.ts
+	// ../qubit-app/plugins/qubit-office/game/ui/HudPanel.ts
+	/** The HUD's own dashboard route. Framed by the dock; also the fallback link. */
+	var HUD_PATH = "/qubit-hud";
+	/** A same-origin frame's height inside a side sheet. */
+	var HUD_FRAME_HEIGHT = "100%";
+	/** The frame's title: what a screen reader announces for the region. */
+	var HUD_FRAME_TITLE = "Qubit HUD";
+	/**
+	* The dashboard's base path, read from the host's injected global — the same
+	* seam `office-app.ts::hostBasePath` uses. A deployment behind a subpath must
+	* frame `<base>/qubit-hud`, not `/qubit-hud`.
+	*/
+	function hostBasePath$2() {
+		if (typeof window === "undefined") return "";
+		const raw = window.__QUBIT_BASE_PATH__;
+		if (!raw) return "";
+		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
+	}
+	/**
+	* The URL the dock frames: `HUD_PATH`, rebased if the dashboard is.
+	*
+	* An OMITTED base falls back to the host's injected global — `undefined or ""`
+	* must resolve the same way `office-app.ts::officeAppSrc` does, or a subpath
+	* deployment frames `/qubit-hud` at the domain root and gets the wrong page.
+	* An explicit empty string means "served at the root" and is honoured.
+	*/
+	function hudFrameSrc(base) {
+		const raw = base === void 0 ? hostBasePath$2() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${HUD_PATH}`;
+	}
+	/** The dock's body: the framed HUD, with its refusals named. */
+	function createHudDock(args) {
+		const { React: R, hooks, base } = args;
+		const src = hudFrameSrc(base ?? hostBasePath$2());
+		return function HudDock() {
+			const [loaded, setLoaded] = hooks.useState(false);
+			const note = (id, text) => R.createElement("div", {
+				key: id,
+				className: "office-game__panel office-game__hudNote",
+				"data-testid": id,
+				role: "status",
+				"aria-live": "polite"
+			}, text);
+			return R.createElement("div", {
+				className: "office-game__frameWrap",
+				"data-testid": "office-game-hud-frame-wrap",
+				"data-state": loaded ? "ready" : "loading"
+			}, [
+				R.createElement("iframe", {
+					key: "frame",
+					"data-testid": "office-game-hud-frame",
+					className: "office-game__hudFrame",
+					title: HUD_FRAME_TITLE,
+					src,
+					height: HUD_FRAME_HEIGHT,
+					referrerPolicy: "same-origin",
+					onLoad: () => setLoaded(true)
+				}),
+				R.createElement("p", {
+					key: "direct",
+					className: "office-game__hudDirect"
+				}, [R.createElement("a", {
+					key: "a",
+					className: "office-game__hudLink",
+					"data-testid": "office-game-hud-open",
+					href: src,
+					target: "_blank",
+					rel: "noopener"
+				}, "Open HUD in its own tab")]),
+				!loaded ? note("office-game-hud-loading", `Loading the HUD from ${src}\u2026 If it does not appear, open it in its own tab instead.`) : null
+			]);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/office-app.ts
 	/** The plugin's served directory, relative to the dashboard base path. */
 	var OFFICE_APP_PATH = "/plugin-apps/qubit-office/habblaud/";
 	/**
@@ -192413,21 +192480,20 @@ create: function(game) {
 	* into index.html (`window.__QUBIT_BASE_PATH__`) is the same seam the dashboard
 	* itself uses, so there is one source of truth for the base, not two.
 	*/
-	function hostBasePath() {
+	function hostBasePath$1() {
 		if (typeof window === "undefined") return "";
 		const raw = window.__QUBIT_BASE_PATH__;
 		if (!raw) return "";
 		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
 	}
 	function officeAppSrc(opts = {}) {
-		const url = officeAppUrl(opts.base ?? hostBasePath());
+		const url = officeAppUrl(opts.base ?? hostBasePath$1());
 		const query = new URLSearchParams();
 		if (opts.mock) query.set("mock", "1");
 		const suffix = query.toString();
 		return suffix ? `${url}?${suffix}` : url;
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/api-bridge.ts
+	// ../qubit-app/plugins/qubit-office/game/app/api-bridge.ts
 	var activeBridges = /* @__PURE__ */ new WeakMap();
 	function installOfficeApiBridge(win, opts = {}) {
 		const prefix = `${(opts.apiPrefix ?? win.__QUBIT_API_PREFIX__ ?? "/agent").replace(/\/+$/, "")}/api/office/habblaud/`;
@@ -192618,8 +192684,7 @@ create: function(game) {
 			ok: true
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/SeatModelPanel.tsx
+	// ../qubit-app/plugins/qubit-office/game/app/SeatModelPanel.tsx
 	function createSeatModelPanel(R, hooks) {
 		const { useState, useEffect } = hooks;
 		return function SeatModelPanel(props) {
@@ -192743,8 +192808,241 @@ create: function(game) {
 			}, children);
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/office-api.ts
+	// ../qubit-app/plugins/qubit-office/game/app/agents-panel.ts
+	/** The Office API prefix: the server serves the compat family under `/agent`. */
+	var API_PREFIX = "/agent";
+	/**
+	* The panel's route. Named after the resource it reads (`agents/panel`), so it
+	* sits under the office family the api-bridge already owns and cannot be
+	* confused with the general API.
+	*/
+	var AGENTS_PANEL_PATH = "/api/office/habblaud/agents/panel";
+	/** The full URL, rebased onto the host's base path when the SPA is served one. */
+	function agentsPanelUrl(base) {
+		const raw = base === void 0 ? hostBasePath() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${AGENTS_PANEL_PATH}`;
+	}
+	/** The dashboard's base path, from the host's injected global (may be absent). */
+	function hostBasePath() {
+		if (typeof window === "undefined") return "";
+		const raw = window.__QUBIT_BASE_PATH__;
+		if (!raw) return "";
+		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
+	}
+	/**
+	* The session token. The office document is served with its own copy; when it
+	* is the embedded app the parent has one and `win.parent` can be read
+	* (same origin). Never a query parameter — the server rejects those outright.
+	*/
+	function readToken(win) {
+		const w = win ?? (typeof window === "undefined" ? null : window);
+		if (!w) return "";
+		if (typeof w.__QUBIT_SESSION_TOKEN__ === "string" && w.__QUBIT_SESSION_TOKEN__) return w.__QUBIT_SESSION_TOKEN__;
+		try {
+			const parent = w.parent;
+			return parent && parent.__QUBIT_SESSION_TOKEN__ || "";
+		} catch {
+			return "";
+		}
+	}
+	/** A human label for a seat type. The raw value when it is not one we know. */
+	function seatTypeLabel(seatType) {
+		switch (seatType) {
+			case "ceo": return "CEO";
+			case "director_functional": return "Functional director";
+			case "director_portfolio": return "Portfolio director";
+			case "manager": return "Manager";
+			case "worker": return "Worker";
+			default: return seatType || "Unclassified seat";
+		}
+	}
+	/** The one-line summary a reader sees before the list. Counts only. */
+	function summaryLine(counts) {
+		if (!counts) return "";
+		const divs = counts.divisions;
+		const head = counts.headcount;
+		const rooms = counts.rooms;
+		const board = counts.boardroom_seats;
+		return `${head} seats · ${divs} divisions · ${rooms} rooms` + (board ? ` · ${board} in the boardroom` : "");
+	}
+	/**
+	* Grouping check: the buckets must account for every seat exactly once. A
+	* mismatch is NAMED, never rendered as a shorter list that looks complete.
+	*/
+	function groupingProblem(data) {
+		const rows = data.seats ?? [];
+		const counted = (data.divisions ?? []).reduce((n, g) => n + (g.seats?.length ?? 0), 0);
+		if (counted !== rows.length) return `the panel groups ${counted} seats but the route served ${rows.length}`;
+		const claimed = data.counts?.headcount;
+		if (typeof claimed === "number" && claimed !== rows.length) return `the route's headcount (${claimed}) disagrees with its seat list (${rows.length})`;
+		return "";
+	}
+	/**
+	* Fetch the panel. Throws nothing: a failure is returned as a named error so
+	* the component always has something true to say.
+	*/
+	async function fetchAgentPanel(opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		const url = agentsPanelUrl(opts.base);
+		const token = readToken(opts.win);
+		const headers = { Accept: "application/json" };
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		try {
+			const res = await f(url, {
+				headers,
+				credentials: "same-origin",
+				signal: opts.signal
+			});
+			if (res.status === 401) return {
+				kind: "error",
+				message: `The agents panel was refused (HTTP 401); the office session token was not accepted. Reload the page to refresh it.`
+			};
+			if (res.status === 404) return {
+				kind: "error",
+				message: `The agents panel route is not served here (HTTP 404: ${url}). This server does not expose the office roster.`
+			};
+			const body = await res.json().catch(() => null);
+			if (!body || typeof body !== "object") return {
+				kind: "error",
+				message: `The agents panel answered HTTP ${res.status} with no JSON body.`
+			};
+			if (body.ok !== true) return {
+				kind: "error",
+				message: body.detail || body.code ? `The agents panel could not be built: ${body.detail || body.code}` : `The agents panel answered not-ok (HTTP ${res.status}).`
+			};
+			const problem = groupingProblem(body);
+			if (problem) return {
+				kind: "error",
+				message: `The agents panel data is inconsistent: ${problem}.`
+			};
+			return {
+				kind: "ready",
+				data: body
+			};
+		} catch (err) {
+			return {
+				kind: "error",
+				message: `The agents panel could not be reached: ${err instanceof Error ? err.message : String(err)}`
+			};
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/AgentsPanel.tsx
+	/** One seat row: emoji, persona name, type, room, supervisor. */
+	function seatRow(R, seat, index) {
+		const meta = [seatTypeLabel(seat.seat_type)];
+		if (seat.room) meta.push(seat.room === "boardroom" ? "Boardroom" : seat.room);
+		if (seat.supervisor) meta.push(`reports to ${seat.supervisor}`);
+		return R.createElement("li", {
+			key: `${seat.slug}:${index}`,
+			className: "agents-panel__seat",
+			"data-testid": "agents-panel-seat",
+			"data-seat-slug": seat.slug,
+			"data-seat-type": seat.seat_type
+		}, [
+			R.createElement("span", {
+				key: "e",
+				className: "agents-panel__emoji",
+				"aria-hidden": "true"
+			}, seat.emoji || "•"),
+			R.createElement("span", {
+				key: "n",
+				className: "agents-panel__name"
+			}, seat.name),
+			R.createElement("span", {
+				key: "m",
+				className: "agents-panel__meta"
+			}, meta.join(" · "))
+		]);
+	}
+	/** One division: a heading with its REAL headcount, then its seats. */
+	function divisionGroup(R, division, open) {
+		const boardroom = division.slug === "";
+		const heading = `${division.label} \u2014 ${division.headcount} ` + (division.headcount === 1 ? "seat" : "seats");
+		return R.createElement("details", {
+			key: division.slug || "boardroom",
+			className: "agents-panel__division",
+			"data-testid": "agents-panel-division",
+			id: `agents-panel-division-${division.slug || "boardroom"}`,
+			"data-division": division.slug,
+			"data-headcount": String(division.headcount),
+			open
+		}, [R.createElement("summary", {
+			key: "s",
+			className: "agents-panel__divisionHead"
+		}, [R.createElement("span", {
+			key: "l",
+			className: "agents-panel__divisionLabel"
+		}, heading), division.floor !== null && !boardroom ? R.createElement("span", {
+			key: "f",
+			className: "agents-panel__divisionMeta"
+		}, `Floor ${division.floor}${division.kind ? ` \u00b7 ${division.kind}` : ""}`) : R.createElement("span", {
+			key: "f",
+			className: "agents-panel__divisionMeta"
+		}, boardroom ? "Above every division" : division.kind)]), R.createElement("ul", {
+			key: "u",
+			className: "agents-panel__seats"
+		}, division.seats.map((seat, i) => seatRow(R, seat, i)))]);
+	}
+	function createAgentsPanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function AgentsPanel(props) {
+			const [state, setState] = useState({ kind: "loading" });
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				fetchAgentPanel({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then((next) => {
+					if (live) setState(next);
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [props.base]);
+			if (state.kind === "loading") return R.createElement("div", {
+				className: "agents-panel",
+				"data-testid": "agents-panel",
+				"data-state": "loading",
+				role: "status",
+				"aria-live": "polite"
+			}, "Loading the roster…");
+			if (state.kind === "error") return R.createElement("div", {
+				className: "agents-panel agents-panel__error",
+				"data-testid": "agents-panel",
+				"data-state": "error",
+				role: "alert"
+			}, state.message);
+			const { data } = state;
+			const counts = data.counts;
+			const groups = data.divisions ?? [];
+			const boardroom = groups.find((g) => g.slug === "");
+			const divisions = groups.filter((g) => g.slug !== "");
+			return R.createElement("div", {
+				className: "agents-panel",
+				"data-testid": "agents-panel",
+				"data-state": "ready",
+				"data-seats": String(counts?.headcount ?? 0),
+				"data-divisions": String(counts?.divisions ?? divisions.length)
+			}, [
+				R.createElement("div", {
+					key: "summary",
+					className: "agents-panel__summary",
+					"data-testid": "agents-panel-summary"
+				}, summaryLine(counts)),
+				boardroom ? divisionGroup(R, boardroom, false) : null,
+				...divisions.map((d) => divisionGroup(R, d, false)),
+				counts ? R.createElement("div", {
+					key: "types",
+					className: "agents-panel__types",
+					"data-testid": "agents-panel-types"
+				}, Object.entries(counts.seat_types).map(([type, n]) => `${n} ${seatTypeLabel(type).toLowerCase()}`).join(" · ")) : null
+			]);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/office-api.ts
 	var ROUTES = [
 		{
 			client: "access",
@@ -192796,17 +193094,17 @@ create: function(game) {
 		},
 		{
 			client: "permissions/:id",
-			qubit: null,
+			qubit: "/api/permissions/:id",
 			readOnly: false,
 			gated: true,
-			note: "Permission decisions need the Qubit confirmation authority."
+			note: "A decision settles the shared Qubit approval journal once."
 		},
 		{
 			client: "messages",
-			qubit: null,
+			qubit: "/api/messages",
 			readOnly: false,
 			gated: true,
-			note: "Sending messages is an org mutation requiring confirmation."
+			note: "A send becomes a real office task claimed for the seat."
 		},
 		{
 			client: "terminal/pty",
@@ -192816,15 +193114,15 @@ create: function(game) {
 		},
 		{
 			client: "spawn",
-			qubit: null,
+			qubit: "/api/spawn",
 			readOnly: false,
-			note: "Starting an agent is not exposed through this client adapter."
+			note: "A spawn queues a real office task; no second Claude session."
 		},
 		{
 			client: "renameRoom",
-			qubit: null,
+			qubit: "/api/rooms/rename",
 			readOnly: false,
-			note: "Room rename is not exposed from this embedded app."
+			note: "Room rename writes the real office store."
 		},
 		{
 			client: "deliveries",
@@ -192854,7 +193152,7 @@ create: function(game) {
 			missing,
 			gated,
 			canRender: true,
-			viewOnly: true,
+			viewOnly: false,
 			live: ROUTES.some((route) => route.client === "stream" && !!route.qubit)
 		};
 	}
@@ -192862,8 +193160,7 @@ create: function(game) {
 		const v = bindingVerdict();
 		return `${v.bound.length} bound · ${v.missing.length} unavailable · ${v.gated.length} confirmation-gated`;
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
+	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
 	function connectionText(props) {
 		const state = props.officeState ?? "connecting";
 		const rooms = props.officeRooms ?? 0;
@@ -192887,6 +193184,14 @@ create: function(game) {
 			const [loaded, setLoaded] = useState(false);
 			const [failed, setFailed] = useState(null);
 			const [panelOpen, setPanelOpen] = useState(false);
+			const [hudOpen, setHudOpen] = useState(false);
+			const [agentsOpen, setAgentsOpen] = useState(false);
+			const HudDock = createHudDock({
+				React: R,
+				hooks,
+				base: props.base
+			});
+			const AgentsPanel = createAgentsPanel(R, hooks);
 			const frameRef = useRef(null);
 			const SeatModelPanel = createSeatModelPanel(R, hooks);
 			useEffect(() => {
@@ -193021,18 +193326,82 @@ create: function(game) {
 					}));
 				}
 			}
+			children.push(R.createElement("button", {
+				key: "agents-toggle",
+				type: "button",
+				className: "office-game__agentsToggle",
+				"data-testid": "office-game-agents-btn",
+				"aria-expanded": agentsOpen,
+				"aria-controls": "office-game-agents-dock",
+				onClick: () => setAgentsOpen(!agentsOpen)
+			}, agentsOpen ? "Hide agents" : "Agents"));
+			if (agentsOpen) children.push(R.createElement("div", {
+				key: "agents-dock",
+				id: "office-game-agents-dock",
+				className: "office-game__dock office-game__agentsDock office-game__panel",
+				"data-testid": "office-game-agents-dock",
+				role: "region",
+				"aria-label": "Office agents"
+			}, [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead"
+			}, [R.createElement("span", { key: "t" }, "Agents"), R.createElement("button", {
+				key: "x",
+				type: "button",
+				className: "office-game__btn",
+				"data-testid": "office-game-agents-close",
+				"aria-label": "Close agents",
+				onClick: () => setAgentsOpen(false)
+			}, "Close")]), R.createElement(AgentsPanel, {
+				key: "body",
+				base: props.base
+			})]));
+			children.push(R.createElement("button", {
+				key: "hud-toggle",
+				type: "button",
+				className: "office-game__hudToggle",
+				"data-testid": "office-game-hud-btn",
+				"aria-expanded": hudOpen,
+				"aria-controls": "office-game-hud-dock",
+				onClick: () => setHudOpen(!hudOpen)
+			}, hudOpen ? "Hide HUD" : "HUD"));
+			if (hudOpen) children.push(R.createElement("div", {
+				key: "hud-dock",
+				id: "office-game-hud-dock",
+				className: "office-game__dock office-game__panel",
+				"data-testid": "office-game-hud-dock",
+				role: "region",
+				"aria-label": "HUD"
+			}, [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead"
+			}, [
+				R.createElement("span", { key: "t" }, "HUD"),
+				R.createElement("a", {
+					key: "open",
+					className: "office-game__hudLink",
+					"data-testid": "office-game-hud-open-link",
+					href: hudFrameSrc(props.base)
+				}, "Open HUD"),
+				R.createElement("button", {
+					key: "x",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "office-game-hud-close",
+					"aria-label": "Close HUD",
+					onClick: () => setHudOpen(false)
+				}, "Close")
+			]), R.createElement(HudDock, { key: "body" })]));
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				className: "office-game"
 			}, children);
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/types.ts
+	// ../qubit-app/plugins/qubit-office/game/types.ts
 	/** The schema this adapter is written against. A mismatch is refused, not coerced. */
 	var EXPECTED_SCHEMA = "qubit-office-tower/1";
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/adapter.ts
+	// ../qubit-app/plugins/qubit-office/game/adapter.ts
 	/**
 	* Poll cadence. It is deliberately slower than the store's animation tick: the
 	* tower fold takes hundreds of milliseconds, and a sub-second abort/restart
@@ -193196,8 +193565,7 @@ create: function(game) {
 			payload: body
 		};
 	}
-	//#endregion
-	//#region ../qubit-app/plugins/qubit-office/game/entry.ts
+	// ../qubit-app/plugins/qubit-office/game/entry.ts
 	var SDK = window.__QUBIT_PLUGIN_SDK__;
 	if (!SDK || !SDK.React || !SDK.hooks) console.warn("[qubit-office] plugin SDK missing (React/hooks); the game entry cannot register. The Office tab will show no office.");
 	else {
@@ -193301,5 +193669,4 @@ create: function(game) {
 			})))
 		};
 	}
-	//#endregion
 })();

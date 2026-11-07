@@ -61,6 +61,10 @@ _SSE_HEARTBEAT_S = 15.0
 #: and the vendoring script's rewrite target must agree — three copies of this
 #: string is three chances to drift.
 OFFICE_APP_PREFIX = "/plugin-apps/"
+#: The ported workbench's canonical public path. `/wb` is its short alias —
+#: upstream's own JS and its shim assume that shorter form, so both are routed
+#: to the same tree. Keep them in sync with `workbench_ui_routes.MOUNT`.
+WORKBENCH_MOUNT = "/qubit-workbench"
 
 # --------------------------------------------------------------------------
 # Transport-boundary redaction (Wave 5, G2).
@@ -894,7 +898,7 @@ SPA_ROUTE_PATHS = (
     "/reports", "/operations", "/devices", "/memory", "/qubit-approvals",
     "/qubit-boards", "/qubit-brand", "/qubit-chat", "/qubit-gateway",
     "/qubit-models", "/qubit-office", "/qubit-office2", "/qubit-office3",
-    "/qubit-runtime", "/qubit-hud",
+    "/qubit-runtime", "/qubit-hud", "/qubit-workbench",
 )
 SPA_ROUTE_SET = frozenset(SPA_ROUTE_PATHS)
 # First path segment of every shell route, for SPA deep links such as
@@ -1323,6 +1327,19 @@ def debrand_theme_style_id(markup: str) -> str:
     return markup.replace(LEGACY_THEME_CSS_STYLE_ID, QUBIT_THEME_CSS_STYLE_ID)
 
 
+#: The dashboard ROUTES allowed to be framed on the SAME ORIGIN, and only those.
+#:
+#: `security_headers` emits `X-Frame-Options: DENY` and `frame-ancestors 'none'`
+#: for every document, and `_serve_qubit_index` grants the SAMEORIGIN exception
+#: for the paths listed here — no others, and by EXACT match, so a future route
+#: that merely shares a prefix does not inherit the grant. Today that is one
+#: entry: the HUD (`/qubit-hud`), framed by the Office page's HUD dock so the
+#: operator can read the vitals without leaving the room they belong to.
+#: Same-origin framing only (`'self'`); no other origin can frame the page, and
+#: every other route keeps refusing frames.
+HUD_FRAME_ROUTE = frozenset({"/qubit-hud"})
+
+
 def security_headers(*, allow_same_origin_frame: bool = False) -> list:
     """Browser hardening headers emitted on every ``_send`` response.
 
@@ -1333,11 +1350,18 @@ def security_headers(*, allow_same_origin_frame: bool = False) -> list:
     stylesheet the theme presets load is the only third-party style source,
     and its font files are the only third-party font source.
 
-    ``allow_same_origin_frame`` is used for exactly ONE document: the plugin
-    application HTML (Office) that the dashboard embeds in a same-origin
-    iframe. Emitting ``DENY`` there would break that intentional embedding,
-    so it gets ``SAMEORIGIN`` + ``frame-ancestors 'self'`` instead. Every
-    other response refuses framing outright.
+    ``allow_same_origin_frame`` is granted to exactly TWO documents, both
+    first-party and both same-origin only:
+
+      * the plugin application HTML (Office), which the dashboard embeds in a
+        same-origin iframe (``_serve_plugin_app``);
+      * ``HUD_FRAME_ROUTE`` (``/qubit-hud``), which the Office page's HUD dock
+        frames (``_serve_qubit_index``).
+
+    Emitting ``DENY`` there would break those intentional embeddings, so they
+    get ``SAMEORIGIN`` + ``frame-ancestors 'self'`` instead. Every other
+    response refuses framing outright, and ``'self'`` means no other ORIGIN
+    can frame them either.
     """
     frame_ancestors = "'self'" if allow_same_origin_frame else "'none'"
     x_frame_options = "SAMEORIGIN" if allow_same_origin_frame else "DENY"
@@ -2507,7 +2531,36 @@ class WebUIHandler(BaseHTTPRequestHandler):
             except Exception:  # noqa: BLE001 - never fail a request over gzip
                 wire = body
                 extra = None
-        self._send(200, wire, "text/html; charset=utf-8", extra_headers=extra)
+        # TWO same-origin documents may be framed, and only these two:
+        #
+        #  1. The Office plugin app (`/plugin-apps/qubit-office/...`), served by
+        #     `_serve_app_html` — NOT by this method. It gets SAMEORIGIN so the
+        #     dashboard's intentional full-bleed embed keeps working.
+        #  2. `HUD_FRAME_ROUTE` (`/qubit-hud`), framed by the Office page's HUD
+        #     dock (`frontend/qubit-app/plugins/qubit-office/game/ui/
+        #     HudPanel.ts`) so the operator reads the vitals without leaving the
+        #     room they belong to. Without the grant the browser refuses the
+        #     frame (measured: `X-Frame-Options: DENY`,
+        #     `frame-ancestors 'none'`) and the dock can only say so.
+        #
+        # WHY THIS IS NARROW AND WHY IT IS SAFE. `SAMEORIGIN` + `frame-ancestors
+        # 'self'` names the framing ORIGIN, not "anyone": no other origin can
+        # frame the page, and same-origin framing adds no privilege a
+        # same-origin page does not already have (it can read this document via
+        # `window.open`, or fetch it with the same credentials). The grant is
+        # keyed on the REQUEST PATH as an EXACT match, so every other SPA route
+        # — `/sessions`, `/qubit-workbench`, the catch-all deep links — still
+        # answers DENY, and a future route that merely shares the prefix
+        # (`/qubit-hud-anything`) does not inherit it. It is set immediately
+        # before the response and cleared in `finally`, so it cannot leak onto
+        # the next request on a keep-alive socket.
+        if (self.path.split("?", 1)[0].rstrip("/") or "/") in HUD_FRAME_ROUTE:
+            self._allow_same_origin_frame = True
+        try:
+            self._send(200, wire, "text/html; charset=utf-8",
+                       extra_headers=extra)
+        finally:
+            self._allow_same_origin_frame = False
 
     def _serve_qubit_static(self, sub: str) -> None:
         dist = self._qubit_dist()
@@ -3839,6 +3892,73 @@ class WebUIHandler(BaseHTTPRequestHandler):
                   state="UNAVAILABLE")
         return True
 
+    def _serve_workbench_ui(self, method: str) -> bool:
+        """Serve the ported workbench UI (``/wb/*``). True when this handled it.
+
+        Two surfaces under one prefix, mirroring how the office app is served:
+
+        * ``/wb/api/<sub>`` — the shim. Rewritten to the compat authority's
+          ``h_wb_gateway``, which routes each sub-path to the shim module; the
+          same session token and the same auth gate as every other API call.
+        * ``/wb/<file>`` — one file from the ported static tree, confined to
+          ``voicebridge/workbench_ui/static`` by ``serve_asset``'s own
+          ``resolve()``. ``/wb`` and ``/wb/`` serve the app's index.
+
+        Declared here rather than inline in ``do_GET`` so ``do_POST`` can share
+        the API half without duplicating the parse.
+        """
+        path = self.path.split("?")[0]
+        # Two prefixes, one surface: /qubit-workbench is the page the sidebar
+        # links to, /wb is the short alias upstream's own JS assumes. Both serve
+        # the same tree and the same shim, so a link from either works.
+        mount = next((m for m in (WORKBENCH_MOUNT, "/wb")
+                      if path == m or path.startswith(m + "/")), "")
+        if not mount:
+            return False
+        from . import workbench_ui_routes as R
+
+        app = getattr(self.server, "app", None)
+        token = str(getattr(app, "api_token", "") or "")
+        if path.startswith(mount + "/api/"):
+            from urllib.parse import parse_qs, urlsplit
+
+            sub = path[len(mount) + len("/api/"):].strip("/")
+            query = {k: v[0] for k, v in parse_qs(
+                urlsplit(self.path).query, keep_blank_values=True).items()}
+            body: Dict[str, Any] = {}
+            if method != "GET":
+                try:
+                    length = int(self.headers.get("Content-Length", 0) or 0)
+                except ValueError:
+                    length = 0
+                if length:
+                    try:
+                        parsed = json.loads(
+                            self.rfile.read(length).decode("utf-8", "replace")
+                            or "{}")
+                    except ValueError:
+                        parsed = {}
+                    body = parsed if isinstance(parsed, dict) else {}
+            # The config lives on the orchestrator, exactly as every other compat
+            # handler reads it. `wb_cfg` was never set on the server object, so
+            # every handler that needed a real config (the approval journal, the
+            # cron store, the session store) was handed None and answered a 503
+            # with "AttributeError: 'NoneType' object has no attribute
+            # 'state_dir'". The live probe caught it on /api/approval/pending.
+            _orch = getattr(getattr(self, "app", None), "orch", None)
+            cfg = (getattr(self.server, "wb_cfg", None)
+                   or (getattr(_orch, "cfg", None) if _orch is not None else None))
+            if R.stream_kind(sub) and cfg is not None:
+                R.stream_sse(self, sub, cfg, query)
+                return True
+            status, payload = R.h_wb_gateway(
+                cfg, query, body, {"sub": sub, "method": method})
+            self._json(payload, status)
+            return True
+        R.serve_asset(self, "/" if path == mount else path[len(mount):],
+                      token=token, base_path=mount)
+        return True
+
     # -- routes ----------------------------------------------------------
     def do_GET(self) -> None:  # noqa: N802
         if self._maybe_pty_upgrade():
@@ -3852,6 +3972,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if self._refuse_qubit_ws():
             return
         path = self.path.split("?")[0]
+        # The ported workbench (upstream's own HTML/CSS/JS) is what
+        # /qubit-workbench now serves, and /wb stays as its short alias. The
+        # static tree wins over the React page it replaced: the React route and
+        # its sidebar entry point here, so there is ONE workbench and this is it.
+        if self._serve_workbench_ui("GET"):
+            return
         if path in ("/", "/index.html"):
             # Ruling 3 → Option A: the root lands on the Qubit chat workspace.
             self._redirect("/chat")
@@ -4691,6 +4817,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = self.path.split("?")[0]
+        if self._serve_workbench_ui("POST"):
+            return
         if path == "/api/permissions":
             # Packet 7E: mutating permission/skill actions (explicit confirm).
             if not self._api_token_ok():

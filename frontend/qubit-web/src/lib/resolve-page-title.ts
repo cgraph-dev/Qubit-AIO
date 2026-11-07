@@ -66,6 +66,15 @@ export const ROUTE_TITLES: Record<string, string> = {
   "/admin/users": "Operator & Credentials",
   "/canvas": "Qubit Canvas",
   "/qubit-office": "Qubit Office",
+  // The three-panel workspace. Same reachability rule as the HUD above: the
+  // route exists in App.tsx, but a route with no SIDEBAR_SECTIONS path and no
+  // builtin nav row is a page nobody can click.
+  "/qubit-workbench": "Qubit Workbench",
+  // HUD is a hidden-tab plugin (its manifest keeps "hidden": true so no extra
+  // auto tab is generated); it reaches the sidebar as an App.tsx builtin entry
+  // grouped in the System section. Without this the header fell through to the
+  // naive fallback and rendered "Qubit-hud".
+  "/qubit-hud": "Qubit HUD",
   "/qubit-office2": "Agent Quest",
   "/qubit-office3": "Voice Chat",
   "/qubit-taskflows": "Qubit Taskflows",

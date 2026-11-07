@@ -1143,12 +1143,7 @@
     preview: {border: "1px dashed #e6b45a", borderRadius: 8,
               padding: "6px 10px", fontSize: 12, color: "#e6b45a"},
     warn: {border: "1px solid #e0554a", borderRadius: 8, padding: "6px 10px",
-           fontSize: 12, color: "#e0554a"},
-    /* the one link on this page. It is navigation to another tab, not a
-     * request, so it carries an href and no handler. */
-    nav: {fontSize: 12, padding: "4px 10px", borderRadius: 6,
-          border: "1px solid #2a3443", color: "inherit",
-          textDecoration: "none"}
+           fontSize: 12, color: "#e0554a"}
   };
 
   function Office() {
@@ -1544,13 +1539,6 @@
     }
 
     return e("div", {style: styles.page, "data-state": "ready"},
-      /* --- the way to the HUD. A navigation, not a request: this page stays
-       * read-only (C4). Rendered even for an empty org, because the office the
-       * user came to look at is not the only view of this agent. --- */
-      e("div", {style: styles.bar},
-        e("a", {href: "/qubit-hud", style: styles.nav},
-          "Open HUD")),
-
       /* --- the preview banner. A drawing nobody can identify as a drawing is
        * the lie; a labelled one is just a drawing. --- */
       v.preview ? e("div", {style: styles.preview}, v.preview_legend) : null,

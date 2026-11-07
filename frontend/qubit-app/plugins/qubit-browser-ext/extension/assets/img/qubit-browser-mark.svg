@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Qubit Browser mark">
+  <!-- Monochrome mask: render the Qubit atom mark white-on-transparent. Theming
+       is handled by the consumer via `background-color: var(--qubit-ink)` and
+       `mask-image: url(...)` so the mark picks up the active theme's ink colour
+       instead of being a hard-coded blue square.
+
+       Replaced a hardcoded serif "H" (Hermes) inside a box. Same interlocking
+       orbit as frontend/qubit-web/public/favicon.svg, redrawn as strokes: a
+       mask uses only the alpha channel, so the favicon's teal-to-peach gradient
+       would flatten to one colour here anyway. -->
+  <g fill="none" stroke="#fff" stroke-width="17" stroke-linecap="round">
+    <ellipse cx="128" cy="128" rx="88" ry="46" transform="rotate(45 128 128)"/>
+    <ellipse cx="128" cy="128" rx="88" ry="46" transform="rotate(-45 128 128)"/>
+  </g>
+  <circle cx="128" cy="128" r="15" fill="#fff"/>
+</svg>

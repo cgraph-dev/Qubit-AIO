@@ -19,58 +19,81 @@ reads QUBIT's own state instead:
 Every collector is a pure function returning a JSON-ready ``dict``. This module
 registers no route; the dashboard route table is owned elsewhere.
 
-PORTS (7 in-scope HUD tabs' backends)
+PORTS — 19 panels, each with its decision recorded in its own docstring
+------------------------------------------------------------------------
+Originally seven:
+
     collectors_health          <- backend/collectors/health.py (+ config.py merge)
     collectors_cron            <- backend/collectors/cron.py
     collectors_plugins         <- backend/collectors/plugins.py
     collectors_skills          <- backend/collectors/skills.py
     collectors_model_info      <- backend/collectors/model_info.py
     collectors_model_analytics <- backend/collectors/model_analytics.py
+    collectors_sessions        <- Qubit-authored over the session authority
 
-DROPPED (no truthful Qubit source; a missing panel is correct, a fabricated one
-is not)
-    SKIP: sudo governance  - HUD classified sudo from gateway.log prose; Qubit
-                             has no structured sudo-approval ledger to read.
-    SKIP: replay            - HUD replayed state.db rows through a schema it
-                             was verified against (v16/23/26/31); Qubit's
-                             schema genuinely differs and the session authority
-                             exposes no replay/rewind read model.
-    SKIP: corrections       - Qubit records no correction events.
-    SKIP: patterns          - Qubit records no pattern-mining events.
-    SKIP: verify            - HUD shelled `hermes verify`; Qubit has no verify
-                             command and no verify artifact to read.
-    SKIP: providers         - HUD shelled `hermes auth`; dropped in favour of
-                             the credential-reference inventory Qubit does
-                             expose (credential-presence diagnostics inside
-                             collectors_health — see ``keys``).
-    SKIP: projects          - HUD listed ~/projects; Qubit's projects.db has no
-                             stable public read seam owned by a single writer.
-    SKIP: profiles          - Qubit profiles are independent islands; the HUD's
-                             cross-profile aggregate would need a second home
-                             reader that violates island isolation.
-    SKIP: memory            - HUD parsed ~/.hermes/memory markdown; Qubit's
-                             memory providers are plugin-owned and expose no
-                             single read authority.
-    SKIP: gateway           - HUD shelled `hermes gateway`; Qubit's gateway
-                             control is an operator/action surface (voicebridge.
-                             approvals), not a read-only collector.
-    SKIP: live chat         - out of scope (owner decision) and would need a
-                             websocket this module does not own.
-    SKIP: live model caps   - COLLAPSED into collectors_model_info, which reads
-                             the real models.dev cache Qubit ships.
+Then twelve a previous revision of this package DROPPED as "no truthful Qubit
+source". That claim was measured and found wrong: most of the upstream
+"dropped" tabs are thin routers over collectors whose inputs Qubit already
+publishes. Each module below carries the PORT/MAP/GAP decision and the evidence:
+
+    collectors_sudo          MAP   approvals journal + safety policy + the
+                                   session authority (prose scraping refused)
+    collectors_replay        MAP   session authority list()/messages()
+    collectors_corrections   MAP   MemoryStore `supersedes` + `history` ledger
+    collectors_patterns      PORT  upstream aggregates over authority inputs;
+                                   tool sequences are reported GAP, not faked
+    collectors_verify        MAP   voicebridge.checkpoints sha256 re-verify
+    collectors_providers     MAP   voicebridge.credentials inventory (no shell)
+    collectors_projects      PORT  voicebridge.projects registry + git enrichment
+    collectors_profiles      MAP   profile registry + per-island authority read
+    collectors_memory        MAP   voicebridge.active_memory + MemoryStore
+    collectors_gateway       PORT  gateway_supervisor status + RPC registry
+    collectors_live_chat     GAP   no chat WebSocket (WS_SINGLE_PATH); served as
+                                   a polled snapshot of the typed event journal
+    collectors_live_models   MAP   per-model models.dev caps; live PROBE is GAP
+
+STILL REFUSED — the parts that remain genuinely absent
+------------------------------------------------------
+    live chat WS               Qubit keeps one event path; ``webui`` refuses a
+                               second WS with ``WS_SINGLE_PATH``. The panel shows
+                               the journal snapshot and names the refusal.
+    live model probe           ``/api/providers/validate`` is a recorded
+                               refusal (``_NO_NETWORK_PROBE``); capability rows
+                               say "catalog", never "pinged".
+    per-step replay trace      the authority publishes role/content/timestamp
+                               only; tool_calls/reasoning/token_count are null.
+    tool-workflow sequences    same missing column; ``tool_workflows`` is None
+                               with a reason.
+    sudo outcomes              upstream inferred them from tool blobs and log
+                               prose. The journal's decision states are shown
+                               instead; no outcome is guessed.
+    gateway actions            upstream shelled the CLI; the HUD is a viewer.
 """
 
 from __future__ import annotations
 
 __all__ = [
     "branding",
+    "collectors_corrections",
     "collectors_cron",
+    "collectors_gateway",
     "collectors_health",
+    "collectors_live_chat",
+    "collectors_live_models",
+    "collectors_memory",
     "collectors_model_analytics",
     "collectors_model_info",
+    "collectors_patterns",
     "collectors_plugins",
+    "collectors_profiles",
+    "collectors_projects",
+    "collectors_providers",
+    "collectors_replay",
     "collectors_sessions",
     "collectors_skills",
+    "collectors_sudo",
+    "collectors_verify",
+    "profiles_shim",
 ]
 
 #: The HUD release these collectors were verified against (upstream pin).

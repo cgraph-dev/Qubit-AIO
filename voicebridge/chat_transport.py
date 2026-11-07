@@ -4269,10 +4269,31 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
     finally:
         _release_cancel(sid, ev)
     elapsed_ms = int((time.monotonic() - started) * 1000)
+    return _remote_outcome(cfg, sid, routed, res, elapsed_ms,
+                           context_meta=context_meta, decision=decision,
+                           reasoning=reasoning, st=st)
+
+
+def _remote_outcome(cfg: Any, sid: str, routed: Dict[str, Any], res: Any,
+                    elapsed_ms: int, *, context_meta: Optional[Dict[str, Any]],
+                    decision: Any, reasoning: Optional[str], st: Any,
+                    streamed_text: Optional[str] = None,
+                    path_suffix: str = "") -> Dict[str, Any]:
+    """Turn one gateway :class:`ProviderResult` into the turn's outcome dict.
+
+    One authority for the receipt/receipt-fields, the typed failure mapping,
+    the empty-reply guard, and the transcript write, shared by the blocking
+    remote turn and the streaming one so a streamed turn persists and receipts
+    exactly like a blocking turn.
+
+    ``streamed_text`` (streaming path only) is the text the client already
+    received; it is authoritative for what gets persisted, so the transcript
+    can never disagree with what was displayed.
+    """
     receipt = {"runtime": "provider-gateway", "provider": res.provider,
                "model": res.model, "identity": res.identity,
                "profile": routed.get("profile_id"),
-               "path": "voicebridge.providers.gateway.run"}
+               "path": "voicebridge.providers.gateway.run" + path_suffix}
     _applied = (res.details or {}).get("reasoning_applied")
     if _applied is not None:
         receipt["reasoning_applied"] = dict(_applied)
@@ -4307,7 +4328,12 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
                 "code": str(res.code or "MODEL_ERROR"),
                 "detail": _redact(res.message or "provider refused")[:300],
                 "session_id": sid, "elapsed_ms": elapsed_ms, "receipt": receipt}
-    safe = _redact(_sanitize(str(res.text or "").strip()))
+    # What the client actually saw wins: on the streaming path ``res.text`` is
+    # the re-join of the emitted chunks, but a partial cut mid-stream still
+    # returns what really arrived.
+    source_text = (streamed_text if streamed_text is not None
+                   else str(res.text or ""))
+    safe = _redact(_sanitize(str(source_text or "").strip()))
     if not safe:
         return {"ok": False, "state": "FAILED", "code": "MODEL_UNAVAILABLE",
                 "detail": "provider returned no text; nothing was fabricated",
@@ -4321,6 +4347,124 @@ def _generate_remote(cfg: Any, sid: str, clean: str, context: str,
     return {"ok": True, "reply": safe, "session": sid, "session_id": sid,
             "elapsed_ms": elapsed_ms, "message": saved.get("message"),
             "message_count": saved.get("message_count"), "receipt": receipt}
+
+
+def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
+                        routed: Dict[str, Any], *,
+                        timeout_s: Optional[float],
+                        cancel: Optional[Callable[[], bool]],
+                        context_meta: Optional[Dict[str, Any]] = None,
+                        decision: Any = None,
+                        reasoning: Optional[str] = None
+                        ) -> Iterator[Dict[str, Any]]:
+    """Run one remote turn and yield REAL per-chunk deltas as they arrive.
+
+    Yields ``("delta", text)`` once per SSE chunk the provider actually sent,
+    then ``("outcome", dict)`` with the same outcome dict
+    :func:`_generate_remote` returns (identical fields, identical receipt),
+    including ``streaming`` in the receipt: ``True`` only when chunks really
+    streamed, ``False`` when the provider answered with one whole body.
+
+    Nothing here splits a finished reply: a provider that ignores ``stream``
+    yields exactly one delta carrying the whole answer and reports
+    ``streaming: False``. The gateway (:func:`providers.gateway.run_stream`)
+    owns every policy gate, so this wrapper only adapts it to an iterator —
+    the provider client call runs in a worker thread so deltas reach the
+    caller while the response is still being read.
+    """
+    from .providers import gateway as GW
+    from .providers.contracts import ProviderRequest
+
+    st = store(cfg)
+    ev = _cancel_event(sid)
+    ev.clear()
+    prompt = clean
+    if context:
+        prompt = f"Recent conversation:\n{context}\n\nUser: {clean}"
+    started = time.monotonic()
+
+    def _stopped() -> bool:
+        return (_estop(cfg) or ev.is_set()
+                or (cancel is not None and bool(cancel())))
+
+    if _stopped():
+        _release_cancel(sid, ev)
+        yield ("outcome", {"ok": False, "state": "UNAVAILABLE",
+                           "code": "CANCELLED",
+                           "detail": "cancelled before remote execution",
+                           "session_id": sid})
+        return
+    req = ProviderRequest(
+        prompt=prompt, max_tokens=1024,
+        timeout_s=min(timeout_s or 120.0, 300.0),
+        route="frontier", provider=str(routed.get("provider") or ""),
+        model=str(routed.get("model") or ""),
+        idempotency_key=f"{sid}:{time.monotonic_ns()}")
+    box: "queue.Queue[Any]" = queue.Queue()
+    finished = object()
+
+    def _on_delta(chunk: str) -> None:
+        # Called from the reading thread; the queue is what makes this an
+        # incremental stream rather than one batch at the end.
+        if chunk:
+            box.put(("delta", chunk))
+
+    def _worker() -> None:
+        try:
+            res = GW.run_stream(
+                req, cfg, _on_delta,
+                cancel=_stopped, reasoning=reasoning,
+                profile_id=str(routed.get("profile_id") or ""),
+                session_id=sid)
+            box.put(("result", res))
+        except Exception as exc:  # noqa: BLE001 - typed, redacted
+            box.put(("error", exc))
+        finally:
+            box.put(finished)
+
+    thread = threading.Thread(target=_worker,
+                              name=f"qubit-chat-remote-stream-{sid}",
+                              daemon=True)
+    thread.start()
+    emitted: List[str] = []
+    res: Any = None
+    err: Optional[BaseException] = None
+    try:
+        while True:
+            item = box.get()
+            if item is finished:
+                break
+            kind, value = item
+            if kind == "delta":
+                emitted.append(value)
+                yield ("delta", value)
+            elif kind == "result":
+                res = value
+            elif kind == "error":
+                err = value
+    finally:
+        _release_cancel(sid, ev)
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    if err is not None or res is None:
+        _audit("turn_remote_error", session=sid,
+               error=str(err if err is not None else "no result"))
+        yield ("outcome", {"ok": False, "state": "FAILED",
+                           "code": "MODEL_ERROR",
+                           "detail": _redact(str(err or "no result"))[:300],
+                           "session_id": sid})
+        return
+    streamed = bool((res.details or {}).get("streaming")) and bool(emitted)
+    outcome = _remote_outcome(
+        cfg, sid, routed, res, elapsed_ms,
+        context_meta=context_meta, decision=decision, reasoning=reasoning,
+        st=st,
+        # A cut mid-stream returns only what the client really received.
+        streamed_text=("".join(emitted) if (emitted and not res.ok) else None),
+        path_suffix=".stream")
+    receipt = dict(outcome.get("receipt") or {})
+    receipt["streaming"] = streamed
+    outcome["receipt"] = receipt
+    yield ("outcome", outcome)
 
 
 def _agent_chat(cfg: Any, st: Any, sid: str, clean: str, *,
@@ -4632,10 +4776,12 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
                    ) -> Iterator[Dict[str, Any]]:
     """Streaming envelope for a registered non-local profile.
 
-    The gateway/provider path is non-streaming, so the reply is emitted as a
-    single truthful ``delta`` and the receipt marks ``streaming: false``. It
-    never claims token-by-token streaming for a provider that does not offer
-    it, and never fabricates text on failure.
+    Emits the provider's REAL chunks as individual ``delta`` events and then
+    ONE ``done`` carrying the full reply and the receipt. The start event's
+    ``streaming`` flag is honest: ``true`` only when the provider actually
+    streamed (a provider that answers with a whole body yields a single delta
+    and reports ``streaming: false``). No text is ever synthesized: a failure
+    is a typed ``error`` and a cancelled turn is a ``cancelled`` event.
     """
     clean = _bounded((text or "").strip(), MAX_TEXT_CHARS)
     st = store(cfg)
@@ -4662,24 +4808,42 @@ def _stream_remote(cfg: Any, text: str, *, session: Optional[str],
         yield {"event": "error", "code": appended.get("code"),
                "detail": appended.get("detail", "")}
         return
+    # The start frame opens the turn before the first byte of the answer is
+    # available, so it cannot claim streaming yet: ``streaming: False`` here is
+    # the truthful state at open, not a verdict on the whole turn.
+    # ``receipt.streaming`` on the done frame is that verdict, and it is
+    # measured from what actually arrived, never assumed.
     yield {"event": "start", "session_id": sid, "session": sid,
            "model": routed.get("model"), "provider": routed.get("provider"),
            "streaming": False, "message": appended.get("message"),
            "context": decision.public(), **_pending_event_field(cfg, sid)}
-    res = _generate_remote(cfg, sid, clean, context, routed,
-                           timeout_s=timeout_s, cancel=cancel,
-                           context_meta=ctx_meta, decision=decision,
-                           reasoning=reasoning)
-    if not res.get("ok"):
-        yield {"event": "error", "code": res.get("code"),
-               "detail": res.get("detail"), "session_id": sid}
+    outcome: Optional[Dict[str, Any]] = None
+    for kind, value in _stream_remote_turn(
+            cfg, sid, clean, context, routed, timeout_s=timeout_s,
+            cancel=cancel, context_meta=ctx_meta, decision=decision,
+            reasoning=reasoning):
+        if kind == "delta":
+            yield {"event": "delta", "text": value, "session_id": sid}
+        else:
+            outcome = value
+    if outcome is None:
+        yield {"event": "error", "code": "MODEL_ERROR",
+               "detail": "remote stream produced no result",
+               "session_id": sid}
         return
-    yield {"event": "delta", "text": res["reply"], "session_id": sid}
-    receipt = dict(res.get("receipt") or {})
-    receipt["streaming"] = False
-    yield {"event": "done", "ok": True, "reply": res["reply"],
+    if not outcome.get("ok"):
+        _detail = str(outcome.get("detail") or "")
+        if outcome.get("code") == "CANCELLED":
+            yield {"event": "cancelled", "session_id": sid,
+                   "elapsed_ms": outcome.get("elapsed_ms")}
+            return
+        yield {"event": "error", "code": outcome.get("code"),
+               "detail": _detail, "session_id": sid}
+        return
+    yield {"event": "done", "ok": True, "reply": outcome["reply"],
            "session_id": sid, "session": sid,
-           "elapsed_ms": res.get("elapsed_ms"), "receipt": receipt,
+           "elapsed_ms": outcome.get("elapsed_ms"),
+           "receipt": dict(outcome.get("receipt") or {}),
            **_pending_event_field(cfg, sid)}
 
 
@@ -4848,8 +5012,12 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     Event shapes: ``{"event": "start"}``, ``{"event": "delta", "text": ...}``,
     ``{"event": "done", "reply": ..., "receipt": ...}``,
     ``{"event": "cancelled"}``, ``{"event": "error", "code": ...}``. Deltas
-    are real completed sentences streamed from ``local_llm``; nothing is
-    synthesized when the model fails. ``reasoning`` is validated before any
+    are real incremental text, never synthesized on failure: the local path
+    streams completed sentences from ``local_llm``, and the remote path
+    streams the provider's own SSE chunks
+    (:func:`_stream_remote_turn`). A provider that answers in one body yields
+    one delta and is marked ``receipt.streaming == False`` — no reply is ever
+    split into fake token deltas. ``reasoning`` is validated before any
     session write and threaded as a real output budget on both the local
     streaming worker and the remote path.
 
@@ -5229,8 +5397,26 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     final_reply = ""
     identity_res = None
     try:
+        deadline = (time.monotonic() + float(timeout_s)) if timeout_s else None
         while True:
-            item = out.get()
+            try:
+                # A blocking get() is how a stalled provider used to hang the
+                # caller forever: timeout_s was accepted and never applied, so
+                # a worker that never put anything left the turn "active" with
+                # no events indefinitely. Poll with a bound and turn the miss
+                # into a terminal event the client can render.
+                item = out.get(timeout=0.25)
+            except queue.Empty:
+                if deadline is not None and time.monotonic() > deadline:
+                    _audit("stream_timeout", session=sid,
+                           timeout_s=float(timeout_s))
+                    yield {"event": "error", "code": "TURN_TIMEOUT",
+                           "detail": ("the provider produced no output within "
+                                      f"{float(timeout_s):.1f}s; the turn was "
+                                      "abandoned rather than left hanging"),
+                           "session_id": sid}
+                    return
+                continue
             if item is done:
                 break
             kind, value = item
@@ -5446,13 +5632,29 @@ def pty_session(cfg: Any, session_id: str = DEFAULT_SESSION, *,
     except Exception:
         scope = "global"
     key = f"{scope}\0{sid}"
+    if not reset:
+        # Fast path: a session already built needs no constructor and no lock
+        # held across one. Reading under the lock is cheap.
+        with _pty_lock:
+            existing = _pty_sessions.get(key)
+        if existing is not None:
+            return existing
+    # Build OUTSIDE the lock. AgentPtySession can take a long time (it touches
+    # the agent runtime), and holding a module-wide lock across that blocks
+    # EVERY other turn in the process — measured as turns sitting active with
+    # no events while the worker thread waited in futex_do_wait.
+    fresh = AgentPtySession(cfg, sid, model=model)
     with _pty_lock:
-        if reset or key not in _pty_sessions:
-            _pty_sessions[key] = AgentPtySession(cfg, sid, model=model)
-            if len(_pty_sessions) > _PTY_MAX:
-                oldest = next(iter(_pty_sessions))
-                _pty_sessions.pop(oldest, None)
-        return _pty_sessions[key]
+        # Double-check: another thread may have built this key while we did.
+        # Whoever installed first wins, so both callers share one session.
+        current = _pty_sessions.get(key)
+        if current is not None and not reset:
+            return current
+        _pty_sessions[key] = fresh
+        if len(_pty_sessions) > _PTY_MAX:
+            oldest = next(iter(_pty_sessions))
+            _pty_sessions.pop(oldest, None)
+        return fresh
 
 
 def pty_feed(cfg: Any, session_id: str, data_b64: str, *,

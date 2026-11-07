@@ -1,0 +1,205 @@
+.branded-select {
+  position: relative;
+  width: 100%;
+}
+
+.branded-select-native {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+  pointer-events: none;
+}
+
+.branded-select-button {
+  position: relative;
+  width: 100%;
+  min-height: 44px;
+  /* Shared chevron contract: reserve its lane, keep an optical 14px end inset. */
+  padding-inline: 12px 36px;
+  text-align: start;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+}
+
+.branded-select-button::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-end: 14px;
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  color: var(--qubit-muted, currentColor);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.branded-select-button:disabled { opacity: 0.7; cursor: not-allowed; }
+
+.branded-select-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--qubit-paper, #fbfcff);
+  color: var(--qubit-ink, inherit);
+  border: 1px solid var(--qubit-line-strong);
+}
+
+.branded-select-list[hidden] { display: none; }
+
+.branded-select-list > * { flex: none; }
+
+.branded-select-list::-webkit-scrollbar { width: 8px; }
+
+.branded-select-list::-webkit-scrollbar-thumb {
+  background: rgba(var(--qubit-fg-rgb), 0.45);
+  border: 1px solid var(--qubit-line-strong);
+}
+
+.branded-select-option {
+  min-height: 36px;
+  padding: 8px 12px;
+  text-align: left;
+  text-transform: none;
+  letter-spacing: 0.01em;
+  line-height: 1.35;
+  font-size: calc(14px * var(--qubit-text-zoom, 1));
+  background: transparent;
+  color: inherit;
+  border: 0;
+  border-radius: 0;
+}
+
+.branded-select-option-language {
+  font-family: "Segoe UI", "Yu Gothic", "Microsoft YaHei", "Malgun Gothic", "Noto Sans Thai", "Leelawadee UI", sans-serif;
+  letter-spacing: normal;
+  line-height: 1.45;
+}
+
+.branded-select-option[aria-selected="true"],
+.branded-select-option:hover,
+.branded-select-option:focus-visible {
+  background: rgba(var(--qubit-fg-rgb), 0.12);
+  color: var(--qubit-fg, inherit);
+}
+
+html[data-qubit-font-profile] .settings-dialog .browser-control-action,
+html[data-qubit-font-profile] .settings-dialog .browser-control-field > span,
+html[data-qubit-font-profile] .settings-dialog .browser-control-card h5,
+html[data-qubit-font-profile] .settings-dialog .bot-mode-cron-title h4,
+html[data-qubit-font-profile] .settings-dialog .bot-mode-density-row > span {
+  font-family: var(--qubit-font-ui);
+  font-synthesis: none;
+}
+html[data-qubit-font-profile] .settings-dialog .browser-control-kicker {
+  font-family: var(--qubit-font-display);
+  font-synthesis: none;
+  text-transform: uppercase;
+}
+html[data-qubit-font-profile] .settings-dialog .browser-control-action {
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+html[data-qubit-font-profile="signature"] button {
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+html[data-qubit-font-profile="signature"] .hint,
+html[data-qubit-font-profile="signature"] .settings-dialog label,
+html[data-qubit-font-profile="signature"] .web-settings-dialog label,
+html[data-qubit-font-profile="signature"] .settings-dialog button,
+html[data-qubit-font-profile="signature"] .web-settings-dialog button,
+html[data-qubit-font-profile="signature"] .settings-dialog input,
+html[data-qubit-font-profile="signature"] .web-settings-dialog input,
+html[data-qubit-font-profile="signature"] .settings-dialog textarea,
+html[data-qubit-font-profile="signature"] .web-settings-dialog textarea {
+  text-transform: none;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+}
+
+html[data-qubit-font-profile="signature"] .settings-dialog button,
+html[data-qubit-font-profile="signature"] .web-settings-dialog button,
+html[data-qubit-font-profile="signature"] .settings-dialog input,
+html[data-qubit-font-profile="signature"] .web-settings-dialog input,
+html[data-qubit-font-profile="signature"] .settings-dialog label,
+html[data-qubit-font-profile="signature"] .web-settings-dialog label,
+html[data-qubit-font-profile="signature"] .hint {
+  font-size: calc(13px * var(--qubit-text-zoom, 1));
+}
+
+html[data-qubit-font-profile="signature"] .settings-dialog .settings-header-actions > button,
+html[data-qubit-font-profile="signature"] .settings-dialog .settings-connection-test-label {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-family: var(--qubit-font-mono);
+  font-size: calc(9px * var(--qubit-text-zoom, 1));
+  line-height: 1;
+}
+html[data-qubit-font-profile="signature"] .settings-dialog .browser-control-action {
+  font-family: var(--qubit-font-ui);
+  font-size: calc(13px * var(--qubit-text-zoom, 1));
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+html[data-qubit-font-profile="signature"] .hero-copy .eyebrow,
+html[data-qubit-font-profile="signature"] .release-sidecar-copy .eyebrow {
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+  font-size: calc(10.5px * var(--qubit-text-zoom, 1));
+  line-height: 1.2;
+}
+
+.bot-chat-intro-title,
+.bot-mode-head h2,
+.bot-mode-sheet-head h2,
+.bot-mode-rail > header h2,
+.bot-mode-row-copy strong {
+  font-weight: 500;
+  font-synthesis: none;
+  letter-spacing: 0.02em;
+}
+.bot-mode-row-copy strong {
+  font-family: var(--qubit-font-ui);
+  font-size: calc(15px * var(--qubit-text-zoom, 1));
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+.bot-chat-intro-subtitle,
+.bot-mode-head p,
+.bot-mode-sheet-head p,
+.bot-mode-row-copy span,
+.bot-mode-row-copy small {
+  font-family: var(--qubit-font-ui);
+  font-synthesis: none;
+  letter-spacing: 0.01em;
+  text-transform: none;
+}
+.bot-mode-density-row .branded-select {
+  width: 100%;
+  min-width: 0;
+  flex: none;
+}
+
+.bot-mode-density-row .branded-select-button {
+  min-height: 34px;
+  width: 100%;
+}

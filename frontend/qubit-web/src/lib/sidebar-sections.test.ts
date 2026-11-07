@@ -46,6 +46,12 @@ describe("sectionizeNav", () => {
     const all = SIDEBAR_SECTIONS.flatMap((s) => [...s.paths]);
     expect(new Set(all).size).toBe(all.length);
   });
+
+  it("groups /qubit-hud under System so a hidden-tab plugin is still reachable", () => {
+    const out = sectionizeNav([item("/system"), item("/qubit-hud")]);
+    expect(out.map((s) => s.section.id)).toEqual(["system"]);
+    expect(out[0].entries.map((e) => e.path)).toEqual(["/system", "/qubit-hud"]);
+  });
 });
 
 describe("navDescription", () => {

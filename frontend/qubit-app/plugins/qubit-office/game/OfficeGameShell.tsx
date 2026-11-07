@@ -443,6 +443,15 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
         else setSettingsDrawer(!settingsDrawer);
       },
     }, "Settings"),
+    // Navigation only. The office page is read-only (see the file header): a
+    // link is not a mutation, so the staged-op journal is not bypassed here —
+    // it is never reached. The HUD is the read surface the office does not own.
+    R.createElement("a", {
+      key: "hud", className: "office-game__btn",
+      href: "/qubit-hud",
+      "data-testid": "office-game-open-hud",
+      "aria-label": "Open HUD",
+    }, "Open HUD"),
   ]);
 
   const attrs = shellAttributes(settings);

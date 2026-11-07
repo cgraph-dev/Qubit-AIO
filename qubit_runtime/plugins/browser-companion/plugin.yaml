@@ -1,32 +1,98 @@
 name: browser-companion
+kind: standalone
 version: 0.4.0
 manifest_version: 2
 api_version: 1
 description: >-
-  The Qubit side of the browser companion extension: gives the agent the browser
-  context a turn carries (Browser Context Protocol v2) through three owner-scoped,
-  consume-once tools. Fail-soft: with no browser context attached, every tool
-  reports unavailable. Browser control (tab_* actions) is NOT part of this plugin
-  — Qubit's own browser_* tools already route to an attached extension controller.
-author: Qubit
+  The Qubit side of the Qubit Browser Extension. Gives the agent the browser
+  context the extension sends with a turn, and carries Qubit Control: the
+  agent working in the person's own browser tabs through the extension (tab_*
+  tools, across several tabs at once). Fail-soft: when no browser context or
+  browser is attached, every tool reports unavailable.
+author: Iruzen (iruzen-dono); Qubit port
 license: MIT
-tags: [browser, browser-extension, context]
+homepage: https://github.com/abundantbeing/hermes-browser-extension
+tags: [browser, browser-extension, tabs, context]
+# Upstream's floor was Hermes Agent 0.22 (manifest v2, the three hooks and the
+# register_platform_handler("api_server") seam). Qubit carries all three.
+# requires_hermes: ">=0.22"  -- omitted: Qubit reads a `requires_qubit` VALUE but does not
+# list the key in _KNOWN_MANIFEST_FIELDS, so declaring it would log an
+# "unknown manifest field" warning on every load. Nothing is gated: this plugin
+# needs nothing Qubit does not ship.
 
-# Backend, not standalone: a bundled ``backend`` plugin auto-loads on discovery,
-# while a bundled ``standalone`` one is opt-in through ``plugins.enabled``. This
-# plugin is native and always present, exactly like its siblings below it.
-kind: backend
-
-# No privileged host surface is requested: the plugin registers its own tools,
-# overrides no built-in tool, makes no host-owned LLM call, acts on no chat
-# platform and reads no credential.
+# No privileged host surface is requested: the plugin registers its own
+# tools (it overrides no built-in tool), makes no host-owned LLM
+# call, acts on no chat platform and reads no credential. Declaring nothing
+# is the truthful `capabilities:` block, so the consent screen stays empty.
+#
+# `register_platform_handler("api_server", ...)` — the seam the routes are wired
+# through — needs no capability: it is a host call, not a credential grant.
 capabilities: []
 
 provides_tools:
   - browser_context_status
   - browser_get_context
   - browser_clear_context
+  - browser_event_log
+  - browser_control_status
+  - browser_context_journal
+  - browser_text_utility
+  - tab_back
+  - tab_batch
+  - tab_click
+  - tab_drag
+  - tab_fill
+  - tab_hover
+  - tab_navigate
+  - tab_press
+  - tab_screenshot
+  - tab_scroll
+  - tab_scroll_to
+  - tab_select
+  - tab_snapshot
+  - tab_activate
+  - tab_close
+  - tab_create
+  - tab_group
+  - tab_ungroup
+  - tab_list
+  - tab_type
+
+# The `tab_*` names are registered only where Qubit's own extension control is
+# OFF (`browser.extension_control.enabled` unset/false). Where it is on, the
+# extension attaches to Qubit's core broker and these 20 are not registered, so
+# the tool list never claims a tool that can only answer `no_browser`.
+# (The condition lives in control_tools.core_extension_control_on(); it is
+# documented on the block, not encoded here, because the manifest carries no
+# conditional-tool field and one is not worth inventing for a single plugin.)
 
 provides_hooks:
   - pre_llm_call
   - pre_tool_call
+  - post_tool_call
+
+# Routes register() wires through register_platform_handler("api_server"). Kept as
+# a comment, not a manifest field: Qubit rejects unknown manifest keys with a
+# load-time warning (`_KNOWN_MANIFEST_FIELDS`), and no host code reads a route
+# declaration. The live list is status_route.ROUTE_PATHS and the payload
+# GET /api/plugins/browser-companion/status returns.
+#   GET  /api/plugins/browser-companion/status
+#   GET  /api/plugins/browser-companion/context/status
+#   POST /api/plugins/browser-companion/context
+#   GET  /api/plugins/browser-companion/actions
+#   POST /api/plugins/browser-companion/control/register
+#   GET  /api/plugins/browser-companion/control/ws
+#   GET  /api/plugins/browser-companion/profiles
+#   GET  /api/plugins/browser-companion/profiles/{name}/avatar
+#
+# One bundled skill: skills/browser-companion/SKILL.md (registered by name in __init__.py).
+
+config_schema:
+  durable_receipts:
+    type: bool
+    default: true
+    description: Persist only bounded redacted tool receipt metadata across restarts.
+  receipt_limit:
+    type: int
+    default: 8
+    description: Maximum durable redacted receipts to retain, clamped to eight.

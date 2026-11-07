@@ -1,0 +1,129 @@
+{
+  "manifest_version": 3,
+  "default_locale": "en",
+  "name": "__MSG_extensionName__",
+  "short_name": "__MSG_extensionShortName__",
+  "version": "0.4.0",
+  "description": "__MSG_extensionDescription__",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "assets/icons/icon-16.png",
+    "32": "assets/icons/icon-32.png",
+    "48": "assets/icons/icon-48.png",
+    "128": "assets/icons/icon-128.png"
+  },
+  "permissions": [
+    "activeTab",
+    "alarms",
+    "contextMenus",
+    "debugger",
+    "downloads",
+    "declarativeNetRequestWithHostAccess",
+    "offscreen",
+    "scripting",
+    "sidePanel",
+    "storage",
+    "unlimitedStorage",
+    "tabs"
+  ],
+  "optional_permissions": [
+    "webRequest"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "http://*/*",
+    "https://*/*",
+    "file:///*"
+  ],
+  "action": {
+    "default_title": "__MSG_openExtension__",
+    "default_icon": {
+      "16": "assets/icons/icon-16.png",
+      "32": "assets/icons/icon-32.png",
+      "48": "assets/icons/icon-48.png",
+      "128": "assets/icons/icon-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+H",
+        "mac": "Alt+H"
+      },
+      "description": "__MSG_openExtension__"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
+      "js": [
+        "lib/browser-api-global.js",
+        "content-extractor.js",
+        "content.js",
+        "lib/i18n-content.js",
+        "content-inline-helper.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://127.0.0.1/*",
+        "http://localhost/*"
+      ],
+      "include_globs": [
+        "*/webapp/launch*",
+        "*/webapp/window*"
+      ],
+      "css": [
+        "qubit-web-launch.css"
+      ],
+      "js": [
+        "lib/browser-api-global.js",
+        "qubit-web-launch.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "assets/img/qubit-browser-extension-icon-box-white.png",
+        "assets/img/qubit-browser-extension-icon-ink.png",
+        "assets/img/assist-wing.png",
+        "assets/img/assist-staff.svg",
+        "assets/img/assist-girl-outline.png",
+        "assets/img/assist-girl-solid.png",
+        "assets/img/qubit-wing-mark.svg"
+      ],
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ]
+    },
+    {
+      "resources": [
+        "qubit-web-opening.html"
+      ],
+      "matches": [
+        "http://127.0.0.1/*",
+        "http://localhost/*"
+      ]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src http://127.0.0.1:* http://localhost:*; img-src 'self' data: blob:; media-src 'self'; connect-src http: https: wss: ws://127.0.0.1:* ws://localhost:*;"
+  }
+}

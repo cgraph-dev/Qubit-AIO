@@ -1,0 +1,120 @@
+@font-face {
+  font-family: "Rules Variable";
+  src: url("../assets/fonts/RulesVariable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Rules Gothic Compressed";
+  src: url("../assets/fonts/RulesGothicCmp-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Collapse";
+  src: url("../assets/fonts/Collapse-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Collapse";
+  src: url("../assets/fonts/Collapse-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "QubitDisplay";
+  src: url("../assets/fonts/Sigurd-Variable.woff2") format("woff2");
+  font-weight: 300 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "QubitMono";
+  src: url("../assets/fonts/CourierPrime-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light;
+  --qubit-blue: #0000f2;
+  --qubit-blue-deep: #03038f;
+  --qubit-paper: #fbfcff;
+  --qubit-white: #f8faff;
+  --qubit-ink: #0000f2;
+  --qubit-blue-rgb: 0, 0, 242;
+  --qubit-paper-rgb: 251, 252, 255;
+  --qubit-white-rgb: 248, 250, 255;
+  --qubit-fg-rgb: var(--qubit-white-rgb);
+  --qubit-shadow-rgb: 0, 0, 80;
+  --qubit-line: rgba(var(--qubit-blue-rgb), 0.24);
+  --qubit-line-strong: rgba(var(--qubit-blue-rgb), 0.76);
+  --qubit-muted: rgba(var(--qubit-blue-rgb), 0.64);
+  --qubit-blue-muted: rgba(var(--qubit-white-rgb), 0.72);
+  --qubit-blue-line: rgba(var(--qubit-white-rgb), 0.42);
+  --qubit-success: #0a8f54;
+  --qubit-warning: #a96800;
+  --qubit-danger: #d51f4e;
+  --qubit-font-ui: "Rules Variable", "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --qubit-font-display: "Rules Gothic Compressed", "QubitDisplay", "Rules Variable", "Space Grotesk", sans-serif;
+  --qubit-font-mono: "Aeonik Fono", "Aeonik Fono Pro", "Aeonik Fono Pro TRIAL", "QubitMono", "Courier Prime", "Cascadia Code", monospace;
+  font-family: var(--qubit-font-ui);
+  font-synthesis: none;
+}
+
+html[data-qubit-theme^="custom:"] {
+  color-scheme: light;
+}
+
+html[data-qubit-theme^="custom:"][data-qubit-mode="dark"] {
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+button,
+input,
+textarea,
+select { font: inherit; }
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

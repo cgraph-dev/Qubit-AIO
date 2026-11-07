@@ -1395,7 +1395,10 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             profile = get_active_profile_name()  # launch profile, pre-identity (advertised model name)
             if profile and profile not in {"default", "custom"}:
                 profile_name = profile
-        return resolve_effective_model(explicit, profile_name, "hermes-agent")
+        # ``qubit-agent`` is the canonical virtual model name (compat alias:
+        # ``hermes-agent``). This literal reaches clients as the advertised id in
+        # /v1/models, so it must be the Qubit one — the browser extension shows it.
+        return resolve_effective_model(explicit, profile_name, "qubit-agent")
 
     def _cors_headers_for_origin(self, origin: str) -> Optional[Dict[str, str]]:
         """Return CORS headers for an allowed browser origin."""
@@ -2365,7 +2368,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
 
     async def _handle_health(self, request: "web.Request") -> "web.Response":
         """GET /health — simple health check."""
-        return web.json_response({"status": "ok", "platform": "hermes-agent", "version": _qubit_version()})
+        return web.json_response({"status": "ok", "platform": "qubit-agent", "version": _qubit_version()})
 
     @_require_auth
     async def _handle_health_detailed(self, request: "web.Request") -> "web.Response":
@@ -2421,7 +2424,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         model_name = self._resolve_model_name("") if _api_request_profile.get() else self._model_name
 
         def _model(mid: str, root: str, parent) -> Dict[str, Any]:
-            return {"id": mid, "object": "model", "created": now, "owned_by": "hermes", "permission": [],
+            return {"id": mid, "object": "model", "created": now, "owned_by": "qubit", "permission": [],
                     "root": root, "parent": parent}
         models = [_model(model_name, model_name, None)]
         models.extend(
@@ -2480,7 +2483,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
                     "local_vps": "websocket-subprotocol-ticket",
                     "cloud": "authenticated-gateway-rpc"}}}
         return web.json_response({
-            "object": "hermes.api_server.capabilities", "platform": "hermes-agent",
+            "object": "qubit.api_server.capabilities", "platform": "qubit-agent",
             "model": self._model_name,
             "auth": {"type": "bearer", "required": bool(self._api_key)},
             "runtime": {

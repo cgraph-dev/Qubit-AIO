@@ -8,6 +8,7 @@ limits are reported honestly.
 """
 from __future__ import annotations
 
+import contextlib
 import http.client
 import json
 import socket
@@ -155,6 +156,151 @@ class AbortableHTTPTransport:
                 pass
 
 
+class AbortableChatStream:
+    """One ``stream: true`` chat-completions POST over a socket this owns.
+
+    The streaming sibling of :class:`AbortableHTTPTransport`: ``http.client``
+    keeps the live connection, so :meth:`abort` can ``shutdown`` it (``shutdown``,
+    not just ``close``, is what wakes a thread blocked in ``recv`` on Linux)
+    while a chunk read is mid-flight. Idempotent, and safe before the socket
+    exists.
+
+    ``open`` returns a context manager yielding the decoded ``data:`` payload
+    lines as *parsed JSON objects* — the caller never sees raw bytes, so an
+    SSE comment, a keep-alive blank line, or a ``[DONE]`` sentinel is skipped
+    here rather than in three call sites.
+    """
+
+    def __init__(self, url: str, headers: Dict[str, str],
+                 payload: Dict[str, Any], timeout_s: float) -> None:
+        parts = urllib.parse.urlsplit(url)
+        self._scheme = (parts.scheme or "http").lower()
+        self._host = parts.hostname or "127.0.0.1"
+        self._port = parts.port
+        self._path = parts.path or "/"
+        if parts.query:
+            self._path = f"{self._path}?{parts.query}"
+        self._body = json.dumps(payload).encode()
+        self._headers = dict(headers or {})
+        self._timeout_s = float(timeout_s)
+        self._lock = threading.RLock()
+        self._conn: Any = None
+        self._aborted = False
+
+    def abort(self) -> bool:
+        """Shut down the live socket; False when none was in flight."""
+        with self._lock:
+            self._aborted = True
+            conn = self._conn
+        if conn is None:
+            return False
+        try:
+            sock = getattr(conn, "sock", None)
+            if sock is not None:
+                sock.shutdown(socket.SHUT_RDWR)
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
+        try:
+            conn.close()
+        except Exception:  # noqa: BLE001 - abort is best-effort
+            pass
+        return True
+
+    @property
+    def aborted(self) -> bool:
+        with self._lock:
+            return self._aborted
+
+    @contextlib.contextmanager
+    def _connection(self) -> Any:
+        """Own one connection for the life of the ``with`` block."""
+        cls = (http.client.HTTPSConnection if self._scheme == "https"
+               else http.client.HTTPConnection)
+        conn = cls(self._host, self._port, timeout=self._timeout_s)
+        with self._lock:
+            if self._aborted:
+                raise _StreamAborted("request aborted before send")
+            self._conn = conn
+        resp = None
+        try:
+            conn.request("POST", self._path, body=self._body,
+                         headers={**self._headers,
+                                  "Accept": "text/event-stream"})
+            resp = conn.getresponse()
+            if int(getattr(resp, "status", 200) or 200) != 200:
+                # Surface the error body so the caller can map it with the
+                # same status→code table the blocking client uses.
+                try:
+                    raw = resp.read().decode("utf-8", "replace")[:2000]
+                except Exception:  # noqa: BLE001 - body already gone
+                    raw = ""
+                raise _StreamHTTPError(int(resp.status or 0), raw)
+            yield resp
+        finally:
+            with self._lock:
+                self._conn = None
+            if resp is not None:
+                try:
+                    resp.close()
+                except Exception:  # noqa: BLE001 - cleanup only
+                    pass
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001 - cleanup only
+                pass
+
+    def frames(self) -> Any:
+        """Yield each SSE ``data:`` payload as a parsed JSON object.
+
+        A plain generator (NOT a context manager) so callers iterate it in a
+        ``for`` loop exactly as they read a file: ``contextlib`` would collapse
+        a generator to its first value only.
+        """
+        with self._connection() as resp:
+            for line in iter(resp.readline, b""):
+                if self.aborted:
+                    raise _StreamAborted("request aborted mid-stream")
+                text = line.decode("utf-8", "replace").strip()
+                if not text or text.startswith(":"):
+                    continue  # blank keep-alive / SSE comment
+                if not text.startswith("data:"):
+                    # A provider that ignored ``stream: true`` answers 200 with
+                    # ONE plain JSON body, not SSE. Surface it as a single frame
+                    # so the caller can accept it whole (and report honestly
+                    # that nothing streamed) instead of seeing an empty turn.
+                    if text.startswith("{"):
+                        try:
+                            obj = json.loads(text)
+                        except Exception:  # noqa: BLE001 - not JSON either
+                            continue
+                        if isinstance(obj, dict):
+                            yield obj
+                            return
+                    continue  # event:/id:/retry: frames carry no content
+                data = text[len("data:"):].strip()
+                if data == "[DONE]":
+                    return
+                try:
+                    obj = json.loads(data)
+                except Exception:  # noqa: BLE001 - one bad frame is skipped
+                    continue
+                if isinstance(obj, dict):
+                    yield obj
+
+
+class _StreamAborted(Exception):
+    """Raised when the stream was aborted mid-flight (cancel / e-stop)."""
+
+
+class _StreamHTTPError(Exception):
+    """Non-200 response to a streaming request; carries status + body."""
+
+    def __init__(self, status: int, body: str) -> None:
+        super().__init__(f"http {status}: {body[:300]}")
+        self.status = status
+        self.body = body
+
+
 class _CancelWatch:
     """Watch a cancel hook for the duration of one blocking transport call.
 
@@ -200,6 +346,45 @@ _REFUSAL_MARKERS = (
     "moderation", "refusal", "blocked_by_policy", "policy_violation",
     "safety_system", "responsible_ai",
 )
+
+
+def _http_error_result(provider: str, model: str, status: int,
+                       body: Dict[str, Any]) -> "ProviderResult":
+    """Typed refusal for a non-200 provider response.
+
+    One table shared by :meth:`FrontierClient.complete` and
+    :meth:`FrontierClient.complete_stream` so the streaming path can never map
+    an error code differently from the blocking path. Returns a
+    ``ProviderResult`` with ``ok=False``; the caller decides whether the code
+    is retryable (``PROVIDER_OUTAGE`` / ``RATE_LIMITED``) before giving up.
+    """
+    ident = f"{provider}/{model}"
+    base: Dict[str, Any] = {"ok": False, "provider": provider,
+                            "model": model, "identity": ident}
+    if _looks_like_refusal(body):
+        return ProviderResult(code="CONTENT_REFUSED",
+                              message=json.dumps(body)[:300], **base)
+    if status == 404:
+        if _looks_like_dead_model(body):
+            return _dead_model_result(provider, model, body)
+        return ProviderResult(code="NOT_CONFIGURED",
+                              message="endpoint or model not found "
+                                      f"(http 404 at {provider})", **base)
+    if status in (401, 403):
+        return ProviderResult(code="AUTH_INVALID", message=f"http {status}",
+                              **base)
+    if status == 400 and "tool" in json.dumps(body)[:500].lower():
+        return ProviderResult(code="UNSUPPORTED_CAPABILITY",
+                              message=json.dumps(body)[:300], **base)
+    if status in (400, 422):
+        if _looks_like_dead_model(body):
+            return _dead_model_result(provider, model, body)
+        return ProviderResult(code="MALFORMED_RESPONSE",
+                              message=json.dumps(body)[:300], **base)
+    if status == 429:
+        return ProviderResult(code="RATE_LIMITED", message="http 429", **base)
+    return ProviderResult(code="PROVIDER_OUTAGE", message=f"http {status}",
+                          **base)
 
 
 def _looks_like_refusal(body: Dict[str, Any]) -> bool:
@@ -513,3 +698,238 @@ class FrontierClient:
         return ProviderResult(ok=False, code=last_code, message=last_msg,
                               provider=self.provider, model=self.model,
                               identity=f"{self.provider}/{self.model}")
+
+    def complete_stream(self, req: ProviderRequest, prompt_text: str,
+                        est_cost: float = 0.0,
+                        messages: Optional[List[Dict[str, Any]]] = None,
+                        on_delta: Optional[Callable[[str], None]] = None,
+                        extra_headers: Optional[Dict[str, str]] = None
+                        ) -> ProviderResult:
+        """Stream one chat completion, calling ``on_delta`` per real chunk.
+
+        ``on_delta(text)`` receives ONLY the incremental content of one SSE
+        chunk, as the provider sent it — never a fragment split out of a
+        finished reply. The returned :class:`ProviderResult` carries the same
+        fields as :meth:`complete` (``text`` = the concatenation of every
+        chunk, ``usage``, ``details``) so a caller can persist or receipt it
+        identically.
+
+        ``details["streaming"]`` is the honest verdict: ``True`` only when
+        chunks really arrived over SSE. A provider/transport that ignores
+        ``stream: true`` and answers with a single JSON body is accepted as
+        one delta and marked ``streaming: False`` — the caller then says so
+        rather than claiming token streaming.
+
+        There is NO retry once a delta was emitted: a retry would duplicate
+        text the client already displayed. Retries apply only to failures
+        before the first chunk (the blocking path's exact table).
+        """
+        if self.cancel is not None and self.cancel():
+            return ProviderResult(ok=False, code="CANCELLED",
+                                  message="cancelled before send",
+                                  provider=self.provider, model=self.model,
+                                  identity=f"{self.provider}/{self.model}")
+        convo = messages if messages else [{"role": "user",
+                                            "content": prompt_text}]
+        payload: Dict[str, Any] = {
+            "model": self.model,
+            "messages": convo,
+            "max_tokens": req.max_tokens,
+            "stream": True,
+            # Ask for usage on the final chunk; a provider that does not
+            # support it ignores the field.
+            "stream_options": {"include_usage": True},
+        }
+        if req.structured_schema is not None:
+            payload["response_format"] = {"type": "json_object"}
+        if req.tools:
+            payload["tools"] = req.tools
+        real_headers = {"Content-Type": "application/json",
+                        "Authorization": f"Bearer {self._key}"}
+        # Relay-required affinity headers (OpenCode) arrive from the gateway so
+        # a streamed turn sends exactly what the blocking transport sends.
+        for _k, _v in (extra_headers or {}).items():
+            real_headers.setdefault(str(_k), str(_v))
+        url = f"{self.base_url}/chat/completions"
+        last_code, last_msg = "PROVIDER_OUTAGE", "no attempts"
+        t0 = time.time()
+        transport_retries = 0
+        for attempt in range(self.max_retries + 1):
+            if self.cancel is not None and self.cancel():
+                return ProviderResult(ok=False, code="CANCELLED",
+                                      message="cancelled during retry",
+                                      provider=self.provider, model=self.model,
+                                      identity=f"{self.provider}/{self.model}")
+            stream = AbortableChatStream(url, real_headers, payload,
+                                         self.timeout_s)
+            acc: List[str] = []
+            pt = ct = 0
+            finish_reason = ""
+            sent = 0
+            first_ms: Optional[int] = None
+            single_body: Dict[str, Any] = {}
+            try:
+                with _CancelWatch(self.cancel, stream):
+                    for frame in stream.frames():
+                        if self.cancel is not None and self.cancel():
+                            raise _StreamAborted("cancelled mid-stream")
+                        if isinstance(frame.get("usage"), dict):
+                            usage = frame["usage"]
+                            pt = int(usage.get("prompt_tokens") or pt)
+                            ct = int(usage.get("completion_tokens") or ct)
+                        choices = frame.get("choices")
+                        if not isinstance(choices, list) or not choices:
+                            # Not a chunk envelope. A provider that ignored
+                            # stream:true answers with one whole JSON body —
+                            # remember it and accept it below, NEVER split it
+                            # into fake token deltas.
+                            if "choices" not in frame and "usage" not in frame:
+                                single_body = frame
+                                break
+                            continue
+                        choice = choices[0] if isinstance(choices[0], dict) else {}
+                        finish_reason = (str(choice.get("finish_reason") or "")
+                                         or finish_reason)
+                        if "delta" not in choice:
+                            # A whole (non-streamed) completion body: accept it
+                            # as ONE delta below and report streaming False —
+                            # never read ``message`` as if it were a chunk.
+                            single_body = frame
+                            break
+                        delta = choice.get("delta") or {}
+                        chunk = (delta.get("content")
+                                 if isinstance(delta, dict) else None)
+                        if not chunk:
+                            continue
+                        if sent == 0:
+                            first_ms = int((time.time() - t0) * 1000)
+                        acc.append(str(chunk))
+                        sent += 1
+                        if on_delta is not None:
+                            on_delta(str(chunk))
+            except _StreamHTTPError as exc:
+                try:
+                    body = json.loads(exc.body or "{}")
+                except Exception:  # noqa: BLE001 - keep the raw text
+                    body = {"__http_error__": exc.body[:300]}
+                res = _http_error_result(self.provider, self.model,
+                                         exc.status,
+                                         body if isinstance(body, dict) else {})
+                if res.code in ("RATE_LIMITED", "PROVIDER_OUTAGE") \
+                        and sent == 0:
+                    last_code, last_msg = res.code, res.message
+                    transport_retries += 1
+                    if transport_retries > self.max_retries:
+                        break
+                    continue
+                return res
+            except _StreamAborted:
+                # A stopped turn returns what really arrived; the caller
+                # decides (the stream envelope reports ``cancelled``).
+                return ProviderResult(ok=False, code="CANCELLED",
+                                      message="cancelled during provider call",
+                                      provider=self.provider, model=self.model,
+                                      identity=f"{self.provider}/{self.model}",
+                                      details={"streaming": sent > 0,
+                                               "chunks": sent,
+                                               "partial_text": "".join(acc)})
+            except Exception as exc:  # noqa: BLE001 - typed transport error
+                err = str(exc)[:300]
+                low = err.lower()
+                last_code = ("TIMEOUT" if "timed out" in low or "timeout" in low
+                             else "PROVIDER_OUTAGE")
+                last_msg = err
+                if sent:
+                    # Text already reached the client: never retry (it would
+                    # duplicate the visible answer), surface it typed instead.
+                    return ProviderResult(ok=False, code=last_code,
+                                          message=err,
+                                          provider=self.provider, model=self.model,
+                                          identity=f"{self.provider}/{self.model}",
+                                          details={"streaming": True,
+                                                   "chunks": sent,
+                                                   "partial_text": "".join(acc)})
+                log_event("frontier.attempt", provider=self.provider,
+                          attempt=attempt, code=last_code)
+                transport_retries += 1
+                if transport_retries > self.max_retries:
+                    break
+                continue
+            ms = int((time.time() - t0) * 1000)
+            text = "".join(acc).strip()
+            if not text and single_body:
+                # Non-streaming body from a provider that ignored stream:true.
+                try:
+                    whole, pt, ct, finish_reason, _ = _extract_text(single_body)
+                except Exception as exc:  # noqa: BLE001 - typed refusal
+                    return ProviderResult(ok=False, code="MALFORMED_RESPONSE",
+                                          message=str(exc)[:200],
+                                          provider=self.provider,
+                                          model=self.model,
+                                          identity=f"{self.provider}/{self.model}")
+                if whole:
+                    if on_delta is not None:
+                        on_delta(whole)
+                    return self._streamed_result(whole, pt, ct, ms, est_cost,
+                                                 streamed=False)
+            if not text:
+                if finish_reason == "length":
+                    return ProviderResult(
+                        ok=False, code="OUTPUT_TRUNCATED",
+                        message=(
+                            f"provider stopped at max_tokens="
+                            f"{int(payload.get('max_tokens') or 0)} with no "
+                            f"visible content ({ct} completion tokens); lower "
+                            "the reasoning level or raise the output budget"),
+                        provider=self.provider, model=self.model,
+                        identity=f"{self.provider}/{self.model}")
+                return ProviderResult(ok=False, code="MALFORMED_RESPONSE",
+                                      message="empty content",
+                                      provider=self.provider, model=self.model,
+                                      identity=f"{self.provider}/{self.model}")
+            if len(text) > self.max_response_chars:
+                return ProviderResult(ok=False, code="RESPONSE_TOO_LARGE",
+                                      message=f"{len(text)} chars",
+                                      provider=self.provider, model=self.model,
+                                      identity=f"{self.provider}/{self.model}")
+            if req.structured_schema is not None:
+                try:
+                    json.loads(text)
+                except Exception:  # noqa: BLE001 - typed refusal
+                    return ProviderResult(ok=False, code="MALFORMED_RESPONSE",
+                                          message="schema output not JSON",
+                                          provider=self.provider,
+                                          model=self.model,
+                                          identity=f"{self.provider}/{self.model}")
+            return self._streamed_result(text, pt, ct, ms, est_cost,
+                                         streamed=sent > 0, chunks=sent,
+                                         first_delta_ms=first_ms)
+        return ProviderResult(ok=False, code=last_code, message=last_msg,
+                              provider=self.provider, model=self.model,
+                              identity=f"{self.provider}/{self.model}")
+
+    def _streamed_result(self, text: str, pt: int, ct: int, ms: int,
+                         est_cost: float, *, streamed: bool,
+                         chunks: int = 0,
+                         first_delta_ms: Optional[int] = None) -> ProviderResult:
+        """Build the success result shared by the streaming and whole-body paths."""
+        # Providers that omit per-chunk usage: charge the tokens we can count
+        # rather than reporting a zero-token turn.
+        if ct <= 0 and streamed:
+            ct = max(1, len(text) // 4) if text else 0
+        usage = UsageRecord(provider=self.provider, model=self.model,
+                            identity=f"{self.provider}/{self.model}",
+                            prompt_tokens=pt, completion_tokens=ct,
+                            # Declared latency is the measured time to the FIRST
+                            # chunk (what the operator waited before seeing
+                            # text), never a guess derived from the total.
+                            latency_ms=int(first_delta_ms or ms),
+                            cost_usd_est=est_cost)
+        log_event("frontier.ok", provider=self.provider, model=self.model,
+                  ms=ms, streamed=streamed, chunks=chunks)
+        return ProviderResult(ok=True, text=text, provider=self.provider,
+                              model=self.model,
+                              identity=f"{self.provider}/{self.model}",
+                              usage=usage,
+                              details={"streaming": bool(streamed),
+                                       "chunks": int(chunks)})

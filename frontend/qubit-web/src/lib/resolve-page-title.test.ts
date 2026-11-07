@@ -51,6 +51,13 @@ describe("resolvePageTitle", () => {
     ).toBe("Kanban");
   });
 
+  it("resolves the Qubit HUD overlay route to its literal title", () => {
+    // Regression: without the ROUTE_TITLES entry the naive fallback produced
+    // "Qubit-hud" (the plugin tab is hidden, so there is no plugin label).
+    expect(resolvePageTitle("/qubit-hud", t, [])).toBe("Qubit HUD");
+    expect(resolvePageTitle("/qubit-hud/", t, [])).toBe("Qubit HUD");
+  });
+
   it("falls back to capitalized path segment for unknown routes", () => {
     expect(resolvePageTitle("/whatever", t, [])).toBe("Whatever");
   });
