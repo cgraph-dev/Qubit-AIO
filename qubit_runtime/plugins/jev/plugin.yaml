@@ -1,7 +1,29 @@
 name: jev
-version: 1.0.0
-description: "Optional typed decision provider — yes/no probabilities, closed-set distributions and rubric scores from a decision model (Jev), via the OpenCode Zen free tier (OPENCODE_ZEN_API_KEY) or a TypeSafe key. Reports unavailable and changes nothing when no key is configured."
-author: Qubit Labs
-kind: backend
+version: 0.25.2
+description: TypeSafe Jev takes the cheap decisions - model routing, skill selection, memory filtering, compaction selection, GUI and browser action choice, and (opt-in) policy decisions and a shadow command-risk gate. Choose typesafe, openrouter, venice or zen at runtime via jev setup-key; no single provider key is mandatory at install.
+author: Steve Darlow
+license: MIT
+homepage: https://github.com/kerpopule/hermes-jev-skills (upstream; ported into Qubit)
+manifest_version: 2
+# Provider selection and private key setup happen at runtime via `jev setup-key`.
+# Providers: typesafe, openrouter, venice, zen. No single provider is required.
 provides_tools:
+  - jev_supervise
+  - jev_escalate
+  - jev_memory_filter
+  - jev_search
+  - jev_compact_select
+  - jev_choose_action
   - jev_decide
+  - jev_score
+  - jev_route_to
+provides_hooks:
+  - pre_llm_call
+  - transform_llm_output
+  - pre_approval_request
+  - post_approval_response
+tags: [jev, typesafe, routing, memory, compaction, computer-use]
+config_schema:
+  routing: {type: str, description: "off | shadow | on"}
+  skills: {type: str, description: "off | on"}
+  notice: {type: str, description: "off | on"}
