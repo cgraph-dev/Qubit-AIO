@@ -1,6 +1,7 @@
 """One detached-process primitive; callers must first prove owner/service absence."""
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 import subprocess
@@ -9,6 +10,28 @@ import sys
 from qubit_cli._subprocess_compat import windows_detach_popen_kwargs, _WINDOWS_GATEWAY_BREAKAWAY_ENV
 from qubit_cli.gateway_launchd_runtime import GatewayJob, start_gateway_job
 from qubit_cli.gateway_runtime_service import RuntimeStartError, remaining
+
+logger = logging.getLogger(__name__)
+
+# CREATE_BREAKAWAY_FROM_JOB is denied with ERROR_ACCESS_DENIED when the enclosing Job Object
+# does not grant JOB_OBJECT_LIMIT_BREAKAWAY_OK. GitHub-hosted Windows runners run every step in
+# such a job, so the strict no-breakaway refusal below would make an unmanaged gateway impossible
+# there. The fallback keeps the child inside that job (it is torn down when the job ends), which
+# is exactly the intended lifetime on a CI runner but NOT on Desktop/Tauri, where the launching
+# job may end long before the daemon is done. Default off; only an operator/test host whose job
+# outlives the daemon may opt in.
+_ALLOW_BREAKAWAY_FALLBACK_ENV = "HERMES_WINDOWS_GATEWAY_ALLOW_BREAKAWAY_FALLBACK"
+
+
+def _breakaway_fallback_allowed() -> bool:
+    return os.environ.get(_ALLOW_BREAKAWAY_FALLBACK_ENV, "").strip().lower() in {
+        "1", "true", "yes", "on"}
+
+
+def _is_breakaway_denied(exc: OSError) -> bool:
+    """Only ERROR_ACCESS_DENIED means "the job forbids breakaway"; a missing interpreter or any
+    other spawn failure must keep its own verdict instead of being retried and mislabelled."""
+    return getattr(exc, "winerror", None) == 5 or isinstance(exc, PermissionError)
 
 
 # One launch's policy and pins, never the shared daemon's: hook consent would become daemon-lifetime
@@ -90,6 +113,29 @@ def spawn_unmanaged_gateway(profile_home: Path, *, deadline: float, idle_exit: b
     try:
         with (logs / "gateway-stdio.log").open("ab", buffering=0) as output:
             remaining(deadline)
+            if sys.platform == "win32":
+                from qubit_cli._subprocess_compat import windows_detach_flags_without_breakaway
+                try:
+                    return subprocess.Popen(
+                        command, cwd=root, env=env, close_fds=True,
+                        stdin=subprocess.DEVNULL, stdout=output, stderr=output,
+                        # detached-spawn: ok — a gateway daemon launch must outlive its launcher
+                        **windows_detach_popen_kwargs())
+                except OSError as exc:
+                    if not (_is_breakaway_denied(exc) and _breakaway_fallback_allowed()):
+                        raise
+                    # Contained fallback for a host whose Job Object forbids breakaway and whose
+                    # lifetime is the daemon's (CI runners). Never silent: the record names the
+                    # flag, and the breakaway marker is stamped "0" exactly like _spawn_detached.
+                    logger.warning(
+                        "Gateway breakaway spawn denied (winerror=%s); retrying without "
+                        "CREATE_BREAKAWAY_FROM_JOB because %s is set",
+                        getattr(exc, "winerror", None), _ALLOW_BREAKAWAY_FALLBACK_ENV)
+                    fallback_env = {**env, _WINDOWS_GATEWAY_BREAKAWAY_ENV: "0"}
+                    return subprocess.Popen(
+                        command, cwd=root, env=fallback_env, close_fds=True,
+                        stdin=subprocess.DEVNULL, stdout=output, stderr=output,
+                        creationflags=windows_detach_flags_without_breakaway())
             return subprocess.Popen(command, cwd=root, env=env, close_fds=True,
                                     stdin=subprocess.DEVNULL, stdout=output, stderr=output,
                                     # detached-spawn: ok — a gateway daemon launch must outlive its launcher

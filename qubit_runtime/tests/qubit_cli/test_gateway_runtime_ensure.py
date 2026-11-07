@@ -313,11 +313,39 @@ def test_native_windows_spawn_never_retries_without_breakaway(tmp_path, monkeypa
     def denied(argv, **kwargs):
         calls.append(kwargs)
         raise PermissionError("job forbids breakaway")
+    monkeypatch.delenv("HERMES_WINDOWS_GATEWAY_ALLOW_BREAKAWAY_FALLBACK", raising=False)
     monkeypatch.setattr(start.subprocess, "Popen", denied)
     with pytest.raises(RuntimeStartError, match="windows_breakaway_unavailable"):
         start.spawn_unmanaged_gateway(tmp_path, deadline=time.monotonic()+5)
     assert len(calls) == 1
     assert calls[0]["creationflags"] == windows_detach_flags()
+
+
+@pytest.mark.platforms("windows")
+def test_native_windows_spawn_retries_contained_fallback_only_when_opted_in(tmp_path, monkeypatch):
+    """A Job Object that denies breakaway (hosted CI) may opt into the contained spawn; the
+    fallback drops only CREATE_BREAKAWAY_FROM_JOB and stamps the breakaway marker "0"."""
+    from qubit_cli import gateway_runtime_start as start
+    from qubit_cli._subprocess_compat import (
+        _WINDOWS_GATEWAY_BREAKAWAY_ENV,
+        windows_detach_flags,
+        windows_detach_flags_without_breakaway,
+    )
+    calls = []
+    child = object()
+    def denied_then_ok(argv, **kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise PermissionError("job forbids breakaway")
+        return child
+    monkeypatch.setattr(start.subprocess, "Popen", denied_then_ok)
+    monkeypatch.setenv("HERMES_WINDOWS_GATEWAY_ALLOW_BREAKAWAY_FALLBACK", "1")
+    assert start.spawn_unmanaged_gateway(tmp_path, deadline=time.monotonic()+5) is child
+    assert len(calls) == 2
+    assert calls[0]["creationflags"] == windows_detach_flags()
+    assert calls[1]["creationflags"] == windows_detach_flags_without_breakaway()
+    assert calls[0]["env"][_WINDOWS_GATEWAY_BREAKAWAY_ENV] == "1"
+    assert calls[1]["env"][_WINDOWS_GATEWAY_BREAKAWAY_ENV] == "0"
 
 
 @pytest.mark.platforms("macos")

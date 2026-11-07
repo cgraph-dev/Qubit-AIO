@@ -60,7 +60,14 @@ def _run_script_job(home: WinHome, script: str, env_extra: dict[str, str] | None
     assert created.returncode == 0 and match, created.tail()
     job_id = match.group(1)
     ran = hermes(home, "cron", "run", job_id, cwd=home.profile, env_extra=env_extra)
-    assert ran.returncode == 0 and "Ran now:" in ran.stdout, f"job did not run synchronously:\n{ran.tail()}"
+    # ``cron run`` exits 1 when the job actually ran and failed (the pin's contract), so a bare
+    # ``returncode == 0`` would conflate "ran and failed" with "did not run". Prove the
+    # synchronous execution, then pin the exit code to the job's own verdict. The caller asserts
+    # the status itself, and the KNOWN gate sees the real failure signature.
+    assert "Ran now:" in ran.stdout, f"job did not run synchronously:\n{ran.tail()}"
+    expected_rc = 0 if "Ran now: succeeded." in ran.stdout else 1
+    assert ran.returncode == expected_rc, (
+        f"cron run exit {ran.returncode} disagrees with its own verdict:\n{ran.tail()}")
     jobs = json.loads((home.qubit_home / "cron" / "jobs.json").read_text(encoding="utf-8"))["jobs"]
     job = next(j for j in jobs if j["id"] == job_id)
     outputs = sorted((home.qubit_home / "cron" / "output" / job_id).glob("*.md"))
