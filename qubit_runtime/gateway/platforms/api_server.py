@@ -2368,7 +2368,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
 
     async def _handle_health(self, request: "web.Request") -> "web.Response":
         """GET /health — simple health check."""
-        return web.json_response({"status": "ok", "platform": "hermes-agent", "version": _qubit_version()})
+        return web.json_response({"status": "ok", "platform": "qubit-agent", "version": _qubit_version()})
 
     @_require_auth
     async def _handle_health_detailed(self, request: "web.Request") -> "web.Response":
@@ -2483,7 +2483,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
                     "local_vps": "websocket-subprotocol-ticket",
                     "cloud": "authenticated-gateway-rpc"}}}
         return web.json_response({
-            "object": "hermes.api_server.capabilities", "platform": "hermes-agent",
+            "object": "qubit.api_server.capabilities", "platform": "qubit-agent",
             "model": self._model_name,
             "auth": {"type": "bearer", "required": bool(self._api_key)},
             "runtime": {
