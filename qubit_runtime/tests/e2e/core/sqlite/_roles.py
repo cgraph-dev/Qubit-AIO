@@ -75,14 +75,18 @@ def _patient(a: dict, out: Out, op: str, fn, *, deadline: float = 90.0):
     """Run ``fn()``; in the DELETE arm (``busy_ok``) a SQLITE_BUSY refusal is reported as a ``busy`` event and
     retried. DELETE mode is documented to block readers on writes (qubit_state_wal), so a busy read/open is an
     availability event there, never an integrity one. In the WAL arm it propagates and fails the role."""
+    from qubit_state_errors import is_fts_constructor_lock_error, is_sqlite_lock_error
+
     end = time.monotonic() + deadline
     while True:
         try:
             return fn()
-        except sqlite3.OperationalError as exc:
+        except sqlite3.DatabaseError as exc:
             # By result code, not text: SQLITE_BUSY also surfaces as "vtable constructor failed:
-            # messages_fts" when the FTS5 table's config read hits the lock during an open.
-            busy = getattr(exc, "sqlite_errorcode", None) in (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED) or any(
+            # messages_fts" when the FTS5 table's config read hits the lock during an open. Some
+            # SQLite builds (the GitHub runner's) lose the BUSY code and raise plain DatabaseError,
+            # so classify by the production predicate rather than the exception subclass.
+            busy = is_sqlite_lock_error(exc) or is_fts_constructor_lock_error(exc) or any(
                 m in str(exc).lower() for m in ("database is locked", "database is busy"))
             if not (busy and a.get("busy_ok")) or time.monotonic() > end:
                 raise
