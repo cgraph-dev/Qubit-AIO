@@ -42,8 +42,8 @@ from qubit_state_health import (
 from qubit_state_errors import (
     _DELETED_WAL_GENERATION_MSG, _DISK_IO_ERROR_MARKER, _STATE_DB_CORRUPT_MSG, _STATE_DB_GENERATION_KEY,
     _STATE_DB_REPLACED_MSG, DeletedWalGenerationError, SessionCompressionInProgressError, StateDbCorruptError,
-    StateDbReplacedError, _is_no_more_rows, classify_persistence_error, is_malformed_db_error,
-    is_malformed_schema_error, is_sqlite_lock_error,
+    StateDbReplacedError, _is_no_more_rows, classify_persistence_error, is_fts_constructor_lock_error,
+    is_malformed_db_error, is_malformed_schema_error, is_sqlite_lock_error,
 )
 from qubit_state_guard import (
     _STATE_DB_GUARD_BYPASS_ENV, _in_test_context, _is_production_state_db, _real_platform_state_root,
@@ -859,8 +859,8 @@ class SessionDB(
             try:
                 self._connect_and_init()
                 return
-            except sqlite3.OperationalError as exc:
-                if not is_sqlite_lock_error(exc):
+            except sqlite3.DatabaseError as exc:
+                if not (is_sqlite_lock_error(exc) or is_fts_constructor_lock_error(exc)):
                     raise
                 self._close_connection_quietly(self._conn)
                 now = time.monotonic()

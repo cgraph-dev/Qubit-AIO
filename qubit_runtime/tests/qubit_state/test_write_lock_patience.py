@@ -231,3 +231,50 @@ def test_lock_lost_inside_fts_constructor_classifies_as_busy(tmp_path):
     assert "vtable constructor failed" in str(excinfo.value)
     assert is_transient_sqlite_error(excinfo.value)
     assert classify_persistence_error(excinfo.value) == "locked"
+
+
+def test_older_sqlite_fts_constructor_error_is_classified_as_busy_and_retried(tmp_path, monkeypatch):
+    """SQLite builds that lose the BUSY code inside FTS5's xConnect raise a plain
+    ``DatabaseError`` ('vtable constructor failed: messages_fts') with SQLITE_ERROR. The open
+    must wait that out like any other lock, and the classifiers must call it 'locked'."""
+    from qubit_state_errors import (
+        classify_persistence_error, is_fts_constructor_lock_error, is_transient_sqlite_error,
+    )
+
+    def old_build_error() -> sqlite3.DatabaseError:
+        exc = sqlite3.DatabaseError("vtable constructor failed: messages_fts")
+        exc.sqlite_errorcode = sqlite3.SQLITE_ERROR
+        exc.sqlite_errorname = "SQLITE_ERROR"
+        return exc
+
+    exc = old_build_error()
+    assert is_fts_constructor_lock_error(exc)
+    assert is_transient_sqlite_error(exc)
+    assert classify_persistence_error(exc) == "locked"
+
+    # Damage still fails closed: result code or wording that names corruption wins.
+    corrupt = sqlite3.DatabaseError("vtable constructor failed: messages_fts: database disk image is malformed")
+    corrupt.sqlite_errorcode = sqlite3.SQLITE_CORRUPT_VTAB
+    assert not is_fts_constructor_lock_error(corrupt)
+    assert classify_persistence_error(corrupt) == "fts_index"
+
+    _use_delete_journal_mode(monkeypatch, tmp_path)
+    db_path = tmp_path / "state.db"
+    SessionDB(db_path=db_path).close()
+
+    attempts = {"n": 0}
+    real = SessionDB._connect_and_init
+
+    def flaky(self):
+        if attempts["n"] == 0:
+            attempts["n"] += 1
+            raise old_build_error()
+        return real(self)
+
+    monkeypatch.setattr(SessionDB, "_connect_and_init", flaky)
+    db = SessionDB(db_path=db_path)
+    try:
+        assert attempts["n"] == 1, "the open did not retry the FTS-constructor lock"
+        assert db._fts_enabled is True
+    finally:
+        db.close()
