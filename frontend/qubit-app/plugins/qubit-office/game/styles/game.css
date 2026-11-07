@@ -398,3 +398,140 @@
     animation-duration: 1ms !important;
   }
 }
+
+/* --- the agents panel: the roster's seats, grouped by division ------------ */
+/* The trigger floats top-LEFT, opposite the HUD button, so opening one never
+   covers the other. Same look as the HUD trigger: the vendored app owns every
+   pixel of the frame and has no toolbar to host a button. */
+.office-game__agentsToggle {
+  position: absolute;
+  top: var(--office-s3);
+  left: var(--office-s3);
+  z-index: 3;
+  appearance: none;
+  border: var(--office-border);
+  background: rgba(11, 15, 22, 0.82);
+  color: var(--office-ink);
+  border-radius: var(--office-radius);
+  padding: var(--office-s1) var(--office-s3);
+  font-size: var(--office-fs-sm);
+  cursor: pointer;
+}
+
+.office-game__agentsToggle:hover {
+  border-color: var(--office-accent);
+}
+
+.office-game__agentsToggle:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
+}
+
+/* A side sheet on the LEFT edge, mirroring the HUD dock on the right.
+   WHY `.office-game__dock.office-game__agentsDock` (specificity 0,2,0): the dock
+   element also carries `.office-game__panel`, whose `padding`/`border`/`radius`
+   rules come LATER in this file and would win over a single-class `.office-game
+   __agentsDock` — measured: the sheet collapsed to a 39px-tall bar. The HUD dock
+   escapes it because it sets no padding of its own. */
+.office-game__dock.office-game__agentsDock {
+  right: auto;
+  left: 0;
+  border: 0;
+  border-right: var(--office-border);
+  border-radius: 0;
+  box-shadow: var(--office-shadow);
+}
+
+.agents-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--office-s2) var(--office-s3) var(--office-s3);
+  font-size: var(--office-fs-sm);
+  color: var(--office-ink);
+}
+
+.agents-panel[data-state="loading"],
+.agents-panel__error {
+  color: var(--office-muted);
+}
+
+.agents-panel__error {
+  border: 1px solid var(--office-bad, #e0554a);
+  border-radius: var(--office-radius);
+  color: var(--office-bad, #e0554a);
+  margin: var(--office-s3);
+  padding: var(--office-s2);
+}
+
+.agents-panel__summary {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  padding-bottom: var(--office-s2);
+  border-bottom: var(--office-border);
+  margin-bottom: var(--office-s2);
+}
+
+.agents-panel__division {
+  border-bottom: var(--office-border);
+  padding: var(--office-s1) 0;
+}
+
+.agents-panel__divisionHead {
+  display: flex;
+  gap: var(--office-s3);
+  align-items: baseline;
+  cursor: pointer;
+  padding: var(--office-s1) 0;
+}
+
+.agents-panel__divisionHead::marker,
+.agents-panel__divisionHead::-webkit-details-marker {
+  color: var(--office-muted);
+}
+
+.agents-panel__divisionLabel {
+  flex: 1 1 auto;
+  font-weight: 600;
+}
+
+.agents-panel__divisionMeta {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  white-space: nowrap;
+}
+
+.agents-panel__seats {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 var(--office-s1) var(--office-s3);
+}
+
+.agents-panel__seat {
+  display: flex;
+  gap: var(--office-s2);
+  align-items: baseline;
+  padding: 2px 0;
+  font-size: var(--office-fs-xs);
+}
+
+.agents-panel__emoji {
+  width: 1.2em;
+  flex: 0 0 auto;
+}
+
+.agents-panel__name {
+  flex: 0 0 auto;
+}
+
+.agents-panel__meta {
+  color: var(--office-muted);
+  flex: 1 1 auto;
+  overflow-wrap: anywhere;
+}
+
+.agents-panel__types {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  padding-top: var(--office-s2);
+}
