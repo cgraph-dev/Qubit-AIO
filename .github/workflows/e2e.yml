@@ -12,8 +12,14 @@ on:
 permissions:
   contents: read
 
+# Pushes get a per-commit group: the public seed is force-pushed to
+# main/production every few minutes, and a branch-keyed group either cancels a
+# run that is still working or queues the newer one behind it. Pull requests
+# keep the old same-ref group so a new push to the PR still supersedes the
+# previous run.
 concurrency:
-  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  group: >-
+    e2e-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -25,9 +31,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    concurrency:
-      group: e2e-${{ github.workflow }}-${{ github.ref }}-${{ matrix.shard }}
-      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     env:
       SHARD: ${{ matrix.shard }}
       SHARDS: "8"
@@ -36,6 +39,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # Upgrade/hand-off cells resolve N-1 from a release tag or HEAD~1.
+          # A depth-1 clone has neither. (The public seed is exported as a
+          # single root commit; those cells skip there with that evidence.)
+          fetch-depth: 0
+          fetch-tags: true
       - name: Install E2E system tools
         run: |
           sudo apt-get update -qq
@@ -74,7 +83,11 @@ jobs:
         working-directory: qubit_runtime
       - name: Run this E2E shard
         run: |
+          # One flake retry per file: the hosted runner is 4 vCPU/16 GB and a few
+          # live cells (SQLite torture, 429 rotation) are load-sensitive. A pass on
+          # retry is still reported as FLAKY, and a deterministic failure fails
+          # twice rather than being hidden.
           python scripts/run_tests_parallel.py \
             --files-from /tmp/e2e-shard.txt \
-            -j 2 --file-timeout 1200 --file-retries 0
+            -j 2 --file-timeout 1200 --file-retries 1
         working-directory: qubit_runtime
