@@ -47,5 +47,5 @@ jobs:
         env:
           QUBIT_E2E_WINDOWS_INSTALL: "0"
         run: >
-          python -m pytest -q -m "platforms('windows')" -p no:cacheprovider
+          python -m pytest -q -m platforms -p no:cacheprovider
           tests/e2e/core/windows
