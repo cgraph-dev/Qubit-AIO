@@ -251,6 +251,7 @@ _STATUS: Dict[str, int] = {
     "WB_READ_ONLY_SURFACE": 403,
     "WB_PTY_FORBIDDEN": 403,
     "WB_CAPABILITY_UNBOUND": 501,
+    "WB_NO_MODEL_INVENTORY": 503,
     "WB_NOT_IN_PORT_SET": 501,
 }
 
@@ -865,43 +866,142 @@ def h_wb_settings(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return 200, merged
 
 
+def _wb_model_rows(config: Any) -> List[Tuple[str, str]]:
+    """Flatten ``providers`` from an ``/api/config``-shaped dict.
+
+    Returns ``(provider, model_id)`` pairs in provider-then-id order, deduped on
+    the pair (a model listed twice under one provider appears once) and then on
+    the bare id (the picker's value is the id, so the same id under two
+    providers is one selectable row — the first provider wins and keeps its
+    label). Every provider contributes its ``default_model`` plus every key of
+    its ``models`` dict; nothing is invented and no id is normalized.
+    """
+    if not isinstance(config, dict):
+        return []
+    provs = config.get("providers")
+    if not isinstance(provs, dict):
+        return []
+    pairs: List[Tuple[str, str]] = []
+    seen_pairs = set()
+    for pname in sorted(provs):
+        pcfg = provs.get(pname)
+        if not isinstance(pcfg, dict):
+            continue
+        name = str(pname)
+        candidates: List[str] = []
+        default_model = pcfg.get("default_model")
+        if isinstance(default_model, str) and default_model.strip():
+            candidates.append(default_model.strip())
+        ids = pcfg.get("models")
+        if isinstance(ids, dict):
+            candidates.extend(str(k).strip() for k in ids)
+        elif isinstance(ids, (list, tuple)):
+            candidates.extend(str(m).strip() for m in ids
+                              if isinstance(m, str))
+        for mid in candidates:
+            if not mid:
+                continue
+            if (name, mid) in seen_pairs:
+                continue
+            seen_pairs.add((name, mid))
+            pairs.append((name, mid))
+    return pairs
+
+
 def h_wb_models(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Any]:
-    """GET /api/wb/api/models — the model picker's inventory."""
+    """GET /api/wb/api/models — the model picker's inventory.
+
+    An empty picker is not cosmetic: the ported client then falls back to
+    upstream's HARDCODED names (``GPT-5.4 Mini``), sends one to
+    ``/api/chat/start``, and the turn dies inside the transport with
+    CIRCUIT_OPEN while the pane shows a blank "Processed" row. So this NEVER
+    answers ``models: []`` as success — an empty inventory is a typed refusal.
+
+    The inventory lives in the fork's ``/api/config`` ``providers`` tree (a
+    dict of provider -> ``{default_model, models}``). Qubit's own compat
+    ``h_config`` cannot serve it: ``config.DEFAULTS`` has no ``providers`` key,
+    and with ``cfg=None`` it degrades to the voice-only subset. Read the same
+    record the dashboard reads — the vendored runtime, in-process.
+    """
+    config: Any = None
+    source = ""
     try:
-        from voicebridge import qubit_compat as HC
-        code, out = HC.dispatch(cfg, "GET", "/api/config", query={}, body={})
+        from voicebridge import qubit_asgi as HA
+        code, _hdrs, body = HA.call("GET", "/api/config", query={},
+                                    headers={"accept": "application/json"})
+        if 200 <= int(code) < 300:
+            try:
+                config = json.loads(bytes(body).decode("utf-8"))
+                source = "qubit_asgi:/api/config"
+            except (ValueError, UnicodeDecodeError):
+                config = None
     except Exception as exc:  # noqa: BLE001
         return _refusal("WB_BACKEND_UNAVAILABLE",
                         f"model inventory unavailable: {type(exc).__name__}: {exc}",
                         endpoint="models")
-    if code != 200 or not isinstance(out, dict):
-        return code if code >= 400 else 502, out
-    active = str(out.get("model") or out.get("default_model") or "")
-    provider = str(out.get("provider") or "")
-    models = out.get("models") or out.get("available_models") or []
-    if isinstance(models, list):
-        rows = [m if isinstance(m, dict) else {"id": str(m)} for m in models]
-    else:
-        rows = [{"id": str(k)} for k in models]
-    # /api/config carries no flat model list, only per-provider defaults. An
-    # empty picker is not cosmetic: the client then falls back to upstream's
-    # HARDCODED names ("GPT-5.4 Mini"), sends one to /api/chat/start, and the
-    # turn fails deep in the transport with CIRCUIT_OPEN while the pane shows a
-    # blank "Processed" row. Derive the real inventory from the providers Qubit
-    # actually has configured, and label each row with its provider.
-    if not rows:
-        provs = out.get("providers")
-        if isinstance(provs, dict):
-            for pname, pcfg in sorted(provs.items()):
-                if not isinstance(pcfg, dict):
-                    continue
-                mid = str(pcfg.get("default_model") or "").strip()
-                if mid:
-                    rows.append({"id": mid, "provider": pname,
-                                 "label": f"{mid} ({pname})"})
-    return 200, {"ok": True, "active": active, "provider": provider,
-                 "models": rows}
+    pairs = _wb_model_rows(config)
+    if not pairs:
+        return _refusal(
+            "WB_NO_MODEL_INVENTORY",
+            "no model inventory is configured: /api/config carries no "
+            "providers with a default_model or a models list, so the picker "
+            "has nothing real to offer rather than a list it would have to "
+            "invent",
+            endpoint="models",
+            counterpart="configure a provider in Qubit Settings (/dashboard) "
+                        "or `qubit config set`")
+    active = str(config.get("model") or "").strip()
+    provider = str(config.get("provider") or "").strip()
+    if not provider:
+        # /api/config leaves the top-level provider null; the fork's
+        # /api/model/info carries the resolved provider for the active model.
+        try:
+            from voicebridge import qubit_asgi as HA2
+            code, _h2, body2 = HA2.call("GET", "/api/model/info", query={},
+                                        headers={"accept": "application/json"})
+            if 200 <= int(code) < 300:
+                info = json.loads(bytes(body2).decode("utf-8"))
+                provider = str(info.get("provider") or "").strip()
+                # model/info is the RESOLVED record (the config's top-level
+                # ``model`` can lag a switch), so it wins when it has one.
+                active = str(info.get("model") or "").strip() or active
+        except Exception:  # noqa: BLE001 - label only; inventory stands
+            pass
+    if provider and not active:
+        pcfg = (config.get("providers") or {}).get(provider)
+        if isinstance(pcfg, dict):
+            active = str(pcfg.get("default_model") or "").strip()
+    rows: List[Dict[str, Any]] = []
+    seen_ids: Dict[str, int] = {}
+    for pname, mid in pairs:
+        if mid in seen_ids:
+            # The same id can be listed under several providers (the live
+            # config lists ``deepseek-v4.1-flash`` under both cheapvibecode's
+            # models dict and opencode-go's default). The picker's value is the
+            # id, so keep ONE row — but attribute it to the provider that
+            # actually carries the ACTIVE model, otherwise the row the user is
+            # running is labelled with somebody else's provider.
+            if provider and pname == provider and \
+                    rows[seen_ids[mid]]["provider"] != provider:
+                rows[seen_ids[mid]] = {"id": mid, "provider": pname,
+                                       "label": f"{mid} ({pname})",
+                                       "active": bool(active) and mid == active}
+            continue
+        seen_ids[mid] = len(rows)
+        rows.append({"id": mid, "provider": pname,
+                     "label": f"{mid} ({pname})",
+                     "active": bool(active) and mid == active})
+    absent = bool(active) and active not in seen_ids
+    payload: Dict[str, Any] = {"ok": True, "active": active,
+                               "provider": provider, "models": rows,
+                               "source": source}
+    if absent:
+        # The running model is real but not in the configured inventory (a
+        # CUSTOM id, or a provider whose model list is empty). Say so instead
+        # of silently leaving every row unselected.
+        payload["active_not_in_inventory"] = True
+    return 200, payload
 
 
 def h_wb_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
