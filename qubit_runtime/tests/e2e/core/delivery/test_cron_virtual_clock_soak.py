@@ -153,13 +153,23 @@ class Model:
     def active(self):
         return [j for j in self.jobs.values() if not j.done]
 
+    def _extra_fire(self, job: ModelJob, t: float) -> None:
+        """A trigger/manual run is an EXTRA fire (``cron/extra_fire.py``): it records a run but
+        never consumes the repeat budget or re-stamps a still-pending occurrence. Only a slot
+        already due at the extra fire is dropped and re-anchored, matching the product's
+        ``extra_fire.settle`` (recurring -> next natural occurrence, one-shot -> stays due)."""
+        self.fires.append((job.name, None, t))
+        if job.kind in ("cron", "interval") and (job.pending is None or job.pending <= t):
+            if job.kind == "cron":
+                job.pending = job.occ.first_after(t)
+            else:
+                job.pending = t + job.interval
+
     def tick(self, t: float) -> None:
         for job in self.active():
             if job.trigger:
                 job.trigger = False
-                job.fired += 1
-                self.fires.append((job.name, None, t))
-                job.advance_from(t)
+                self._extra_fire(job, t)
                 continue
             if job.pending is None or job.pending > t:
                 continue
@@ -172,10 +182,7 @@ class Model:
 
     def manual(self, name: str, t: float) -> None:
         job = self.jobs[name]
-        job.fired += 1
-        self.fires.append((name, None, t))
-        if job.kind == "interval":
-            job.pending = t + job.interval
+        self._extra_fire(job, t)
         if job.times is not None and job.fired >= job.times:
             job.done, job.pending = True, None
 
@@ -278,6 +285,11 @@ class Soak:
             return not [r for r in H.non_terminal(self.home) if r["job_id"] not in held_ids]
 
         H.wait_until(quiet, f"scheduler quiescence {self.describe(self.now())}")
+        # A gateway's housekeeping tick drains the durable delivery queue that a finished agent
+        # run booked (delivery_outcome == "queued"); the soak has no gateway, so run the real
+        # drain here. It settles the queue's terminal outcome back onto the execution ledger,
+        # which the final truth check reads.
+        H.drain_deliveries()
 
     def tick(self, hosts=None, entering: Optional[str] = None) -> None:
         t = self.now()
@@ -696,6 +708,10 @@ def test_two_replicas_contend_for_every_fire(soak_env):
             assert nxt > clock.now_ts(), f"round {rnd} {name}: not re-armed past now ({_iso(nxt)})"
     finally:
         peer.stop()
+    # The winner's run books a durable delivery (outcome "queued"); a real gateway's
+    # housekeeping drains it. Do that before reading the ledger, so "delivered" is the
+    # queue's own terminal verdict rather than an un-drained handoff.
+    H.drain_deliveries()
     rows = H.ledger_rows(qubit_home)
     sink = H.read_jsonl(control.sink)
     starts = {r["exec"] for r in H.read_jsonl(control.runs) if r["event"] == "start"}
