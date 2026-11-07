@@ -30,7 +30,9 @@ from qubit_state_fts import (_drop_orphan_fts_shadow_tables, base_index_recognis
                               fts_layout_current)
 from qubit_state_holders import _read_proc_argv
 from qubit_state_search import _delete_meta, _meta_row
-from qubit_state_errors import is_fts_constructor_lock_error, is_sqlite_lock_error
+from qubit_state_errors import (
+    is_corrupt_fts_table_error, is_fts_constructor_lock_error, is_sqlite_lock_error,
+)
 from qubit_state_titles import next_title_in_lineage
 
 # Pre-split logger identity so log filtering/capture is unchanged.
@@ -1272,48 +1274,71 @@ class SessionSchemaMixin:
             else:
                 self._fts_enabled = self._trigram_available = self._fts_cjk_available = False
         else:
-            base_sql, trigram_sql = _FTS_DDL[legacy_fts]
-            # Measure before any DDL. Publishing missing base triggers before rebuild admission lets
-            # another process write through an index whose bootstrap/repair has no owner (#105790).
-            base_triggers_missing = (
-                self._fts_triggers_missing(cursor, _FTS_BASE_TRIGGERS) or "messages_fts" in orphan_repaired
-            )
-            trigram_triggers_missing = (
-                self._fts_triggers_missing(cursor, _FTS_TRIGRAM_TRIGGERS) or "messages_fts_trigram" in orphan_repaired
-            )
-
-            def ensure_and_rebuild() -> None:
-                self._fts_enabled = self._ensure_fts_schema(cursor, "messages_fts", base_sql)
-                if not self._fts_enabled:
-                    return
-                self._trigram_available = self._ensure_fts_schema(cursor, "messages_fts_trigram", trigram_sql)
-                self._rebuild_fts_indexes(
-                    cursor, legacy=legacy_fts, include_trigram=self._trigram_available,
+            try:
+                base_sql, trigram_sql = _FTS_DDL[legacy_fts]
+                # Measure before any DDL. Publishing missing base triggers before rebuild admission lets
+                # another process write through an index whose bootstrap/repair has no owner (#105790).
+                base_triggers_missing = (
+                    self._fts_triggers_missing(cursor, _FTS_BASE_TRIGGERS) or "messages_fts" in orphan_repaired
                 )
-                if not legacy_fts:
-                    self._ensure_fts_cjk_schema(cursor)
+                trigram_triggers_missing = (
+                    self._fts_triggers_missing(cursor, _FTS_TRIGRAM_TRIGGERS) or "messages_fts_trigram" in orphan_repaired
+                )
 
-            if base_triggers_missing:
-                # The authority covers the whole first-publication sequence, not merely the final rebuild.
-                # ``executescript`` commits DDL statement-by-statement, so acquiring after ensure exposed a
-                # partially initialized FTS family while another opener held the rebuild lock.
-                self._run_admitted_startup_rebuild(cursor, ensure_and_rebuild)
-            else:
-                self._fts_enabled = self._ensure_fts_schema(cursor, "messages_fts", base_sql)
-                if self._fts_enabled:
-                    # Trigram is optional; without it CJK search falls back to LIKE.
-                    trigram_enabled = self._ensure_fts_schema(cursor, "messages_fts_trigram", trigram_sql)
-                    self._trigram_available = trigram_enabled
-                    if trigram_enabled and trigram_triggers_missing:
-                        self._run_admitted_startup_rebuild(
-                            cursor,
-                            lambda: self._rebuild_fts_indexes(
-                                cursor, legacy=legacy_fts, include_trigram=trigram_enabled,
-                            ),
-                        )
-            if self._fts_enabled and not legacy_fts and not base_triggers_missing:
-                # CJK-bigram index: strictly additive, gated on the loadable tokenizer.
-                self._ensure_fts_cjk_schema(cursor)
+                def ensure_and_rebuild() -> None:
+                    self._fts_enabled = self._ensure_fts_schema(cursor, "messages_fts", base_sql)
+                    if not self._fts_enabled:
+                        return
+                    self._trigram_available = self._ensure_fts_schema(cursor, "messages_fts_trigram", trigram_sql)
+                    self._rebuild_fts_indexes(
+                        cursor, legacy=legacy_fts, include_trigram=self._trigram_available,
+                    )
+                    if not legacy_fts:
+                        self._ensure_fts_cjk_schema(cursor)
+
+                if base_triggers_missing:
+                    # The authority covers the whole first-publication sequence, not merely the final rebuild.
+                    # ``executescript`` commits DDL statement-by-statement, so acquiring after ensure exposed a
+                    # partially initialized FTS family while another opener held the rebuild lock.
+                    self._run_admitted_startup_rebuild(cursor, ensure_and_rebuild)
+                else:
+                    self._fts_enabled = self._ensure_fts_schema(cursor, "messages_fts", base_sql)
+                    if self._fts_enabled:
+                        # Trigram is optional; without it CJK search falls back to LIKE.
+                        trigram_enabled = self._ensure_fts_schema(cursor, "messages_fts_trigram", trigram_sql)
+                        self._trigram_available = trigram_enabled
+                        if trigram_enabled and trigram_triggers_missing:
+                            self._run_admitted_startup_rebuild(
+                                cursor,
+                                lambda: self._rebuild_fts_indexes(
+                                    cursor, legacy=legacy_fts, include_trigram=trigram_enabled,
+                                ),
+                            )
+                if self._fts_enabled and not legacy_fts and not base_triggers_missing:
+                    # CJK-bigram index: strictly additive, gated on the loadable tokenizer.
+                    self._ensure_fts_cjk_schema(cursor)
+            except sqlite3.DatabaseError as exc:
+                # A corrupt FTS vtable can fail even the LIMIT 0 probe at open (SQLite 3.45's
+                # DELETE mode reports ``vtable constructor failed: messages_fts``). That is the
+                # FTS layer's damage, not the canonical store's: fail open by taking the same
+                # drop-and-rebuild path as a deferred stale index instead of refusing the open.
+                if not is_corrupt_fts_table_error(exc):
+                    raise
+                logger.warning(
+                    "state.db FTS index cannot be opened (corrupt vtable); rebuilding it: %s", exc,
+                )
+                self._fts_stale = True
+                self._drop_all_fts_triggers(cursor)
+                if self._recover_stale_fts(cursor, legacy=legacy_fts):
+                    self._ensure_fts_cjk_schema(cursor)
+                else:
+                    self._fts_enabled = self._trigram_available = self._fts_cjk_available = False
+        # A successful init supersedes a deferral an earlier open recorded while the index was
+        # stale/corrupt. The offline repair path (repair_state_db_schema -> drop_fts_rebuild)
+        # recreates the index without touching state_meta, so without this the diagnostic would
+        # outlive the fresh index forever.
+        if self._fts_enabled and not self._fts_stale:
+            cursor.execute("DELETE FROM state_meta WHERE key = ?", (FTS_REBUILD_DEFERRAL_KEY,))
         # IF NOT EXISTS cannot rewrite pre-existing broad AFTER UPDATE triggers.
         if self._fts_enabled:
             self._migrate_broad_fts_update_triggers(cursor)

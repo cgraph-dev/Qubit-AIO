@@ -169,6 +169,23 @@ def is_fts_scoped_corruption_error(exc_or_str) -> bool:
     return any(marker in text for marker in _DB_CORRUPTION_MARKERS)
 
 
+def is_corrupt_fts_table_error(exc: BaseException) -> bool:
+    """True when an FTS vtable cannot be constructed because its shadow tables are corrupt.
+
+    SQLite keeps ``SQLITE_CORRUPT_VTAB`` for that case (the code path above), but older
+    builds surface it as a bare ``DatabaseError`` whose text is
+    ``vtable constructor failed: messages_fts``. The same text is also how a *busy* FTS5
+    xConnect reports ``SQLITE_BUSY``, so a lock error is explicitly not damage: callers
+    must retry those, not drop the index.
+    """
+    if not isinstance(exc, sqlite3.DatabaseError) or is_sqlite_lock_error(exc):
+        return False
+    if is_fts_scoped_corruption_error(exc):
+        return True
+    text = str(exc).lower()
+    return "vtable constructor failed" in text and bool(_FTS_OBJECT_RE.search(text))
+
+
 class CompressionSessionClosedError(RuntimeError):
     """A durable write targeted a parent already closed by compression."""
 

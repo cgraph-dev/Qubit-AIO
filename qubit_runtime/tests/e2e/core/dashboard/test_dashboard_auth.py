@@ -51,22 +51,30 @@ def walk(routes):
     for route in routes:
         effective = getattr(route, "effective_route_contexts", None)
         if callable(effective):
+            emitted = False
             for context in effective():
                 inner = (getattr(context, "starlette_route", None)
                          or getattr(context, "original_route", None))
                 if inner is not None:
                     yield inner
-            continue
-        yield route
-        nested = getattr(route, "routes", None)
-        if nested:
-            yield from walk(nested)
+                    emitted = True
+            if not emitted:
+                yield route
+        else:
+            yield route
+        for attr in ("routes", "original_router"):
+            nested = getattr(route, attr, None)
+            if nested is not None and not isinstance(nested, list):
+                nested = getattr(nested, "routes", None)
+            if nested:
+                yield from walk(nested)
 
 
-mounted = list(walk(app.routes))
-http = sorted({(m, r.path) for r in mounted if isinstance(r, APIRoute)
-               for m in r.methods if m != "HEAD"})
-ws = sorted({r.path for r in mounted if isinstance(r, WebSocketRoute)})
+routes = list(walk(app.routes))
+http = sorted({(m, r.path) for r in routes if isinstance(r, APIRoute) for m in r.methods if m != "HEAD"})
+# Match the Starlette base, not only APIWebSocketRoute: the subclass can be
+# absent from the traversed tree even when the socket is served.
+ws = sorted({r.path for r in routes if isinstance(r, WebSocketRoute)})
 print(json.dumps({"http": http, "ws": ws, "public": sorted(PUBLIC_API_PATHS)}))
 """
 # The OAuth redirect lands from the identity provider's page: no header can ride on it by design.

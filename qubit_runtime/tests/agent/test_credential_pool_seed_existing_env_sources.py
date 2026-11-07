@@ -92,3 +92,25 @@ def test_numbered_env_siblings_seed_rotation_without_config(home, provider, prim
     assert len({pool.select().source for _ in range(6)}) == 3
     rows = json.loads((home / "auth.json").read_text(encoding="utf-8"))["credential_pool"][provider]
     assert len(rows) == 3 and all("access_token" not in row for row in rows)
+
+
+def test_openrouter_env_mirror_is_used_for_seeded_env_rows(home):
+    """An ambient OPENROUTER_BASE_URL mirror must win over the vendor default.
+
+    The openrouter early-return branch used the module constant for every env-seeded row,
+    so a configured mirror was ignored and background metadata probes left for the public
+    endpoint. The registry path has always honoured ``base_url_env_var``.
+    """
+    from agent.credential_pool import load_pool
+
+    mirror = "https://openrouter-mirror.example/api/v1"
+    (home / ".env").write_text(
+        f"OPENROUTER_API_KEY={SYN_PRIMARY}\nOPENROUTER_BASE_URL={mirror}\n", encoding="utf-8"
+    )
+    from qubit_cli.config import invalidate_env_cache
+    invalidate_env_cache()
+
+    pool = load_pool("openrouter")
+    available, _ = pool._available_entries()
+    assert available, "the env-seeded row was dropped"
+    assert {entry.base_url for entry in available} == {mirror}
