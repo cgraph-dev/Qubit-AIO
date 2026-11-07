@@ -37,11 +37,30 @@ pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="PO
 
 _INVENTORY = r"""
 import json
-from fastapi.routing import APIRoute, APIWebSocketRoute
+from fastapi.routing import APIRoute
+from starlette.routing import WebSocketRoute
 from qubit_cli.web_server import app
 from qubit_cli.dashboard_auth.public_paths import PUBLIC_API_PATHS
-http = sorted({(m, r.path) for r in app.routes if isinstance(r, APIRoute) for m in r.methods if m != "HEAD"})
-ws = sorted({r.path for r in app.routes if isinstance(r, APIWebSocketRoute)})
+
+
+def walk(routes):
+    for route in routes:
+        yield route
+        # FastAPI >= 0.16x keeps an included router as a wrapper instead of
+        # flattening it into app.routes; older releases flatten. Follow both.
+        for attr in ("routes", "original_router"):
+            nested = getattr(route, attr, None)
+            if nested is not None and not isinstance(nested, list):
+                nested = getattr(nested, "routes", None)
+            if nested:
+                yield from walk(nested)
+
+
+routes = list(walk(app.routes))
+http = sorted({(m, r.path) for r in routes if isinstance(r, APIRoute) for m in r.methods if m != "HEAD"})
+# Match the Starlette base, not only APIWebSocketRoute: the subclass can be
+# absent from the traversed tree even when the socket is served.
+ws = sorted({r.path for r in routes if isinstance(r, WebSocketRoute)})
 print(json.dumps({"http": http, "ws": ws, "public": sorted(PUBLIC_API_PATHS)}))
 """
 # The OAuth redirect lands from the identity provider's page: no header can ride on it by design.

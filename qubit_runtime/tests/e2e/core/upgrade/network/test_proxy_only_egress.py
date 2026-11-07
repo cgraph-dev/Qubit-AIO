@@ -35,6 +35,11 @@ pytestmark = [
 ]
 
 GIT_PATH = "/NousResearch/hermes-agent.git/"
+# Best-effort metadata only: the post-update release-history compare asks the GitHub API,
+# and a proxy with no route for it refuses the CONNECT while the update still completes
+# (warning only). That request goes through this proxy, so it is not a bypass and no
+# prompt/credential leaves; every other refused or TLS-rejected host is still a failure.
+OPTIONAL_METADATA_HOSTS = frozenset({"api.github.com"})
 
 
 @pytest.fixture(scope="module")
@@ -51,7 +56,7 @@ def _assert_updated_through_proxy(inst: S.Installed, r: S.Result, new: str) -> N
     assert channel, "the channel record was never read through the proxy\n" + r.report(inst)
     fetches = [h for h in edge.proxy.requests("github.com") if h.path.startswith(GIT_PATH) and h.status == 200]
     assert any("git-upload-pack" in h.path for h in fetches), "no git fetch crossed the proxy\n" + r.report(inst)
-    stray = sorted(edge.proxy.hosts("refused") | edge.proxy.hosts("tls-rejected"))
+    stray = sorted((edge.proxy.hosts("refused") | edge.proxy.hosts("tls-rejected")) - OPTIONAL_METADATA_HOSTS)
     assert not stray, f"the update tried to reach hosts the proxy does not route: {stray}\n" + r.report(inst)
     v = inst.version_works()
     assert v.rc == 0 and I.TRACEBACK not in v.out, "`qubit --version` broken after the update\n" + I.describe(v.cp)
