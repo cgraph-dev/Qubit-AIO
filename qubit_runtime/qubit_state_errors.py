@@ -42,6 +42,13 @@ _TRANSIENT_SQLITE_MARKERS = (
 _SQLITE_LOCK_CODES = (sqlite3.SQLITE_BUSY, sqlite3.SQLITE_LOCKED)
 
 
+# FTS5's xConnect reports a failed ``%_config`` read as this bare wording. Newer SQLite
+# preserves SQLITE_BUSY (and Python raises OperationalError), but older builds report generic
+# SQLITE_ERROR, so the result code says "error" while the real cause is lock contention. Only
+# this exact object-scoped wording is retried; corruption/undecodable-content messages are not.
+_FTS_CONSTRUCTOR_LOCK_RE = re.compile(r"vtable constructor failed:\s*messages_fts\w*")
+
+
 def _sqlite_primary_code(exc_or_str) -> int | None:
     """Primary result code (extended codes keep it in the low byte); None when unknown."""
     code = getattr(exc_or_str, "sqlite_errorcode", None)
@@ -58,18 +65,34 @@ def is_sqlite_lock_error(exc_or_str) -> bool:
     return "locked" in text or "busy" in text
 
 
-def _is_no_more_rows(exc: sqlite3.Error) -> bool:
-    """Transient engine error on contended WAL appends (retries like locked/busy);
-    message-scoped because some builds raise it as InterfaceError."""
-    return "no more rows available" in str(exc).lower()
+def is_fts_constructor_lock_error(exc_or_str) -> bool:
+    """Older SQLite builds lose the BUSY code inside FTS5's xConnect and report generic
+    ``SQLITE_ERROR`` with ``vtable constructor failed: messages_fts…``. Treat that exact
+    wording as retryable lock contention, but never overrule a code/text that asserts damage:
+    a genuine corrupt index still fails closed."""
+    code = _sqlite_primary_code(exc_or_str)
+    if code is not None and code not in (sqlite3.SQLITE_ERROR, *_SQLITE_LOCK_CODES):
+        return False
+    text = str(exc_or_str).lower()
+    if any(marker in text for marker in _MALFORMED_DB_MARKERS) or "corrupt" in text:
+        return False
+    return bool(_FTS_CONSTRUCTOR_LOCK_RE.search(text))
 
 
 def is_transient_sqlite_error(exc: BaseException) -> bool:
     """"Busy right now", not "damaged": one predicate so retry and the HTTP
-    503-vs-500 split cannot drift apart."""
-    return isinstance(exc, sqlite3.OperationalError) and (
-        is_sqlite_lock_error(exc) or any(marker in str(exc).lower() for marker in _TRANSIENT_SQLITE_MARKERS)
+    503-vs-500 split cannot drift apart. ``DatabaseError`` (not only its OperationalError
+    subclass) matters on SQLite builds that report FTS lock contention as SQLITE_ERROR."""
+    return isinstance(exc, sqlite3.DatabaseError) and (
+        is_sqlite_lock_error(exc) or is_fts_constructor_lock_error(exc)
+        or any(marker in str(exc).lower() for marker in _TRANSIENT_SQLITE_MARKERS)
     )
+
+
+def _is_no_more_rows(exc: sqlite3.Error) -> bool:
+    """Transient engine error on contended WAL appends (retries like locked/busy);
+    message-scoped because some builds raise it as InterfaceError."""
+    return "no more rows available" in str(exc).lower()
 
 
 def is_malformed_schema_error(exc: BaseException) -> bool:
@@ -315,7 +338,7 @@ def classify_persistence_error(exc_or_str) -> str:
     # naming messages_fts*) is index damage, never whole-file corruption (#97794).
     if is_fts_scoped_corruption_error(exc_or_str):
         return "fts_index"
-    if _sqlite_primary_code(exc_or_str) in _SQLITE_LOCK_CODES:
+    if _sqlite_primary_code(exc_or_str) in _SQLITE_LOCK_CODES or is_fts_constructor_lock_error(exc_or_str):
         return "locked"
     if getattr(exc_or_str, "sqlite_errorcode", None) == sqlite3.SQLITE_CONSTRAINT_FOREIGNKEY:
         return "session_row_missing"

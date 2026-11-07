@@ -37,11 +37,36 @@ pytestmark = pytest.mark.skipif(not sys.platform.startswith("linux"), reason="PO
 
 _INVENTORY = r"""
 import json
-from fastapi.routing import APIRoute, APIWebSocketRoute
+from fastapi.routing import APIRoute
+from starlette.routing import WebSocketRoute
 from qubit_cli.web_server import app
 from qubit_cli.dashboard_auth.public_paths import PUBLIC_API_PATHS
-http = sorted({(m, r.path) for r in app.routes if isinstance(r, APIRoute) for m in r.methods if m != "HEAD"})
-ws = sorted({r.path for r in app.routes if isinstance(r, APIWebSocketRoute)})
+
+
+def walk(routes):
+    # Every mounted route, across FastAPI versions. Older FastAPI flattens include_router into
+    # app.routes; current versions keep an _IncludedRouter wrapper whose effective routes are
+    # exposed by effective_route_contexts(). Neither form is public API, so handle both and
+    # recurse into any nested router/mount rather than trusting one internal shape.
+    for route in routes:
+        effective = getattr(route, "effective_route_contexts", None)
+        if callable(effective):
+            for context in effective():
+                inner = (getattr(context, "starlette_route", None)
+                         or getattr(context, "original_route", None))
+                if inner is not None:
+                    yield inner
+            continue
+        yield route
+        nested = getattr(route, "routes", None)
+        if nested:
+            yield from walk(nested)
+
+
+mounted = list(walk(app.routes))
+http = sorted({(m, r.path) for r in mounted if isinstance(r, APIRoute)
+               for m in r.methods if m != "HEAD"})
+ws = sorted({r.path for r in mounted if isinstance(r, WebSocketRoute)})
 print(json.dumps({"http": http, "ws": ws, "public": sorted(PUBLIC_API_PATHS)}))
 """
 # The OAuth redirect lands from the identity provider's page: no header can ride on it by design.

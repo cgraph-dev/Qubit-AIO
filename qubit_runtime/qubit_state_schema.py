@@ -30,7 +30,7 @@ from qubit_state_fts import (_drop_orphan_fts_shadow_tables, base_index_recognis
                               fts_layout_current)
 from qubit_state_holders import _read_proc_argv
 from qubit_state_search import _delete_meta, _meta_row
-from qubit_state_errors import is_sqlite_lock_error
+from qubit_state_errors import is_fts_constructor_lock_error, is_sqlite_lock_error
 from qubit_state_titles import next_title_in_lineage
 
 # Pre-split logger identity so log filtering/capture is unchanged.
@@ -477,7 +477,13 @@ class SessionSchemaMixin:
             return True
         except UnicodeDecodeError as exc:
             decode_exc = exc
-        except sqlite3.OperationalError as exc:
+        except sqlite3.DatabaseError as exc:
+            # On older SQLite builds FTS5 loses the BUSY code here; re-raise so the patient
+            # open retries it instead of reading lock contention as a corrupt index.
+            if is_sqlite_lock_error(exc) or is_fts_constructor_lock_error(exc):
+                raise
+            if not isinstance(exc, sqlite3.OperationalError):
+                raise
             if self._is_fts5_unavailable_error(exc):
                 # A missing trigram tokenizer only affects trigram search; only a missing
                 # FTS5 module disables FTS entirely.

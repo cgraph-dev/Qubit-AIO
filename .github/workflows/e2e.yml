@@ -36,6 +36,31 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Provide an N-1 history for the upgrade lane
+        # The public release seed has a fresh one-commit history, so the upgrade suite's
+        # N-1 = HEAD~1 does not exist there. Create a two-commit chain whose tip tree is the
+        # checked-out seed tree (both synthetic commits are empty, so the working tree is
+        # byte-identical to the seed). No assertion is weakened; the clone-shape tests still
+        # prove a real N-1 -> HEAD update.
+        run: |
+          if git rev-parse -q --verify "HEAD~1^{commit}" >/dev/null; then
+            echo "N-1 already present ($(git rev-list --count HEAD) commits); no synthesis needed"
+            exit 0
+          fi
+          git -c user.name="Qubit E2E" -c user.email="e2e@qubit.invalid" -c commit.gpgsign=false \
+            commit --allow-empty -q -m "e2e: synthesized N-1 for a single-commit seed"
+          git -c user.name="Qubit E2E" -c user.email="e2e@qubit.invalid" -c commit.gpgsign=false \
+            commit --allow-empty -q -m "e2e: synthesized release head"
+          # actions/checkout fetches depth 1, so the workspace carries a shallow marker even
+          # though a one-commit seed has no older history to fetch. A clone of a shallow
+          # workspace also stays shallow, which changes the installer's checkout shape and makes
+          # the updater ask api.github.com for a commit count. The synthesized chain above is
+          # complete locally, so the marker is spurious for this workspace.
+          if [ -f .git/shallow ]; then
+            rm -f .git/shallow
+            echo "cleared the depth-1 shallow marker"
+          fi
+          echo "synthesized $(git rev-list --count HEAD) commits; HEAD~1=$(git rev-parse --short HEAD~1)"
       - name: Install E2E system tools
         run: |
           sudo apt-get update -qq
