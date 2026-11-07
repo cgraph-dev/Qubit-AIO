@@ -904,6 +904,18 @@ class CLISessionMixin:
 
             write_breadcrumb(self.session_id)
 
+    def _transfer_session_yolo(self, old_session_id: str, new_session_id: str) -> None:
+        """Move the live /yolo bypass when the conversation continues under a new id.
+
+        ``/branch`` and an auto-compression rotation reassign ``self.session_id`` mid-run while
+        ``_session_yolo`` is keyed by id, so the toggle would silently revert without this. The
+        shared helper (``tools.approval_yolo``) also moves the chat's MCP spend total; the new
+        session row records the bypass at creation (``with_session_yolo``).
+        """
+        from tools.approval_yolo import transfer_session_yolo
+
+        transfer_session_yolo(old_session_id, new_session_id)
+
     def _is_session_yolo_active(self) -> bool:
         """Whether YOLO bypass is on for this session: reads ``tools.approval._session_yolo``
         (not a stale env var) and honors the frozen process-start ``--yolo`` flag."""

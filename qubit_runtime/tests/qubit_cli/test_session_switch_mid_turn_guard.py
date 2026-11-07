@@ -38,7 +38,9 @@ def cli(tmp_path, monkeypatch):
     obj.reasoning_config, obj._pending_title, obj._resumed, obj._pending_resume_sessions = {}, None, False, None
     obj.agent = _Agent("parent")
     obj.conversation_history = [{"role": "user", "content": "hi"}]
-    for name in ("_transfer_session_yolo", "_restore_session_cwd", "_restore_session_yolo",
+    # _transfer_session_yolo is deliberately NOT stubbed: /branch must reach the real helper
+    # (a missing method here aborted the switch and left the next turn denied).
+    for name in ("_restore_session_cwd", "_restore_session_yolo",
                  "_restore_session_model", "_display_resumed_history"):
         setattr(obj, name, lambda *a, **k: None)
     db.create_session(session_id="parent", source="cli", model="m")
