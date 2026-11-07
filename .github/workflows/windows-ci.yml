@@ -22,8 +22,11 @@ jobs:
       - name: Install the runtime and test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e qubit_runtime
-          python -m pip install pytest pytest-asyncio psutil pyyaml pathspec ruamel.yaml
+          # The E2E conftest imports the gateway/plugin surface through the
+          # root package; install the same dependency set the Linux lanes use
+          # instead of a partial runtime-only environment.
+          python -m pip install -e ".[test]"
+          python -m pip install pytest-asyncio
       - name: Collect the core Windows e2e suites
         working-directory: qubit_runtime
         run: >

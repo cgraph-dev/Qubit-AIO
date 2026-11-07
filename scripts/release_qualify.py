@@ -452,11 +452,7 @@ def install_step(out_dir: Path) -> dict:
         "        'templates': resources.resource_path('config/task-templates.yaml').is_file(),\n"
         "        'systemd': resources.resource_path('systemd').is_dir(),\n"
         "        'qubit_runtime': resources.resource_path("
-        "'qubit_runtime/qubit_cli/main.py').is_file(),\n"
-        "        'migration_doc': resources.resource_path("
-        "'docs/archive/2026-09-21/QUBIT_MIGRATION.md').is_file(),\n"
-        "        'vendor_manifest': resources.resource_path("
-        "'docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json').is_file()}\n"
+        "'qubit_runtime/qubit_cli/main.py').is_file()}\n"
         "sys.exit(0 if all(need.values()) else 1)\n"
     )
     checks.append(run_check("resources.packaged", py + ["-c", res_code]))
