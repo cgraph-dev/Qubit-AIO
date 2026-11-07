@@ -1254,10 +1254,37 @@ def decide_turn_action(text: Any, *, cfg: Any = None,
                 "task_text": task_text or raw, "params": dict(params),
                 "reason": reason}
     if kind == "clarify":
-        return {"action": "clarify", "kind": kind,
-                "task_text": raw, "params": {}, "reason": reason}
-    return {"action": "refuse", "kind": kind,
-            "task_text": raw, "params": {}, "reason": reason}
+        return _jev_advise(raw, {"action": "clarify", "kind": kind,
+                                 "task_text": raw, "params": {},
+                                 "reason": reason}, cfg)
+    return _jev_advise(raw, {"action": "refuse", "kind": kind,
+                             "task_text": raw, "params": {},
+                             "reason": reason}, cfg)
+
+
+def _jev_advise(text: str, decided: Dict[str, Any],
+                cfg: Any) -> Dict[str, Any]:
+    """Attach an advisory Jev verdict to an ambiguous turn. Never acts on it.
+
+    The returned dict is the local decision, unchanged in every field the
+    router reads. When Jev is off (the default) this is a no-op, so the turn
+    path is byte-identical to before. When it is on, the verdict rides along
+    under ``jev`` for the caller to log — the seam map's rule is that Jev
+    "re-ranks only ambiguous kinds", and today the re-rank is recorded, not
+    applied, until the live key path is proved.
+    """
+    try:
+        from .jev.advice import advise, should_ask
+
+        if not should_ask(decided, cfg):
+            return decided
+        verdict = advise(text, decided, cfg)
+        if verdict.get("asked"):
+            decided = dict(decided)
+            decided["jev"] = verdict
+    except Exception:  # noqa: BLE001 - advisory must never break routing
+        return decided
+    return decided
 
 
 # ---------------------------------------------------------------------------
