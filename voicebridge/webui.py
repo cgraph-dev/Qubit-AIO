@@ -3948,7 +3948,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             _orch = getattr(getattr(self, "app", None), "orch", None)
             cfg = (getattr(self.server, "wb_cfg", None)
                    or (getattr(_orch, "cfg", None) if _orch is not None else None))
-            if R.stream_kind(sub) and cfg is not None:
+            if (R.stream_kind(sub) and cfg is not None
+                    and str(query.get("probe") or "") not in ("1", "true", "yes")):
                 R.stream_sse(self, sub, cfg, query)
                 return True
             status, payload = R.h_wb_gateway(

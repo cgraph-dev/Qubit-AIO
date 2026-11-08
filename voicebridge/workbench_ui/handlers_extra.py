@@ -613,6 +613,78 @@ def profile_active(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     }
 
 
+def profile_switch(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
+                   p: Dict[str, Any]) -> Tuple[int, Any]:
+    """``POST /api/profile/switch {name}`` — set the reference active profile.
+
+    qubit_compat's real route is the PLURAL ``POST /api/profiles/active`` with the
+    name on the query string (``name=``); the ported UI posts the singular path
+    with ``{name}`` in the JSON body. This adapter maps one onto the other and
+    returns the active-profile wire shape the UI reads back. A missing ``name``
+    or an unknown profile is a typed refusal, never a silent success — switching
+    to a profile that does not exist would look like it worked.
+    """
+    name = str((b or {}).get("name") or (q or {}).get("name") or "").strip()
+    if not name:
+        return _refuse("WB_BAD_INPUT", "POST /api/profile/switch needs {name}",
+                       endpoint="profile/switch", status=400)
+    try:
+        from .. import qubit_compat as HC
+
+        code, out = HC.dispatch(cfg, "POST", "/api/profiles/active",
+                                query={"name": name}, body={})
+    except Exception as exc:  # noqa: BLE001
+        return _refuse("WB_BACKEND_UNAVAILABLE",
+                       f"the profile registry raised {type(exc).__name__}: {exc}",
+                       endpoint="profile/switch", status=503)
+    if code >= 400:
+        # The registry refused (unknown profile, read-only, …): pass its own
+        # typed refusal through rather than claiming a switch that did not happen.
+        if isinstance(out, dict):
+            return code, {**out, "endpoint": "profile/switch"}
+        return _refuse("WB_BAD_INPUT", f"the profile registry refused: {out}",
+                       endpoint="profile/switch", status=code)
+    return 200, {
+        "ok": True,
+        "profile": {"name": name, "id": name, "active": True},
+        "active_profile": name,
+        "profile_available": True,
+    }
+
+
+def sessions_gateway_probe(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
+                           p: Dict[str, Any]) -> Tuple[int, Any]:
+    """``GET /api/sessions/gateway/stream?probe=1`` — the client's liveness probe.
+
+    The ported client (``sessions.js:probeGatewaySSEStatus``) fetches this with
+    ``?probe=1`` and reads ``watcher_running`` to decide between opening the SSE
+    channel and falling back to polling. Qubit has no separate "gateway watcher"
+    process: the sidebar hot channel is ``sessions/events``, fed by a poll of the
+    session store. That channel IS running whenever the store answers, so the
+    honest probe answer is ``watcher_running: true`` with a real, measured poll
+    interval as ``fallback_poll_ms`` — no fabricated watcher state. When the store
+    is down the handler answers 503 with the store's own failure and the client
+    falls back to polling, which is the behaviour it was written for.
+    """
+    snap = _sessions_snapshot(cfg)
+    if snap.get("error"):
+        return 503, {"ok": False, "watcher_running": False,
+                     "code": "WB_BACKEND_UNAVAILABLE",
+                     "detail": snap["error"],
+                     "fallback_poll_ms": 15000}
+    return 200, {"ok": True, "watcher_running": True,
+                 "fallback_poll_ms": int(_sessions_poll_ms()),
+                 "mode": "sessions/events",
+                 "detail": ("Qubit feeds this channel from the session store's "
+                            "change signal; GET /api/sessions/gateway/stream "
+                            "serves the same SSE frames as /api/sessions/events.")}
+
+
+def _sessions_poll_ms() -> float:
+    """The SSE change-poll interval in ms (one source: ``sessions_events_frames``)."""
+    return 2000.0
+
+
 def health_agent(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
                  p: Dict[str, Any]) -> Tuple[int, Any]:
     """``GET /api/health/agent`` — live facts from the turn path's own authority."""
@@ -676,8 +748,17 @@ def onboarding_status(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     onboarding nudge, which is the true state.
     """
     ready, why = _agent_ready(cfg)
+    # The ported client reads ``status.settings.default_workspace`` and
+    # ``status.workspaces.last`` unconditionally (onboarding.js:460) and threw
+    # ``Cannot read properties of undefined (reading 'default_workspace')`` when
+    # ``settings`` was absent. Qubit has no single global default workspace (the
+    # workspace is a per-turn choice), so the honest value is the empty string
+    # with no last workspace — the client's own ``|| ''`` fallbacks then apply.
     return 200, {"ok": True, "complete": ready, "needs_onboarding": not ready,
-                 "detail": why, "steps": [], "upstream": UPSTREAM_PIN}
+                 "detail": why, "steps": [],
+                 "settings": {"default_workspace": "", "default_model": _ready_model(cfg)},
+                 "workspaces": {"available": [], "last": ""},
+                 "upstream": UPSTREAM_PIN}
 
 
 def client_events_log(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
@@ -755,6 +836,16 @@ def _version() -> str:
         return str(getattr(_vb, "__version__", "") or "unknown")
     except Exception:  # noqa: BLE001
         return "unknown"
+
+
+def _ready_model(cfg: Any) -> str:
+    """The configured chat model, or ``""`` — never a guessed name."""
+    try:
+        from .. import chat_transport as CT
+
+        return str(CT.configured_model(cfg) or "")
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def _agent_ready(cfg: Any) -> Tuple[bool, str]:

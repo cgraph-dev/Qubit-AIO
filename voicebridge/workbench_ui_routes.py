@@ -299,6 +299,7 @@ from .workbench_ui.handlers_extra import (chat_start as _x_chat_start,
                                           session_stream as _x_session_stream,
                                           session_flag as _x_session_flag,
                                           sessions_events as _x_sessions_events,
+                                          sessions_gateway_probe as _x_gateway_probe,
                                           approval_pending as _x_approval_pending,
                                           approval_respond as _x_approval_respond,
                                           clarify_pending as _x_clarify_pending,
@@ -306,6 +307,7 @@ from .workbench_ui.handlers_extra import (chat_start as _x_chat_start,
                                           workspace_list as _x_workspace_list,
                                           workspaces as _x_workspaces,
                                           profile_active as _x_profile_active,
+                                          profile_switch as _x_profile_switch,
                                           health_agent as _x_health_agent,
                                           dashboard_config as _x_dash_config,
                                           dashboard_status as _x_dash_status,
@@ -408,6 +410,18 @@ def profile_active(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Any]:
     return _x_profile_active(cfg, dict(q or {}), b if isinstance(b, dict) else {},
                              dict(p or {}))
+
+
+def profile_switch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_profile_switch(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                             dict(p or {}))
+
+
+def sessions_gateway_probe(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Any]:
+    return _x_gateway_probe(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                            dict(p or {}))
 
 
 def health_agent(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1176,8 +1190,14 @@ PORT_SET: Dict[str, str] = {
     # qubit_compat and the gateway dispatches to them there. Listing them in both
     # would double-count them in the endpoint table (the table script caught
     # exactly that). Only the SUB-paths Qubit does not already serve live here.
-    "profile/active": "h_wb_passthrough",
-    "profile/switch": "h_wb_passthrough",
+    #
+    # profile/active and profile/switch are NOT passthrough: qubit_compat serves
+    # the PLURAL ``/api/profiles/active``, so a passthrough dispatch to the
+    # singular ``/api/profile/active`` answered "no compat route" 404 — the
+    # browser's boot call, measured live. They route to the dedicated handlers
+    # below, which dispatch the plural route themselves.
+    "profile/active": "profile_active",
+    "profile/switch": "profile_switch",
     "skills/content": "h_wb_passthrough",
     "skills/toggle": "h_wb_passthrough",
     "memory/write": "h_wb_passthrough",
@@ -1218,6 +1238,9 @@ _EXTRA_PREFIXES: Dict[str, str] = {
     "chat/stream/status": "chat_stream_status",
     # the client's sidebar hot channel (SSE; see stream_kind below)
     "sessions/events": "sessions_events",
+    # the sidebar's gateway hot channel: ?probe=1 is a JSON preflight; without
+    # it the listener serves the same SSE as sessions/events (stream_kind)
+    "sessions/gateway/stream": "sessions_gateway_probe",
     # workspace tree the composer's file picker and the workspace panel read
     "list": "workspace_list",
     "workspaces": "workspaces",
@@ -1418,6 +1441,7 @@ _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "session_stream": session_stream,
     "session_flag": session_flag,
     "sessions_events": sessions_events,
+    "sessions_gateway_probe": sessions_gateway_probe,
     "approval_pending": approval_pending,
     "approval_respond": approval_respond,
     "approval_family": approval_family,
@@ -1428,6 +1452,7 @@ _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "workspace_list": workspace_list,
     "workspaces": workspaces,
     "profile_active": profile_active,
+    "profile_switch": profile_switch,
     "health_agent": health_agent,
     "dashboard_config": dashboard_config,
     "dashboard_status": dashboard_status,
@@ -1479,6 +1504,13 @@ def stream_kind(sub: str) -> Optional[str]:
     if clean == "chat/stream":
         return "chat"
     if clean == "sessions/events":
+        return "sessions"
+    # The gateway hot channel the sidebar's EventSource opens
+    # (``sessions.js:startGatewaySSE``). It is the same store-backed snapshot
+    # stream as ``sessions/events``; answering 501 made the client reconnect in
+    # a loop. ``?probe=1`` is a JSON preflight and is routed to its own handler,
+    # never here (the listener checks for the probe query first).
+    if clean == "sessions/gateway/stream":
         return "sessions"
     # The per-session EventSource the transcript pane opens before it paints.
     # Upstream uses it for confirm-connection, bg_task_complete and self-heal;
