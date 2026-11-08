@@ -142,3 +142,26 @@ def test_forwarded_family_help_has_no_user_facing_upstream_names():
     assert not offenders, (
         "forwarded family help still exposes upstream names: " + "; ".join(
             offenders))
+
+
+# `qubit serve` is the backend the desktop app spawns
+# (apps/desktop/electron/backend-command.ts::serveBackendArgs). It used to be a
+# typed refusal, which left the app with no local backend at all; it is now a
+# classified forward (`cli_qubit_forward.serve_route`). This pins the user-facing
+# half of that fix: the help a user actually reads must exist and carry no legacy
+# product name. Unlike the allowlist above there is no identifier carve-out here —
+# `serve` takes no upstream env var or flag, so a single hit is a real regression.
+def test_serve_help_exits_zero_and_is_brand_clean():
+    from voicebridge import cli as CLI
+
+    buf, err = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(err):
+        with pytest.raises(SystemExit) as exc:
+            CLI.main(["serve", "--help"])
+    assert exc.value.code == 0, (exc.value.code, err.getvalue()[-800:])
+    text = buf.getvalue()
+    assert text.strip(), "qubit serve --help produced no output"
+    # Sanity: this is really the serve help, not an empty/refusal envelope.
+    assert text.lstrip().startswith("usage: qubit serve"), text[:200]
+    residual = re.findall(r"hermes|Hermes|Nous", text)
+    assert not residual, f"qubit serve --help exposes legacy brand: {residual}"

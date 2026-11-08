@@ -229,6 +229,32 @@ FAMILY_FORWARD_WAVE6 = {
     # (and is covered by tests/test_cli_ports_wave6.py).
     "codex-runtime": ("codex-runtime", frozenset({""}),
                       frozenset({"migrate"})),
+    # Wave 10: `evals`, `recipe`, `traces` are Qubit-native local surfaces the
+    # fork grew in-tree (its parsers already read "Qubit" in their own help:
+    # "Run the offline eval bench", "List and run Qubit recipes", "Inspect the
+    # local redacted trace store"), but the Qubit parser never declared them,
+    # so before this row every invocation fell through the whole route ladder
+    # and was reachable only through the raw `qubit agent <args>` passthrough —
+    # argparse `invalid choice` for a bare `qubit evals`. They are classified
+    # forwards, not refusals: the fork IS the implementation and it is
+    # local-only (no model calls, no network for evals; a redacted on-machine
+    # store for traces).
+    #
+    # `evals run` is an offline bench over a caller-named JSONL dataset or the
+    # local trace store — read-only against that input, so it forwards verbatim;
+    # `--db` only overrides which store is read.
+    "evals": ("evals", frozenset({"run", ""}), frozenset()),
+    # `recipe list` is a registry listing. `recipe run` EXECUTES a recipe
+    # through a RuntimePort engine — it can call a model and produce side
+    # effects — so it is confirm-gated like every other mutating fork verb,
+    # even when `--dry-run` is passed: a preview flag the caller may or may
+    # not set is not an authorization boundary. Fail-closed wins.
+    "recipe": ("recipe", frozenset({"list", ""}), frozenset({"run"})),
+    # `traces list|show|export` read the local redacted store (`export` writes
+    # only the caller-named `--output` file). `traces prune` DELETES rows from
+    # that store and is therefore confirm-gated.
+    "traces": ("traces", frozenset({"list", "show", "export", ""}),
+               frozenset({"prune"})),
 }
 
 # ---------------------------------------------------------------------------

@@ -1,63 +1,89 @@
-# Workbench chat — live status after the v5 lane
+# Workbench chat — the stream deadlock, and the state after fixing it
 
-Written after driving the running server, not by reading code. Every claim has a
-command behind it.
+Written by driving the running server, not by reading code. Every claim has a
+command or a test behind it.
+
+## The bug: the reader took its own lock twice
+
+Every turn returned `start: 200`, opened the SSE stream, received
+`: connected`, and then delivered nothing. The pump was healthy the whole
+time — it called `chat_transport`, pulled the model's reply and pushed
+`token` + `done` into the run buffer in about 5 seconds.
+
+The cause, in `chat_stream_frames`' follow loop:
+
+```python
+with run.changed:                     # Condition wrapping run.lock
+    if not run.snapshot(cursor)[0]:   # snapshot() takes run.lock AGAIN
+        run.changed.wait(_POLL_S)
+```
+
+`_Run.changed` is `threading.Condition(self.lock)` and `snapshot()` acquires
+that same **non-reentrant** `threading.Lock`. The reader deadlocked against
+itself on the first iteration and never reached `wait()`: it sat holding the
+lock, so the pump's `notify_all()` had nothing to wake and `push()` blocked
+behind it. One bug, two symptoms — a silent client and a wedged pump.
+
+### How it was found, and the two diagnoses before it
+
+Both earlier theories were wrong and are recorded so they are not repeated:
+
+- **`_pty_lock` held across `AgentPtySession` construction.** A real defect
+  (fixed in `2626f7751`), but not this bug — turns still hung after it.
+- **"20 `wb-chat-*` threads deadlocked against each other."** Also wrong. Those
+  were the turn's own workers; `comm` truncates at 15 chars, so they only
+  looked like one thread. The pump was never stuck in the transport at all.
+
+What settled it was tracing **both sides** into the journal:
+
+```
+[wb-read <id>] _get -> True runs=1 after_seq=0     # reader found the run
+[wb-pump <id>] event: token                        # pump buffered the event
+(nothing from the frame-yield trace)               # reader never left the loop
+```
+
+A reader that has found the run and a pump that has pushed an event, with no
+frame crossing between them, is a lock problem inside the reader — not a model,
+PTY or network problem.
 
 ## Fixed and verified
 
 | Fix | Commit | Evidence |
 |---|---|---|
-| Model picker returns 43 real models | `961cba3bb` | live `/wb/api/models`: `models: 43`, `active: deepseek-v4.1-flash`, `provider: opencode-go`; the old `[]` is gone |
-| PTY lock no longer held across construction | `2626f7751` | `tests/test_pty_lock_scope.py`: 2 failed → 3 passed |
-| `stream_turn` honours `timeout_s` | `2626f7751` | same suite; previously `out.get()` blocked forever |
-| Runs that can never settle expire | `ea70402c0` | absolute `_HARD_MAX_S` backstop |
-| Voice path intact | — | `test_qubitchat_voice_continuity9u.py` + `test_barge_stream.py`: 9 passed |
+| Stream reader no longer re-enters its own run lock | `3fbab89c0` | live: `token` → `done` in ~5 s; browser reply rendered in 4 s via `#btnSend` |
+| A dead pump no longer locks its session out | `fb671c98b` | two consecutive turns on one session both `200` (the second was `409` before) |
+| Model picker returns real models | `961cba3bb` | `/wb/api/models`: 43 entries, `active: deepseek-v4.1-flash` |
+| PTY lock no longer held across construction | `2626f7751` | `tests/test_pty_lock_scope.py`: 3 passed |
+| Runs that can never settle expire | `ea70402c0` | `_HARD_MAX_S` backstop, now covered by `test_workbench_run_gc.py` |
+| Voice path intact | — | `test_qubitchat_voice_continuity9u.py` + `test_barge_stream.py` |
 
-Still working, verified live: the page and its assets load with
-`failed requests: 0`, the session list renders real data, `/api/session` returns
-real user + assistant rows, and `/api/session/stream` answers `initial`.
+Live turn, verbatim:
 
-## NOT fixed — chat turns still hang, and it is not the lock
-
-A turn posted to `/wb/api/chat/start` returns `start: 200`, then sits
-`active: true` while `/wb/api/chat/stream` sends only `: connected`.
-
-New measurement, and the reason the earlier diagnosis was wrong: while the run
-is stuck the bridge process holds **20 threads all named `wb-chat-37b0a7e`** —
-the same run — every one parked in `futex_do_wait`. `comm` is truncated at 15
-characters, so that is one pump plus the worker threads its turn spawned, all
-deadlocked against each other.
-
-Releasing `_pty_lock` across construction was a real defect and is fixed, but it
-is not what blocks the turn. The block happens *after* the pump is running,
-among threads the turn itself spawns. `timeout_s` cannot fire there because the
-pump is inside the generator: the clock is only checked between events.
-
-### What would find it
-
-Dump all 20 stacks at the moment of the stall — that names the exact lock and
-both holders in one shot. Three sessions have inferred this from `wchan`; none
-has read the Python frames, because py-spy needs elevated permissions here.
-
-```bash
-sudo env "PATH=$PATH" .venv/bin/py-spy dump --pid <bridge-pid>
+```
+: connected
+event: token  {"text": "SHIPPED", "seq": 1}
+event: done   {"status": "completed", "reply": "SHIPPED", "elapsed_ms": ~5000}
 ```
 
-## Open — the ported client may not paint the tokens
+## Tests that pin it
 
-Not re-tested since the transport changed. Measured earlier: `S.messages` ended
-up with the user turn only and the assistant row read "Processed" with an empty
-body, while `/api/session` returned the reply fine — so that failure was
-client-side consumption, not persistence.
+`tests/test_workbench_stream_deadlock.py` and `tests/test_workbench_run_gc.py`.
+Both were proven to fail against the old code before landing — reverting the
+follow loop reproduces the hang, reverting `live_run_for_session` fails the
+lockout test — so they fail for the right reason rather than passing slowly.
+
+`_gc()`'s retention rules had no coverage at all before this; the run registry
+is process-global and one-run-per-session, so a reap that is too eager loses a
+finished turn and one that is too lazy locks the session out permanently.
 
 ## Not ported (typed 501, by design)
 
 `/api/sessions/gateway/stream`, `/api/session/update`, `/api/session/yolo`,
-`/api/profile/active` (404), `/api/list` (503). Each answers a named refusal;
-none silently pretends to work.
+`/api/profile/active` (404), `/api/list` (503), `/api/chat/status`. Each answers
+a named refusal; none silently pretends to work.
 
 ## Deliberately not done
 
-The `_HARD_MAX_S` backstop and the timeout make the failure *visible and
-bounded* rather than correct. They do not make chat stream. Do not read this
-document as "chat works".
+`_HARD_MAX_S` and the per-event deadline remain as visibility backstops for a
+transport that genuinely stalls. They are not what makes chat stream — the lock
+fix is — but they still bound a failure that no reader-side fix can see.
