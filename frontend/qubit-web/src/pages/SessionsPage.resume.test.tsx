@@ -171,12 +171,9 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root?.unmount());
   container?.remove();
-  vi.unstubAllGlobals();
-  // GSAP keeps one ticker timer alive past unmount; keep its frame primitives
-  // defined so the next tick cannot surface as an unhandled exception.
-  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
-    setTimeout(() => cb(0), 0) as unknown as number);
-  vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
+  // Keep the frame primitives installed for the life of the file: GSAP can
+  // schedule one ticker callback after unmount, and removing them first is a
+  // load-dependent unhandled ReferenceError.
 });
 
 describe("SessionsPage resume routing", () => {
