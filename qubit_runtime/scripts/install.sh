@@ -662,6 +662,28 @@ stage_prerequisites() {
     log_success "prerequisites ok (git, curl)"
 }
 
+# True when $COMMIT is an ancestor of the branch being installed. Prefers the
+# remote-tracking ref and falls back to the local branch when origin is
+# unavailable, so a pinned install from a clone whose origin cannot be fetched
+# still verifies meaningfully. Both refs are equally trustworthy: either one
+# containing the commit proves it is on the intended lineage. The fallback is
+# always logged -- never a silent loosening -- and a ref that exists but does
+# NOT contain $COMMIT is a hard rejection, not a reason to try the other one.
+commit_is_on_branch() {
+    local repo="$1" commit="$2"
+    if git -C "$repo" rev-parse --verify --quiet "refs/remotes/origin/$BRANCH^{commit}" >/dev/null 2>&1; then
+        if git -C "$repo" merge-base --is-ancestor "$commit" "origin/$BRANCH" 2>/dev/null; then
+            return 0
+        fi
+        fail "commit $commit is not on branch $BRANCH" commit_not_on_branch
+    fi
+    log_warn "origin/$BRANCH unavailable; verifying against local $BRANCH"
+    if git -C "$repo" merge-base --is-ancestor "$commit" "$BRANCH" 2>/dev/null; then
+        return 0
+    fi
+    return 1
+}
+
 stage_repository() {
     local pinned=false release_tag=""
     # An interrupted clone from an older installer can leave a .git with no
@@ -863,7 +885,7 @@ stage_repository() {
         if [ -n "$INSTALL_COMMIT" ]; then
             # Pin before publishing: a pinned clone has no files yet, and an
             # unpublished tree never leaves an empty checkout behind.
-            git -C "$staged/tree" merge-base --is-ancestor "$INSTALL_COMMIT" "origin/$BRANCH" 2>/dev/null \
+            commit_is_on_branch "$staged/tree" "$INSTALL_COMMIT" \
                 || { rm -rf "$staged"; fail "commit $INSTALL_COMMIT is not on branch $BRANCH" commit_not_on_branch; }
             cloned=false
             for attempt in 1 2; do
@@ -920,7 +942,7 @@ stage_repository() {
         # A pin must come from the branch being installed: the complete
         # marker records both, and a commit off that branch would make the
         # next plain rerun "update" onto a different line.
-        git -C "$INSTALL_DIR" merge-base --is-ancestor "$INSTALL_COMMIT" "origin/$BRANCH" 2>/dev/null \
+        commit_is_on_branch "$INSTALL_DIR" "$INSTALL_COMMIT" \
             || fail "commit $INSTALL_COMMIT is not on branch $BRANCH" commit_not_on_branch
         run_logged "Pinning $INSTALL_COMMIT" git -C "$INSTALL_DIR" checkout "$INSTALL_COMMIT" \
             || fail "could not pin commit $INSTALL_COMMIT" git_checkout_failed
