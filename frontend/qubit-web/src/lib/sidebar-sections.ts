@@ -40,7 +40,10 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
     id: "work",
     label: "Work",
     index: "02",
-    paths: ["/files", "/analytics", "/models", "/logs", "/qubit-scheduler", "/agent-workspace"],
+    // Workbench leads: it is the three-panel workspace (chat + files + terminal)
+    // and the widest surface in the dashboard, so burying it under System with
+    // eight other routes made the primary working view undiscoverable.
+    paths: ["/qubit-workbench", "/files", "/analytics", "/models", "/logs", "/qubit-scheduler", "/agent-workspace"],
   },
   {
     id: "voice",
@@ -87,7 +90,6 @@ export const SIDEBAR_SECTIONS: readonly SidebarSectionSpec[] = [
     paths: [
       "/system",
       "/qubit-hud",
-      "/qubit-workbench",
       "/config",
       "/env",
       "/profiles",

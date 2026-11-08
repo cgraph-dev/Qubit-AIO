@@ -47,6 +47,7 @@ import {
   Package,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelsTopLeft,
   Plug,
   Puzzle,
   Radio,
@@ -517,6 +518,11 @@ const BUILTIN_NAV_REST: NavItem[] = [
   // plugin's path — the same pattern /qubit-office uses. The label comes from
   // ROUTE_TITLES, and sidebar-sections.ts groups it under System.
   { path: "/qubit-hud", label: "Qubit HUD", icon: Activity },
+  // Qubit Workbench had the same gap as the HUD: the route is mounted and serves
+  // the three-panel workspace, but it was never listed here, so the sidebar
+  // showed no way in and the surface was reachable only by typing the URL.
+  // Grouped first under Work (sidebar-sections.ts).
+  { path: "/qubit-workbench", label: "Qubit Workbench", icon: PanelsTopLeft },
   { path: "/qubit-office", labelKey: "office", label: "Qubit Office", icon: Users, exactEnd: true },
   // `/qubit-office2` (Agent Quest) and `/qubit-office3` (Voice Chat) are no
   // longer listed: office2 duplicates the Office roster under a colliding
