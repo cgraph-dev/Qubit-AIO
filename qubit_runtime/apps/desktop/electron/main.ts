@@ -4618,7 +4618,8 @@ async function resolveHermesBackend(backendArgs: string[]): Promise<ResolvedHerm
   //    active runtime is usable, launch it directly; only fall through to
   //    bootstrap when the runtime itself is unusable.
   const activeBackend: SourceBackend | null = await resolveSourceInstallationBackend(ACTIVE_HERMES_ROOT, backendArgs, {
-    hermesHome: QUBIT_HOME
+    hermesHome: QUBIT_HOME,
+    onReject: reason => rememberLog(`[bootstrap] rejected Qubit install at ${ACTIVE_HERMES_ROOT}: ${reason}`)
   })
 
   const activeRuntime: ActiveRuntimeState = activeRuntimeState(activeBackend)

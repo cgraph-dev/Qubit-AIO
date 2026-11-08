@@ -20,6 +20,8 @@ export interface SourceBackend {
 interface SourceOptions {
   isWindows?: boolean
   env?: NodeJS.ProcessEnv
+  /** Diagnostic sink: why a candidate root was rejected (used by boot logging). */
+  onReject?: (reason: string) => void
 }
 
 /** Keep the validated command. PM owns interpreter and generation selection. */
@@ -28,7 +30,18 @@ export async function resolveSourceInstallationBackend(
   args: string[],
   options: SourceOptions & { hermesHome?: string } = {}
 ): Promise<SourceBackend | null> {
-  if (!existsSync(path.join(root, 'qubit_cli', 'main.py'))) {
+  // A Qubit checkout vendors the runtime under qubit_runtime/, while an upstream
+  // (hermes) checkout has qubit_cli/ at the root. Accept either layout: the
+  // installer's own runtime_dir() draws the same distinction, and a checkout that
+  // only satisfies the upstream shape made every Qubit install look unusable —
+  // the app logged "no usable Qubit install" for a complete, working install and
+  // dropped the user back to first-run setup.
+  const runtimeRoot: string = existsSync(path.join(root, 'qubit_runtime', 'qubit_cli', 'main.py'))
+    ? path.join(root, 'qubit_runtime')
+    : root
+
+  if (!existsSync(path.join(runtimeRoot, 'qubit_cli', 'main.py'))) {
+    if (typeof options.onReject === 'function') options.onReject(`no qubit_cli/main.py under ${runtimeRoot}`)
     return null
   }
 
@@ -36,6 +49,7 @@ export async function resolveSourceInstallationBackend(
   const launcher: string | null = resolveInstallationLauncher(root, isWindows, options.hermesHome)
 
   if (!launcher) {
+    if (typeof options.onReject === 'function') options.onReject(`no launcher resolved for ${root}`)
     return null
   }
 
@@ -52,7 +66,10 @@ export async function resolveSourceInstallationBackend(
       timeout: PROBE_TIMEOUT_MS,
       windowsHide: true
     })
-  } catch {
+  } catch (error) {
+    if (typeof options.onReject === 'function') {
+      options.onReject(`launcher ${launcher} failed its --version probe: ${(error as Error)?.message ?? error}`)
+    }
     return null
   }
 
@@ -99,7 +116,17 @@ export function createSourcePythonBackend(
     // The backend runs in the user's workspace cwd, and the selected
     // interpreter need not have this checkout installed: name it explicitly.
     // (The scrubbed inherited value could point at another checkout.)
-    env: { ...buildDesktopBackendEnv({ currentEnv: options.env ?? process.env }), PYTHONPATH: root },
+    //
+    // PYTHONPATH must name the directory that CONTAINS qubit_cli/, which in a
+    // Qubit checkout is the vendored qubit_runtime/ — pointing it at the
+    // checkout root leaves `-m qubit_cli.main` unresolvable. Same layout rule
+    // as resolveSourceInstallationBackend above.
+    env: {
+      ...buildDesktopBackendEnv({ currentEnv: options.env ?? process.env }),
+      PYTHONPATH: existsSync(path.join(root, 'qubit_runtime', 'qubit_cli', 'main.py'))
+        ? path.join(root, 'qubit_runtime')
+        : root
+    },
     root,
     bootstrap: false,
     shell: false,

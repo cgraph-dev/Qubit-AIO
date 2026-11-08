@@ -43,7 +43,17 @@ export function resolveInstallationLauncher(
 
   // Earlier PM installers published only to user-bin. Trust that historical
   // launcher only after its existing version surface proves exact source identity.
-  if (stagedFileExists(path.join(updateRoot, 'qubit_cli', '_launchers.py'))) {
+  //
+  // The marker lives with the runtime: an upstream (hermes) checkout has
+  // qubit_cli/ at its root, while a Qubit checkout vendors it under
+  // qubit_runtime/. Checking only the root made every Qubit install look like it
+  // had no launcher, so the desktop reported "no usable Qubit install" for a
+  // complete install and fell back to first-run setup forever.
+  const runtimeRoot: string = stagedFileExists(path.join(updateRoot, 'qubit_runtime', 'qubit_cli', '_launchers.py'))
+    ? path.join(updateRoot, 'qubit_runtime')
+    : updateRoot
+
+  if (stagedFileExists(path.join(runtimeRoot, 'qubit_cli', '_launchers.py'))) {
     const defaultHome: string = platformDefaultHermesHome(os.homedir(), process.env, isWindows ? 'win32' : 'linux')
 
     const dirs: string[] = isWindows
