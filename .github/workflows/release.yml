@@ -8,6 +8,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing v* release tag to rebuild and verify"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -33,7 +39,7 @@ jobs:
       - name: Resolve the release tag
         id: tag
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           case "$TAG" in
@@ -71,7 +77,7 @@ jobs:
             --repo . --fresh-install --require-fresh-install --json
       - name: Build, install, and reproduce artifacts
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -o pipefail
           python scripts/release_qualify.py \
