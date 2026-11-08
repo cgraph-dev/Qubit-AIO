@@ -55,11 +55,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/release"
+          # SHA256SUMS covers every published asset, including the bootstrap
+          # installers and release metadata. Download the whole release rather
+          # than a narrow pattern so the checksum contract can be verified.
           gh release download "$TAG" \
             --repo "$GITHUB_REPOSITORY" \
-            --pattern '*.whl' \
-            --pattern '*.tar.gz' \
-            --pattern 'SHA256SUMS' \
             --dir "$RUNNER_TEMP/release"
           ls -l "$RUNNER_TEMP/release"
       - name: Verify the release checksums

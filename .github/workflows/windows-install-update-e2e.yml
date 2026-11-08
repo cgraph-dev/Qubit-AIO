@@ -20,6 +20,7 @@ jobs:
     defaults:
       run:
         shell: pwsh
+        working-directory: qubit_runtime
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
@@ -29,7 +30,7 @@ jobs:
       - name: Install test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest psutil pyyaml pathspec
+          python -m pip install -e ".[test]" pytest psutil pyyaml pathspec
       - name: Run Windows install + update E2E
         env:
           HERMES_E2E_STRICT_ACCEPTANCE: ${{ inputs.strict_acceptance }}
