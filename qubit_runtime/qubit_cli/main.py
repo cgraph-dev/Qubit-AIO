@@ -2677,7 +2677,10 @@ def _dashboard_sanitize_desktop_env(headless_backend) -> None:
     ):
         os.environ.pop("HERMES_WEB_DIST", None)
     if not headless_backend:
+        # Both spellings: a shell that inherited ``HERMES_SERVE_HEADLESS`` from a pre-rename
+        # backend would otherwise disable the SPA of the browser dashboard it launches.
         os.environ.pop("QUBIT_SERVE_HEADLESS", None)
+        os.environ.pop("HERMES_SERVE_HEADLESS", None)
 
 
 def _require_dashboard_web_deps() -> None:

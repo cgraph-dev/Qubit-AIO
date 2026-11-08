@@ -25,6 +25,16 @@ if TYPE_CHECKING:
 _log = logging.getLogger("qubit_cli.web_server")
 
 
+def _serve_headless_env() -> str:
+    """The ``QUBIT_SERVE_HEADLESS`` value, falling back to the legacy ``HERMES_`` spelling.
+
+    Keep-for-compat alias (same shape as ``web_server_dashboard._serve_headless``): the canonical
+    name is written by ``main_dashboard._resolve_dashboard_web_dist``, the legacy one by a backend
+    spawned from a pre-rename build. Do not drop the fallback without retiring every old spawn.
+    """
+    return os.environ.get("QUBIT_SERVE_HEADLESS") or os.environ.get("HERMES_SERVE_HEADLESS") or ""
+
+
 # ---------------------------------------------------------------------------
 # Config schema — auto-generated from DEFAULT_CONFIG
 # ---------------------------------------------------------------------------
@@ -670,7 +680,9 @@ def _dashboard_skew_restart_hint() -> str:
 
     See #97046.
     """
-    if os.environ.get("QUBIT_SERVE_HEADLESS") == "1":
+    # Dual read — ``QUBIT_SERVE_HEADLESS`` is canonical, ``HERMES_SERVE_HEADLESS`` is what
+    # backends spawned by a pre-rename build export. See ``main_dashboard._resolve_dashboard_web_dist``.
+    if _serve_headless_env() == "1":
         return (
             "restart the Desktop-owned backend to load the new code "
             "(use Restart backend in Qubit Desktop, or quit and reopen the app)"

@@ -103,6 +103,15 @@ _CAPABILITY_ENDPOINTS = (
     ("artifact_download", ("GET", "/v1/artifacts/download/{artifact_id}")))
 _BROWSER_CONTROL_WS_PROTOCOL = "hermes-browser-control-v1"
 _BROWSER_CONTROL_TICKET_PROTOCOL_PREFIX = "hermes-browser-control-ticket."
+# Rebrand aliases. The shipped extension was rebranded (``port_browser_extension.TEXT_RULES``
+# rewrites ``hermes-browser-control-v1`` -> ``qubit-browser-control-v1``), and
+# ``plugins/browser-companion/control_routes.WS_PROTOCOL`` — with ``wire_check.py`` pinning the
+# extension source to it — speaks the ``qubit-`` spelling. This handler still compared only
+# ``hermes-``, so every controller dial from the packaged extension was refused 401 before the
+# upgrade, while the test harness (which pins ``hermes-``) stayed green. Accept both; the
+# handshake answers with whichever spelling the client offered.
+_BROWSER_CONTROL_WS_PROTOCOL_ALIASES = ("qubit-browser-control-v1",)
+_BROWSER_CONTROL_TICKET_PROTOCOL_PREFIXES = ("qubit-browser-control-ticket.", _BROWSER_CONTROL_TICKET_PROTOCOL_PREFIX)
 
 
 def _approval_event_choices(*, smart_denied: bool, allow_session: bool, allow_permanent: bool) -> list[str]:
@@ -2596,10 +2605,19 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
             value.strip() for value in request.headers.get("Sec-WebSocket-Protocol", "").split(",")
             if value.strip()]
         ticket_protocols = [
-            value for value in requested_protocols if value.startswith(_BROWSER_CONTROL_TICKET_PROTOCOL_PREFIX)]
-        if _BROWSER_CONTROL_WS_PROTOCOL not in requested_protocols or len(ticket_protocols) != 1:
+            value for value in requested_protocols
+            if value.startswith(_BROWSER_CONTROL_TICKET_PROTOCOL_PREFIXES)]
+        offered_protocol = next(
+            (name for name in (_BROWSER_CONTROL_WS_PROTOCOL, *_BROWSER_CONTROL_WS_PROTOCOL_ALIASES)
+             if name in requested_protocols), "")
+        if not offered_protocol or len(ticket_protocols) != 1:
             raise web.HTTPUnauthorized()
-        ticket_value = ticket_protocols[0][len(_BROWSER_CONTROL_TICKET_PROTOCOL_PREFIX) :]
+        # Either prefix was accepted above, so strip the one actually presented — slicing by the
+        # canonical prefix alone would leave `qubit-browser-control-ticket.` glued to the value.
+        ticket_prefix = next(
+            prefix for prefix in _BROWSER_CONTROL_TICKET_PROTOCOL_PREFIXES
+            if ticket_protocols[0].startswith(prefix))
+        ticket_value = ticket_protocols[0][len(ticket_prefix):]
         if not ticket_value:
             raise web.HTTPUnauthorized()
         try:
@@ -2609,7 +2627,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
         except Exception:
             logger.exception("browser-control WS ticket consumption failed")
             raise web.HTTPUnauthorized() from None
-        ws = web.WebSocketResponse(heartbeat=30.0, protocols=(_BROWSER_CONTROL_WS_PROTOCOL,))
+        ws = web.WebSocketResponse(heartbeat=30.0, protocols=(offered_protocol,))
         await ws.prepare(request)
         loop = asyncio.get_running_loop()
         _send = _browser_controller_ws_sender(ws, loop)

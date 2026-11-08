@@ -1044,16 +1044,23 @@ def _route_named_profile_dashboard(
 def _resolve_dashboard_web_dist(args, _headless_backend: bool) -> None:
     """Build or validate the web UI dist before the server imports.
 
-    ``serve`` sets HERMES_SERVE_HEADLESS so mount_spa() stays off. Otherwise build
+    ``serve`` sets QUBIT_SERVE_HEADLESS so mount_spa() stays off. Otherwise build
     unless HERMES_WEB_DIST / --skip-build promise a dist — then verify index.html
     (else the server serves 404s). --skip-build on the default location gets ONE
     recovery build; a caller-managed HERMES_WEB_DIST can't be populated.
+
+    Single write, dual read: this is the ONLY writer, and it writes the canonical
+    ``QUBIT_`` name. Every reader (``web_server_dashboard.mount_spa``,
+    ``web_server_config._dashboard_skew_restart_hint``) accepts the legacy
+    ``HERMES_`` spelling too — this writer used to emit only ``HERMES_`` while both
+    readers had already moved to ``QUBIT_``, so ``qubit serve`` mounted the SPA it
+    exists to suppress and nothing reported an error.
     """
     from qubit_cli.main import PROJECT_ROOT
     from qubit_cli.main_web_build import _build_web_ui
     skip_build = getattr(args, "skip_build", False)
     if _headless_backend:
-        os.environ["HERMES_SERVE_HEADLESS"] = "1"  # set before web_server import
+        os.environ["QUBIT_SERVE_HEADLESS"] = "1"  # set before web_server import
     elif "HERMES_WEB_DIST" not in os.environ and not skip_build:
         if not _build_web_ui(PROJECT_ROOT / "web", fatal=True):
             sys.exit(1)

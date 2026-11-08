@@ -171,8 +171,15 @@ def _ticket_principal(request: Request) -> tuple[dict, str | None]:
         return {"user_id": session.user_id, "provider": session.provider,
                 "issuer": getattr(session, "issuer", "") or ""}, None
     if not getattr(request.app.state, "auth_required", False):
-        from qubit_cli.web_server import _SESSION_HEADER_NAME, _has_valid_session_token
-        presented = (request.headers.get(_SESSION_HEADER_NAME)
+        from qubit_cli.web_server import _SESSION_HEADER_ALIASES, _has_valid_session_token
+        # Read every alias, exactly like the validator above it. Reading only the canonical
+        # ``_SESSION_HEADER_NAME`` authenticated a request that presented the legacy
+        # ``X-Hermes-Session-Token`` yet recorded ``session_token=None``, so the socket ticket
+        # skipped ``generation_of(session_token)`` and lost browser sign-out revocation —
+        # unauthenticated in effect, while every credential check passed. Keep-for-compat: the
+        # alias tuple in ``qubit_cli.web_server`` is the single source of truth for both sides.
+        presented = (next((request.headers.get(name) for name in _SESSION_HEADER_ALIASES
+                           if request.headers.get(name)), None)
                      or request.headers.get("authorization", "").removeprefix("Bearer "))
         if _has_valid_session_token(request):
             return dict(SESSION_TOKEN_OWNER), presented

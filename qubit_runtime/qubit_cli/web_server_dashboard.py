@@ -34,6 +34,20 @@ normalize_web_asset_mime_types()
 _log = logging.getLogger("qubit_cli.web_server")
 
 
+def _serve_headless() -> bool:
+    """True when this process is the ``qubit serve`` headless backend.
+
+    Read both brand spellings: ``QUBIT_SERVE_HEADLESS`` is canonical (and the only name
+    ``main_dashboard._resolve_dashboard_web_dist`` writes now), ``HERMES_SERVE_HEADLESS`` is
+    what a backend spawned by a pre-rename build exports. Keep-for-compat alias — do not
+    "clean up" the legacy branch, see ``docs/REBRAND-SWEEP-PLAN.md`` (single write, dual read).
+
+    A defined-but-empty value is not headless: this is a presence-and-value check, matching the
+    original ``== "1"`` comparison rather than truthiness of the raw string.
+    """
+    return os.environ.get("QUBIT_SERVE_HEADLESS") == "1" or os.environ.get("HERMES_SERVE_HEADLESS") == "1"
+
+
 def _normalise_prefix(raw: Optional[str]) -> str:
     """Normalise an X-Forwarded-Prefix header value (single source of truth lives in
     ``qubit_cli.dashboard_auth.prefix`` so gate, OAuth, cookies and SPA mount agree)."""
@@ -127,7 +141,11 @@ def mount_spa(application: FastAPI):
 
     # `hermes serve` is the headless backend: it must NEVER serve the browser SPA, even if a
     # dist is lying around, so only the JSON-RPC/WS/API surface is reachable.
-    if os.environ.get("QUBIT_SERVE_HEADLESS") == "1":
+    # Dual read: ``QUBIT_SERVE_HEADLESS`` is what ``qubit serve`` writes today; a backend
+    # spawned by an older build (or by a Desktop pinned to one) exports the legacy
+    # ``HERMES_SERVE_HEADLESS``. Keep the alias — dropping it re-opens exactly the
+    # writer/reader split where serve mounted the SPA it exists to suppress.
+    if _serve_headless():
 
         @application.get("/{full_path:path}")
         async def no_frontend(full_path: str):
