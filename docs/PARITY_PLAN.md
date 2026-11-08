@@ -245,10 +245,46 @@ Verifiers get: the pin, the claim set to test, and the instructions above.
   unchanged.
 - Any agent's "done" being accepted without a pin check.
 
-## Open decisions for the owner
+## Office mounting — decided, and already built
 
-1. **Office mounting** — the ported HUD app inside the Habblaud iframe, or a
-   sibling route Office links to? (Decides how "1:1 UI" is verified.)
-2. **Not an open question, recorded so it is not reopened:** HUD's chat and the
-   workbench's chat are both ported in full. They are different products'
-   chat implementations and neither is replaced by the other.
+Owner: **inside the Habblaud iframe.**
+
+Good news, measured not assumed: the mount already exists and works.
+`frontend/qubit-app/plugins/qubit-office/game/ui/HudPanel.ts` frames
+`/qubit-hud` from inside the Office dock, and the server grants it —
+verified live:
+
+```
+GET /qubit-hud
+  X-Frame-Options: SAMEORIGIN
+  Content-Security-Policy: … frame-ancestors 'self' …
+GET /qubit-office → 200
+```
+
+`HudPanel.ts` documents the design that failed before it: watching
+`window.__QUBIT_PLUGINS__` from the Office document never worked, because the
+Office page is a full-bleed iframe of the vendored app — a *different document*
+that never loads `/dashboard-plugins/qubit-hud/qubit-hud.js`. A registration
+cannot cross a document boundary. Framing the HUD's own route avoids that
+entirely.
+
+**Consequence for this plan: Phase 1 does not build a mount, it fills a frame
+that already works.** Everything below is therefore about the FRAMED DOCUMENT —
+what `/qubit-hud` serves — not about Office's layout:
+
+- The ported HUD app must be what `/qubit-hud` serves.
+- Office's `HudPanel.ts` needs no rewrite; its `HUD_PATH` constant should keep
+  pointing at the same route.
+- The existing escape-hatch link to `/qubit-hud` keeps working unchanged.
+- Verification runs *inside the Office iframe*, which is stricter than opening
+  `/qubit-hud` directly — a same-origin frame fails differently from a top-level
+  document (CSP, storage partitioning, focus), so testing only the top-level
+  route would miss the real surface.
+
+One thing to check while porting: `HudPanel.ts` calls the HUD "seven GET tabs".
+After the port it is the full upstream app with its own chat, which writes.
+The "read-only" note in that file's docstring (`THE OFFICE STAYS READ-ONLY
+(C4)`) is about the Office *page* issuing no request — the framed document is
+allowed to write, exactly as `/qubit-hud` already does today. Restate that in
+the file when it is touched, so the next reader does not misread the comment as
+"the HUD must not write".
