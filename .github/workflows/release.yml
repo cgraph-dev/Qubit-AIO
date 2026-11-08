@@ -80,6 +80,7 @@ jobs:
           TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -o pipefail
+          mkdir -p dist
           python scripts/release_qualify.py \
             --build --install --reproduce --unsigned-ok --json \
             --tag "$TAG" --out dist/release \
