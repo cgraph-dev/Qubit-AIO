@@ -38,13 +38,17 @@ VENV_HOLDERS_EXIT = 3
 
 
 def _venv_pythons(machine: Machine) -> list:
-    return sorted(machine.qubit_home.glob("installs/*/environments/*/venv/Scripts/python.exe"))
+    # Managed (pm) environments live under installs/, the source installer's is
+    # QUBIT_HOME\venv; both are the install's own interpreter.
+    found = set(machine.qubit_home.glob("installs/*/environments/*/venv/Scripts/python.exe"))
+    found.update(machine.qubit_home.glob("venv/Scripts/python.exe"))
+    return sorted(found)
 
 
 def _spawn_holders(machine: Machine) -> list[int]:
     """What keeps a venv busy on a real box: long-lived processes on its interpreter."""
     pythons = _venv_pythons(machine)
-    assert pythons, f"harness: no venv\\Scripts\\python.exe under {machine.qubit_home / 'installs'}"
+    assert pythons, f"harness: no venv\\Scripts\\python.exe under {machine.qubit_home}"
     pids = []
     for exe in pythons:
         proc = subprocess.Popen([str(exe), "-c", "import time; time.sleep(900)"], cwd=machine.profile,

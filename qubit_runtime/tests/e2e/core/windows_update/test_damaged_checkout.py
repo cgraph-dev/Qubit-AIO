@@ -67,7 +67,7 @@ def test_paused_gateway_comes_back_when_the_update_cannot_fetch(journey: Journey
 
 def test_rerunning_the_installer_repairs_the_checkout(journey: Journey) -> None:
     m, reinstall = journey.machine, journey["reinstall"]
-    parked = list(m.qubit_home.glob("hermes-agent.broken-*"))
+    parked = list(m.qubit_home.glob("qubit.broken-*"))
     head, update = journey["head_after_reinstall"], journey["update_after_reinstall"]
     assert reinstall.returncode == 0 and parked and len(head) == 40, fail_with(
         m, f"rerunning install.ps1 over the damaged checkout did not repair it (rc={reinstall.returncode}, "

@@ -376,7 +376,7 @@ def _cli_update(machine, label: str):
 
 
 def _handoff(machine, label: str):
-    script = machine.install_dir / "scripts" / "desktop-update" / "windows.ps1"
+    script = machine.install_dir / "qubit_runtime" / "scripts" / "desktop-update" / "windows.ps1"
     return lambda: machine.spawn_logged(
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script),
          "-InstallRoot", str(machine.install_dir), "-DesktopPid", "0", "-NoUi", "-NoGateway"], label)
@@ -461,7 +461,7 @@ def _direct_update_child(proc) -> psutil.Process | None:
 # Printed by ``_cmd_update_impl``, which qubit_cli/main.py enters only after
 # ``UpdateLock.acquire()`` returned: once update.log gains one, the update child has
 # taken its place under the script's claim (and named itself in it, where it does).
-UPDATE_BANNER = "Updating Hermes Agent..."
+UPDATE_BANNER = "Updating Qubit Agent..."
 
 
 UPDATE_DONE = "Update complete!"
