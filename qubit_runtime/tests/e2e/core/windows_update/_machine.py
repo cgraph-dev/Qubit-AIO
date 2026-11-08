@@ -66,13 +66,8 @@ from tests.e2e.core.windows._helpers import (
 from tests.fakes.fake_llm_provider import write_qubit_home
 
 
-def _repo_root() -> Path:
-    """The checkout root that owns ``scripts/install.ps1``.
-
-    In the upstream layout the vendored runtime is the repository root; in the
-    public Qubit seed it is ``qubit_runtime/`` inside the umbrella repository.
-    Resolve the enclosing git checkout instead of assuming a fixed depth.
-    """
+def _git_root() -> Path:
+    """The enclosing checkout that owns the git history used by the harness."""
     here = Path(__file__).resolve()
     for parent in here.parents:
         if (parent / ".git").exists():
@@ -80,7 +75,11 @@ def _repo_root() -> Path:
     return here.parents[4]
 
 
-REPO_ROOT = _repo_root()
+# The upstream layout keeps install.ps1 at the repository root; the public
+# Qubit seed vendored the runtime under qubit_runtime/. The installer and the
+# git history therefore resolve independently.
+INSTALL_ROOT = Path(__file__).resolve().parents[4]
+GIT_ROOT = _git_root()
 OPT_IN_ENV = "HERMES_E2E_WINDOWS_INSTALL"
 INSTALL_TIMEOUT = 1500.0
 UPDATE_TIMEOUT = 1200.0
@@ -242,13 +241,13 @@ class Machine:
     def stage(self) -> None:
         """serve.git at HEAD (+ NEXT in its object store), the URL redirect, a seeded home."""
         self.root.mkdir(parents=True, exist_ok=True)
-        self.head = harness_git("-C", str(REPO_ROOT), "rev-parse", f"{self.base_ref}^{{commit}}" if self.base_ref else "HEAD")
-        harness_git("clone", "--bare", "--quiet", str(REPO_ROOT), str(self.serve))
+        self.head = harness_git("-C", str(GIT_ROOT), "rev-parse", f"{self.base_ref}^{{commit}}" if self.base_ref else "HEAD")
+        harness_git("clone", "--bare", "--quiet", str(GIT_ROOT), str(self.serve))
         harness_git("-C", str(self.serve), "update-ref", "refs/heads/main", self.head)
         harness_git("-C", str(self.serve), "symbolic-ref", "HEAD", "refs/heads/main")
         for key in ("uploadpack.allowAnySHA1InWant", "uploadpack.allowFilter"):
             harness_git("-C", str(self.serve), "config", key, "true")
-        self.next = (harness_git("-C", str(REPO_ROOT), "rev-parse", "HEAD") if self.base_ref else self._mint_next())
+        self.next = (harness_git("-C", str(GIT_ROOT), "rev-parse", "HEAD") if self.base_ref else self._mint_next())
         file_url = "file:///" + str(self.serve).replace("\\", "/")
         rewrites = "".join(f"\tinsteadOf = {url}\n" for url in CANONICAL_URLS)
         (self.root / "e2e-gitconfig").write_text(f'[url "{file_url}"]\n{rewrites}', encoding="utf-8")
@@ -414,7 +413,7 @@ class Machine:
                                  capture_output=True, timeout=120, check=True).stdout
             script.write_bytes(raw)
         else:
-            shutil.copyfile(REPO_ROOT / "scripts" / "install.ps1", script)
+            shutil.copyfile(INSTALL_ROOT / "scripts" / "install.ps1", script)
         cwd = self.root / "install-cwd"
         cwd.mkdir(parents=True, exist_ok=True)
         run = self._run_logged(
