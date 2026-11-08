@@ -334,8 +334,8 @@ export function createMinimizeToTray(options: Options) {
     return operation
   }
 
-  ipcMain.handle('qubit:minimize-to-tray:get', status)
-  ipcMain.handle('qubit:minimize-to-tray:set', (_event, on) => setEnabled(on === true))
+  ipcMain.handle('hermes:minimize-to-tray:get', status)
+  ipcMain.handle('hermes:minimize-to-tray:set', (_event, on) => setEnabled(on === true))
   app.on('will-quit', () => {
     quitting = true
     destroyTray()

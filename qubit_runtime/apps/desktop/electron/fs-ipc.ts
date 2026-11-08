@@ -144,7 +144,7 @@ export function registerFsIpc({
   // caller names the profile that OWNS the failing session: a pooled backend
   // serves many profile homes, and the active Desktop profile is the launch
   // one, not the one whose agent.log holds the failure (#119080).
-  ipcMain.handle('qubit:fs:logsRoot', async (_event, profile) => localPluginsRoot('logs', profile))
+  ipcMain.handle('hermes:fs:logsRoot', async (_event, profile) => localPluginsRoot('logs', profile))
 
   ipcMain.handle('hermes:plugin:probe', async (_event, payload) => {
     const identifier = String(payload?.identifier || payload?.repo || '').trim()
