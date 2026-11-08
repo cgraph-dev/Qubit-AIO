@@ -248,9 +248,14 @@ FAMILY_FORWARD_WAVE6 = {
 # counterpart the old `QUBIT_NATIVE_CHAT` refusal only named.
 # ---------------------------------------------------------------------------
 NATIVE_REFUSALS = {
-    "serve": ("QUBIT_NATIVE_SERVE",
-              "qubit serve is not forwarded: the Qubit gateway is `qubit "
-              "gateway serve` (or the `qubit webui` dashboard)"),
+    # `serve` is intentionally absent: it is now a first-class classified
+    # forward (``serve_route`` below). The desktop app spawns
+    # `qubit serve --host 127.0.0.1 --port 0` as its backend (see
+    # apps/desktop/electron/backend-command.ts::serveBackendArgs). Refusing it
+    # left the app with no local backend at all: `serve` was refused, and the
+    # documented compat fallback rewrites to `dashboard --no-open`, which is
+    # refused too — so both rungs of the ladder ended in a typed refusal and
+    # boot failed with "Timed out connecting to Qubit backend".
     "resume": ("QUBIT_NATIVE_RESUME",
                "qubit resume would engage a second emergency-stop authority; "
                "resume through `qubit power enable --confirm` (or `qubit "
@@ -726,6 +731,27 @@ def chat_route(argv: list) -> Optional[FamilyRoute]:
     return FamilyRoute("forward", ["chat", *_strip_family_globals(raw[1:])])
 
 
+def serve_route(argv: list) -> Optional[FamilyRoute]:
+    """Resolve ``qubit serve [...]`` to the vendored headless backend.
+
+    ``qubit serve`` is the backend the desktop app and remote clients spawn:
+    the same ``web_server`` ``dashboard`` starts, minus the browser. The
+    vendored CLI already implements it (``qubit_cli/subcommands/dashboard.py``
+    registers it and binds ``cmd_dashboard`` with ``headless_backend=True``),
+    so this forwards the invocation verbatim rather than reimplementing it —
+    argparse help, ``--host``/``--port`` (including ``0`` for an OS-assigned
+    port), ``--profile`` and the environment the app relies on all survive
+    unchanged.
+
+    Qubit-only launcher globals are stripped, as for every other classified
+    forward: the app never passes them, but a hand-typed invocation may.
+    """
+    raw = list(argv or [])
+    if not raw or raw[0] != "serve":
+        return None
+    return FamilyRoute("forward", ["serve", *_strip_family_globals(raw[1:])])
+
+
 def family_refusal(argv: list) -> Optional[FamilyRoute]:
     """Typed refusal for families that must never be forwarded to the fork.
 
@@ -770,6 +796,9 @@ def route(argv: list, cfg=None) -> Optional[FamilyRoute]:
     if resolved is not None:
         return resolved
     resolved = chat_route(argv)
+    if resolved is not None:
+        return resolved
+    resolved = serve_route(argv)
     if resolved is not None:
         return resolved
     mapped = translate(argv)

@@ -68,7 +68,6 @@ NATIVE_REFUSALS = {
     "logout": ("QUBIT_NATIVE_LOGOUT", "qubit auth logout", "auth"),
     "resume": ("QUBIT_NATIVE_RESUME", "qubit power enable", "power"),
     "send": ("QUBIT_NATIVE_SEND", "qubit msg send", "msg"),
-    "serve": ("QUBIT_NATIVE_SERVE", "qubit gateway serve", "gateway"),
     "uninstall": ("QUBIT_NATIVE_UNINSTALL", "qubit package uninstall",
                   "package"),
     "whatsapp": ("QUBIT_NATIVE_WHATSAPP", "qubit channels", "channels"),
@@ -86,7 +85,13 @@ NATIVE_FAMILIES = {"update": "update"}
 # (`cli_qubit_forward.chat_route`). It is intercepted before argparse (so not
 # a passthrough/`invalid choice`) and asserted in
 # `test_chat_is_a_classified_forward` below.
-FORWARDED_FAMILIES = {"chat"}
+#
+# `serve` followed the same path: the desktop app spawns
+# `qubit serve --host 127.0.0.1 --port 0` as its backend, and a refusal left it
+# with no local backend while its documented compat fallback (`dashboard
+# --no-open`) was refused too. It is now a classified forward
+# (`cli_qubit_forward.serve_route`).
+FORWARDED_FAMILIES = {"chat", "serve"}
 
 # family -> canonical Qubit-native family, or None when the surface is
 # fork-only (no Qubit-native equivalent) and the classified forward is the

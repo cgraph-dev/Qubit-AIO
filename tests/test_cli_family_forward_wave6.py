@@ -106,7 +106,6 @@ NATIVE_REFUSED = (
     ("logout", "QUBIT_NATIVE_LOGOUT"),
     ("resume", "QUBIT_NATIVE_RESUME"),
     ("send", "QUBIT_NATIVE_SEND"),
-    ("serve", "QUBIT_NATIVE_SERVE"),
     ("uninstall", "QUBIT_NATIVE_UNINSTALL"),
     ("whatsapp", "QUBIT_NATIVE_WHATSAPP"),
     ("whatsapp-cloud", "QUBIT_NATIVE_WHATSAPP_CLOUD"),
@@ -181,7 +180,13 @@ def test_every_target_family_is_intercepted_not_argparsed(monkeypatch):
         assert rc in (0, 3), (family, rc)
         assert "invalid choice" not in err.getvalue(), (family, err.getvalue())
     # A bogus subcommand never runs the fork for any target family.
-    assert calls == [], calls
+    #
+    # `serve` is the one exempt family: it is a classified forward to the
+    # vendored CLI (the desktop app spawns `qubit serve --host --port 0` as its
+    # backend), so the forward IS the correct disposition and its argparse gets
+    # to reject a bogus subcommand. Every other family must be intercepted
+    # before the fork is reached.
+    assert [c for c in calls if c[0] != "serve"] == [], calls
 
 
 # ---------------------------------------------------------------------------
