@@ -4,9 +4,16 @@ Owner directive: three upstream projects must work **1:1** inside Qubit. UI is
 1:1 *visually*; everything else is 1:1 *behaviourally*, rewired onto Qubit's own
 backends and owned by Qubit — not a separate server next to it.
 
-- `joeynyc/hermes-hudui` → **Qubit Office** (`hudui was for qubit office`)
-- `nesquena/hermes-webui` → the workbench chat surface
+- `joeynyc/hermes-hudui` → **Qubit Office** (`hudui was for qubit office`).
+  A full app: 25 panel components plus a complete chat UI
+  (`ChatPanel`, `SessionSidebar`, `MessageThread`, `MessageBubble`,
+  `Composer`, `ReasoningBlock`, `ToolCallCard`, `ChatDiagnostics`) served by
+  its own `/chat` routes.
+- `nesquena/hermes-webui` → **the workbench** (separate project, separate chat,
+  separate port; not the same thing as HUD).
 - `abundantbeing/hermes-browser-extension` → the browser companion
+
+Three separate products. Two separate chat implementations, both ported in full.
 
 ## Measured starting point
 
@@ -117,10 +124,21 @@ Workstreams, each independently verifiable:
 4. **Tests.** Port the 35 upstream tests where they assert behaviour we can
    reproduce; add connector tests for the routes upstream lacks.
 
-Risk to state up front: upstream's `ChatPanel` overlaps the workbench chat from
-phase 2, and Office already has an agent panel. Resolve by making the HUD chat
-panel **read-only or routed to the workbench**, not a third chat implementation.
-Decide this before building it, not after.
+Both chats are ported, separately and fully. They serve different sessions and
+live on different surfaces; neither is an alias of the other. The shared work is
+the **transport**: both need a turn to stream from `chat_transport`, and that is
+where the one Qubit authority is reused. The composition, session list, message
+thread, composer and tool-call rendering are each upstream's own and stay
+theirs.
+
+4. **Jev in Office.** Owner directive: `jev-workflows` must work inside Qubit
+   Office, not only in the CLI/TUI. That means the ported HUD app's command
+   palette and its chat reach the plugin's tools the same way an agent turn
+   does. Concretely: the palette's skill-selection and the chat's routing must
+   be able to call `jev_skill_select` / `jev_route` through the bridge, and the
+   `/jev` command's status must be readable from Office. Verify from inside the
+   Office iframe, not from a Python import — a plugin reachable in the CLI and
+   unreachable in Office is the "present but not wired" failure again.
 
 ### Phase 2 — WebUI → workbench, close the route set
 
@@ -229,9 +247,8 @@ Verifiers get: the pin, the claim set to test, and the instructions above.
 
 ## Open decisions for the owner
 
-1. **HUD chat panel** — reuse the workbench chat, or a read-only mirror? (This
-   plan recommends reuse; a third chat implementation is the worst outcome.)
-2. **Office mounting** — inside the Habblaud iframe, or a sibling route that
-   Office links to? (Affects how "1:1 UI" is verified.)
-3. **`jev-workflows` scope** — leave as-is, or use it for routing decisions in
-   the HUD command palette?
+1. **Office mounting** — the ported HUD app inside the Habblaud iframe, or a
+   sibling route Office links to? (Decides how "1:1 UI" is verified.)
+2. **Not an open question, recorded so it is not reopened:** HUD's chat and the
+   workbench's chat are both ported in full. They are different products'
+   chat implementations and neither is replaced by the other.
