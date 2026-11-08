@@ -161,11 +161,10 @@ function textureImage(): HTMLImageElement | null {
     texture = img
   }
 
-  // Not `nous-girl.jpg`: that asset is the BrandMark tile art, dark on white, and
-  // reads as a solid white block once it is wrapped around a cube. This one is
-  // light-on-dark line work, so the faces keep their shading and the channel
-  // split has edges to offset.
-  img.src = `${import.meta.env.BASE_URL}intro-nous-girl.png`
+  // The intro cube wraps its texture around six faces, so the art has to read
+  // at a glance from any angle: a flat, high-contrast mark survives the
+  // channel split, whereas a detailed illustration turns to a muddy block.
+  img.src = `${import.meta.env.BASE_URL}qubit.png`
 
   return null
 }
