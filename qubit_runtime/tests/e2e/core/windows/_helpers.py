@@ -75,6 +75,11 @@ class WinHome:
             "QUBIT_HOME": str(self.qubit_home),
             "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1",
+            # Windows code-page territory: make the child interpret its console
+            # and pipes as UTF-8 even on an en-US runner (cp1252). Without this
+            # the ConPTY composer drops non-ASCII before prompt_toolkit sees it.
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
             "NO_COLOR": "1",
             # The child's state.db lives under tmp_path; under a pytest ancestor the live-DB
             # guard would refuse it. Documented child-process escape hatch (tests/conftest.py).
