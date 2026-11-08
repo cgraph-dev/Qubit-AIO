@@ -662,6 +662,19 @@ stage_prerequisites() {
     log_success "prerequisites ok (git, curl)"
 }
 
+# The checkout this installer is running FROM, when it is one. A dev/source
+# install runs qubit_runtime/scripts/install.sh out of a real git worktree, and
+# that worktree is the only place an unpushed pinned commit exists. Prints the
+# root and returns 0, or prints nothing and returns 1. Never guesses: the path
+# must be a git worktree whose HEAD resolves.
+local_source_repo() {
+    local here
+    here="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)" || return 1
+    [ -n "$here" ] || return 1
+    git -C "$here" rev-parse --verify HEAD >/dev/null 2>&1 || return 1
+    printf '%s\n' "$here"
+}
+
 # True when $COMMIT is an ancestor of the branch being installed. Prefers the
 # remote-tracking ref and falls back to the local branch when origin is
 # unavailable, so a pinned install from a clone whose origin cannot be fetched
@@ -885,7 +898,33 @@ stage_repository() {
         if [ -n "$INSTALL_COMMIT" ]; then
             # Pin before publishing: a pinned clone has no files yet, and an
             # unpublished tree never leaves an empty checkout behind.
-            commit_is_on_branch "$staged/tree" "$INSTALL_COMMIT" \
+            #
+            # The pinned commit may exist only in the local checkout. The
+            # default clone is --filter=tree:0 from REPO_URL, so a commit that
+            # was never pushed simply is not in the fetched graph and the
+            # checkout below would fail with git_checkout_failed even though the
+            # object is sitting on this machine. Seed it from the local repo
+            # first: that keeps the pin exactly as strict (the object is
+            # verified by ancestry immediately after) while letting an
+            # install-from-source work without a push. Only attempted when the
+            # commit is genuinely absent from the clone.
+            if ! git -C "$staged/tree" cat-file -e "$INSTALL_COMMIT^{commit}" 2>/dev/null; then
+                local seed
+                seed="$(local_source_repo)"
+                if [ -n "$seed" ] && git -C "$seed" cat-file -e "$INSTALL_COMMIT^{commit}" 2>/dev/null; then
+                    log_warn "commit $INSTALL_COMMIT is not in the clone; seeding it from $seed"
+                    # Fetch the local BRANCH, not the bare SHA: git refuses to
+                    # fetch an arbitrary commit id from a non-branch ref
+                    # ("couldn't find remote ref <sha>"), so the object only
+                    # arrives when a ref that reaches it is requested. A
+                    # namespaced ref keeps it out of origin/* and local branches.
+                    run_logged "Seeding pinned commit from local checkout" \
+                        git -C "$staged/tree" fetch --no-tags "$seed" "$BRANCH:refs/qubit-seed/$BRANCH" ||
+                        log_warn "seeding from $seed failed; the checkout below will decide"
+                fi
+            fi
+            git -C "$staged/tree" merge-base --is-ancestor "$INSTALL_COMMIT" "origin/$BRANCH" 2>/dev/null \
+                || commit_is_on_branch "$staged/tree" "$INSTALL_COMMIT" \
                 || { rm -rf "$staged"; fail "commit $INSTALL_COMMIT is not on branch $BRANCH" commit_not_on_branch; }
             cloned=false
             for attempt in 1 2; do
