@@ -78,9 +78,10 @@ _CLAIM_BOUNDARY = '("src.unlink()", \'body["claimer"] = identity()\')'
 
 
 def _python(machine) -> Path:
-    found = sorted(machine.hermes_home.glob("installs/*/environments/*/venv/Scripts/python.exe"))
+    found = set(machine.hermes_home.glob("installs/*/environments/*/venv/Scripts/python.exe"))
+    found.update(machine.hermes_home.glob("venv/Scripts/python.exe"))
     assert found, fail_with(machine, "harness: the install has no venv python")
-    return found[0]
+    return sorted(found)[0]
 
 
 def _driver(machine, name: str, body: str, *args: str) -> tuple[subprocess.Popen, Path]:

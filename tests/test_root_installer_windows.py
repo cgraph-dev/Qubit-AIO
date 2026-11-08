@@ -135,7 +135,10 @@ def test_help_and_dry_run_do_not_mutate_the_machine():
     assert "if ($DryRun)" in src
     assert "dry-run complete: no changes were made" in src
 
-    dry = src[src.index("if ($DryRun) {"):]
+    # Scope to Invoke-QubitInstall: Get-Uv/Get-PinnedGit also carry a
+    # `if ($DryRun) { return ... }` guard for the toolchain they would stage.
+    install = src[src.index("function Invoke-QubitInstall"):]
+    dry = install[install.index("if ($DryRun) {"):]
     dry = dry[:dry.index("dry-run complete")]
     assert "Initialize-Checkout" not in dry, (
         "the dry-run branch must not clone or mutate a checkout"

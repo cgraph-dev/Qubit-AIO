@@ -99,6 +99,38 @@ $script:SileroV6Sha256 = '1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65
 $script:Eres2netSha256 = 'c59158379255ad66e161679cca6af8d52d51e389e3224ab7d7a7baae295c2db5'
 $script:SherpaRelease = 'https://github.com/k2-fsa/sherpa-onnx/releases/download'
 
+# --- BEGIN GENERATED: bootstrap pins (scripts/gen-bootstrap-pins.py) ---
+# Derived from pm/lock.json. DO NOT EDIT BY HAND:
+# run scripts/gen-bootstrap-pins.py after a pin bump.
+$script:UvPinVersion = "0.13.5"
+$script:UvPinFiles = @{
+    "win32-x64" = @{
+        Url    = "https://github.com/astral-sh/uv/releases/download/0.13.5/uv-x86_64-pc-windows-msvc.zip"
+        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a"
+        Sha256 = "a38b8d1902b7cfbc76b423ba1bb456f623f42064cdc72628b6075b89afd1019a"
+    }
+    "win32-arm64" = @{
+        Url    = "https://github.com/astral-sh/uv/releases/download/0.13.5/uv-aarch64-pc-windows-msvc.zip"
+        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/09f47edf90726084a70f9426f6e3ca4f46e9bf7cbf23b1716ec64d60b055fae3"
+        Sha256 = "09f47edf90726084a70f9426f6e3ca4f46e9bf7cbf23b1716ec64d60b055fae3"
+    }
+}
+
+$script:GitPinVersion = "2.53.0+3"
+$script:GitPinFiles = @{
+    "win32-x64" = @{
+        Url    = "https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.3/PortableGit-2.53.0.3-64-bit.7z.exe"
+        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/b365da794b1d2225eb24d5f5e09ef7792cfd5fa26c3a3586210280c80dff3a2a"
+        Sha256 = "b365da794b1d2225eb24d5f5e09ef7792cfd5fa26c3a3586210280c80dff3a2a"
+    }
+    "win32-arm64" = @{
+        Url    = "https://github.com/git-for-windows/git/releases/download/v2.53.0.windows.3/PortableGit-2.53.0.3-arm64.7z.exe"
+        MirrorUrl = "https://hermes-assets.nousresearch.com/upstream/sha256/0db54010054c01f35501cf69e1e32d3710138ecb934d188bd77093afed24300e"
+        Sha256 = "0db54010054c01f35501cf69e1e32d3710138ecb934d188bd77093afed24300e"
+    }
+}
+# --- END GENERATED: bootstrap pins ---
+
 function Write-Usage {
     @"
 Qubit Agent installer (Windows)
@@ -126,8 +158,9 @@ Environment:
   QUBIT_INSTALL_CHANNEL     same as -Channel when the flag is absent
   QUBIT_REPO_URL            same as -RepoUrl when the flag is absent
 
-Requires: Windows PowerShell 5.1+, uv. Optional: git (standalone bootstrap),
-node/npm + bash (dashboard build), ollama (local brain), tar (model archives).
+Requires: Windows PowerShell 5.1+. uv and git are provisioned from Qubit's
+pinned, sha256-verified toolchain when the host has none. Optional: node/npm +
+bash (dashboard build), ollama (local brain), tar (model archives).
 
 The canonical launcher is qubit; voicebridge remains a compatibility alias.
 "@
@@ -328,6 +361,129 @@ function Get-CommandPath {
     return $null
 }
 
+function Get-WindowsArch {
+    # The MACHINE's architecture, not the interpreter's: an x64 PowerShell on
+    # Windows-on-ARM must stage the arm64 uv/git artifacts.
+    $machineArch = (Get-ItemProperty 'HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\Environment' -ErrorAction SilentlyContinue).PROCESSOR_ARCHITECTURE
+    if ($machineArch -eq 'ARM64') { return 'arm64' }
+    return 'x64'
+}
+
+function Get-ToolStoreRoot {
+    # Same resolution as pm's store_root(), so the pinned uv/git staged here is
+    # the exact slot pm later adopts instead of downloading a second copy.
+    if ($env:HERMES_RUNTIME_DIR) { return $env:HERMES_RUNTIME_DIR }
+    return (Join-Path $script:Layout.QubitHome 'tools')
+}
+
+function Test-UvRuns {
+    param([string]$Path)
+    $global:LASTEXITCODE = 0
+    try { $out = & $Path --version 2>$null } catch { return $false }
+    if ($LASTEXITCODE -or -not $out) { return $false }
+    $have = ("$out".Trim() -split '\s+')[1] -replace '[^0-9.].*$', ''
+    try { return ([version]$have -ge [version]$script:UvPinVersion) } catch { return $false }
+}
+
+function Get-Uv {
+    # A usable uv already on PATH is kept (a managed host may pin its own);
+    # otherwise stage Qubit's own pinned uv, exactly as the vendored runtime
+    # installer does. Never astral-latest, never a version this build has not
+    # sha256-verified.
+    $onPath = Get-CommandPath 'uv'
+    if ($onPath -and (Test-UvRuns $onPath)) { return $onPath }
+    $target = "win32-$(Get-WindowsArch)"
+    $pin = $script:UvPinFiles[$target]
+    if (-not $pin) {
+        Fail-Prerequisite 'UV' "uv is required and no pinned uv artifact exists for $target"
+    }
+    $entry = Join-Path (Get-ToolStoreRoot) "uv-$($script:UvPinVersion)-$target"
+    $uvExe = Join-Path $entry 'uv.exe'
+    if (Test-Path -LiteralPath $uvExe) {
+        if (Test-UvRuns $uvExe) { return $uvExe }
+        Write-Warn 'cached pinned uv does not run; staging a fresh copy'
+        Remove-Item -LiteralPath $uvExe -Force -ErrorAction SilentlyContinue
+    }
+    if ($DryRun) { return $uvExe }
+    Write-Step "staging pinned uv $($script:UvPinVersion) ($target)"
+    $tmpDir = Join-Path ([IO.Path]::GetTempPath()) "qubit-uv-bootstrap-$PID"
+    try {
+        New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+        $zipPath = Join-Path $tmpDir 'uv.zip'
+        Invoke-VerifiedDownload -Url $pin.Url -MirrorUrl $pin.MirrorUrl -Sha256 $pin.Sha256 -OutFile $zipPath
+        $extractDir = Join-Path $tmpDir 'unpacked'
+        Expand-Archive -Path $zipPath -DestinationPath $extractDir -Force
+        $found = Get-ChildItem -Path $extractDir -Filter 'uv.exe' -Recurse | Select-Object -First 1
+        if (-not $found) { Fail-Prerequisite 'UV' 'uv.exe was not found in the pinned archive' }
+        New-Item -ItemType Directory -Force -Path $entry | Out-Null
+        Move-Item -LiteralPath $found.FullName -Destination $uvExe -Force
+        $uvx = Get-ChildItem -Path $extractDir -Filter 'uvx.exe' -Recurse | Select-Object -First 1
+        if ($uvx) { Move-Item -LiteralPath $uvx.FullName -Destination (Join-Path $entry 'uvx.exe') -Force }
+    } finally {
+        Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    if (-not (Test-UvRuns $uvExe)) {
+        Fail-Prerequisite 'UV' 'the pinned uv was staged but does not run on this host'
+    }
+    return $uvExe
+}
+
+function Get-PinnedGit {
+    # Returns the pinned git.exe for this host, or $null when no pin exists.
+    $target = "win32-$(Get-WindowsArch)"
+    $pin = $script:GitPinFiles[$target]
+    if (-not $pin) { return $null }
+    $entry = Join-Path (Get-ToolStoreRoot) "git-$($script:GitPinVersion)-$target"
+    $gitExe = Join-Path $entry 'cmd\git.exe'
+    if (Test-Path -LiteralPath $gitExe) { return $gitExe }
+    if ($DryRun) { return $gitExe }
+    Write-Step "staging pinned git $($script:GitPinVersion) ($target)"
+    $tmpDir = Join-Path ([IO.Path]::GetTempPath()) "qubit-git-bootstrap-$PID"
+    try {
+        New-Item -ItemType Directory -Force -Path $tmpDir | Out-Null
+        $sfxPath = Join-Path $tmpDir 'portable-git.7z.exe'
+        Invoke-VerifiedDownload -Url $pin.Url -MirrorUrl $pin.MirrorUrl -Sha256 $pin.Sha256 -OutFile $sfxPath
+        $extractDir = Join-Path $tmpDir 'unpacked'
+        New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+        Unblock-File -Path $sfxPath -ErrorAction SilentlyContinue
+        # PortableGit's self-extracting 7z carries its own extractor (stock
+        # Windows tar.exe has no bzip2) and is GUI-subsystem, so `&` would not
+        # wait for it. Bound the wait and kill the whole tree like pm does.
+        $sfx = [System.Diagnostics.Process]::Start($sfxPath, "-o`"$extractDir`" -y")
+        if (-not $sfx.WaitForExit(600000)) {
+            try { & taskkill.exe /T /F /PID $sfx.Id 2>&1 | Out-Null } catch { }
+            $sfx.WaitForExit()
+            Fail-Prerequisite 'GIT' 'the pinned git extractor timed out after 600s'
+        }
+        if ($sfx.ExitCode) {
+            Fail-Prerequisite 'GIT' "the pinned git extractor exited $($sfx.ExitCode)"
+        }
+        if (-not (Test-Path -LiteralPath (Join-Path $extractDir 'cmd\git.exe'))) {
+            Fail-Prerequisite 'GIT' 'git.exe was not found in the pinned archive'
+        }
+        if (Test-Path -LiteralPath $entry) { Remove-Item -LiteralPath $entry -Recurse -Force }
+        New-Item -ItemType Directory -Force -Path (Split-Path -Parent $entry) | Out-Null
+        Move-Item -LiteralPath $extractDir -Destination $entry
+    } finally {
+        Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+    }
+    return $gitExe
+}
+
+function Ensure-Git {
+    # A usable git already on PATH is kept; otherwise stage Qubit's pinned
+    # PortableGit so a clean machine (no git.exe) can clone the product.
+    $onPath = Get-CommandPath 'git'
+    if ($onPath) { return $onPath }
+    $g = Get-PinnedGit
+    if (-not $g) {
+        Fail-Prerequisite 'GIT' 'git is required to bootstrap the Qubit runtime and no pinned Git artifact exists for this host'
+    }
+    $gitEntry = Split-Path (Split-Path $g -Parent) -Parent
+    $env:Path = "$gitEntry\cmd;$gitEntry\usr\bin;$env:Path"
+    return $g
+}
+
 function Test-Prerequisite {
     if ($env:OS -ne 'Windows_NT') {
         Fail-Prerequisite 'UNSUPPORTED_PLATFORM' 'this installer is for Windows; use scripts/install.sh on Linux/macOS'
@@ -335,8 +491,11 @@ function Test-Prerequisite {
     if ($PSVersionTable.PSVersion -lt [version]'5.1') {
         Fail-Prerequisite 'POWERSHELL' "Windows PowerShell 5.1 or newer is required (found $($PSVersionTable.PSVersion))"
     }
-    if (-not (Get-CommandPath 'uv')) {
-        Fail-Prerequisite 'UV' 'uv is required; install it with: powershell -c "irm https://astral.sh/uv/install.ps1 | iex"'
+    # uv/git are provisioned from the pinned toolchain, so their absence from
+    # PATH is not a prerequisite failure. The typed UV class still fires when
+    # this host has no pinned artifact at all (an unsupported architecture).
+    if (-not (Get-CommandPath 'uv') -and -not $script:UvPinFiles["win32-$(Get-WindowsArch)"]) {
+        Fail-Prerequisite 'UV' "uv is required and no pinned uv artifact exists for win32-$(Get-WindowsArch)"
     }
     if (-not $NoModels -and -not (Get-CommandPath 'tar')) {
         Fail-Prerequisite 'TAR' 'tar is required to extract model archives (skip with -NoModels)'
@@ -380,9 +539,17 @@ function Initialize-Checkout {
     # not only through Invoke-QubitInstall's assertion.
     Assert-QubitSource $RepoUrl
     if (Test-Checkout $Target) { return $Target }
-    $git = Get-CommandPath 'git'
-    if (-not $git) {
-        Fail-Prerequisite 'GIT' 'git is required to bootstrap the Qubit runtime when no checkout is present'
+    $git = Ensure-Git
+    # An interrupted clone leaves a .git with no initial commit, where
+    # fetch/checkout abort ("You do not have the initial commit yet"). Move it
+    # aside -- never delete it: it may hold something the user wants.
+    if (Test-Path -LiteralPath (Join-Path $Target '.git') -PathType Container) {
+        & $git -C $Target rev-parse --verify HEAD 2>$null | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            $broken = "$Target.broken-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+            Write-Warn "$Target has no commits (interrupted clone); moving it aside to $broken"
+            Move-Item -LiteralPath $Target -Destination $broken
+        }
     }
     $ref = $GitBranch
     $isRelease = $false
@@ -455,7 +622,10 @@ function Invoke-VerifiedDownload {
     param(
         [string]$Url,
         [string]$Sha256,
-        [string]$OutFile
+        [string]$OutFile,
+        # Optional pinned mirror (the vendored runtime installer's upstream
+        # asset host) tried only when the primary URL fails to download.
+        [string]$MirrorUrl = ''
     )
     if (Test-Path -LiteralPath $OutFile -PathType Leaf) {
         $existing = (Get-FileHash -LiteralPath $OutFile -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -469,15 +639,24 @@ function Invoke-VerifiedDownload {
     $dir = Split-Path -Parent $OutFile
     if ($dir) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     $tmp = "$OutFile.tmp.$PID"
-    Write-Host "==> downloading $(Split-Path -Leaf $OutFile)"
-    try {
-        if ($PSVersionTable.PSVersion.Major -lt 6) {
-            try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+    $urls = @($Url)
+    if ($MirrorUrl -and $MirrorUrl -ne $Url) { $urls += $MirrorUrl }
+    $downloaded = $false
+    foreach ($candidate in $urls) {
+        Write-Host "==> downloading $(Split-Path -Leaf $OutFile)"
+        try {
+            if ($PSVersionTable.PSVersion.Major -lt 6) {
+                try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch { }
+            }
+            Invoke-WebRequest -Uri $candidate -OutFile $tmp -UseBasicParsing
+            $downloaded = $true
+            break
+        } catch {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
         }
-        Invoke-WebRequest -Uri $Url -OutFile $tmp -UseBasicParsing
-    } catch {
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-        Fail-Typed 9 'ASSET_DOWNLOAD_FAILED' "could not download $(Split-Path -Leaf $OutFile) from $Url"
+    }
+    if (-not $downloaded) {
+        Fail-Typed 9 'ASSET_DOWNLOAD_FAILED' "could not download $(Split-Path -Leaf $OutFile) from $($urls -join ' or ')"
     }
     $actual = (Get-FileHash -LiteralPath $tmp -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($actual -ne $Sha256.ToLowerInvariant()) {
@@ -601,10 +780,11 @@ function Install-Venv {
         Write-Step "[dry-run] would create the venv at $($script:Layout.VenvDir) and install the Qubit package"
         return
     }
+    $uv = Get-Uv
     $py = Join-Path $script:Layout.VenvDir 'Scripts\python.exe'
     if (-not (Test-Path -LiteralPath $py -PathType Leaf)) {
         Write-Step "creating venv (uv) at $($script:Layout.VenvDir)"
-        & uv venv --python 3.12 $script:Layout.VenvDir
+        & $uv venv --python 3.12 $script:Layout.VenvDir
         if ($LASTEXITCODE -ne 0) {
             Fail-Typed 1 'QUBIT_INSTALL_VENV_FAILED' 'uv venv failed'
         }
@@ -613,12 +793,12 @@ function Install-Venv {
         Fail-Typed 1 'QUBIT_INSTALL_VENV_FAILED' "venv python was not created at $py"
     }
     Write-Step 'installing the Qubit package and declared dependencies'
-    & uv pip install --python $py "$($script:SourceDir)[hotkey,edge,test]"
+    & $uv pip install --python $py "$($script:SourceDir)[hotkey,edge,test]"
     if ($LASTEXITCODE -ne 0) {
         Fail-Typed 1 'QUBIT_INSTALL_DEPS_FAILED' 'Qubit package installation failed'
     }
     # webrtcvad needs the legacy pkg_resources API (removed in setuptools 81+).
-    & uv pip install --python $py 'setuptools<81'
+    & $uv pip install --python $py 'setuptools<81'
     if ($LASTEXITCODE -ne 0) {
         Fail-Typed 1 'QUBIT_INSTALL_DEPS_FAILED' 'setuptools<81 installation failed'
     }
@@ -763,6 +943,34 @@ function Install-Launcher {
     Write-Ok "qubit launcher installed at $($script:Layout.BinDir)\qubit.cmd"
 }
 
+function Write-CompletionMarker {
+    # The bootstrap receipt `qubit update`/source_stamp read to know this
+    # checkout's install finished and what it pinned. The vendored runtime
+    # installer already writes it; the public Windows entry must too, or an
+    # update treats a fresh install as an unfinished bootstrap.
+    if ($DryRun) { return }
+    $dir = $script:SourceDir
+    if ([string]::IsNullOrWhiteSpace($dir)) { $dir = $script:Layout.InstallDir }
+    if ([string]::IsNullOrWhiteSpace($dir) -or -not (Test-Path -LiteralPath $dir)) { return }
+    $commit = ''
+    $git = Get-CommandPath 'git'
+    if ($git) {
+        $commit = (& $git -C $dir rev-parse HEAD 2>$null | Select-Object -First 1)
+        if ($LASTEXITCODE -ne 0) { $commit = '' }
+    }
+    if (-not $commit) { return }
+    $marker = [ordered]@{
+        schemaVersion = 1
+        pinnedCommit  = "$commit".Trim()
+        pinnedBranch  = $GitBranch
+        completedAt   = (Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ')
+    }
+    $legacy = Join-Path $dir '.hermes-bootstrap-complete'
+    $marker | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $legacy -Encoding UTF8
+    # Dual-publish: the canonical marker beside the one older readers accept.
+    Copy-Item -LiteralPath $legacy -Destination (Join-Path $dir '.qubit-bootstrap-complete') -Force
+}
+
 function Write-Layout {
     param([string]$Mode)
     Write-Step 'Qubit Agent install layout'
@@ -852,6 +1060,7 @@ function Invoke-QubitInstall {
     Install-OllamaModels
     Install-Config
     Install-Launcher
+    Write-CompletionMarker
     Write-PathReloadHint
     Write-Host ''
     Write-Ok "Qubit Agent installed. Run: qubit"
