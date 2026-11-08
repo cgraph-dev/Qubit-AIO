@@ -288,3 +288,22 @@ The "read-only" note in that file's docstring (`THE OFFICE STAYS READ-ONLY
 allowed to write, exactly as `/qubit-hud` already does today. Restate that in
 the file when it is touched, so the next reader does not misread the comment as
 "the HUD must not write".
+
+## Worklists on disk (for the port lanes)
+
+Generated from `git ls-tree -r --name-only HEAD` per clone, written to
+`$SCRATCH/parity-worklists/`:
+
+| Lane | File | Count |
+|---|---|---|
+| `hud-backend` | `hud-backend.txt` | 209 (92 of them `backend/`) |
+| `hud-frontend` | `hud-frontend.txt` | 209 (54 `frontend/`, 35 `tests/`) |
+| `webui-routes` | `webui-routes.txt` | 2552 |
+| `ext-port` | `ext-port.txt` | 1178 |
+
+A note on a measurement trap hit while generating these: an early probe reported
+`hermes-webui` as 1280 files against `git ls-files`' 2552. That was **stdout
+truncation in the probe**, not a real difference — re-running both to a file
+gave 2552 on each side. Briefing an agent with the truncated number would have
+silently understated its target by half. Always write counts to a file and read
+the file; never read a count off a truncated tool result.
