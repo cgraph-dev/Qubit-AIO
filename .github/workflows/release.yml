@@ -164,8 +164,8 @@ jobs:
             v*) ;;
             *) echo "::error::invalid release tag: $TAG"; exit 1 ;;
           esac
-          shopt -s nullglob
-          assets=(release-dist/*.whl release-dist/*.tar.gz release-dist/SHA256SUMS)
+          mapfile -t assets < <(find release-dist -type f \
+            \( -name '*.whl' -o -name '*.tar.gz' -o -name 'SHA256SUMS' \) -print)
           test "${#assets[@]}" -ge 3
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
