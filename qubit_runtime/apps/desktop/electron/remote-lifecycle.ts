@@ -213,8 +213,8 @@ async function locateHermes(ssh, remoteHermesPath) {
 
     const err: any = new Error(
       `The Qubit path you set is not an executable on the remote host: "${remoteHermesPath}". ` +
-        'Check the path (it must be the full path to the `hermes` binary on the remote, e.g. ' +
-        '~/hermes/qubit-agent/.venv/bin/hermes), or clear it to auto-detect.'
+        'Check the path (it must be the full path to the `qubit` binary on the remote, e.g. ' +
+        '~/qubit-agent/.venv/bin/qubit), or clear it to auto-detect.'
     )
 
     err.kind = 'hermes-not-found'
@@ -254,7 +254,7 @@ async function locateHermes(ssh, remoteHermesPath) {
   }
 
   const err: any = new Error(
-    'Qubit is not installed on the remote host (could not find a `hermes` executable). ' +
+    'Qubit is not installed on the remote host (could not find a `qubit` executable). ' +
       'Install it on the remote with:  curl -fsSL https://raw.githubusercontent.com/cgraph-dev/Qubit-AIO/main/scripts/install.sh | sh  ' +
       '— or set the Qubit path explicitly in the SSH connection settings.'
   )

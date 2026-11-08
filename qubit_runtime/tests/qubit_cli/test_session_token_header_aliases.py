@@ -12,7 +12,8 @@ from a credential, only which header carries it.
 import pytest
 
 
-_HEADER_NAMES = ("X-Qubit-Session-Token", "X-Hermes-Session-Token")
+_ALIAS_HEADERS = ("X-Qubit-Session-Token", "X-Hermes-Session-Token")
+_HEADER_NAMES = _ALIAS_HEADERS
 
 
 def _request(headers: dict):
