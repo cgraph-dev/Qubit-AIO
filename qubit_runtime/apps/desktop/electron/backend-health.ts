@@ -5,6 +5,21 @@
 // orphaned python processes (#63454). The poll returns the moment the backend
 // responds, so fast machines see no change; 180s is deliberately generous.
 export const DEFAULT_BACKEND_READY_TIMEOUT_MS = 180_000
+
+/**
+ * Budget for a COLD FIRST-RUN boot, which includes running the installer.
+ *
+ * The first launch on this machine has no backend yet: it clones, builds a PM
+ * environment, installs the dependency graph and builds the products (TUI, web,
+ * desktop renderer). That is minutes of legitimate work, not a hung backend, and
+ * the installer's own `products` stage alone measured ~5 minutes here. Holding it
+ * to the ordinary 180s cold-boot budget kills the install mid-stage every time
+ * and re-drives it from 0 — the observed "gets to Products, resets to 1%" loop.
+ *
+ * A backend that is merely slow to answer is still caught by the ordinary budget
+ * once an install exists; this longer ceiling applies only while installing.
+ */
+export const INSTALL_BOOT_WAIT_TIMEOUT_MS = 1_800_000
 export const DEFAULT_BACKEND_READY_POLL_MS = 500
 // A cold backend can stall its event loop for tens of seconds while Windows
 // scans and byte-compiles the gateway import tree. At the default 15s socket

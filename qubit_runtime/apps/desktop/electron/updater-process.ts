@@ -31,12 +31,19 @@ export function resolveInstallationLauncher(
 ): string | null {
   const names: string[] = launcherNames(isWindows)
 
-  for (const dir of ['.qubit', '.hermes']) {
-    for (const name of names) {
-      const candidate: string = path.join(updateRoot, dir, 'bin', name)
+  // The published launcher sits beside the runtime, which for a Qubit checkout
+  // is the vendored qubit_runtime/ — the installer itself invokes
+  // "$(runtime_dir)/.qubit/bin/qubit", and runtime_dir() is that directory.
+  // Checking only <root>/.qubit/bin missed every Qubit install and reported
+  // "no usable Qubit install" for one that had just completed successfully.
+  for (const base of [updateRoot, path.join(updateRoot, 'qubit_runtime')]) {
+    for (const dir of ['.qubit', '.hermes']) {
+      for (const name of names) {
+        const candidate: string = path.join(base, dir, 'bin', name)
 
-      if (stagedFileExists(candidate)) {
-        return candidate
+        if (stagedFileExists(candidate)) {
+          return candidate
+        }
       }
     }
   }
@@ -102,7 +109,8 @@ const CMD_UNSAFE_PATH: RegExp = /["%&|<>^\r\n]/
 /** The exact argv a launcher `--version` probe runs, screened for cmd.exe. */
 function launcherVersionProbe(
   launcher: string,
-  cwd?: string
+  cwd?: string,
+  versionArgs: string[] = ['--version']
 ): { command: string; args: string[]; options: SpawnSyncOptions } | null {
   // Node refuses to exec a .cmd directly (CVE-2024-27980), and `shell:true`
   // would hand an interpolated path to cmd.exe wholesale. Invoke cmd.exe
@@ -116,7 +124,9 @@ function launcherVersionProbe(
 
   return {
     command: viaCmd ? (process.env.ComSpec ?? 'cmd.exe') : launcher,
-    args: viaCmd ? ['/d', '/s', '/c', `""${launcher}" --version"`] : ['--version'],
+    args: viaCmd
+      ? ['/d', '/s', '/c', `""${launcher}" ${versionArgs.join(' ')}"`]
+      : versionArgs,
     options: {
       cwd,
       encoding: 'utf8' as const,
@@ -130,23 +140,42 @@ function launcherVersionProbe(
 
 /** The install directory a launcher's `--version` surface reports, if any. */
 function launcherInstallDirectory(launcher: string, cwd?: string): string | null {
-  const probe = launcherVersionProbe(launcher, cwd)
+  // Two launcher shapes answer --version differently, and both are valid:
+  //   * the vendored-runtime launcher (`qubit-agent`, upstream-derived) prints
+  //     "Install directory: <path>" from --version directly;
+  //   * the full CLI (`qubit`, from [project.scripts]) prints only its product
+  //     version for --version, and carries the same block on `qubit agent
+  //     --version`.
+  // Probing only the first shape made every install reached through the full
+  // CLI look launcher-less, so the desktop reported "no usable Qubit install"
+  // for a complete install. Try the plain form, then the agent form.
+  const attempts: string[][] = [['--version'], ['agent', '--version']]
 
-  if (!probe) {
-    return null
-  }
+  for (const extraArgs of attempts) {
+    const probe = launcherVersionProbe(launcher, cwd, extraArgs)
 
-  try {
-    const result: SpawnSyncReturns<string | Buffer> = spawnSync(probe.command, probe.args, probe.options)
-
-    if (result.error || result.status !== 0) {
+    if (!probe) {
       return null
     }
 
-    return /^Install directory: (.+)$/m.exec(String(result.stdout))?.[1]?.trim() ?? null
-  } catch {
-    return null
+    try {
+      const result: SpawnSyncReturns<string | Buffer> = spawnSync(probe.command, probe.args, probe.options)
+
+      if (result.error || result.status !== 0) {
+        continue
+      }
+
+      const reported = /^Install directory: (.+)$/m.exec(String(result.stdout))?.[1]?.trim()
+
+      if (reported) {
+        return reported
+      }
+    } catch {
+      continue
+    }
   }
+
+  return null
 }
 
 export function launcherTargetsInstallation(launcher: string, root: string): boolean {
