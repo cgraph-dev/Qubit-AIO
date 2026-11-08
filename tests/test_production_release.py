@@ -18,6 +18,13 @@ import pytest
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "prepare_production_release.py"
 
+# The ambient ``voicebridge`` package resolves to this checkout, so a fixture
+# repo whose declared version disagrees with it can never pass identity.  Bind
+# the release-identity fixtures to the canonical product version instead of a
+# stale literal.
+PRODUCT_VERSION = (REPO / "VERSION").read_text(encoding="utf-8").strip()
+PRODUCT_TAG = "v" + PRODUCT_VERSION
+
 
 def _load():
     spec = importlib.util.spec_from_file_location("prepare_production_release", SCRIPT)
@@ -54,10 +61,10 @@ def _repo(tmp_path: Path, version: str = "0.0.9") -> Path:
 
 def test_resolve_release_binds_version_and_tag(tmp_path: Path):
     module = _load()
-    repo = _repo(tmp_path)
-    release = module.resolve_release(repo, tag="v0.0.9")
-    assert release["version"] == "0.0.9"
-    assert release["tag"] == "v0.0.9"
+    repo = _repo(tmp_path, version=PRODUCT_VERSION)
+    release = module.resolve_release(repo, tag=PRODUCT_TAG)
+    assert release["version"] == PRODUCT_VERSION
+    assert release["tag"] == PRODUCT_TAG
     assert release["identity"]["state"] == "OK"
 
 
@@ -146,7 +153,7 @@ def test_source_tar_is_deterministic_and_keeps_exec_bits(tmp_path: Path):
 
 def test_component_manifest_records_components_and_artifacts(tmp_path: Path):
     module = _load()
-    repo = _repo(tmp_path)
+    repo = _repo(tmp_path, version=PRODUCT_VERSION)
     (repo / "qubit_runtime").mkdir()
     (repo / "qubit_runtime" / "pyproject.toml").write_text(
         "[project]\nname = \"qubit-agent\"\nversion = \"0.21.5\"\n",
@@ -169,7 +176,7 @@ def test_component_manifest_records_components_and_artifacts(tmp_path: Path):
     (repo / "skills" / "one").mkdir(parents=True)
     (repo / "skills" / "one" / "SKILL.md").write_text("# skill\n")
 
-    release = module.resolve_release(repo, tag="v0.0.9")
+    release = module.resolve_release(repo, tag=PRODUCT_TAG)
     tree = {"head": _git(repo, "rev-parse", "HEAD").stdout.strip(),
             "branch": "main", "clean": True}
     source = {"source": {"tracked_files": 3}, "included_files": 2,
@@ -184,8 +191,8 @@ def test_component_manifest_records_components_and_artifacts(tmp_path: Path):
         tree,
     )
     assert manifest["schema"] == "qubit-component-manifest/1"
-    assert manifest["product"]["version"] == "0.0.9"
-    assert manifest["product"]["tag"] == "v0.0.9"
+    assert manifest["product"]["version"] == PRODUCT_VERSION
+    assert manifest["product"]["tag"] == PRODUCT_TAG
     assert manifest["components"]["vendored_runtime"]["version"] == "0.21.5"
     assert manifest["components"]["tui"]["ink"]["name"] == "@qubit/ink"
     assert manifest["components"]["plugin_catalog"]["yaml_entries"] == 1

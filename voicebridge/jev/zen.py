@@ -30,6 +30,11 @@ import urllib.error
 import urllib.request
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+try:  # single-source the User-Agent version; fall back if imported standalone
+    from ..product import PRODUCT_VERSION as _PRODUCT_VERSION
+except Exception:  # pragma: no cover - product import is optional here
+    _PRODUCT_VERSION = "0.0.11"
+
 #: Zen's decision endpoint (``/v1/systemone``, not ``/chat/completions``).
 ZEN_ENDPOINT = "https://opencode.ai/zen/v1/systemone"
 
@@ -146,7 +151,7 @@ def _default_http_post(url: str, body: Dict[str, Any], key: str,
         # Zen sits behind Cloudflare, which rejects urllib's default agent with
         # HTTP 403 {"error code": 1010} before the request is ever routed. curl
         # works, so the blocked part is the User-Agent, not the payload.
-        "User-Agent": "Qubit/0.0.10 (+https://github.com/cgraph-dev/Qubit)",
+        "User-Agent": f"Qubit/{_PRODUCT_VERSION} (+https://github.com/cgraph-dev/Qubit)",
         "Accept": "application/json",
     }
     if key:

@@ -8,6 +8,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing v* release tag to rebuild and verify"
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -33,7 +39,7 @@ jobs:
       - name: Resolve the release tag
         id: tag
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -euo pipefail
           case "$TAG" in
@@ -56,8 +62,10 @@ jobs:
         # artifact without it is rejected by release_qualify.py. Use the
         # canonical builder so a clean tag checkout can produce the bundle.
         run: bash scripts/build_dashboard.sh
-      - name: Install build tooling
-        run: python -m pip install --upgrade pip build uv
+      - name: Install build and release-gate tooling
+        # The fresh-install gate imports PyYAML from the product's runtime
+        # configuration path; it is not part of the bare runner image.
+        run: python -m pip install --upgrade pip build uv && python -m pip install -e ".[test]"
       - name: Enforce the fresh-install release gate
         # Refuse the release unless a fresh install produces a root config.yaml
         # with the default Ollama provider, the dashboard/TUI bundle is
@@ -69,9 +77,10 @@ jobs:
             --repo . --fresh-install --require-fresh-install --json
       - name: Build, install, and reproduce artifacts
         env:
-          TAG: ${{ github.ref_name }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           set -o pipefail
+          mkdir -p dist
           python scripts/release_qualify.py \
             --build --install --reproduce --unsigned-ok --json \
             --tag "$TAG" --out dist/release \
@@ -155,8 +164,8 @@ jobs:
             v*) ;;
             *) echo "::error::invalid release tag: $TAG"; exit 1 ;;
           esac
-          shopt -s nullglob
-          assets=(release-dist/*.whl release-dist/*.tar.gz release-dist/SHA256SUMS)
+          mapfile -t assets < <(find release-dist -type f \
+            \( -name '*.whl' -o -name '*.tar.gz' -o -name 'SHA256SUMS' \) -print)
           test "${#assets[@]}" -ge 3
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber

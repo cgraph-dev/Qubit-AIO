@@ -27,6 +27,7 @@ REPO = Path(__file__).resolve().parents[1]
 RUNTIME = REPO / "qubit_runtime"
 VENDORED_PYPROJECT = RUNTIME / "pyproject.toml"
 PRODUCT_PYPROJECT = REPO / "pyproject.toml"
+PRODUCT_VERSION_FILE = REPO / "VERSION"
 CLI_INIT = RUNTIME / "qubit_cli" / "__init__.py"
 VENDOR_MANIFEST = REPO / "scripts" / "hermes_vendor_manifest.py"
 
@@ -88,8 +89,11 @@ def test_vendored_release_date_matches_the_pin():
 
 def test_version_bump_left_the_product_version_alone():
     # The vendored runtime pin is v0.21.5, but the Qubit product distribution
-    # has its own version (0.0.9) and must not inherit the vendored bump.
-    assert _load_toml(PRODUCT_PYPROJECT)["project"]["version"] == "0.0.9"
+    # has its own version and must not inherit the vendored bump. Read the
+    # canonical value from VERSION rather than pinning a stale literal here.
+    canonical = PRODUCT_VERSION_FILE.read_text(encoding="utf-8").strip()
+    assert canonical and canonical != PIN_VERSION
+    assert _load_toml(PRODUCT_PYPROJECT)["project"]["version"] == canonical
 
 
 # --------------------------------------------------------------------------- #

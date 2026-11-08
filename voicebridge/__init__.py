@@ -10,4 +10,4 @@ Layers:
   orchestrator.py  main loop wiring the layers together
 """
 
-__version__ = "0.0.10"
+__version__ = "0.0.11"

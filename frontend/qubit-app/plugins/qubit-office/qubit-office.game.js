@@ -1,5 +1,5 @@
 (function() {
-	// ../../../../home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules/phaser/dist/phaser.esm.js
+	// phaser.esm.js (bundled from frontend/qubit-web/node_modules)
 	var __webpack_modules__ = {
 		50792(module) {
 			var has = Object.prototype.hasOwnProperty, prefix = "~";

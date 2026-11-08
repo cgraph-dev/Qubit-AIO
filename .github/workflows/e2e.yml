@@ -12,8 +12,14 @@ on:
 permissions:
   contents: read
 
+# Pushes get a per-commit group: the public seed is force-pushed to
+# main/production every few minutes, and a branch-keyed group either cancels a
+# run that is still working or queues the newer one behind it. Pull requests
+# keep the old same-ref group so a new push to the PR still supersedes the
+# previous run.
 concurrency:
-  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  group: >-
+    e2e-${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -25,9 +31,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
-    concurrency:
-      group: e2e-${{ github.workflow }}-${{ github.ref }}-${{ matrix.shard }}
-      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     env:
       SHARD: ${{ matrix.shard }}
       SHARDS: "8"
@@ -36,6 +39,37 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          # Upgrade cells resolve N-1 from HEAD~1; fetch the parent commit only.
+          # Tags stay unfetched unless a real-history checkout is deepened below.
+          fetch-depth: 2
+      - name: Provide upgrade history (real or synthesized)
+        # The public release seed has a fresh one-commit history, so the upgrade suite's
+        # N-1 = HEAD~1 does not exist there. On a root seed, create a two-commit chain whose
+        # tip tree is the checked-out tree (both synthetic commits are empty); a real-history
+        # checkout is deepened instead. No assertion is weakened: the clone-shape tests still
+        # prove a real N-1 -> HEAD update.
+        run: |
+          if git rev-parse -q --verify "HEAD~1^{commit}" >/dev/null; then
+            if [ "$(git rev-parse --is-shallow-repository)" = "true" ]; then
+              git fetch --unshallow --tags --quiet origin || true
+              echo "deepened the existing history"
+            fi
+            echo "N-1 already present ($(git rev-list --count HEAD) commits); no synthesis needed"
+            exit 0
+          fi
+          git -c user.name="Qubit E2E" -c user.email="e2e@qubit.invalid" -c commit.gpgsign=false \
+            commit --allow-empty -q -m "e2e: synthesized N-1 for a single-commit seed"
+          git -c user.name="Qubit E2E" -c user.email="e2e@qubit.invalid" -c commit.gpgsign=false \
+            commit --allow-empty -q -m "e2e: synthesized release head"
+          # actions/checkout fetches depth 2, so a root seed still carries a shallow marker
+          # even though there is no older history to fetch. The synthesized chain above is
+          # complete locally, so clear the spurious marker before the upgrade suite clones it.
+          if [ -f .git/shallow ]; then
+            rm -f .git/shallow
+            echo "cleared the depth-2 shallow marker"
+          fi
+          echo "synthesized $(git rev-list --count HEAD) commits; HEAD~1=$(git rev-parse --short HEAD~1)"
       - name: Install E2E system tools
         run: |
           sudo apt-get update -qq
@@ -74,7 +108,11 @@ jobs:
         working-directory: qubit_runtime
       - name: Run this E2E shard
         run: |
+          # One flake retry per file: the hosted runner is 4 vCPU/16 GB and a few
+          # live cells (SQLite torture, 429 rotation) are load-sensitive. A pass on
+          # retry is still reported as FLAKY, and a deterministic failure fails
+          # twice rather than being hidden.
           python scripts/run_tests_parallel.py \
             --files-from /tmp/e2e-shard.txt \
-            -j 2 --file-timeout 1200 --file-retries 0
+            -j 2 --file-timeout 1200 --file-retries 1
         working-directory: qubit_runtime

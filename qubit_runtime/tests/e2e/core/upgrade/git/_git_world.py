@@ -78,21 +78,43 @@ def _release_tag() -> str | None:
     return None
 
 
-def n1_tag() -> str:
-    """N-1: the newest release tag strictly before HEAD.
+def _has_parent() -> bool:
+    try:
+        I.git("rev-parse", "--verify", "HEAD^", cwd=H.repo_root())
+    except AssertionError:
+        return False
+    return True
+
+
+def n1_tag() -> str | None:
+    """N-1: the newest release tag strictly before HEAD, else ``HEAD~1``.
 
     A checkout without a reachable release tag (a local branch, or a shallow CI clone without
     tags) still has an older commit: ``HEAD~1`` exercises the same upgrade path (install an older
     tree, update to HEAD) instead of erroring during fixture setup. ``QUBIT_E2E_N1_REF`` pins a
     patched commit object, used to prove red a cell whose bug lives in N-1's own updater code.
+
+    Returns None when there is no older commit at all: the public release seed is exported as a
+    fresh ROOT commit (``Fresh history: no source .git directory...``), so neither a parent nor a
+    reachable pre-HEAD tag exists. Callers skip with that evidence instead of failing on an
+    unresolvable ``HEAD~1``.
     """
-    return os.environ.get("QUBIT_E2E_N1_REF") or _release_tag() or "HEAD~1"
+    return os.environ.get("QUBIT_E2E_N1_REF") or _release_tag() or ("HEAD~1" if _has_parent() else None)
 
 
 def n1_base() -> str:
     """The commit an N-1 install sits on: N-1's tag, or ``QUBIT_E2E_N1_REF`` (a patched commit
     object, used to prove red a cell whose bug lives in N-1's own updater code)."""
-    return commit_of(os.environ.get("QUBIT_E2E_N1_REF") or n1_tag())
+    ref = os.environ.get("QUBIT_E2E_N1_REF") or n1_tag()
+    if ref is None:
+        import pytest  # noqa: PLC0415 - only on the unsupported single-commit-seed path
+
+        pytest.skip(
+            "N-1 unavailable: this checkout is a single-commit release seed (no parent commit "
+            "and no release tag before HEAD), so an upgrade-from-N-1 cell has no older tree to "
+            "install. Run this cell from a checkout with release history or set QUBIT_E2E_N1_REF."
+        )
+    return commit_of(ref)
 
 
 def commit_of(ref: str) -> str:

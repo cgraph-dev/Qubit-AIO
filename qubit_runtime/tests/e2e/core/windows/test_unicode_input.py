@@ -123,6 +123,13 @@ def _plain(screen: str) -> str:
     return _ANSI.sub("", screen)
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Hosted Windows pywinpty/ConPTY does not deliver BMP/CJK input to the "
+        "prompt_toolkit composer; the harness control never echoes the tag (#120776)."
+    ),
+)
 def test_classic_cli_console_non_ascii_reaches_wire(tmp_path: Path) -> None:
     """Typed into the classic CLI composer through a real ConPTY: Latin-1 + CJK letters.
     Symbols (✓, emoji) typed this way never reached the composer (not echoed before Enter);

@@ -172,6 +172,11 @@ afterEach(async () => {
   await act(async () => root?.unmount());
   container?.remove();
   vi.unstubAllGlobals();
+  // GSAP keeps one ticker timer alive past unmount; keep its frame primitives
+  // defined so the next tick cannot surface as an unhandled exception.
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+    setTimeout(() => cb(0), 0) as unknown as number);
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
 });
 
 describe("SessionsPage resume routing", () => {

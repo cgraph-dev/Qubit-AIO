@@ -2977,11 +2977,17 @@ def _seed_from_env(provider: str, entries: List[PooledCredential]) -> Tuple[bool
         return seed.result
 
     if provider == "openrouter":
+        # Honour the documented mirror override: an ambient OPENROUTER_BASE_URL in the
+        # profile's .env must win over the vendor default, exactly as the registry's
+        # base_url_env_var path does for every other provider. Without this an env-seeded
+        # OpenRouter credential kept the public endpoint and any background metadata probe
+        # bypassed the configured mirror.
+        env_base_url = (get_env_prefer_dotenv("OPENROUTER_BASE_URL") or "").rstrip("/")
         for env_var in _env_key_var_candidates(["OPENROUTER_API_KEY"], entries):
             token = get_env_prefer_dotenv(env_var)
             if token and seed.upsert(
                 f"env:{env_var}",
-                _env_payload(env_var=env_var, token=token, base_url=OPENROUTER_BASE_URL),
+                _env_payload(env_var=env_var, token=token, base_url=env_base_url or OPENROUTER_BASE_URL),
             ):
                 _warn_env_ingestion_once(provider, env_var)
         return seed.result
