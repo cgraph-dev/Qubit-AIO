@@ -28,6 +28,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
+        # Install the umbrella package, not only the vendored runtime: these
+        # cells import the root product surface and need ruamel.yaml et al.
+        working-directory: .
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[test]" pytest psutil pyyaml pathspec
