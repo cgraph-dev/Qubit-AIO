@@ -384,8 +384,9 @@ function Get-RuntimeRoot {
 }
 
 # Resolve the pm store root (same resolution as pm's store_root()):
-# $env:HERMES_RUNTIME_DIR wins, else <QubitHome>\tools.
+# QUBIT_RUNTIME_DIR (canonical) or HERMES_RUNTIME_DIR wins, else <QubitHome>\tools.
 function Get-PmStoreRoot {
+    if ($env:QUBIT_RUNTIME_DIR) { return $env:QUBIT_RUNTIME_DIR }
     if ($env:HERMES_RUNTIME_DIR) { return $env:HERMES_RUNTIME_DIR }
     return (Join-Path $QubitHome "tools")
 }

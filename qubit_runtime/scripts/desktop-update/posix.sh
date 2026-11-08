@@ -1209,6 +1209,11 @@ export HERMES_UPDATE_STATUS_FILE="$STATUS"
 export HERMES_UPDATE_HANDOFF_PID="$MY_PID"
 # The update's receipt carries this id (update_receipt._launcher_correlation_id),
 # which is how update_committed_after_exit finds THIS run's receipt.
+# Export BOTH spellings: the receipt reader accepts either (canonical QUBIT_ first,
+# HERMES_ read-old), and this shim's own update_committed_after_exit matches against
+# $UPDATE_CORRELATION — a one-sided export left the receipt's correlation_id empty
+# and every managed SSH update reported "no receipt" for a run that succeeded.
+export QUBIT_UPDATE_CORRELATION_ID="$UPDATE_CORRELATION"
 export HERMES_UPDATE_CORRELATION_ID="$UPDATE_CORRELATION"
 # --keep-stash: never re-apply local source edits after the update (they stay
 # parked in git stash). Probe --help first: older installed backends don't

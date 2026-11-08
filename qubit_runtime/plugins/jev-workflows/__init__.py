@@ -46,7 +46,13 @@ _CTX: Any = None
 # ── settings ─────────────────────────────────────────────────────────────────
 
 def _home() -> Path:
-    return Path(os.environ.get("HERMES_HOME") or Path.home() / ".hermes")
+    # Both spellings, canonical first: every ``jevkit.*`` submodule resolves the
+    # home from ``QUBIT_HOME`` only, so reading ``HERMES_HOME`` alone here made this
+    # module and its own package siblings disagree about which tree the plugin
+    # lives in — silently, since neither name is required to exist.
+    return Path(os.environ.get("QUBIT_HOME")
+                or os.environ.get("HERMES_HOME")
+                or Path.home() / ".qubit")
 
 
 def _root() -> Path:

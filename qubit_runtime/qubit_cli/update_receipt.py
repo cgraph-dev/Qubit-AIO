@@ -135,10 +135,16 @@ def _str_records(entries: Any, keys: tuple[str, ...], *, pid: bool = False) -> l
 def _launcher_correlation_id() -> Optional[str]:
     """Correlation id handed in by an external launcher, or None.
 
-    Desktop's managed SSH update exports ``QUBIT_UPDATE_CORRELATION_ID`` and
-    only accepts a receipt whose ``correlation_id`` equals it. This is separate
-    from ``update_id``, which stays the CLI's own id for pm sync receipts."""
-    return os.environ.get("QUBIT_UPDATE_CORRELATION_ID", "").strip() or None
+    Desktop's managed SSH update exports ``HERMES_UPDATE_CORRELATION_ID`` (and,
+    once its launcher is rebranded, ``QUBIT_UPDATE_CORRELATION_ID``) and only
+    accepts a receipt whose ``correlation_id`` equals it. Reading both spellings
+    is mandatory, not cosmetic: nothing errors when the names disagree — the
+    receipt simply carries ``correlation_id=None`` and the launcher reports
+    "no receipt" for an update that ran perfectly. Canonical spelling first.
+    This is separate from ``update_id``, which stays the CLI's own id for pm
+    sync receipts."""
+    return (os.environ.get("QUBIT_UPDATE_CORRELATION_ID", "").strip()
+            or os.environ.get("HERMES_UPDATE_CORRELATION_ID", "").strip() or None)
 
 
 class UpdateReceipt:

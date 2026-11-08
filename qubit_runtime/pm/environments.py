@@ -226,13 +226,18 @@ def store_root(project_root: Path, *, honor_runtime_override: bool = True) -> Pa
     """Resolve a payload-relative or stamped store before PM imports.
 
     ``HERMES_RUNTIME_DIR`` exists so a running process can point PM at a
-    non-default runtime location. Publication paths must pass
-    ``honor_runtime_override=False``: a persisted artifact (an installed
+    non-default runtime location; ``QUBIT_RUNTIME_DIR`` is the canonical
+    spelling (what the installers, ``setup-*.sh`` and the voice bridge use) and
+    ``HERMES_RUNTIME_DIR`` is the one ``pm.runtime.runtime_environment`` exports
+    into child processes. Accepting only one means a process that received the
+    other silently resolves PM's default store instead — the wrong Python and
+    the wrong installed packages, with no error at all. Publication paths must
+    pass ``honor_runtime_override=False``: a persisted artifact (an installed
     launcher) has to bind the store of the tree it serves, never a runtime
     directory inherited through the environment.
     """
     if honor_runtime_override:
-        override = os.environ.get("HERMES_RUNTIME_DIR")
+        override = os.environ.get("QUBIT_RUNTIME_DIR") or os.environ.get("HERMES_RUNTIME_DIR")
         if override:
             return Path(override).resolve()
     root = Path(project_root).resolve()

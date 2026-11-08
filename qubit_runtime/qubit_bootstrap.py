@@ -442,9 +442,14 @@ def harden_import_path(src_root: str | None = None) -> None:
     absent. ``src_root`` defaults to this module's directory (the repo root for every
     shipped entry point), so no spawner env var is required.
     """
-    root = src_root or os.environ.get("HERMES_PYTHON_SRC_ROOT") or os.path.dirname(
-        os.path.abspath(__file__)
-    )
+    root = (src_root
+            or os.environ.get("QUBIT_PYTHON_SRC_ROOT")
+            # Read-old: ``tui_gateway.server._seed_vendored_src_root_pythonpath`` writes both
+            # spellings, but a child spawned by a pre-rename launcher carries only this one —
+            # and missing it does not fail loudly, it relocates the import root to whatever
+            # directory the process happens to run from.
+            or os.environ.get("HERMES_PYTHON_SRC_ROOT")
+            or os.path.dirname(os.path.abspath(__file__)))
 
     sys.path[:] = [p for p in sys.path if p not in ("", ".")]
 

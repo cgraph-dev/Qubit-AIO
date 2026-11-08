@@ -43,7 +43,10 @@ if (-not $artifact) { throw "no uv artifact for $target" }
 $pyPin = $lock.packages.python
 $pyVersion = if ($pyPin) { ($pyPin.version -split '\+')[0] -replace '^(\d+\.\d+).*', '$1' } else { '3.11' }
 
-$store = if ($env:HERMES_RUNTIME_DIR) { $env:HERMES_RUNTIME_DIR } else { Join-Path $HOME '.hermes/tools' }
+# Both spellings: install.ps1's Get-PmStoreRoot, pm.runtime and setup-hermes.ps1 may each
+# export a different one; reading only HERMES_ let this script resolve the default store
+# while the rest of the install used the overridden one.
+$store = if ($env:QUBIT_RUNTIME_DIR) { $env:QUBIT_RUNTIME_DIR } elseif ($env:HERMES_RUNTIME_DIR) { $env:HERMES_RUNTIME_DIR } else { Join-Path $HOME '.qubit/tools' }
 $entry = Join-Path $store "uv-$($uvPin.version)-$target"
 $uv = Join-Path $entry 'uv.exe'
 

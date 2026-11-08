@@ -6,8 +6,13 @@ from pathlib import Path
 
 # The Python root (gatewayClient.ts/imageAttachments.ts pass it): the TUI product ships this
 # helper in dist/scripts/, where parents[2] is not the root.
+# Both spellings: the launcher writes ``QUBIT_`` (canonical) alongside the legacy name, and a
+# pre-rename shipped TUI sends only ``HERMES_``. Reading one makes the other fall back to
+# parents[2] — which is the wrong directory in the dist/ layout, so the import fails silently.
 def python_root() -> Path:
-    return Path(os.environ.get("HERMES_PYTHON_SRC_ROOT") or Path(__file__).resolve().parents[2])
+    return Path(os.environ.get("QUBIT_PYTHON_SRC_ROOT")
+                or os.environ.get("HERMES_PYTHON_SRC_ROOT")
+                or Path(__file__).resolve().parents[2])
 
 
 sys.path.insert(0, str(python_root()))

@@ -146,8 +146,11 @@ $ResultPath = Join-Path $QubitHome ".hermes-update-result.json"
 # stable per-handoff id is minted once.
 $script:ResultRunId = if ($HandoffRun) {
     $HandoffRun
-} elseif ($env:HERMES_UPDATE_CORRELATION_ID) {
-    $env:HERMES_UPDATE_CORRELATION_ID
+} elseif ($env:QUBIT_UPDATE_CORRELATION_ID -or $env:HERMES_UPDATE_CORRELATION_ID) {
+    # Both spellings, canonical first: the launcher may hand in either, and a
+    # run id that disagrees with the one the receipt recorded makes the
+    # post-update check report "no receipt" for an update that succeeded.
+    if ($env:QUBIT_UPDATE_CORRELATION_ID) { $env:QUBIT_UPDATE_CORRELATION_ID } else { $env:HERMES_UPDATE_CORRELATION_ID }
 } else {
     "qubit-handoff-$PID-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
 }

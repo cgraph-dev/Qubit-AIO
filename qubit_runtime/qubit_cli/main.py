@@ -288,6 +288,19 @@ def _config_default_interface_early() -> str:
     return value
 
 
+def _tui_env_requested() -> bool:
+    """True when the environment asks for the TUI, under either brand spelling.
+
+    ``QUBIT_TUI`` is canonical (``main_tui_launch._resolve_use_tui`` and
+    ``_is_tui_chat_launch`` read it), ``HERMES_TUI`` is the name the docs and every
+    pre-rename launcher export. Reading one spelling made a single decision
+    (``_wants_tui_early``) disagree with the resolver that actually launches the
+    TUI, so ``=1`` turned the TUI on for the pre-flight and off for the launch.
+    """
+    return (os.environ.get("QUBIT_TUI") == "1"
+            or os.environ.get("HERMES_TUI") == "1")
+
+
 def _wants_tui_early(argv: list[str] | None = None) -> bool:
     """Earliest TUI decision, usable before argparse/config imports.
 
@@ -302,7 +315,7 @@ def _wants_tui_early(argv: list[str] | None = None) -> bool:
         argv = sys.argv[1:]
     if "--cli" in argv:
         return False
-    if os.environ.get("QUBIT_TUI") == "1" or any(flag in argv for flag in ("--tui", "--native", "--tui-native")):
+    if (_tui_env_requested() or any(flag in argv for flag in ("--tui", "--native", "--tui-native"))):
         return True
     try:
         if not (sys.stdin.isatty() and sys.stdout.isatty()):
@@ -2975,7 +2988,7 @@ _AGENT_SUBCOMMANDS = {
 def _is_tui_chat_launch(args) -> bool:
     if _bypass_chat_launch(args):
         return False
-    if getattr(args, "tui", False) or os.environ.get("HERMES_TUI") == "1":
+    if getattr(args, "tui", False) or _tui_env_requested():
         return True
     # The chat path decides TUI-vs-classic via _resolve_use_tui (--cli/--tui
     # flags, TTY gate, HERMES_TUI env, display.interface config). Bare

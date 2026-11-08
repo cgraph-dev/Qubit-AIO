@@ -1132,7 +1132,11 @@ def _run_exec(run: Runner, argv: Sequence[str], timeout: float) -> Tuple[int, st
 # Install-method detection (Owner Decision #11 lifecycle)
 # --------------------------------------------------------------------------
 def _is_container() -> bool:
-    if str(os.environ.get("QUBIT_CONTAINER", "") or "").strip():
+    # Both spellings: qubit_constants._container_or_chmod_skipped reads both too, and the Docker
+    # images export the legacy name while every doc names QUBIT_CONTAINER. Reading one made
+    # update-method detection and the chmod policy disagree inside the same container.
+    if (str(os.environ.get("QUBIT_CONTAINER", "") or "").strip()
+            or str(os.environ.get("HERMES_CONTAINER", "") or "").strip()):
         return True
     for candidate in ("/.dockerenv", "/run/.containerenv"):
         try:
@@ -1194,6 +1198,8 @@ def detect_install_method(cfg: Any) -> Dict[str, Any]:
         method, reason = "immutable", "the code tree is not writable in place"
     elif str(os.environ.get("QUBIT_CONTAINER", "") or "").strip():
         method, reason = "container", "QUBIT_CONTAINER is set"
+    elif str(os.environ.get("HERMES_CONTAINER", "") or "").strip():
+        method, reason = "container", "HERMES_CONTAINER is set"
     elif is_checkout:
         method, reason = "git-checkout", "a git checkout is present"
     elif immutable:

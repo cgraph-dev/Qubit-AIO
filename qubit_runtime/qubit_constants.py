@@ -394,7 +394,12 @@ def get_default_qubit_root(*, home: str | Path | None = None) -> Path:
     """Root of an explicit home, or the process home when none is supplied."""
     global _default_qubit_root_memo
     native_home = _get_platform_default_qubit_home()
-    env_home = str(home).strip() if home is not None else os.environ.get("QUBIT_HOME", "").strip()
+    # ``QUBIT_HOME`` is canonical; ``HERMES_HOME`` is the read-old spelling a pre-rename launcher
+    # still hands a replayed child (``update_cmd_posix_pause._replay_env``). Both must resolve or
+    # that child silently falls back to the *native* root and re-reads the default profile's
+    # state instead of the profile it was launched under — no error, wrong answer.
+    env_home = str(home).strip() if home is not None else (
+        os.environ.get("QUBIT_HOME", "").strip() or os.environ.get("HERMES_HOME", "").strip())
     env_path = _expand_qubit_home(env_home) if env_home else None
     memo_key = (str(native_home), str(env_path) if env_path is not None else "")
     memo = _default_qubit_root_memo
@@ -1001,14 +1006,19 @@ def get_managed_system(home: str | Path | None = None) -> str | None:
 
 
 def _container_or_chmod_skipped() -> bool:
-    """Container/chmod-skip detection: the ``HERMES_CONTAINER``/``HERMES_SKIP_CHMOD`` operator
+    """Container/chmod-skip detection: the ``QUBIT_CONTAINER``/``QUBIT_SKIP_CHMOD`` (or legacy
+    ``HERMES_``) operator
     overrides on top of the canonical :func:`_detect_container` signals (same breadth as
     :func:`is_container` — Docker/Podman/LXC/Kubernetes, cgroup and root-mountinfo). The cached
     :func:`is_container` itself is deliberately avoided: it ignores these env overrides and is
     computed only once per process, so tests could not flip it. Volume-mounted config is not
     forced to owner-only in containers: gateway and dashboard may run as different UIDs, or
     the mount itself needs broader permissions."""
-    if os.environ.get("HERMES_CONTAINER") or os.environ.get("HERMES_SKIP_CHMOD"):
+    # Both spellings: ``voicebridge/update_manager._is_container`` reads QUBIT_CONTAINER, the
+    # Docker images export HERMES_CONTAINER. A container that set only the documented name
+    # got 0700 on a volume-mounted config and broke the dashboard/gateway pair.
+    if (os.environ.get("QUBIT_CONTAINER") or os.environ.get("HERMES_CONTAINER")
+            or os.environ.get("QUBIT_SKIP_CHMOD") or os.environ.get("HERMES_SKIP_CHMOD")):
         return True
     return _detect_container()
 
@@ -1030,7 +1040,15 @@ def _resolve_qubit_uid_gid() -> tuple[int | None, int | None]:
         except (TypeError, ValueError):
             return None
 
-    return _env_int("HERMES_UID"), _env_int("HERMES_GID")
+    # Both spellings, canonical first. ``browser_connect`` documents QUBIT_UID/QUBIT_GID as the
+    # operator contract while the Docker images export the legacy pair; reading one silently
+    # leaves runtime-created profile dirs root:root (no error — chown just becomes a no-op),
+    # which blocks the uid-mapped workers later. QUBIT_ wins so an operator who sets the name
+    # the docs advertise is not silently ignored.
+    def _uid_gid(kind: str) -> int | None:
+        return _env_int(f"QUBIT_{kind}") or _env_int(f"HERMES_{kind}")
+
+    return _uid_gid("UID"), _uid_gid("GID")
 
 
 def _chown_to_qubit_uid(path) -> None:
@@ -1070,7 +1088,11 @@ def apply_secure_dir_policy(path, *, home: str | Path | None = None) -> None:
     """
     if get_managed_system(home) is not None:
         return
-    explicit_mode = os.environ.get("HERMES_HOME_MODE", "").strip()
+    # Both spellings: ``browser_connect`` documents QUBIT_HOME_MODE as the group-share hatch, and
+    # the Docker images set the legacy pair. An operator who sets the documented name and gets
+    # 0700 anyway sees no error — only a share that does not work.
+    explicit_mode = (os.environ.get("QUBIT_HOME_MODE", "").strip()
+                     or os.environ.get("HERMES_HOME_MODE", "").strip())
     if _container_or_chmod_skipped() and not explicit_mode:
         _chown_to_qubit_uid(path)
         return

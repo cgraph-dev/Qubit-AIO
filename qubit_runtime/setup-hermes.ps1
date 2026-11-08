@@ -40,7 +40,11 @@ if (-not $artifact) { throw "no uv artifact for $target" }
 $pyPin = $lock.packages.python
 $pyVersion = if ($pyPin) { ($pyPin.version -split '\+')[0] -replace '^(\d+\.\d+).*', '$1' } else { '3.11' }
 
-$store = if ($env:QUBIT_RUNTIME_DIR) { $env:QUBIT_RUNTIME_DIR } else { Join-Path $HOME '.qubit/tools' }
+# Both spellings, canonical first: install.ps1 and pm.runtime export HERMES_RUNTIME_DIR,
+# while setup-hermes.ps1 was the only script reading QUBIT_RUNTIME_DIR. Reading one made
+# this setup stage stage uv into the default store while PM (and the running agent)
+# resolved a different one — the pinned uv then looked missing on the next run.
+$store = if ($env:QUBIT_RUNTIME_DIR) { $env:QUBIT_RUNTIME_DIR } elseif ($env:HERMES_RUNTIME_DIR) { $env:HERMES_RUNTIME_DIR } else { Join-Path $HOME '.qubit/tools' }
 $entry = Join-Path $store "uv-$($uvPin.version)-$target"
 $uv = Join-Path $entry 'uv.exe'
 

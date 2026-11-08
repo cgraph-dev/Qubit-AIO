@@ -467,15 +467,25 @@ def _safe_tui_cwd(env: Optional[dict] = None) -> str:
 def _apply_tui_python_env(env: dict) -> None:
     """Seed/repair Python-related env vars shared by CLI and dashboard TUI launches."""
     from qubit_cli.main import PROJECT_ROOT
-    src_root = str(env.get("HERMES_PYTHON_SRC_ROOT") or "").strip()
+    # Read both spellings when validating: ``_seed_vendored_src_root_pythonpath`` in
+    # tui_gateway.server writes QUBIT_ + HERMES_, so judging an env that carries a
+    # valid QUBIT_ root by HERMES_ alone would overwrite it with PROJECT_ROOT —
+    # repairing a value that was never broken and repointing the import root.
+    src_root = str(env.get("QUBIT_PYTHON_SRC_ROOT") or env.get("HERMES_PYTHON_SRC_ROOT") or "").strip()
     if not src_root or not Path(src_root).is_dir():
-        env["HERMES_PYTHON_SRC_ROOT"] = str(PROJECT_ROOT)
+        src_root = str(PROJECT_ROOT)
+    env["HERMES_PYTHON_SRC_ROOT"] = src_root
+    env["QUBIT_PYTHON_SRC_ROOT"] = src_root
 
     cwd = str(env.get("HERMES_CWD") or "").strip()
     if not cwd or not Path(cwd).is_dir():
         env["HERMES_CWD"] = _safe_tui_cwd(env)
 
-    python = str(env.get("HERMES_PYTHON") or "").strip()
+    # Same read-both rule as SRC_ROOT above: nix/qubit-agent.nix exports QUBIT_PYTHON
+    # from its devShell while every other launcher exports HERMES_PYTHON. Validating
+    # only one drops the other on the floor and silently substitutes sys.executable,
+    # so a dev shell pinned to a generation Python runs the agent on the wrong one.
+    python = str(env.get("QUBIT_PYTHON") or env.get("HERMES_PYTHON") or "").strip()
     if os.path.dirname(python):
         python_path = Path(python)
         if not python_path.is_absolute():
@@ -768,7 +778,10 @@ def _resolve_use_tui(args) -> bool:
             return False
     except Exception:
         return False
-    if os.environ.get("HERMES_TUI") == "1":
+    # Both spellings (``main._tui_env_requested``), so this resolver and the early
+    # ``_wants_tui_early`` pre-flight cannot reach opposite verdicts on one var.
+    from qubit_cli.main import _tui_env_requested
+    if _tui_env_requested():
         return True
     try:
         from qubit_cli.config import load_config
