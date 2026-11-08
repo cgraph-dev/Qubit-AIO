@@ -235,7 +235,13 @@ def _resolve_session_token() -> str:
 
 
 _SESSION_TOKEN = _resolve_session_token()
-_SESSION_HEADER_NAME = "X-Hermes-Session-Token"
+_SESSION_HEADER_NAME = "X-Qubit-Session-Token"
+# The desktop shell and the dashboard SPA speak the rebranded header; older
+# bundles (and the voicebridge dashboard) still send the pre-rename name. Accept
+# both: a mismatched name is indistinguishable from a missing credential, and it
+# failed every authenticated call with a bare 401 while /api/status (which needs
+# no token) kept answering — the app looked half-alive instead of unauthorised.
+_SESSION_HEADER_ALIASES = ("X-Qubit-Session-Token", "X-Hermes-Session-Token")
 _SSH_OWNER_NONCE: Optional[str] = None
 _SSH_RUNTIME_PURELIB: Optional[Tuple[str, int, int]] = None
 _SSH_RUNTIME_MARKER: Optional[str] = None
@@ -317,11 +323,13 @@ def _has_valid_session_token(request: Request) -> bool:
 
     The dedicated header avoids collisions with reverse proxies that already use
     ``Authorization`` (Caddy ``basic_auth``); the legacy Bearer path stays for
-    older dashboard bundles.
+    older dashboard bundles. Every alias in :data:`_SESSION_HEADER_ALIASES` is
+    checked, so a client on either side of the Qubit rename authenticates.
     """
-    session_header = request.headers.get(_SESSION_HEADER_NAME, "")
-    if session_header and hmac.compare_digest(session_header.encode(), _SESSION_TOKEN.encode()):
-        return True
+    for name in _SESSION_HEADER_ALIASES:
+        session_header = request.headers.get(name, "")
+        if session_header and hmac.compare_digest(session_header.encode(), _SESSION_TOKEN.encode()):
+            return True
     auth = request.headers.get("authorization", "")
     return hmac.compare_digest(auth.encode(), f"Bearer {_SESSION_TOKEN}".encode())
 

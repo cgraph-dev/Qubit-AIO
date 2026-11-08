@@ -96,14 +96,17 @@ def _scope(route_path: str, query: Iterable[tuple[str, str]]) -> _Scope:
 def session_token_of(request: Request) -> str | None:
     """The browser session token *request* was admitted with on the loopback gate, or None when it
     came with any other credential (a sign-in, a native client's grant, a service token)."""
-    from qubit_cli.web_server import _SESSION_HEADER_NAME
+    from qubit_cli.web_server import _SESSION_HEADER_ALIASES
 
     if (getattr(request.app.state, "auth_required", False)
             or getattr(request.state, "native_http_principal", None)
             or getattr(request.state, "token_authenticated", False)):
         return None
-    return (request.headers.get(_SESSION_HEADER_NAME)
-            or request.headers.get("authorization", "").removeprefix("Bearer ") or None)
+    for name in _SESSION_HEADER_ALIASES:
+        value = request.headers.get(name)
+        if value:
+            return value
+    return request.headers.get("authorization", "").removeprefix("Bearer ") or None
 
 
 def mint(route: str, query: Mapping[str, str], *, authority: FileAuthority,
