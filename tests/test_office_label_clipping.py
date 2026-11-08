@@ -153,7 +153,6 @@ FLOOR_HEIGHT_UNITS = int(_FHU.group(1))
 
 # ------------------------------------------------------ scratch renderer copies
 SCRATCH = Path(__file__).resolve().parent.parent / ".pytest_cache"
-SCRATCH = Path("/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch")
 
 
 def _render_with_src(src_text: str, payload_obj: dict, program: str) -> dict:

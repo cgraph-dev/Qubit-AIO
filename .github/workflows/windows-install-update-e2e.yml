@@ -20,6 +20,7 @@ jobs:
     defaults:
       run:
         shell: pwsh
+        working-directory: qubit_runtime
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
@@ -27,13 +28,17 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install test dependencies
+        # Install the umbrella package, not only the vendored runtime: these
+        # cells import the root product surface and need ruamel.yaml et al.
+        working-directory: .
         run: |
           python -m pip install --upgrade pip
-          python -m pip install pytest psutil pyyaml pathspec
+          python -m pip install -e ".[test]" pytest psutil pyyaml pathspec
       - name: Run Windows install + update E2E
         env:
           HERMES_E2E_STRICT_ACCEPTANCE: ${{ inputs.strict_acceptance }}
           HERMES_E2E_ARTIFACTS: ${{ runner.temp }}/qubit-e2e-artifacts
+          HERMES_E2E_WINDOWS_INSTALL: "1"
           QUBIT_E2E_WINDOWS_INSTALL: "1"
         run: >
           python -m pytest -q -p no:cacheprovider -m platforms

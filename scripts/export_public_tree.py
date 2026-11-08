@@ -190,9 +190,14 @@ MODEL_WEIGHT_SUFFIXES = (
 )
 
 #: Screenshot/capture filename fragments.  Product assets (icons, backgrounds,
-#: plugin artwork) are kept; ad-hoc captures are not.
+#: plugin artwork) are kept; ad-hoc captures are not.  A capture signal only
+#: applies to image files: source modules and CI workflows can legitimately be
+#: named ``e2e-…`` or ``screenshot-…`` without being a capture, and dropping
+#: them breaks the shipped surface (browser extension, desktop settings, the
+#: desktop E2E workflows).
 SCREENSHOT_PREFIXES = ("e2e-", "screen-shot", "screenshot")
 SCREENSHOT_SUFFIXES = ("-e2e.png", "-capture.png", "-screenshot.png")
+SCREENSHOT_IMAGE_SUFFIXES = (".png", ".jpg", ".jpeg", ".webp", ".gif")
 
 #: Product surfaces the public export must retain.  ``prefix`` is a directory
 #: or a single file; the summary reports presence and file count.
@@ -304,6 +309,8 @@ def _is_secret_like(name: str) -> bool:
 
 def _is_screenshot(name: str) -> bool:
     lowered = name.lower()
+    if not lowered.endswith(SCREENSHOT_IMAGE_SUFFIXES):
+        return False
     return lowered.startswith(SCREENSHOT_PREFIXES) or lowered.endswith(SCREENSHOT_SUFFIXES)
 
 

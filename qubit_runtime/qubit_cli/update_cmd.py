@@ -1842,7 +1842,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
     opts = _resolve_update_options(args, gateway_mode)
     gw_input_fn, assume_yes = opts.gw_input_fn, opts.assume_yes
 
-    print("☤ Updating Hermes Agent...")
+    print("☤ Updating Qubit Agent...")
     print()
 
     _pre_update_plan = _begin_update_receipt_and_plan(args)

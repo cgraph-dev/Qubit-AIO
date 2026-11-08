@@ -40,6 +40,10 @@ _PASSTHROUGH_ENV = frozenset({
     "ProgramFiles", "ProgramFiles(x86)", "ProgramW6432", "ProgramData", "CommonProgramFiles",
     "CommonProgramFiles(x86)", "CommonProgramW6432", "USERNAME", "USERDOMAIN", "COMPUTERNAME",
     "PSModulePath", "LANG", "TZ",
+    # Hosted CI runs every step inside a Job Object that denies CREATE_BREAKAWAY_FROM_JOB; its
+    # job outlives this suite, so the contained (no-breakaway) gateway spawn is correct there.
+    # Unset on a normal Windows host, where the strict breakaway contract still applies.
+    "HERMES_WINDOWS_GATEWAY_ALLOW_BREAKAWAY_FALLBACK",
 })
 _SECRET_SUFFIXES = ("_API_KEY", "_TOKEN", "_SECRET", "_ACCESS_KEY")
 
@@ -71,6 +75,11 @@ class WinHome:
             "QUBIT_HOME": str(self.qubit_home),
             "PYTHONPATH": str(REPO_ROOT),
             "PYTHONUNBUFFERED": "1",
+            # Windows code-page territory: make the child interpret its console
+            # and pipes as UTF-8 even on an en-US runner (cp1252). Without this
+            # the ConPTY composer drops non-ASCII before prompt_toolkit sees it.
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
             "NO_COLOR": "1",
             # The child's state.db lives under tmp_path; under a pytest ancestor the live-DB
             # guard would refuse it. Documented child-process escape hatch (tests/conftest.py).

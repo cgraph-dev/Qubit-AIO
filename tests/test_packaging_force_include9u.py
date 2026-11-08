@@ -34,6 +34,10 @@ RUNTIME_TREES = {
         "voicebridge/_data/qubit_runtime/plugin-catalog",
     "qubit_runtime/acp_adapter":
         "voicebridge/_data/qubit_runtime/acp_adapter",
+    # The WhatsApp adapter resolves this tree beside the installed runtime and
+    # spawns the Node bridge from it; a clean wheel must not park WhatsApp.
+    "qubit_runtime/scripts/whatsapp-bridge":
+        "voicebridge/_data/qubit_runtime/scripts/whatsapp-bridge",
 }
 
 
@@ -72,6 +76,8 @@ def test_force_included_sources_exist_and_hold_their_runtime_payload():
     assert (REPO / "qubit_runtime/optional-mcps/n8n-official/manifest.yaml").is_file()
     assert any((REPO / "qubit_runtime/plugin-catalog").glob("*.yaml"))
     assert (REPO / "qubit_runtime/acp_adapter/entry.py").is_file()
+    assert (REPO / "qubit_runtime/scripts/whatsapp-bridge/package.json").is_file()
+    assert (REPO / "qubit_runtime/scripts/whatsapp-bridge/bridge.js").is_file()
 
 
 def test_mcp_and_plugin_catalog_reader_relative_resolution_hits_the_destination():

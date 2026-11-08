@@ -2,9 +2,10 @@
 
 Every file here drives the REAL user entry points on a real Windows runner:
 
-* ``scripts/install.ps1 -NonInteractive`` (this checkout's script, run as a file from a
-  directory that is not a project, like a user who downloaded it);
-* the ``hermes.exe`` it publishes in ``%LOCALAPPDATA%\\qubit\\bin`` for every later
+* ``qubit_runtime/scripts/install.ps1 -NonInteractive`` (the vendored runtime
+  installer inside the public checkout, run as a file from a directory that is not a
+  project, like a user who downloaded it);
+* the ``qubit`` launcher it publishes under ``%LOCALAPPDATA%\\qubit`` for every later
   command (``--version``, one-shot turns, ``gateway run/status/stop``, ``update``);
 * ``qubit update --yes`` from HEAD to NEXT, a synthetic child of HEAD.
 
@@ -65,16 +66,33 @@ from tests.e2e.core.windows._helpers import (
 )
 from tests.fakes.fake_llm_provider import write_qubit_home
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+
+def _git_root() -> Path:
+    """The enclosing checkout that owns the git history used by the harness."""
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / ".git").exists():
+            return parent
+    return here.parents[4]
+
+
+# The public Qubit seed vendors the runtime at qubit_runtime/ inside the
+# umbrella checkout, so the installer (the runtime's own full-ladder script)
+# and the git history resolve to different roots.
+INSTALL_ROOT = Path(__file__).resolve().parents[4]
+GIT_ROOT = _git_root()
 OPT_IN_ENV = "HERMES_E2E_WINDOWS_INSTALL"
 INSTALL_TIMEOUT = 1500.0
 UPDATE_TIMEOUT = 1200.0
 CMD_TIMEOUT = 300.0
 GATEWAY_READY_TIMEOUT = 240.0
+# The installers clone the public Qubit repository. Rewrite that origin to the
+# machine-owned bare clone so the install is hermetic, as it is for a user who
+# points QUBIT_REPO_URL at a mirror.
 CANONICAL_URLS = (
-    "https://github.com/NousResearch/hermes-agent.git",
-    "https://github.com/NousResearch/hermes-agent",
-    "git@github.com:NousResearch/hermes-agent.git",
+    "https://github.com/cgraph-dev/Qubit.git",
+    "https://github.com/cgraph-dev/Qubit",
+    "git@github.com:cgraph-dev/Qubit.git",
 )
 NEXT_MARKER = ".hermes-e2e-next"
 # Captured before any machine strips PATH: harness plumbing (serve.git, rev-parse) only.
@@ -173,15 +191,41 @@ class Machine:
 
     @property
     def qubit_home(self) -> Path:
-        return self.local / "hermes"
+        # The public Windows installer's default: %LOCALAPPDATA%\qubit.
+        return self.local / "qubit"
+
+    @property
+    def hermes_home(self) -> Path:
+        # Compatibility alias for the ported upstream assertions; the layout is
+        # the Qubit home above.
+        return self.qubit_home
 
     @property
     def install_dir(self) -> Path:
-        return self.qubit_home / "hermes-agent"
+        # -QubitHome drives -InstallDir unless -InstallDir is passed: a
+        # standalone install clones into <QUBIT_HOME>\qubit.
+        return self.qubit_home / "qubit"
+
+    @property
+    def qubit_exe(self) -> Path:
+        """The published command, preferring the canonical native launcher.
+
+        The source installer mints a native launcher under QUBIT_HOME\\bin; the
+        checkout installer's console script lives in the venv. Both are real
+        entry points, so pick whichever the install produced."""
+        for candidate in (
+            self.qubit_home / "bin" / "qubit.exe",
+            self.qubit_home / "venv" / "Scripts" / "qubit.exe",
+            self.qubit_home / "bin" / "qubit.cmd",
+        ):
+            if candidate.is_file():
+                return candidate
+        return self.qubit_home / "bin" / "qubit.exe"
 
     @property
     def hermes_exe(self) -> Path:
-        return self.qubit_home / "bin" / "hermes.exe"
+        # Compatibility alias for the ported upstream assertions.
+        return self.qubit_exe
 
     @property
     def serve(self) -> Path:
@@ -227,13 +271,13 @@ class Machine:
     def stage(self) -> None:
         """serve.git at HEAD (+ NEXT in its object store), the URL redirect, a seeded home."""
         self.root.mkdir(parents=True, exist_ok=True)
-        self.head = harness_git("-C", str(REPO_ROOT), "rev-parse", f"{self.base_ref}^{{commit}}" if self.base_ref else "HEAD")
-        harness_git("clone", "--bare", "--quiet", str(REPO_ROOT), str(self.serve))
+        self.head = harness_git("-C", str(GIT_ROOT), "rev-parse", f"{self.base_ref}^{{commit}}" if self.base_ref else "HEAD")
+        harness_git("clone", "--bare", "--quiet", str(GIT_ROOT), str(self.serve))
         harness_git("-C", str(self.serve), "update-ref", "refs/heads/main", self.head)
         harness_git("-C", str(self.serve), "symbolic-ref", "HEAD", "refs/heads/main")
         for key in ("uploadpack.allowAnySHA1InWant", "uploadpack.allowFilter"):
             harness_git("-C", str(self.serve), "config", key, "true")
-        self.next = (harness_git("-C", str(REPO_ROOT), "rev-parse", "HEAD") if self.base_ref else self._mint_next())
+        self.next = (harness_git("-C", str(GIT_ROOT), "rev-parse", "HEAD") if self.base_ref else self._mint_next())
         file_url = "file:///" + str(self.serve).replace("\\", "/")
         rewrites = "".join(f"\tinsteadOf = {url}\n" for url in CANONICAL_URLS)
         (self.root / "e2e-gitconfig").write_text(f'[url "{file_url}"]\n{rewrites}', encoding="utf-8")
@@ -391,22 +435,38 @@ class Machine:
     def install(self, *, as_user: bool = False) -> Run:
         """``powershell -File install.ps1 -NonInteractive`` from a directory that is no project.
 
-        With ``base_ref`` set it is that commit's install.ps1, the script that user downloaded then."""
+        It is the runtime installer inside the public checkout (``qubit_runtime/
+        scripts/install.ps1``), both for this tree and, with ``base_ref``, for the
+        older commit a user downloaded then. Keeping both sides on the same
+        installer family is what makes the upgrade journey comparable."""
+        runtime_installer = "qubit_runtime/scripts/install.ps1"
         script = self.root / "install.ps1"
         if self.base_ref:
-            raw = subprocess.run([REAL_GIT, "-C", str(self.serve), "show", f"{self.head}:scripts/install.ps1"],
-                                 env={k: v for k, v in os.environ.items() if not k.startswith("GIT_")},
-                                 capture_output=True, timeout=120, check=True).stdout
+            env = {k: v for k, v in os.environ.items() if not k.startswith("GIT_")}
+            raw = None
+            # The public seed nests the runtime; a pre-nesting commit kept the
+            # installer at the checkout root. Show the same one the current
+            # layout would run at that commit.
+            for rel in (runtime_installer, "scripts/install.ps1"):
+                shown = subprocess.run([REAL_GIT, "-C", str(self.serve), "show", f"{self.head}:{rel}"],
+                                       env=env, capture_output=True, timeout=120, check=False)
+                if shown.returncode == 0:
+                    raw = shown.stdout
+                    break
+            assert raw is not None, fail_with(self, f"commit {self.head} has no Windows installer")
             script.write_bytes(raw)
         else:
-            shutil.copyfile(REPO_ROOT / "scripts" / "install.ps1", script)
+            shutil.copyfile(INSTALL_ROOT / "scripts" / "install.ps1", script)
         cwd = self.root / "install-cwd"
         cwd.mkdir(parents=True, exist_ok=True)
         run = self._run_logged(
             ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script), "-NonInteractive"],
             "install", timeout=INSTALL_TIMEOUT, cwd=cwd,
-            # serve.git carries this checkout's release tags; install main, not the latest release.
-            env_extra={"HERMES_INSTALL_CHANNEL": "main"}, as_user=as_user)
+            # serve.git carries this checkout's release tags; install main, not
+            # the latest release. The root installer reads the canonical name;
+            # the vendored runtime installer still reads the legacy one.
+            env_extra={"QUBIT_INSTALL_CHANNEL": "main", "HERMES_INSTALL_CHANNEL": "main"},
+            as_user=as_user)
         if run.returncode == 0 and self.hermes_exe.is_file():
             # advance() lands NEXT on main and publishes no release: follow main, not the stable
             # default an official-origin checkout gets (channel resolution has its own suites).

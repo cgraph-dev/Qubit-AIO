@@ -36,7 +36,7 @@ from tests.fakes.fake_llm_provider import FakeLLMServer
 pytestmark = [pytest.mark.platforms("windows"), pytest.mark.integration,
               pytest.mark.live_system_guard_bypass, REQUIRES_OPT_IN]
 
-REFUSAL = "Another Hermes update is already running"
+REFUSAL = "Another Qubit update is already running"
 SURVIVAL_SECONDS = 30
 
 # Runs on the INSTALLED venv against the installed checkout's own update_lock. Degrades to the

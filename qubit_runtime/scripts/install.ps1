@@ -72,6 +72,10 @@ $script:BoundParams = $PSBoundParameters
 # Under iex, script scope is the caller's session and outlives a run; start
 # each run without the previous run's answer (see Set-LauncherUserPath).
 $script:BinDirOnCallerPath = $null
+# The checkout may be the umbrella (runtime nested at qubit_runtime/) or the
+# upstream layout (the checkout IS the runtime). Git operations stay at
+# $InstallDir; every runtime-relative read resolves through Get-RuntimeRoot.
+$script:RuntimeRoot = $null
 $RepoUrl = if ($env:QUBIT_REPO_URL) { $env:QUBIT_REPO_URL } elseif ($env:HERMES_REPO_URL) { $env:HERMES_REPO_URL } else { "https://github.com/cgraph-dev/Qubit.git" }
 
 # --- BEGIN GENERATED: bootstrap pins (scripts/gen-bootstrap-pins.py) ---
@@ -354,7 +358,29 @@ function Initialize-ResolvedPaths {
         temp              = $env:TEMP
         qubit_home       = $resolvedHome
         install_dir       = $resolvedDir
+        # A side-effect-free guess: the checkout may not exist yet (a
+        # standalone run clones it after this report). Get-RuntimeRoot runs
+        # again, uncached, once the checkout is present.
+        runtime_root      = $(if (Test-Path -LiteralPath (Join-Path $resolvedDir 'qubit_runtime\pm\lock.json')) { Join-Path $resolvedDir 'qubit_runtime' } else { $resolvedDir })
     }
+}
+
+# The runtime subtree inside the installed checkout. The public Qubit seed
+# vendors it at qubit_runtime/ under the umbrella repository; an upstream
+# layout checkout is the runtime itself. Resolve it once from the checkout
+# marker every runtime depends on (pm/lock.json) so nested installs read
+# qubit_runtime/pm/lock.json and qubit_runtime/qubit_cli, while git keeps
+# operating on $InstallDir (the checkout root).
+function Get-RuntimeRoot {
+    # Re-evaluated on every call (not cached): the standalone path resolves it
+    # before the clone and again after the checkout materializes.
+    $nested = Join-Path $InstallDir 'qubit_runtime'
+    if (Test-Path -LiteralPath (Join-Path $nested 'pm\lock.json')) {
+        $script:RuntimeRoot = $nested
+    } else {
+        $script:RuntimeRoot = $InstallDir
+    }
+    return $script:RuntimeRoot
 }
 
 # Resolve the pm store root (same resolution as pm's store_root()):
@@ -944,7 +970,12 @@ function Get-BootstrapPython {
     # this interpreter; resolve uv and Python once per process.
     if ($script:BootstrapPython) { return $script:BootstrapPython }
     $uv = Get-Uv
-    $lock = Get-Content (Join-Path $InstallDir "pm\lock.json") -Raw | ConvertFrom-Json
+    $runtimeRoot = Get-RuntimeRoot
+    $lockPath = Join-Path $runtimeRoot "pm\lock.json"
+    if (-not (Test-Path -LiteralPath $lockPath)) {
+        Fail "no pm/lock.json under $runtimeRoot; the checkout is not a Qubit runtime" dir_not_checkout
+    }
+    $lock = Get-Content -LiteralPath $lockPath -Raw | ConvertFrom-Json
     $pyPin = $lock.packages.python
     $pyVersion = if ($pyPin) { ($pyPin.version -split '\+')[0] -replace '^(\d+\.\d+).*', '$1' } else { '3.14' }
     # A bare version lets uv pick emulated x86_64 on Windows-on-ARM.
@@ -963,7 +994,7 @@ function Get-BootstrapPython {
 
 function Invoke-BootstrapPm {
     $bootPy = Get-BootstrapPython
-    Push-Location $InstallDir
+    Push-Location (Get-RuntimeRoot)
     try {
         # Finish bootstrap uv before PM replaces or cleans its store entry.
         # Bare $SkipBrowser, like $InstallDir: under iex/scriptblock entry the
@@ -991,9 +1022,10 @@ function Invoke-SourceCompletion([bool]$Desktop) {
     # arrive through pm as the build asks for them; the bootstrap interpreter
     # itself only re-enters the tree on PM's selected Python.
     $bootPy = Get-BootstrapPython
-    $completionArgs = @('-I', '-B', '-X', 'utf8', 'qubit_cli/source_completion.py', '--source', $InstallDir)
+    $runtimeRoot = Get-RuntimeRoot
+    $completionArgs = @('-I', '-B', '-X', 'utf8', 'qubit_cli/source_completion.py', '--source', $runtimeRoot)
     if ($Desktop) { $completionArgs += '--desktop' }
-    Push-Location $InstallDir
+    Push-Location $runtimeRoot
     try {
         Invoke-Logged "Building the qubit command and apps" { & $bootPy @completionArgs }
         $code = $LASTEXITCODE
@@ -1011,7 +1043,7 @@ function Publish-UserCommand {
     # the user's PATH points at.
     $binDir = Join-Path $QubitHome "bin"
     $bootPy = Get-BootstrapPython
-    Push-Location $InstallDir
+    Push-Location (Get-RuntimeRoot)
     try {
         Invoke-Logged "Publishing the qubit command" { & $bootPy -I -X utf8 qubit_cli/_launchers.py $binDir }
         $code = $LASTEXITCODE
@@ -1031,7 +1063,7 @@ function Test-DesktopProductPresent {
     # electron-builder suffixes the output dir with the arch on every non-x64
     # target (win-arm64-unpacked, linux-arm64-unpacked, mac-arm64), so the x64
     # names alone miss a desktop build on ARM64 (#94703).
-    $release = Join-Path $InstallDir "apps/desktop/release"
+    $release = Join-Path (Get-RuntimeRoot) "apps/desktop/release"
     foreach ($candidate in @("win-unpacked", "win-ia32-unpacked", "win-arm64-unpacked",
                              "linux-unpacked", "linux-arm64-unpacked", "mac", "mac-arm64")) {
         if (Test-Path (Join-Path $release $candidate)) { return $true }
@@ -1077,13 +1109,18 @@ function Stage-Config {
     foreach ($d in @("cron","sessions","logs","pairing","hooks","image_cache","audio_cache","memories","skills")) {
         New-Item -ItemType Directory -Force -Path (Join-Path $QubitHome $d) | Out-Null
     }
+    $runtimeRoot = Get-RuntimeRoot
     $envFile = Join-Path $QubitHome ".env"
     if (-not (Test-Path $envFile)) {
+        # The umbrella keeps .env.example at its root; the upstream layout keeps
+        # it in the runtime tree. Accept either.
         $example = Join-Path $InstallDir ".env.example"
+        if (-not (Test-Path $example)) { $example = Join-Path $runtimeRoot ".env.example" }
         if (Test-Path $example) { Copy-Item $example $envFile } else { New-Item -ItemType File -Path $envFile | Out-Null }
     }
     $cfg = Join-Path $QubitHome "config.yaml"
-    $cfgExample = Join-Path $InstallDir "cli-config.yaml.example"
+    $cfgExample = Join-Path $runtimeRoot "cli-config.yaml.example"
+    if (-not (Test-Path $cfgExample)) { $cfgExample = Join-Path $InstallDir "cli-config.yaml.example" }
     if (-not (Test-Path $cfg) -and (Test-Path $cfgExample)) { Copy-Item $cfgExample $cfg }
     Write-Ok "config prepared in $QubitHome"
 }
@@ -1093,7 +1130,8 @@ function Invoke-InstalledQubit([string[]]$CommandArgs) {
     # installer runs as a string that execution policy never checks, but
     # dot-sourcing a .ps1 from disk is a file load. The default Restricted
     # policy (Windows Sandbox, fresh machines) refuses that load.
-    $runtimeHelper = Join-Path $InstallDir 'scripts/desktop-update/runtime.ps1'
+    $runtimeHelper = Join-Path (Get-RuntimeRoot) 'scripts/desktop-update/runtime.ps1'
+    if (-not (Test-Path -LiteralPath $runtimeHelper)) { $runtimeHelper = Join-Path $InstallDir 'scripts/desktop-update/runtime.ps1' }
     . ([ScriptBlock]::Create([IO.File]::ReadAllText($runtimeHelper)))
     # Not `$command`: Invoke-Native's `$Command` parameter shadows it
     # (names are case-insensitive) and the block would invoke itself.
@@ -1127,9 +1165,10 @@ function Stage-Desktop {
 function Confirm-DesktopArtifact {
     # Probe the packaged artifact the completion just built -- the same
     # candidates qubit_cli/main_desktop._desktop_packaged_executable resolves.
-    Push-Location $InstallDir
+    $runtimeRoot = Get-RuntimeRoot
+    Push-Location $runtimeRoot
     try {
-        $desktopDir = Join-Path $InstallDir "apps\desktop"
+        $desktopDir = Join-Path $runtimeRoot "apps\desktop"
         $candidates = @(
             (Join-Path $desktopDir "release\win-unpacked\Qubit.exe"),
             (Join-Path $desktopDir "release\win-ia32-unpacked\Qubit.exe"),

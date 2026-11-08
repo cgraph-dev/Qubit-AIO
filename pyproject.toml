@@ -1,6 +1,6 @@
 [project]
 name = "qubit-voicebridge"
-version = "0.0.10"
+version = "0.0.14"
 description = "Qubit Agent (Qubit VoiceBridge) — local push-to-talk voice agent: Moonshine ASR, Silero VAD, voice-ID, local LLM, piper TTS — 5 GB VRAM budget."
 readme = "README.md"
 # The project's own LICENSE is the Qubit VoiceBridge Educational Project
@@ -305,6 +305,9 @@ path = "scripts/hatch_build_qubit.py"
 # mappings a clean wheel cannot import either path.
 "qubit_runtime/scripts/releases" = "voicebridge/_data/qubit_runtime/scripts/releases"
 "qubit_runtime/scripts/bundles" = "voicebridge/_data/qubit_runtime/scripts/bundles"
+# The WhatsApp adapter resolves this tree beside the installed runtime and runs
+# the Node bridge from it; the source archive has it but the wheel must too.
+"qubit_runtime/scripts/whatsapp-bridge" = "voicebridge/_data/qubit_runtime/scripts/whatsapp-bridge"
 # ``voicebridge/communications/monitor.py`` imports ``scripts.browser_auto`` (the
 # guarded CDP launch helper) off the same fork root. In a checkout the repo root
 # precedes the fork root on ``sys.path`` so the module resolves from the repo
@@ -685,6 +688,7 @@ exclude = [
 # wheel rebuilt from the sdist loses both paths.
 "qubit_runtime/scripts/releases" = "qubit_runtime/scripts/releases"
 "qubit_runtime/scripts/bundles" = "qubit_runtime/scripts/bundles"
+"qubit_runtime/scripts/whatsapp-bridge" = "qubit_runtime/scripts/whatsapp-bridge"
 "qubit_runtime/batch_runner.py" = "qubit_runtime/batch_runner.py"
 "qubit_runtime/cli.py" = "qubit_runtime/cli.py"
 "qubit_runtime/qubit_bootstrap.py" = "qubit_runtime/qubit_bootstrap.py"

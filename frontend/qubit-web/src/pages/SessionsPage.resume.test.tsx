@@ -171,7 +171,9 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root?.unmount());
   container?.remove();
-  vi.unstubAllGlobals();
+  // Keep the frame primitives installed for the life of the file: GSAP can
+  // schedule one ticker callback after unmount, and removing them first is a
+  // load-dependent unhandled ReferenceError.
 });
 
 describe("SessionsPage resume routing", () => {
