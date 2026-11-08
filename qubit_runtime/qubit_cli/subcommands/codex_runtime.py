@@ -38,7 +38,7 @@ def build_codex_runtime_parser(subparsers) -> None:
             "~/.codex/config.toml for the selected profile.")
     actions = parser.add_subparsers(dest="codex_runtime_action")
     migrate_parser = actions.add_parser(
-        "migrate", help="Regenerate the hermes-managed block in codex's config.toml",
+        "migrate", help="Regenerate the Qubit-managed block in codex's config.toml",
         description="Idempotent: replaces the managed block, keeps user text verbatim, skips Qubit "
             "servers whose name the user already declares outside the block, validates the result "
             "as TOML before writing atomically.")
