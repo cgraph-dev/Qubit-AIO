@@ -311,8 +311,8 @@ function applyTheme(theme: DesktopTheme, mode: 'light' | 'dark', chatFontFamily 
   // they let a brand-new window paint the themed background on its very first
   // frame, before this module has even loaded.
   try {
-    window.localStorage.setItem('hermes-boot-background', chromeBg)
-    window.localStorage.setItem('hermes-boot-color-scheme', rendered)
+    window.localStorage.setItem('qubit-boot-background', chromeBg)
+    window.localStorage.setItem('qubit-boot-color-scheme', rendered)
   } catch {
     // Storage may be unavailable (private mode / quota); the inline script
     // falls back to prefers-color-scheme.

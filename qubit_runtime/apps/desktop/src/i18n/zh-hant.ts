@@ -270,7 +270,7 @@ export const zhHant = defineLocale({
     doneDescription: '偵錯套件已私密上傳。在您的支援討論串中分享以下連結，團隊即可檢視您的日誌。',
     failedTitle: '上傳失敗',
     failedHint:
-      '您也可以在終端機執行 `hermes debug share --nous`，或執行 `hermes debug share --local` 在不上傳的情況下檢視報告。',
+      '您也可以在終端機執行 `qubit debug share --qubit`，或執行 `qubit debug share --local` 在不上傳的情況下檢視報告。',
     handoffLead: '在以下位置繼續討論:',
     links: {
       github: 'GitHub Issues',

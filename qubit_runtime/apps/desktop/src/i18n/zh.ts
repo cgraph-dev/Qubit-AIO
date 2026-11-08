@@ -310,7 +310,7 @@ export const zh = defineLocale({
     doneDescription: '调试包已私密上传。在您的支持会话中分享以下链接，团队即可查看您的日志。',
     failedTitle: '上传失败',
     failedHint:
-      '您也可以在终端运行 `hermes debug share --nous`，或运行 `hermes debug share --local` 在不上传的情况下查看报告。',
+      '您也可以在终端运行 `qubit debug share --qubit`，或运行 `qubit debug share --local` 在不上传的情况下查看报告。',
     handoffLead: '在以下位置继续讨论:',
     links: {
       github: 'GitHub Issues',

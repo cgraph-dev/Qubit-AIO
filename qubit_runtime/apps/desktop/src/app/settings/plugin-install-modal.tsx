@@ -185,7 +185,7 @@ export function PluginInstallModal() {
       ? m.agentTargetRemote(targetProfileLabel)
       : m.agentTargetLocal(
           targetProfileLabel,
-          targetProfile === 'default' ? '~/.hermes/plugins/' : `~/.hermes/profiles/${targetProfile}/plugins/`
+          targetProfile === 'default' ? '~/.qubit/plugins/' : `~/.qubit/profiles/${targetProfile}/plugins/`
         )
 
   // A unified package installed into a local backend carries its own desktop

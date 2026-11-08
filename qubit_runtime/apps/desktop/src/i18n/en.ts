@@ -638,7 +638,7 @@ export const en: Translations = {
       'Your bundle was uploaded privately. Share the link below in your support thread so the team can see your logs.',
     failedTitle: 'Upload failed',
     failedHint:
-      'You can also run `qubit debug share --nous` from a terminal, or `qubit debug share --local` to print the report without uploading.',
+      'You can also run `qubit debug share --qubit` from a terminal, or `qubit debug share --local` to print the report without uploading.',
     handoffLead: 'Pick up the discussion in:',
     links: {
       github: 'GitHub Issues',
@@ -1952,11 +1952,11 @@ export const en: Translations = {
       usageLabel: label => `${label} usage`,
       freeTier: {
         signIn: 'Sign in',
-        title: "You're on the Nous free tier",
+        title: "You're on the Qubit free tier",
         message: 'Sign in with a Qubit account to unlock more models and tools.',
         caption:
           'Runs on nous/welcome with connectors included. Signing in keeps your connectors and adds the tools that need an account and every other model.',
-        name: 'Nous · free tier',
+        name: 'Qubit · free tier',
         footnote:
           'The free tier has no balance and nothing to pay. Payment and usage appear when you sign in with a Qubit account.',
         plan: 'Free tier',
@@ -2066,7 +2066,7 @@ export const en: Translations = {
       state: {
         notice: {
           loggedOut: {
-            title: 'Connect your Nous account',
+            title: 'Connect your Qubit account',
             message: 'Sign in with your Qubit account to see your balance, plan and usage here.',
             action: 'Sign in'
           },
@@ -4499,7 +4499,7 @@ export const en: Translations = {
   },
 
   freeTier: {
-    providerRowTitle: 'Nous · free tier',
+    providerRowTitle: 'Qubit · free tier',
     providerRowPitch: 'Sign in with a Qubit account to unlock more models and tools.',
     readyTitle: 'Qubit is ready.',
     readyCaption: 'Free · connectors included',

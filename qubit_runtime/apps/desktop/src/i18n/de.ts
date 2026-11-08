@@ -604,7 +604,7 @@ export const deOverrides = {
       'Ihr Paket wurde privat hochgeladen. Teilen Sie den Link unten in Ihrem Support-Thread, damit das Team Ihre Logs sehen kann.',
     failedTitle: 'Hochladen fehlgeschlagen',
     failedHint:
-      'Sie können auch `hermes debug share --nous` im Terminal ausführen oder `hermes debug share --local`, um den Bericht ohne Hochladen auszugeben.',
+      'Sie können auch `qubit debug share --qubit` im Terminal ausführen oder `qubit debug share --local`, um den Bericht ohne Hochladen auszugeben.',
     handoffLead: 'Diskussion hier fortsetzen:',
     links: {
       github: 'GitHub Issues',

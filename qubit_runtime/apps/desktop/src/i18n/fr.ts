@@ -603,7 +603,7 @@ export const frOverrides = {
       "Votre paquet a été téléversé de manière privée. Partagez le lien ci-dessous dans votre fil d'assistance afin que l'équipe puisse consulter vos journaux.",
     failedTitle: "Échec de l'envoi",
     failedHint:
-      'Vous pouvez également exécuter `hermes debug share --nous` dans un terminal, ou `hermes debug share --local` pour afficher le rapport sans le téléverser.',
+      'Vous pouvez également exécuter `qubit debug share --qubit` dans un terminal, ou `qubit debug share --local` pour afficher le rapport sans le téléverser.',
     handoffLead: 'Poursuivez la discussion sur :',
     links: {
       github: 'Issues GitHub',

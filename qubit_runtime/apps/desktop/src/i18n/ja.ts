@@ -279,7 +279,7 @@ export const ja = defineLocale({
       'バンドルは非公開でアップロードされました。サポートスレッドで以下のリンクを共有すると、チームがログを確認できます。',
     failedTitle: 'アップロードに失敗しました',
     failedHint:
-      'ターミナルから `hermes debug share --nous` を実行するか、`hermes debug share --local` でアップロードせずにレポートを表示することもできます。',
+      'ターミナルから `qubit debug share --qubit` を実行するか、`qubit debug share --local` でアップロードせずにレポートを表示することもできます。',
     handoffLead: '続きは次の場所で:',
     links: {
       github: 'GitHub Issues',

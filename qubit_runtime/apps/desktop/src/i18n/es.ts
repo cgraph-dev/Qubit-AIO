@@ -604,7 +604,7 @@ export const esOverrides = {
       'Tu paquete se subió de forma privada. Comparte el enlace de abajo en tu hilo de soporte para que el equipo pueda ver tus registros.',
     failedTitle: 'Error al subir',
     failedHint:
-      'También puedes ejecutar `hermes debug share --nous` desde una terminal, o `hermes debug share --local` para mostrar el informe sin subirlo.',
+      'También puedes ejecutar `qubit debug share --qubit` desde una terminal, o `qubit debug share --local` para mostrar el informe sin subirlo.',
     handoffLead: 'Continúa la conversación en:',
     links: {
       github: 'Issues de GitHub',
