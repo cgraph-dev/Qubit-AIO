@@ -141,3 +141,19 @@ test('code-skew 503 unwraps to a restart-required summary, not raw IPC JSON', ()
   $notifications.get()[0]?.action?.onClick()
   expect($backendRestartRequest.get()).toBe(before + 1)
 })
+
+// The reported dialog: an ipcMain.handle('hermes:connection') rejection whose
+// inner text has no "Error: " label reached the user with the channel name
+// above it. readableError is the seam every error toast/dialog goes through.
+test('a bare hermes:connection IPC rejection surfaces no channel name', () => {
+  notifyError(
+    new Error(
+      "Error invoking remote method 'hermes:connection': Setting up Qubit stopped before it could finish."
+    ),
+    'Connection failed'
+  )
+
+  expect(lastMessage()).toBe('Setting up Qubit stopped before it could finish.')
+  expect(lastMessage()).not.toMatch(/hermes|remote method/i)
+})
+

@@ -5,6 +5,7 @@ import { translateNow, type Translations } from '@/i18n'
 import type { ChatMessage } from '@/lib/chat-messages'
 import { isReadFileErrorResult } from '@/lib/desktop-fs'
 import { type CommandsCatalogLike, filterDesktopCommandsCatalog } from '@/lib/desktop-slash-commands'
+import { ipcErrorMessage } from '@/lib/ipc-error-copy'
 import { isProviderSetupErrorMessage } from '@/lib/provider-setup-errors'
 import type { ComposerAttachment } from '@/store/composer'
 
@@ -45,9 +46,9 @@ export function isProviderSetupError(error: unknown) {
 }
 
 export function inlineErrorMessage(error: unknown, fallback: string): string {
-  const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : fallback
+  const raw = ipcErrorMessage(error, fallback)
 
-  return (raw.match(/Error invoking remote method '[^']+': Error: (.+)$/)?.[1] ?? raw).replace(/^Error:\s*/, '').trim()
+  return raw.replace(/^Error:\s*/, '').trim()
 }
 
 export function isSessionNotFoundError(error: unknown): boolean {

@@ -1497,7 +1497,23 @@ def main() -> int:
             print(f"error: --slice must be I/N (e.g. 1/4), got: {slice_raw!r}", file=sys.stderr)
             sys.exit(2)
 
-    repo_root = Path(__file__).resolve().parent.parent
+    # The test tree lives at the checkout root, not beside this script. This
+    # file is qubit_runtime/scripts/run_tests_parallel.py, so two parents up is
+    # qubit_runtime/ — which also contains a qubit_runtime/tests/ directory of
+    # its own (84 files against the root tree's 1000+). Resolving to the nearer
+    # parent made every named path resolve under the wrong tree, so
+    # `run_tests.sh tests/foo.py` failed with "no such test path" for a file
+    # that plainly exists, and a bare run silently exercised the minority tree.
+    #
+    # Prefer the checkout root (the parent that owns a tests/ directory AND is a
+    # git worktree root); fall back to the script's own ancestry for the
+    # vendored layout where qubit_runtime/ really is the root.
+    _script_dir = Path(__file__).resolve().parent
+    repo_root = next(
+        (root for root in (_script_dir.parent.parent, _script_dir.parent)
+         if (root / 'tests').is_dir()),
+        _script_dir.parent,
+    )
 
     files, roots = _select_files(args, pytest_passthrough, repo_root)
 
