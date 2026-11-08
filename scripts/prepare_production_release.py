@@ -163,7 +163,7 @@ def check_tag(repo: Path, tag: str) -> dict:
     checkout of a tag).
     """
     proc = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", tag],
+        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"{tag}^{{commit}}"],
         capture_output=True,
         text=True,
         check=False,
