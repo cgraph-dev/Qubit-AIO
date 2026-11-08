@@ -1,9 +1,16 @@
 name: release
 
-# Tag-driven release build. This workflow builds and verifies the artifacts and
-# creates a DRAFT GitHub release only. It never publishes, never uploads to a
-# package registry, and never uses repository secrets. A human must approve the
-# `release` environment (draft step) and publish the release manually.
+# Tag-driven release build. This workflow builds and verifies the COMPLETE
+# production asset set (wheel/sdist/source, bootstraps, installers, manifests,
+# notes and a checksum file covering all of them) and creates a DRAFT GitHub
+# release only. It never publishes, never uploads to a package registry, and
+# never uses repository secrets. A human must approve the `release` environment
+# (draft step) and publish the release manually.
+#
+# Asset composition is owned by scripts/prepare_production_release.py and the
+# canonical set is declared in scripts/release_assets.py. Do not replace this
+# with a wheel/sdist-only upload: a partial upload rewrites SHA256SUMS and
+# destroys the complete asset set of an existing release.
 on:
   push:
     tags:
@@ -24,7 +31,7 @@ concurrency:
 
 jobs:
   build:
-    name: Build and verify release artifacts
+    name: Build and verify the complete release asset set
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -35,6 +42,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
+          # A dispatch rebuilds an EXISTING tag; a tag push checks out that tag.
+          # Never check out a branch here: the release must be built from the
+          # tagged commit, and prepare_production_release.py refuses a tag that
+          # does not point at HEAD.
+          ref: ${{ inputs.tag && format('refs/tags/{0}', inputs.tag) || github.ref }}
           fetch-depth: 0
       - name: Resolve the release tag
         id: tag
@@ -66,74 +78,72 @@ jobs:
         # The fresh-install gate imports PyYAML from the product's runtime
         # configuration path; it is not part of the bare runner image.
         run: python -m pip install --upgrade pip build uv && python -m pip install -e ".[test]"
-      - name: Enforce the fresh-install release gate
-        # Refuse the release unless a fresh install produces a root config.yaml
-        # with the default Ollama provider, the dashboard/TUI bundle is
-        # packaged, and the POSIX + Windows release assets exist. A DEGRADED
-        # result is a failure here (the release cannot be certified).
-        run: |
-          set -euo pipefail
-          python scripts/release_fresh_install_gate.py \
-            --repo . --fresh-install --require-fresh-install --json
-      - name: Build, install, and reproduce artifacts
+      - name: Prepare and verify the complete production release asset set
+        # One owner for asset composition. This runs the canonical release
+        # qualifier (build+install+reproduce), the fresh-install gate, the
+        # source export, both bootstrap/installer pairs, the archives, the
+        # component manifest, the release notes, the gate report, the summary
+        # and a SHA256SUMS covering all of them. It never creates or moves a
+        # tag and never publishes.
         env:
           TAG: ${{ inputs.tag || github.ref_name }}
+          OUT: ${{ runner.temp }}/qubit-production-release
         run: |
-          set -o pipefail
-          mkdir -p dist
-          python scripts/release_qualify.py \
-            --build --install --reproduce --unsigned-ok --json \
-            --tag "$TAG" --out dist/release \
-            | tee dist/release-report.json
+          set -euo pipefail
+          rm -rf "$OUT"
+          python scripts/prepare_production_release.py \
+            --out "$OUT" --tag "$TAG" --verify
+      - name: Stage and verify the complete asset set
+        # Stage only the assets declared in scripts/release_assets.py and write
+        # a manifest the draft job can verify without checking out the repo.
+        env:
+          OUT: ${{ runner.temp }}/qubit-production-release
+          ASSETS: ${{ runner.temp }}/release-assets
+          MANIFEST: ${{ runner.temp }}/release-assets-manifest.json
+        run: |
+          set -euo pipefail
+          rm -rf "$ASSETS" "$MANIFEST"
+          python scripts/release_assets.py \
+            --source "$OUT" --dest "$ASSETS" --manifest "$MANIFEST"
+          python scripts/release_assets.py \
+            --check "$ASSETS" --manifest "$MANIFEST"
       - name: Report the release verdict
         if: always()
+        env:
+          OUT: ${{ runner.temp }}/qubit-production-release
         run: |
           python - <<'PY'
           import json
           import os
           import pathlib
 
-          path = pathlib.Path("dist/release-report.json")
+          path = pathlib.Path(os.environ["OUT"]) / "release-summary.json"
           if not path.is_file():
-              print("no release report produced")
-              raise SystemExit(1)
-          report = json.loads(path.read_text())
-          version = report.get("version_identity", {})
+              print("no release summary produced")
+              raise SystemExit(0)
+          summary = json.loads(path.read_text())
+          version = summary.get("version")
           lines = [
-              f"verdict: {report.get('verdict')}",
-              f"tree: {report.get('tree', {}).get('state')}",
-              "version: tag={tag} pyproject={pyproject} package={package} "
-              "state={state}".format(
-                  tag=version.get("tag"),
-                  pyproject=version.get("pyproject_version"),
-                  package=version.get("package_version"),
-                  state=version.get("state"),
-              ),
+              f"version: {summary.get('tag')} ({version})",
+              f"state: {summary.get('state')}",
+              f"assets: {len(summary.get('assets', []))}",
           ]
-          for name, step in report.get("steps", {}).items():
-              lines.append(f"{name}: {step.get('state', '?')}")
+          for name, state in (summary.get("verification") or {}).items():
+              lines.append(f"{name}: {state}")
           text = "\n".join(lines)
           print(text)
-          summary = os.environ.get("GITHUB_STEP_SUMMARY")
-          if summary:
-              with open(summary, "a", encoding="utf-8") as fh:
+          step_summary = os.environ.get("GITHUB_STEP_SUMMARY")
+          if step_summary:
+              with open(step_summary, "a", encoding="utf-8") as fh:
                   fh.write("```\n" + text + "\n```\n")
           PY
-      - name: Write SHA256SUMS
-        run: |
-          set -euo pipefail
-          cd dist/release/build1
-          sha256sum ./*.whl ./*.tar.gz > ../../SHA256SUMS
-          cat ../../SHA256SUMS
-      - name: Upload verified artifacts
+      - name: Upload the complete verified asset set
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: release-dist
+          name: release-assets
           path: |
-            dist/release/build1/*.whl
-            dist/release/build1/*.tar.gz
-            dist/SHA256SUMS
-            dist/release-report.json
+            ${{ runner.temp }}/release-assets/
+            ${{ runner.temp }}/release-assets-manifest.json
           if-no-files-found: error
           retention-days: 30
 
@@ -143,16 +153,54 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Manual approval gate. Do not add secrets here. Publishing is intentionally
-    # absent: the only write is creating/updating a draft release.
+    # absent: the only write is creating/updating a DRAFT release carrying the
+    # complete asset set.
     environment: release
     permissions:
       contents: write
     steps:
-      - name: Download verified artifacts
+      - name: Download the complete verified asset set
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
-          name: release-dist
+          name: release-assets
           path: release-dist
+      - name: Verify the complete asset set before touching a release
+        # The build job already staged and checked this set. Re-verify here so
+        # an incomplete or corrupted artifact can never overwrite SHA256SUMS.
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path("release-dist")
+          manifest_path = root / "release-assets-manifest.json"
+          assets_dir = root / "release-assets"
+          if not manifest_path.is_file() or not assets_dir.is_dir():
+              print("::error::complete release asset artifact is missing")
+              raise SystemExit(1)
+          manifest = json.loads(manifest_path.read_text())
+          required = manifest.get("required") or []
+          expected = {entry["name"]: entry["sha256"]
+                      for entry in manifest.get("assets", [])}
+          missing = [name for name in required if name not in expected]
+          files = {path.name: path for path in assets_dir.iterdir() if path.is_file()}
+          missing_files = sorted(name for name in expected if name not in files)
+          mismatched = []
+          for name, digest in expected.items():
+              path = files.get(name)
+              if path is None:
+                  continue
+              actual = hashlib.sha256(path.read_bytes()).hexdigest()
+              if actual != digest:
+                  mismatched.append(name)
+          if missing or missing_files or mismatched:
+              print("::error::incomplete release asset set: missing=%s missing_files=%s mismatched=%s"
+                    % (missing, missing_files, mismatched))
+              raise SystemExit(1)
+          print("verified %d complete release assets" % len(expected))
+          PY
       - name: Create or update the draft release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -164,17 +212,33 @@ jobs:
             v*) ;;
             *) echo "::error::invalid release tag: $TAG"; exit 1 ;;
           esac
-          mapfile -t assets < <(find release-dist -type f \
-            \( -name '*.whl' -o -name '*.tar.gz' -o -name 'SHA256SUMS' \) -print)
-          test "${#assets[@]}" -ge 3
+          shopt -s nullglob
+          assets=(release-dist/release-assets/*)
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "::error::no release assets staged"
+            exit 1
+          fi
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$TAG" "${assets[@]}" --repo "$GITHUB_REPOSITORY" --clobber
-            echo "updated existing draft/release $TAG with verified assets"
+            draft="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" \
+                      --json isDraft --jq '.isDraft')"
+            if [ "$draft" != "true" ]; then
+              # Never clobber a published release (and never replace its
+              # complete SHA256SUMS with a partial one).
+              echo "::error::release $TAG is published; refusing to modify it"
+              exit 1
+            fi
+            gh release edit "$TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "Qubit ${TAG#v}" \
+              --notes-file release-dist/release-assets/release-notes.md
+            gh release upload "$TAG" "${assets[@]}" \
+              --repo "$GITHUB_REPOSITORY" --clobber
+            echo "updated existing draft release $TAG with the complete asset set"
           else
             gh release create "$TAG" "${assets[@]}" \
               --repo "$GITHUB_REPOSITORY" \
-              --draft \
+              --draft --verify-tag \
               --title "Qubit ${TAG#v}" \
-              --notes "Draft release built from ${GITHUB_SHA}. Publishing requires a manual, approved release step; this workflow never publishes."
-            echo "created draft release $TAG"
+              --notes-file release-dist/release-assets/release-notes.md
+            echo "created draft release $TAG with the complete asset set"
           fi
