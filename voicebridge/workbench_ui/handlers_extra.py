@@ -754,8 +754,38 @@ def onboarding_status(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     # ``settings`` was absent. Qubit has no single global default workspace (the
     # workspace is a per-turn choice), so the honest value is the empty string
     # with no last workspace — the client's own ``|| ''`` fallbacks then apply.
-    return 200, {"ok": True, "complete": ready, "needs_onboarding": not ready,
-                 "detail": why, "steps": [],
+    #
+    # THE GATE KEY IS ``completed``, NOT ``complete``. The client opens the
+    # first-run overlay on ``ONBOARDING.active = !status.completed``
+    # (onboarding.js:465). This handler shipped only ``complete``, so on a box
+    # where a turn was plainly possible (``complete: true``) the wizard still
+    # covered the whole page in Chrome and "Qubit Agent is not fully available
+    # yet" was painted over a live agent. ``completed`` is emitted alongside
+    # ``complete`` (both true only when a turn really is possible) and the
+    # ``system`` block the wizard renders (``system.qubit_wb_found``,
+    # ``imports_ok``, ``chat_ready``, ``provider_configured``) is filled from the
+    # same readiness fact, so a genuinely not-ready box still shows the wizard
+    # with truthful status instead of "Unknown".
+    model = ""
+    try:
+        from .. import chat_transport as CT
+
+        model = str(CT.configured_model(cfg) or "")
+    except Exception:  # noqa: BLE001 - readiness already reported the failure
+        model = ""
+    system_detail = {
+        "qubit_wb_found": ready,
+        "imports_ok": ready,
+        "chat_ready": ready,
+        "provider_configured": bool(model),
+        "current_model": model or None,
+        "current_provider": _ready_provider(model),
+        "config_path": None,
+        "env_path": None,
+    }
+    return 200, {"ok": True, "complete": ready, "completed": ready,
+                 "needs_onboarding": not ready,
+                 "detail": why, "steps": [], "system": system_detail,
                  "settings": {"default_workspace": "", "default_model": _ready_model(cfg)},
                  "workspaces": {"available": [], "last": ""},
                  "upstream": UPSTREAM_PIN}
@@ -846,6 +876,17 @@ def _ready_model(cfg: Any) -> str:
         return str(CT.configured_model(cfg) or "")
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _ready_provider(model: str) -> Optional[str]:
+    """The provider half of ``"provider/model"``, or None when it is not there.
+
+    ``configured_model`` returns the string the turn path resolves; splitting it
+    is a READ of that string, not a second resolution — no provider is invented
+    for a model id that carries no prefix.
+    """
+    parts = str(model or "").split("/", 1)
+    return parts[0] if len(parts) == 2 and parts[0] else None
 
 
 def _agent_ready(cfg: Any) -> Tuple[bool, str]:
