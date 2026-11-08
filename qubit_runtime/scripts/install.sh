@@ -924,6 +924,7 @@ stage_repository() {
                 fi
             fi
             git -C "$staged/tree" merge-base --is-ancestor "$INSTALL_COMMIT" "origin/$BRANCH" 2>/dev/null \
+                || git -C "$staged/tree" merge-base --is-ancestor "$INSTALL_COMMIT" "refs/qubit-seed/$BRANCH" 2>/dev/null \
                 || commit_is_on_branch "$staged/tree" "$INSTALL_COMMIT" \
                 || { rm -rf "$staged"; fail "commit $INSTALL_COMMIT is not on branch $BRANCH" commit_not_on_branch; }
             cloned=false
