@@ -65,7 +65,22 @@ from tests.e2e.core.windows._helpers import (
 )
 from tests.fakes.fake_llm_provider import write_qubit_home
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
+
+def _repo_root() -> Path:
+    """The checkout root that owns ``scripts/install.ps1``.
+
+    In the upstream layout the vendored runtime is the repository root; in the
+    public Qubit seed it is ``qubit_runtime/`` inside the umbrella repository.
+    Resolve the enclosing git checkout instead of assuming a fixed depth.
+    """
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / ".git").exists():
+            return parent
+    return here.parents[4]
+
+
+REPO_ROOT = _repo_root()
 OPT_IN_ENV = "HERMES_E2E_WINDOWS_INSTALL"
 INSTALL_TIMEOUT = 1500.0
 UPDATE_TIMEOUT = 1200.0
