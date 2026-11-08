@@ -38,6 +38,7 @@ jobs:
         env:
           HERMES_E2E_STRICT_ACCEPTANCE: ${{ inputs.strict_acceptance }}
           HERMES_E2E_ARTIFACTS: ${{ runner.temp }}/qubit-e2e-artifacts
+          HERMES_E2E_WINDOWS_INSTALL: "1"
           QUBIT_E2E_WINDOWS_INSTALL: "1"
         run: >
           python -m pytest -q -p no:cacheprovider -m platforms
