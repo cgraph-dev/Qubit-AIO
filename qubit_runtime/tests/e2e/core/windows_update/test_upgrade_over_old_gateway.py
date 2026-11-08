@@ -72,7 +72,7 @@ def _gateway_files(m: Machine) -> list[Path]:
     lock_dir = m.profile / ".local" / "state" / "hermes" / "gateway-locks"
     if lock_dir.is_dir():
         paths += [lock_dir, *sorted(lock_dir.iterdir())]
-    skip = {"hermes-agent", "tools", "bin"}  # code and toolchain: read+execute (test_paths_and_acls.py)
+    skip = {"qubit", "tools", "bin"}  # code and toolchain: read+execute (test_paths_and_acls.py)
     paths += [p for p in sorted(home.iterdir()) if p.name not in skip]
     seen, out = set(), []
     for p in paths:

@@ -163,7 +163,7 @@ def check_tag(repo: Path, tag: str) -> dict:
     checkout of a tag).
     """
     proc = subprocess.run(
-        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", tag],
+        ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"{tag}^{{commit}}"],
         capture_output=True,
         text=True,
         check=False,
@@ -579,17 +579,37 @@ def _release_notes(release: dict, tree: dict, artifacts: list[dict]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _asset_records(assets: list[Path]) -> list[dict]:
+    return [
+        {"name": path.name, "sha256": sha256(path), "size_bytes": path.stat().st_size}
+        for path in assets
+    ]
+
+
 def _write_sha256sums(assets: list[Path], target: Path) -> list[dict]:
-    records = []
-    lines = []
-    for path in assets:
-        digest = sha256(path)
-        records.append(
-            {"name": path.name, "sha256": digest, "size_bytes": path.stat().st_size}
-        )
-        lines.append("%s  %s" % (digest, path.name))
-    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    records = _asset_records(assets)
+    target.write_text(
+        "\n".join("%s  %s" % (record["sha256"], record["name"])
+                  for record in records) + "\n",
+        encoding="utf-8",
+    )
     return records
+
+
+def _final_asset_paths(artifacts: dict[str, Path], source_archive: Path,
+                       release_payloads: list[Path], component_path: Path,
+                       notes_path: Path, gate_report_path: Path,
+                       summary_path: Path) -> list[Path]:
+    """Every asset that must be published, including the gate report and summary.
+
+    ``SHA256SUMS`` is the checksum file over this list, so it cannot include
+    itself.  The complete set is validated by ``scripts/release_assets.py``.
+    """
+    return [
+        artifacts["wheel"], artifacts["sdist"], source_archive,
+        *release_payloads, component_path, notes_path,
+        gate_report_path, summary_path,
+    ]
 
 
 def _verify_sha256sums(assets_dir: Path) -> None:
@@ -658,7 +678,7 @@ def prepare(repo: Path, out: Path, version: str | None = None,
 
     # The gate reads SHA256SUMS and the built assets, so publish the initial
     # manifest/checksums first, then run it. The final checksum set is rewritten
-    # afterwards to include the gate report itself.
+    # afterwards to include the gate report and release summary themselves.
     sums = out / "SHA256SUMS"
     _write_sha256sums(
         [artifacts["wheel"], artifacts["sdist"], source_archive,
@@ -675,14 +695,18 @@ def prepare(repo: Path, out: Path, version: str | None = None,
     component_path.write_text(
         json.dumps(component, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
-    records = _write_sha256sums(
-        [artifacts["wheel"], artifacts["sdist"], source_archive,
-         *release_payloads, component_path, notes_path,
-         out / "release-gate-report.json"],
-        sums,
-    )
-    _verify_sha256sums(out)
+    gate_report_path = out / "release-gate-report.json"
+    summary_path = out / "release-summary.json"
 
+    asset_paths = _final_asset_paths(
+        artifacts, source_archive, release_payloads, component_path,
+        notes_path, gate_report_path, summary_path,
+    )
+    # The summary cannot record its own digest; every other published asset is
+    # listed and, with SHA256SUMS itself excluded, checksummed below.
+    records = _asset_records(
+        [path for path in asset_paths if path != summary_path]
+    )
     summary = {
         "state": "OK",
         "version": release["version"],
@@ -701,6 +725,8 @@ def prepare(repo: Path, out: Path, version: str | None = None,
             "sha256sums": str(sums),
             "component_manifest": str(component_path),
             "release_notes": str(notes_path),
+            "release_gate_report": str(gate_report_path),
+            "release_summary": str(summary_path),
             "release_report": str(qualify_dir / "release-report.json"),
         },
         "next": [
@@ -711,9 +737,14 @@ def prepare(repo: Path, out: Path, version: str | None = None,
             "Owner: verify the draft assets, then publish manually.",
         ],
     }
-    (out / "release-summary.json").write_text(
+    summary_path.write_text(
         json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
+    # Final checksum set covers every published asset, including the gate
+    # report and this summary. Then refuse if the canonical set is incomplete.
+    _write_sha256sums(asset_paths, sums)
+    _verify_sha256sums(out)
+    _load_module("release_assets", "scripts/release_assets.py").check_assets(out)
     return summary
 
 

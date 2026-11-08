@@ -185,12 +185,19 @@ def main() -> int:
         "scripts/install.ps1": _splice(
             REPO_ROOT / "scripts" / "install.ps1", _ps1_fragment(uv, git), args.check
         ),
-        # setup-qubit.sh deliberately holds NO fragment: it runs after a
-        # checkout exists, so it reads the pin straight from pm/lock.json
-        # at run time (the pm.sh-derived bootstrap). The fragment exists
-        # only for the curl|sh / irm|iex installers that bootstrap BEFORE
-        # any checkout exists.
     }
+    # The public Qubit seed nests this runtime under qubit_runtime/ and its
+    # Windows entry point is the umbrella's scripts/install.ps1. Keep that
+    # copy's pinned toolchain fragment derived from the same lock too.
+    umbrella_installer = REPO_ROOT.parent / "scripts" / "install.ps1"
+    if umbrella_installer.is_file() and BEGIN_MARK in umbrella_installer.read_text(encoding="utf-8-sig"):
+        results["../scripts/install.ps1"] = _splice(
+            umbrella_installer, _ps1_fragment(uv, git), args.check
+        )
+    # setup-qubit.sh deliberately holds NO fragment: it runs after a checkout
+    # exists, so it reads the pin straight from pm/lock.json at run time (the
+    # pm.sh-derived bootstrap). The fragment exists only for the curl|sh /
+    # irm|iex installers that bootstrap BEFORE any checkout exists.
     stale = [name for name, fresh in results.items() if not fresh]
     if args.check and stale:
         print(
