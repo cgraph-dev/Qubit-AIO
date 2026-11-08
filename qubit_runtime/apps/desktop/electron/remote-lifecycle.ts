@@ -40,6 +40,20 @@ const READY_RE = READY_IN_MERGED_OUTPUT_RE // the remote log is `>> log 2>&1`: m
 const REMOTE_LOCK_DIR = '~/.hermes/desktop-ssh'
 const SUPPORTED_REMOTE_OS = new Set(['Linux', 'Darwin'])
 const DEFAULT_READY_TIMEOUT_MS = 45_000
+
+// A slow remote (cold sshd, first-run package install, a loaded CI box) can
+// legitimately need longer than the 45s default, while a test suite wants it
+// short. Read the override once per call, validate it, and fall back to the
+// default rather than letting a malformed value become an instant timeout.
+function resolveReadyTimeoutMs(): number {
+  const raw = process.env.HERMES_REMOTE_READY_TIMEOUT_MS
+
+  if (raw === undefined || raw === '') return DEFAULT_READY_TIMEOUT_MS
+
+  const parsed = Number(raw)
+
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_READY_TIMEOUT_MS
+}
 const READY_POLL_INTERVAL_MS = 750
 // macOS sshd starts non-interactive shells with a 256-FD soft limit even when
 // the hard limit is unlimited. A Desktop backend can legitimately exceed that
@@ -200,7 +214,7 @@ async function locateHermes(ssh, remoteHermesPath) {
     const err: any = new Error(
       `The Qubit path you set is not an executable on the remote host: "${remoteHermesPath}". ` +
         'Check the path (it must be the full path to the `hermes` binary on the remote, e.g. ' +
-        '~/hermes-agent/.venv/bin/hermes), or clear it to auto-detect.'
+        '~/hermes/qubit-agent/.venv/bin/hermes), or clear it to auto-detect.'
     )
 
     err.kind = 'hermes-not-found'
@@ -223,6 +237,10 @@ async function locateHermes(ssh, remoteHermesPath) {
   // command locations (scripts/install.sh) — per-user, root/FHS, legacy venv.
   candidates.push('~/.local/bin/hermes')
   candidates.push('/usr/local/bin/hermes')
+  // Current layout first, then the pre-rename directory: a remote host set up
+  // before the rebrand still has `hermes-agent`, and dropping it would turn a
+  // working remote into "not found" purely because of the rename.
+  candidates.push('~/.hermes/qubit-agent/venv/bin/hermes')
   candidates.push('~/.hermes/hermes-agent/venv/bin/hermes')
 
   for (const candidate of candidates) {
@@ -1756,6 +1774,7 @@ export {
   connect,
   connectReservationPath,
   DEFAULT_READY_TIMEOUT_MS,
+  resolveReadyTimeoutMs,
   disconnect,
   expandRemotePath,
   fingerprintToken,

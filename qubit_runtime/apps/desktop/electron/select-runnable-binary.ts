@@ -32,3 +32,34 @@ export function selectRunnableBinary(opts: RunnableBinaryOptions): string | null
 
   return existing.find(opts.binaryRuns) || existing[0] || null
 }
+
+/** Error `kind` marking a failure where git itself never ran successfully. */
+export const GIT_UNUSABLE = 'git-unusable'
+
+// Spawn-level errno values that mean "this git binary cannot execute here",
+// as opposed to a network or repository problem that a retry could fix.
+const UNUSABLE_ERRNOS = new Set(['ENOENT', 'EACCES', 'ENOEXEC', 'EPERM'])
+
+/**
+ * Turn a spawn-level failure into a human-readable local diagnosis, or null
+ * when the error is not about the binary itself.
+ *
+ * `child_process` reports a missing or unlaunchable executable as a bare errno
+ * on the `error` event. Left as-is it reads as a network/update failure, so the
+ * user is told to check their connection when the real fix is installing git.
+ */
+export function describeGitSpawnFailure(error: unknown, gitBinary?: string): string | null {
+  const code = (error as { code?: string } | null | undefined)?.code
+
+  if (!code || !UNUSABLE_ERRNOS.has(code)) return null
+
+  const which = gitBinary || 'git'
+
+  if (code === 'ENOENT') return `Git is not installed or not on PATH (looked for ${which}).`
+
+  if (code === 'EACCES' || code === 'EPERM') return `Git at ${which} is not executable.`
+
+  // EBADARCH arrives as ENOEXEC on some platforms; both mean the binary exists
+  // but this machine cannot run it (usually the wrong CPU architecture).
+  return `Git at ${which} cannot run on this system.`
+}

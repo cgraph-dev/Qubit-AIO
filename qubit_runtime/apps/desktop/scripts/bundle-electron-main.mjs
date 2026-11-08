@@ -36,10 +36,14 @@ export async function bundleElectronMain({ source, out, stamp, dev = false }) {
   // Dev bundles leave the environment alone so source-tree resolution keeps working.
   const envBanner = dev ? '' : environmentDefaultsBanner(process.env.HERMES_BUNDLE_ENV_JSON || '{}')
   const define = {}
+  // The clock this bake bakes, captured at parse time so a restamp landing
+  // mid-build cannot be reported as the value that went into the bundle.
+  let bakedStampClock = null
   if (!dev) {
     if (!stamp) throw new Error('A prepared install stamp is required')
     const raw = readFileSync(stamp, 'utf8')
     const metadata = JSON.parse(raw)
+    bakedStampClock = metadata.builtAt ?? null
     define['process.env.HERMES_DESKTOP_IS_PACKAGED'] = JSON.stringify(true)
     define.__HERMES_INSTALL_STAMP__ = raw
     define.__HERMES_PRODUCT_IDENTITY__ = productIdentity(source, metadata)
@@ -75,6 +79,13 @@ export async function bundleElectronMain({ source, out, stamp, dev = false }) {
     format: 'cjs',
     outfile: join(out, 'preview-guest-preload.js'),
   })
+  // Return the clock this bake actually baked, NOT a re-read of the stamp.
+  // desktop.mjs records it in the build receipt, and freshness.productCurrent
+  // compares it against the stamp on disk: re-reading here would let a restamp
+  // that landed mid-build be recorded as the baked value, certifying a product
+  // whose packaged clock disagrees with electron-main.mjs. Dev builds bake no
+  // stamp, so they report null (the "predates this" shape productCurrent tolerates).
+  return { stampClock: bakedStampClock }
 }
 
 if (isMain(import.meta.url)) {

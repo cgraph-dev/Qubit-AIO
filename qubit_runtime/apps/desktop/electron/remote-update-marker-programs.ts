@@ -163,7 +163,7 @@ def checkout_lock(root):
 def checkout_held():
     # update_lock.checkout_lock_held: take the flock for one try and drop it. A lock file that
     # exists but cannot be opened or probed counts as held: reclaim needs a provably free checkout.
-    roots=[os.path.join(os.path.dirname(marker),'hermes-agent')]
+    roots=[os.path.join(os.path.dirname(marker),'qubit-agent')]
     roots+=[os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(os.path.expanduser(exe))))) for exe in sys.argv[3:] if exe]
     for root in roots:
         try:lock=os.open(checkout_lock(root),os.O_RDONLY|os.O_CLOEXEC)

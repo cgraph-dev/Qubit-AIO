@@ -1597,7 +1597,7 @@ export const en: Translations = {
       cloudAgentProvisioning: 'Provisioning…',
       cloudStatusLabel: status => `Status: ${status}`,
       remoteUrlTitle: 'Remote URL',
-      remoteUrlDesc: 'Base URL for the remote dashboard backend. Path prefixes are supported, for example /hermes.',
+      remoteUrlDesc: 'Base URL for the remote dashboard backend. Path prefixes are supported, for example /qubit.',
       probing: 'Checking how this gateway authenticates…',
       probeError:
         "Qubit can't reach that address. Check the URL and that the other computer is running Qubit — sign-in options appear once it answers.",
@@ -3202,7 +3202,7 @@ export const en: Translations = {
       title: (profile: string) => `Connect ${profile} to a remote host`,
       description: 'Sessions in this profile will run on the remote Qubit you point it at, instead of this computer.',
       urlLabel: 'Remote address',
-      urlPlaceholder: 'https://hermes.example.com',
+      urlPlaceholder: 'https://gateway.example.com',
       urlInvalid: 'Enter a full address starting with http:// or https://',
       tokenLabel: 'Access token',
       tokenPlaceholder: 'Paste the remote session token',
@@ -4364,7 +4364,7 @@ export const en: Translations = {
     remoteSetupDesc: 'Enter your gateway URL. Qubit Desktop will detect whether it needs a token or browser sign-in.',
     remoteUrlTitle: 'Gateway URL',
     remoteUrlDesc: 'Use the base URL of the Qubit gateway, including https:// when remote.',
-    remoteUrlPlaceholder: 'https://gateway.example.com/hermes',
+    remoteUrlPlaceholder: 'https://gateway.example.com/qubit',
     probing: 'Detecting gateway authentication...',
     probeError:
       "Qubit can't reach that address. Check the URL and that the other computer is running Qubit — sign-in options appear once it answers.",
@@ -5282,7 +5282,7 @@ export const en: Translations = {
       reject: 'Reject',
       alwaysTitle: 'Always allow this command?',
       alwaysDescription: pattern =>
-        `This adds the “${pattern}” pattern to your permanent allowlist (~/.hermes/config.yaml). Qubit won’t ask again for commands like this — in this session or any future one.`,
+        `This adds the “${pattern}” pattern to your permanent allowlist (~/.qubit/config.yaml). Qubit won’t ask again for commands like this — in this session or any future one.`,
       alwaysAllow: 'Always allow'
     },
     clarify: {
