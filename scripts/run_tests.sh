@@ -88,8 +88,14 @@ unset py
 
 args=()
 for a in "$@"; do
-    # Strip a repo-root-relative runtime prefix; the runner is CWD'd into qubit_runtime.
-    [[ "$a" == qubit_runtime/* ]] && a="${a#qubit_runtime/}"
+    # The runner is CWD'd into qubit_runtime, so a repo-root-relative path has to be
+    # rebased onto it. Strip the prefix ONLY when the caller's path names no real
+    # file as typed: this checkout owns BOTH tests/ trees, and qubit_runtime/tests/…
+    # previously stripped down to tests/… which then resolved against the
+    # unvendored root tree and reported "no such test path" for a file that exists.
+    if [[ "$a" == qubit_runtime/* && ! -e "$a" ]]; then
+        a="${a#qubit_runtime/}"
+    fi
     args+=("$a")
 done
 
