@@ -68,6 +68,17 @@ QUBIT_OWNED_PREFIXES = (
     "/api/ops",
     "/api/plugins/qubit-achievements",
     "/api/plugins/kanban",
+    # The HUD is a Qubit-owned surface with no upstream counterpart: all 19
+    # panels are served by `voicebridge/hud_routes.py` collectors over Qubit's
+    # own stores. Without this prefix the GETs are proxy-first, and because the
+    # vendored runtime does not declare `/api/hud/*` they fall through to the
+    # SPA history fallback — every panel rendered the HTML shell with a 200
+    # instead of its collector payload.
+    "/api/hud",
+    # Same shape for the Workbench surface (`voicebridge/workbench/`) and its
+    # static-UI shim (`voicebridge/workbench_shim_routes.py`, serving /wb/).
+    "/api/workbench",
+    "/api/wb",
 )
 
 _lock = threading.Lock()
