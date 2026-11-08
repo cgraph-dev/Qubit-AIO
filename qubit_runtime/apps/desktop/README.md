@@ -253,6 +253,31 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\hermes\hermes-agent\venv"
 
 > The default Hermes home on Windows is `%LOCALAPPDATA%\hermes`. Set the `QUBIT_HOME` env var if you've relocated it.
 
+### Running the desktop beside a CLI on the same machine
+
+You do not need `QUBIT_HOME` for this. A gateway takes an exclusive lock on
+`<home>/gateway.lock`, so a desktop and a CLI sharing one home means the second
+one to start reports `Gateway runtime already owns profile`. The desktop
+therefore always runs on its own root, resolved by `electron/data-paths.mjs`:
+
+- `~/.qubit-desktop/qubit-desktop` is the desktop's backend home (`QUBIT_HOME`
+  for everything it spawns). `~/.qubit-desktop/profile` is a symlink to the data
+  the desktop owns, and `<root>/profile/config.yaml` records that this machine
+  belongs to the desktop.
+- If `~/.qubit` (or `%LOCALAPPDATA%\qubit`) does not exist yet — a single-home
+  user — the desktop uses that documented default and creates nothing. The
+  first-launch bootstrap installs into it.
+- If it already exists, the desktop ADOPTS it once: the whole directory moves
+  intact to `~/.qubit-desktop/.qubit` and `~/.qubit` becomes a symlink into the
+  desktop's root, so the CLI and every documented default keep working. The
+  install tree moves with it.
+- `QUBIT_HOME` still wins outright (used verbatim, nothing is created).
+
+If something unrecognisable sits where the desktop needs to write, it prints one
+diagnostic to `QUBIT_HOME/logs/desktop.log` and starts without a backend rather
+than writing into a home a terminal may already own.
+
+
 ---
 
 ## Community

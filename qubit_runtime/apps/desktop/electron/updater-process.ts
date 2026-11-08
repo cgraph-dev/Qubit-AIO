@@ -23,11 +23,22 @@ export function resolveVenvDir(updateRoot: string): string {
 import { platformDefaultHermesHome } from './data-paths'
 import { hiddenWindowsChildOptions } from './windows-child-options'
 
+/**
+ * The home children spawned straight from here (updater scripts, launcher
+ * probes) search for their user-bin launchers. main.ts sets `QUBIT_HOME` to the
+ * home this launch actually resolved, so a plain launch and an explicit env var
+ * both reach the same dirs; never blank, because that would silently drop the
+ * `<home>/bin` probe on the default home.
+ */
+function launcherSearchHome(): string {
+  return process.env.QUBIT_HOME || platformDefaultHermesHome(os.homedir())
+}
+
 /** Exact installation identity; PATH may refer to another checkout. */
 export function resolveInstallationLauncher(
   updateRoot: string,
   isWindows: boolean = process.platform === 'win32',
-  hermesHome: string = process.env.QUBIT_HOME ?? ''
+  hermesHome: string = launcherSearchHome()
 ): string | null {
   const names: string[] = launcherNames(isWindows)
 
@@ -197,7 +208,7 @@ export function launcherTargetsInstallation(launcher: string, root: string): boo
  */
 export function userLauncherInstallRoot(
   isWindows: boolean = process.platform === 'win32',
-  hermesHome: string = process.env.QUBIT_HOME ?? ''
+  hermesHome: string = launcherSearchHome()
 ): { launcher: string; root: string } | null {
   for (const launcher of userBinLaunchers(isWindows, hermesHome)) {
     const root: string | null = launcherInstallDirectory(launcher)

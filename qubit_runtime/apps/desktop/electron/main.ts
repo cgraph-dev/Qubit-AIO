@@ -188,7 +188,7 @@ import {
 import type { RosterProfileMetadata } from './connection-registry'
 import { describeCrashReason, installCrashForensics } from './crash-forensics'
 import { adoptServedDashboardToken, resolveServedDashboardToken } from './dashboard-token'
-import { resolveDesktopHermesHome, resolveDesktopUserData } from './data-paths'
+import { desktopOwnHomePlan, prepareOwnHomeRoot, resolveDesktopHermesHome, resolveDesktopUserData } from './data-paths'
 import { loadOrCreateInstallationId, sshOwnershipId } from './desktop-installation'
 import { formatDesktopLogLine } from './desktop-log-line'
 import {
@@ -827,11 +827,44 @@ if (!isPrimaryInstance) {
   app.exit(0)
 }
 
-const QUBIT_HOME: string = resolveDesktopHermesHome({
+// The desktop runs on its OWN root so it can sit beside a CLI or voice-bridge
+// gateway on the same machine: a gateway holds an exclusive flock on
+// `<home>/gateway.lock` per profile home, so two surfaces on one home means the
+// second one dies with "Gateway runtime already owns profile". The root is
+// `~/.qubit-desktop`, BESIDE the shared root and derived from whatever root this
+// launch resolves (env var, registry, platform default) — so a GUI launch and
+// `npm start` agree, no env var to remember. A user with no home yet keeps the
+// documented default; a user who already has one gets `~/.qubit` repointed at
+// the desktop's data dir, so the CLI and the documented default still work.
+const HOME_PLAN = desktopOwnHomePlan({
   home: app.getPath('home'),
   directoryExists,
   readWindowsHome: (): string | null => readWindowsUserEnvVar('QUBIT_HOME')
 })
+// null while the own root could not be prepared (a foreign home or link in the
+// way): the app still opens and says why, but spawns no backend into a home a
+// terminal may own.
+const OWN_HOME_READY: string | null = prepareOwnHomeRoot(HOME_PLAN)
+const QUBIT_HOME: string = OWN_HOME_READY ?? HOME_PLAN.sharedHome
+// `first` legitimately runs on the documented home with no desktop root at all
+// (a single-home user); every other rung must have produced one.
+const IS_OWN_HOME_LIVE: boolean = HOME_PLAN.status === 'first' || OWN_HOME_READY !== null
+
+if (HOME_PLAN.status !== 'explicit') {
+  console.log(`[hermes] home: ${QUBIT_HOME} (${HOME_PLAN.status}, shared root ${HOME_PLAN.sharedHome})`)
+}
+
+if (!IS_OWN_HOME_LIVE) {
+  console.error(
+    `[hermes] ${HOME_PLAN.sharedHome} already contains something that is not this app's home link; ` +
+      `not creating ${HOME_PLAN.ownRoot}. The app starts read-only and spawns no backend — ` +
+      `stop the gateway using that home and restart, or set QUBIT_HOME.`
+  )
+} else {
+  // Every child (bootstrap, backend, update scripts) must inherit the home this
+  // launch actually decided on, incl. the relative `~/.qubit` symlink spelling.
+  process.env.QUBIT_HOME = QUBIT_HOME
+}
 
 // #77311: `desktop.electron_flags` and the renderer heap ceiling
 // (`desktop.renderer_max_old_space_mb`) used to reach Chromium only through
@@ -843,7 +876,9 @@ const QUBIT_HOME: string = resolveDesktopHermesHome({
   let desktopLaunchYaml: string = ''
 
   try {
-    desktopLaunchYaml = fs.readFileSync(path.join(QUBIT_HOME, 'config.yaml'), 'utf8')
+    // The user's global config lives in the shared root (`~/.qubit/config.yaml`;
+    // the own home's link makes the two spellings one file). Read-only.
+    desktopLaunchYaml = fs.readFileSync(path.join(HOME_PLAN.sharedHome, 'config.yaml'), 'utf8')
   } catch {
     void 0 // first run: no config yet → Chromium defaults
   }
@@ -861,14 +896,16 @@ const QUBIT_HOME: string = resolveDesktopHermesHome({
   }
 }
 
-// ACTIVE_HERMES_ROOT — the canonical mutable Qubit install. Same path
-// install.ps1 / install.sh use, so a desktop-only user and a CLI-only user end
-// up with identical layouts and can share one install.
+// ACTIVE_HERMES_ROOT — the canonical mutable Qubit install. The code tree is a
+// property of the shared root, not of this window's data home: a desktop that
+// runs on `<shared>/desktop/qubit-desktop` still uses the install at
+// `<shared>/qubit-agent`, the same path install.ps1 / install.sh use, so a
+// desktop-only user and a CLI-only user share one install.
 //
 // The checkout directory is named after the product, not the upstream project
-// this tree forked from: someone browsing QUBIT_HOME must not meet a directory
-// whose name contradicts the app they launched.
-const ACTIVE_HERMES_ROOT = path.join(QUBIT_HOME, 'qubit-agent')
+// this tree forked from: someone browsing the shared root must not meet a
+// directory whose name contradicts the app they launched.
+const ACTIVE_HERMES_ROOT = path.join(HOME_PLAN.sharedHome, 'qubit-agent')
 // VENV_ROOT — venv lives inside the repo, exactly like install.ps1 does it.
 const VENV_ROOT = path.join(ACTIVE_HERMES_ROOT, 'venv')
 // BOOTSTRAP_COMPLETE_MARKER — written by the first-launch bootstrap runner
@@ -3432,7 +3469,7 @@ function resolveCheckoutUpdateStrategy(): UpdaterStrategy {
  * source.
  */
 function resolveDesktopFeedBaseUrl(): string {
-  return resolveFeedBaseUrl(readUpdatesFeedBaseFromConfig(path.join(QUBIT_HOME, 'config.yaml')))
+  return resolveFeedBaseUrl(readUpdatesFeedBaseFromConfig(path.join(HOME_PLAN.sharedHome, 'config.yaml')))
 }
 
 /** The updater channel from the baked install stamp ('canary' vs 'stable'). */
@@ -4715,6 +4752,17 @@ async function ensureRuntime(
 ): Promise<ResolvedHermesBackend> {
   localBackendLifecycle.assertCanStart()
   assertStillOwned()
+
+  // The own home could not be created (something already sits at the shared
+  // root's desktop/ name). Never spawn — or bootstrap into — a home a CLI may
+  // own; the window still opens and explains why rather than failing obscurely.
+  if (!IS_OWN_HOME_LIVE) {
+    throw new Error(
+      `Qubit's desktop home could not be created at ${HOME_PLAN.ownRoot} because something else is already there. ` +
+        `Nothing was changed. Stop the gateway using ${HOME_PLAN.sharedHome} and restart Qubit, or set QUBIT_HOME ` +
+        'to a directory this app may use.'
+    )
+  }
 
   if (!backend.bootstrap) {
     await advanceBootProgress('runtime.external', `Using ${backend.label}`, 32)
