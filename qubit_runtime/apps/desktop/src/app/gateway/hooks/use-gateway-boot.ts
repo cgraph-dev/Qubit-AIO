@@ -16,6 +16,7 @@ import type { DesktopBootProgress, HermesConnection, HermesWindowState } from '@
 import { HermesGateway } from '@/hermes'
 import { translateNow } from '@/i18n'
 import { desktopDefaultCwd } from '@/lib/desktop-fs'
+import { ipcErrorMessage } from '@/lib/ipc-error-copy'
 import {
   decideLivenessForceClose,
   LIVENESS_PROBE_TIMEOUT_MS,
@@ -869,7 +870,12 @@ export function useGatewayBoot({
           !cancelled && (switchToken === null ? !$gatewaySwitching.get() : isCurrentGatewaySwitch(switchToken))
 
         if (mayPublishFailure) {
-          const message = err instanceof Error ? err.message : String(err)
+          // Boot failures surface in the recovery dialog verbatim, and an IPC
+          // rejection arrives as "Error invoking remote method 'hermes:<x>':
+          // ..." — the channel name is an internal contract literal, so it must
+          // be stripped before a person sees it. Same seam as every other
+          // renderer error (src/lib/ipc-error-copy.ts).
+          const message = ipcErrorMessage(err, String(err))
           bootFailed = true
           failDesktopBoot(message)
 
