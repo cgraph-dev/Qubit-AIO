@@ -4584,11 +4584,16 @@ export const deOverrides = {
     manualBody:
       'Sie haben Qubit über die Befehlszeile installiert, daher laufen Updates auch dort. Fügen Sie dies in Ihr Terminal ein:',
     manualPickedUp: 'Qubit übernimmt die neue Version beim nächsten Start.',
+    manualBodyBackend:
+      'Das Qubit-Backend wird außerhalb dieser App verwaltet. Führen Sie dies auf dem Server aus, der es hostet:',
+    manualPickedUpBackend: 'Das Backend übernimmt die neue Version, sobald das Update abgeschlossen ist.',
+    manualUnavailableTitle: 'Von hier aus nicht aktualisierbar',
     guiSkewTitle: 'Desktop-App aktualisieren',
     guiSkewBody:
       'Das Backend wurde aktualisiert, aber dieses Desktop-App-Paket nicht. Aktualisieren oder installieren Sie die Qubit-Desktop-App neu (Ihr AppImage / .deb / .rpm), um beide abzugleichen.',
     copy: 'Kopieren',
     copied: 'Kopiert',
+    copyFullLog: 'Vollständiges Protokoll kopieren',
     done: 'Fertig',
     applyingBody:
       'Der Qubit-Updater übernimmt in einem eigenen Fenster und öffnet Qubit automatisch wieder, wenn er fertig ist. Bitte öffnen Sie Qubit während des Updates nicht selbst erneut.',

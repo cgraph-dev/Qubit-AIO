@@ -59,6 +59,13 @@ describe.each(COMPLETE_LOCALES)('%s desktop catalog', locale => {
   it('covers exactly the English key set with matching value kinds', () => {
     expect([...catalog.keys()].sort()).toEqual([...english.keys()].sort())
 
+    // A key present but emptied renders a blank label, which a key-set diff misses.
+    for (const [path, value] of english) {
+      if (typeof value === 'string' && value !== '') {
+        expect(catalog.get(path), `${path} is blank`).not.toBe('')
+      }
+    }
+
     for (const [path, value] of english) {
       expect({ path, kind: kindOf(catalog.get(path)) }).toEqual({ path, kind: kindOf(value) })
     }

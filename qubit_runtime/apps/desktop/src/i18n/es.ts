@@ -4578,11 +4578,16 @@ export const esOverrides = {
     manualBody:
       'Instalaste Qubit desde la línea de comandos, así que las actualizaciones también se ejecutan ahí. Pega esto en tu terminal:',
     manualPickedUp: 'Qubit usará la nueva versión la próxima vez que lo abras.',
+    manualBodyBackend:
+      'El backend de Qubit se gestiona fuera de esta aplicación. Ejecuta esto en el servidor que lo aloja:',
+    manualPickedUpBackend: 'El backend usará la nueva versión cuando termine la actualización.',
+    manualUnavailableTitle: 'No se puede actualizar desde aquí',
     guiSkewTitle: 'Actualiza la aplicación de escritorio',
     guiSkewBody:
       'El backend se actualizó, pero el paquete de esta aplicación de escritorio no cambió. Actualiza o reinstala la aplicación de escritorio de Qubit (tu AppImage / .deb / .rpm) para que coincidan.',
     copy: 'Copiar',
     copied: 'Copiado',
+    copyFullLog: 'Copiar el registro completo',
     done: 'Listo',
     applyingBody:
       'El actualizador de Qubit tomará el control en su propia ventana y volverá a abrir Qubit al terminar.',

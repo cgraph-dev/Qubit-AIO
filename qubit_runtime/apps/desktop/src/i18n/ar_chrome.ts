@@ -330,7 +330,7 @@ export const arChrome = {
       renamed: 'تمت إعادة التسمية',
       renameFailed: 'فشلت إعادة التسمية',
       renameTitle: 'إعادة تسمية الجلسة',
-      renameDesc: '',
+      renameDesc: 'اتركه فارغًا للمسح.',
       untitledPlaceholder: 'جلسة بلا عنوان',
       deleteTitle: 'حذف الجلسة؟',
       deleteDesc: title => `سيتم حذف «${title}» نهائيًا. لا يمكن التراجع عن هذا الإجراء.`,

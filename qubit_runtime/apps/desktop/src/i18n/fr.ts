@@ -4597,11 +4597,16 @@ export const frOverrides = {
     manualBody:
       "Vous avez installé Qubit depuis la ligne de commande, les mises à jour s'y effectuent donc aussi. Collez ceci dans votre terminal :",
     manualPickedUp: 'Qubit prendra en compte la nouvelle version au prochain lancement.',
+    manualBodyBackend:
+      'Le backend Qubit est géré en dehors de cette application. Exécutez ceci sur le serveur qui l’héberge :',
+    manualPickedUpBackend: 'Le backend prendra en compte la nouvelle version une fois la mise à jour terminée.',
+    manualUnavailableTitle: 'Mise à jour impossible depuis ici',
     guiSkewTitle: "Mettre à jour l'application de bureau",
     guiSkewBody:
       "Le backend a été mis à jour, mais ce package d'application de bureau ne l'a pas été. Mettez à jour ou réinstallez l'application de bureau Qubit (votre AppImage / .deb / .rpm) pour qu'elle corresponde.",
     copy: 'Copier',
     copied: 'Copié',
+    copyFullLog: 'Copier le journal complet',
     done: 'Terminé',
     applyingBody:
       'Le programme de mise à jour de Qubit prend le relais dans sa propre fenêtre et rouvre Qubit automatiquement une fois terminé. Ne rouvrez pas Qubit vous-même pendant la mise à jour.',

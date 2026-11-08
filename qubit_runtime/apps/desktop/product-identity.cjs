@@ -9,16 +9,16 @@
 'use strict'
 
 const variants = {
-  '': { display: 'Qubit', kebab: 'hermes', pascal: 'Hermes' },
+  '': { display: 'Qubit', kebab: 'qubit', pascal: 'Qubit' },
   light: {
     display: 'Qubit Light',
-    kebab: 'hermes-light',
-    pascal: 'HermesLight'
+    kebab: 'qubit-light',
+    pascal: 'QubitLight'
   },
   bundled: {
     display: 'Qubit Agent',
-    kebab: 'hermes-bundled',
-    pascal: 'HermesBundled'
+    kebab: 'qubit-bundled',
+    pascal: 'QubitBundled'
   }
 }
 
@@ -54,7 +54,7 @@ const displayName = buildCommit
 
 const kebabSuffix = buildCommit ? `-${buildCommit}` : canary ? '-canary' : ''
 const pascalSuffix = buildCommit ? `Commit${buildCommit}` : canary ? 'Canary' : ''
-const cliName = `${light ? 'hermes-light' : 'hermes'}${kebabSuffix}`
+const cliName = `${light ? 'qubit-light' : 'qubit'}${kebabSuffix}`
 if (store && (canary || buildCommit)) {
   throw new Error('Store packaging is only eligible for stable releases')
 }
