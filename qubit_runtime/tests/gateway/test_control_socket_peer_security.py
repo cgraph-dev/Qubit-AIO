@@ -138,7 +138,8 @@ def test_clients_refuse_a_control_listener_run_by_another_uid(tmp_path, monkeypa
             await server.stop()
     asyncio.run(run())
     import importlib.util
-    spec = importlib.util.spec_from_file_location("tui_bootstrap", "ui-tui/scripts/gateway_bootstrap.py")
+    script = Path(__file__).resolve().parents[2] / "ui-tui" / "scripts" / "gateway_bootstrap.py"
+    spec = importlib.util.spec_from_file_location("tui_bootstrap", script)
     tui_bootstrap = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(tui_bootstrap)
     for client in (gateway_client.private_control_query, session_hosted_transport.owner_request, tui_bootstrap.bootstrap):

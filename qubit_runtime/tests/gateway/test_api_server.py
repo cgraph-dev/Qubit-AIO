@@ -908,8 +908,8 @@ class TestModelsEndpoint:
             data = await resp.json()
             assert data["object"] == "list"
             assert len(data["data"]) == 1
-            assert data["data"][0]["id"] == "hermes-agent"
-            assert data["data"][0]["owned_by"] == "hermes"
+            assert data["data"][0]["id"] == "qubit-agent"
+            assert data["data"][0]["owned_by"] == "qubit"
 
     @pytest.mark.asyncio
     async def test_models_returns_profile_name(self):
@@ -942,9 +942,9 @@ class TestCapabilitiesEndpoint:
             resp = await cli.get("/v1/capabilities")
             assert resp.status == 200
             data = await resp.json()
-            assert data["object"] == "hermes.api_server.capabilities"
-            assert data["platform"] == "hermes-agent"
-            assert data["model"] == "hermes-agent"
+            assert data["object"] == "qubit.api_server.capabilities"
+            assert data["platform"] == "qubit-agent"
+            assert data["model"] == "qubit-agent"
             assert data["auth"]["type"] == "bearer"
             assert data["auth"]["required"] is False
             assert data["runtime"]["mode"] == "server_agent"
