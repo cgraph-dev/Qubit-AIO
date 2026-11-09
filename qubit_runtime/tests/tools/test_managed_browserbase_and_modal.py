@@ -49,6 +49,12 @@ def _reset_modules(prefixes: tuple[str, ...]):
 
 @pytest.fixture(autouse=True)
 def _restore_tool_and_agent_modules():
+    # ``_install_fake_tools_package`` also REPLACES ``sys.modules["plugins"]`` with a stub
+    # package (it needs ``plugins.browser`` on the import path). Restoring only ``tools*`` and
+    # ``agent*`` left that stub installed for the rest of the session, so every later test that
+    # resolves a plugin by dotted path — ``monkeypatch.setattr("plugins.web...")``,
+    # ``plugins.memory...``, ``plugins.platforms...`` — hit ``module 'plugins' has no attribute
+    # 'web'``. Snapshot ``plugins*`` alongside them.
     original_modules = {
         name: module
         for name, module in sys.modules.items()
@@ -56,11 +62,13 @@ def _restore_tool_and_agent_modules():
         or name.startswith("tools.")
         or name == "agent"
         or name.startswith("agent.")
+        or name == "plugins"
+        or name.startswith("plugins.")
     }
     try:
         yield
     finally:
-        _reset_modules(("tools", "agent"))
+        _reset_modules(("tools", "agent", "plugins"))
         sys.modules.update(original_modules)
 
 
