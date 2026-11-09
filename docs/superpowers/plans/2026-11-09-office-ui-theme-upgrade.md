@@ -146,6 +146,27 @@ Not themed: `--side-w`, `--drawer-w`, `--top-h`, `--gap`, `--free-*`, `--font-*`
 
 ---
 
+## Calibration result (2026-11-09, measured on the purchased sheets)
+
+Confirmed by rendering labelled frame grids and compositing real recipes (preview:
+`/tmp/final_candidates.png`, not committed — derived art stays out of the tree until the pack is approved):
+
+| Layer | Frame (32 tier) | Notes |
+|---|---|---|
+| Body | row 0, col 0 (`32×64`) | front idle, 4 frames on row 0 |
+| Eyes | row 0, col 0 | tiny overlay; front |
+| Hair (body) | **row 3, col 0** | front idle; rows 0–2/4–5 are back/side, rows 6–7 are walk-front |
+| Outfit bottom | row 0, col 0 | every outfit file's row 0 is a bottom garment |
+| Outfit top | **row 7, col 0** | every file's torso coverage peaks at row 7; row 8 is an alternate top |
+| Portrait | 64 px cell, row 0, col 0 → downscale to 32 | 10×3 grid of 64 px cells at the 32 tier |
+| Accessory | **not calibrated** | omit in v1; backpacks/hats need a per-family frame map |
+
+Open item from calibration: every outfit file shares a blue base garment at row 7, so
+row 0+7 produces only subtle variation. v1 ships that pair (valid, consistent) and a
+second pass maps true outfit layers (row/column semantics) before claiming outfit
+variety. The part indices (skin/eyes/hair) are shared with the portrait, which is what
+makes the face and body match.
+
 ## Skills we will use (and the one we won't invent)
 
 Local skills that apply:
