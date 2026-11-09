@@ -11,7 +11,7 @@
     "verified_by",
     "notes"
   ],
-  "generated_at": "2026-11-09T01:32:26Z",
+  "generated_at": "2026-11-09T02:22:36Z",
   "generator": "scripts/parity_ledger.py",
   "plan": "docs/PARITY_PLAN.md (Phase 0)",
   "surfaces": {
@@ -33,7 +33,7 @@
       "files_at_pin_ls_tree": 2552,
       "files_git_ls_files": 2552,
       "our_inventory_files": 108,
-      "our_inventory_lines": 135375
+      "our_inventory_lines": 135379
     },
     "extension": {
       "clone": "/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch/hermes-browser-extension",
