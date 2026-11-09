@@ -20,12 +20,15 @@ set -u
 # hygiene can't break the locked sync the way it used to before pm owned it.
 export UV_NO_CONFIG=1
 
-# The default source is the repository that actually receives commits. Qubit-AIO
-# publishes no release tags, so an install here tracks its branch (see the
-# releases/latest fallback in stage_repository, and docs/INSTALL-REF-RULE.md).
-# Point QUBIT_REPO_URL at https://github.com/cgraph-dev/Qubit.git to install from
-# a repo that publishes stable releases instead.
-REPO_URL="${QUBIT_REPO_URL:-${HERMES_REPO_URL:-https://github.com/cgraph-dev/Qubit-AIO.git}}"
+# The default source is the PUBLIC production repository. It is the one that carries
+# release tags (v0.0.14 and later), so the releases/latest lookup in stage_repository can
+# resolve for an anonymous installer — see docs/INSTALL-REF-RULE.md.
+#
+# Do NOT point this default at cgraph-dev/Qubit-AIO. That repository is the private
+# umbrella where development happens: it is invisible to an unauthenticated clone, so the
+# release lookup 404s and a clean install fails at the door. Contributors who want to
+# install their own work-in-progress branch set QUBIT_REPO_URL instead.
+REPO_URL="${QUBIT_REPO_URL:-${HERMES_REPO_URL:-https://github.com/cgraph-dev/Qubit.git}}"
 BRANCH="main"
 CHANNEL="${QUBIT_INSTALL_CHANNEL:-${HERMES_INSTALL_CHANNEL:-}}"
 INSTALL_COMMIT=""
@@ -751,9 +754,12 @@ stage_repository() {
                 log_warn "Could not resolve the latest stable release; keeping the current checkout"
                 return 0
             fi
-            # A repo with no published releases (releases/latest 404s, e.g.
-            # Qubit-AIO) is a valid branch-tracking source, not a broken one:
-            # fall back to the branch rather than refusing to install at all.
+            # A repo with no published releases (releases/latest 404s) is a valid
+            # branch-tracking source, not a broken one: fall back to the branch rather
+            # than refusing to install at all. Note a PRIVATE repo also 404s here for an
+            # anonymous installer — that is why the default points at the public
+            # production repo, and a private checkout is passed via QUBIT_REPO_URL with
+            # credentials already on the machine.
             log_warn "No published stable release for $REPO_URL; installing from branch $BRANCH"
             channel="$BRANCH"
         fi

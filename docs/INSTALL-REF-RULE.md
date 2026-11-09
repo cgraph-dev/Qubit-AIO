@@ -1,7 +1,8 @@
 # Install ref rule — what a fresh "Install Qubit locally" gets
 
-Status: **decision recorded, option (b) implemented (code only, nothing published)**.
-Owner action still required — see [Open decision](#open-decision-for-the-owner).
+Status: **RESOLVED — owner ruling 2026-11-09 (option (a)): the default source is the
+public production repo `cgraph-dev/Qubit`; `Qubit-AIO` is the private development
+umbrella and is never a default.** See [the ruling](#open-decision-for-the-owner).
 
 ## The rule as it stands
 
@@ -140,11 +141,30 @@ behaviour, so nothing regresses for existing release users.
 
 ## Open decision for the owner
 
-The fix makes fresh installs current **today**, but it does not make the two
-repos converge. Pick one:
+**RESOLVED — owner ruling, 2026-11-09: option (a).**
 
-- **Keep (b) as the shipping model** — accept "users track `main`" as the
-  product contract, and make the release feed optional.
-- **Move to (a)** — tag and publish from `Qubit-AIO`, then either revert the
-  `REPO_URL` default back to a release-publishing repo or let (b)'s fallback
-  become dead code that only fires for forks.
+> "Qubit-AIO is here the umbrella, Qubit is the repo where I have everything clean
+> like a production repo where updates and things like that work and CI."
+
+So the two repositories are not competing sources; they have different jobs:
+
+| Repo | Visibility | Role | Publishes |
+|---|---|---|---|
+| `cgraph-dev/Qubit` | **public** | production front door — releases, tags, CI, updates | `vX.Y.Z` tags, `releases/latest` |
+| `cgraph-dev/Qubit-AIO` | **private** | the umbrella where development happens | nothing |
+
+`REPO_URL` therefore defaults to **`Qubit`** (was `Qubit-AIO`) in both
+`install.sh` and `install.ps1`. A development checkout is still installable by
+setting `QUBIT_REPO_URL=https://github.com/cgraph-dev/Qubit-AIO.git`, which
+succeeds only for an operator whose git credentials can already see the private
+repo — an anonymous installer gets 404 from that URL, which is exactly why it must
+not be the default.
+
+Consequences worth keeping in mind:
+
+- The `releases/latest` 404 → branch fallback in `stage_repository` is now a path
+  for *forks and unpublished repos*, not for the default. It stays.
+- A private repo is indistinguishable from a missing one over the anonymous API
+  (`404` either way), so "it worked on my machine" is not evidence that the
+  default is installable. Test a fresh install without credentials.
+

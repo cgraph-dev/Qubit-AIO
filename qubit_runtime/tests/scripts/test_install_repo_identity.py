@@ -16,10 +16,13 @@ ROOT = Path(__file__).resolve().parents[2]
 INSTALL_SH = ROOT / "scripts" / "install.sh"
 INSTALL_PS1 = ROOT / "scripts" / "install.ps1"
 QUBIT = "https://github.com/cgraph-dev/Qubit.git"
-# The installer's default source: it moved from Qubit.git (publishes releases,
-# receives no commits) to Qubit-AIO.git (receives them, publishes no releases),
-# so a bare install ships current code instead of the old release tag.
-DEFAULT_SOURCE = "cgraph-dev/Qubit-AIO.git"
+# The installer's default source is the PUBLIC production repo. Owner ruling
+# 2026-11-09: Qubit is the production front door (public, tagged, publishes
+# releases, runs CI); Qubit-AIO is the private development umbrella. A private
+# repo is invisible to an anonymous clone, so defaulting to it made
+# releases/latest 404 for every real installer. See docs/INSTALL-REF-RULE.md.
+DEFAULT_SOURCE = "cgraph-dev/Qubit.git"
+DEV_SOURCE = "cgraph-dev/Qubit-AIO.git"
 HERMES = "https://github.com/NousResearch/hermes-agent.git"
 
 
