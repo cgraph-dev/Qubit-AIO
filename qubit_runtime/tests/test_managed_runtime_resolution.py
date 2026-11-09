@@ -66,6 +66,11 @@ _EXEMPT_DIRS = (
     ".venv",
     "venv",
     ".worktrees",
+    # Local build output, untracked and gitignored. `scripts/build-webapp.mjs` materialises a
+    # 1.2 GB npm workspace here (vendored node-gyp, a copy of the desktop electron sources);
+    # scanning it reports third-party `shutil.which` calls as unreviewed Qubit call sites and
+    # fails this guard on a working tree that is doing nothing wrong.
+    ".build",
 )
 
 # Call sites where a bare PATH lookup is the correct answer. Each entry is
