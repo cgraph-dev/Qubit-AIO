@@ -24,13 +24,22 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE / "static"
 
-#: 73 + 6 = 79 of 184 answer; 105 remain GAP. MEASURED from the shipped tables
-#: (``PORT_SET`` + ``_EXTRA_PREFIXES`` + ``EXISTING_SET``). The doc's earlier
-#: 48/130 predated the config, extension and auth wave AND under-counted the
-#: seven ``_EXTRA_PREFIXES`` routes the gateway already served.
-EXPECTED_PORT = 73
+#: 91 of 184 answer; 93 remain GAP. MEASURED from the shipped tables
+#: (``PORT_SET`` + ``_EXTRA_PREFIXES`` + ``EXISTING_SET`` + the
+#: ``command_family.ROUTES`` table). The doc's earlier 48/130 predated the
+#: config, extension and auth wave AND under-counted the seven
+#: ``_EXTRA_PREFIXES`` routes the gateway already served. ``PORT`` here is
+#: therefore an ANSWERED count (85 PORT_SET-shaped + the 6 EXISTING live inside
+#: it): what matters, and what is asserted, is that every endpoint the ported
+#: page calls is either answered or answers a typed refusal, and that neither
+#: number drifts silently from the code.
+#:
+#: Two lanes were live in the same tree while these numbers moved (the
+#: file-family/commands wave served ``file/*`` and ``commands/*``), so
+#: ``EXPECTED_ANSWERED`` is the whole answered set, not one lane's share.
+EXPECTED_ANSWERED = 91
 EXPECTED_EXISTING = 6
-EXPECTED_GAP = 105
+EXPECTED_GAP = 93
 EXPECTED_TOTAL = 184
 
 
@@ -79,6 +88,13 @@ def verdicts() -> tuple[dict[str, str], dict[str, str], dict[str, str], list[str
     # the server actually answers, which is the opposite of a receipt.
     for k, v in R._EXTRA_PREFIXES.items():
         port.setdefault("/api/" + k, v)
+    # The git / worktree / terminal / workspace families keep their own table
+    # (``workbench_ui/command_family.py``). Counting them from THAT table rather
+    # than from a copy here keeps this receipt honest: a family path that loses
+    # its handler shows up as GAP again, which is the whole point.
+    from voicebridge.workbench_ui import command_family as CF
+    for k in CF.ROUTES:
+        port.setdefault("/api/" + k, "command_family")
     eps = endpoints_in_tree()
     gap = {e: "WB_NOT_IN_PORT_SET" for e in eps
            if e not in port and e not in existing}
@@ -108,8 +124,8 @@ def main(argv: list[str]) -> int:
     n_port = sum(1 for v, _, _ in rows if v == "PORT")
     n_ex = sum(1 for v, _, _ in rows if v == "EXISTING")
     n_gap = sum(1 for v, _, _ in rows if v == "GAP")
-    if n_port != EXPECTED_PORT:
-        bad.append(f"PORT {n_port}, doc says {EXPECTED_PORT}")
+    if n_port + n_ex != EXPECTED_ANSWERED:
+        bad.append(f"{n_port + n_ex} answered, doc says {EXPECTED_ANSWERED}")
     if n_ex != EXPECTED_EXISTING:
         bad.append(f"EXISTING {n_ex}, doc says {EXPECTED_EXISTING}")
     if n_gap != EXPECTED_GAP:

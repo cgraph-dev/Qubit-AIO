@@ -19,9 +19,10 @@ return contracts:
 
 2. ``wbui_routes()`` / ``wbui_handlers()`` — the compat-table rows. Their JS
    calls 184 distinct ``/api/*`` paths; Qubit serves 6 of them under those names
-   and 48 more are answerable from a real Qubit authority. The shim maps those
-   54; every other path gets a TYPED REFUSAL, never an empty list — an empty
-   list reads as "you have none", and that is a lie the UI would paint.
+   and 78 more are answerable from a real Qubit authority. The shim maps those
+   84; every other path gets a TYPED REFUSAL, never an empty list — an empty
+   list reads as "you have none", and that is a lie the UI would paint. The
+   count is MEASURED by ``workbench_ui/_endpoint_table.py``, not asserted here.
 
 THE REFUSAL SHAPE
 ---------------------------------------------------------------------------
@@ -41,9 +42,11 @@ READ/WRITE SPLIT
 Every Qubit-backed read goes through the existing seams and nothing else:
 ``workbench.adapters_sessions`` (→ ``QubitSessionStore``), ``cron_bridge``,
 ``approvals.ApprovalJournal``, ``qubit_compat.h_config``. The workspace is
-read-only by construction, and the terminal is refused with Qubit's existing
-``PTY_NO_SHELL`` gate — this module does not add a second implementation of
-either.
+read-only by construction, and the terminal NEVER spawns a shell: it is the
+agent-backed session in ``workbench_ui/terminal_family.py`` behind upstream's
+terminal wire (``backend:"agent"``, ``shell:false``), so ``PTY_NO_SHELL`` still
+holds for every process-spawning path. This module adds a second implementation
+of neither.
 """
 from __future__ import annotations
 
@@ -1164,6 +1167,42 @@ def h_wb_logs(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                         endpoint="logs")
 
 
+def terminal_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/terminal/start`` — the agent-backed terminal (no shell)."""
+    from .workbench_ui import terminal_family as TF
+
+    return TF.start(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                    dict(p or {}))
+
+
+def terminal_input(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/terminal/input`` — keystrokes -> one agent turn on Enter."""
+    from .workbench_ui import terminal_family as TF
+
+    return TF.input_text(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def terminal_resize(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/terminal/resize`` — record the pane's geometry."""
+    from .workbench_ui import terminal_family as TF
+
+    return TF.resize(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                     dict(p or {}))
+
+
+def terminal_close(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/terminal/close`` — end the session (idempotent)."""
+    from .workbench_ui import terminal_family as TF
+
+    return TF.close(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                    dict(p or {}))
+
+
 def h_wb_terminal(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Any]:
     """POST /api/wb/api/terminal/{start,close,input,resize} — REFUSED.
@@ -1365,18 +1404,23 @@ PORT_SET: Dict[str, str] = {
     "personalities": "h_wb_settings",
     "personality/set": "h_wb_settings",
     "prompts": "h_wb_settings",
-    # workspace (read-only). NOTE: the UI never calls /api/workspace; the tree
-    # read is served by the existing workbench route /api/workbench/workspace/tree
-    # and by ``file`` here. The handler stays reachable for the workbench page's
-    # own use but is not part of the endpoint count.
-    "file": "h_wb_workspace_preview",
-    "file/save": "h_wb_file_save",
+    # workspace files (writes go through voicebridge.file_patch, the ONE
+    # brokered confined-write lane; reads through voicebridge.files). Every verb
+    # the ported client calls is a PORT row or a file/ family verb, so a file
+    # click can never fall through to WB_NOT_IN_PORT_SET.
+    "file": "h_wb_file_read",
+    "file/raw": "h_wb_file_raw",
+    "file/save": "file_family",
     "projects": "h_wb_projects",
-    # terminal (refused)
-    "terminal/start": "h_wb_terminal",
-    "terminal/close": "h_wb_terminal",
-    "terminal/input": "h_wb_terminal",
-    "terminal/resize": "h_wb_terminal",
+    # terminal — served by the command family (workbench_ui/command_family.py).
+    # These rows used to point at ``h_wb_terminal``, a blanket PTY_NO_SHELL
+    # refusal; the family keeps that policy (no shell is ever spawned) but
+    # answers with the agent-backed session the pane can actually render, so the
+    # exact-name lookup must not shadow it.
+    "terminal/start": "terminal_start",
+    "terminal/close": "terminal_close",
+    "terminal/input": "terminal_input",
+    "terminal/resize": "terminal_resize",
     # share (refused)
     "share/create": "h_wb_file_save_stub",
 }
@@ -1395,6 +1439,17 @@ _EXTRA_PREFIXES: Dict[str, str] = {
     "chat/steer": "chat_steer",
     "chat/stop": "chat_stop",
     "chat/stream/status": "chat_stream_status",
+    # the composer's command registry and side question
+    # (workbench_ui/handlers_commands.py). All six are in the measured call set;
+    # three of them (bundles, bundles/resolve, moa/resolve) are typed refusals
+    # because Qubit has no such authority, and a refusal that NAMES the missing
+    # thing beats the generic WB_NOT_IN_PORT_SET the table used to give.
+    "commands": "wb_commands",
+    "commands/exec": "wb_commands_exec",
+    "commands/bundles": "wb_commands_bundles",
+    "commands/bundles/resolve": "wb_commands_bundles_resolve",
+    "commands/moa/resolve": "wb_commands_moa_resolve",
+    "btw": "wb_btw",
     # the client's sidebar hot channel (SSE; see stream_kind below)
     "sessions/events": "sessions_events",
     # the sidebar's gateway hot channel: ?probe=1 is a JSON preflight; without
@@ -1470,26 +1525,50 @@ def auth_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 def file_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 p: Dict[str, str]) -> Tuple[int, Any]:
-    """``/api/file/<verb>`` — reads delegate; every write is brokered or refused."""
-    sub = str(p.get("sub") or "")
+    """``/api/file/<verb>`` — the real Qubit file authority (workbench_ui/file_family.py).
+
+    Every verb the ported client calls now has a handler here: reads go through
+    ``voicebridge.files`` and writes through ``voicebridge.file_patch``, the ONE
+    brokered confined-write lane. ``file/move`` and ``file/rename`` stay typed
+    refusals because that lane has no rename primitive; ``file/open-vscode``
+    refuses because Qubit never launches an editor; ``file/reveal`` refuses on a
+    host without a desktop session. Each refusal names the reason.
+    """
+    from .workbench_ui import file_family as FF
+
+    sub = str(p.get("sub") or "").strip("/")
     verb = sub.rsplit("/", 1)[-1] if "/" in sub else str(p.get("action") or "")
-    read_verbs = {"read", "preview", "open", "path", "reveal"}
-    if verb in read_verbs:
-        return h_wb_workspace_preview(cfg, q, b, p)
-    if verb == "save":
-        return h_wb_file_save(cfg, q, b, p)
-    if verb in ("create", "rename", "delete", "move", "upload", "write"):
-        return _refusal(
-            "WB_BROKERED_WRITE",
-            f"file/{verb} is a mutating workspace write: Qubit file mutations are "
-            f"brokered, confirmed actions with an audit receipt "
-            f"(voicebridge.file_patch via voicebridge.broker), never a viewer "
-            f"write. Nothing was changed.",
-            endpoint="file/" + verb, status=403,
-            counterpart="Qubit file patch (brokered + confirmed)")
-    return _refusal("WB_CAPABILITY_UNBOUND",
-                    f"/api/file/{verb} has no Qubit authority",
-                    endpoint="file/" + verb)
+    handler = FF.WRITE_VERBS.get(verb)
+    if handler is None:
+        return _refusal("WB_CAPABILITY_UNBOUND",
+                        f"/api/file/{verb or '<none>'} has no Qubit authority",
+                        endpoint="file/" + (verb or ""))
+    return handler(cfg, q, b, p)
+
+
+def h_wb_file_read(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/file?session_id=&path=`` — the preview pane's text read."""
+    from .workbench_ui import file_family as FF
+
+    return FF.file_read(cfg, q, b, p)
+
+
+def h_wb_file_raw(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/file/raw`` without a writer: a typed refusal, never bytes.
+
+    The listener claims this path before the gateway (``webui`` must write the
+    body itself, see ``raw_handler()``). Reaching this handler means the caller
+    went through the JSON gateway — answering a JSON refusal is correct there,
+    serving bytes under a ``application/json`` framing would not be.
+    """
+    return _refusal(
+        "WB_FILE_RAW_REQUIRES_BYTES",
+        "GET /api/file/raw streams file bytes and is served by the listener's "
+        "own raw branch, not by the JSON gateway; this path was invoked "
+        "through the gateway, so nothing was streamed.",
+        endpoint="file/raw")
 
 
 def h_wb_file_save_stub(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1539,7 +1618,127 @@ def _resolve_handler(sub: str, method: str) -> Optional[Callable[..., Any]]:
     for prefix, handler_name in _EXTRA_FAMILIES:
         if clean.startswith(prefix) and len(clean) > len(prefix):
             return getattr(mod, handler_name, None)
-    return None
+    # The git / worktree / terminal / workspace command families own their own
+    # table (``workbench_ui/command_family.py``): thirty-odd paths, most of them
+    # keyed by a verb tail, so listing them here would be a second copy of the
+    # same list. Checked LAST so a path the earlier tables already answer keeps
+    # answering from there (``session/worktree/status`` is a session read).
+    return _command_handler(clean)
+
+
+def _command_handler(clean: str) -> Optional[Callable[..., Any]]:
+    """The command-family handler for ``clean``, or None (never raises)."""
+    try:
+        from .workbench_ui import command_family as CF
+
+        return CF.handler_for(clean)
+    except Exception:  # noqa: BLE001 - a broken family must not break routing
+        return None
+
+
+# ---------------------------------------------- composer commands + side question
+# ``workbench_ui/handlers_commands.py`` owns the behaviour; these pins exist so
+# the gateway's table and the family stay one audit surface (the same reason
+# every other family has wrappers here).
+def wb_commands(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/commands`` — the real slash catalog in upstream's row shape."""
+    from .workbench_ui import handlers_commands as HC
+
+    return HC.commands(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def wb_commands_exec(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/commands/exec`` — run it on ``chat_transport``'s executor."""
+    from .workbench_ui import handlers_commands as HC
+
+    return HC.commands_exec(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def wb_commands_bundles(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/commands/bundles`` — typed: no persisted bundle registry."""
+    from .workbench_ui import handlers_commands as HC
+
+    return HC.commands_bundles(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def wb_commands_bundles_resolve(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/commands/bundles/resolve`` — typed: nothing to resolve against."""
+    from .workbench_ui import handlers_commands as HC
+
+    return HC.commands_bundles_resolve(cfg, dict(q or {}), dict(b or {}),
+                                       dict(p or {}))
+
+
+def wb_commands_moa_resolve(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/commands/moa/resolve`` — typed: Qubit has no MoA route."""
+    from .workbench_ui import handlers_commands as HC
+
+    return HC.commands_moa_resolve(cfg, dict(q or {}), dict(b or {}),
+                                   dict(p or {}))
+
+
+def wb_btw(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+           p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/btw`` — one ephemeral side question on the parent session."""
+    from .workbench_ui import handlers_commands as HC
+
+    return HC.btw(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+# ------------------------------------------------------------- raw bytes
+def raw_handler(sub: str) -> Optional[Callable[..., None]]:
+    """The one path in this port that writes BYTES instead of JSON, or None.
+
+    ``workspace.js:291`` builds ``/api/file/raw?...&inline=1|download=1`` and
+    the browser fetches it directly for images, media, PDFs, HTML documents and
+    attachments — so it must answer with a body and a content type, exactly
+    like ``serve_asset`` does, not with a ``(status, json)`` tuple. The
+    listener's workbench branch calls this BEFORE the JSON gateway dispatcher
+    and hands over the request handler.
+
+    Confinement is the same ``file_family.resolve_workspace_path`` every other
+    file route uses, and the bytes come from ``voicebridge.files.read_bytes``
+    (bounded, special-file-refusing) — no second reader and no escaped path.
+    """
+    clean = str(sub or "").strip("/")
+    if clean != "file/raw":
+        return None
+
+    def handle(handler: Any, cfg: Any, q: Dict[str, Any]) -> None:
+        from .workbench_ui import file_family as FF
+
+        absolute, err = FF.file_raw_check(None, str((q or {}).get("path") or ""))
+        if err is not None:
+            status, payload = err
+            handler._json(payload, status)
+            return
+        try:
+            from .. import files as F
+
+            got = F.read_bytes(None, str(absolute))
+        except Exception as exc:  # noqa: BLE001 - a refusal, not a traceback
+            status, payload = FF.refusal(
+                str(getattr(exc, "code", "") or "FILES_IO"),
+                str(getattr(exc, "detail", "") or exc),
+                endpoint="file/raw")
+            handler._json(payload, status)
+            return
+        download = str((q or {}).get("download") or "").lower() in (
+            "1", "true", "yes", "on")
+        disposition = "attachment" if download else "inline"
+        body = bytes(got.get("data") or b"")
+        name = str(got.get("name") or absolute.name)
+        handler._send(200, body, str(got.get("mime")
+                                     or "application/octet-stream"),
+                      extra_headers=[("Content-Disposition",
+                                      f'{disposition}; filename="{name}"')])
+
+    return handle
 
 
 def h_wb_gateway(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1624,6 +1823,14 @@ _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "clarify_respond": clarify_respond,
     "clarify_family": clarify_family,
     "file_family": file_family,
+    "h_wb_file_read": h_wb_file_read,
+    "h_wb_file_raw": h_wb_file_raw,
+    "wb_commands": wb_commands,
+    "wb_commands_exec": wb_commands_exec,
+    "wb_commands_bundles": wb_commands_bundles,
+    "wb_commands_bundles_resolve": wb_commands_bundles_resolve,
+    "wb_commands_moa_resolve": wb_commands_moa_resolve,
+    "wb_btw": wb_btw,
     "workspace_list": workspace_list,
     "workspaces": workspaces,
     "profile_active": profile_active,
@@ -1678,6 +1885,18 @@ def wbui_handlers() -> Dict[str, Callable[..., Tuple[int, Any]]]:
 # ---------------------------------------------------------------------------
 # SSE: the two paths that are streams, not JSON
 # ---------------------------------------------------------------------------
+def is_blocking(sub: str) -> bool:
+    """Whether answering ``sub`` runs a subprocess (so it must leave the loop).
+
+    The git and worktree families run ``git`` and the workspace family touches
+    the project registry: both block, and the listener must hand them to a
+    worker thread instead of the event-loop thread. Purely a classification —
+    it starts nothing.
+    """
+    clean = str(sub or "").strip("/")
+    return clean.startswith(("git/", "worktree/", "worktrees"))
+
+
 def stream_kind(sub: str) -> Optional[str]:
     """``"chat"`` / ``"sessions"`` when ``sub`` must be served as SSE, else None.
 
@@ -1712,6 +1931,20 @@ def stream_kind(sub: str) -> Optional[str]:
     # stream that answered 501.
     if clean == "session/stream":
         return "session"
+    # The composer terminal's output channel (``terminal.js:559`` opens
+    # ``api/terminal/output?session_id=`` as an EventSource). It is not in the
+    # 165-endpoint list — that list is built from fetch calls — but the pane
+    # dials it the moment ``terminal/start`` succeeds, so answering 501 here
+    # would leave a started terminal with no output forever.
+    if clean == "terminal/output":
+        return "terminal"
+    # The ephemeral /btw stream: ``commands.js:2379`` takes ``stream_id`` from
+    # the POST and opens an EventSource on this path, listening for ``done``
+    # (``{answer}``) and ``apperror`` (``messages.js:10858``). A JSON answer
+    # here would make the listener reconnect forever, so it is a real stream
+    # with a bounded wait.
+    if clean == "btw/stream":
+        return "btw"
     return None
 
 
@@ -1738,6 +1971,23 @@ def stream_frames(sub: str, cfg: Any, q: Dict[str, str]) -> Iterable[str]:
         from .workbench_ui.handlers_extra import sessions_events_frames
 
         yield from sessions_events_frames(cfg)
+        return
+    if kind == "terminal":
+        from .workbench_ui import command_family as CF
+
+        frames = CF.stream_frames("terminal/output", cfg, dict(q or {}))
+        if frames is not None:
+            yield from frames
+        return
+    if kind == "btw":
+        from .workbench_ui import handlers_commands as HC
+
+        stream_id = str((q or {}).get("stream_id") or "").strip()
+        if not stream_id:
+            yield ('event: apperror\\ndata: {"message": "GET /api/btw/stream '
+                   'needs ?stream_id="}\\n\\n')
+            return
+        yield from HC.btw_stream_frames(stream_id)
         return
     if kind == "session":
         # Confirm-connection only. Upstream also pushes bg_task_complete and

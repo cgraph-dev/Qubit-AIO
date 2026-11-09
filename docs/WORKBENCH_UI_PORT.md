@@ -147,17 +147,17 @@ The brief's ~165 was an estimate; 184 is the measurement.
 > §2.4 were then confirmed by matching each endpoint's real request form. The
 > number to trust is §2.4's 6, and `_endpoint_table.py` re-derives it.
 
-### 2.2 Verdict summary — 73 PORT / 6 EXISTING / 105 GAP of 184
+### 2.2 Verdict summary — 91 answered / 93 GAP of 184
 
 | Verdict | Endpoints | What it means |
 |---|---:|---|
-| **PORT** | 73 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
+| **PORT** | 85 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
 | **EXISTING** | 6 | `qubit_compat.ROUTES` already serves this exact path; the shim passes through to `qubit_compat.dispatch`. |
-| **GAP** | 105 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
-| **Total** | **184** | 73 + 6 + 105, checked in `_endpoint_table.py`. |
+| **GAP** | 93 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
+| **Total** | **184** | 85 PORT (the 6 EXISTING are counted inside that 85) + 93 GAP, checked in `_endpoint_table.py`. |
 
-**"How many of the 165 work" → 79 of 184** (73 ported + 6 existing) answer real
-Qubit data; 105 answer a typed refusal. The brief's ~165 was an estimate; the
+**"How many of the 165 work" → 91 of 184** answer real Qubit data; 93 answer a
+typed refusal. The brief's ~165 was an estimate; the
 measured distinct count is 184 after normalising template tails. Every number
 here is reproduced mechanically by `voicebridge/workbench_ui/_endpoint_table.py`
 (which prints this very table), so the doc cannot drift from the code.
@@ -169,6 +169,12 @@ the 48 → 73 growth: `settings`, `providers` (+`/delete`), `reasoning`,
 is a truthful read of Qubit's own gate; every passkey path is a deliberate typed
 refusal because Qubit has no WebAuthn credential store — see §2.5.
 
+The workbench **command families** (`voicebridge/workbench_ui/command_family.py`)
+add the five workspace-registry paths the panel had been calling since the port
+landed (`/api/workspaces/add|rename|remove|reorder`, plus the refused
+`/api/workspace/upload`) and re-bind the four `/api/terminal/*` rows that used to
+be a blanket `PTY_NO_SHELL` refusal — see §2.3.2.
+
 The remaining count correction is a MEASUREMENT fix, not new code: seven routes
 the gateway already answered (`dashboard/config`, `dashboard/status`,
 `health/agent`, `onboarding/status`, `client-events/log`,
@@ -176,12 +182,12 @@ the gateway already answered (`dashboard/config`, `dashboard/status`,
 `PORT_SET` and were being counted GAP. `_endpoint_table.py` now reads them, so
 the receipt matches what the server actually answers.
 
-## 2.3 The PORT set (73) — what each maps to
+## 2.3 The PORT set (85) — what each maps to
 
 Every handler resolves its dependency INSIDE the call and answers a typed 503
 when it is absent (the `workbench_routes.py` rule: a missing capability is a
 refusal, never an ImportError at boot). `_endpoint_table.py` asserts this table
-has exactly the 73 PORT entries and no others.
+has exactly the 85 PORT entries and no others.
 
 | Endpoint | Method | Qubit authority |
 |---|---|---|
@@ -229,10 +235,30 @@ has exactly the 73 PORT entries and no others.
 | `/api/share/create` | POST | typed refusal `SHARE_UNAVAILABLE`. |
 | `/api/skills/content` | GET | skills list + file read through `voicebridge.files` confinement. |
 | `/api/skills/toggle` | POST | existing skill toggle route. |
-| `/api/terminal/close` | POST | pairs with start. |
-| `/api/terminal/input` | POST | same `PTY_NO_SHELL` gate. |
-| `/api/terminal/resize` | POST | same `PTY_NO_SHELL` gate. |
-| `/api/terminal/start` | POST | **typed refusal** `PTY_NO_SHELL` (Qubit forbids raw shell spawn). The xterm pane mounts and shows the refusal instead of sitting blank. |
+| `/api/terminal/close` | POST | `workbench_ui/terminal_family.close` — drops the agent session (idempotent). |
+| `/api/terminal/input` | POST | `terminal_family.input_text` → `chat_transport.AgentPtySession.feed` (one agent turn on Enter). |
+| `/api/terminal/resize` | POST | `terminal_family.resize` — records the pane geometry. |
+| `/api/terminal/start` | POST | `terminal_family.start` — an **agent-backed** terminal. No shell, no PTY: `PTY_NO_SHELL` still holds for every process-spawning path. Every payload carries `backend:"agent"`, `shell:false`. The pane's `api/terminal/output` EventSource is served as a live SSE stream from the same family. |
+
+#### 2.3.2 The git / worktree / workspace families
+
+Served by `voicebridge/workbench_ui/command_family.py` (routes) over
+`git_family.py`, `git_repo.py`, `git_format.py`, `terminal_family.py`,
+`workspace_family.py`, gated by `workspace_scope.py` and executed through
+`cmdrun.py`. Every path is proven inside a REGISTERED workspace root before a
+command exists to run; outside is `WB_WORKSPACE_OUTSIDE` (403) and nothing
+executes. The ported page itself calls only the `terminal/*` and `workspaces/*`
+rows (the git family is the coding rail's contract, served here because the
+workbench serves the same checkout).
+
+| Endpoint | Method | Qubit authority |
+|---|---|---|
+| `/api/git/status`, `/log`, `/diff`, `/branches`, `/worktrees`, `/review/rev-parse` | GET | `git_family` over `cmdrun`/`git_repo`, parsers shared with `qubit_cli.web_git`; `.env`/`auth.json` never diffed (`GIT_SENSITIVE_PATH`). |
+| `/api/git/stage`, `/unstage`, `/discard`, `/commit`, `/branch/switch`, `/push`, `/pull`, `/worktree/add`, `/worktree/remove` | POST | validate → shared confirm journal → `git.write.<verb>` grant (same journal and grant the original `/api/git/...` compat rows use), `applied:false`. `stage` requires explicit `paths` — no `add -A`. |
+| `/api/workspaces` | GET | `voicebridge.projects.list_projects` rows (one per registered folder) + `terminal_remote_backend:false`. |
+| `/api/workspaces/add`, `/remove`, `/rename` | POST | `projects.add_folder` / `remove_folder` / `rename`, after the shared confirm journal settles. |
+| `/api/workspaces/reorder` | POST | typed `501 WORKSPACE_ORDER_UNSUPPORTED` — the registry has no order field. |
+| `/api/workspace/upload` | POST | typed `403 WB_BROKERED_WRITE` — file writes are brokered (`file_patch`). |
 
 #### 2.3.1 The config / extension / auth wave (the 48 → 73 growth)
 
@@ -324,7 +350,7 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 
 **Commands & bundles** (5): `/api/commands`, `/api/commands/bundles`, `/api/commands/bundles/resolve`, `/api/commands/exec`, `/api/commands/moa/resolve`
 
-**Workspaces & project management** (10): `/api/projects/bind`, `/api/projects/create`, `/api/projects/delete`, `/api/projects/rename`, `/api/workspaces`, `/api/workspaces/add`, `/api/workspaces/remove`, `/api/workspaces/rename`, `/api/workspaces/reorder`, `/api/workspaces/suggest`
+**Workspaces & project management** (5): `/api/projects/bind`, `/api/projects/create`, `/api/projects/delete`, `/api/projects/rename`, `/api/workspaces/suggest` — the four `/api/workspaces/*` writes and the listing are PORT rows (§2.3.2).
 
 **Files, mutating (read-only seam)** (15): `/api/escape/authorize`, `/api/escape/file/raw`, `/api/escape/file/read`, `/api/escape/list`, `/api/file/create`, `/api/file/create-dir`, `/api/file/delete`, `/api/file/move`, `/api/file/office-save`, `/api/file/open-vscode`, `/api/file/path`, `/api/file/raw`, `/api/file/rename`, `/api/file/reveal`, `/api/folder/download`
 

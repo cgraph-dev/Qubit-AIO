@@ -3952,8 +3952,34 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     and str(query.get("probe") or "") not in ("1", "true", "yes")):
                 R.stream_sse(self, sub, cfg, query)
                 return True
-            status, payload = R.h_wb_gateway(
-                cfg, query, body, {"sub": sub, "method": method})
+            # ``/api/file/raw`` is a BYTES route: the browser assigns it to an
+            # ``<img>``/``<iframe>``/download anchor (``workspace.js:291``), so
+            # it needs a body + content type, not a ``(status, json)`` tuple.
+            # Claimed here, before the JSON dispatcher, exactly like the SSE
+            # routes above.
+            raw = R.raw_handler(sub)
+            if raw is not None:
+                raw(self, cfg, query)
+                return True
+            # The git/worktree families run ``git``. This listener serves
+            # several threads, but an endpoint that blocks is still wrong on
+            # one: it holds a thread for the whole command, and the same
+            # handlers are reachable from an event-loop context. Handing the
+            # blocking families to a worker is the vendored dashboard's own
+            # pattern (``qubit_cli/web_routers/git.py::_git_op`` uses
+            # ``run_in_executor`` for exactly this).
+            run = R.h_wb_gateway
+            if R.is_blocking(sub):
+                from concurrent.futures import ThreadPoolExecutor
+
+                with ThreadPoolExecutor(max_workers=1,
+                                        thread_name_prefix="wb-git") as pool:
+                    status, payload = pool.submit(
+                        run, cfg, query, body,
+                        {"sub": sub, "method": method}).result()
+            else:
+                status, payload = run(
+                    cfg, query, body, {"sub": sub, "method": method})
             self._json(payload, status)
             return True
         R.serve_asset(self, "/" if path == mount else path[len(mount):],
