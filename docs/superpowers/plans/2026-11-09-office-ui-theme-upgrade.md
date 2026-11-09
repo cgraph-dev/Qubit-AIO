@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.14 + Pillow (build/validate/serve), TypeScript/React 19 (host-provided React), Vitest (jsdom), pytest, Playwright (Python), the existing `/plugins/` static route and `_serve_app_html` document injector.
 
-**Spec:** `docs/DECISIONS.md` rulings 14 and 15; `THIRD_PARTY_NOTICES.md` §"LimeZu — purchased office art"; the 2026-11-09 asset audit of `/home/trick/Desktop/UI Office`.
+**Spec:** `docs/DECISIONS.md` rulings 14 and 15; `THIRD_PARTY_NOTICES.md` §"LimeZu — purchased office art"; the 2026-11-09 asset audit of the owner's local download (not in the repo).
 
 ---
 
@@ -44,6 +44,13 @@
 | 8 | **Visual regression discipline**: element shots, animations/caret off, fixed clock, data stubbed, baselines reviewed | `https://playwright.dev/docs/test-snapshots`, `https://diffy.website/blog/playwright-visual-regression-testing/` | Opt-in Playwright goldens at DPR 1/2. |
 | 9 | **Pixel art**: `image-rendering: pixelated`, integer scaling, DPR caveats | `https://developer.mozilla.org/en-US/docs/Games/Techniques/Crisp_pixel_art_look` | Atlas tiles are natively 32 px, displayed at exactly 32 px. |
 | 10 | **9-slice** `border-image` guidance | `https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/border-image-slice` | Optional, validated slices; tokens-only in v1. |
+| 11 | **Archive extraction is an attack surface** (zip slip, symlinks, zip bombs, Unicode/case duplicates, device names, ADS) | `https://best.openssf.org/Secure-Coding-Guide-for-Python/04_neutralization/pyscg-0012/`, `https://nocomplexity.github.io/fileaudit/zip_validations.html`, `https://github.com/umar0x/decompress` | Install validates NFC-normalised paths, case-insensitive duplicates, depth/size/ratio caps, no symlinks/encryption/unsupported compression, temp dir → readback → atomic rename. |
+| 12 | **CSS background sprites need an accessible name**; background images are invisible to AT and can fail to load | `https://www.w3.org/WAI/GL/wiki/ARIATechnique_usingImgRole_with_aria-label_forCSS-backgroundImage`, `https://developer.mozilla.org/en-US/docs/Web/Accessibility/ARIA/Reference/Roles/img_role`, `https://www.bbc.co.uk/accessibility/forproducts/guides/mobile/background-images` | Sprite gets `role="img"` + `aria-label`; the emoji stays as a visible fallback when CSS fails and is `aria-hidden` only when the sheet is ready. |
+| 13 | **Contrast thresholds are per element class**, not one pair; game UI needs 4.5 text / 3 non-text / 3 disabled, and colour alone is not enough | `https://devdocs.xbox.com/build/game-principles/accessibility/xag-deep-dives/xag-102-contrast`, `https://developer.mozilla.org/en-US/docs/Web/Accessibility/Guides/Understanding_WCAG/Perceivable/Color_contrast` | Contrast matrix over text, muted, accent, border, status and level colours; no colour-only state (the office already pairs colour+shape). |
+| 14 | **Visual checks inside iframes are finicky**: element shots only, stable dimensions, animations disabled *inside* the frame, no full-page host shots | `https://playwright.dev/docs/api/class-framelocator`, `https://github.com/microsoft/playwright/issues/37367` | Frame-scoped locators, fixed viewport + `--force-device-scale-factor=1`, animations/caret off, no full-page iframe shot. |
+| 15 | **An allowlist of third-party variables can drift** (Netflix rejected an allowlist for that reason) | `https://github.com/Netflix/metaflow-ui/pull/204` | Deliberate, versioned allowlist + a **drift report** that lists `.ui-root` variables in the vendored CSS not yet themed; it warns, never fails the build. |
+| 16 | **Local paths must not ship** (repo clean-tree rule; a committed `theme.json` could carry `/home/<user>/…`) | repo `AGENTS.md` clean-tree/provenance rules | `source` is a sanitised description, never a filesystem path; a guard scans committed theme JSON for `/home/`, `~/`, `C:\Users`, `\\`. |
+| 17 | **`?theme=` must reach the framed document too**, or host and iframe disagree | local design review | The override is propagated on the iframe URL and read by `_serve_app_html`; both sides use the same validated payload. |
 
 ---
 
@@ -56,6 +63,8 @@
 - **No raw archives in the tree.** Derived files only, each sha256 + byte length.
 - **Owner decision O1/C4:** no celebrity/meme sprite families.
 - **No new polling/remounts.** Docks keep stable identity (`c5bd8a69b`).
+- **No operator paths in shipped files.** Theme manifests use a sanitised `source` description; `/home/…`, `~/`, `C:\Users\…` and UNC paths are refused and scanned for.
+- **Archive installs are hostile input.** NFC/case-insensitive duplicate checks, no symlinks/encrypted entries/unsupported compression, depth/size/ratio caps, atomic publish.
 - **No source-shape tests.** Behaviour and artifacts only.
 - **No service restart during implementation;** focused tests; `VERIFIED` not claimed.
 
@@ -72,7 +81,7 @@
   "version": "1.0.0",
   "license": "LimeZu … redistribution prohibited; credit required",
   "credit": "LimeZu — https://limezu.itch.io",
-  "source": "owner purchase 2026-11-09",
+  "source": "owner purchase of LimeZu Modern Interiors + Modern User Interface, 2026-11-09",
   "tokens": {
     "color-surface": "#0d0d1a",
     "color-surface-raised": "#161a23",
@@ -99,10 +108,10 @@
 `index.json`: `{"schema":1,"size":32,"cols":20,"cells":{"ceo":[0,0],"lead-quality":[1,0]}}`.
 
 Validation:
-- exact format/schema; id `^[a-z0-9][a-z0-9-]{0,39}$`; non-empty credit/license.
+- exact format/schema; id `^[a-z0-9][a-z0-9-]{0,39}$`; non-empty credit/license; `source` is a description, not a path (no `/home/`, `~/`, drive/UNC).
 - files: relative, `[A-Za-z0-9._/-]`, no `.`/`..`, no Windows reserved basename, allowlisted suffix, no symlink, exists, `bytes`/`sha256` match; case-insensitive duplicates refused; totals within limits.
 - tokens: key `^[a-z][a-z0-9-]{1,40}$`; **typed values only** — colors `^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$`, lengths `^(0|[1-9][0-9]{0,3})(px|rem|em)$`; reject `url(`, `image-set(`, `src(`, `var(`, `attr(`, `@`, `\`, `;`, `}` anywhere.
-- portraits: atlas/index declared; size ∈ {16,32,48}; index schema matches; every slug cell inside `cols×rows`.
+- portraits: atlas/index declared; size ∈ {16,32,48}; index schema matches; every slug cell inside `cols×rows`; atlas pixel size == `cols×rows×size`; the index may not contain local paths or scripts.
 - slices (optional): 4 positive ints, `width` px, `repeat ∈ stretch|round|repeat`, `src` declared.
 - contrast: `color-text-primary` vs `color-surface` ≥ 4.5; `color-text-muted` vs `color-surface` ≥ 3.0.
 
@@ -122,6 +131,7 @@ Not themed: `--side-w`, `--drawer-w`, `--top-h`, `--gap`, `--free-*`, `--font-*`
 | `voicebridge/qubit_compat.py` | `GET /api/office/theme` (+ `?theme=`), panel call |
 | `scripts/office_theme_build.py` | Atlas + index + manifest + QA (deterministic) |
 | `scripts/office_theme_extract.py` | Read owner packs in memory → portrait layers (32/48) + contact sheet + `--check` |
+| `scripts/office_theme_audit.py` | Drift report: `.ui-root` variables in the vendored CSS vs `ALLOWED_THEME_VARS` (warning, exit 0) |
 | `frontend/qubit-web/public/plugins/qubit-office/themes/limezu/…` | Generated, committed pack |
 | `frontend/qubit-app/plugins/qubit-office/game/app/office-theme.ts` | Fetch theme, host tokens/classes, portrait readiness |
 | `AgentsPanel.tsx` / `agents-panel.ts` | Atlas sprite rows + emoji fallback |
@@ -147,6 +157,17 @@ Not themed: `--side-w`, `--drawer-w`, `--top-h`, `--gap`, `--free-*`, `--font-*`
 ])
 def test_dangerous_token_values_are_refused(value):
     assert T.validate_tokens({"color-accent": value}), value
+
+def test_source_must_not_be_a_local_path(tmp_path):
+    pack = _pack(tmp_path / "demo", source="/home/alice/Desktop/UI Office")
+    assert any("path" in p for p in T.validate_theme(pack))
+
+def test_duplicate_after_unicode_normalisation_is_refused(tmp_path):
+    manifest = _manifest()
+    # 'e' + combining acute vs precomposed 'é'
+    manifest["files"] = {"portraits/café.png": {"sha256": "0"*64, "bytes": 1},
+                         "portraits/caf\u00e9.png": {"sha256": "0"*64, "bytes": 1}}
+    assert any("duplicate" in p for p in T.validate_manifest(manifest))
 
 def test_token_css_only_allowlisted_vars():
     css = T.token_css({"color-accent": "#7cc8ff", "radius-control": "4px"}, {}, "/plugins/x", "1.0.0")
@@ -202,7 +223,7 @@ def test_token_css_only_allowlisted_vars():
 
 **Files:** `agents-panel.ts`, `AgentsPanel.tsx`; test `agents-panel.test.ts`.
 
-- [ ] **Step 1: failing tests** — a seat’s cell renders a 32×32 sprite span with `role="img"` + `aria-label`; the emoji remains in the DOM as fallback until the sheet is ready; a broken sheet leaves emojis visible (preload failure path); no per-seat `<img>` requests.
+- [ ] **Step 1: failing tests** — a seat’s cell renders a 32×32 sprite span with `role="img"` + `aria-label="<name> portrait"`; the emoji stays in the DOM as the visible fallback until the sheet is ready and is `aria-hidden="true"` only once the sheet is confirmed; a broken sheet keeps emojis visible and announced; no per-seat `<img>` requests; keyboard/AT focus order unchanged.
 - [ ] **Step 2: run → FAIL.**
 - [ ] **Step 3: implement** — preload `atlas` once, add `office-portraits-ready` to the panel root on success, position via `background-position: calc(-1 * var(--cell-x) * 32px) calc(-1 * var(--cell-y) * 32px)`, `image-rendering: pixelated`, fixed 32×32 box (no layout shift).
 - [ ] **Step 4: run** office-app Vitest.
@@ -219,7 +240,9 @@ def test_token_css_only_allowlisted_vars():
 - [ ] **Step 1: failing tests**
   - server: office app document contains exactly one `<style data-office-theme>` only when a theme is active; it appears **after** `</head>`’s stylesheet link; other plugin apps get none; the style contains only allowlisted vars and no `url(`; CSP remains `style-src 'self' 'unsafe-inline'`;
   - host: classic ⇒ no class/link/fetch; active ⇒ one link + `data-office-theme`; idempotent; dispose removes; a parent rerender does not change the iframe `src` or remount the dock;
-  - menu: if `.ui-btn-group[aria-label="Panels"]` is missing, the fallback icon buttons render in the host so the feature never disappears after an upstream change.
+  - override: `?theme=limezu` themes the host **and** the iframe (the override is appended to the iframe URL and read by `_serve_app_html`); an invalid override falls back to `classic` on both sides;
+  - existing office-document contract tests are updated for the extra `<style>` (they must still assert the token/stream globals and CSP);
+  - menu: if `.ui-btn-group[aria-label="Panels"]` is missing after a bounded wait, fallback icon buttons render in the host; if the group appears later, injection takes over and the fallback is removed (never both at once).
 - [ ] **Step 2: run → FAIL.**
 - [ ] **Step 3: implement** server injection (office app only, after the app stylesheet, `html body .ui-root`), host loader (one `no-store` fetch, `?v=`), menu fallback, dispose.
 - [ ] **Step 4: run** tests.
@@ -261,7 +284,10 @@ def test_token_css_only_allowlisted_vars():
   - **Habblaud unchanged:** `python3 scripts/vendor_habblaud.py --check` exits 0;
   - the office document’s theme style appears only for `qubit-office`, never another plugin app;
   - active theme ⇒ 283 seats, no file map in the payload, credit present;
-  - `LICENSE-ASSETS` exists and the payload carries the credit.
+  - `LICENSE-ASSETS` exists and the payload carries the credit;
+  - **no operator paths** in committed theme JSON (`/home/`, `~/`, `C:\\Users`, `\\\\`);
+  - **contrast matrix** passes for text, muted, accent, border, status and level colours against the two surfaces (4.5 text / 3.0 non-text), and disabled states are ≥ 3.0;
+  - **allowlist drift report:** `python3 scripts/office_theme_audit.py` lists `.ui-root` variables in the vendored CSS that are not in `ALLOWED_THEME_VARS` (warning only; no build failure).
 - [ ] **Step 2: run → FAIL.**
 - [ ] **Step 3: implement the visual probe.** `QUBIT_OFFICE_VISUAL=1`; loopback `WebUI`; stub tower/stream/panel; Playwright at DPR 1 and 2; animations off, caret hidden, clock fixed; element screenshots of the Agents panel and the menu group; baselines committed and updated only after review.
 - [ ] **Step 4: run guards + probe + `vendor_habblaud.py --check`.**
@@ -295,6 +321,8 @@ def test_token_css_only_allowlisted_vars():
 | Visual goldens | `QUBIT_OFFICE_VISUAL=1 scripts/run_tests.sh tests/test_office_visual_regression.py -q` | pass at DPR 1 and 2 |
 | Build | `npx vite build --config vite.office-game.config.ts` | succeeds |
 | Reproducibility | `python3 scripts/office_theme_extract.py --check` | decoded pixels + JSON identical |
+| Clean tree | `scripts/run_tests.sh tests/test_office_theme.py -q -k "operator_path or duplicate"` | pass (no operator path, no Unicode/case duplicate) |
+| Drift report | `python3 scripts/office_theme_audit.py` | lists new unthemed `.ui-root` vars; exit 0 |
 | Live classic | `/qubit-office` no theme | identical look, no extra requests, HUD marker 15 s |
 | Live themed | `office.theme: limezu` / `?theme=limezu` | atlas = **1** image request, credit visible, menu order unchanged, game interactive |
 | Rollback | `QUBIT_OFFICE_THEME=classic` | immediate classic look |
@@ -311,7 +339,8 @@ def test_token_css_only_allowlisted_vars():
 3. **New art:** run the extractor with a new `--source`, rebuild, `--check`, review goldens.
 4. **New surfaces:** consume `loadOfficeTheme`; no new fetch/format.
 5. **Share:** zip, publish sha, `qubit office theme install`.
-6. **Vendor upgrade:** if Habblaud is ever updated for security/upstream, re-run the menu-group selector test and the theme goldens; the fallback buttons cover a changed selector.
+6. **Vendor upgrade:** if Habblaud is ever updated for security/upstream, re-run the menu-group selector test, `office_theme_audit.py` (new `.ui-root` variables) and the goldens; the fallback buttons cover a changed selector. Never patch Habblaud for a theme — add the new variable to the allowlist instead.
+7. **Never commit a personal path.** `source` is a description; the clean-tree guard scans theme JSON.
 
 ## Self-review
 

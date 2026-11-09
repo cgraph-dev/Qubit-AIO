@@ -174,7 +174,7 @@ done
     or substitute it.
     → Provenance: owner session 2026-11-09; inventory, licence quotes and
     sha256s in `THIRD_PARTY_NOTICES.md`. Source files live at
-    `/home/trick/Desktop/UI Office` and are not part of the repo.
+    `the owner's local download (2026-11-09)` and are not part of the repo.
 
 15. **Habblaud stays vendored and unpatched for UI work (owner ruling, 2026-11-09).**
     The Office UI upgrade must **not** modify, patch, rebuild, or re-vendor the

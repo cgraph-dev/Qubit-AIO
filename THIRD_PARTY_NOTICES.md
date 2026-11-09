@@ -990,7 +990,7 @@ statement in distributions:
 ## LimeZu — purchased office art (office UI upgrade)
 
 Owner-purchased pixel-art packs held outside the repository at
-`/home/trick/Desktop/UI Office` (not vendored wholesale; only chosen
+`the owner's local download (2026-11-09)` (not vendored wholesale; only chosen
 files/slices would be added, each with its licence recorded here). Owner
 ruling 14 in `docs/DECISIONS.md` permits in-game use with credit.
 
