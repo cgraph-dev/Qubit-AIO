@@ -20,7 +20,9 @@ import type { RosterRow } from './types'
 // the origin, install via skills.manage, and bubble onInstalled so the
 // checklist above gains the row. Search-box fallback kept for offline use.
 
-const HUB_ORIGIN = 'https://github.com/cgraph-dev/Qubit-AIO'
+// Exported so tests post picks from the origin the handler actually trusts
+// instead of a hardcoded one that can drift from it silently.
+export const HUB_ORIGIN = 'https://github.com/cgraph-dev/Qubit-AIO'
 const HUB_PICKER_URL = HUB_ORIGIN + '/docs/skills?embed=picker'
 /** One `skills.manage action=search` hit. */
 interface HubSkillResult {

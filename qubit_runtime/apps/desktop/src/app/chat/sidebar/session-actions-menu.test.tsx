@@ -167,7 +167,7 @@ describe('SessionActionsMenu', () => {
   })
 
   it('passes profile to renameSession when submitting from RenameSessionDialog', async () => {
-    const { renameSession } = await import('@/qubit')
+    const { renameSession } = await import('@/hermes')
     vi.mocked(renameSession).mockResolvedValue({ ok: true, title: 'Prep Butler' })
 
     render(

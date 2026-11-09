@@ -24,7 +24,9 @@ import { $paneHeightOverride, setPaneHeightOverride } from '@/store/panes'
 // to the parent window. We validate the origin and route the install through
 // the standard hub action pipeline (background action + tailed log + Skills
 // list invalidation), scoped to the Capabilities profile selector.
-const HUB_ORIGIN = 'https://github.com/cgraph-dev/Qubit-AIO'
+// Exported so tests post picks from the origin the component actually trusts
+// instead of a hardcoded one that can drift from it silently.
+export const HUB_ORIGIN = 'https://github.com/cgraph-dev/Qubit-AIO'
 const HUB_PICKER_URL = `${HUB_ORIGIN}/docs/skills?embed=picker`
 
 // Hub viewport height: persisted through the shared pane store (same one the

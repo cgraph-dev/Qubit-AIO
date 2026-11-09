@@ -14,8 +14,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { translateBots } from './i18n-test-helper'
-
-const HUB_ORIGIN = 'https://hermes-agent.nousresearch.com'
+import { HUB_ORIGIN } from './skills-hub'
 
 const mocks = vi.hoisted(() => ({
   notify: vi.fn(),

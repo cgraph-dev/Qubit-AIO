@@ -28,9 +28,18 @@ export interface ArtifactLoadResult {
   failures: ArtifactLoadFailure[]
 }
 
+/** Page size for one artifact-index read. */
+const ARTIFACT_PAGE_SIZE = 500
+
+/** Default cap on one page's serialized JSON (see `maxPageJsonChars`). */
+const ARTIFACT_DEFAULT_MAX_PAGE_JSON_CHARS = 32_000_000
+
 const MARKDOWN_IMAGE_RE = /!\[([^\]]*)\]\(([^)\s]+)\)/g
 const MARKDOWN_LINK_RE = /\[([^\]]+)\]\(([^)\s]+)\)/g
-const URL_RE = /https?:\/\/[^\s<>"')]+/g
+// Backticks terminate a capture: a URL inside inline code (`https://x`) would
+// otherwise keep the closing delimiter, and trailing-punctuation trimming does
+// not strip it.
+const URL_RE = /https?:\/\/[^\s<>"'`)]+/g
 const PATH_RE = /(^|[\s("'`])((?:\/|~[\\/]|\.\.?[\\/]|\\\\)[^\s"'`<>]+(?:\.[a-z0-9]{1,8})?)/gi
 const WINDOWS_PATH_RE = /(^|[\s("'`])([A-Za-z]:[\\/][^\s"'`<>]+(?:\.[a-z0-9]{1,8})?)/gi
 const IMAGE_EXT_RE = /\.(?:png|jpe?g|gif|webp|svg|bmp)(?:\?.*)?$/i
@@ -519,17 +528,48 @@ export function collectArtifactsForSession(session: SessionInfo, messages: Sessi
 
 export async function loadArtifactsForSessions(
   sessions: SessionInfo[],
-  loadMessages: (session: SessionInfo) => Promise<SessionMessage[]>
+  loadMessages: (
+    session: SessionInfo,
+    page: { limit: number; offset: number }
+  ) => Promise<{
+    messages: SessionMessage[]
+    pagination?: { limit: number; offset: number; order?: 'latest' | 'oldest' | undefined; returned: number }
+  }>,
+  options: { maxPageJsonChars?: number } = {}
 ): Promise<ArtifactLoadResult> {
   const artifacts: ArtifactRecord[] = []
   const failures: ArtifactLoadFailure[] = []
+  const maxPageJsonChars = options.maxPageJsonChars ?? ARTIFACT_DEFAULT_MAX_PAGE_JSON_CHARS
 
-  // Keep only one transcript resident at a time. Recent sessions can each be
-  // tens of megabytes, so loading the whole page concurrently can exhaust both
-  // the Desktop renderer and a remote dashboard backend.
+  // Keep only one transcript page resident at a time. Recent sessions can each
+  // be tens of megabytes, so loading the whole page concurrently can exhaust
+  // both the Desktop renderer and a remote dashboard backend.
   for (const session of sessions) {
     try {
-      const messages = await loadMessages(session)
+      const messages: SessionMessage[] = []
+      let offset = 0
+
+      while (true) {
+        const page = await loadMessages(session, { limit: ARTIFACT_PAGE_SIZE, offset })
+
+        if ((JSON.stringify(page.messages) ?? '').length > maxPageJsonChars) {
+          throw new Error(
+            'One transcript page exceeds the Desktop safe-load limit for artifact indexing; ' +
+              'use the Web Dashboard export for this session.'
+          )
+        }
+
+        messages.push(...page.messages)
+
+        // A backend that predates pagination answers in full every time, so
+        // there is no next page to ask for.
+        if (!page.pagination || page.messages.length === 0 || page.messages.length < page.pagination.limit) {
+          break
+        }
+
+        offset += page.messages.length
+      }
+
       artifacts.push(...collectArtifactsForSession(session, messages))
     } catch (error) {
       failures.push({ error, session })

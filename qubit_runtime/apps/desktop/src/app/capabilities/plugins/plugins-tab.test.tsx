@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { $pluginDecisions, $pluginRecords, dropPlugin, patchPlugin, publishPlugin } from '@/contrib/plugins-store'
+import { CATALOG_ORIGIN } from '@/lib/plugin-catalog'
 import { queryClient } from '@/lib/query-client'
 import { $agentPlugins, $agentPluginsStatus } from '@/store/agent-plugins'
 import { $confirmRequest, settleConfirm } from '@/store/confirm'
@@ -238,7 +239,7 @@ describe('PluginsTab', () => {
           tier: 'community',
           type: 'hermes-plugin-pick'
         },
-        origin: 'https://hermes-agent.nousresearch.com'
+        origin: CATALOG_ORIGIN
       })
     )
 
@@ -333,7 +334,7 @@ describe('PluginsTab', () => {
           subdir: 'nested-plugin',
           type: 'hermes-plugin-pick'
         },
-        origin: 'https://hermes-agent.nousresearch.com'
+        origin: CATALOG_ORIGIN
       })
     )
 
@@ -680,7 +681,7 @@ describe('PluginsTab catalog UX', () => {
           repo: 'https://github.com/example/demo-weather',
           type: 'hermes-plugin-pick'
         },
-        origin: 'https://hermes-agent.nousresearch.com'
+        origin: CATALOG_ORIGIN
       })
     )
 
@@ -713,7 +714,7 @@ describe('PluginsTab catalog UX', () => {
           repo: 'https://github.com/example/demo-weather',
           type: 'hermes-plugin-pick'
         },
-        origin: 'https://hermes-agent.nousresearch.com'
+        origin: CATALOG_ORIGIN
       })
     )
 

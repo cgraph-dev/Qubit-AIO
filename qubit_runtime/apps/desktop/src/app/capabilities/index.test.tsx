@@ -263,7 +263,7 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
 
   it('hub picker refuses to reinstall an already-installed skill', async () => {
     const { notify } = await import('@/store/notifications')
-    const { EmbeddedHubPicker } = await import('./skills/embedded-hub-picker')
+    const { EmbeddedHubPicker, HUB_ORIGIN } = await import('./skills/embedded-hub-picker')
 
     render(<EmbeddedHubPicker installedNames={new Set(['web-research'])} profile={null} />)
 
@@ -274,7 +274,7 @@ describe('CapabilitiesView toolset management', { timeout: 60_000 }, () => {
       window.dispatchEvent(
         new MessageEvent('message', {
           data: { type: 'hermes-skill-pick', name: 'web-research', identifier: 'web-research' },
-          origin: 'https://hermes-agent.nousresearch.com'
+          origin: HUB_ORIGIN
         })
       )
     })
