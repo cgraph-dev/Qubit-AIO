@@ -899,3 +899,90 @@ statement in distributions:
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
 
+## mattpocock/skills — portable workflow skills (MIT)
+
+Twenty-two Qubit skills are ports of the workflow documents in
+[mattpocock/skills](https://github.com/mattpocock/skills) (MIT,
+`Copyright (c) 2026 Matt Pocock`), reviewed at pinned commit
+`4ae2317ddb22b046e26455e4f9c9b3aaaf62212d` (2026-10-31, "software-factory:
+glossary skill for designing a factory (#1316)"). Upstream paths are
+`skills/engineering/<name>/`, `skills/productivity/<name>/` and `skills/misc/<name>/`.
+
+Ported skills with their local names and locations:
+
+- From `skills/engineering/`: `ask-matt`, `codebase-design`, `code-review`,
+  `diagnosing-bugs`, `domain-modeling`, `grill-with-docs`, `implement`,
+  `implement-spec`, `improve-codebase-architecture`, `pr`, `prototype` →
+  `skills/software-development/<name>/` at the same names.
+- From `skills/productivity/`: `grilling`, `grill-me`, `handoff`, `teach`,
+  `to-questionnaire`, `wait-what`, `writing-for-agents` →
+  `skills/productivity/<name>/` at the same names.
+- From `skills/misc/`: `git-guardrails-claude-code` → `skills/devops/git-guardrails/`
+  (renamed), `migrate-to-shoehorn`, `scaffold-exercises`, `setup-pre-commit` →
+  `skills/devops/<name>/` at the same names.
+
+Supporting files carried across as `references/` and `scripts/`:
+`ask-matt/PHASE-BOUNDARIES.md`, `codebase-design/{DEEPENING,DESIGN-IT-TWICE}.md`,
+`diagnosing-bugs/scripts/hitl-loop.template.sh`,
+`domain-modeling/{GLOSSARY-FORMAT,ADR-FORMAT}.md`,
+`git-guardrails-claude-code/scripts/block-dangerous-git.sh`,
+`improve-codebase-architecture/HTML-REPORT.md`, `pr/CREDITS.md`,
+`prototype/{LOGIC,UI}.md`,
+`teach/{MISSION-FORMAT,RESOURCES-FORMAT,LEARNING-RECORD-FORMAT}.md`,
+and `writing-for-agents/SKILL-MECHANICS.md`.
+
+Local changes (the substance — the workflow advice and reference material — is
+preserved):
+
+- **Format conversion.** Upstream's `disable-model-invocation: true` has no Qubit
+  equivalent and is removed; Qubit has no user-only skill visibility, so those
+  skills carry a normal description. Frontmatter gains `version`, `author`,
+  `license`, `platforms`, and `metadata.qubit.{tags, category, related_skills}`,
+  and every description is rewritten to Qubit's 60-character trigger form.
+- **Invocation.** Upstream's "call the Skill tool with <name>" is replaced with
+  `skill_view(name="<name>")` (and `file_path=` for supporting files), so a skill
+  reaches another through Qubit's actual loader.
+- **Rebrand.** No upstream product, vendor, or competitor names appear in skill
+  text; `git-guardrails` is retargeted from a foreign tool gate to Qubit's
+  `hooks.pre_tool_call` shell hook (exit code 2 blocks, `fail_closed` supported)
+  and renamed accordingly.
+- **Trimmed routing.** `ask-matt` routes only among the skills that exist in this
+  port; upstream skills not ported (`tdd`, `to-spec`, `to-tickets`, `triage`,
+  `wayfinder`, `retro`, `wizard`, `research`, `setup-matt-pocock-skills`) are
+  named as absent rather than linked.
+- **Third-party credit inside the port.** The `pr` skill's Summary visual menu is
+  itself adapted upstream from Dex Horthy's `show-me` skill
+  ([humanlayer/skills](https://github.com/humanlayer/skills)); that attribution is
+  reproduced in `pr/references/CREDITS.md` and travels with this record.
+- Body structure follows Qubit's section order (`When to Use`, `Prerequisites`,
+  `How to Run`, `Quick Reference`, `Procedure`, `Pitfalls`, `Verification`), with
+  shell utilities replaced by native tool names in prose.
+
+Not ported: upstream's `skills/deprecated/` and `skills/in-progress/` trees —
+retired and unfinished upstream work respectively, which would ship dead advice.
+Also not ported among the finished engineering set: `tdd`, `to-spec`, `to-tickets`,
+`triage`, `wayfinder`, `retro`, `wizard`, `research`, and
+`setup-matt-pocock-skills`, which are outside this port's scope.
+
+MIT License text requirement: include the copyright notice and this permission
+statement in distributions:
+
+> Copyright (c) 2026 Matt Pocock
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
