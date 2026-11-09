@@ -679,7 +679,11 @@ def ask(
     headers = {"Content-Type": "application/json", "Accept": "application/json", "User-Agent": USER_AGENT}
     if needs_images:
         headers[images.DANGER_ZONE_HEADER] = "true"
-    if key:
+    # Zen's free tier rejects ANY bearer ("401 Invalid credential"), so a key held for the paid
+    # Zen chat door must never be attached to the decision door — the same rule the guard above
+    # follows when it declines to *require* one. Sending it turns the only door a fresh install
+    # can open into a 401.
+    if key and via != "zen":
         headers["Authorization"] = f"Bearer {key}"
     if via == "openrouter":
         # OpenRouter asks callers to identify themselves; neither header carries anything
