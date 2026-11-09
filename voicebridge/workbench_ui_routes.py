@@ -256,6 +256,7 @@ _STATUS: Dict[str, int] = {
     "WB_CAPABILITY_UNBOUND": 501,
     "WB_NO_MODEL_INVENTORY": 503,
     "WB_NOT_IN_PORT_SET": 501,
+    "WB_EGRESS_BLOCKED": 403,
     # The config/extension/auth family (workbench_ui/handlers_config.py).
     "WB_AUTH_MODEL_UNSUPPORTED": 501,
     "WB_CREDENTIALS_NOT_IN_CONFIG": 403,
@@ -599,6 +600,143 @@ def wb_auth_logout(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _refusal("WB_BACKEND_UNAVAILABLE",
                         f"/api/auth/logout unavailable: "
                         f"{type(exc).__name__}: {exc}", endpoint="auth/logout")
+
+
+# ------------------- settings / onboarding / updates (handlers_settings.py)
+# One thin wrapper per handler, for the same reason every other family has them:
+# the gateway resolves handlers BY NAME, so a path whose name is missing from
+# ``_HANDLERS`` answers ``WB_NOT_IN_PORT_SET`` even though the code exists.
+def _s_settings(fn_name: str, cfg: Any, q: Any, b: Any, p: Any
+                ) -> Tuple[int, Any]:
+    """Delegate one settings/onboarding/updates request to its owner module."""
+    from .workbench_ui import handlers_settings as HS
+
+    fn = getattr(HS, fn_name, None)
+    if fn is None:  # pragma: no cover - a renamed handler is a build error
+        return _refusal("WB_BACKEND_UNAVAILABLE",
+                        f"the settings family has no handler {fn_name!r}",
+                        endpoint="settings")
+    return fn(cfg, dict(q or {}), b if isinstance(b, dict) else {}, dict(p or {}))
+
+
+def wb_model_auxiliary(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/model/auxiliary`` — the auxiliary-task pins (no secrets)."""
+    return _s_settings("model_auxiliary", cfg, q, b, p)
+
+
+def wb_providers_self_hosted(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/providers/self-hosted`` — refused (Qubit stores key references)."""
+    return _s_settings("providers_self_hosted", cfg, q, b, p)
+
+
+def wb_provider_cost_history(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/provider/cost-history`` — Qubit's own recorded spend per day."""
+    return _s_settings("provider_cost_history", cfg, q, b, p)
+
+
+def wb_provider_quota(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/provider/quota`` — refused: no quota state is recorded."""
+    return _s_settings("provider_quota", cfg, q, b, p)
+
+
+def wb_models_refresh(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/models/refresh`` — refused: needs the provider's credential."""
+    return _s_settings("models_refresh", cfg, q, b, p)
+
+
+def wb_onboarding_probe(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/onboarding/probe`` — bounded probe of a self-hosted endpoint."""
+    return _s_settings("onboarding_probe", cfg, q, b, p)
+
+
+def wb_onboarding_setup(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/onboarding/setup`` — provider/model through ``select_model``."""
+    return _s_settings("onboarding_setup", cfg, q, b, p)
+
+
+def wb_onboarding_complete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/onboarding/complete`` — acknowledge setup, or refuse."""
+    return _s_settings("onboarding_complete", cfg, q, b, p)
+
+
+def wb_onboarding_oauth_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/onboarding/oauth/start`` — the ONE device-code flow authority."""
+    return _s_settings("onboarding_oauth_start", cfg, q, b, p)
+
+
+def wb_onboarding_oauth_poll(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/onboarding/oauth/poll`` — one status reading of a live flow."""
+    return _s_settings("onboarding_oauth_poll", cfg, q, b, p)
+
+
+def wb_onboarding_oauth_cancel(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                               p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/onboarding/oauth/cancel`` — marks the session cancelled."""
+    return _s_settings("onboarding_oauth_cancel", cfg, q, b, p)
+
+
+def wb_system_health(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/system/health`` — host CPU/memory/disk for the insights panel."""
+    return _s_settings("system_health", cfg, q, b, p)
+
+
+def wb_health_restart_bridge(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/health/restart`` and ``POST /api/gateway/{start,stop,restart}``.
+
+    ONE refusal for every way the client asks to bounce the messaging daemon: the
+    banner button (``ui.js:14363``) and the Gateway card's lifecycle controls
+    (``panels.js:14642`` builds ``/api/gateway/<action>``). The action is only
+    used to name the request back — it never selects a different behaviour,
+    because none of them is this listener's to perform.
+    """
+    sub = str((p or {}).get("sub") or "").rstrip("/")
+    action = sub.rsplit("/", 1)[-1] if "/" in sub else "restart"
+    if action not in ("start", "stop", "restart"):
+        action = "restart"
+    code, out = _s_settings("health_restart_bridge", cfg, q, b, p)
+    if isinstance(out, dict):
+        # Re-point the refusal at the action the caller actually asked for, so
+        # the panel's toast quotes the right verb.
+        out = {**out, "endpoint": f"gateway/{action}",
+               "qubit_counterpart": f"CLI `qubit gateway {action}` (asks for "
+                                    f"confirmation), or Qubit Dashboard → System"}
+    return code, out
+
+
+def wb_gateway_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/gateway/status`` — the messaging daemon's real state."""
+    return _s_settings("gateway_status", cfg, q, b, p)
+
+
+def wb_git_info(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/git-info`` — the workspace badge's confined repo facts."""
+    return _s_settings("git_info", cfg, q, b, p)
+
+
+def wb_updates_check_q(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                       p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/updates/check`` — Qubit's OWN update source, mapped."""
+    return _s_settings("updates_check_q", cfg, q, b, p)
+
+
+def wb_updates_apply_bridge(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/updates/{apply,force,clear_lock,summary}`` — refused, named."""
+    return _s_settings("updates_apply_bridge", cfg, q, b, p)
 
 
 
@@ -1383,6 +1521,36 @@ PORT_SET: Dict[str, str] = {
     "auth/passkey/register": "wb_auth_unsupported",
     "auth/passkey/register/options": "wb_auth_unsupported",
 
+    # settings / onboarding / updates families (workbench_ui/handlers_settings.py).
+    # Same rule as every other family: an entry is here only when this listener
+    # ANSWERS it — with real data or with a typed refusal that names why. The
+    # updater writes (apply/force/clear_lock/summary) and the restart verb are
+    # refusals on purpose; the real Qubit path is named in their detail.
+    "model/auxiliary": "wb_model_auxiliary",
+    "providers/self-hosted": "wb_providers_self_hosted",
+    "provider/cost-history": "wb_provider_cost_history",
+    "provider/quota": "wb_provider_quota",
+    "models/refresh": "wb_models_refresh",
+    "onboarding/probe": "wb_onboarding_probe",
+    "onboarding/setup": "wb_onboarding_setup",
+    "onboarding/complete": "wb_onboarding_complete",
+    "onboarding/oauth/start": "wb_onboarding_oauth_start",
+    "onboarding/oauth/poll": "wb_onboarding_oauth_poll",
+    "onboarding/oauth/cancel": "wb_onboarding_oauth_cancel",
+    "system/health": "wb_system_health",
+    "health/restart": "wb_health_restart_bridge",
+    "gateway/status": "wb_gateway_status",
+    "git-info": "wb_git_info",
+    "updates/apply": "wb_updates_apply_bridge",
+    "updates/force": "wb_updates_apply_bridge",
+    "updates/clear_lock": "wb_updates_apply_bridge",
+    "updates/summary": "wb_updates_apply_bridge",
+    # The Gateway card's lifecycle buttons and the health banner's restart both
+    # land here: ONE refusal, because starting/stopping/restarting the messaging
+    # daemon is `qubit gateway …` behind the supervisor's confirm gate.
+    "gateway/start": "wb_health_restart_bridge",
+    "gateway/stop": "wb_health_restart_bridge",
+    "gateway/restart": "wb_health_restart_bridge",
     # NOTE: /api/skills, /api/memory, /api/profiles, /api/mcp/servers and
     # /api/logs are EXISTING_SET, not PORT_SET — they are already served by
     # qubit_compat and the gateway dispatches to them there. Listing them in both
@@ -1436,6 +1604,25 @@ PORT_SET: Dict[str, str] = {
     "terminal/resize": "terminal_resize",
     # share (refused)
     "share/create": "h_wb_file_save_stub",
+    # kanban: the vendored boards page on Qubit's ONE boards store
+    # (workbench_ui/kanban_family.py). ``docs/WORKBENCH_UI_PORT.md`` called
+    # these twelve GAP; the paths were missing, the authority was not —
+    # ``voicebridge.kanban`` is what the CLI, voice and /qubit-boards write, so
+    # every handler below ends there and none is a second writer.
+    "kanban/config": "kanban_config",
+    "kanban/boards": "kanban_boards",
+    "kanban/board": "kanban_board",
+    "kanban/stats": "kanban_stats",
+    "kanban/assignees": "kanban_assignees",
+    "kanban/tasks": "kanban_tasks",
+    "kanban/tasks/bulk": "kanban_tasks_bulk",
+    "kanban/links": "kanban_links",
+    "kanban/links/delete": "kanban_links_delete",
+    "kanban/dispatch": "kanban_dispatch",
+    "kanban/events": "kanban_events",
+    # SSE — served by stream_sse() through stream_kind(), never by a JSON
+    # handler. Listed here so the endpoint table counts it as answered.
+    "kanban/events/stream": "kanban_stream",
 }
 
 #: Paths under ``/api/wb/api/`` that are dispatched by the gateway itself rather
@@ -1479,7 +1666,10 @@ _EXTRA_PREFIXES: Dict[str, str] = {
     "onboarding/status": "onboarding_status",
     "client-events/log": "client_events_log",
     "transcribe/capability": "transcribe_capability",
-    "updates/check": "updates_check",
+    # The check is Qubit's OWN update source (handlers_settings.updates_check_q),
+    # not the old "no upstream channel" stub: the panel reads behind/channel
+    # off this reply, and a hardcoded "up to date" hid real updates.
+    "updates/check": "wb_updates_check_q",
 }
 
 #: Prefixes whose tail is a verb or an id. The gateway resolves these to the
@@ -1631,6 +1821,14 @@ def _resolve_handler(sub: str, method: str) -> Optional[Callable[..., Any]]:
     for prefix, handler_name in _EXTRA_FAMILIES:
         if clean.startswith(prefix) and len(clean) > len(prefix):
             return getattr(mod, handler_name, None)
+    # ``kanban/boards/<slug>`` and ``.../<slug>/switch`` carry their slug in the
+    # path, so the bare ``kanban/boards`` row cannot answer them. Resolved here
+    # (and ONLY when the slug segment is non-empty) so the collection row stays
+    # the plain list/create handler.
+    if clean.startswith("kanban/boards/"):
+        parts = clean[len("kanban/boards/"):].strip("/").split("/")
+        if parts and parts[0]:
+            return getattr(mod, "kanban_boards", None)
     # The git / worktree / terminal / workspace command families own their own
     # table (``workbench_ui/command_family.py``): thirty-odd paths, most of them
     # keyed by a verb tail, so listing them here would be a second copy of the
@@ -1701,6 +1899,128 @@ def wb_btw(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     from .workbench_ui import handlers_commands as HC
 
     return HC.btw(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+# -------------------------------------------------------------------- kanban
+# The vendored boards page (`panels.js`) on Qubit's ONE boards store. The
+# behaviour lives in ``workbench_ui/kanban_family.py``; these pins exist so the
+# gateway's NAME-addressed table and the family stay one audit surface — a
+# PORT_SET row whose name is missing here answered WB_NOT_IN_PORT_SET while the
+# handler existed (the reason every other family has these wrappers too).
+def kanban_board(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/kanban/board`` — the board, in the native store's lanes."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.board(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_boards(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET|POST /api/kanban/boards`` and ``/<slug>{,/switch, PATCH, DELETE}``.
+
+    The collection row and the slug-scoped verbs resolve to this ONE handler
+    (``_resolve_handler`` picks it for ``kanban/boards/<slug>``), so the split
+    is made from the SAME ``sub`` the gateway passes — reading a separate
+    ``slug`` param would silently serve the collection list for a PATCH.
+    """
+    from .workbench_ui import kanban_family as KF
+
+    sub = str((p or {}).get("sub") or "").strip("/")
+    if sub.startswith("kanban/boards/") and sub[len("kanban/boards/"):].strip("/"):
+        return KF.board_verb(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+    return KF.boards(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_stats(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/kanban/stats`` — per-status counts from the store."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.stats(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_assignees(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/kanban/assignees`` — the assignee picker's roster."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.assignees(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_config(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET|PATCH /api/kanban/config`` — ``dashboard.kanban`` preferences."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.config(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_tasks(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/kanban/tasks`` — create on the native store."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.tasks(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_tasks_bulk(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                      p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/kanban/tasks/bulk`` — per-id status moves, reported each."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.tasks_bulk(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_links(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/kanban/links`` — typed refusal (the store has no edges)."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.links(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_links_delete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/kanban/links/delete`` — idempotent no-op, ``removed: false``."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.links_delete(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_dispatch(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/kanban/dispatch`` — real dry-run plan; a real run refuses."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.dispatch(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_events(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET /api/kanban/events?since=N`` — the board timeline's delta."""
+    from .workbench_ui import kanban_family as KF
+
+    return KF.events(cfg, dict(q or {}), dict(b or {}), dict(p or {}))
+
+
+def kanban_stream(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Any]:
+    """``GET|POST /api/kanban/events/stream`` reached as JSON rather than SSE.
+
+    ``stream_kind()`` claims this path before the JSON gateway, so a request
+    only lands here when something dispatched it through the gateway anyway.
+    Answering JSON keeps that caller honest instead of hanging on a socket it
+    never opens; the SSE framing lives in ``stream_sse``.
+    """
+    return 200, {
+        "ok": True, "stream": "kanban/events/stream",
+        "content_type": "text/event-stream",
+        "detail": ("this path is served as SSE by the listener's stream branch "
+                   "(workbench_ui_routes.stream_sse); open it with "
+                   "EventSource, not fetch()"),
+        "events": [], "latest_event_id": 0,
+    }
 
 
 # ------------------------------------------------------------- raw bytes
@@ -1872,6 +2192,37 @@ _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "wb_auth_logout": wb_auth_logout,
     "wb_auth_unsupported": wb_auth_unsupported,
     "auth_family": auth_family,
+    # settings / onboarding / updates (workbench_ui/handlers_settings.py)
+    "wb_model_auxiliary": wb_model_auxiliary,
+    "wb_providers_self_hosted": wb_providers_self_hosted,
+    "wb_provider_cost_history": wb_provider_cost_history,
+    "wb_provider_quota": wb_provider_quota,
+    "wb_models_refresh": wb_models_refresh,
+    "wb_onboarding_probe": wb_onboarding_probe,
+    "wb_onboarding_setup": wb_onboarding_setup,
+    "wb_onboarding_complete": wb_onboarding_complete,
+    "wb_onboarding_oauth_start": wb_onboarding_oauth_start,
+    "wb_onboarding_oauth_poll": wb_onboarding_oauth_poll,
+    "wb_onboarding_oauth_cancel": wb_onboarding_oauth_cancel,
+    "wb_system_health": wb_system_health,
+    "wb_health_restart_bridge": wb_health_restart_bridge,
+    "wb_gateway_status": wb_gateway_status,
+    "wb_git_info": wb_git_info,
+    "wb_updates_check_q": wb_updates_check_q,
+    "wb_updates_apply_bridge": wb_updates_apply_bridge,
+    # kanban (workbench_ui/kanban_family.py)
+    "kanban_board": kanban_board,
+    "kanban_boards": kanban_boards,
+    "kanban_stats": kanban_stats,
+    "kanban_assignees": kanban_assignees,
+    "kanban_config": kanban_config,
+    "kanban_tasks": kanban_tasks,
+    "kanban_tasks_bulk": kanban_tasks_bulk,
+    "kanban_links": kanban_links,
+    "kanban_links_delete": kanban_links_delete,
+    "kanban_dispatch": kanban_dispatch,
+    "kanban_events": kanban_events,
+    "kanban_stream": kanban_stream,
 }
 
 
@@ -1958,6 +2309,13 @@ def stream_kind(sub: str) -> Optional[str]:
     # with a bounded wait.
     if clean == "btw/stream":
         return "btw"
+    # The kanban board's live channel (``panels.js:3282`` opens it with
+    # ``EventSource`` and listens for ``hello`` then ``events``). It is a real
+    # poll-backed stream over the board's ONE store — answering JSON here made
+    # the client's ``onerror`` count up and fall back to a 30s poll it did not
+    # need.
+    if clean == "kanban/events/stream":
+        return "kanban"
     return None
 
 
@@ -2001,6 +2359,13 @@ def stream_frames(sub: str, cfg: Any, q: Dict[str, str]) -> Iterable[str]:
                    'needs ?stream_id="}\\n\\n')
             return
         yield from HC.btw_stream_frames(stream_id)
+        return
+    if kind == "kanban":
+        # The kanban family's own frames — the SAME shape its JSON ``events``
+        # read serves, so a tab on SSE and a tab on the 30s poll converge.
+        from .workbench_ui import kanban_family as KF
+
+        yield from KF.stream(sub, cfg, dict(q or {}))
         return
     if kind == "session":
         # Confirm-connection only. Upstream also pushes bg_task_complete and

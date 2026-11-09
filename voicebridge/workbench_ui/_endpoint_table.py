@@ -41,9 +41,24 @@ ROOT = HERE / "static"
 #: paths that wave added on top of the previous 91; every one of them answers
 #: real data or a TYPED refusal (``WB_CAPABILITY_UNBOUND`` /
 #: ``WB_BROKERED_WRITE``), so none is counted GAP.
-EXPECTED_ANSWERED = 99
+#:
+#: 118 = 99 + the settings/onboarding/updates wave's 19 (``handlers_settings.py``):
+#: 11 answering real authority (auxiliary config, cost history, the four
+#: onboarding verbs + three oauth verbs, system health, gateway status, git-info)
+#: and 8 answering a NAMED refusal (self-hosted provider write, quota,
+#: models/refresh, gateway restart/lifecycle x4, updates apply/force/clear_lock/
+#: summary). A refusal still counts ANSWERED — what matters is that the panel
+#: gets a reason instead of a spinner, and that no path silently invents data.
+#:
+#: 130 = 118 + the kanban family's 12 (``workbench_ui/kanban_family.py``). The
+#: doc called all twelve GAP; the paths were missing, not the authority —
+#: ``voicebridge.kanban`` is the ONE boards store the CLI, voice and
+#: /qubit-boards already write. Ten answer real store data; ``kanban/links`` is
+#: a NAMED refusal (the store has no dependency edges) and ``links/delete`` is
+#: its idempotent no-op, both still ANSWERED because the panel gets a reason.
+EXPECTED_ANSWERED = 130
 EXPECTED_EXISTING = 6
-EXPECTED_GAP = 85
+EXPECTED_GAP = 54
 EXPECTED_TOTAL = 184
 
 
