@@ -143,8 +143,13 @@ def status(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     repo, err = _repo_or_refuse(cfg, start, "git/status")
     if err:
         return err
-    return _run_guarded("git/status",
-                        lambda: git_format.status_payload(repo, workspace=start))
+    # The route's OWN state code: callers distinguish a non-repo workspace from a
+    # repository by this field, so `status_payload` alone left every caller
+    # reading `state` as absent (measured: /api/git-info answered "not a
+    # repository" for a real repository because the key was missing).
+    payload = {**git_format.status_payload(repo, workspace=start),
+               "state": "OK"}
+    return _run_guarded("git/status", lambda: payload)
 
 
 def log(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],

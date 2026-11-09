@@ -64,7 +64,7 @@ HTML untouched on its asset URLs. (Concretely: the tree is mounted at
 | `extension_settings.js` | 32,608 | **PATCH** | `window.HermesExtensionSettings` (§4 R1). |
 | `terminal.js` | 30,593 | **COPY** | xterm is now vendored (§1.3); no `hermes` token in the file. |
 | `outline.js` | 20,422 | **COPY** | none. |
-| `onboarding.js` | 43,525 | **PATCH** | visible strings + storage key. Endpoints are GAP (§3). |
+| `onboarding.js` | 43,525 | **PATCH** | visible strings + storage key. Endpoints are PORT (§2.5). |
 | `a11y-helpers.js` | 18,580 | **COPY** | none. |
 | `icons.js` | 11,944 | **COPY** | none. |
 | `login.js` | 9,286 | **OMIT** | Its only job is the upstream password/passkey login screen. Qubit's gate is the dashboard's own (`X-Qubit-Session-Token`, loopback bootstrap), and a second auth scheme is forbidden by the task. `index.html`'s reference to it is dropped. |
@@ -147,17 +147,17 @@ The brief's ~165 was an estimate; 184 is the measurement.
 > §2.4 were then confirmed by matching each endpoint's real request form. The
 > number to trust is §2.4's 6, and `_endpoint_table.py` re-derives it.
 
-### 2.2 Verdict summary — 99 answered / 85 GAP of 184
+### 2.2 Verdict summary — 124 answered / 54 GAP of 184
 
 | Verdict | Endpoints | What it means |
 |---|---:|---|
-| **PORT** | 93 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
+| **PORT** | 124 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
 | **EXISTING** | 6 | `qubit_compat.ROUTES` already serves this exact path; the shim passes through to `qubit_compat.dispatch`. |
-| **GAP** | 85 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
-| **Total** | **184** | 93 PORT (the 6 EXISTING are counted inside that 93) + 85 GAP, checked in `_endpoint_table.py`. |
+| **GAP** | 54 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
+| **Total** | **184** | 124 PORT (the 6 EXISTING are counted inside that 124) + 54 GAP, checked in `_endpoint_table.py`. |
 
-**"How many of the 165 work" → 99 of 184** answer real Qubit data; 85 answer a
-typed refusal. The brief's ~165 was an estimate; the
+**"How many of the 165 work" → 130 of 184** answer real Qubit data or a typed
+refusal that names why; 54 are GAP. The brief's ~165 was an estimate; the
 measured distinct count is 184 after normalising template tails. Every number
 here is reproduced mechanically by `voicebridge/workbench_ui/_endpoint_table.py`
 (which prints this very table), so the doc cannot drift from the code.
@@ -175,6 +175,18 @@ landed (`/api/workspaces/add|rename|remove|reorder`, plus the refused
 `/api/workspace/upload`) and re-bind the four `/api/terminal/*` rows that used to
 be a blanket `PTY_NO_SHELL` refusal — see §2.3.2.
 
+The kanban family (`voicebridge/workbench_ui/kanban_family.py`) accounts for
+118 → 130: all twelve `/api/kanban/*` paths this page calls, which §2.5 used to
+list as GAP ("no kanban REST family at these paths"). The paths were missing, not
+the authority — `voicebridge.kanban` is the ONE boards store the CLI, voice, the
+operations catalog and `/qubit-boards` already write, and `kanban_bridge` names
+it the only writable authority. Ten answer real store data (`board`, `boards`,
+`stats`, `assignees`, `config`, `tasks`, `tasks/bulk`, `dispatch`'s dry-run plan,
+`events`, `events/stream`); `links` is a named `WB_CAPABILITY_UNBOUND` (the
+native store has no dependency edges) and `links/delete` its idempotent no-op.
+Write verbs that would spawn workers or invent a second store refuse by name —
+see §2.3.4.
+
 The remaining count correction is a MEASUREMENT fix, not new code: seven routes
 the gateway already answered (`dashboard/config`, `dashboard/status`,
 `health/agent`, `onboarding/status`, `client-events/log`,
@@ -182,12 +194,12 @@ the gateway already answered (`dashboard/config`, `dashboard/status`,
 `PORT_SET` and were being counted GAP. `_endpoint_table.py` now reads them, so
 the receipt matches what the server actually answers.
 
-## 2.3 The PORT set (93) — what each maps to
+## 2.3 The PORT set (124) — what each maps to
 
 Every handler resolves its dependency INSIDE the call and answers a typed 503
 when it is absent (the `workbench_routes.py` rule: a missing capability is a
 refusal, never an ImportError at boot). `_endpoint_table.py` asserts this table
-has exactly the 93 PORT entries and no others.
+has exactly the 124 PORT entries and no others.
 
 | Endpoint | Method | Qubit authority |
 |---|---|---|
@@ -313,6 +325,32 @@ every plugin mutation goes through `plugins_cmd._admit_and_save_plugin_sets`
 | `/api/auth/logout` | POST | **EXISTING authority** `qubit_compat.h_auth_logout` (revokes loopback session tokens). Routed, not re-implemented. |
 | `/api/auth/passkeys`, `/api/auth/passkey/{register,register/options,delete}` | POST | **typed refusal** `WB_AUTH_MODEL_UNSUPPORTED` — Qubit has no WebAuthn credential store. See §2.5. |
 
+### 2.3.4 The kanban family (12) — one store, no second writer
+
+`voicebridge/workbench_ui/kanban_family.py` serves the boards page on
+`voicebridge.kanban`, the store the CLI, voice, the operations catalog and
+`/qubit-boards` already write (`kanban_bridge.BOARD_AUTHORITY` names it the only
+writable authority). Reads reuse `qubit_plugins._native_task_vendor` — the ONE
+synthesizer of the vendored task shape — and writes end in `kanban.create` /
+`move_task` / `claim` / `block` / `complete` / `archive_task` / `comment`.
+Landing them on the fork's `qubit_cli.kanban_db` instead would be the third store
+`kanban_bridge` exists to prevent.
+
+| Endpoint | Method | Qubit authority |
+|---|---|---|
+| `/api/kanban/board` | GET | `kanban.list_tasks` + `kanban.log`, grouped by the store's OWN lanes (`open/claimed/blocked/done`). The vendored nine-lane vocabulary is translated per card and named in `upstream_columns`; the page's `assignee` filter is applied server-side. |
+| `/api/kanban/boards` | GET/POST | `kanban.boards_list` / `kanban.boards_create` (+ `set_board_project` for a `default_workdir` inside a registered root). |
+| `/api/kanban/boards/<slug>`, `…/switch` | PATCH/DELETE/POST | rename = one UPDATE on the store's own `boards.name`; archive = `kanban.archive_task` for each of the board's tasks (there is no board-lifecycle verb, and a directory delete would bypass the store's writer); `main` refuses. |
+| `/api/kanban/config` | GET/PATCH | `dashboard.kanban` in the raw user config, written through `qubit_cli.config.atomic_config_write` — the same section and writer the vendored plugin's own `GET /config` uses. |
+| `/api/kanban/tasks` | POST | `kanban.create`, then `move_task`/`claim`/`block`/`complete` for an explicit `status`; a `running`/`review` create is refused (a card is claimed by a worker, not by the board). |
+| `/api/kanban/tasks/bulk` | POST | per-id `move_task`/`claim`/… with a per-id result row. |
+| `/api/kanban/stats` | GET | `kanban.stats` → `{by_status}`. |
+| `/api/kanban/assignees` | GET | `kanban.list_tasks` union (each entry `{name, on_disk, counts}`). |
+| `/api/kanban/events` | GET | `kanban.log` — the board timeline re-derived with a stable cursor; `?since=` pages it. `synthetic: true` says the ids are positions, not upstream's event table. |
+| `/api/kanban/events/stream` | GET | SSE over that same timeline: `hello` then `events` (`{events, cursor}`), one poll per board, a 15s keep-alive comment, bounded at 300s so the client's own `EventSource` reconnect resumes with no duplicates. Framing is `stream_sse`. |
+| `/api/kanban/dispatch` | POST | `?dry_run=1` answers a REAL plan from `list_tasks` (queued / assigned / skipped-unassigned). A real run is a typed `WB_CAPABILITY_UNBOUND`: a tick spawns one worker subprocess per claimed task, and this listener does not start agent processes as a side effect of a dashboard click (`qubit kanban run` does, behind its own gate). |
+| `/api/kanban/links`, `links/delete` | POST | **typed refusal** `WB_CAPABILITY_UNBOUND` — `voicebridge.kanban` has no dependency edge table, so an accepted link would be dropped or need a second store. `links/delete` is its idempotent `removed: false` counterpart. |
+
 ### 2.4 The EXISTING set (6) — pass-through
 
 These paths ARE in `qubit_compat.ROUTES` today, so the shim does not
@@ -328,11 +366,46 @@ and returns the result verbatim.
 | `/api/sessions/search` | GET | `h_sessions_list` result reshaped to `{results:[...]}`. |
 | `/api/skills` | GET | **EXISTING** `GET /api/skills`. |
 
-### 2.5 The GAP set (85) — grouped, with the honest reason
+### 2.5 The GAP set (54) — grouped, with the honest reason
 
 The UI must render its own error for each. None of these get invented rows. Every
 shim refusal carries `{ok:false, state:"UNAVAILABLE", code, detail, qubit_counterpart}`
 so the panel shows a reason and a pointer, not a spinner.
+
+**Settings, onboarding and updates are no longer GAP groups.** The 20 settings
+paths and all 12 onboarding/updates paths are PORT_SET rows on
+`workbench_ui/handlers_settings.py` — 14 answering real Qubit authority, the
+other 18 answering a refusal that names why and points at the real counterpart.
+The security rule is unchanged and is now enforced in code, not prose: **no
+route in this family returns a raw API key or accepts one for storage.**
+Provider metadata (name, configured yes/no, model list) IS portable and is
+served; the credential itself never is.
+
+| Path | Answer |
+|---|---|
+| `/api/model/auxiliary` | live `auxiliary` config from the vendored `_AUX_TASK_SLOTS`; no key field in any row |
+| `/api/provider/cost-history` | Qubit's OWN recorded spend (`sessions.estimated_cost_usd`/`actual_cost_usd`), per local day. `monthly_budget: null` — Qubit has no budget field, and the panel hides its controls on null |
+| `/api/onboarding/probe` | bounded (5 s) GET of `{base_url}/models` using **only the key in the request**, reduced to `id`/`label`. An unreachable endpoint is the wizard's `ok:false` + reason |
+| `/api/onboarding/setup` | `{provider, model, base_url}` through `providers.endpoints.select_model`; an `api_key` in the body is REFUSED and nothing is written |
+| `/api/onboarding/complete` | readiness via the same preflight `onboarding_status` reads, then a vendor-agnostic ack marker; refused (409) when a turn is not possible |
+| `/api/onboarding/oauth/{start,poll,cancel}` | adapters over the ONE device-code authority (`qubit_cli.web_routers.oauth`), wire-shape renamed (`flow_id`↔`session_id`). Under the egress guard the device-code call is `EGRESS_DENIED`, which is answered as `WB_EGRESS_BLOCKED` (403) naming `qubit auth <provider>` — the guard is the security model and is never bypassed to make login work |
+| `/api/system/health` | host CPU/memory/disk reshaped from the existing `h_system_stats` probe; a missing metric stays `null` |
+| `/api/gateway/status` | `gateway_supervisor.status` (the messaging daemon). `lifecycle.managed: false` — the gateway is an operator daemon (Owner Decision #16), so the card shows its read-only note |
+| `/api/git-info` | the session's workspace through `git_family`'s existing confinement; outside the registered roots it answers the badge's "hide" branch |
+| `/api/updates/check` | `update_manager.check` — QUBIT's update source. A failed check carries the real reason in `webui.error` instead of a fabricated "up to date" |
+| `/api/providers/self-hosted` | **REFUSED** `WB_CREDENTIALS_NOT_IN_CONFIG` — Qubit stores key REFERENCES (`env:`/`file:`); the refusal says so louder when the body carried a key |
+| `/api/models/refresh` | **REFUSED** `WB_CREDENTIALS_NOT_IN_CONFIG` — a live catalog refresh means calling the provider with its stored credential; this listener does not load provider secrets, and `/api/models` already serves the configured inventory |
+| `/api/provider/quota` | **REFUSED** `WB_CAPABILITY_UNBOUND` — no quota or credential-pool state is recorded anywhere. `status:"unavailable"` would falsely imply a credential exists; a number would be a lie about someone's bill |
+| `/api/health/restart`, `/api/gateway/{start,stop,restart}` | **REFUSED** `WB_BROKERED_WRITE` — restarting the daemon is `gateway_supervisor.control`: e-stop, `gateway.control` grant, audit record. A browser POST that skipped that gate is exactly what this port refuses to build. Status is still live at `GET /api/gateway/status` |
+| `/api/updates/{apply,force,clear_lock,summary}` | **REFUSED** `WB_CAPABILITY_UNBOUND` — Qubit's updater has a different authority surface: `POST /api/qubit/update` (confirm, e-stop, clean tree, update lock, snapshot, `git pull --ff-only`). Its lock is held by a live process, not a file to unlink; `summary` would summarise release notes that do not exist |
+
+**Kanban is no longer a GAP group.** All twelve `/api/kanban/*` paths are
+PORT_SET rows on `voicebridge.kanban` — the store the CLI, voice and
+`/qubit-boards` already write. The old reason ("no kanban REST family at these
+paths") described the missing ROUTES, not a missing capability: the store, its
+read synthesizer and its write verbs all existed. `links` and `links/delete`
+answer a named refusal because the native store really has no dependency edges
+(§2.3.4).
 
 **Auth is no longer a GAP group.** `auth/status` is a real read of Qubit's own
 gate, `auth/logout` routes to `qubit_compat.h_auth_logout`, and the four
@@ -353,25 +426,24 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 
 | Group | Count | Why it is a GAP |
 |---|---:|---|
-| **Chat / streaming** | 4 | Qubit's turn runs `chat_transport.turn`, which is not an SSE `/api/chat/start` contract. The composer sends and the turn completes, but the token-by-token stream the UI expects has no Qubit emitter. **The single biggest real gap** — chat works only in send-and-reload mode. |
+| **Chat / streaming** | 3 | Qubit's turn runs `chat_transport.turn`, which is not an SSE `/api/chat/start` contract. The composer sends and the turn completes, but the token-by-token stream the UI expects has no Qubit emitter. **The single biggest real gap** — chat works only in send-and-reload mode. |
 | **Sessions — upstream-only verbs** | 20 | These are upstream's `state.db` verbs (branch, fork, compress, yolo, handoff). `QubitSessionStore` has no such operations, and writing them here would be a second writer on the transcript — the corruption `workbench/__init__.py` exists to prevent. |
-| **Kanban** | 12 | Qubit has a dashboard kanban plugin but no kanban REST family at these paths. |
-| **Commands & bundles** | 5 | No Qubit command-bundle authority. |
-| **Workspaces & project management** | 10 | Qubit's workspace seam is read-only by design; `adapters_workspace.refused_mutation` answers the writes. `/api/workspace/upload` likewise refuses. |
-| **Files, mutating (read-only seam)** | 15 | Read-only workspace seam. `preview_file` and the tree ARE live (via `/api/workbench/workspace/*`); every mutation and the VS Code/reveal shell-outs are refused. |
+| **Commands & bundles** | 0 | Ported: all five are PORT rows answering real data or a named `WB_CAPABILITY_UNBOUND` (§2.3.3). |
+| **Workspaces & project management** | 5 | The four `/api/projects/*` writes and `/api/workspaces/suggest`. The `/api/workspaces/*` writes, the listing and `workspace/upload` are PORT rows (§2.3.2). |
+| **Files, mutating (read-only seam)** | 6 | The four `/api/escape/*` paths (Qubit's confinement REFUSES out-of-root paths rather than granting access to them, so there is no grant mechanism to implement), plus `/api/file/office-save` and `/api/folder/download`. The `file/*` verbs, the tree and `preview_file` are live. |
 | **Auth** | 0 | Ported. `auth/status` reads Qubit's real loopback-token gate; `auth/logout` routes to `qubit_compat.h_auth_logout`; the four passkey paths are PORT entries answering `WB_AUTH_MODEL_UNSUPPORTED`. No login or second gate is implemented. |
-| **Onboarding & updates** | 12 | Qubit's setup lives on the dashboard's own System page; the upstream updater reads a different product's release feed. |
+| **Onboarding & updates** | 0 | Ported. `status`/`probe`/`setup`/`complete` answer real Qubit authority; the three OAuth verbs adapt the one device-code flow (`WB_EGRESS_BLOCKED` names `qubit auth` when the guard denies it); `updates/check` reads Qubit's own source and the four updater WRITES are named refusals. |
 | **Extensions** | 0 | Ported: `status`/`registry`/`toggle` answer from real plugin discovery; `install`/`uninstall`/`sidecar-proxy-consent` are typed refusals naming the real path. |
 | **Notes / wiki / insights / goal** | 8 | No Qubit notes/wiki/insights/goal authority. |
 | **Rollback / scripts / shutdown / misc** | 8 | Qubit has its own checkpoint surface at a different path; `share` has no Qubit authority. |
-| **Settings, upstream-only families** | 20 | Provider quota/cost, auxiliary-model and refresh routes, gateway, git-info and the upstream health endpoints. Provider CRUD is a typed refusal (Qubit stores key REFERENCES, never raw keys); `settings`/`reasoning`/`default-model`/`providers`(GET) are ported. |
-| **Total** | **105** | |
+| **Settings, upstream-only families** | 2 | Only the two background-poll routes remain (`/api/background`, `/api/background/status` — no Qubit background-job surface at those paths). Auxiliary config, cost history, gateway, git-info and system health are PORT; quota, models/refresh, self-hosted-provider writes and the restart/lifecycle verbs are named refusals. |
+| **Total** | **54** | Recomputes to the 54 GAP in §2.2 exactly: 3 chat + 20 session verbs + 5 workspaces/projects + 6 files-mutating + 8 notes/wiki/insights + 8 rollback/scripts/misc + 2 background + 2 `/api/gateway` path forms |
 
 **Chat / streaming** (3): `/api/chat/start`, `/api/chat/steer`, `/api/chat/stream/status` (`/api/btw` is answered — §2.3.3)
 
 **Sessions — upstream-only verbs** (20): `/api/session/anchor-scene`, `/api/session/branch`, `/api/session/clear`, `/api/session/compress/start`, `/api/session/compress/status`, `/api/session/compression-recovery/start`, `/api/session/conversation-rounds`, `/api/session/duplicate`, `/api/session/handoff-summary`, `/api/session/import`, `/api/session/import_cli`, `/api/session/lineage/report`, `/api/session/move`, `/api/session/retry`, `/api/session/title/regenerate`, `/api/session/truncate`, `/api/session/undo`, `/api/session/worktree/remove`, `/api/session/worktree/status`, `/api/session/yolo`
 
-**Kanban** (12): `/api/kanban/assignees`, `/api/kanban/board`, `/api/kanban/boards`, `/api/kanban/config`, `/api/kanban/dispatch`, `/api/kanban/events`, `/api/kanban/events/stream`, `/api/kanban/links`, `/api/kanban/links/delete`, `/api/kanban/stats`, `/api/kanban/tasks`, `/api/kanban/tasks/bulk`
+**Kanban** — none remain: all twelve are PORT rows on `voicebridge.kanban` (§2.3.4); `links` and `links/delete` answer a named `WB_CAPABILITY_UNBOUND` there because the native store has no dependency edges.
 
 **Commands & bundles** — none remain: all five are PORT rows answering real data or a typed `WB_CAPABILITY_UNBOUND` that names the missing concept (§2.3.3)
 
@@ -381,7 +453,7 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 
 **Auth** (6): `/api/auth/logout`, `/api/auth/passkey/delete`, `/api/auth/passkey/register`, `/api/auth/passkey/register/options`, `/api/auth/passkeys`, `/api/auth/status`
 
-**Onboarding & updates** (12): `/api/onboarding/complete`, `/api/onboarding/oauth/cancel`, `/api/onboarding/oauth/poll`, `/api/onboarding/oauth/start`, `/api/onboarding/probe`, `/api/onboarding/setup`, `/api/onboarding/status`, `/api/updates/apply`, `/api/updates/check`, `/api/updates/clear_lock`, `/api/updates/force`, `/api/updates/summary`
+**Onboarding & updates** — none remain: see the table at the top of §2.5 (`handlers_settings.py`).
 
 **Extensions** (6): `/api/extensions/install`, `/api/extensions/registry`, `/api/extensions/sidecar-proxy-consent`, `/api/extensions/status`, `/api/extensions/toggle`, `/api/extensions/uninstall`
 
@@ -389,7 +461,7 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 
 **Rollback / scripts / shutdown / misc** (8): `/api/list`, `/api/rollback/diff`, `/api/rollback/list`, `/api/rollback/restore`, `/api/scripts/list`, `/api/share`, `/api/share/revoke`, `/api/shutdown`
 
-**Settings, upstream-only families** (24): `/api/background`, `/api/background/status`, `/api/client-events/log`, `/api/dashboard/config`, `/api/dashboard/status`, `/api/gateway`, `/api/gateway/status`, `/api/git-info`, `/api/health/agent`, `/api/health/restart`, `/api/model/auxiliary`, `/api/models/refresh`, `/api/profile/create`, `/api/profile/delete`, `/api/provider/cost-history`, `/api/provider/quota`, `/api/providers`, `/api/providers/delete`, `/api/providers/self-hosted`, `/api/skills/delete`, `/api/skills/save`, `/api/skills/usage`, `/api/system/health`, `/api/workspace/upload`
+**Settings, upstream-only families** — two remain: `/api/background`, `/api/background/status` (Qubit has no background-job surface at those paths). Everything else in the old 24 is answered: §2.5's table covers the settings/onboarding/updates wave; `client-events/log`, `dashboard/*`, `health/agent`, `providers`(GET/POST), `providers/delete`, `skills/{save,delete,usage}`, `workspace/upload`, `profile/create`, `profile/delete` are the config/extensions wave (§2.3). `/api/gateway` and `/api/gateway/$` are the client's own two path FORMS of the lifecycle route — they parse as GAP because no PORT row names the bare path; `gateway/start|stop|restart` are answered (§2.5).
 
 ### 2.6 What this means for "does the UI work"
 
@@ -401,7 +473,8 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 | Workspace panel (file tree, preview) | **Live** via `/api/workbench/workspace/*`. |
 | Settings, Models, Memory, Skills, MCP, Logs, Tasks(crons), Approvals | Mixed: the read half is live, the write half is typed-refusal. |
 | Composer send | Sends through Qubit's turn; **no token stream**. |
-| Kanban, Extensions, Onboarding, Wiki, Notes, Insights | Typed refusal inside their own panel error state. |
+| Kanban, Extensions, Onboarding, Settings (providers/cost/gateway) | **Live** for the read half and the settings/onboarding verbs (§2.5); the credential and operator writes are typed refusals inside their own panel error state. |
+| Wiki, Notes, Insights, Goal | Typed refusal inside their own panel error state. |
 
 ---
 
