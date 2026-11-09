@@ -48,7 +48,7 @@ handler does; `client-local (cli_only)` commands are terminal/UI features of a c
 | `/clear` | refused | HermesCLI._cmd_clear | local | action: new | session.mutate reset | client-local (cli_only) |
 | `/codex-runtime` (/codex_runtime) | control | HermesCLI._handle_codex_runtime | slash.exec | slash.exec | slash.exec | per-session setting (gateway handler) |
 | `/commands` | read | messaging-only: unknown command | slash.exec | action: help | slash.exec | messaging-only |
-| `/compress` (/compact) | refused | HermesCLI._manual_compress | **broken**: session.compress (-32601) | action: compress | session.mutate compress |  |
+| `/compress` (/compact) | refused | HermesCLI._manual_compress | canonical route | action: compress | session.mutate compress |  |
 | `/config` | refused | HermesCLI.show_config | slash.exec: refused | unavailable: terminal | slash.exec: refused | client-local (cli_only) |
 | `/context` (/ctx) | read | HermesCLI._show_context_breakdown | slash.exec | slash.exec | slash.exec | TUI session: main's live /context with the category table |
 | `/copy` | refused | HermesCLI._handle_copy_command | local | unavailable: terminal | slash.exec: refused | client-local (cli_only) |

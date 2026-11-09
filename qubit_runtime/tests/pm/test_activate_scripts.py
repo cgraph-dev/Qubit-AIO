@@ -311,7 +311,7 @@ def test_activate_fails_cleanly_without_a_store(tmp_path: Path):
 def _powershell() -> str | None:
     for name in ("pwsh", "powershell"):
         found = shutil.which(name)
-        if found and "windowsapps" not in str(found).lower():
+        if found and "windowsapps" not in str(found).lower() and _powershell_answers(found):
             return found
     # Prefer the conventional System32 host over an MSIX-packaged one
     # (same WinError-5-outside-package-context class as _bash()); also the
@@ -324,6 +324,24 @@ def _powershell() -> str | None:
         if cand.exists():
             return str(cand)
     return None
+
+
+def _powershell_answers(path: str) -> bool:
+    """True when ``path`` is a working PowerShell host, not a broken shim.
+
+    ``shutil.which`` finds the *name*; a version manager's shim (mise/asdf) with no
+    version set installs fine and then exits non-zero with a setup complaint. Trusting
+    the name turned the documented "skip gracefully when no host is available" into a
+    string-parse failure on a host that has no PowerShell at all.
+    """
+    try:
+        probe = subprocess.run(
+            [path, "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSEdition"],
+            capture_output=True, text=True, timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0 and probe.stdout.strip() in {"Core", "Desktop"}
 
 
 def test_powershell_scripts_parse():

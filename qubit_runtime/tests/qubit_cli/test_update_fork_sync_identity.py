@@ -140,7 +140,11 @@ def test_a_failed_upstream_sync_after_the_pull_owes_the_restart_for_the_pulled_c
         update_cmd_commit.begin_update_attempt()
     assert _git(clone, "rev-parse", "HEAD") == commits[1]
     assert (read_host_obligation() or {}).get("expected_sha") == commits[1]
-    assert completion_pending_path(clone).is_file()
+    # The tail is armed under the install-state root (``PROJECT_ROOT``), not the checkout root:
+    # Qubit vendors the runtime under ``qubit_runtime/`` and the launch/update completion clears
+    # the marker there. Ask the same accessor rather than assuming upstream's single-root layout.
+    from qubit_cli.update_cmd_commit import _state_root
+    assert completion_pending_path(_state_root(clone)).is_file()
 
 
 def test_a_custody_refused_upstream_merge_after_the_pull_still_owes_the_pulled_commit(tmp_path, monkeypatch, capsys):

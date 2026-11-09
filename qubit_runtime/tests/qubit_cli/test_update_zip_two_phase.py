@@ -661,7 +661,9 @@ def test_a_journal_that_cannot_be_dropped_after_the_commit_never_fails_the_updat
     finally:
         update_cmd_commit.begin_update_attempt()
     assert (live / "payload" / "version.txt").read_text(encoding="utf-8-sig") == "new"
-    assert completion_pending_path(live).is_file()
+    # The tail is armed under the install-state root (``PROJECT_ROOT``), not the swap's live tree:
+    # Qubit vendors the runtime under ``qubit_runtime/``. Ask the same accessor.
+    assert completion_pending_path(update_cmd_commit._state_root(live)).is_file()
     assert (read_host_obligation() or {}).get("expected_sha") == "b" * 40
 
 

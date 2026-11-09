@@ -67,6 +67,11 @@ def test_generated_launchd_plist_pins_qubit_home_and_has_no_voice_units(
     monkeypatch.setattr(gateway, "_stable_service_working_dir", lambda: str(tmp_path))
     monkeypatch.setattr(gateway, "_build_service_path_dirs", lambda: ["/usr/bin", "/bin"])
     monkeypatch.setattr(gateway, "_append_node_dir_for_service", lambda _dirs: None)
+    # The plist echoes the *ambient* PATH after the priority dirs, so a developer shell pointing at
+    # a directory named like a voice unit (this host's voicebridge runtime) would fail the
+    # assertions below without anything being wrong with the plist. Pin PATH: the contract under
+    # test is which units the job supervises, not what the caller's shell had.
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
 
     text = gateway.generate_launchd_plist()
     plist = plistlib.loads(text.encode("utf-8"))

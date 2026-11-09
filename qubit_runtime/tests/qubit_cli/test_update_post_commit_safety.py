@@ -144,7 +144,12 @@ _CHILD = textwrap.dedent('''
         "config_version": yaml.safe_load((home / "config.yaml").read_text())["_config_version"],
         "latest_config_version": DEFAULT_CONFIG["_config_version"],
         "pending": completion_pending_path(source).is_file(),
+        # ``write_source_stamp(adopted=True)`` publishes identity-only after the move, and
+        # ``venv_sync`` reads ``adoptedAt`` as "not evidence of a completed install". A stamp that
+        # is merely present is not a tree stamped done: report the discriminator production uses.
         "stamp": (source / "install-stamp.json").is_file(),
+        "stamp_done": (lambda p: p.is_file() and "adoptedAt" not in json.loads(p.read_text(encoding="utf-8-sig")))(
+            source / "install-stamp.json"),
         "marker_at_verify": (cell / "marker-at-verify").read_text() if (cell / "marker-at-verify").exists() else None,
         "marker_final": marker.read_text() if marker.exists() else None,
         "migration_entered": entered.is_file()}))
@@ -210,7 +215,7 @@ def test_config_format_write_failure_is_owed_not_reported_complete(tmp_path):
     # The receipt names the debt, the tail stays pending and nothing stamps the tree as done.
     assert summary["followups"] == ["config_migration"]
     assert summary["pending"] is True
-    assert summary["stamp"] is False
+    assert summary["stamp_done"] is False
     # C3: the receipt names what actually failed. The build succeeded; only the config is owed.
     assert summary["stages"].get("build") == "success", summary["stages"]
 
@@ -224,7 +229,7 @@ def test_profile_sync_followup_keeps_the_tail_owed(tmp_path):
     assert summary["followups"] == ["profile_sync"]
     # A profile sync that did not finish is tail work: retried by the next launch, never stamped done.
     assert summary["pending"] is True
-    assert summary["stamp"] is False
+    assert summary["stamp_done"] is False
 
 
 @pytest.mark.platforms("posix")

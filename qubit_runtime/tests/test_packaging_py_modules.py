@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import os
 import sys
 import tomllib
 from pathlib import Path
@@ -24,15 +25,21 @@ PACKAGES = ("agent", "tools", "qubit_cli", "gateway", "tui_gateway", "cron", "ac
 def _root_py_modules() -> set[str]:
     spec = importlib.util.spec_from_file_location("_qubit_setup_py", REPO_ROOT / "setup.py")
     mod = importlib.util.module_from_spec(spec)
-    saved = sys.argv
+    saved_argv = sys.argv
+    saved_cwd = Path.cwd()
     sys.argv = ["setup.py", "--name"]  # setup() must not try to build anything on import
+    # ``setup()`` reads ``./pyproject.toml`` relative to the process cwd, not to ``setup.py``.
+    # Qubit vendors the runtime under ``qubit_runtime/``, so a run started at the outer checkout
+    # root would hand setuptools the *voicebridge* pyproject and die in metadata validation.
+    os.chdir(REPO_ROOT)
     try:
         try:
             spec.loader.exec_module(mod)
         except SystemExit:
             pass
     finally:
-        sys.argv = saved
+        os.chdir(saved_cwd)
+        sys.argv = saved_argv
     return set(mod._root_py_modules())
 
 

@@ -353,7 +353,10 @@ def test_a_second_update_in_one_process_never_hands_back_the_first_updates_debt(
     from qubit_cli.venv_sync import completion_pending_path
 
     commit.arm_commit_obligations(root, "b" * 40)  # update 1: committed, nothing handed back
-    tail, host = completion_pending_path(root), host_obligation_path()
+    # ``arm_commit_obligations`` arms the tail under the install-state root the launch/update
+    # completion later clears (``PROJECT_ROOT``), not the git checkout root: Qubit vendors the
+    # runtime under ``qubit_runtime/``, so the two differ. Ask the same accessor.
+    tail, host = completion_pending_path(commit._state_root(root)), host_obligation_path()
     owed = {tail: tail.read_bytes(), host: host.read_bytes()}
 
     class _Entered(Exception):
