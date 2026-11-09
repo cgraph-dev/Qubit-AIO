@@ -18,12 +18,21 @@ from __future__ import annotations
 #: Qubit's plugin id and toolset for this plugin (``plugins/browser-companion``).
 PLUGIN_NAME = "browser-companion"
 
-#: The extension's own name for the plugin, kept as upstream's wire value: the
-#: ported extension's ``lib/companion-plugin-status.mjs`` sends this string and
-#: falls back to ``/v1/toolsets`` when the routes answer 404. It is a wire id,
-#: not Qubit's plugin id, so the two are deliberately different values in one
-#: place rather than silently diverging in several.
-EXTENSION_PLUGIN_NAME = "qubit-browser-extension"
+#: The extension's own name for the plugin, kept as upstream's wire value.
+#:
+#: The ported extension's ``lib/companion-plugin-status.mjs`` VERIFIES this field:
+#: ``parseCompanionStatusPayload`` rejects the whole payload unless
+#: ``payload.plugin`` equals its own ``COMPANION_PLUGIN_NAME``, which is
+#: ``browser-companion`` — the same value as Qubit's plugin id. Upstream's older
+#: spelling is the one the extension treats as a PREVIOUS copy
+#: (``COMPANION_LEGACY_PLUGIN_NAME``) and reports as outdated.
+#:
+#: It was ``"qubit-browser-extension"`` here, so the route served at the right path
+#: with a correct ``object``/``version``/``tools`` and was still discarded: the
+#: extension classified a perfectly healthy plugin as ``outdated``
+#: (``companion-no-route``) and fell back to ``/v1/toolsets``. Measured live —
+#: ``probeCompanionPlugin`` returned state=outdated, tools=27, routes=0.
+EXTENSION_PLUGIN_NAME = PLUGIN_NAME
 
 #: Base path of every route this plugin wires. The extension calls exactly this.
 BASE_PATH = f"/api/plugins/{PLUGIN_NAME}"
