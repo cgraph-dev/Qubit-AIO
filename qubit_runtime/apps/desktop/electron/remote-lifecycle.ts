@@ -29,6 +29,7 @@ import crypto from 'node:crypto'
 
 import { READY_IN_MERGED_OUTPUT_RE } from './backend-ready'
 import { parseRemoteProfileListing } from './connection-registry'
+import { backendProfileArg } from './profile-id-guard'
 import { assertBootstrapNotSuperseded, withRemoteTimeout } from './ssh-connection'
 
 const LOCKFILE_SCHEMA_VERSION = 2
@@ -1126,7 +1127,12 @@ async function terminateOwnedDashboardForUpdate(ssh, expected) {
 // fd-detachment is already handled by </dev/null + redirect + &).
 function buildSpawnCommand(hermesPath, profile, opts: any = {}) {
   const hermes = expandRemotePath(hermesPath)
-  const profileArgs = profile ? `--profile ${shq(profile)} ` : ''
+  // A mixed-case roster/bridge label must never reach `--profile <value>`: the
+  // CLI would create a phantom `profiles/<label>` dir beside the real one
+  // (#88842). `backendProfileArg` mirrors the CLI's trim + case-fold, so argv
+  // and the published lockfile agree on the pinned id.
+  const pinnedProfile = backendProfileArg(profile)
+  const profileArgs = pinnedProfile ? `--profile ${shq(pinnedProfile)} ` : ''
   const logPath = expandRemotePath(opts.logPath)
   const tokenFilePath = opts.tokenFilePath
   const tokenArg = tokenFilePath ? ` --ssh-session-token-file ${expandRemotePath(tokenFilePath)}` : ''
@@ -1172,7 +1178,13 @@ function buildSpawnCommand(hermesPath, profile, opts: any = {}) {
   const lockPath = expandRemotePath(lockfilePath(opts.ownershipId))
   const tokenPath = tokenFilePath ? expandRemotePath(tokenFilePath) : ''
   const ownerPath = `${reservation}/owner`
-  const metadata = JSON.stringify({ schemaVersion: LOCKFILE_SCHEMA_VERSION, ...opts.lockMetadata, pid: '__PID__' })
+  const metadata = JSON.stringify({
+    schemaVersion: LOCKFILE_SCHEMA_VERSION,
+    ...opts.lockMetadata,
+    // The published record must name the same pinned id `--profile` carries.
+    profile: pinnedProfile ?? '',
+    pid: '__PID__'
+  })
   const reservationNonce = validateSpawnNonce(opts.reservationNonce || crypto.randomBytes(8).toString('hex'))
 
   return withRemoteUpdateMutex(
@@ -1348,7 +1360,7 @@ async function spawnRemoteDashboard(
           ownershipId,
           spawnNonce,
           port: 0,
-          profile,
+          profile: backendProfileArg(profile) ?? '',
           hermesPath,
           hermesHome,
           logPath,

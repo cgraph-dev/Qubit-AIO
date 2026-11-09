@@ -342,7 +342,11 @@ const FORBIDDEN_REMOTE_HEADER_NAMES = new Set([
   'trailer',
   'transfer-encoding',
   'upgrade',
-  'x-hermes-session-token'
+  // The desktop ships `X-Qubit-Session-Token` and the server accepts the
+  // pre-rename `X-Hermes-Session-Token` as an alias; both carry the local
+  // session credential and must never be forwarded to a remote proxy.
+  'x-hermes-session-token',
+  'x-qubit-session-token'
 ])
 
 /**

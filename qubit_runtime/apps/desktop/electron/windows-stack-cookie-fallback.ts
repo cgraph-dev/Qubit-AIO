@@ -39,6 +39,22 @@ const DISABLE_GPU_COMPOSITING_SWITCH = '--disable-gpu-compositing'
 
 export type GpuStackCookieMarkerState = 'booting' | 'fallback' | 'ok'
 
+/**
+ * The GPU override env var, read the way every other desktop surface reads it.
+ * `qubit desktop` writes `HERMES_DESKTOP_DISABLE_GPU` from the `disable_gpu`
+ * config value (main_desktop.py) and main.ts / linux-gpu-fallback.ts /
+ * bootstrap-platform.ts all read that name; reading anything else here would
+ * silently ignore the user's setting on Windows. `QUBIT_DESKTOP_DISABLE_GPU`
+ * is accepted as a compat spelling.
+ */
+function gpuDisableOverride(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.HERMES_DESKTOP_DISABLE_GPU ?? env.QUBIT_DESKTOP_DISABLE_GPU
+
+  return String(raw || '')
+    .trim()
+    .toLowerCase()
+}
+
 export type GpuStackCookieFallbackReason = 'renderer-crash-loop'
 
 export interface GpuStackCookieMarker {
@@ -82,11 +98,7 @@ export function isWindowsStackCookieExit(exitCode: unknown): boolean {
 }
 
 export function isQubitDesktopGpuOverrideOff(env: NodeJS.ProcessEnv = process.env): boolean {
-  const override = String(env.QUBIT_DESKTOP_DISABLE_GPU || '')
-    .trim()
-    .toLowerCase()
-
-  return GPU_OVERRIDE_OFF.has(override)
+  return GPU_OVERRIDE_OFF.has(gpuDisableOverride(env))
 }
 
 /**
@@ -100,11 +112,7 @@ export function alreadyHasDisableGpu(argv: readonly string[] = [], env: NodeJS.P
     return true
   }
 
-  const override = String(env.QUBIT_DESKTOP_DISABLE_GPU || '')
-    .trim()
-    .toLowerCase()
-
-  return GPU_OVERRIDE_ON.has(override)
+  return GPU_OVERRIDE_ON.has(gpuDisableOverride(env))
 }
 
 /** Relaunch argv with a single `--disable-gpu` + compositing switch. */

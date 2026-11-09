@@ -163,7 +163,9 @@ module.exports = {
       NSRemindersFullAccessUsageDescription: `${displayName} needs full access to Reminders to read and manage reminders when explicitly requested.`,
       NSScreenCaptureUsageDescription: `${displayName} captures the screen when you ask the agent to screenshot or record it.`,
       NSLocalNetworkUsageDescription: `${displayName} connects to devices on your local network when a plugin or feature you enable requests it.`,
-      NSAppleMusicUsageDescription: `${displayName} accesses your music library when a plugin or feature you enable requests it.`
+      NSAppleMusicUsageDescription: `${displayName} accesses your music library when a plugin or feature you enable requests it.`,
+      NSContactsUsageDescription: `${displayName} needs access to Contacts to look up people you ask it about.`,
+      NSAppleEventsUsageDescription: `${displayName} needs to control other apps on your behalf when you ask it to.`
     },
     target: ['dmg', 'zip'],
     sign: createMacSigner({
