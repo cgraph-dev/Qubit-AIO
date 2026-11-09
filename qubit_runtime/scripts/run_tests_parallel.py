@@ -653,6 +653,22 @@ def _run_one_file_once(
     # Every tempfile.* call inside the test process lands in the same per-run root, so the
     # parent's cleanup of ``temproot`` removes them too instead of leaving them in /tmp.
     env["TMPDIR"] = temproot
+    # The shell that launches the suite routinely has QUBIT_HOME pointing at the
+    # developer's LIVE runtime (this project's own docs tell you to export it). Handing
+    # that to a test process is wrong by construction: `home_io_guard` then refuses the
+    # very first read of <home>/.env with "TEST BUG: file I/O against the REAL hermes
+    # home", which reads as a broken test rather than a mis-set environment. The conftests
+    # re-point QUBIT_HOME to a tmp_path per test, but that happens AFTER import, so any
+    # module-level or collection-time read has already tripped the guard — measured:
+    # test_runner_compressed_receipt 3 failed -> 3 passed with QUBIT_HOME unset.
+    #
+    # Drop it here, the one place the child environment is built, so every per-file
+    # subprocess starts clean. A test that genuinely needs a home gets the fixture's
+    # temp one; nothing needs the live one, and if something does, the guard should say
+    # so loudly rather than half-run.
+    for _home_var in ("QUBIT_HOME", "HERMES_HOME"):
+        env.pop(_home_var, None)
+
 
     subproc_start = time.monotonic()
     # launch the pytest process
