@@ -11,7 +11,34 @@ import pytest
 
 
 ROOT = Path(__file__).resolve().parents[3]
-POWERSHELL = shutil.which("powershell") or shutil.which("pwsh")
+
+
+def _usable_powershell() -> str | None:
+    """Return a PowerShell that actually runs, or None.
+
+    ``shutil.which`` happily returns a version-manager shim (mise/asdf) whose
+    target was never installed; invoking it fails with the manager's own
+    ``No version is set for shim`` error rather than running PowerShell. Probe
+    the resolved binary so a non-runnable shim reads as "not installed" and the
+    test skips, instead of failing on a missing receipt file it never wrote.
+    """
+    for name in ("powershell", "pwsh"):
+        found = shutil.which(name)
+        if not found:
+            continue
+        try:
+            probe = subprocess.run(
+                [found, "-NoProfile", "-NonInteractive", "-Command", "$PSVersionTable.PSVersion.Major"],
+                capture_output=True, text=True, timeout=30,
+            )
+        except (OSError, subprocess.SubprocessError):
+            continue
+        if probe.returncode == 0 and probe.stdout.strip().isdigit():
+            return found
+    return None
+
+
+POWERSHELL = _usable_powershell()
 
 
 @pytest.mark.platforms("any")

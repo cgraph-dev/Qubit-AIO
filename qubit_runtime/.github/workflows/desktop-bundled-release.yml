@@ -1742,7 +1742,7 @@ jobs:
         shell: bash
         run: |
           python -m scripts.releases.handoff fetch --tag "$HERMES_PAYLOAD_TAG" --commit "$RELEASE_COMMIT" \
-            --name windows-universal --root staged --include 'HermesBundled-*-win.msixbundle'
+            --name windows-universal --root staged --include 'QubitBundled-*-win.msixbundle'
       - name: Publish identical tested bytes without rebuilding
         shell: bash
         run: |
@@ -1757,10 +1757,10 @@ jobs:
           from pathlib import Path
           from scripts.bundles.release_artifacts import main, single
           expected = json.loads(Path('staged/expected-identity.json').read_text(encoding='utf-8'))
-          bundle = single(Path('staged').glob('HermesBundled-*-win.msixbundle'))
+          bundle = single(Path('staged').glob('QubitBundled-*-win.msixbundle'))
           # The handoff binds the assembly filename and bytes. Never recompute
           # its revision against stable tags that can change after native smoke.
-          match = re.fullmatch(r'HermesBundled-(\d+\.\d+\.\d+\.\d+)-win\.msixbundle', bundle.name)
+          match = re.fullmatch(r'QubitBundled-(\d+\.\d+\.\d+\.\d+)-win\.msixbundle', bundle.name)
           if not match:
               raise ValueError('Missing assembly version in receipt-bound bundle name')
           version = match[1]

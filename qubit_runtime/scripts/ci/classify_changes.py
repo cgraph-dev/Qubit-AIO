@@ -401,6 +401,9 @@ _UPDATE_DEPENDENCIES = (
     "apps/desktop/scripts/build-webapp.mjs",  # source_build's Webapp renderer build
     "qubit_cli/webapp.py",  # source_build rebuilds the Webapp bundle a home serves
     "gateway/webapp_listener.py",  # source_build reads which homes serve the Webapp
+    # venv_sync's supervised-child probe imports only these leaf marker constants,
+    # deliberately not gateway/restart.py (which pulls ruamel before PM activates).
+    "gateway/supervisor_markers.py",
 )
 # General-purpose modules an entry point imports but that half the product
 # imports too (>= HUB_MIN_IMPORTERS product modules, checked by the test). The

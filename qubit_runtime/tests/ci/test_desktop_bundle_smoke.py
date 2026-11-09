@@ -63,7 +63,7 @@ def test_public_smoke_fetches_the_receipt_bound_native_format(tmp_path, r2_serve
     release = tmp_path / 'apps/desktop/release'
     release.mkdir(parents=True)
     suffix = f'mac-{arch}.{fmt}' if platform == 'darwin' else ('win.msixbundle' if fmt == 'msixbundle' else f'win-{arch}.msix')
-    filename = f'HermesBundled-0.28.0-{suffix}'
+    filename = f'QubitBundled-0.28.0-{suffix}'
     payload = b'transport fixture only: not a deployable package'
     (release / filename).write_bytes(payload)
     (release / ('Store-' + filename)).write_bytes(b'not eligible')
@@ -73,7 +73,7 @@ def test_public_smoke_fetches_the_receipt_bound_native_format(tmp_path, r2_serve
     if platform == 'darwin':
         # The producer stages all of its formats together; smoke selects one.
         for ext in ('dmg', 'zip', 'zip.blockmap'):
-            (release / f'HermesBundled-0.28.0-mac-{arch}.{ext}').write_bytes(payload)
+            (release / f'QubitBundled-0.28.0-mac-{arch}.{ext}').write_bytes(payload)
         (release / f'{arch}-canary-mac.yml').write_bytes(payload)
     staged = shell_step(tmp_path, r2_server, '', '', {**env, 'TARGET': f'{platform}-{arch}'},
                         script=stage_step(jobs[producer])['run'])
@@ -97,7 +97,7 @@ def test_public_smoke_fetches_the_receipt_bound_native_format(tmp_path, r2_serve
 @pytest.mark.parametrize('fault', ['missing', 'ambiguous', 'wrong-commit', 'corrupt'])
 def test_download_faults_never_export_an_accepted_artifact(tmp_path, r2_server, fault):
     env = transport_env(tmp_path, r2_server, commit=True)
-    filename = 'HermesBundled-0.28.0-win-x64.msix'
+    filename = 'QubitBundled-0.28.0-win-x64.msix'
     payload = b'inert integrity fixture'
     row = {'path': filename, 'size': len(payload), 'sha256': hashlib.sha256(payload).hexdigest()}
     receipt = {'schema': 2, 'commit': 'b' * 40 if fault == 'wrong-commit' else SHA,
@@ -107,7 +107,7 @@ def test_download_faults_never_export_an_accepted_artifact(tmp_path, r2_server, 
     if fault == 'missing':
         receipt['files'] = [{**row, 'path': 'Store-' + filename}]
     elif fault == 'ambiguous':
-        second = 'HermesBundled-0.29.0-win-x64.msix'
+        second = 'QubitBundled-0.29.0-win-x64.msix'
         receipt['files'].append({**row, 'path': second})
         r2_server.store[prefix + second] = (payload, '"e"')
     r2_server.store[prefix + 'handoff-win32-x64.json'] = (json.dumps(receipt).encode(), '"e"')
@@ -206,7 +206,7 @@ def test_canary_publisher_consumes_staged_bytes_and_writes_pointer_last(tmp_path
     bundle = release / filename
     with zipfile.ZipFile(bundle, 'w') as archive:
         archive.writestr('AppxMetadata/AppxBundleManifest.xml',
-                         '<Bundle><Identity Name="NousResearch.HermesBundledCanary" '
+                         '<Bundle><Identity Name="NousResearch.QubitBundledCanary" '
                          'Publisher="CN=Qubit Labs Inc., O=Qubit Labs Inc., L=Austin, S=Texas, C=US" '
                          f'Version="{version}"/></Bundle>')
     tested_bytes = bundle.read_bytes()
@@ -234,13 +234,13 @@ def test_canary_publisher_consumes_staged_bytes_and_writes_pointer_last(tmp_path
 
     # The publication job must refuse an ambiguous envelope, even when a
     # caller accidentally broadens the receipt selector in future.
-    (tmp_path / 'staged/HermesBundled-0.29.0.0-win.msixbundle').write_bytes(tested_bytes)
+    (tmp_path / 'staged/QubitBundled-0.29.0.0-win.msixbundle').write_bytes(tested_bytes)
     before = len(writes)
     refused = shell_step(tmp_path, r2_server, publisher,
                          'Publish identical tested bytes without rebuilding', env)
     assert refused.returncode != 0
     assert len([row for row in r2_server.requests if row[0] == 'PUT']) == before
-    (tmp_path / 'staged/HermesBundled-0.29.0.0-win.msixbundle').unlink()
+    (tmp_path / 'staged/QubitBundled-0.29.0.0-win.msixbundle').unlink()
 
     # Filename, tag base, and baked identity must still agree. Reading the
     # accepted assembly version is not permission to trust arbitrary metadata.
@@ -258,8 +258,8 @@ def test_canary_publisher_consumes_staged_bytes_and_writes_pointer_last(tmp_path
         assert refused.returncode != 0, field
         assert len([row for row in r2_server.requests if row[0] == 'PUT']) == before
     staged_bundle.write_bytes(tested_bytes)
-    for wrong in ['HermesBundled-0.29.0.0-win.msixbundle', 'HermesBundled-0.28.1.65536-win.msixbundle',
-                  'HermesBundled-0.28.1-canary.20260818101010-win.msixbundle']:
+    for wrong in ['QubitBundled-0.29.0.0-win.msixbundle', 'QubitBundled-0.28.1.65536-win.msixbundle',
+                  'QubitBundled-0.28.1-canary.20260818101010-win.msixbundle']:
         renamed = staged_bundle.rename(staged_bundle.with_name(wrong))
         refused = shell_step(tmp_path, r2_server, publisher,
                              'Publish identical tested bytes without rebuilding', env)
