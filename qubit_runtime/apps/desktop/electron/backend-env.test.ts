@@ -54,7 +54,7 @@ test('backend runs the store toolchain even after the login-shell PATH is merged
   const loginPath = '/Users/u/.nvm/versions/node/v20.0.0/bin:/opt/homebrew/bin:/usr/bin'
 
   const execFileFn = (_file, _args, _options, callback) => {
-    queueMicrotask(() => callback(null, `__QUBIT_LOGIN_PATH_START__${loginPath}__QUBIT_LOGIN_PATH_END__`, ''))
+    queueMicrotask(() => callback(null, `__HERMES_LOGIN_PATH_START__${loginPath}__HERMES_LOGIN_PATH_END__`, ''))
 
     return { stdin: { end() {} } }
   }

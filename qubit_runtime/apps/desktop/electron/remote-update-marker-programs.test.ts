@@ -150,10 +150,10 @@ test.skipIf(process.platform === 'win32')(
     const marker = path.join(root, '.hermes-update-in-progress')
 
     try {
-      mkdirSync(path.join(root, 'hermes-agent', '.git'), { recursive: true })
+      mkdirSync(path.join(root, 'qubit-agent', '.git'), { recursive: true })
       deadMarker(marker)
 
-      await withCheckoutLockHeld(path.join(root, 'hermes-agent', '.git', 'hermes-update.lock'), async () => {
+      await withCheckoutLockHeld(path.join(root, 'qubit-agent', '.git', 'hermes-update.lock'), async () => {
         assert.deepEqual(await gate([marker]), { code: 0, stdout: 'HELD', stderr: '' })
         assert.ok(existsSync(marker), 'a dead marker beside a held checkout lock must be kept')
         const refused = await gate([marker, 'echo PAYLOAD-RAN'])

@@ -84,8 +84,8 @@ describe('hermes:fs:reveal', () => {
 // A pooled backend serves several profile homes; the active Desktop profile
 // is the LAUNCH one, so the error card names the profile owning the failing
 // session and the root resolves under THAT home (#119080).
-describe('qubit:fs:logsRoot', () => {
-  const logsRoot = (profile?: string) => electron.handlers.get('qubit:fs:logsRoot')!({}, profile)
+describe('hermes:fs:logsRoot', () => {
+  const logsRoot = (profile?: string) => electron.handlers.get('hermes:fs:logsRoot')!({}, profile)
 
   it('resolves the logs dir of the profile that owns the session', async () => {
     await expect(logsRoot('finex')).resolves.toBe(path.join(scratch, 'profiles', 'finex', 'logs'))

@@ -124,11 +124,12 @@ test('resolveRemovableAppPath: dev-run .app resolves (safety is shouldRemoveAppB
 
 test('resolveRemovableAppPath finds the install dir on Windows', () => {
   assert.equal(
-    resolveRemovableAppPath('C:\\Users\\x\\AppData\\Local\\Programs\\Hermes\\Hermes.exe', 'win32'),
-    'C:\\Users\\x\\AppData\\Local\\Programs\\Hermes'
+    resolveRemovableAppPath('C:\\Users\\x\\AppData\\Local\\Programs\\Qubit\\Qubit.exe', 'win32'),
+    'C:\\Users\\x\\AppData\\Local\\Programs\\Qubit'
   )
+  // Pre-rename per-user NSIS install: still removable by the same helper.
   assert.equal(
-    resolveRemovableAppPath('C:\\Users\\x\\AppData\\Local\\hermes-desktop\\Hermes.exe', 'win32'),
+    resolveRemovableAppPath('C:\\Users\\x\\AppData\\Local\\hermes-desktop\\Qubit.exe', 'win32'),
     'C:\\Users\\x\\AppData\\Local\\hermes-desktop'
   )
 })

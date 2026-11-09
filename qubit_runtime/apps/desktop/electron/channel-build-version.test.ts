@@ -154,7 +154,7 @@ test('channel packaging reuses admitted identity and rejects unsupported or unsa
 })
 
 test('a channel that copies the stable identity packages and runs as the regular app', (): void => {
-  process.env.QUBIT_DESKTOP_VARIANT = 'bundled'
+  process.env.HERMES_DESKTOP_VARIANT = 'bundled'
 
   for (const file of ['../product-identity.cjs', '../electron-builder.config.cjs']) {
     delete require.cache[require.resolve(file)]
@@ -184,7 +184,12 @@ test('a channel that copies the stable identity packages and runs as the regular
   // A token would make the runtime pin a userData dir that installed stable doesn't use.
   assert.equal(branded.identity.token, undefined)
   assert.equal(branded.identity.appId, official.appId)
-  assert.equal(branded.config.extraMetadata?.productName, stable.config.extraMetadata?.productName)
+  // Identity inside the packaged app is stable's, so it runs as the regular
+  // app. `productName` is still stamped: electron-builder.config.cjs sets it
+  // whenever a channel request is present (to isolate userData from first
+  // access before main.ts runs), so the value is the display name — not
+  // stable's `undefined`.
+  assert.equal(branded.config.extraMetadata?.productName, official.displayName)
   assert.equal(branded.config.extraMetadata?.name, stable.config.extraMetadata?.name)
   assert.equal(branded.config.artifactName, stable.config.artifactName)
 

@@ -20,7 +20,7 @@ import zipfile
 def main() -> None:
     repository = Path(__file__).resolve().parents[4]
     temp = Path(sys.argv[1])
-    root = Path(os.environ["QUBIT_HOME"]) / "hermes-agent"
+    root = Path(os.environ["QUBIT_HOME"]) / "qubit-agent"
     root.mkdir(parents=True)
     for name in (
         "qubit_cli", "qubit_platform", "pm", "agent", "tools", "gateway", "tui_gateway", "cron", "plugins",
@@ -86,13 +86,13 @@ def main() -> None:
     python.symlink_to(getattr(sys, "_base_executable", sys.executable))
     Facts(paths.facts_path()).record("python", "fixture", entry.name, {"PATH": [str(python.parent)]},
                                    store, target=current_target(), digest=tree_digest(entry))
-    launchers = ensure_install_launchers(root, root / ".hermes" / "bin")
+    launchers = ensure_install_launchers(root, root / ".qubit" / "bin")
     assert launchers
     (root / "desktop_launch_probe.py").write_text(
         "import desktop_backend_proof, json, sys\n"
         "print(json.dumps({'python': sys.executable, 'module': desktop_backend_proof.__file__, "
         "'value': desktop_backend_proof.VALUE}))\n", encoding="utf-8")
-    print(json.dumps({"root": str(root), "launcher": str(root / ".hermes/bin/hermes"),
+    print(json.dumps({"root": str(root), "launcher": str(root / ".qubit/bin/qubit"),
                       "python": str(python), "selected": str(selected)}))
 
 
