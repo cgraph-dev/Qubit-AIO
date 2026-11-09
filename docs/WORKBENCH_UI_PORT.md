@@ -367,17 +367,17 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 | **Settings, upstream-only families** | 20 | Provider quota/cost, auxiliary-model and refresh routes, gateway, git-info and the upstream health endpoints. Provider CRUD is a typed refusal (Qubit stores key REFERENCES, never raw keys); `settings`/`reasoning`/`default-model`/`providers`(GET) are ported. |
 | **Total** | **105** | |
 
-**Chat / streaming** (4): `/api/btw`, `/api/chat/start`, `/api/chat/steer`, `/api/chat/stream/status`
+**Chat / streaming** (3): `/api/chat/start`, `/api/chat/steer`, `/api/chat/stream/status` (`/api/btw` is answered — §2.3.3)
 
 **Sessions — upstream-only verbs** (20): `/api/session/anchor-scene`, `/api/session/branch`, `/api/session/clear`, `/api/session/compress/start`, `/api/session/compress/status`, `/api/session/compression-recovery/start`, `/api/session/conversation-rounds`, `/api/session/duplicate`, `/api/session/handoff-summary`, `/api/session/import`, `/api/session/import_cli`, `/api/session/lineage/report`, `/api/session/move`, `/api/session/retry`, `/api/session/title/regenerate`, `/api/session/truncate`, `/api/session/undo`, `/api/session/worktree/remove`, `/api/session/worktree/status`, `/api/session/yolo`
 
 **Kanban** (12): `/api/kanban/assignees`, `/api/kanban/board`, `/api/kanban/boards`, `/api/kanban/config`, `/api/kanban/dispatch`, `/api/kanban/events`, `/api/kanban/events/stream`, `/api/kanban/links`, `/api/kanban/links/delete`, `/api/kanban/stats`, `/api/kanban/tasks`, `/api/kanban/tasks/bulk`
 
-**Commands & bundles** (5): `/api/commands`, `/api/commands/bundles`, `/api/commands/bundles/resolve`, `/api/commands/exec`, `/api/commands/moa/resolve`
+**Commands & bundles** — none remain: all five are PORT rows answering real data or a typed `WB_CAPABILITY_UNBOUND` that names the missing concept (§2.3.3)
 
 **Workspaces & project management** (5): `/api/projects/bind`, `/api/projects/create`, `/api/projects/delete`, `/api/projects/rename`, `/api/workspaces/suggest` — the four `/api/workspaces/*` writes and the listing are PORT rows (§2.3.2).
 
-**Files, mutating (read-only seam)** (15): `/api/escape/authorize`, `/api/escape/file/raw`, `/api/escape/file/read`, `/api/escape/list`, `/api/file/create`, `/api/file/create-dir`, `/api/file/delete`, `/api/file/move`, `/api/file/office-save`, `/api/file/open-vscode`, `/api/file/path`, `/api/file/raw`, `/api/file/rename`, `/api/file/reveal`, `/api/folder/download`
+**Files, mutating** — the `file/*` verbs are answered (§2.3.3). Still GAP (5): `/api/escape/authorize`, `/api/escape/file/raw`, `/api/escape/file/read`, `/api/escape/list` (the escape-grant mechanism Qubit does not have — its confinement refuses out-of-root paths instead of granting access to them), `/api/file/office-save` and `/api/folder/download` (no Office round-trip, no folder-archive writer)
 
 **Auth** (6): `/api/auth/logout`, `/api/auth/passkey/delete`, `/api/auth/passkey/register`, `/api/auth/passkey/register/options`, `/api/auth/passkeys`, `/api/auth/status`
 
