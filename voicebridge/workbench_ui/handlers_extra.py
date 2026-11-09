@@ -56,19 +56,37 @@ _MESSAGE_CONTENT_CAP = 200_000
 
 
 # ----------------------------------------------------------------- helpers
+#: Status codes for the family-specific refusals. The route module's ``_STATUS``
+#: table is the ONE authority; these entries exist only so ``_refuse`` can answer
+#: before that module is imported (the deep, rare cases). Keeping a SECOND full
+#: copy here is what made ``WB_AUTH_MODEL_UNSUPPORTED`` answer 502: the code was
+#: added to ``workbench_ui_routes._STATUS`` and this table still said "unknown".
+_LOCAL_STATUS: Dict[str, int] = {
+    "WB_BAD_INPUT": 400,
+    "WB_READ_ONLY_SURFACE": 403,
+    "WB_BROKERED_WRITE": 403,
+    "WB_CONFIRM_REQUIRED": 409,
+    "WB_NOT_FOUND": 404,
+    "WB_CAPABILITY_UNBOUND": 501,
+    "WB_NOT_IN_PORT_SET": 501,
+    "WB_BACKEND_UNAVAILABLE": 503,
+}
+
+
+def _status_for(code: str) -> int:
+    """The HTTP status for a refusal code, from the ONE shared table."""
+    import sys
+
+    routes = sys.modules.get("voicebridge.workbench_ui_routes")
+    table = getattr(routes, "_STATUS", None) if routes is not None else None
+    if isinstance(table, dict) and code in table:
+        return table[code]
+    return _LOCAL_STATUS.get(code, 502)
+
+
 def _refuse(code: str, detail: str, *, endpoint: str = "",
             counterpart: str = "", status: int = 0) -> Tuple[int, Dict[str, Any]]:
-    table = {
-        "WB_BAD_INPUT": 400,
-        "WB_READ_ONLY_SURFACE": 403,
-        "WB_BROKERED_WRITE": 403,
-        "WB_CONFIRM_REQUIRED": 409,
-        "WB_NOT_FOUND": 404,
-        "WB_CAPABILITY_UNBOUND": 501,
-        "WB_NOT_IN_PORT_SET": 501,
-        "WB_BACKEND_UNAVAILABLE": 503,
-    }
-    return (status or table.get(code, 502)), {
+    return (status or _status_for(code)), {
         "ok": False,
         "state": "UNAVAILABLE",
         "code": code,

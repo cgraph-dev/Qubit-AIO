@@ -147,27 +147,41 @@ The brief's ~165 was an estimate; 184 is the measurement.
 > §2.4 were then confirmed by matching each endpoint's real request form. The
 > number to trust is §2.4's 6, and `_endpoint_table.py` re-derives it.
 
-### 2.2 Verdict summary — 48 PORT / 6 EXISTING / 130 GAP of 184
+### 2.2 Verdict summary — 73 PORT / 6 EXISTING / 105 GAP of 184
 
 | Verdict | Endpoints | What it means |
 |---|---:|---|
-| **PORT** | 48 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
+| **PORT** | 73 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
 | **EXISTING** | 6 | `qubit_compat.ROUTES` already serves this exact path; the shim passes through to `qubit_compat.dispatch`. |
-| **GAP** | 130 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
-| **Total** | **184** | 48 + 6 + 130, checked in `_endpoint_table.py`. |
+| **GAP** | 105 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
+| **Total** | **184** | 73 + 6 + 105, checked in `_endpoint_table.py`. |
 
-**"How many of the 165 work" → 54 of 184** (48 ported + 6 existing) answer real
-Qubit data; 130 answer a typed refusal. The brief's ~165 was an estimate; the
+**"How many of the 165 work" → 79 of 184** (73 ported + 6 existing) answer real
+Qubit data; 105 answer a typed refusal. The brief's ~165 was an estimate; the
 measured distinct count is 184 after normalising template tails. Every number
 here is reproduced mechanically by `voicebridge/workbench_ui/_endpoint_table.py`
 (which prints this very table), so the doc cannot drift from the code.
 
-## 2.3 The PORT set (48) — what each maps to
+The config / extension / auth families added by the settings wave account for
+the 48 → 73 growth: `settings`, `providers` (+`/delete`), `reasoning`,
+`default-model`, the six `extensions/*` paths, `mcp/tools`, and
+`auth/status` + `auth/logout` + the four `auth/passkey*` refusals. `auth/status`
+is a truthful read of Qubit's own gate; every passkey path is a deliberate typed
+refusal because Qubit has no WebAuthn credential store — see §2.5.
+
+The remaining count correction is a MEASUREMENT fix, not new code: seven routes
+the gateway already answered (`dashboard/config`, `dashboard/status`,
+`health/agent`, `onboarding/status`, `client-events/log`,
+`transcribe/capability`, `updates/check`) live in `_EXTRA_PREFIXES` rather than
+`PORT_SET` and were being counted GAP. `_endpoint_table.py` now reads them, so
+the receipt matches what the server actually answers.
+
+## 2.3 The PORT set (73) — what each maps to
 
 Every handler resolves its dependency INSIDE the call and answers a typed 503
 when it is absent (the `workbench_routes.py` rule: a missing capability is a
 refusal, never an ImportError at boot). `_endpoint_table.py` asserts this table
-has exactly the 48 PORT entries and no others.
+has exactly the 73 PORT entries and no others.
 
 | Endpoint | Method | Qubit authority |
 |---|---|---|
@@ -220,6 +234,34 @@ has exactly the 48 PORT entries and no others.
 | `/api/terminal/resize` | POST | same `PTY_NO_SHELL` gate. |
 | `/api/terminal/start` | POST | **typed refusal** `PTY_NO_SHELL` (Qubit forbids raw shell spawn). The xterm pane mounts and shows the refusal instead of sitting blank. |
 
+#### 2.3.1 The config / extension / auth wave (the 48 → 73 growth)
+
+Each row names the ONE authority it writes through. Every config write goes
+through `qubit_cli.config.atomic_config_write` (never a direct file write);
+every plugin mutation goes through `plugins_cmd._admit_and_save_plugin_sets`
+(the same admission gate `qubit plugins enable/disable` passes).
+
+| Endpoint | Method | Qubit authority |
+|---|---|---|
+| `/api/settings` | GET | the FLAT panel record: `show_thinking`/`theme`/`default_model`/`reasoning_effort` read from `config.yaml` + `DEFAULT_CONFIG`. The raw `/api/config` tree used to be served here, so every control hydrated from `undefined`. |
+| `/api/settings` | POST | `atomic_config_write`, narrow allowlist (`display.show_reasoning`, `display.streaming`, `dashboard.theme`). An unknown field is refused and NOTHING is written. |
+| `/api/reasoning` | GET | `agent.reasoning_effort` + `display.show_reasoning` + the effort ladder the core accepts. |
+| `/api/reasoning` | POST | `atomic_config_write` for those same two keys — the keys the CLI's `/reasoning` writes. |
+| `/api/default-model` | GET | the current `model.default`/`model.provider`. |
+| `/api/default-model` | POST | `providers.endpoints.select_model` — the canonical find-or-create-and-activate resolver, same as the SPA. Was answered by the models READ handler, so a pick was silently discarded. |
+| `/api/providers` | GET | the `providers` tree of `/api/config`; presence facts only (`has_key`, `key_ref`), never a key value. |
+| `/api/providers` | POST | **typed refusal** `WB_CREDENTIALS_NOT_IN_CONFIG` — Qubit stores a reference, never a raw key. |
+| `/api/providers/delete` | POST | same refusal. |
+| `/api/tools`, `/api/mcp/tools` | GET | the live MCP server set `/api/mcp/servers` serves. `mcp/tools` used to pass through to `qubit_compat`, which has no such route (404). |
+| `/api/extensions/status` | GET | `web_server_dashboard._discover_dashboard_plugins` + `plugins_cmd._get_{enabled,disabled}_set`. |
+| `/api/extensions/registry` | GET | the installed set, `remote_registry:false` — Qubit has no remote catalog to invent entries from. |
+| `/api/extensions/toggle` | POST | `_admit_and_save_plugin_sets` — atomic, refusal-safe (AdmissionRefused → 409, state provably unchanged). |
+| `/api/extensions/install`, `/api/extensions/uninstall` | POST | **typed refusal** `WB_BROKERED_INSTALL` — plugin install is `qubit plugins install <owner/repo>`, a pinned/provenance flow, not a posted `download_url`. |
+| `/api/extensions/sidecar-proxy-consent` | POST | **typed refusal** — Qubit has no sidecar/proxy layer to consent to. |
+| `/api/auth/status` | GET | Qubit's REAL model: `qubit_compat._status_auth_gate` (loopback session token). `password_auth_enabled`/`passkey_feature_flag` are honestly `false`. |
+| `/api/auth/logout` | POST | **EXISTING authority** `qubit_compat.h_auth_logout` (revokes loopback session tokens). Routed, not re-implemented. |
+| `/api/auth/passkeys`, `/api/auth/passkey/{register,register/options,delete}` | POST | **typed refusal** `WB_AUTH_MODEL_UNSUPPORTED` — Qubit has no WebAuthn credential store. See §2.5. |
+
 ### 2.4 The EXISTING set (6) — pass-through
 
 These paths ARE in `qubit_compat.ROUTES` today, so the shim does not
@@ -235,11 +277,28 @@ and returns the result verbatim.
 | `/api/sessions/search` | GET | `h_sessions_list` result reshaped to `{results:[...]}`. |
 | `/api/skills` | GET | **EXISTING** `GET /api/skills`. |
 
-### 2.5 The GAP set (130) — grouped, with the honest reason
+### 2.5 The GAP set (105) — grouped, with the honest reason
 
 The UI must render its own error for each. None of these get invented rows. Every
 shim refusal carries `{ok:false, state:"UNAVAILABLE", code, detail, qubit_counterpart}`
 so the panel shows a reason and a pointer, not a spinner.
+
+**Auth is no longer a GAP group.** `auth/status` is a real read of Qubit's own
+gate, `auth/logout` routes to `qubit_compat.h_auth_logout`, and the four
+`auth/passkey*` paths are PORT_SET entries that answer `WB_AUTH_MODEL_UNSUPPORTED`
+— a deliberate, named refusal, not an unported path. That refusal is the whole
+point: Qubit's dashboard auth is a loopback session token (and model access is
+provider OAuth); there is no `password_hash`, no session cookie and no WebAuthn
+credential table. Implementing a passkey register/verify path here would be a
+second auth system on the same listener, unreviewed — strictly worse than a 501
+that names the gap. `login.js` stays OMITTED for the same reason (§1).
+
+**Extras that ARE answered despite once being GAP:** `extensions/status`,
+`extensions/registry`, `extensions/toggle` (real plugin discovery + the one
+admission authority), `extensions/install`/`extensions/uninstall` (refused —
+code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
+(refused — no sidecar layer), `mcp/tools`, `settings`, `providers`,
+`reasoning`, `default-model`.
 
 | Group | Count | Why it is a GAP |
 |---|---:|---|
@@ -249,13 +308,13 @@ so the panel shows a reason and a pointer, not a spinner.
 | **Commands & bundles** | 5 | No Qubit command-bundle authority. |
 | **Workspaces & project management** | 10 | Qubit's workspace seam is read-only by design; `adapters_workspace.refused_mutation` answers the writes. `/api/workspace/upload` likewise refuses. |
 | **Files, mutating (read-only seam)** | 15 | Read-only workspace seam. `preview_file` and the tree ARE live (via `/api/workbench/workspace/*`); every mutation and the VS Code/reveal shell-outs are refused. |
-| **Auth** | 6 | A second auth scheme is forbidden. `/api/auth/status` is answered by the shim as `{authenticated:true, mode:"token"}` so the panel does not show a login screen — it implements NO login, so it cannot become a second gate. The passkey routes are typed refusals. |
+| **Auth** | 0 | Ported. `auth/status` reads Qubit's real loopback-token gate; `auth/logout` routes to `qubit_compat.h_auth_logout`; the four passkey paths are PORT entries answering `WB_AUTH_MODEL_UNSUPPORTED`. No login or second gate is implemented. |
 | **Onboarding & updates** | 12 | Qubit's setup lives on the dashboard's own System page; the upstream updater reads a different product's release feed. |
-| **Extensions** | 6 | No Qubit extension registry at these paths. |
+| **Extensions** | 0 | Ported: `status`/`registry`/`toggle` answer from real plugin discovery; `install`/`uninstall`/`sidecar-proxy-consent` are typed refusals naming the real path. |
 | **Notes / wiki / insights / goal** | 8 | No Qubit notes/wiki/insights/goal authority. |
 | **Rollback / scripts / shutdown / misc** | 8 | Qubit has its own checkpoint surface at a different path; `share` has no Qubit authority. |
-| **Settings, upstream-only families** | 24 | Provider CRUD, provider quota/cost, auxiliary-model and refresh routes, dashboard config/status, gateway, git-info and the upstream health endpoints. Qubit's own health is `/api/status` plus the SPA System page. |
-| **Total** | **130** | |
+| **Settings, upstream-only families** | 20 | Provider quota/cost, auxiliary-model and refresh routes, gateway, git-info and the upstream health endpoints. Provider CRUD is a typed refusal (Qubit stores key REFERENCES, never raw keys); `settings`/`reasoning`/`default-model`/`providers`(GET) are ported. |
+| **Total** | **105** | |
 
 **Chat / streaming** (4): `/api/btw`, `/api/chat/start`, `/api/chat/steer`, `/api/chat/stream/status`
 

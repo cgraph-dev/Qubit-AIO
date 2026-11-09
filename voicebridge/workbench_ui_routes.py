@@ -253,6 +253,12 @@ _STATUS: Dict[str, int] = {
     "WB_CAPABILITY_UNBOUND": 501,
     "WB_NO_MODEL_INVENTORY": 503,
     "WB_NOT_IN_PORT_SET": 501,
+    # The config/extension/auth family (workbench_ui/handlers_config.py).
+    "WB_AUTH_MODEL_UNSUPPORTED": 501,
+    "WB_CREDENTIALS_NOT_IN_CONFIG": 403,
+    "WB_BROKERED_INSTALL": 403,
+    "WB_PLUGIN_ADMISSION_REFUSED": 409,
+    "WB_NOT_FOUND": 404,
 }
 
 
@@ -315,6 +321,25 @@ from .workbench_ui.handlers_extra import (chat_start as _x_chat_start,
                                           client_events_log as _x_client_log,
                                           transcribe_capability as _x_transcribe,
                                           updates_check as _x_updates_check)
+
+# The operational-settings call set — settings/models/providers/reasoning,
+# extensions/*, tools, and the auth-model refusal. Its own module because these
+# handlers carry a sharp write-authority story (one writer per family) and the
+# auth refusals need to be readable in isolation from the chat shims.
+from .workbench_ui.handlers_config import (
+    auth_status as _c_auth_status,
+    auth_unsupported as _c_auth_unsupported,
+    default_model as _c_default_model,
+    extensions_install as _c_ext_install,
+    extensions_registry as _c_ext_registry,
+    extensions_sidecar_consent as _c_ext_consent,
+    extensions_status as _c_ext_status,
+    extensions_toggle as _c_ext_toggle,
+    providers as _c_providers,
+    reasoning as _c_reasoning,
+    settings as _c_settings,
+    tools as _c_tools)
+
 
 
 def chat_start(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -464,6 +489,114 @@ def updates_check(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Any]:
     return _x_updates_check(cfg, dict(q or {}), b if isinstance(b, dict) else {},
                             dict(p or {}))
+
+
+# ------------------------------------- operational settings / extensions / auth
+# Each wrapper pins the METHOD and the sub-path so the config handlers can branch
+# on a write without re-deriving either. ``p['method']`` is set by the gateway;
+# ``p['sub']`` is the full path below ``/api/wb/api/`` and is what the auth
+# refusal quotes back.
+def wb_settings(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/settings`` — GET the flat panel record; POST a narrow write."""
+    return _c_settings(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                       dict(p or {}))
+
+
+def wb_reasoning(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/reasoning`` — the effort chip's read and its two-key write."""
+    return _c_reasoning(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                        dict(p or {}))
+
+
+def wb_providers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                 p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/providers`` (+ ``/delete``) — list; every write is refused."""
+    return _c_providers(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                        dict(p or {}))
+
+
+def wb_default_model(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                     p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/default-model`` — read the default; POST applies via select_model."""
+    return _c_default_model(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                            dict(p or {}))
+
+
+def wb_tools(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+             p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/tools`` and ``/api/mcp/tools`` — the MCP tool inventory."""
+    return _c_tools(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                    dict(p or {}))
+
+
+def wb_extensions_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Any]:
+    return _c_ext_status(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def wb_extensions_registry(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Any]:
+    return _c_ext_registry(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                           dict(p or {}))
+
+
+def wb_extensions_toggle(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Any]:
+    return _c_ext_toggle(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                         dict(p or {}))
+
+
+def wb_extensions_install(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                          p: Dict[str, str]) -> Tuple[int, Any]:
+    return _c_ext_install(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                          dict(p or {}))
+
+
+def wb_extensions_sidecar_consent(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                  p: Dict[str, str]) -> Tuple[int, Any]:
+    return _c_ext_consent(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                          dict(p or {}))
+
+
+def wb_auth_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/auth/status`` — Qubit's real auth model, described truthfully."""
+    return _c_auth_status(cfg, dict(q or {}), b if isinstance(b, dict) else {},
+                          dict(p or {}))
+
+
+def wb_auth_unsupported(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                        p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/auth/{passkeys,passkey/*}`` — refused, naming the missing authority."""
+    params = dict(p or {})
+    if not params.get("sub"):
+        params["sub"] = "auth"
+    return _c_auth_unsupported(cfg, dict(q or {}),
+                               b if isinstance(b, dict) else {}, params)
+
+
+def wb_auth_logout(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Any]:
+    """``POST /api/auth/logout`` — the REAL Qubit authority, not a refusal.
+
+    ``qubit_compat.h_auth_logout`` already implements this exact path: it revokes
+    the loopback session tokens and answers ``next: /login``. Routing here keeps
+    the one implementation instead of adding a second logout beside it.
+    """
+    try:
+        from voicebridge import qubit_compat as HC
+        code, out = HC.dispatch(cfg, "POST", "/api/auth/logout",
+                                query=dict(q or {}),
+                                body=b if isinstance(b, dict) else {})
+        return code, out
+    except Exception as exc:  # noqa: BLE001
+        return _refusal("WB_BACKEND_UNAVAILABLE",
+                        f"/api/auth/logout unavailable: "
+                        f"{type(exc).__name__}: {exc}", endpoint="auth/logout")
+
 
 
 def _adapter(module: str) -> Any:
@@ -1179,12 +1312,38 @@ PORT_SET: Dict[str, str] = {
     "approval/respond": "h_wb_approval_respond",
     "clarify/pending": "h_wb_clarify_pending",
     "clarify/respond": "h_wb_file_save_stub",
-    # config surfaces
-    "settings": "h_wb_settings",
+    # config surfaces. ``settings``/``reasoning`` are the FLAT panel records
+    # (theme/show_thinking/default_model/reasoning_effort). Before this they were
+    # routed to ``h_wb_settings``, which answered the raw /api/config tree: every
+    # control hydrated from ``undefined`` and painted its default over the user's
+    # real value. ``default-model`` POST is a WRITE and used to be answered by the
+    # models READ handler, so a model choice was silently discarded.
+    "settings": "wb_settings",
     "models": "h_wb_models",
     "model/set": "h_wb_passthrough",
-    "default-model": "h_wb_models",
-    "reasoning": "h_wb_settings",
+    "default-model": "wb_default_model",
+    "reasoning": "wb_reasoning",
+    "providers": "wb_providers",
+    "providers/delete": "wb_providers",
+    "tools": "wb_tools",
+    # extensions: read + enable/disable through the ONE plugin admission
+    # authority; install/uninstall are code-install and are refused.
+    "extensions/status": "wb_extensions_status",
+    "extensions/registry": "wb_extensions_registry",
+    "extensions/toggle": "wb_extensions_toggle",
+    "extensions/install": "wb_extensions_install",
+    "extensions/uninstall": "wb_extensions_install",
+    "extensions/sidecar-proxy-consent": "wb_extensions_sidecar_consent",
+    # auth: status is a truthful read of Qubit's own gate; logout is the REAL
+    # qubit_compat authority; every passkey path is a typed refusal because Qubit
+    # has no WebAuthn credential store (see handlers_config's auth section).
+    "auth/status": "wb_auth_status",
+    "auth/logout": "wb_auth_logout",
+    "auth/passkeys": "wb_auth_unsupported",
+    "auth/passkey/delete": "wb_auth_unsupported",
+    "auth/passkey/register": "wb_auth_unsupported",
+    "auth/passkey/register/options": "wb_auth_unsupported",
+
     # NOTE: /api/skills, /api/memory, /api/profiles, /api/mcp/servers and
     # /api/logs are EXISTING_SET, not PORT_SET — they are already served by
     # qubit_compat and the gateway dispatches to them there. Listing them in both
@@ -1201,7 +1360,7 @@ PORT_SET: Dict[str, str] = {
     "skills/content": "h_wb_passthrough",
     "skills/toggle": "h_wb_passthrough",
     "memory/write": "h_wb_passthrough",
-    "mcp/tools": "h_wb_passthrough",
+    "mcp/tools": "wb_tools",
     "plugins": "h_wb_passthrough",
     "personalities": "h_wb_settings",
     "personality/set": "h_wb_settings",
@@ -1264,6 +1423,9 @@ _EXTRA_FAMILIES: Tuple[Tuple[str, str], ...] = (
     ("approval/", "approval_family"),
     ("clarify/", "clarify_family"),
     ("file/", "file_family"),
+    # every passkey path — including ones not in PORT_SET — is the same refusal,
+    # so a version skew in the ported client cannot turn one into a bare 501.
+    ("auth/passkey", "auth_family"),
 )
 
 
@@ -1291,6 +1453,19 @@ def clarify_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _refusal("WB_CAPABILITY_UNBOUND",
                     f"/api/clarify/{verb} has no Qubit authority",
                     endpoint="clarify/" + verb)
+
+
+def auth_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                p: Dict[str, str]) -> Tuple[int, Any]:
+    """``/api/auth/passkey…`` — every form of it is the same typed refusal.
+
+    ``auth/status`` and ``auth/logout`` have their own PORT_SET rows and are
+    reached FIRST by ``_resolve_handler``; this family exists only so a nested or
+    version-skewed passkey path still gets ``WB_AUTH_MODEL_UNSUPPORTED`` (with the
+    gap named) instead of a generic "not in the port set" that reads like a bug.
+    """
+    sub = str(p.get("sub") or "").strip("/")
+    return wb_auth_unsupported(cfg, q, b, {**dict(p or {}), "sub": sub or "auth"})
 
 
 def file_family(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -1460,6 +1635,23 @@ _HANDLERS: Dict[str, Callable[..., Tuple[int, Any]]] = {
     "client_events_log": client_events_log,
     "transcribe_capability": transcribe_capability,
     "updates_check": updates_check,
+    # the operational-settings / extensions / auth call set
+    # (workbench_ui/handlers_config.py). A name here with no entry answered
+    # _WB_NOT_IN_PORT_SET even though the handler existed.
+    "wb_settings": wb_settings,
+    "wb_reasoning": wb_reasoning,
+    "wb_providers": wb_providers,
+    "wb_default_model": wb_default_model,
+    "wb_tools": wb_tools,
+    "wb_extensions_status": wb_extensions_status,
+    "wb_extensions_registry": wb_extensions_registry,
+    "wb_extensions_toggle": wb_extensions_toggle,
+    "wb_extensions_install": wb_extensions_install,
+    "wb_extensions_sidecar_consent": wb_extensions_sidecar_consent,
+    "wb_auth_status": wb_auth_status,
+    "wb_auth_logout": wb_auth_logout,
+    "wb_auth_unsupported": wb_auth_unsupported,
+    "auth_family": auth_family,
 }
 
 

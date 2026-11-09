@@ -24,10 +24,13 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 ROOT = HERE / "static"
 
-#: 48 + 6 = 54 of 184. The exact numbers the doc's §2.2 states.
-EXPECTED_PORT = 48
+#: 73 + 6 = 79 of 184 answer; 105 remain GAP. MEASURED from the shipped tables
+#: (``PORT_SET`` + ``_EXTRA_PREFIXES`` + ``EXISTING_SET``). The doc's earlier
+#: 48/130 predated the config, extension and auth wave AND under-counted the
+#: seven ``_EXTRA_PREFIXES`` routes the gateway already served.
+EXPECTED_PORT = 73
 EXPECTED_EXISTING = 6
-EXPECTED_GAP = 130
+EXPECTED_GAP = 105
 EXPECTED_TOTAL = 184
 
 
@@ -70,6 +73,12 @@ def verdicts() -> tuple[dict[str, str], dict[str, str], dict[str, str], list[str
 
     port = {"/api/" + k: v for k, v in R.PORT_SET.items()}
     existing = {"/api/" + k: "qubit_compat pass-through" for k in R.EXISTING_SET}
+    # ``_EXTRA_PREFIXES`` are dispatched by the gateway too (they need the query
+    # string or the raw sub-path, so they are not PORT_SET keys). Leaving them
+    # out counted seven SERVED endpoints as GAP — the table under-reported what
+    # the server actually answers, which is the opposite of a receipt.
+    for k, v in R._EXTRA_PREFIXES.items():
+        port.setdefault("/api/" + k, v)
     eps = endpoints_in_tree()
     gap = {e: "WB_NOT_IN_PORT_SET" for e in eps
            if e not in port and e not in existing}
