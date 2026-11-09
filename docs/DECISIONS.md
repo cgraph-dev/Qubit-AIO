@@ -175,3 +175,17 @@ done
     → Provenance: owner session 2026-11-09; inventory, licence quotes and
     sha256s in `THIRD_PARTY_NOTICES.md`. Source files live at
     `/home/trick/Desktop/UI Office` and are not part of the repo.
+
+15. **Habblaud stays vendored and unpatched for UI work (owner ruling, 2026-11-09).**
+    The Office UI upgrade must **not** modify, patch, rebuild, or re-vendor the
+    vendored Habblaud client (`frontend/qubit-app/plugins/qubit-office/habblaud/`)
+    for theming. UI work happens in the Qubit-owned shell around the iframe:
+    agent portraits in the Agents panel, the host docks, the injected menu icons,
+    and append-only runtime overrides of a **documented allowlist** of the
+    office's own `.ui-root` CSS variables. Everything stays off by default
+    (`office.theme: classic`) and is removable without a rebuild. Room/tile art
+    inside the canvas would require a re-vendor, so it is explicitly **deferred**
+    and needs a new owner decision. Gate: `python3 scripts/vendor_habblaud.py
+    --check` must stay green and the vendored hashes unchanged in every lane.
+    → Provenance: owner session 2026-11-09 ("dont fuck habblaud we just update ui
+    to make it better and easier to upgrade in the future").
