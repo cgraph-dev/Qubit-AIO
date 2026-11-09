@@ -37,9 +37,13 @@ ROOT = HERE / "static"
 #: Two lanes were live in the same tree while these numbers moved (the
 #: file-family/commands wave served ``file/*`` and ``commands/*``), so
 #: ``EXPECTED_ANSWERED`` is the whole answered set, not one lane's share.
-EXPECTED_ANSWERED = 91
+#: 99 = the 8 ``file/*`` write verbs + ``file/raw`` + the 6 ``commands*``/``btw``
+#: paths that wave added on top of the previous 91; every one of them answers
+#: real data or a TYPED refusal (``WB_CAPABILITY_UNBOUND`` /
+#: ``WB_BROKERED_WRITE``), so none is counted GAP.
+EXPECTED_ANSWERED = 99
 EXPECTED_EXISTING = 6
-EXPECTED_GAP = 93
+EXPECTED_GAP = 85
 EXPECTED_TOTAL = 184
 
 

@@ -1411,6 +1411,19 @@ PORT_SET: Dict[str, str] = {
     "file": "h_wb_file_read",
     "file/raw": "h_wb_file_raw",
     "file/save": "file_family",
+    # The write verbs route through ``file_family`` (→ file_patch), but they are
+    # listed here too: PORT_SET is what the endpoint table and the doc count are
+    # derived from, and a verb that only resolves through the family prefix read
+    # as GAP while the live server answered it. One row per verb the ported
+    # client calls (ui.js quoted in file_family's docstring).
+    "file/create": "file_family",
+    "file/create-dir": "file_family",
+    "file/delete": "file_family",
+    "file/move": "file_family",
+    "file/rename": "file_family",
+    "file/path": "file_family",
+    "file/reveal": "file_family",
+    "file/open-vscode": "file_family",
     "projects": "h_wb_projects",
     # terminal — served by the command family (workbench_ui/command_family.py).
     # These rows used to point at ``h_wb_terminal``, a blanket PTY_NO_SHELL
@@ -1717,9 +1730,9 @@ def raw_handler(sub: str) -> Optional[Callable[..., None]]:
             status, payload = err
             handler._json(payload, status)
             return
-        try:
-            from .. import files as F
+        from voicebridge import files as F
 
+        try:
             got = F.read_bytes(None, str(absolute))
         except Exception as exc:  # noqa: BLE001 - a refusal, not a traceback
             status, payload = FF.refusal(

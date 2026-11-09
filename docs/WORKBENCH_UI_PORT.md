@@ -147,16 +147,16 @@ The brief's ~165 was an estimate; 184 is the measurement.
 > §2.4 were then confirmed by matching each endpoint's real request form. The
 > number to trust is §2.4's 6, and `_endpoint_table.py` re-derives it.
 
-### 2.2 Verdict summary — 91 answered / 93 GAP of 184
+### 2.2 Verdict summary — 99 answered / 85 GAP of 184
 
 | Verdict | Endpoints | What it means |
 |---|---:|---|
-| **PORT** | 85 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
+| **PORT** | 93 | No Qubit route exists; this port writes a shim handler answering from a real Qubit authority. |
 | **EXISTING** | 6 | `qubit_compat.ROUTES` already serves this exact path; the shim passes through to `qubit_compat.dispatch`. |
-| **GAP** | 93 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
-| **Total** | **184** | 85 PORT (the 6 EXISTING are counted inside that 85) + 93 GAP, checked in `_endpoint_table.py`. |
+| **GAP** | 85 | No Qubit authority. Typed refusal (`ok:false` + code + detail naming the missing capability) so the UI renders its own error path. Never an empty list — an empty list reads "you have none", which is a lie. |
+| **Total** | **184** | 93 PORT (the 6 EXISTING are counted inside that 93) + 85 GAP, checked in `_endpoint_table.py`. |
 
-**"How many of the 165 work" → 91 of 184** answer real Qubit data; 93 answer a
+**"How many of the 165 work" → 99 of 184** answer real Qubit data; 85 answer a
 typed refusal. The brief's ~165 was an estimate; the
 measured distinct count is 184 after normalising template tails. Every number
 here is reproduced mechanically by `voicebridge/workbench_ui/_endpoint_table.py`
@@ -182,12 +182,12 @@ the gateway already answered (`dashboard/config`, `dashboard/status`,
 `PORT_SET` and were being counted GAP. `_endpoint_table.py` now reads them, so
 the receipt matches what the server actually answers.
 
-## 2.3 The PORT set (85) — what each maps to
+## 2.3 The PORT set (93) — what each maps to
 
 Every handler resolves its dependency INSIDE the call and answers a typed 503
 when it is absent (the `workbench_routes.py` rule: a missing capability is a
 refusal, never an ImportError at boot). `_endpoint_table.py` asserts this table
-has exactly the 85 PORT entries and no others.
+has exactly the 93 PORT entries and no others.
 
 | Endpoint | Method | Qubit authority |
 |---|---|---|
@@ -207,8 +207,8 @@ has exactly the 85 PORT entries and no others.
 | `/api/crons/status` | GET | `cron_bridge.store_path` + job counts. |
 | `/api/crons/update` | POST | `cron_bridge.update`. |
 | `/api/default-model` | GET/POST | same handler, default-model projection. |
-| `/api/file` | GET | `workbench.adapters_workspace.preview_file` (read). |
-| `/api/file/save` | POST | `adapters_workspace.refused_mutation` — the workspace is read-only by construction; the UI shows its own refusal toast. |
+| `/api/file` | GET | `workbench_ui/file_family.file_read` → `voicebridge.files` (bounded, redacted, binary-refusing) confined to the registered project roots. |
+| `/api/file/save` | POST | `file_family.file_save` → `voicebridge.file_patch.write_bytes` — the ONE brokered confined-write lane, prior bytes backed up first, receipt (with `backup`) returned. See §2.3.3. |
 | `/api/mcp/tools` | GET | existing servers + tools projection. |
 | `/api/memory/write` | POST | compat memory-write route. |
 | `/api/model/set` | POST | pass-through to existing `/api/model/set`. |
@@ -239,6 +239,31 @@ has exactly the 85 PORT entries and no others.
 | `/api/terminal/input` | POST | `terminal_family.input_text` → `chat_transport.AgentPtySession.feed` (one agent turn on Enter). |
 | `/api/terminal/resize` | POST | `terminal_family.resize` — records the pane geometry. |
 | `/api/terminal/start` | POST | `terminal_family.start` — an **agent-backed** terminal. No shell, no PTY: `PTY_NO_SHELL` still holds for every process-spawning path. Every payload carries `backend:"agent"`, `shell:false`. The pane's `api/terminal/output` EventSource is served as a live SSE stream from the same family. |
+
+#### 2.3.3 The file write verbs and the composer command set
+
+Served by `voicebridge/workbench_ui/file_family.py` and
+`voicebridge/workbench_ui/handlers_commands.py`. Every file path is resolved by
+`file_family.resolve_workspace_path` — `realpath` inside a REGISTERED project
+root, `.` meaning that root, never the process cwd — and every WRITE then goes
+through `voicebridge.file_patch`, the ONE brokered confined-write lane (e-stop
+latch, `bwrap` confinement probe, atomic write, durable backup). A path that
+leaves a root — `..`, an absolute escape, or a symlink pointing out — answers
+`WB_WORKSPACE_OUTSIDE` (403) and nothing is read or written.
+
+| Endpoint | Method | Qubit authority |
+|---|---|---|
+| `/api/file/create`, `/create-dir`, `/delete`, `/save` | POST | `file_patch.write_bytes` / `mkdir_path` / `delete_path`. `create` never overwrites (typed `FILE_PATCH_CONFLICT`); `delete` ARCHIVES into `<state>/file_patch_backups/deleted` and returns `archived_to`, so it is reversible; `save` backs up the prior bytes and returns the receipt. |
+| `/api/file`, `/api/file/raw` | GET | `voicebridge.files` through `adapters_workspace.preview_file` / `files.read_bytes`. `raw` is a BYTES route (image/media/PDF/HTML/download behind `workspace.js:291`), claimed by the listener before the JSON dispatcher. |
+| `/api/file/path` | POST | the confined absolute path — the value `ui.js:26780` copies to the clipboard. |
+| `/api/file/move`, `/rename` | POST | **typed 403 `WB_BROKERED_WRITE`** — `file_patch` has no rename primitive and this port does not grow a second write path beside it. |
+| `/api/file/open-vscode` | POST | **typed 501 `WB_CAPABILITY_UNBOUND`** — Qubit never launches an editor from the dashboard. |
+| `/api/file/reveal` | POST | typed refusal naming the real path; `WB_NO_DESKTOP_SESSION` on a headless host (the measured case here), `WB_BROKERED_WRITE` where a desktop session exists but launching must still be brokered. |
+| `/api/commands` | GET | `workbench_shim.system._command_rows` — the SAME catalog `GET /api/chat/slash-commands` serves (CLI registry + gateway mixins + skill catalog + plugin registry + toolsets) in upstream's row shape. |
+| `/api/commands/exec` | POST | `chat_transport.run_qubitchat_slash` — the ONE slash executor `/qubit-chat` and voice use. `data.output` is a real answer or a named miss, never phantom success. |
+| `/api/commands/bundles`, `/bundles/resolve` | GET/POST | **typed 501 `WB_CAPABILITY_UNBOUND`** — Qubit bundles are session-scoped runtime objects with no listable registry; an empty list would read as "you have none". |
+| `/api/commands/moa/resolve` | GET | **typed 501 `WB_CAPABILITY_UNBOUND`** — no mixture-of-agents resolver exists. |
+| `/api/btw` (+ `/api/btw/stream`) | POST / SSE | `chat_transport.stream_turn` on the Qubit brain path, one worker per side question. The QUESTION is appended to the parent session (sidecar marker under `display_metadata.btw`); the ANSWER is delivered only on the ephemeral `btw` stream (`done` / `apperror`), never into the transcript. |
 
 #### 2.3.2 The git / worktree / workspace families
 
@@ -303,7 +328,7 @@ and returns the result verbatim.
 | `/api/sessions/search` | GET | `h_sessions_list` result reshaped to `{results:[...]}`. |
 | `/api/skills` | GET | **EXISTING** `GET /api/skills`. |
 
-### 2.5 The GAP set (105) — grouped, with the honest reason
+### 2.5 The GAP set (85) — grouped, with the honest reason
 
 The UI must render its own error for each. None of these get invented rows. Every
 shim refusal carries `{ok:false, state:"UNAVAILABLE", code, detail, qubit_counterpart}`

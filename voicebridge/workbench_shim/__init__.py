@@ -174,21 +174,59 @@ def truthy(value: Any) -> bool:
     return str(value or "").strip().lower() in ("1", "true", "yes", "on")
 
 
+class _EmptyCfg:
+    """An empty config that answers the two accessors the gates use.
+
+    Deliberately NOT a ``dict``: the config interface is
+    ``cfg.get(section, key, default=...)`` (keyword-only), which ``dict.get``
+    shadows with a positional signature — a subclass raised
+    ``TypeError: dict.get() takes no keyword arguments`` on every probe. This
+    answers ``""`` (the "unset" value) for every key and resolves the ONE state
+    directory the rest of the process uses, so a store opened on it fails
+    closed exactly as it does for a real config.
+    """
+
+    def get(self, *_args: Any, default: Any = None, **_kwargs: Any) -> Any:
+        return default
+
+    def state_dir(self) -> Any:
+        from pathlib import Path
+
+        from ..config import voice_layout
+
+        path = Path(voice_layout().effective["state"])
+        try:
+            path.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
+        return path
+
+
+_EMPTY_CFG: Any = _EmptyCfg()
+
+
 def e_stopped(cfg: Any) -> bool:
     """The one mutation gate, read from the single e-stop authority.
 
     Fail closed, exactly like ``qubit_compat._estop``: an unreadable authority
-    means "stopped", never "allowed".
+    means "stopped", never "allowed". A MISSING config (the listener hands
+    ``None`` when no orchestrator is attached) is not an unreadable authority —
+    the latch store resolves its own default path and fails closed by itself if
+    it cannot be read — so it is normalised to an empty config first. Passing
+    ``None`` straight through made every one of these gates answer
+    EMERGENCY_STOP on a healthy host with the latch explicitly cleared
+    (measured: ``PowerControlStore.load()`` with a cleared file, gate True).
     """
     try:
         from ..broker import estop_engaged
 
-        return bool(estop_engaged(cfg))
+        return bool(estop_engaged(cfg if cfg is not None else _EMPTY_CFG))
     except Exception:
         try:
             from .. import power as PW
 
-            return bool(PW.estop_engaged(cfg))
+            return bool(PW.estop_engaged(cfg if cfg is not None
+                                         else _EMPTY_CFG))
         except Exception:
             return True
 
