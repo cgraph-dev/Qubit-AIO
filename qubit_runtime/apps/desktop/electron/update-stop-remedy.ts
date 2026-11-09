@@ -92,7 +92,7 @@ const STOP_EXPLANATIONS: Record<string, UpdateStopExplanation> = {
       'The updater refused to move this install back to the release it offered, because that release predates the ' +
       'gateway runtime your session stores already use. Downgrading is unsupported, and nothing was changed: you are ' +
       'still on the version you had.\n\n' +
-      'To follow this checkout instead of the release channel, run `hermes update --set-channel main`, or pick a ' +
+      'To follow this checkout instead of the release channel, run `qubit update --set-channel main`, or pick a ' +
       `channel in About ▸ Updates.\n\n${UPDATES_GUIDE}`
   }
 }

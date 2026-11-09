@@ -53,7 +53,11 @@ def _stub_local(monkeypatch):
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
-              reasoning=None):
+              reasoning=None, cancel=None):
+        # ``cancel`` is part of the real signature (local_llm.chat_local): STOP
+        # ends an in-flight local call. A double pinned to the OLD signature is
+        # the same bug class as a guard pinned to an old spelling — the caller
+        # is correct and the test dies on it.
         calls.append({"text": text, "model": model,
                       "conversation_prompt": conversation_prompt,
                       "context": context})
@@ -68,6 +72,26 @@ def _no_plan(monkeypatch):
     import voicebridge.planner as _pl
 
     monkeypatch.setattr(_pl, "plan", lambda _t: None)
+
+
+def _no_vendored(monkeypatch):
+    """Take the planner path deliberately.
+
+    ``run_session`` prefers the tool-capable vendored ``AIAgent`` for the turn
+    and only falls back to the planner when that runtime is not importable.
+    These tests assert on SESSION CONTINUITY — which conversation id the turn
+    lands on and that one store is written — not on the turn's transport. On a
+    checkout where the vendored runtime IS importable, the real agent dials the
+    configured provider (the operator's key), and a rejected/down provider
+    sends ``auto_recover_after_exhaustion`` into its retry backoff — so the
+    suite hung on a live network call instead of testing what it is named for.
+    """
+    import voicebridge.agent as A
+
+    def _unavailable(*_a, **_kw):
+        return None
+
+    monkeypatch.setattr(A, "_run_vendored_session", _unavailable)
 
 
 def _assert_one_canonical_store(cfg):
@@ -123,6 +147,7 @@ def test_run_session_with_default_alias_lands_on_canonical_session(
 
     cfg = _cfg(tmp_path, monkeypatch)
     _no_plan(monkeypatch)
+    _no_vendored(monkeypatch)
     _stub_local(monkeypatch)
 
     # session="" is the empty/voice-default alias: it must converge.
@@ -150,6 +175,7 @@ def test_voice_then_chat_and_chat_then_voice_are_continuous(
 
     cfg = _cfg(tmp_path, monkeypatch)
     _no_plan(monkeypatch)
+    _no_vendored(monkeypatch)
     stub = _stub_local(monkeypatch)
     sid = canonical_session_id(cfg)
 
@@ -200,6 +226,7 @@ def test_run_worker_task_voice_alias_converges(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch)
     _no_plan(monkeypatch)
+    _no_vendored(monkeypatch)
     _stub_local(monkeypatch)
 
     orch = object.__new__(VoiceOrchestrator)          # skip heavy __init__

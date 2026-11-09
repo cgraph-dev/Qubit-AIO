@@ -37,7 +37,7 @@ export interface CheckoutStrategyDeps {
   resolveUpdaterBinary: () => string | null
   /**
    * True when one remote gateway serves this Desktop (app-global remote /
-   * cloud / SSH). The hand-off then tells `hermes update` not to (re)start a
+   * cloud / SSH). The hand-off then tells `qubit update` not to (re)start a
    * local messaging gateway: with the same channel credentials as the remote
    * host it would become a competing long-poll consumer (#117529).
    */
@@ -56,14 +56,14 @@ export interface CheckoutStrategyDeps {
 
 /**
  * The manual command card for a checkout with no staged updater: the exact
- * `hermes update` line to run, branch-pinned to the checkout's current branch
- * for non-main (bare `hermes update` would silently switch the install
+ * `qubit update` line to run, branch-pinned to the checkout's current branch
+ * for non-main (bare `qubit update` would silently switch the install
  * off-branch).
  */
 export function buildManualUpdateCommand(currentBranch: string | null | undefined): string {
   return currentBranch && currentBranch !== 'HEAD' && currentBranch !== 'main'
-    ? `hermes update --branch ${currentBranch}`
-    : 'hermes update'
+    ? `qubit update --branch ${currentBranch}`
+    : 'qubit update'
 }
 
 /**
@@ -142,7 +142,7 @@ export function createCheckoutStrategy(deps: CheckoutStrategyDeps): UpdaterStrat
     const targetLabel: string = status.channel ?? branch
 
     const manualCommand: string = status.channel
-      ? `hermes update --channel ${status.channel}`
+      ? `qubit update --channel ${status.channel}`
       : buildManualUpdateCommand(branch)
 
     const updater: string | null = deps.resolveUpdaterBinary()
@@ -167,14 +167,14 @@ export function createCheckoutStrategy(deps: CheckoutStrategyDeps): UpdaterStrat
 
     if (!deps.isWindows && (!updater || status.channel)) {
       // macOS/Linux: hand off to the repo-owned posix script — same shape as
-      // Windows (quit → detached orchestrator → `hermes update` → relaunch),
+      // Windows (quit → detached orchestrator → `qubit update` → relaunch),
       // minus the venv-lock gauntlet POSIX doesn't need. The old in-app
       // updater (applyUpdatesPosixInApp) is gone with everything it dragged
       // in: the HERMES_DESKTOP_CHILD_PID reaper-exclusion dance (#37532),
       // the in-window rebuild retry, and the relaunch-outcome matrix — the
       // script owns swap/relaunch, and the app is DEAD during the update so
       // there is nothing to reap around. Checkouts that predate the script
-      // get the manual `hermes update` card once; their next update pulls it.
+      // get the manual `qubit update` card once; their next update pulls it.
       return await applyPosixHandoff(targetArgs, targetLabel, manualCommand)
     }
 
@@ -258,7 +258,7 @@ export function createCheckoutStrategy(deps: CheckoutStrategyDeps): UpdaterStrat
     // months-stale updater logic — pre-#67369 cache resolver, pre-#74782
     // marker adoption — producing failures that were fixed on main long ago
     // (2026-08-09 incident). scripts/desktop-update/windows.ps1 ships WITH the
-    // checkout, so each `hermes update` refreshes the code that drives the
+    // checkout, so each `qubit update` refreshes the code that drives the
     // next one. Checkouts that predate the script fall back to the binary
     // path unchanged.
     const scriptHandoff = resolveUpdateScriptHandoff(updateRoot)
@@ -311,7 +311,7 @@ export function createCheckoutStrategy(deps: CheckoutStrategyDeps): UpdaterStrat
       // the first moments of the hand-off — the script's step 0 overwrites it
       // with its own live $PID, and if the script never starts the wrapper's
       // dead pid makes the marker read as stale and self-delete (no wedge).
-      // The `hermes update` child adopts the SCRIPT's claim via
+      // The `qubit update` child adopts the SCRIPT's claim via
       // update_lock.py's process-ancestry rule; no mtime heuristics needed.
       if (Number.isInteger(child.pid)) {
         writeUpdateMarker(deps.hermesHome, child.pid, { startedAt: updateStartedAt })
@@ -431,7 +431,7 @@ export function createCheckoutStrategy(deps: CheckoutStrategyDeps): UpdaterStrat
       String(process.pid)
     ]
 
-    // A remote-served Desktop owns no local messaging gateway: `hermes update
+    // A remote-served Desktop owns no local messaging gateway: `qubit update
     // --gateway` would (re)start one here anyway, and with the same channel
     // credentials as the remote host it becomes a competing long-poll consumer
     // (#117529). Keep --gateway for the local-ownership default.

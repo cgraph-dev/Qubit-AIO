@@ -11,7 +11,7 @@ import { hiddenWindowsChildOptions, windowsShellCommand } from './windows-child-
 const GATEWAY_ENSURE_PROTOCOL_DEADLINE_MS = 60_000
 const GATEWAY_ENSURE_CLIENT_GRACE_MS = 15_000
 
-/** Run one bounded `hermes ... gateway <verb>` client (`ensure` by default; `restart` for a stale owner). */
+/** Run one bounded `qubit ... gateway <verb>` client (`ensure` by default; `restart` for a stale owner). */
 export function runGatewayEnsure(
   backend, cwd: string, home: string, parentEnv: NodeJS.ProcessEnv = process.env,
   { timeoutMs = GATEWAY_ENSURE_PROTOCOL_DEADLINE_MS + GATEWAY_ENSURE_CLIENT_GRACE_MS, label = 'qubit gateway ensure' }: { timeoutMs?: number; label?: string } = {}
@@ -78,7 +78,7 @@ export interface GatewayEndpoint {
  *  drain, and a turn parked on approval/clarify there waits for an answer only this window can give. */
 export type StaleGatewayRestart = (endpoint: GatewayEndpoint, stale: { gateway: string; client: string }) => Promise<null | { done: Promise<void> }>
 
-/** The profile whose `hermes --profile P gateway restart` replaces the process behind `endpoint`:
+/** The profile whose `qubit --profile P gateway restart` replaces the process behind `endpoint`:
  *  the multiplexer root (`default`) for a served secondary, else the endpoint's own profile home. */
 export function gatewayOwnerProfile(endpoint: GatewayEndpoint): string {
   const home = endpoint.control_home || endpoint.profile_id
@@ -86,7 +86,7 @@ export function gatewayOwnerProfile(endpoint: GatewayEndpoint): string {
   return path.basename(path.dirname(home)) === 'profiles' ? path.basename(home) : 'default'
 }
 
-/** `hermes --profile P gateway restart --detach`: without a service, the CLI would otherwise run the
+/** `qubit --profile P gateway restart --detach`: without a service, the CLI would otherwise run the
  *  replacement as this bounded client, a child its timeout kills. A runtime older than `--detach`
  *  names the flag argparse rejects (exit 2); it gets its old restart, which still works wherever a
  *  service owns the gateway, instead of no restart at all. */

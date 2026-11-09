@@ -57,7 +57,7 @@ it('moves a checkout without a source probe to main, but surfaces a broken probe
       }
 
       expect(await strategy.check()).toMatchObject({ supported: true, updateAvailable: true, branch: 'main' })
-      expect(await strategy.apply()).toMatchObject({ ok: true, manual: true, command: 'hermes update' })
+      expect(await strategy.apply()).toMatchObject({ ok: true, manual: true, command: 'qubit update' })
     }
 
     fs.writeFileSync(modulePath, 'def main():\n    raise RuntimeError("invalid channel configuration")\n')
