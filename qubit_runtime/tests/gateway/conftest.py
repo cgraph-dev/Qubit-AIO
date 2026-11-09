@@ -741,3 +741,36 @@ def hosted_owner(tmp_path, monkeypatch):
     thread.join()
     loop.close()
     store._db.close()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_gateway_runner_ref():
+    """Give every gateway test a process with NO live runner.
+
+    ``GatewayRunner.__init__`` publishes itself through the module global
+    ``gateway.run._gateway_runner_ref`` (a weakref) and nothing clears it, so the last
+    runner built stays reachable for the rest of the pytest session. Import-time
+    readers then see a runner that has nothing to do with the current test — for
+    example ``gateway.relay.egress._live_relay_fronted()`` prefers the live adapter's
+    ``fronts_platform()`` over the caller's ``GATEWAY_RELAY_PLATFORMS`` snapshot, so a
+    stale adapter makes a later test conclude "not relay-routed" and skip the egress
+    guard.
+
+    106 files in this directory construct a ``GatewayRunner``. Before this fixture the
+    symptom showed up as failures that pass in isolation and fail in a directory run:
+
+      relay/ test_relay_egress_declines   34 passed alone, 5 failed after a sibling
+      test_bot_receipt_tombstone_expiry   13 passed alone, 2 failed in a prefix run
+
+    The sentinel is the same lambda the module initialises the global to, i.e. "no
+    runner in this process" — what a CLI or cron process sees. Production behaviour is
+    untouched; only test-to-test leakage is removed.
+    """
+    import gateway.run as _gateway_run
+
+    saved = _gateway_run._gateway_runner_ref
+    _gateway_run._gateway_runner_ref = lambda: None
+    try:
+        yield
+    finally:
+        _gateway_run._gateway_runner_ref = saved
