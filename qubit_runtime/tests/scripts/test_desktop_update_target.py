@@ -78,6 +78,11 @@ def _run_handoff(tmp_path, target, *, windows=False, inherited_home=True, modern
     env.pop("PYTHONPATH", None)
     env.pop("PYTHONHOME", None)
     env.pop("QUBIT_HOME", None)
+    # HERMES_HOME is QUBIT_HOME's declared alias (agent_compat.env_aliases), so a host that
+    # exports it — the VoiceBridge shell exports both — reintroduces the operator's real home
+    # through the alias after the line above cleared the primary name. Measured: this file
+    # passes 15 with the alias cleared and fails 2 with it set.
+    env.pop("HERMES_HOME", None)
     if inherited_home:
         env["QUBIT_HOME"] = str(home)
     if modern:
