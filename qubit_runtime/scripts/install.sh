@@ -687,18 +687,20 @@ local_source_repo() {
 # containing the commit proves it is on the intended lineage. The fallback is
 # always logged -- never a silent loosening -- and a ref that exists but does
 # NOT contain $COMMIT is a hard rejection, not a reason to try the other one.
+#
+# A pure predicate: it returns a status and never fails the stage itself. A
+# `fail` here would `exit` the shell from inside the caller's `||` chain, so
+# the caller's staged-clone cleanup would never run and a refused pin would
+# leak its `.hermes-clone-*` directory. The caller owns the cleanup and the
+# single `fail` that names the rejection.
 commit_is_on_branch() {
     local repo="$1" commit="$2"
     if git -C "$repo" rev-parse --verify --quiet "refs/remotes/origin/$BRANCH^{commit}" >/dev/null 2>&1; then
-        if git -C "$repo" merge-base --is-ancestor "$commit" "origin/$BRANCH" 2>/dev/null; then
-            return 0
-        fi
-        fail "commit $commit is not on branch $BRANCH" commit_not_on_branch
+        git -C "$repo" merge-base --is-ancestor "$commit" "origin/$BRANCH" 2>/dev/null && return 0
+        return 1
     fi
     log_warn "origin/$BRANCH unavailable; verifying against local $BRANCH"
-    if git -C "$repo" merge-base --is-ancestor "$commit" "$BRANCH" 2>/dev/null; then
-        return 0
-    fi
+    git -C "$repo" merge-base --is-ancestor "$commit" "$BRANCH" 2>/dev/null && return 0
     return 1
 }
 
