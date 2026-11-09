@@ -254,7 +254,7 @@ workbench serves the same checkout).
 | Endpoint | Method | Qubit authority |
 |---|---|---|
 | `/api/git/status`, `/log`, `/diff`, `/branches`, `/worktrees`, `/review/rev-parse` | GET | `git_family` over `cmdrun`/`git_repo`, parsers shared with `qubit_cli.web_git`; `.env`/`auth.json` never diffed (`GIT_SENSITIVE_PATH`). |
-| `/api/git/stage`, `/unstage`, `/discard`, `/commit`, `/branch/switch`, `/push`, `/pull`, `/worktree/add`, `/worktree/remove` | POST | validate → shared confirm journal → `git.write.<verb>` grant (same journal and grant the original `/api/git/...` compat rows use), `applied:false`. `stage` requires explicit `paths` — no `add -A`. |
+| `/api/git/stage`, `/unstage`, `/discard`, `/commit`, `/branch/switch`, `/push`, `/pull`, `/worktree/add`, `/worktree/remove` | POST | validate → shared confirm journal → `git.write.<verb>` grant (same journal and grant the original `/api/git/...` compat rows use), `applied:false`. `stage` requires explicit `paths` — no `add -A`. **Not exercised end to end in this port:** every mutation path is verified through the confirmation journal (staged 409 → settled 200 with a grant, nothing applied); the step that would apply the staged command through the brokered opencode worktree flow is not built, which is why `applied` is always `false`. |
 | `/api/workspaces` | GET | `voicebridge.projects.list_projects` rows (one per registered folder) + `terminal_remote_backend:false`. |
 | `/api/workspaces/add`, `/remove`, `/rename` | POST | `projects.add_folder` / `remove_folder` / `rename`, after the shared confirm journal settles. |
 | `/api/workspaces/reorder` | POST | typed `501 WORKSPACE_ORDER_UNSUPPORTED` — the registry has no order field. |
