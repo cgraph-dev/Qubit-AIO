@@ -9,6 +9,7 @@ import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
+import { installOfficeMenuButtons, type OfficeMenuController } from "./office-menu";
 import { createSeatModelPanel } from "./SeatModelPanel";
 import { createAgentsPanel } from "./AgentsPanel";
 import {
@@ -74,6 +75,52 @@ function connectionText(props: OfficeAppProps): string {
   return "Connecting to the office backend\u2026";
 }
 
+type ShellComponents = {
+  base?: string;
+  HudDock: ReturnType<typeof createHudDock>;
+  AgentsPanel: ReturnType<typeof createAgentsPanel>;
+  SeatModelPanel: ReturnType<typeof createSeatModelPanel>;
+};
+
+/**
+ * Component factories memoised per (hooks, base).
+ *
+ * WHY THIS EXISTS — the refresh bug. These were called on EVERY render. A
+ * factory returns a NEW function, so React saw a different component type each
+ * time and unmounted/remounted the whole subtree: the HUD dock's iframe was
+ * torn down and reloaded every time the page re-rendered, and the agents panel
+ * refetched its roster on the same cadence. The page re-renders whenever the
+ * host's tower poll updates its props — i.e. constantly — which is exactly the
+ * "HUD keeps refreshing" the owner saw. A stable identity per shell instance
+ * makes a re-render a re-render, not a reload.
+ *
+ * A WeakMap on the hooks object (not a React useRef) keeps this correct even
+ * for callers that pass a minimal hook surface, and lets the cache die with the
+ * shell.
+ */
+const SHELL_COMPONENT_CACHE = new WeakMap<object, Map<string, ShellComponents>>();
+
+function shellComponents(
+  R: OfficeGameShellProps["React"],
+  hooks: OfficeGameShellProps["hooks"],
+  base?: string,
+): ShellComponents {
+  const key = (hooks ?? {}) as object;
+  const byBase = SHELL_COMPONENT_CACHE.get(key) ?? new Map<string, ShellComponents>();
+  const cacheKey = base ?? "";
+  const cached = byBase.get(cacheKey);
+  if (cached) return cached;
+  const built: ShellComponents = {
+    base,
+    HudDock: createHudDock({ React: R, hooks, base }),
+    AgentsPanel: createAgentsPanel(R, hooks),
+    SeatModelPanel: createSeatModelPanel(R, hooks),
+  };
+  byBase.set(cacheKey, built);
+  SHELL_COMPONENT_CACHE.set(key, byBase);
+  return built;
+}
+
 /**
  * Build the component. React and hooks arrive as arguments, exactly as the rest
  * of the plugin does it.
@@ -100,12 +147,12 @@ export function createOfficeApp(
     // does. See app/AgentsPanel.tsx for why that is the only mechanism that
     // can cross the document boundary.
     const [agentsOpen, setAgentsOpen] = useState(false);
-    const HudDock = createHudDock({ React: R, hooks, base: props.base });
-    const AgentsPanel = createAgentsPanel(R, hooks);
+    // Stable across renders — see shellComponents().
+    const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
-    // Built unconditionally (hooks must not be conditional) but only rendered
-    // when a seat is chosen, so the default view is still just the game.
-    const SeatModelPanel = createSeatModelPanel(R, hooks);
+    // The two icon buttons installed into the office's own panel group. The
+    // controller lives for one iframe load; a reload (or a new base) swaps it.
+    const menuRef = useRef<OfficeMenuController | null>(null);
 
     useEffect(() => {
       const frame = frameRef.current;
@@ -129,6 +176,15 @@ export function createOfficeApp(
       const onLoad = () => {
         setLoaded(true);
         setFailed(null);
+        // Put the Agents and HUD icons where the office keeps its own panel
+        // buttons. The document is same-origin, so the shell can append to the
+        // group; the buttons drive THIS component's dock state.
+        menuRef.current?.dispose();
+        menuRef.current = installOfficeMenuButtons(win, {
+          onToggleAgents: () => setAgentsOpen((v: boolean) => !v),
+          onToggleHud: () => setHudOpen((v: boolean) => !v),
+        });
+        menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
         props.onReady?.();
       };
       const onError = () => setFailed("The office app failed to load.");
@@ -140,9 +196,17 @@ export function createOfficeApp(
       return () => {
         frame.removeEventListener("load", onLoad);
         frame.removeEventListener("error", onError);
+        menuRef.current?.dispose();
+        menuRef.current = null;
         restoreBridge?.();
       };
     }, [props.base, props.mock]);
+
+    // Mirror the dock state onto the injected buttons after every render: the
+    // office paints its own active state from `aria-pressed`.
+    useEffect(() => {
+      menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
+    });
 
     const children: unknown[] = [
       R.createElement("iframe", {
@@ -275,17 +339,10 @@ export function createOfficeApp(
     }
 
     // THE AGENTS PANEL, OPENED FROM INSIDE THE OFFICE. Every seat the building
-    // plan places, grouped by division, from the roster on disk. It sits on the
-    // LEFT so it never covers the HUD dock or the HUD button on the right.
-    children.push(R.createElement("button", {
-      key: "agents-toggle",
-      type: "button",
-      className: "office-game__agentsToggle",
-      "data-testid": "office-game-agents-btn",
-      "aria-expanded": agentsOpen,
-      "aria-controls": "office-game-agents-dock",
-      onClick: () => setAgentsOpen(!agentsOpen),
-    }, agentsOpen ? "Hide agents" : "Agents"));
+    // plan places, grouped by division, from the roster on disk. Its toggle is
+    // the icon installed into the office's own panel group (app/office-menu.ts),
+    // so there is no second floating button here. It sits on the LEFT so it
+    // never covers the HUD dock.
     if (agentsOpen) {
       children.push(R.createElement("div", {
         key: "agents-dock",
@@ -309,17 +366,9 @@ export function createOfficeApp(
 
     // THE HUD, OPENED FROM INSIDE THE OFFICE. The page's own link to
     // /qubit-hud leaves the office; this opens the same panels over it, so the
-    // vitals are one click from the room they belong to. Both stay: the link
-    // is still the way to the HUD as its own tab.
-    children.push(R.createElement("button", {
-      key: "hud-toggle",
-      type: "button",
-      className: "office-game__hudToggle",
-      "data-testid": "office-game-hud-btn",
-      "aria-expanded": hudOpen,
-      "aria-controls": "office-game-hud-dock",
-      onClick: () => setHudOpen(!hudOpen),
-    }, hudOpen ? "Hide HUD" : "HUD"));
+    // vitals are one click from the room they belong to. The toggle is the icon
+    // installed into the office's own panel group (app/office-menu.ts); the
+    // /qubit-hud link itself stays, as the HUD's own tab.
     if (hudOpen) {
       children.push(R.createElement("div", {
         key: "hud-dock",

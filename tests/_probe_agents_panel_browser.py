@@ -296,8 +296,11 @@ def main() -> int:
               "the embedded document has no __QUBIT_PLUGINS__ (a HUD/registry "
               "lookup from inside it can never succeed)")
 
-        # 4. open the agents panel from the shell
-        page.click("[data-testid=office-game-agents-btn]")
+        # 4. open the agents panel from the office's OWN panel menu: the shell
+        #    injects the Agents icon into the vendored app's Panels group, so
+        #    the click happens inside the frame, not on a floating button.
+        assert inner is not None
+        inner.click("[data-testid=office-menu-agents]")
         page.wait_for_selector("[data-testid=agents-panel][data-state=ready]",
                                timeout=30000)
         check(True, "the agents panel reached its ready state inside the office page")

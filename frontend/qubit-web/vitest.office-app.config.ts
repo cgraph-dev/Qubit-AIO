@@ -19,6 +19,14 @@ const APP_DIR = path.resolve(
   HERE, "../qubit-app/plugins/qubit-office/game/app");
 
 export default defineConfig({
+  // The tests live OUTSIDE this package (../qubit-app/...). Under the default
+  // node environment Vite serves them through /@fs; a per-file
+  // `@vitest-environment jsdom` (office-menu.test.ts needs a DOM) otherwise
+  // fails to load every out-of-root test with "Cannot find module /@fs/...".
+  // Allow the repo root so the DOM environment can read them.
+  server: {
+    fs: { allow: [path.resolve(HERE, "../../..")] },
+  },
   test: {
     environment: "node",
     include: [path.join(APP_DIR, "**/*.test.ts")],

@@ -259,3 +259,42 @@ def _node_modules_source(repo):
         except OSError:
             continue
     return None
+
+
+# ======================================================================
+# 4 — the roster resolves in an INSTALLED wheel, not only a checkout
+# ======================================================================
+def test_runtime_root_falls_back_to_packaged_data(tmp_path, monkeypatch):
+    """An installed wheel ships the runtime as ``voicebridge/_data``.
+
+    Measured live: the office page ran from site-packages, where
+    ``parents[2]/qubit_runtime`` does not exist, so the roster read as empty and
+    the panel answered ``AGENCY_ORG_UNAVAILABLE ("no ported personas on
+    disk")`` even though the personas were in the wheel. The packaged asset is
+    the real root there.
+    """
+    from pathlib import Path
+
+    import voicebridge.resources as RES
+
+    checkout_runtime = Path(__file__).resolve().parents[1] / "qubit_runtime"
+    assert checkout_runtime.is_dir()
+
+    monkeypatch.setattr(A, "_REPO_ROOT", tmp_path)  # no qubit_runtime here
+    monkeypatch.setattr(
+        RES, "resource_path",
+        lambda name: checkout_runtime if name == "qubit_runtime" else tmp_path / name,
+    )
+
+    assert A.runtime_root() == checkout_runtime
+    assert A.skills_root().is_dir()
+    assert A.load()["personas"], "the packaged roster must still resolve"
+
+
+def test_runtime_root_prefers_the_checkout_when_it_exists():
+    """A source checkout must not go hunting through package data."""
+    from pathlib import Path
+
+    runtime = Path(__file__).resolve().parents[1] / "qubit_runtime"
+    assert A.runtime_root(runtime) == runtime
+    assert A.runtime_root() == runtime

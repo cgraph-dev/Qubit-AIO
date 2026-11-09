@@ -9,21 +9,48 @@ const createHarness = () => {
     src: "",
   };
   const tree: Array<{ type: unknown; props: Record<string, unknown> }> = [];
+  const refSlots: Array<{ current: unknown }> = [];
+  let refIndex = 0;
   const React = {
     createElement(type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) {
       const element = { type, props: { ...(props ?? {}), children } };
       tree.push(element);
-      if (type === "iframe") Object.assign(frame, element.props);
+      if (type === "iframe") {
+        Object.assign(frame, element.props);
+        // React points the ref at the mounted node; do the same, or the
+        // component's `frameRef.current` would stay null.
+        const ref = element.props.ref as { current: unknown } | undefined;
+        if (ref) ref.current = frame;
+      }
       return element;
     },
   };
-  let effectCleanup: (() => void) | undefined;
+  // Every effect's cleanup, not just the last one: the component has more than
+  // one effect now (frame/bridge + menu state mirror).
+  const effectCleanups: Array<() => void> = [];
   const hooks = {
     useState: (initial: unknown) => [initial, vi.fn()],
-    useRef: () => ({ current: frame }),
-    useEffect: (fn: () => void | (() => void)) => { effectCleanup = fn() || undefined; },
+    // One stable slot per ref call, like React. The component now keeps a
+    // mutable controller in a ref, so a constant `{current: frame}` is not a
+    // faithful double.
+    useRef: (initial: unknown) => {
+      // This harness runs effects inline during the render (before the fake
+      // createElement mounts the iframe), so the FIRST ref — the frame — is
+      // seeded as React would have it after commit.
+      const seed = refIndex === 0 ? frame : initial;
+      const slot = refSlots[refIndex] ?? (refSlots[refIndex] = { current: seed });
+      refIndex += 1;
+      return slot;
+    },
+    useEffect: (fn: () => void | (() => void)) => {
+      const cleanup = fn();
+      if (typeof cleanup === "function") effectCleanups.push(cleanup);
+    },
   };
-  return { frame, tree, React, hooks, cleanup: () => effectCleanup?.() };
+  return {
+    frame, tree, React, hooks,
+    cleanup: () => { for (const cleanup of effectCleanups.splice(0)) cleanup(); },
+  };
 };
 
 describe("Habblaud embedding", () => {

@@ -155,10 +155,38 @@ def floor_role_for(division: str) -> str:
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def runtime_root(root: Optional[Path] = None) -> Path:
+    """The vendored ``qubit_runtime`` tree holding the ported division skills.
+
+    In a source checkout that tree sits beside ``voicebridge/`` (``parents[2]``
+    of this file). In an INSTALLED wheel it does not: the runtime ships as
+    package data at ``voicebridge/_data/qubit_runtime``, so the checkout walk
+    resolves ``<site-packages>/qubit_runtime`` — which is absent — and the
+    roster reads as empty. That made the agents panel answer
+    ``AGENCY_ORG_UNAVAILABLE ("no ported personas on disk")`` on every install
+    even though the personas were in the wheel. Resolve the real root the same
+    way every other packaged asset is resolved, and only fall back to the
+    checkout walk when neither exists.
+    """
+    if root is not None:
+        return Path(root)
+    checkout = _REPO_ROOT / "qubit_runtime"
+    if checkout.is_dir():
+        return checkout
+    try:
+        from ..resources import resource_path
+
+        packaged = resource_path("qubit_runtime")
+        if packaged.is_dir():
+            return packaged
+    except Exception:  # noqa: BLE001 — an unreadable resource is an absent one
+        pass
+    return checkout
+
+
 def skills_root(root: Optional[Path] = None) -> Path:
     """The directory holding the ported division skills."""
-    base = Path(root) if root is not None else _REPO_ROOT / "qubit_runtime"
-    return base / SKILLS_SUBDIR
+    return runtime_root(root) / SKILLS_SUBDIR
 
 
 def _frontmatter(text: str) -> Dict[str, Any]:

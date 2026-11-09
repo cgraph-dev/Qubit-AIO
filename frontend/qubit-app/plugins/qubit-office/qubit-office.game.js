@@ -1,5 +1,5 @@
 (function() {
-	// phaser.esm.js (bundled from frontend/qubit-web/node_modules)
+	// node_modules/phaser/dist/phaser.esm.js
 	var __webpack_modules__ = {
 		50792(module) {
 			var has = Object.prototype.hasOwnProperty, prefix = "~";
@@ -192589,6 +192589,143 @@ create: function(game) {
 		win.fetch = bridge;
 		return restore;
 	}
+	var MENU_BUTTONS = [{
+		id: "agents",
+		label: "Agents",
+		title: "Agents: every seat the office plans, by division",
+		testId: "office-menu-agents",
+		icon: {
+			cols: 27,
+			rows: 14,
+			d: "M5 0h4v1H5zM4 1h6v1H4zM13 1h3v1H13zM3 2h7v1H3zM12 2h5v1H12zM3 3h7v1H3zM12 3h5v1H12zM3 4h7v1H3zM12 4h5v1H12zM24 4h1v1H24zM3 5h7v1H3zM12 5h5v1H12zM24 5h1v1H24zM4 6h5v1H4zM13 6h3v1H13zM22 6h5v1H22zM4 7h5v1H4zM13 7h3v1H13zM24 7h1v1H24zM5 8h3v1H5zM11 8h7v1H11zM24 8h1v1H24zM3 9h7v1H3zM12 9h7v1H12zM1 10h11v1H1zM13 10h6v1H13zM0 11h13v1H0zM0 12h13v1H0zM0 13h13v1H0z"
+		}
+	}, {
+		id: "hud",
+		label: "HUD",
+		title: "HUD: the office and agent vitals",
+		testId: "office-menu-hud",
+		icon: {
+			cols: 19,
+			rows: 17,
+			d: "M0 0h5v1H0zM17 0h1v1H17zM0 1h1v1H0zM0 2h1v1H0zM0 3h1v1H0zM7 3h2v1H7zM10 3h2v1H10zM18 3h1v1H18zM5 4h8v1H5zM5 5h2v1H5zM9 5h1v1H9zM12 5h2v1H12zM4 6h2v1H4zM13 6h1v1H13zM4 7h1v1H4zM9 7h1v1H9zM13 7h1v1H13zM3 8h3v1H3zM8 8h1v1H8zM10 8h1v1H10zM12 8h3v1H12zM3 9h2v1H3zM9 9h1v1H9zM13 9h2v1H13zM4 10h1v1H4zM13 10h1v1H13zM4 11h2v1H4zM12 11h2v1H12zM5 12h2v1H5zM9 12h1v1H9zM11 12h2v1H11zM0 13h1v1H0zM6 13h6v1H6zM0 14h1v1H0zM9 14h1v1H9zM0 15h1v1H0zM0 16h4v1H0zM11 16h3v1H11z"
+		}
+	}];
+	/** The group the office renders its own panel buttons in. */
+	var PANELS_GROUP_SELECTOR = ".ui-btn-group[aria-label=\"Panels\"]";
+	/**
+	* Largest cell grid we render 1:1. Above this, scale down proportionally.
+	*
+	* The office's own icons are a 10×10 grid drawn at 20×20 (2 px per cell). The
+	* traced icons are 19×17 and 27×14, so drawing them at 2 px per cell would
+	* overflow the 32 px button. Rendering ONE CSS pixel per cell is both the
+	* source's native scale and the only size that stays crisp under
+	* `shape-rendering="crispEdges"`: a non-integer scale rounds 1-cell strokes to
+	* nothing (the Agents plus lost its crossbar at 22 px).
+	*/
+	var MAX_ICON_PX = 28;
+	/** Build one button with the app's own classes and icon convention. */
+	function buildButton(doc, spec, onActivate) {
+		const button = doc.createElement("button");
+		button.type = "button";
+		button.className = "ui-icon-btn";
+		button.setAttribute("aria-label", spec.label);
+		button.setAttribute("title", spec.title);
+		button.setAttribute("aria-pressed", "false");
+		button.setAttribute("data-testid", spec.testId);
+		button.setAttribute("data-office-menu", spec.id);
+		button.addEventListener("click", onActivate);
+		const ns = "http://www.w3.org/2000/svg";
+		const svg = doc.createElementNS(ns, "svg");
+		const scale = Math.min(1, MAX_ICON_PX / spec.icon.cols);
+		const width = Math.max(1, Math.round(spec.icon.cols * scale));
+		const height = Math.max(1, Math.round(spec.icon.rows * scale));
+		svg.setAttribute("class", "ui-px-icon");
+		svg.setAttribute("width", String(width));
+		svg.setAttribute("height", String(height));
+		svg.setAttribute("viewBox", `0 0 ${spec.icon.cols} ${spec.icon.rows}`);
+		svg.setAttribute("shape-rendering", "crispEdges");
+		svg.setAttribute("aria-hidden", "true");
+		svg.setAttribute("focusable", "false");
+		const path = doc.createElementNS(ns, "path");
+		path.setAttribute("fill", "currentColor");
+		path.setAttribute("d", spec.icon.d);
+		svg.appendChild(path);
+		button.appendChild(svg);
+		return button;
+	}
+	/**
+	* Insert the two buttons into the office's panel group, before Settings.
+	*
+	* Returns ``null`` only when there is no document to install into. A group
+	* that is missing at call time is not a failure: the observer picks it up when
+	* it mounts, so a slow first paint still gets the buttons.
+	*/
+	function installOfficeMenuButtons(win, opts) {
+		const doc = win.document;
+		if (!doc || !doc.body) return null;
+		const byId = {
+			agents: null,
+			hud: null
+		};
+		const state = {
+			agents: false,
+			hud: false
+		};
+		const findGroup = () => doc.querySelector(PANELS_GROUP_SELECTOR);
+		const insert = (group, button) => {
+			const settings = Array.from(group.querySelectorAll("button")).find((b) => (b.getAttribute("title") || "") === "Settings");
+			if (settings) group.insertBefore(button, settings);
+			else group.appendChild(button);
+		};
+		const attach = () => {
+			const group = findGroup();
+			if (!group) return false;
+			for (const spec of MENU_BUTTONS) {
+				const existing = byId[spec.id];
+				if (existing && existing.isConnected) continue;
+				const onActivate = spec.id === "agents" ? opts.onToggleAgents : opts.onToggleHud;
+				const button = buildButton(doc, spec, onActivate);
+				button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
+				byId[spec.id] = button;
+				insert(group, button);
+			}
+			return true;
+		};
+		attach();
+		let scheduled = false;
+		const observer = new MutationObserver(() => {
+			if (scheduled) return;
+			scheduled = true;
+			const run = () => {
+				scheduled = false;
+				attach();
+			};
+			if (typeof win.requestAnimationFrame === "function") win.requestAnimationFrame(run);
+			else setTimeout(run, 0);
+		});
+		observer.observe(doc.body, {
+			childList: true,
+			subtree: true
+		});
+		return {
+			update(next) {
+				state.agents = Boolean(next.agents);
+				state.hud = Boolean(next.hud);
+				for (const spec of MENU_BUTTONS) {
+					const button = byId[spec.id];
+					if (button) button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
+				}
+			},
+			dispose() {
+				observer.disconnect();
+				for (const spec of MENU_BUTTONS) {
+					const button = byId[spec.id];
+					if (button && button.isConnected) button.remove();
+					byId[spec.id] = null;
+				}
+			}
+		};
+	}
 	var SEAT_MODEL_ROUTE = `/agent/api/office/habblaud/agents`;
 	function seatModelUrl(agentId) {
 		return `${SEAT_MODEL_ROUTE}/${encodeURIComponent(String(agentId))}/model`;
@@ -193175,6 +193312,43 @@ create: function(game) {
 		return "Connecting to the office backend…";
 	}
 	/**
+	* Component factories memoised per (hooks, base).
+	*
+	* WHY THIS EXISTS — the refresh bug. These were called on EVERY render. A
+	* factory returns a NEW function, so React saw a different component type each
+	* time and unmounted/remounted the whole subtree: the HUD dock's iframe was
+	* torn down and reloaded every time the page re-rendered, and the agents panel
+	* refetched its roster on the same cadence. The page re-renders whenever the
+	* host's tower poll updates its props — i.e. constantly — which is exactly the
+	* "HUD keeps refreshing" the owner saw. A stable identity per shell instance
+	* makes a re-render a re-render, not a reload.
+	*
+	* A WeakMap on the hooks object (not a React useRef) keeps this correct even
+	* for callers that pass a minimal hook surface, and lets the cache die with the
+	* shell.
+	*/
+	var SHELL_COMPONENT_CACHE = /* @__PURE__ */ new WeakMap();
+	function shellComponents(R, hooks, base) {
+		const key = hooks ?? {};
+		const byBase = SHELL_COMPONENT_CACHE.get(key) ?? /* @__PURE__ */ new Map();
+		const cacheKey = base ?? "";
+		const cached = byBase.get(cacheKey);
+		if (cached) return cached;
+		const built = {
+			base,
+			HudDock: createHudDock({
+				React: R,
+				hooks,
+				base
+			}),
+			AgentsPanel: createAgentsPanel(R, hooks),
+			SeatModelPanel: createSeatModelPanel(R, hooks)
+		};
+		byBase.set(cacheKey, built);
+		SHELL_COMPONENT_CACHE.set(key, byBase);
+		return built;
+	}
+	/**
 	* Build the component. React and hooks arrive as arguments, exactly as the rest
 	* of the plugin does it.
 	*/
@@ -193186,14 +193360,9 @@ create: function(game) {
 			const [panelOpen, setPanelOpen] = useState(false);
 			const [hudOpen, setHudOpen] = useState(false);
 			const [agentsOpen, setAgentsOpen] = useState(false);
-			const HudDock = createHudDock({
-				React: R,
-				hooks,
-				base: props.base
-			});
-			const AgentsPanel = createAgentsPanel(R, hooks);
+			const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
 			const frameRef = useRef(null);
-			const SeatModelPanel = createSeatModelPanel(R, hooks);
+			const menuRef = useRef(null);
 			useEffect(() => {
 				const frame = frameRef.current;
 				if (!frame) return;
@@ -193212,6 +193381,15 @@ create: function(game) {
 				const onLoad = () => {
 					setLoaded(true);
 					setFailed(null);
+					menuRef.current?.dispose();
+					menuRef.current = installOfficeMenuButtons(win, {
+						onToggleAgents: () => setAgentsOpen((v) => !v),
+						onToggleHud: () => setHudOpen((v) => !v)
+					});
+					menuRef.current?.update({
+						agents: agentsOpen,
+						hud: hudOpen
+					});
 					props.onReady?.();
 				};
 				const onError = () => setFailed("The office app failed to load.");
@@ -193226,9 +193404,17 @@ create: function(game) {
 				return () => {
 					frame.removeEventListener("load", onLoad);
 					frame.removeEventListener("error", onError);
+					menuRef.current?.dispose();
+					menuRef.current = null;
 					restoreBridge?.();
 				};
 			}, [props.base, props.mock]);
+			useEffect(() => {
+				menuRef.current?.update({
+					agents: agentsOpen,
+					hud: hudOpen
+				});
+			});
 			const children = [R.createElement("iframe", {
 				key: "frame",
 				ref: frameRef,
@@ -193326,15 +193512,6 @@ create: function(game) {
 					}));
 				}
 			}
-			children.push(R.createElement("button", {
-				key: "agents-toggle",
-				type: "button",
-				className: "office-game__agentsToggle",
-				"data-testid": "office-game-agents-btn",
-				"aria-expanded": agentsOpen,
-				"aria-controls": "office-game-agents-dock",
-				onClick: () => setAgentsOpen(!agentsOpen)
-			}, agentsOpen ? "Hide agents" : "Agents"));
 			if (agentsOpen) children.push(R.createElement("div", {
 				key: "agents-dock",
 				id: "office-game-agents-dock",
@@ -193356,15 +193533,6 @@ create: function(game) {
 				key: "body",
 				base: props.base
 			})]));
-			children.push(R.createElement("button", {
-				key: "hud-toggle",
-				type: "button",
-				className: "office-game__hudToggle",
-				"data-testid": "office-game-hud-btn",
-				"aria-expanded": hudOpen,
-				"aria-controls": "office-game-hud-dock",
-				onClick: () => setHudOpen(!hudOpen)
-			}, hudOpen ? "Hide HUD" : "HUD"));
 			if (hudOpen) children.push(R.createElement("div", {
 				key: "hud-dock",
 				id: "office-game-hud-dock",
