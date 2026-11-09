@@ -911,7 +911,7 @@ def crons_recent(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     try:
         from ..workbench_shim import crons as CR
 
-        return CR.h_wb_crons_recent(cfg, dict(q or {}), _body(b), dict(p or {}))
+        return CR.crons_recent(cfg, dict(q or {}), _body(b), dict(p or {}))
     except Exception as exc:  # noqa: BLE001
         return _refuse("WB_BACKEND_UNAVAILABLE",
                        f"the cron authority raised {type(exc).__name__}: {exc}",
@@ -941,9 +941,13 @@ def cron_verb(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
                        f"/api/crons/{verb} has no Qubit authority; nothing was "
                        f"changed.", endpoint="crons/" + verb)
     try:
-        from ..workbench_shim import crons as CR
+        # ``h_wb_cron_action`` lives in the route module, not the shim's crons
+        # family (``crons.HANDLERS`` has no such name), so it cannot be reached
+        # as ``CR.h_wb_cron_action``. Imported here rather than at module scope
+        # because workbench_ui_routes imports THIS module at import time.
+        from .. import workbench_ui_routes as _R
 
-        return CR.h_wb_cron_action(cfg, dict(q or {}), _body(b), params)
+        return _R.h_wb_cron_action(cfg, dict(q or {}), _body(b), params)
     except Exception as exc:  # noqa: BLE001
         return _refuse("WB_BACKEND_UNAVAILABLE",
                        f"the cron authority raised {type(exc).__name__}: {exc}",
@@ -963,7 +967,7 @@ def workspace_list(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     try:
         from ..workbench_shim import workspace as WS
 
-        return WS.h_wb_workspace_list(cfg, dict(q or {}), _body(b), dict(p or {}))
+        return WS.workspace_list(cfg, dict(q or {}), _body(b), dict(p or {}))
     except Exception as exc:  # noqa: BLE001
         return _refuse("WB_BACKEND_UNAVAILABLE",
                        f"the workspace adapter raised {type(exc).__name__}: {exc}",
@@ -977,7 +981,7 @@ def approval_pending(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     try:
         from ..workbench_shim import approvals as AP
 
-        return AP.h_wb_approval_pending(cfg, dict(q or {}), _body(b), dict(p or {}))
+        return AP.approval_pending(cfg, dict(q or {}), _body(b), dict(p or {}))
     except Exception as exc:  # noqa: BLE001
         return _refuse("WB_BACKEND_UNAVAILABLE",
                        f"the approval journal raised {type(exc).__name__}: {exc}",
@@ -990,7 +994,7 @@ def approval_respond(cfg: Any, q: Dict[str, Any], b: Dict[str, Any],
     try:
         from ..workbench_shim import approvals as AP
 
-        return AP.h_wb_approval_respond(cfg, dict(q or {}), _body(b), dict(p or {}))
+        return AP.approval_respond(cfg, dict(q or {}), _body(b), dict(p or {}))
     except Exception as exc:  # noqa: BLE001
         return _refuse("WB_BACKEND_UNAVAILABLE",
                        f"the approval journal raised {type(exc).__name__}: {exc}",
