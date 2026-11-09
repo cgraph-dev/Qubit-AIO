@@ -35,8 +35,62 @@ def is_truthy_value(value: Any, default: bool = False) -> bool:
 
 
 def env_var_enabled(name: str, default: str = "") -> bool:
-    """Return True when an environment variable is set to a truthy value."""
-    return is_truthy_value(os.getenv(name, default), default=False)
+    """Return True when an environment variable is set to a truthy value.
+
+    Reads every brand spelling of ``name`` (current first, then the pre-rename one),
+    so a variable written under either name is understood. Asking about
+    ``HERMES_FOO`` therefore also honours ``QUBIT_FOO`` — the rebrand renamed writers
+    and readers at different times, and a reader that accepts only one spelling
+    silently sees an unset variable.
+    """
+    value = env_alias_value(name)
+    return is_truthy_value(default if value is None else value, default=False)
+
+
+ENV_PREFIX = "QUBIT_"
+LEGACY_ENV_PREFIX = "HERMES_"
+
+
+def env_var_alias(name: str) -> str:
+    """The current-brand spelling of ``name``: ``HERMES_FOO`` -> ``QUBIT_FOO``.
+
+    The rebrand renamed writers and readers at different times, so a variable is
+    routinely written under one spelling and read under the other. ``env_var_aliases``
+    below is what readers should use; this is the single place the mapping lives, so a
+    later change to the convention does not mean hunting string literals.
+
+    A name without the legacy prefix is returned unchanged — there is nothing to
+    translate, and inventing a prefix would rename a variable that already works.
+    """
+    if name.startswith(LEGACY_ENV_PREFIX):
+        return ENV_PREFIX + name[len(LEGACY_ENV_PREFIX) :]
+    return name
+
+
+def env_var_aliases(name: str) -> tuple[str, ...]:
+    """Every spelling ``name`` may legitimately have, current first.
+
+    A reader accepts all of them (first match wins) so a backend spawned by a
+    pre-rename build is still understood; a writer emits the first. This is the
+    "single write, dual read" rule the rebrand depends on — see
+    docs/DECISIONS.md.
+    """
+    current = env_var_alias(name)
+    legacy = (
+        LEGACY_ENV_PREFIX + current[len(ENV_PREFIX) :]
+        if current.startswith(ENV_PREFIX)
+        else current
+    )
+    return (current,) if legacy == current else (current, legacy)
+
+
+def env_alias_value(name: str, default: str | None = None) -> str | None:
+    """The value of ``name`` under its current spelling, falling back to the legacy one."""
+    for candidate in env_var_aliases(name):
+        value = os.getenv(candidate)
+        if value is not None:
+            return value
+    return default
 
 
 def file_signature(st: os.stat_result) -> tuple[int, int, int, int]:
