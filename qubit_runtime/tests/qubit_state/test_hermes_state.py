@@ -1784,13 +1784,17 @@ class TestSessionTitleIndexRepair:
         session_db.set_session_title("unique", "unique-title")
         session_db.close()
 
-        with sqlite3.connect(db_path) as conn:
+        # ``with sqlite3.connect(...)`` commits but does NOT close the connection, so it
+        # would leak a live tracked descriptor (unclosed-database ResourceWarning).
+        # ``contextlib.closing`` closes but does not commit — so commit explicitly.
+        with contextlib.closing(sqlite3.connect(db_path)) as conn:
             conn.execute("DROP INDEX idx_sessions_title_unique")
             if duplicate_titles:
                 conn.execute(
                     "UPDATE sessions SET title = 'shared-title' "
                     "WHERE id IN ('older', 'newer')"
                 )
+            conn.commit()
 
         return db_path
 
@@ -6391,6 +6395,7 @@ class TestPerformancePragmasEndToEnd:
         )
         db_path = home / "state.db"
         db = SessionDB(db_path=db_path)
+        rconn = None
         try:
             # Writer connection.
             assert self._read(db._conn) == self.CONFIGURED
@@ -6399,6 +6404,11 @@ class TestPerformancePragmasEndToEnd:
             assert rconn is not None, "WAL reader expected on local filesystem"
             assert self._read(rconn) == self.CONFIGURED
         finally:
+            # _get_read_conn() hands a connection OUT of the pool; close() only drains
+            # what is still IN it, so a checked-out conn must be closed here or it
+            # leaks a live tracked descriptor (unclosed-database ResourceWarning).
+            if rconn is not None:
+                db._close_read_conn(rconn)
             db.close()
 
         # Read-only cross-profile attach.
@@ -6416,12 +6426,17 @@ class TestPerformancePragmasEndToEnd:
         home = self._fresh_home(tmp_path, monkeypatch, config_text=None)
         db_path = home / "state.db"
         db = SessionDB(db_path=db_path)
+        rconn = None
         try:
             assert self._read(db._conn) == defaults
             rconn = db._get_read_conn()
             if rconn is not None:
                 assert self._read(rconn) == defaults
         finally:
+            # Checked out of the pool by _get_read_conn(); close() drains only what
+            # remains in the pool, so close this one here or it leaks (see above).
+            if rconn is not None:
+                db._close_read_conn(rconn)
             db.close()
 
         ro = SessionDB(db_path=db_path, read_only=True)
@@ -6441,6 +6456,10 @@ class TestFts5SanitizerCharacterClass:
 
     @staticmethod
     def _fts_table():
+        """A populated in-memory FTS5 table. The CALLER owns the connection and must
+        close it (``with contextlib.closing(self._fts_table()) as conn:``); the suite
+        treats a leaked ``sqlite3.Connection`` as an error via the pytest
+        ``filterwarnings = error`` rule, so returning it unclosed failed teardown."""
         import sqlite3
 
         conn = sqlite3.connect(":memory:")
@@ -6472,12 +6491,12 @@ class TestFts5SanitizerCharacterClass:
         ],
     )
     def test_query_stays_parsable(self, query):
-        conn = self._fts_table()
-        sanitized = self._sanitize(query)
-        if not sanitized.strip():
-            return
-        # Raises sqlite3.OperationalError if a special character survived.
-        conn.execute("SELECT count(*) FROM t WHERE t MATCH ?", (sanitized,)).fetchone()
+        with contextlib.closing(self._fts_table()) as conn:
+            sanitized = self._sanitize(query)
+            if not sanitized.strip():
+                return
+            # Raises sqlite3.OperationalError if a special character survived.
+            conn.execute("SELECT count(*) FROM t WHERE t MATCH ?", (sanitized,)).fetchone()
 
     def test_plain_terms_are_untouched(self):
         assert self._sanitize("hello world").split() == ["hello", "world"]
@@ -6490,22 +6509,22 @@ class TestFts5SanitizerCharacterClass:
         assert '"my-app.config.ts"' in self._sanitize("my-app.config.ts")
 
     def test_prefix_star_still_works(self):
-        conn = self._fts_table()
-        sanitized = self._sanitize("gate*")
-        rows = conn.execute(
-            "SELECT count(*) FROM t WHERE t MATCH ?", (sanitized,)
-        ).fetchone()
+        with contextlib.closing(self._fts_table()) as conn:
+            sanitized = self._sanitize("gate*")
+            rows = conn.execute(
+                "SELECT count(*) FROM t WHERE t MATCH ?", (sanitized,)
+            ).fetchone()
         assert rows[0] == 1
 
     def test_percent_stripped_for_non_cjk_query(self):
         # % is kept only for the CJK LIKE fallback; a non-CJK query never
         # reaches that fallback, so % must be stripped before MATCH.
-        conn = self._fts_table()
-        sanitized = self._sanitize("50%")
-        assert "%" not in sanitized
-        conn.execute(
-            "SELECT count(*) FROM t WHERE t MATCH ?", (sanitized,)
-        ).fetchone()
+        with contextlib.closing(self._fts_table()) as conn:
+            sanitized = self._sanitize("50%")
+            assert "%" not in sanitized
+            conn.execute(
+                "SELECT count(*) FROM t WHERE t MATCH ?", (sanitized,)
+            ).fetchone()
 
     def test_percent_preserved_for_cjk_query(self):
         # The CJK LIKE fallback builds its own pattern from the sanitized
