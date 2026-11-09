@@ -1337,8 +1337,17 @@ class SessionSchemaMixin:
         # stale/corrupt. The offline repair path (repair_state_db_schema -> drop_fts_rebuild)
         # recreates the index without touching state_meta, so without this the diagnostic would
         # outlive the fresh index forever.
+        #
+        # The DELETE is gated on the record being there: an unconditional write takes the write
+        # lock on every settled open even when it changes nothing, which blocks every other open
+        # behind a sibling process's transaction (the invariant __init__ states and
+        # test_settled_open_issues_no_main_db_writes pins).
         if self._fts_enabled and not self._fts_stale:
-            cursor.execute("DELETE FROM state_meta WHERE key = ?", (FTS_REBUILD_DEFERRAL_KEY,))
+            present = cursor.execute(
+                "SELECT 1 FROM state_meta WHERE key = ? LIMIT 1", (FTS_REBUILD_DEFERRAL_KEY,),
+            ).fetchone()
+            if present:
+                cursor.execute("DELETE FROM state_meta WHERE key = ?", (FTS_REBUILD_DEFERRAL_KEY,))
         # IF NOT EXISTS cannot rewrite pre-existing broad AFTER UPDATE triggers.
         if self._fts_enabled:
             self._migrate_broad_fts_update_triggers(cursor)
