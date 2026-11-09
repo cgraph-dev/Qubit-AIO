@@ -40,6 +40,12 @@ OWNED_FILES = (
     "qubit_runtime/qubit_cli/azure_detect.py",
     "qubit_runtime/qubit_cli/diagnostics_upload.py",
     "qubit_runtime/tools/tts_tool_providers.py",
+    # The per-tool HTTP modules that build outbound SDK/raw clients. Both were
+    # missing from this scan, and one of them — managed_gateway_identity — had
+    # already drifted back to the upstream ``hermes-agent/`` User-Agent, which is
+    # exactly the leak this test exists to catch.
+    "qubit_runtime/tools/xai_http.py",
+    "qubit_runtime/tools/managed_gateway_identity.py",
     "qubit_runtime/agent/pet/store.py",
     "qubit_runtime/agent/pet/manifest.py",
     "qubit_runtime/tools/mcp_oauth.py",
@@ -116,8 +122,28 @@ def test_agent_user_agents_are_qubit() -> None:
         "qubit_runtime/qubit_cli/diagnostics_upload.py"
     )
     tts = _read("qubit_runtime/tools/tts_tool_providers.py")
-    assert 'f"qubit-agent/{get_version_info().base_version}"' in tts
-    assert '"qubit-agent/0.0.0"' in tts
+    # The Gemini client header is the same identity every other tool sends: the
+    # product/version pair, built where the request is built. The literal this
+    # used to demand ("qubit-agent/0.0.0") was never a version pin — it was the
+    # ``except`` arm's fallback, and it vanished when that arm was respelled
+    # ``qubit/0.0.0``, failing this test on code that was still correct. Accept
+    # either fallback spelling, and require that the header itself still names
+    # the qubit-agent product, so a rebrand back to the upstream token fails.
+    marker = 'headers["X-Goog-Api-Client"]'
+    assert marker in tts, "the Gemini TTS request no longer stamps X-Goog-Api-Client"
+    header_arms = [
+        line for line in tts.splitlines()
+        if marker in line and '=' in line.split(marker, 1)[1]
+    ]
+    assert header_arms, "X-Goog-Api-Client is set without naming an identity"
+    for arm in header_arms:
+        value = arm.split("=", 1)[1].split()
+        identity = [part for part in value if "qubit" in part and "/" in part]
+        assert identity, f"non-Qubit Gemini client identity: {arm.strip()}"
+        assert not any(part.lstrip('f"\'').startswith("hermes") for part in identity), (
+            f"legacy Gemini client identity: {arm.strip()}"
+        )
+    assert ('"qubit/0.0.0"' in tts) or ('"qubit-agent/0.0.0"' in tts)
     assert '"qubit-agent-petdex"' in _read("qubit_runtime/agent/pet/store.py")
     assert '"qubit-agent-petdex"' in _read("qubit_runtime/agent/pet/manifest.py")
 

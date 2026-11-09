@@ -74,7 +74,7 @@ def user_agent() -> str:
     from qubit_platform.host.facts import os_family
 
     os_name = _OS_FAMILY.get(os_family(), "unknown")
-    return f"hermes-agent/{get_version_info().base_version} ({request_surface()}; {os_name})"
+    return f"qubit-agent/{get_version_info().base_version} ({request_surface()}; {os_name})"
 
 
 def _send_consented() -> bool:

@@ -66,7 +66,7 @@ def test_user_agent_names_the_session_surface(platform, bound, surface):
         platform(bound)
     agent = user_agent()
     product, _, rest = agent.partition(" ")
-    assert product.startswith("hermes-agent/") and len(product) > len("hermes-agent/")
+    assert product.startswith("qubit-agent/") and len(product) > len("qubit-agent/")
     assert rest.startswith(f"({surface}; ") and rest.endswith(")")
     assert rest[len(surface) + 3:-1] in {"linux", "macos", "windows", "unknown"}
 
@@ -80,7 +80,7 @@ def test_correlation_ids_go_only_with_send_consent(send):
     client.schemas(["GMAIL_SEND_EMAIL"])
 
     first, second = (sent["headers"] for sent in transport.sent)
-    assert first["User-Agent"].startswith("hermes-agent/")
+    assert first["User-Agent"].startswith("qubit-agent/")
     correlation = {k for k in first if k.startswith("x-nous-hermes-") or k == "x-request-id"}
     if not send:
         assert correlation == set()

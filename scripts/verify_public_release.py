@@ -364,6 +364,18 @@ def find_assets(names: set[str], version: str,
 
 
 def infer_version(names: Iterable[str]) -> str | None:
+    """The one version every published build asset agrees on.
+
+    A stable tag is CalVer-shaped ``vX.Y.Z`` (``update_channel.STABLE_TAG_RE``),
+    but the wheel is named from PEP 440, and Python normalises a comparison
+    shape: ``0.21.4-2`` publishes as ``0.21.4.post2``. Older releases in
+    ``ver=36.2.post1`` publish as ``36.2-1``. So the archive name and the wheel
+    name for ONE release do not carry the same spelling of the same version,
+    and a single ``VERSION_RE`` that accepts only the archive spelling makes
+    inference from the wheel ambiguous: a 1:1-renamed wheel is invisible, or a
+    release with both spellings looks like two versions. Normalise both sides
+    to the stable tag shape instead of demanding they be spelled alike.
+    """
     found: set[str] = set()
     for name in names:
         for pattern in (
@@ -372,9 +384,46 @@ def infer_version(names: Iterable[str]) -> str | None:
             r"^qubit[_-]voicebridge-(.+)-py3-none-any\.whl$",
         ):
             match = re.match(pattern, name)
-            if match and VERSION_RE.match(match.group(1)):
-                found.add(match.group(1))
+            if not match:
+                continue
+            canonical = _canonical_version(match.group(1))
+            if canonical:
+                found.add(canonical)
     return next(iter(found)) if len(found) == 1 else None
+
+
+#: PEP 440's normalised form of a <version>-<digit> comparison shape.
+_COMPARISON_SHAPE_RE = re.compile(r"^(\d+(?:\.\d+)*)-(\d+)$")
+_POST_RELEASE_RE = re.compile(r"^(\d+(?:\.\d+)*)\.post(\d+)$")
+_PEP440_DEV_OR_RC_RE = re.compile(
+    r"^(\d+(?:\.\d+)*)(?:\.?(a|b|rc|alpha|beta|pre|preview)\.?(\d*))$"
+)
+_PEP440_PRE_OR_DEV_RE = re.compile(r"^(\d+(?:\.\d+)*)(?:\.(a|b|rc|dev)(\d+))$")
+
+
+def _canonical_version(raw: str) -> str | None:
+    """Map an asset-name version to the stable tag's spelling, or None."""
+    core = _COMPARISON_SHAPE_RE.match(raw)
+    if core:
+        return "%s-%s" % core.groups()
+    # PEP 440's normalised form comes FIRST: VERSION_RE's generic suffix group
+    # happens to accept ".post2" and "rc1" as written, which would otherwise
+    # short-circuit before the respelling and leave one release looking like
+    # two versions.
+    post = _POST_RELEASE_RE.match(raw)
+    if post:
+        return "%s-%s" % post.groups()
+    # 1.0rc1 / 1.0a2 / 1.0.dev3 -> the tag's 1.0-rc1 / 1.0-alpha2 / 1.0-dev3.
+    # (VERSION_RE already accepted every spelling whose pre-release label is
+    # not one PEP 440 abbreviates — "alpha" and "beta" never reach this point.)
+    pep = _PEP440_PRE_OR_DEV_RE.match(raw) or _PEP440_DEV_OR_RC_RE.match(raw)
+    if pep:
+        label = {"a": "alpha", "b": "beta", "alpha": "alpha", "beta": "beta",
+                 "pre": "rc", "preview": "rc"}.get(pep.group(2), pep.group(2))
+        return "%s-%s%s" % (pep.group(1), label, pep.group(3) or "")
+    if VERSION_RE.match(raw):
+        return raw
+    return None
 
 
 def _metadata_field(text: str, key: str) -> str | None:

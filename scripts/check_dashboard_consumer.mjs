@@ -11,8 +11,39 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const html = readFileSync(join(root, "frontend/index.html"), "utf8");
+// Select the consumer by what it DOES, never by its position. This used to be
+// `blocks[blocks.length - 2]`, an off-by-one that broke the moment the
+// permissions domain split its inline script in two: the document then ended
+// with the learned-preferences, permissions and reports blocks, and `length - 2`
+// pointed at the permissions panel. eval'ing that against this harness's stub
+// DOM threw `Cannot read properties of null (reading 'addEventListener')` —
+// before the consumer ever loaded — and no assertion in the file could run.
 const blocks = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m => m[1]);
-const consumer = blocks[blocks.length - 2]; // 0: main page, 1: SSE consumer, 2: correction UI
+const consumerIndex = blocks.findIndex(b => b.includes("/api/events/stream"));
+if (consumerIndex < 0) {
+  console.error("CONSUMER FAILED: frontend/index.html has no inline block reading /api/events/stream");
+  process.exit(1);
+}
+// Exactly one block may own the stream; a second copy would mean two consumers
+// racing the same journal, which is worse than the missing block this replaces.
+if (blocks.filter(b => b.includes("/api/events/stream")).length !== 1) {
+  console.error("CONSUMER FAILED: more than one inline block reads /api/events/stream");
+  process.exit(1);
+}
+const consumer = blocks[consumerIndex];
+// The consumer opens the stream through frontend/ui.js's vbStream(path, opts)
+// (shared header token, typed {ok,status,authRequired,reader,cancel}), not a
+// bare fetch — and ui.js is a separate <script src>, so this hermetic harness
+// never loads it. Stand in for exactly the contract the consumer relies on
+// instead of letting the call throw: an unstubbed vbStream made every run fail
+// at "vbStream is not defined" with fetchCalls empty, regardless of whether the
+// consumer still handled resync correctly.
+globalThis.vbStream = async (url, opts = {}) => {
+  const res = await globalThis.fetch(url, { headers: {}, signal: opts.signal });
+  if (res.status === 401) return { ok: false, status: 401, authRequired: true, reader: null, cancel() {} };
+  if (!res.ok || !res.body) return { ok: false, status: res.status, authRequired: false, reader: null, cancel() {} };
+  return { ok: true, status: res.status, authRequired: false, reader: res.body.getReader(), cancel() {} };
+};
 
 const shown = [];
 globalThis.window = globalThis;

@@ -538,3 +538,21 @@ def test_windows_archive_installer_must_match_the_asset(tmp_path: Path):
     checks = _checks(report)
     assert rc == 1
     assert checks["archive_installer_windows"]["ok"] is False
+
+
+def test_infer_version_accepts_a_pep440_respelt_of_one_version():
+    """One release, two legal spellings: the archive keeps the tag's shape, the
+    wheel carries PEP 440's normalised form of the same version."""
+    module = _load()
+    assert module.infer_version({"Qubit-0.21.4-2-source.tar.gz"}) == "0.21.4-2"
+    assert module.infer_version({"qubit_voicebridge-0.21.4.post2-py3-none-any.whl"}) == "0.21.4-2"
+    assert module.infer_version({
+        "Qubit-0.21.4-2-source.tar.gz",
+        "qubit_voicebridge-0.21.4.post2-py3-none-any.whl",
+    }) == "0.21.4-2"
+    assert module.infer_version({"qubit_voicebridge-1.0rc1-py3-none-any.whl"}) == "1.0-rc1"
+    # Two genuinely different versions is still ambiguous, never a silent pick.
+    assert module.infer_version({
+        "Qubit-0.21.4-source.tar.gz",
+        "qubit_voicebridge-0.21.5-py3-none-any.whl",
+    }) is None

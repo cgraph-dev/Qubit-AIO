@@ -188,17 +188,31 @@ assert venv in pkg.parents, f"voicebridge not imported from install: {pkg}"
 
 # Package-data completeness: every runtime resource must resolve from the
 # installed package data, not a checkout.
+# Name each resource by the INSTALLED resource name — the first argument of the
+# matching pyproject force-include entry — not by a source path that once
+# happened to be the same string. Two of these probe the wrong thing without a
+# fallback: the vendor manifest ships from docs/generated/ (its installed name
+# still says docs/archive/2026-09-21/, and that source path was purged in
+# eafb54e26), and the migration doc is installed as docs/MIGRATIONS.md from
+# docs/MIGRATION.md, a rename voicebridge/portable.py already resolves both ways.
+# resource_path() never raises — it falls back to a checkout path that does not
+# exist — so a stale name here fails the whole rehearsal for every user while
+# the wheel is complete.
 need = {
-    "frontend_dist": resources.resource_path("frontend/qubit-dist/index.html"),
-    "qubit_runtime": resources.resource_path("qubit_runtime/qubit_cli/main.py"),
-    "vendor_manifest": resources.resource_path(
-        "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json"),
-    "config_example": resources.resource_path("config/voice.example.yaml"),
-    "systemd": resources.resource_path("systemd"),
-    "migration_doc": resources.resource_path("docs/archive/2026-09-21/QUBIT_MIGRATION.md"),
+    "frontend_dist": "frontend/qubit-dist/index.html",
+    "qubit_runtime": "qubit_runtime/qubit_cli/main.py",
+    "vendor_manifest": "docs/archive/2026-09-21/QUBIT_HERMES_VENDOR_MANIFEST.json",
+    "config_example": "config/voice.example.yaml",
+    "systemd": "systemd",
+    "migration_doc": ("docs/MIGRATIONS.md", "docs/MIGRATION.md",
+                      "docs/archive/2026-09-21/QUBIT_MIGRATION.md"),
 }
-missing = [k for k, v in need.items() if not v.exists()]
-assert not missing, f"packaged resources missing: {missing}"
+missing = []
+for key, names in need.items():
+    names = names if isinstance(names, tuple) else (names,)
+    if not any(resources.resource_path(n).exists() for n in names):
+        missing.append(f"{key}: tried {[str(resources.resource_path(n)) for n in names]}")
+assert not missing, "packaged resources missing: " + " | ".join(missing)
 
 from voicebridge.config import Config
 from voicebridge.webui import WebUI
