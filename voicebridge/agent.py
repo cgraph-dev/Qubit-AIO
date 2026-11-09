@@ -570,6 +570,7 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
                           persist_user: bool = False,
                           event_sink: Optional[Callable[[str, dict], None]] = None,
                           progress_sink: Optional[Callable[..., None]] = None,
+                          stream_delta: Optional[Callable[[Optional[str]], None]] = None,
                           session_model: Optional[str] = None
                           ) -> "Optional[Dict[str, Any]]":
     """Run one tool-capable agent turn through the vendored ``AIAgent``.
@@ -762,6 +763,13 @@ def _run_vendored_session(cfg: Any, text: str, sid: str, *,
             clarify_callback=_vendor_clarify_callback,
             event_callback=event_sink,
             tool_progress_callback=progress_sink,
+            # Real per-token streaming seam. The vendored agent fires this with
+            # each increment as the model produces it, and with ``None`` at a
+            # segment boundary (before tool lines). Without it a general turn
+            # is only ever available as one finished string — which is exactly
+            # why /qubit-chat and the workbench both showed one delta at the
+            # end while claiming to stream. ``None`` keeps the old behavior.
+            stream_delta_callback=stream_delta,
         )
         result = agent.run_conversation(text) or {}
     except AgentDenied:
@@ -1188,6 +1196,7 @@ def run_agent_turn(cfg: Any, text: str, *, session: str,
                    estop_engaged: Optional[Callable[[], bool]] = None,
                    event_sink: Optional[Callable[[str, dict], None]] = None,
                    progress_sink: Optional[Callable[..., None]] = None,
+                   stream_delta: Optional[Callable[[Optional[str]], None]] = None,
                    model: Optional[str] = None,
                    provider: Optional[str] = None
                    ) -> "Optional[Dict[str, Any]]":
@@ -1257,6 +1266,7 @@ def run_agent_turn(cfg: Any, text: str, *, session: str,
                                  reasoning=reasoning, persist_user=True,
                                  event_sink=event_sink,
                                  progress_sink=progress_sink,
+                                 stream_delta=stream_delta,
                                  session_model=session_model)
 
 

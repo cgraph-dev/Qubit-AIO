@@ -61,6 +61,17 @@ EXPECTED_EXISTING = 6
 EXPECTED_GAP = 54
 EXPECTED_TOTAL = 184
 
+#: The chat routes are PORT and always were: ``verdicts()`` below resolves
+#: ``/api/chat/start``, ``/api/chat/steer``, ``/api/chat/stop`` and
+#: ``/api/chat/stream/status`` from ``PORT_SET``, and ``/api/chat/stream`` is
+#: served as SSE by ``workbench_ui_routes.stream_kind``. A ``docs/…§2.5`` group
+#: row once claimed "Chat / streaming | 3" as the biggest gap; THIS table never
+#: agreed (0 chat paths in ``gap``), so the count was right and the prose was
+#: wrong. Kept as a guard: if a chat path ever lands in GAP again it will show
+#: up as a count drift here, not as prose someone has to notice.
+CHAT_ROUTES = ("/api/chat/start", "/api/chat/steer", "/api/chat/stop",
+               "/api/chat/stream", "/api/chat/stream/status")
+
 
 def endpoints_in_tree() -> list[str]:
     """Every distinct ``/api/...`` the ported JS and HTML call.
@@ -149,6 +160,13 @@ def main(argv: list[str]) -> int:
         bad.append(f"EXISTING {n_ex}, doc says {EXPECTED_EXISTING}")
     if n_gap != EXPECTED_GAP:
         bad.append(f"GAP {n_gap}, doc says {EXPECTED_GAP}")
+    # A chat route in GAP is a real regression: those four are the pane's whole
+    # turn path, and the count above would still pass if some OTHER path had
+    # been un-ported in the same change. Naming them makes the drift specific.
+    chat_missing = [r for r in CHAT_ROUTES
+                    if r not in port and r not in existing and r != "/api/chat/stream"]
+    if chat_missing:
+        bad.append(f"chat routes fell out of PORT: {', '.join(chat_missing)}")
     for b in bad:
         print("DRIFT:", b)
     print("\nOK — code and doc agree" if not bad else "\nDRIFT — fix the doc or the shim")

@@ -426,7 +426,7 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 
 | Group | Count | Why it is a GAP |
 |---|---:|---|
-| **Chat / streaming** | 3 | Qubit's turn runs `chat_transport.turn`, which is not an SSE `/api/chat/start` contract. The composer sends and the turn completes, but the token-by-token stream the UI expects has no Qubit emitter. **The single biggest real gap** — chat works only in send-and-reload mode. |
+| **Chat / streaming** | 0 | Ported. `chat/start`, `chat/steer` and `chat/stream/status` are PORT rows (`chat_stream.py`); `GET /api/chat/stream` is served as SSE chunked by `stream_kind()`/`stream_sse()`. `chat/start` begins one real turn on a background thread and answers upstream's `{stream_id, session_id, …}` envelope, and `GET /api/chat/stream?stream_id=` relays `event: token` / `reasoning` / `tool` / `done` / `error` as the turn produces them. **Measured 2026-11-09:** `start` 200 in 0.12 s, stream `text/event-stream` with first bytes at 0.013 s, `event: token` then `event: done`. Two limits are real and are NOT this port's gap: (`a`) `chat/steer` answers `501 MID_TURN_STEER` when a run IS live (no mid-turn guidance channel on `chat_transport`) and `409 NO_ACTIVE_STREAM` with `fallback: queue` when none is; (`b`) delta *granularity* comes from the turn path — see §2.5.1. |
 | **Sessions — upstream-only verbs** | 20 | These are upstream's `state.db` verbs (branch, fork, compress, yolo, handoff). `QubitSessionStore` has no such operations, and writing them here would be a second writer on the transcript — the corruption `workbench/__init__.py` exists to prevent. |
 | **Commands & bundles** | 0 | Ported: all five are PORT rows answering real data or a named `WB_CAPABILITY_UNBOUND` (§2.3.3). |
 | **Workspaces & project management** | 5 | The four `/api/projects/*` writes and `/api/workspaces/suggest`. The `/api/workspaces/*` writes, the listing and `workspace/upload` are PORT rows (§2.3.2). |
@@ -437,9 +437,39 @@ code install is `qubit plugins install`), `extensions/sidecar-proxy-consent`
 | **Notes / wiki / insights / goal** | 8 | No Qubit notes/wiki/insights/goal authority. |
 | **Rollback / scripts / shutdown / misc** | 8 | Qubit has its own checkpoint surface at a different path; `share` has no Qubit authority. |
 | **Settings, upstream-only families** | 2 | Only the two background-poll routes remain (`/api/background`, `/api/background/status` — no Qubit background-job surface at those paths). Auxiliary config, cost history, gateway, git-info and system health are PORT; quota, models/refresh, self-hosted-provider writes and the restart/lifecycle verbs are named refusals. |
-| **Total** | **54** | Recomputes to the 54 GAP in §2.2 exactly: 3 chat + 20 session verbs + 5 workspaces/projects + 6 files-mutating + 8 notes/wiki/insights + 8 rollback/scripts/misc + 2 background + 2 `/api/gateway` path forms |
+| **Total** | **54** | Recomputes to the 54 GAP in §2.2 exactly: 20 session verbs + 2 background + 5 projects/workspaces + 6 files-mutating/escape + 3 notes + 3 wiki + 3 skills + 3 rollback + 1 scripts + 1 shutdown + 1 insights + 1 goal + 2 `/api/gateway` path forms + 2 profile + 1 `share/revoke`. Chat contributes **0** — `verdicts()` puts all four chat routes in PORT and none in GAP; the group line that claimed 3 was the doc's error and `_endpoint_table.py` never agreed with it. |
 
-**Chat / streaming** (3): `/api/chat/start`, `/api/chat/steer`, `/api/chat/stream/status` (`/api/btw` is answered — §2.3.3)
+**Chat / streaming** (0 GAP). All four are PORT rows and were measured live on 2026-11-09:
+
+| Route | Verdict | Measured |
+|---|---|---|
+| `POST /api/chat/start` | PORT → `chat_stream.chat_start` | `200` in **0.090 s**; body `{"ok":true,"stream_id":"…","session_id":"…","pending_started_at":…,"turn_id":null,"title":null,"effective_model":"deepseek-v4.1-flash","upstream":"…","via":"voicebridge.chat_transport.stream_turn"}` |
+| `GET /api/chat/stream?stream_id=` | PORT → SSE, `text/event-stream`, `Transfer-Encoding: chunked` | headers+first bytes **0.011 s**; first frame `: connected`, then `event: token`, `event: done` |
+| `GET /api/chat/stream/status?stream_id=` | PORT → `chat_stream.chat_stream_status` | `200 {"ok":true,"active":…,"replay_available":…}`; a missing `stream_id` is `400` — the route is wired and validates, it does not refuse |
+
+`chat/steer` is a PORT row answering a *typed* outcome rather than upstream's behaviour: `409 NO_ACTIVE_STREAM` (`fallback: "queue"`) when the session has no live run, `501 MID_TURN_STEER` when one does — `chat_transport` has no in-flight agent object to stash guidance into. That 501 is a real named capability limit, not an unported route.
+
+### 2.5.1 What "streams" means here — measured, twice
+
+**The SSE transport was already correct.** `chat_start` runs the turn on a background thread (`chat_stream._pump`), `chat_stream_frames` replays the buffer then follows it, and `stream_sse` writes each frame as its own HTTP chunk. The composer never worked in send-and-reload mode: the browser gets `Content-Type: text/event-stream`, `Transfer-Encoding: chunked`, and bytes **11 ms** after the request.
+
+**What was wrong is delta granularity, and it is shared with `/wb` — the workbench was never the outlier.** Measured on the same prompt ("count 1 to 20, one per line"), same server:
+
+| Path | TTFB | First content event | Complete |
+|---|---|---|---|
+| `POST /qubit-workbench/api/chat/start` + `GET …/chat/stream` | 0.011 s | `event: token` at **11.809 s** | 12.076 s |
+| `POST /agent/api/qubit/chat/stream` (`/wb`) | 0.126 s | `event: start` **7.776 s**, `event: delta` **7.779 s** | 8.606 s |
+
+On both paths the connection opens immediately but the **first content event arrives after the whole turn finished** (0.27 s before completion on the workbench, 0.83 s on `/wb`), and it carries the entire reply in one event. There is no incremental text on either. A `receipt.streaming` key is absent entirely on `/wb`.
+
+Root cause, `chat_transport.py:5247-5275` (the general-turn branch) → `_agent_chat` → `agent.run_agent_turn`: that path constructs `AIAgent(...)` **without** `stream_delta_callback` (`voicebridge/agent.py`, the `AIAgent(...)` call), so the vendored runtime has no seam to report increments and the reply only exists once finished. The stream then emits exactly one `delta` holding the whole answer, followed by `done`.
+
+Fix (this commit): `stream_delta` is threaded `run_agent_turn` → `_run_vendored_session` → `AIAgent(stream_delta_callback=…)` — the same seam the vendored runtime's own API server uses (`gateway/platforms/api_server_runs.py:1143`) — and `stream_turn` drains it through a queue on a worker thread so each real increment is yielded the moment it is produced. A segment boundary (`None`) is dropped, never rendered. When a runtime emits no increments the finished reply is still sent as **one** truthful `delta` with `receipt.streaming: false`; a reply is never split into invented tokens.
+
+- In-process verification (`tests/test_chat_agent_streaming_deltas.py`): 4 deltas at **0.194 / 0.549 / 0.946 / 1.346 s**, `done` at 1.770 s, `receipt.streaming: true`; no-increment fallback yields 1 delta and `false`.
+- **Not yet live on :8890**: the running `qubit-voicebridge` (pid 599779) still has the pre-fix `chat_transport`/`agent` loaded. The measured numbers above are the current live behaviour; the fix takes effect on the next restart of that service, which this change does not perform.
+
+Honest residual: per-token vs per-sentence granularity is the provider's own chunking. An API profile that answers in one body yields one delta and reports `streaming: false`; that is reported, never faked.
 
 **Sessions — upstream-only verbs** (20): `/api/session/anchor-scene`, `/api/session/branch`, `/api/session/clear`, `/api/session/compress/start`, `/api/session/compress/status`, `/api/session/compression-recovery/start`, `/api/session/conversation-rounds`, `/api/session/duplicate`, `/api/session/handoff-summary`, `/api/session/import`, `/api/session/import_cli`, `/api/session/lineage/report`, `/api/session/move`, `/api/session/retry`, `/api/session/title/regenerate`, `/api/session/truncate`, `/api/session/undo`, `/api/session/worktree/remove`, `/api/session/worktree/status`, `/api/session/yolo`
 

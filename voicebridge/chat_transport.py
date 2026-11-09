@@ -4497,7 +4497,8 @@ def _stream_remote_turn(cfg: Any, sid: str, clean: str, context: str,
 def _agent_chat(cfg: Any, st: Any, sid: str, clean: str, *,
                 timeout_s: Optional[float] = None,
                 cancel: Optional[Callable[[], bool]] = None,
-                reasoning: Optional[str] = None
+                reasoning: Optional[str] = None,
+                stream_delta: Optional[Callable[[Optional[str]], None]] = None
                 ) -> "Optional[Dict[str, Any]]":
     """Run a general turn through the tool-capable agent, else None.
 
@@ -4531,7 +4532,8 @@ def _agent_chat(cfg: Any, st: Any, sid: str, clean: str, *,
             cfg, clean, session=sid, reasoning=reasoning,
             estop_engaged=lambda: _estop(cfg)
             or (cancel is not None and bool(cancel())),
-            progress_sink=progress_sink)
+            progress_sink=progress_sink,
+            stream_delta=stream_delta)
     except AG.AgentDenied as exc:
         _audit("turn_agent_denied", session=sid, code=exc.code)
         code = "EMERGENCY_STOP" if exc.code == "EMERGENCY_STOP" \
@@ -5245,17 +5247,79 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
     # DECISIONS #26: a general conversation turn runs the SAME tool-capable
     # agent the /chat terminal drives (full tool schema + real tool calls), on
     # both local and API-resolved sessions — /chat parity. The deterministic
-    # fast paths above never reach here. The agent is non-streaming, so its
-    # reply is one truthful delta. An explicit per-call model is honored (the
-    # caller asked for a specific model, not the /chat config model); when no
-    # tool-capable vendored runtime is available this falls through to the
-    # legacy remote/local stream byte-identically.
+    # fast paths above never reach here.
+    #
+    # THE AGENT STREAMS AS IT PRODUCES. ``run_agent_turn`` is synchronous, so
+    # the turn runs on a worker thread while this generator drains a queue and
+    # yields each real increment the instant the agent's
+    # ``stream_delta_callback`` fires — the same seam the vendored runtime's
+    # own API server uses. Before this, the callback was never wired, so the
+    # whole reply existed only as one finished string and the client received
+    # a single ``delta`` seconds after the turn began (measured: one token
+    # event at 12.98 s for a 30-line answer, ``done`` 0.4 s later). The
+    # callback also fires ``None`` at a segment boundary (before tool lines);
+    # that is not text and is dropped, never rendered.
+    #
+    # A caller whose runtime cannot stream still gets exactly ONE truthful
+    # ``delta``: when the agent emitted no real increment, the finished reply
+    # is sent once. No reply is ever split into invented token events.
     if decided.get("action") in ("answer_local", "clarify") and not model:
-        agent_out = _agent_chat(cfg, st, sid, clean, timeout_s=timeout_s,
-                                cancel=cancel, reasoning=reasoning_level)
+        import queue as _queue
+
+        _box: "_queue.Queue[Any]" = _queue.Queue()
+        _FINISHED = object()
+        _streamed: List[str] = []
+
+        def _on_stream_delta(chunk: Optional[str]) -> None:
+            # Called from the agent's thread. ``None`` = segment boundary.
+            if chunk:
+                _streamed.append(chunk)
+                _box.put(("delta", str(chunk)))
+
+        def _run_agent() -> None:
+            try:
+                _box.put(("out", _agent_chat(
+                    cfg, st, sid, clean, timeout_s=timeout_s,
+                    cancel=cancel, reasoning=reasoning_level,
+                    stream_delta=_on_stream_delta)))
+            except BaseException as exc:  # noqa: BLE001 - typed by the reader
+                _box.put(("exc", exc))
+            finally:
+                _box.put(_FINISHED)
+
+        _thread = threading.Thread(target=_run_agent,
+                                   name=f"qb-agent-turn-{sid[:16]}",
+                                   daemon=True)
+        _thread.start()
+        _agent_out: Any = None
+        _exc: Optional[BaseException] = None
+        _started_frame = False
+        while True:
+            _item = _box.get()
+            if _item is _FINISHED:
+                break
+            _kind, _val = _item
+            if _kind == "delta":
+                if not _started_frame:
+                    _started_frame = True
+                    yield {"event": "start", "session_id": sid,
+                           "session": sid, "route": "agent",
+                           "streaming": True,
+                           **_pending_event_field(cfg, sid)}
+                yield {"event": "delta", "text": _val, "session_id": sid}
+            elif _kind == "out":
+                _agent_out = _val
+            else:
+                _exc = _val
+        if _exc is not None:
+            raise _exc
+        agent_out = _agent_out
         if agent_out is not None:
-            yield {"event": "start", "session_id": sid, "session": sid,
-                   "route": "agent", **_pending_event_field(cfg, sid)}
+            if not _started_frame:
+                yield {"event": "start", "session_id": sid,
+                       "session": sid, "route": "agent",
+                       "streaming": bool(_streamed),
+                       **_pending_event_field(cfg, sid)}
             if not agent_out.get("ok"):
                 yield {"event": "error",
                        "code": agent_out.get("code", "MODEL_ERROR"),
@@ -5264,11 +5328,16 @@ def stream_turn(cfg: Any, text: str, *, session: Optional[str] = None,
                        **_pending_event_field(cfg, sid)}
                 return
             text_out = str(agent_out.get("reply") or "")
-            yield {"event": "delta", "text": text_out, "session_id": sid}
+            if not _streamed and text_out:
+                # Nothing streamed: one truthful delta, never a fake token run.
+                yield {"event": "delta", "text": text_out, "session_id": sid}
+            _receipt = dict(agent_out.get("receipt") or {})
+            # The verdict is measured from what actually reached the client.
+            _receipt["streaming"] = bool(_streamed)
             yield {"event": "done", "ok": True, "reply": text_out,
                    "session_id": sid, "session": sid,
                    "elapsed_ms": agent_out.get("elapsed_ms"),
-                   "receipt": agent_out.get("receipt"),
+                   "receipt": _receipt,
                    **_pending_event_field(cfg, sid)}
             return
     routed_probe = resolve_route(cfg, model, session=session, role=role)
