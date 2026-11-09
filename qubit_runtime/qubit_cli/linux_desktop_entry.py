@@ -25,10 +25,13 @@ from typing import Callable, Mapping, Optional
 # Identity the packaged app claims for its window: electron-builder bakes product-identity.cjs's
 # `appId` into extraMetadata.desktopName, and Electron hands that string to the compositor
 # verbatim (Wayland app_id, CHROME_DESKTOP). GNOME links a window to a launcher by StartupWMClass
-# or by a `<app_id>.desktop` file name, so the entry has to carry the same id. The build identity
-# keeps the historical ``hermes`` kebab so an installed app's OS registration/userData does not
-# move; the user-visible name is Qubit.
-APP_ID = "com.nousresearch.hermes"
+# or by a `<app_id>.desktop` file name, so the entry has to carry the same id. This MUST equal
+# apps/desktop/product-identity.cjs `appId` — windows from the installed package carry
+# `com.nousresearch.qubit` as their WM_CLASS, so an entry named after any other id leaves the
+# running window unassociated with its launcher (no dock icon, no taskbar grouping).
+# tests/qubit_cli/test_linux_desktop_entry.py::test_app_id_matches_the_desktop_build_identity
+# enforces the equality.
+APP_ID = "com.nousresearch.qubit"
 DESKTOP_ENTRY_NAME = f"{APP_ID}.desktop"
 
 # Entry name written before the app-id rename; a successful install converts it into a hidden
