@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
 
@@ -21,6 +22,22 @@ from pm.lock import Facts, Lockfile
 from pm.store import Store, current_target, tree_digest
 from tests.pm._fixtures import make_tar, served as served  # noqa: PLC0414 -- the self-alias is load-bearing: it suppresses F811 for the pytest fixture parameter shadowing this import
 from tests.pm.test_pm_core import FakeTool, pm_env as core_env
+
+
+def _child_env():
+    """Environment for the crashing subprocess.
+
+    The child imports ``tests.pm.test_pm_authority`` to reuse ``FakeTool``. Upstream that
+    resolves because the suite lives at ``tests/``; this repo vendors the agent source under
+    ``qubit_runtime/``, so the importable root is ``qubit_runtime/`` and the inherited
+    PYTHONPATH (repo root) cannot see ``tests.pm``.
+    """
+    env = dict(os.environ)
+    root = str(Path(__file__).resolve().parents[2])
+    existing = env.get("PYTHONPATH", "")
+    parts = [root] + [p for p in existing.split(os.pathsep) if p]
+    env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(parts))
+    return env
 
 
 @pytest.fixture
@@ -238,7 +255,17 @@ def test_killed_replacement_recovers_on_next_install(pm_env, route, interruption
         import pm.paths as paths
         import pm.registry as registry
         from pm.store import Store
-        from tests.pm.test_pm_authority import FakeTool
+        # FakeTool is four lines over `pm.registry.BinaryPackage`; inlining it here avoids
+        # importing this test module from the child at all. The repo has TWO ``tests``
+        # packages (repo-root and vendored ``qubit_runtime/tests``), so any dotted
+        # ``tests.pm...`` import resolves to whichever pytest.ini put first and fails.
+        from pm.packages import BinaryPackage
+        class FakeTool(BinaryPackage):
+            name = 'faketool'
+            probe_version = False
+            binary_rel = {'win32': 'bin/faketool', 'posix': 'bin/faketool'}
+            def fetch_url(self, version, target):
+                return f'{FakeTool.base_url}/{self.name}-{version}.tar.gz'
         from pm.install import ensure, stage_only
         paths.lockfile_path = lambda: Path(sys.argv[1])
         registry._packages[FakeTool.name] = FakeTool()
@@ -257,7 +284,7 @@ def test_killed_replacement_recovers_on_next_install(pm_env, route, interruption
     """)
     child = subprocess.run(
         [sys.executable, "-c", code, str(env["lockfile_path"]), route, interruption],
-        env=dict(os.environ), capture_output=True, text=True, timeout=30,
+        env=_child_env(), capture_output=True, text=True, timeout=30,
         check=False,
     )
     assert child.returncode == 17, child.stderr
