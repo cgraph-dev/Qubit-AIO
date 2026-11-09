@@ -131,9 +131,9 @@ HEARTBEAT_SECONDS = 15.0
 #: instead of pinning a listener thread forever.
 STREAM_MAX_SECONDS = 300.0
 
-#: One condition variable per board, so an open stream announces new events to
-#: its peers (and wakes them ahead of their poll timeout) instead of every tab
-#: carrying its own independent loop.
+#: One condition variable per board, so an open stream announces its cursor to
+#: its peers (they re-poll at once instead of sleeping out the leg) rather than
+#: every tab carrying an independent loop.
 _WAKE: Dict[str, threading.Condition] = {}
 _WAKE_LOCK = threading.Lock()
 
@@ -367,7 +367,16 @@ def _board_plan(cfg: Any, q: Dict[str, Any]) -> Dict[str, Any]:
     for task in tasks:
         columns.setdefault(str(task.get("status") or "open"), []).append(
             _card(task))
-    names = sorted({str(t.get("assignee") or "") for t in tasks} - {""})
+    # The picker's value set: the full roster (profiles on disk included, so a
+    # fresh profile is filterable before it owns a card), not just this page of
+    # tasks. A complete board is one query; a paged one is not, and the page
+    # asks for the whole board.
+    try:
+        names = sorted({str(entry.get("name") or "") for entry in
+                        (_plugins().h_plugin_kanban_assignees(
+                            cfg, q, {}, {})[1].get("assignees") or [])} - {""})
+    except Exception:  # noqa: BLE001 - a roster is best-effort, never a 500
+        names = sorted({str(t.get("assignee") or "") for t in tasks} - {""})
     return {"columns": columns, "assignees": names,
             "latest": _cursor(events),
             "db_path": str(N._db_path(cfg))}
@@ -975,7 +984,7 @@ def stream(sub: str, cfg: Any, q: Optional[Dict[str, Any]] = None) -> Iterator[s
                 {"event": "error", "code": payload.get("code"),
                  "detail": payload.get("detail")}) + "\n\n")
             return
-        cursor = int(payload.get("cursor") or since)
+        cursor = int(payload.get("latest_event_id") or 0)
         if cursor != since:
             yield ("event: events\ndata: " + json.dumps(
                 {"events": payload.get("events") or [], "cursor": cursor})
@@ -983,7 +992,13 @@ def stream(sub: str, cfg: Any, q: Optional[Dict[str, Any]] = None) -> Iterator[s
             since = cursor
             last_beat = time.time()
             continue
+        # Nothing new. Announce this cursor to the board's other streams (they
+        # re-poll at once instead of sleeping out the leg), then wait for an
+        # announcement or the next poll. A write from ANOTHER process cannot be
+        # signalled — the poll is what makes that visible, which is why it stays
+        # on every stream rather than being replaced by a signal.
         with cond:
+            cond.notify_all()
             cond.wait(POLL_SECONDS)
         if time.time() - last_beat >= HEARTBEAT_SECONDS:
             # Comment-only frame: the client's parser ignores it, a proxy does
@@ -992,11 +1007,11 @@ def stream(sub: str, cfg: Any, q: Optional[Dict[str, Any]] = None) -> Iterator[s
             last_beat = time.time()
 
 
-#: The fine-grained board paths: ``boards/<slug>`` and ``boards/<slug>/switch``.
-#: Expressed as two regex-shaped prefixes rather than a byte copy of upstream's
-#: routes (which they replace), so a new verb under ``boards/`` cannot silently
-#: fall through to the generic refusal.
-BOARD_VERB_PREFIXES: Tuple[str, ...] = ("boards/",)
+#: Paths below ``kanban/`` whose tail is a slug, not a verb (``boards/<slug>``,
+#: ``boards/<slug>/switch``). The routes demand the slug, so these are answered
+#: by the same PORT_SET row through ``_resolve_handler``'s prefix test; the tuple
+#: exists so the port table can name them in one place.
+BOARD_VERB_PREFIXES: Tuple[str, ...] = ("kanban/boards/",)
 
 __all__ = [
     "VENDOR_TO_NATIVE", "UPSTREAM_COLUMNS", "NATIVE_COLUMNS",

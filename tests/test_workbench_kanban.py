@@ -119,7 +119,9 @@ def test_board_filters_by_assignee_and_hides_archived(home, store):
     status, out = call(home, "GET", "kanban/board", query={"assignee": "alice"})
     assert status == 200, out
     assert titles(out) == ["mine"]
-    assert out["assignees"] == ["alice"]
+    # The picker offers EVERY assignee on the board (filtering it down to the
+    # one already selected would leave no way back), while the cards are filtered.
+    assert out["assignees"] == ["alice", "bob"]
 
     status, all_of_them = call(home, "GET", "kanban/board")
     assert status == 200, all_of_them

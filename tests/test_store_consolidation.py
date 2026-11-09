@@ -33,6 +33,11 @@ def _cfg(tmp_path, monkeypatch):
     qubit = tmp_path / "home" / ".hermes"
     qubit.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("QUBIT_HOME", str(qubit))
+    # Not a dispatcher worker. This suite's own earlier tests set QUBIT_HOME on
+    # the PROCESS (``qubit_plugins._prepare_runtime``), so a runner that happens
+    # to carry the delegate fence would open the vendored store READ-ONLY and
+    # every write below would refuse for a reason unrelated to authority.
+    monkeypatch.delenv("HERMES_DELEGATED_CHILD_CONTEXT", raising=False)
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     return C.Config.load(p)

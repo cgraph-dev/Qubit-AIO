@@ -117,8 +117,23 @@ def test_terminal_paths_reach_the_agent_family_and_never_a_pty(wired, sub,
 
 def test_an_unported_path_is_still_a_typed_refusal(wired):
     cfg, _repo, _tmp = wired
-    status, payload = call("kanban/board", cfg)
+    status, payload = call("wiki/page", cfg)
     assert status == 501 and payload["code"] == "WB_NOT_IN_PORT_SET"
+
+
+def test_the_kanban_board_is_served_from_the_native_store(wired):
+    """The twelve kanban paths stopped being GAP: this one answers real data.
+
+    It used to be the "unported path" witness for the refusal above; the board
+    now resolves ``voicebridge.kanban`` (``workbench_ui/kanban_family.py``), so
+    an EMPTY store answers an empty board rather than a 501.
+    """
+    cfg, _repo, _tmp = wired
+    status, payload = call("kanban/board", cfg)
+    assert status == 200, payload
+    assert payload["ok"] is True
+    assert [c["name"] for c in payload["columns"]] == \
+        ["open", "claimed", "blocked", "done"]
 
 
 def test_outside_every_root_is_refused_through_the_full_stack(wired, tmp_path):
