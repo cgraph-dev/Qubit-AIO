@@ -1,0 +1,6 @@
+name: project-workflow-router
+version: "1.0.0"
+description: "Injects the app/project workflow router into the turn when the user asks to create, build, change, fix, refactor or scope an app or project, so the ported workflow skills are always consulted before any code is written."
+author: "Qubit Agent"
+provides_hooks:
+  - pre_llm_call
