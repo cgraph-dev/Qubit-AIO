@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [implementation, orchestration, task-graph, subagents, worktrees, spec]
     category: software-development
-    related_skills: [implement, code-review, subagent-driven-development, subagent-report-verification]
+    related_skills: [implement, code-review]
 ---
 
 # Implement Spec Skill

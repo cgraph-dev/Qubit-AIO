@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [implementation, tickets, tdd, code-review, delivery]
     category: software-development
-    related_skills: [implement-spec, code-review, requesting-code-review, commit-as-you-go]
+    related_skills: [implement-spec, code-review, requesting-code-review]
 ---
 
 # Implement Skill

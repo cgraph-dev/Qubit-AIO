@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [debugging, diagnosis, regression, feedback-loop, performance]
     category: software-development
-    related_skills: [falsifiability-mutation-proof, requesting-code-review, codebase-design]
+    related_skills: [requesting-code-review, codebase-design]
 ---
 
 # Diagnosing Bugs Skill

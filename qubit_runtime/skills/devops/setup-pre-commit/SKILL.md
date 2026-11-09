@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [git-hooks, husky, lint-staged, prettier, pre-commit, javascript]
     category: devops
-    related_skills: [git-guardrails, commit-as-you-go, requesting-code-review]
+    related_skills: [git-guardrails, requesting-code-review]
 ---
 
 # Setup Pre-Commit Skill

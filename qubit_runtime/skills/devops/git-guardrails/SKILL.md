@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [git, guardrails, safety, hooks, destructive-commands]
     category: devops
-    related_skills: [commit-as-you-go, terminal-session-lifecycle]
+    related_skills: []
 ---
 
 # Git Guardrails Skill

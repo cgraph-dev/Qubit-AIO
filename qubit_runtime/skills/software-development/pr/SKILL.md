@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [pull-request, pr-body, evidence, diagrams, merge-risk]
     category: software-development
-    related_skills: [code-review, implement, commit-as-you-go]
+    related_skills: [code-review, implement]
 ---
 
 # PR Skill

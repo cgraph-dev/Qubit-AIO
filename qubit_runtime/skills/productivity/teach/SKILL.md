@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [teaching, learning, lessons, spaced-repetition, curriculum]
     category: productivity
-    related_skills: [writing-for-agents, memento-flashcards, wait-what]
+    related_skills: [writing-for-agents, wait-what]
 ---
 
 # Teach Skill

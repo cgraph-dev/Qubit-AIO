@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [exercises, scaffolding, course, lint, directories]
     category: devops
-    related_skills: [teach, commit-as-you-go]
+    related_skills: [teach]
 ---
 
 # Scaffold Exercises Skill

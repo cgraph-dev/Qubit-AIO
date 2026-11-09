@@ -9,7 +9,7 @@ metadata:
   qubit:
     tags: [writing, agents-md, skills, documentation, context-pointers, prompting]
     category: productivity
-    related_skills: [qubit-agent-skill-authoring, grilling, handoff]
+    related_skills: [grilling, handoff]
 ---
 
 # Writing For Agents Skill
