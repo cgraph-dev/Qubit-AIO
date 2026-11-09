@@ -59,6 +59,15 @@ if (store && (canary || buildCommit)) {
   throw new Error('Store packaging is only eligible for stable releases')
 }
 
+// The OS deep-link scheme. It is a WIRE CONTRACT, not a brand surface: the
+// packaged app registers it at launch (electron/main.ts HERMES_PROTOCOL) and
+// the .desktop file must register exactly the same one, or a clicked link
+// opens nothing. When DEV_SERVER is set the app registers 'hermes-dev'
+// instead; electron-builder.config.cjs passes that flag through so packaging
+// never advertises a scheme the app will not claim.
+const devServer = Boolean(process.env.HERMES_DESKTOP_DEV_SERVER)
+const deepLinkScheme = devServer ? 'hermes-dev' : 'hermes'
+
 /** @typedef {import("./product-identity.d.cts")} ProductIdentity */
 
 /** @type {ProductIdentity} */
@@ -67,6 +76,7 @@ const identity = {
   light,
   displayName,
   appId: `com.nousresearch.${name.kebab}${kebabSuffix}`,
+  deepLinkScheme,
   // Store and commit builds do not publish a release feed.
   channel: store || buildCommit ? null : light ? (canary ? 'light-canary' : 'light') : (canary ? 'canary' : 'latest'),
   appNamePascal: `${name.pascal}${pascalSuffix}`,

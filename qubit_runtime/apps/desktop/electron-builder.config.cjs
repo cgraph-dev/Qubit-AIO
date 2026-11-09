@@ -25,6 +25,7 @@ const {
   artifactNamePascal,
   windowsExecutableName,
   channel,
+  deepLinkScheme,
   msixAppIdWithOrg
 } = require('./product-identity.cjs')
 
@@ -73,10 +74,17 @@ module.exports = {
   appId,
   productName: displayName,
   executableName: displayName,
+  // The OS deep-link handler this package registers. Every target derives its
+  // registration from this ONE list: macOS CFBundleURLTypes, the MSIX
+  // windows.protocol extension, the Windows registry entry, and the Linux
+  // .desktop `MimeType=x-scheme-handler/<scheme>` line. It MUST name the
+  // scheme the app registers at launch (electron/main.ts HERMES_PROTOCOL,
+  // via product-identity.cjs `deepLinkScheme`) — a mismatch here leaves a
+  // clickable link that opens nothing.
   protocols: [
     {
       name: `${displayName} Protocol`,
-      schemes: ['hermes']
+      schemes: [deepLinkScheme]
     }
   ],
   // A store build is archived, never served to a feed — prefix its artifact

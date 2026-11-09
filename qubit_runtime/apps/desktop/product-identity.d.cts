@@ -7,6 +7,11 @@ interface ProductIdentity {
   displayName: string
   /** OS-level app identity. e.g. "com.nousresearch.hermes-light" */
   appId: string
+  /** The OS deep-link scheme the app registers at launch. e.g. "hermes".
+   *  MUST equal the scheme shipped in macOS CFBundleURLTypes, the MSIX
+   *  windows.protocol extension and the Linux .desktop MimeType — the
+   *  .desktop entry is generated from this value, never guessed. */
+  deepLinkScheme: string
   /** app name in pascal case. e.g. "HermesLight" */
   appNamePascal: string
   /** Artifact prefix stays compatible with release archive consumers. */

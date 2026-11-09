@@ -17883,9 +17883,13 @@ ipcMain.handle('hermes:vscode-theme:search', async (_event, query) => searchMark
 // running app. Three delivery paths: macOS 'open-url',
 // Win/Linux running-app 'second-instance' (argv), Win/Linux cold-start argv.
 // ---------------------------------------------------------------------------
-const HERMES_PROTOCOL = DEV_SERVER ? 'hermes-dev' : 'hermes'
+// The registered scheme comes from the build identity (product-identity.cjs),
+// which is ALSO what electron-builder packages into CFBundleURLTypes, the MSIX
+// windows.protocol extension and the Linux .desktop MimeType. One value, so a
+// clicked link can never point at a scheme the app does not claim.
+const HERMES_PROTOCOL = PRODUCT_IDENTITY.deepLinkScheme
 /** Schemes accepted when parsing inbound URLs (dev accepts both). */
-const DEEPLINK_SCHEMES = DEV_SERVER ? ['hermes-dev', 'hermes'] : ['hermes']
+const DEEPLINK_SCHEMES = DEV_SERVER ? ['hermes-dev', 'hermes'] : [HERMES_PROTOCOL]
 let _pendingDeepLink = null
 let _rendererReadyForDeepLink = false
 // Set by sendOpenUpdatesRequested() when the renderer cannot hear it yet.
