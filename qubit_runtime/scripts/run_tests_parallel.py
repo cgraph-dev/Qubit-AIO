@@ -668,6 +668,14 @@ def _run_one_file_once(
     # so loudly rather than half-run.
     for _home_var in ("QUBIT_HOME", "HERMES_HOME"):
         env.pop(_home_var, None)
+    # Same class, measured separately: when the suite is launched from inside the dashboard
+    # (which is where this project is normally developed), the shell exports
+    # HERMES_TUI_DASHBOARD=1 / QUBIT_TUI_DASHBOARD=1. `tui_gateway.entry.main()` treats that as
+    # "a VoiceBridge gateway owns this home, serve beside it" and skips the launch-home claim
+    # entirely — so a test that pins the claim path could never observe it. Measured on
+    # test_entry_claims_launch_home.py: 3 failed -> 4 passed once these were unset.
+    for _dash_var in ("HERMES_TUI_DASHBOARD", "QUBIT_TUI_DASHBOARD"):
+        env.pop(_dash_var, None)
 
 
     subproc_start = time.monotonic()

@@ -9,11 +9,19 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 from gateway.runtime_ownership import process_ownership
 from tui_gateway import entry
+
+# The repo vendors the agent source under ``qubit_runtime/``; upstream keeps it at the
+# root. A bare "scripts/..." resolves only in the second layout, so the holder process
+# never started and the test read "" instead of "READY".
+_LOCK_HOLDER = str(
+    Path(__file__).resolve().parents[2] / "scripts" / "_probe_laneA_lock_holder.py"
+)
 
 
 @pytest.fixture
@@ -42,7 +50,7 @@ def test_main_refuses_a_home_owned_by_another_process(home, monkeypatch):
     second reservation from this process would not conflict.
     """
     holder = subprocess.Popen(
-        [sys.executable, "scripts/_probe_laneA_lock_holder.py", str(home)],
+        [sys.executable, _LOCK_HOLDER, str(home)],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     try:
         assert holder.stdout.readline().strip() == "READY"
@@ -65,7 +73,7 @@ def test_dashboard_terminal_serves_beside_a_live_gateway(home, monkeypatch, flag
     while a chat is open), and it must not take the exclusive runtime lock itself."""
     monkeypatch.setenv(flag, "1")
     holder = subprocess.Popen(
-        [sys.executable, "scripts/_probe_laneA_lock_holder.py", str(home)],
+        [sys.executable, _LOCK_HOLDER, str(home)],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True)
     try:
         assert holder.stdout.readline().strip() == "READY"
