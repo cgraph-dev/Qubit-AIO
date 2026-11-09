@@ -1490,6 +1490,17 @@ class TestMultiAgentRouting:
         assert card["name"] == "Research Agent"
         assert card["supportedInterfaces"][0]["url"] == "http://agents.example.com/research/"
         assert card["supportedInterfaces"][0]["tenant"] == "research"
+        # The agent's own `capabilities` become its advertised toolsets, and therefore its skills.
+        # `_advertised_skills` prefers the LIVE tool registry whenever it holds any toolsets, so
+        # without pinning it this assertion describes whatever an earlier test left registered —
+        # it passed only while the registry happened to be empty. This test is about path routing
+        # and the canonical URL, not about which toolsets the host has installed.
+        monkeypatch.setattr(
+            A2AAdapter, "_advertised_skills",
+            lambda self, agent=None: protocol.skills_from_toolsets(
+                (agent or {}).get("advertised_toolsets") or (agent or {}).get("capabilities") or []),
+        )
+        card = adapter._build_card("http://agents.example.com/", agent=route["agent"])
         assert {s["name"] for s in card["skills"]} == {"research", "web"}
 
     def test_tenant_routing_selects_agent_without_path_prefix(self):

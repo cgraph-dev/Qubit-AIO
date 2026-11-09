@@ -223,7 +223,15 @@ class TestConnectivityChecks:
 def test_discovery_loaded_setup_module_exposes_post_setup(monkeypatch):
     """`hermes memory setup mem0` reaches the wizard when the package is first imported by plugin
     discovery, which execs sibling modules before ``__init__`` (#103078). The invariant is on the
-    module the loader actually cached, not on a normal top-level import."""
+    module the loader actually cached, not on a normal top-level import.
+
+    The restore must be COMPLETE. Popping the package and letting discovery re-exec it leaves a
+    second module object alive unless every reference is put back: a later test that imports
+    ``Mem0MemoryProvider`` from this package or patches
+    ``plugins.memory.mem0._backend.<X>`` would otherwise reach the duplicate while the original
+    still serves the provider — ``test_mem0_v3``'s backend-routing tests failed that way,
+    order-dependently.
+    """
     from plugins.memory import load_memory_provider
 
     saved = {k: sys.modules.pop(k) for k in list(sys.modules) if k.startswith("plugins.memory.mem0")}
@@ -236,3 +244,22 @@ def test_discovery_loaded_setup_module_exposes_post_setup(monkeypatch):
             if k.startswith("plugins.memory.mem0"):
                 del sys.modules[k]
         sys.modules.update(saved)
+        # Two references are left dangling by the re-import and BOTH must be repaired:
+        #
+        # * ``plugins.memory.mem0`` (the package attribute on ``plugins.memory``) still points at
+        #   the module discovery created, and that is what ``from plugins.memory.mem0 import X``
+        #   resolves — the shape every sibling test module uses;
+        # * the submodules bound onto that package, which a later
+        #   ``monkeypatch.setattr("plugins.memory.mem0._backend.X", …)`` reaches via ``sys.modules``.
+        #
+        # Restoring only ``sys.modules`` leaves the two disagreeing: one test patches a module
+        # object the provider under test never holds. Overwrite the entries rather than
+        # ``setdefault`` — the duplicate is exactly what is sitting there.
+        package = saved.get("plugins.memory.mem0")
+        if package is not None:
+            parent = sys.modules.get("plugins.memory")
+            if parent is not None:
+                setattr(parent, "mem0", package)  # rebind the package attribute, not sys.modules alone
+            for attr, module in list(vars(package).items()):
+                if getattr(module, "__name__", "") == f"plugins.memory.mem0.{attr}":
+                    sys.modules[module.__name__] = module
