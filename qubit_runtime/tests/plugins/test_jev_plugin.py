@@ -28,13 +28,27 @@ def _isolate(monkeypatch, tmp_path):
     qubit_home = tmp_path / ".hermes"
     qubit_home.mkdir()
     monkeypatch.setenv("QUBIT_HOME", str(qubit_home))
+    # The ported plugin ships DISABLED (plugins.enabled is opt-in), and it is named
+    # jev-workflows to avoid colliding with the catalog plugin literally called 'jev'.
+    # Enable it the way an operator would before discovery.
+    import qubit_yaml as yaml
+    (qubit_home / "config.yaml").write_text(
+        yaml.safe_dump({"plugins": {"enabled": ["jev-workflows"]}}), encoding="utf-8",
+    )
+    # The policy tools (jev_decide / jev_score / jev_route_to) register only when the
+    # decide_tools switch was ON before load — upstream gates them behind opt-in
+    # ("only when `/jev decide_tools on` was set before the gateway started"). The switch
+    # is read from <home>/jev/state.json, so write it the way the /jev command would.
+    jev_dir = qubit_home / "jev"
+    jev_dir.mkdir(parents=True, exist_ok=True)
+    (jev_dir / "state.json").write_text(json.dumps({"decide_tools": "on"}), encoding="utf-8")
     for name in ("OPENCODE_ZEN_API_KEY", "TYPESAFE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     from qubit_cli import plugins as pmod
 
     mgr = pmod.PluginManager()
     mgr.discover_and_load()
-    assert mgr._plugins["jev"].enabled, mgr._plugins["jev"].error
+    assert mgr._plugins["jev-workflows"].enabled, mgr._plugins["jev-workflows"].error
     yield qubit_home
 
 
@@ -46,7 +60,7 @@ def _pin(settings):
     from tools.registry import _check_fn_cache
 
     (get_qubit_home() / "config.yaml").write_text(
-        yaml.safe_dump({"plugins": {"entries": {"jev": {"settings": settings}}}}), encoding="utf-8")
+        yaml.safe_dump({"plugins": {"enabled": ["jev-workflows"], "entries": {"jev-workflows": {"settings": settings}}}}), encoding="utf-8")
     mgr = pmod.PluginManager()
     mgr.discover_and_load()
     _check_fn_cache.clear()
@@ -77,7 +91,7 @@ def test_discovered_as_a_bundled_backend():
 
     mgr = pmod.PluginManager()
     mgr.discover_and_load()
-    loaded = mgr._plugins["jev"]
+    loaded = mgr._plugins["jev-workflows"]
     assert loaded.manifest.source == "bundled"
     assert loaded.manifest.kind == "backend"
     assert loaded.enabled and loaded.error is None
