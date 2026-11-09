@@ -88,7 +88,7 @@ export function createAppRelauncher(
         } catch (error) {
           // A synchronous spawn throw (E2BIG) must not cost the restart.
           console.error(
-            `[hermes] relaunching ${target} failed (${String(error)}); relaunching through Electron instead`
+            `[qubit] relaunching ${target} failed (${String(error)}); relaunching through Electron instead`
           )
         }
       }

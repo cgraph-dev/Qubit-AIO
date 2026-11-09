@@ -119,7 +119,7 @@ export function readDesktopLaunchConfig(yamlText: string): DesktopLaunchConfig {
 
     if (meantToSet) {
       console.warn(
-        '[hermes] config.yaml: desktop.electron_flags / desktop.renderer_max_old_space_mb were ignored — ' +
+        '[qubit] config.yaml: desktop.electron_flags / desktop.renderer_max_old_space_mb were ignored — ' +
           'the launch reader supports only two-space-indented keys under a top-level `desktop:` with ' +
           'four-space `- ` list items (see the Desktop docs). Launching with Chromium defaults.'
       )
@@ -223,7 +223,7 @@ export function applyLaunchSwitches(
     }
 
     console.log(
-      `[hermes] desktop launch switch from config.yaml: --${planned.name}${planned.value === undefined ? '' : `=${planned.value}`}`
+      `[qubit] desktop launch switch from config.yaml: --${planned.name}${planned.value === undefined ? '' : `=${planned.value}`}`
     )
   }
 }

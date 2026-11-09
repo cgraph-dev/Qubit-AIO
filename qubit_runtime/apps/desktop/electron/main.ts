@@ -629,7 +629,7 @@ if (REMOTE_DISPLAY_REASON) {
   // with only --disable-gpu: force compositing onto the CPU too.
   app.commandLine.appendSwitch('disable-gpu-compositing')
   console.log(
-    `[hermes] remote display detected (${REMOTE_DISPLAY_REASON}); disabling GPU hardware acceleration to prevent flicker`
+    `[qubit] remote display detected (${REMOTE_DISPLAY_REASON}); disabling GPU hardware acceleration to prevent flicker`
   )
 }
 
@@ -645,14 +645,14 @@ if (DEV_CDP.port) {
   // so a future edit can't widen it by omission.
   app.commandLine.appendSwitch('remote-debugging-address', '127.0.0.1')
   console.log(
-    `[hermes] renderer debugging on http://127.0.0.1:${DEV_CDP.port} — anything that can reach it ` +
+    `[qubit] renderer debugging on http://127.0.0.1:${DEV_CDP.port} — anything that can reach it ` +
       'can run code in the renderer. HERMES_DESKTOP_CDP_PORT=off to disable.'
   )
 } else {
   const why = describeDevCdpDecision(DEV_CDP)
 
   if (why) {
-    console.warn(`[hermes] ${why}`)
+    console.warn(`[qubit] ${why}`)
   }
 }
 
@@ -663,7 +663,7 @@ if (IS_WSL && !REMOTE_DISPLAY_REASON && fs.existsSync('/dev/dxg')) {
   app.commandLine.appendSwitch('ignore-gpu-blocklist')
   app.commandLine.appendSwitch('enable-gpu-rasterization')
   app.commandLine.appendSwitch('enable-zero-copy')
-  console.log('[hermes] WSL GPU passthrough (/dev/dxg) detected; enabling GPU acceleration')
+  console.log('[qubit] WSL GPU passthrough (/dev/dxg) detected; enabling GPU acceleration')
 }
 
 // Linux: point Chromium at the session's keychain backend so safeStorage can
@@ -674,12 +674,12 @@ if (IS_WSL && !REMOTE_DISPLAY_REASON && fs.existsSync('/dev/dxg')) {
 const PASSWORD_STORE = resolveLinuxPasswordStore()
 
 if (PASSWORD_STORE.warning) {
-  console.warn(`[hermes] ${PASSWORD_STORE.warning}`)
+  console.warn(`[qubit] ${PASSWORD_STORE.warning}`)
 }
 
 if (PASSWORD_STORE.store) {
   app.commandLine.appendSwitch('password-store', PASSWORD_STORE.store)
-  console.log(`[hermes] using password-store backend: ${PASSWORD_STORE.store}`)
+  console.log(`[qubit] using password-store backend: ${PASSWORD_STORE.store}`)
 }
 
 // Windows sandbox / GPU breakpoint crash recovery (#38216).
@@ -716,9 +716,9 @@ if (IS_WINDOWS) {
     const acl = grantAllApplicationPackagesAcl(exeDir, { execFileSync })
 
     if (acl.ok) {
-      console.log(`[hermes] granted ALL APPLICATION PACKAGES RX on ${exeDir} (#38216)`)
+      console.log(`[qubit] granted ALL APPLICATION PACKAGES RX on ${exeDir} (#38216)`)
     } else if (acl.error && acl.error !== 'missing-target-or-exec') {
-      console.warn(`[hermes] AppContainer ACL grant failed on ${exeDir}: ${acl.error}`)
+      console.warn(`[qubit] AppContainer ACL grant failed on ${exeDir}: ${acl.error}`)
     }
   }
 
@@ -740,7 +740,7 @@ if (IS_WINDOWS) {
     app.commandLine.appendSwitch('no-sandbox')
     process.env.ELECTRON_DISABLE_SANDBOX = '1'
     console.log(
-      `[hermes] Windows sandbox fallback enabled (${sandboxDecision.reason}); launching with --no-sandbox (#38216)`
+      `[qubit] Windows sandbox fallback enabled (${sandboxDecision.reason}); launching with --no-sandbox (#38216)`
     )
   }
 
@@ -771,14 +771,14 @@ if (IS_WINDOWS) {
     }
 
     console.warn(
-      `[hermes] Windows GPU sandbox crashed (exit=${details?.exitCode}); relaunching once with --no-sandbox (#38216)`
+      `[qubit] Windows GPU sandbox crashed (exit=${details?.exitCode}); relaunching once with --no-sandbox (#38216)`
     )
 
     try {
       app.relaunch({ args: buildNoSandboxRelaunchArgs(process.argv.slice(1)) })
       void exitAfterBackendShutdown(0)
     } catch (error) {
-      console.error(`[hermes] --no-sandbox relaunch failed: ${error?.message || error}`)
+      console.error(`[qubit] --no-sandbox relaunch failed: ${error?.message || error}`)
     }
   })
 }
@@ -809,13 +809,13 @@ const SOURCE_REPO_ROOT = path.resolve(APP_ROOT, '../..')
 // Runtime identity comes only from the baked artifact stamp. Dev runs have none.
 if (INSTALL_STAMP) {
   console.log(
-    `[hermes] install stamp: ${INSTALL_STAMP.commit ? INSTALL_STAMP.commit.slice(0, 12) : 'no-commit'}${INSTALL_STAMP.branch ? ` (${INSTALL_STAMP.branch})` : ''}${INSTALL_STAMP.dirty ? ' [DIRTY]' : ''} from ${INSTALL_STAMP.source || 'unknown'}`
+    `[qubit] install stamp: ${INSTALL_STAMP.commit ? INSTALL_STAMP.commit.slice(0, 12) : 'no-commit'}${INSTALL_STAMP.branch ? ` (${INSTALL_STAMP.branch})` : ''}${INSTALL_STAMP.dirty ? ' [DIRTY]' : ''} from ${INSTALL_STAMP.source || 'unknown'}`
   )
 } else if (IS_PACKAGED) {
   // Dev builds without a stamp are normal; packaged builds without one
   // mean the bootstrap won't know what to clone. Surface clearly.
   console.error(
-    '[hermes] WARNING: no install-stamp.json found in packaged build. First-launch bootstrap will not have a pinned ref to install.'
+    '[qubit] WARNING: no install-stamp.json found in packaged build. First-launch bootstrap will not have a pinned ref to install.'
   )
 }
 
@@ -851,12 +851,12 @@ const QUBIT_HOME: string = OWN_HOME_READY ?? HOME_PLAN.sharedHome
 const IS_OWN_HOME_LIVE: boolean = HOME_PLAN.status === 'first' || OWN_HOME_READY !== null
 
 if (HOME_PLAN.status !== 'explicit') {
-  console.log(`[hermes] home: ${QUBIT_HOME} (${HOME_PLAN.status}, shared root ${HOME_PLAN.sharedHome})`)
+  console.log(`[qubit] home: ${QUBIT_HOME} (${HOME_PLAN.status}, shared root ${HOME_PLAN.sharedHome})`)
 }
 
 if (!IS_OWN_HOME_LIVE) {
   console.error(
-    `[hermes] ${HOME_PLAN.sharedHome} already contains something that is not this app's home link; ` +
+    `[qubit] ${HOME_PLAN.sharedHome} already contains something that is not this app's home link; ` +
       `not creating ${HOME_PLAN.ownRoot}. The app starts read-only and spawns no backend — ` +
       `stop the gateway using that home and restart, or set QUBIT_HOME.`
   )
@@ -891,7 +891,7 @@ if (!IS_OWN_HOME_LIVE) {
     }
 
     console.log(
-      `[hermes] desktop launch switch from config.yaml: --${planned.name}${planned.value === undefined ? '' : `=${planned.value}`}`
+      `[qubit] desktop launch switch from config.yaml: --${planned.name}${planned.value === undefined ? '' : `=${planned.value}`}`
     )
   }
 }
@@ -13856,7 +13856,7 @@ function startHudGameOverlayFeed(win: BrowserWindow) {
 
     if (!reported) {
       reported = true
-      console.warn(`[hermes] HUD cannot enumerate windows: ${windows.reason}`)
+      console.warn(`[qubit] HUD cannot enumerate windows: ${windows.reason}`)
     }
 
     return null

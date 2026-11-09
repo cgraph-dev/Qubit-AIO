@@ -97,7 +97,7 @@ export function relaunchIfNoSandboxCameTooLate(host: SandboxRelaunchHost, before
     return false
   }
 
-  console.warn('[hermes] --no-sandbox requested after Chromium started; relaunching with it on the command line')
+  console.warn('[qubit] --no-sandbox requested after Chromium started; relaunching with it on the command line')
   // The launcher's ready pipe is not inherited across the relaunch; a stale fd
   // number would make the next process write its reveal byte into whatever
   // file reuses that descriptor.
