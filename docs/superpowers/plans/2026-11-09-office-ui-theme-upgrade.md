@@ -156,16 +156,57 @@ Confirmed by rendering labelled frame grids and compositing real recipes (previe
 | Body | row 0, col 0 (`32×64`) | front idle, 4 frames on row 0 |
 | Eyes | row 0, col 0 | tiny overlay; front |
 | Hair (body) | **row 3, col 0** | front idle; rows 0–2/4–5 are back/side, rows 6–7 are walk-front |
-| Outfit bottom | row 0, col 0 | every outfit file's row 0 is a bottom garment |
-| Outfit top | **row 7, col 0** | every file's torso coverage peaks at row 7; row 8 is an alternate top |
+| Outfit bottom | row 0, col 0 | every outfit file's row 0 is the bottom garment |
+| Outfit base top | row 7, col 0 | shared dark undershirt across files |
+| Outfit top | **row 8, col 0** | the outfit's own colour; matches the bottom's colour (red/green/ivory/orange/teal/blue…). Some files have row 7 or 8 empty (31, 33) — the builder skips empty rows. |
+| Outfit shoes | row 14, col 0 | optional; some outfits bake shoes into the top |
 | Portrait | 64 px cell, row 0, col 0 → downscale to 32 | 10×3 grid of 64 px cells at the 32 tier |
 | Accessory | **not calibrated** | omit in v1; backpacks/hats need a per-family frame map |
 
-Open item from calibration: every outfit file shares a blue base garment at row 7, so
-row 0+7 produces only subtle variation. v1 ships that pair (valid, consistent) and a
-second pass maps true outfit layers (row/column semantics) before claiming outfit
-variety. The part indices (skin/eyes/hair) are shared with the portrait, which is what
-makes the face and body match.
+Outfit variety is now **solved**: composing bottom row 0 + base row 7 + top row 8 +
+shoes row 14 yields visibly different outfits (preview: `/tmp/outfit_variety.png`:
+red, green, ivory, orange, teal, blue). The earlier “all look the same” result was
+row 7 alone (the shared undershirt); row 8 is the outfit's own colour. The part indices
+(skin/eyes/hair) are shared with the portrait, which is what makes face and body match.
+
+## Art handling — do not redistribute the paid art
+
+Finding (2026-11-09, verified in the upstream macOS fork's README and the LimeZu comments):
+the Modern Interiors/UI spritesheets are **paid art that must not be redistributed** — “Never
+redistribute. Every user must buy their own copy.” Use in the game is allowed; shipping the
+sheets (or a derived atlas that reproduces them) in the public source tree is the redistribution
+the licence forbids. Reference: `https://github.com/stas-bool/Character-Generator-2.0` (README
+licence table), `https://limezu.itch.io/moderninteriors`.
+
+Therefore:
+- **The repo ships recipes, not art.** Committed: `theme.recipe.json` (tokens + per-agent part
+  indices + `template_version` + credit/licence), the builder/extractor/calibration scripts, the
+  docs. **Not committed**: the `.zip` packs, the extracted parts, the portrait/body atlases.
+- **The owner builds locally** from their purchase: `scripts/office_theme_build.py --source
+  "/path/to/UI Office" --out "$QUBIT_HOME/office/themes/limezu"`. The output directory is
+  gitignored and served locally.
+- **Sharing a theme = sharing the recipe**, not the art. Another person runs the builder against
+  their own purchase. `qubit office theme export` exports the recipe bundle (tokens + recipes +
+  licence), never the PNGs.
+- The CC-BY pack (Serene Village) may still ship with attribution, but it is not used in this
+  upgrade.
+- The two generator apps (Character Generator GPLv3, Portrait Generator proprietary) are tools
+  only — never shipped or modified.
+
+This supersedes the earlier “commit the generated pack” approach.
+
+## UI assets the owner supplied
+
+| Source | What it is | How it is used |
+|---|---|---|
+| `modernuserinterface-win.zip` (LimeZu Modern UI) | 16/32/48 px UI sheets (`Modern_UI_Style_1`, `Style_2`, `Gamepad`), animated buttons, and the 903 portrait pieces already in use | **Token palette** sampled from the sheets + **optional 9-slice** frames for our docks/buttons; portrait pieces feed the portrait atlas |
+| `hud-agents-icons.jpeg` | The two menu glyphs | Already traced into `ui-px-icon` paths (HUD/Agents) |
+| `/home/trick/Desktop/ui elements` | WhatsApp-saved **reference** images from an “AI design studio” (watermarked concept art, e.g. crimson/ivory gothic UI) | **Reference only — never shipped, never used as a texture.** Optional: derive a second token preset (`crimson`) from its palette if the owner wants that direction |
+| `Character Generator 2.0` / `Portrait Generator 1.5.0` | Paid art + third-party tools | Art sources for the atlases (built locally); tools never shipped |
+
+Tasks add: `--ui-contact-sheet` (labelled grid of the Modern UI sheets, for authoring
+`theme.recipe.json:slices`) and a palette sampler that writes the token values; the reference
+moodboard is not ingested.
 
 ## Skills we will use (and the one we won't invent)
 
@@ -380,6 +421,8 @@ def test_token_css_only_allowlisted_vars():
 | Build | `npx vite build --config vite.office-game.config.ts` | succeeds |
 | Reproducibility | `python3 scripts/office_theme_extract.py --check` | decoded pixels + JSON identical |
 | Clean tree | `scripts/run_tests.sh tests/test_office_theme.py -q -k "operator_path or duplicate"` | pass (no operator path, no Unicode/case duplicate) |
+| No paid art committed | `git ls-files frontend/qubit-web/public/plugins/qubit-office/themes` | recipe JSON only — no `.png`/`.webp` atlases |
+| Outfit variety | `python3 scripts/office_theme_build.py --check` | two recipes with different outfit files yield different torso hashes |
 | Drift report | `python3 scripts/office_theme_audit.py` | lists new unthemed `.ui-root` vars; exit 0 |
 | Live classic | `/qubit-office` no theme | identical look, no extra requests, HUD marker 15 s |
 | Live themed | `office.theme: limezu` / `?theme=limezu` | atlas = **1** image request, credit visible, menu order unchanged, game interactive |

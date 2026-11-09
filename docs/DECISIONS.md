@@ -165,10 +165,12 @@ done
     (a) credit LimeZu on any surface that ships the art;
     (b) record a pack's name, sha256 and licence text in
     `THIRD_PARTY_NOTICES.md` before using it;
-    (c) the purchase does **not** resolve exposing the raw `.zip` packs through
-    the public repo or release — do not add the downloaded packs themselves to
-    the tree; assets used by the product are chosen files/slices with their
-    provenance recorded;
+    (c) paid art is **not redistributed**: do not add the raw `.zip` packs, the
+    extracted parts, or derived atlases to the public tree. The repo ships the
+    theme **recipe** (tokens + part indices) and the builder; each person builds
+    locally from their own purchase. Evidence: the upstream macOS fork's README
+    ("Never redistribute. Every user must buy their own copy") and LimeZu's
+    licence ("you can't resell or distribute the asset"). In-game use is allowed;
     (d) if a specific asset still cannot be shipped, stop with
     `BLOCKED — LICENSE REVIEW REQUIRED` and name the asset; never silently strip
     or substitute it.

@@ -1051,3 +1051,20 @@ Any redistributed Serene Village material requires attribution, a link to the
 licence, and an indication of changes.
 
 Local divergence: none yet — no pack file has been added to the tree.
+
+
+### How Qubit uses the LimeZu art (redistribution posture)
+
+Qubit does **not** commit the purchased `.zip` packs, the extracted part sheets, or
+the generated portrait/body atlases. The repository ships a **theme recipe**
+(`theme.recipe.json`: colour tokens, per-agent part indices, template version,
+credit/licence) plus the builder that materialises a local pack from the owner's
+purchase. Sharing a theme shares the recipe; each person builds against their own
+copy. This follows the upstream generator fork's explicit rule ("Never
+redistribute. Every user must buy their own copy") and LimeZu's licence
+("you can't resell or distribute the asset to others"). In-game use is allowed.
+
+The two generator applications are **tools only and are not shipped**:
+Character Generator 2.0 (Gray Matter Studios / Legendaryswordsman2, GPLv3
+upstream) and Portrait Generator 1.5.0 (Gray Matter Studios; no licence file in
+the archive). Neither is modified or redistributed.
