@@ -66,7 +66,7 @@ def keychain_get(service: str, account: str) -> str | None:
     try:
         proc = subprocess.run(
             ["security", "find-generic-password", "-s", service, "-a", account, "-w"],
-            capture_output=True, text=True, timeout=15,
+            capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL,
         )
     except Exception:  # noqa: BLE001
         return None
@@ -259,7 +259,7 @@ class OwnedChrome:
         with open(self.log_path, "wb") as log:  # the child keeps its own descriptor
             self.process = subprocess.Popen(
                 [self.chrome_path, *chrome_args(self.port, self.profile_dir, self.url)],
-                stdout=log, stderr=subprocess.STDOUT,
+                stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
             )
         websocket = wait_for_cdp(self.port, timeout=self.startup_timeout)
         if not websocket:

@@ -120,7 +120,8 @@ def tail(text: str, lines: int = TAIL_LINES, chars: int = TAIL_CHARS) -> str:
 
 def _git(repo: Path, *args: str) -> str:
     try:
-        done = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, timeout=60)
+        done = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, timeout=60,
+                              stdin=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
         return ""
     return done.stdout if done.returncode == 0 else ""
@@ -142,7 +143,8 @@ def run_check(command: str, repo: Path, timeout: float = CHECK_TIMEOUT) -> Dict[
     """Run one check the caller named (a test runner, compiler, type checker or linter)."""
     started = time.monotonic()
     try:
-        done = subprocess.run(command, shell=True, cwd=repo, capture_output=True, text=True, timeout=timeout)
+        done = subprocess.run(command, shell=True, cwd=repo, capture_output=True, text=True,
+                              timeout=timeout, stdin=subprocess.DEVNULL)
         code, output = done.returncode, (done.stdout or "") + (done.stderr or "")
     except subprocess.TimeoutExpired as error:
         code = 124

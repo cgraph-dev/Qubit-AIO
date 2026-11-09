@@ -89,7 +89,8 @@ def hermes_apply(card_id: str, target: Mapping[str, str]) -> bool:
             "sys.exit(0 if a and b else 1)\n")
     try:
         done = subprocess.run([str(python), "-c", code, card_id, target["model"], target.get("provider", ""),
-                               target["effort"]], cwd=agent, capture_output=True, text=True, timeout=60)
+                               target["effort"]], cwd=agent, capture_output=True, text=True, timeout=60,
+                              stdin=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
         return False
     return done.returncode == 0

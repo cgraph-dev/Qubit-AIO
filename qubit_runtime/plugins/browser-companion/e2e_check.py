@@ -98,6 +98,7 @@ def render_envelopes() -> tuple[str, str, str]:
         text=True,
         timeout=120,
         check=False,
+        stdin=subprocess.DEVNULL,
     )
     if result.returncode != 0:
         raise SystemExit(f"node render failed:\n{result.stdout}\n{result.stderr}")

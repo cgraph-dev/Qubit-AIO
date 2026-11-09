@@ -12,7 +12,8 @@ import time
 SHA=re.compile(r'^[0-9a-f]{40}$')
 
 def _git(repo, *args):
-    return subprocess.check_output(['git','-C',str(repo),*args],stderr=subprocess.PIPE,timeout=30)
+    return subprocess.check_output(['git','-C',str(repo),*args],stderr=subprocess.PIPE,timeout=30,
+                                   stdin=subprocess.DEVNULL)
 
 def _installed_path(home, name):
     if name.startswith('jevkit/'):

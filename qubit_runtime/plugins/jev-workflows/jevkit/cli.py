@@ -635,7 +635,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         token = os.environ.get("DASHBOARD_TOKEN") or secrets.token_urlsafe(24)
         os.environ["DASHBOARD_TOKEN"] = token
         print(f"open once with the token: http://{args.host}:{args.port}/?token={token}", file=sys.stderr)
-    return subprocess.call(command)
+    return subprocess.call(command, stdin=subprocess.DEVNULL)
 
 
 def cmd_ask(args: argparse.Namespace) -> int:

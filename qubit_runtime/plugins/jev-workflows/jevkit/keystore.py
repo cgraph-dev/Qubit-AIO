@@ -77,7 +77,8 @@ def _from_keychain(provider: str = "typesafe") -> Optional[str]:
     else:
         return None
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8, check=False)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8, check=False,
+                              stdin=subprocess.DEVNULL)
     except Exception:  # noqa: BLE001 - a broken secret store must never crash a caller
         return None
     value = proc.stdout.strip()

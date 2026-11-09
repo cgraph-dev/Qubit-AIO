@@ -196,7 +196,8 @@ def _append(row: Dict[str, Any]) -> None:
 def available_gb() -> Optional[float]:
     """Free + inactive + purgeable memory on macOS (``vm_stat``); None when it cannot be read."""
     try:
-        out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=2).stdout
+        out = subprocess.run(["vm_stat"], capture_output=True, text=True, timeout=2,
+                             stdin=subprocess.DEVNULL).stdout
     except (OSError, subprocess.SubprocessError):
         return None
     page = re.search(r"page size of (\d+) bytes", out)

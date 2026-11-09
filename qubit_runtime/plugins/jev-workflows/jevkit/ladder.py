@@ -120,7 +120,8 @@ def clear(name: Optional[str] = None) -> None:
 
 def _run_probe(command: str, timeout: float = PROBE_TIMEOUT) -> bool:
     try:
-        done = subprocess.run(command, shell=True, capture_output=True, timeout=timeout, check=False)
+        done = subprocess.run(command, shell=True, capture_output=True, timeout=timeout, check=False,
+                              stdin=subprocess.DEVNULL)
         return done.returncode == 0
     except Exception:  # noqa: BLE001 - a probe that cannot run is a rung that cannot be trusted
         return False

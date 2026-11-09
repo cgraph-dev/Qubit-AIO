@@ -86,14 +86,17 @@ class SearchBrowser:
             (app / 'Contents/Info.plist').write_bytes(plistlib.dumps({
                 'CFBundleIdentifier': self.bundle, 'CFBundleName': 'Automation Lab',
                 'CFBundleExecutable': 'Search', 'CFBundlePackageType': 'APPL', 'LSUIElement': True}))
-            subprocess.run(['codesign', '--force', '--sign', '-', str(app)], check=True, capture_output=True, timeout=20)
+            subprocess.run(['codesign', '--force', '--sign', '-', str(app)], check=True, capture_output=True,
+                           timeout=20, stdin=subprocess.DEVNULL)
             for key in ('bench', 'welcomed'):
-                subprocess.run(['defaults', 'write', self.suite, key, '-bool', 'true'], check=True, capture_output=True, timeout=5)
+                subprocess.run(['defaults', 'write', self.suite, key, '-bool', 'true'], check=True,
+                               capture_output=True, timeout=5, stdin=subprocess.DEVNULL)
             tmp = self.runtime / 'tmp'
             tmp.mkdir(mode=0o700)
             env = dict(os.environ, SEARCH_PROBE=self.world, TMPDIR=str(tmp))
             env.pop('SEARCH_MEASURE', None)
-            self.process = subprocess.Popen([str(exe)], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            self.process = subprocess.Popen([str(exe)], env=env, stdout=subprocess.DEVNULL,
+                                            stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
             end = time.monotonic() + 20
             while not self.sock.exists():
                 if self.process.poll() is not None or time.monotonic() > end:
@@ -321,7 +324,8 @@ class SearchBrowser:
             elif path.exists():
                 shutil.rmtree(path)
         if self.started:
-            subprocess.run(['defaults', 'delete', self.suite], capture_output=True, timeout=5)
+            subprocess.run(['defaults', 'delete', self.suite], capture_output=True, timeout=5,
+                           stdin=subprocess.DEVNULL)
         self.tabs.clear()
         self.tickets.clear()
         self.cleanup_receipt = {'pid_exited': self.process is None or self.process.poll() is not None,
