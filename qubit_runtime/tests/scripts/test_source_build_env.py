@@ -8,6 +8,8 @@ import sys
 
 import pytest
 
+from tests.scripts._powershell import find_powershell
+
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "tests/install/e2e-assets"
@@ -171,10 +173,10 @@ def test_posix_build_children_stamp_old_and_new_without_changing_parent(tmp_path
 @pytest.mark.platforms("windows", "posix")
 def test_powershell_build_children_stamp_old_and_new_without_changing_parent(tmp_path):
     path = os.pathsep.join(p for p in os.get_exec_path() if ".hermes" not in Path(p).parts)
-    # Windows PowerShell 5.1 is what install-e2e-windows-run.yml drives windows-e2e.ps1 (the
-    # asset's real consumer) with; pwsh is the only PowerShell a POSIX host offers.
-    order = ("powershell", "pwsh") if os.name == "nt" else ("pwsh", "powershell")
-    shell = next((found for name in order if (found := shutil.which(name, path=path))), None)
+    # The harness below runs with HOME=tmp_path, so probe with that exact env: a
+    # version-manager shim (mise) resolves on PATH and then dies because it reads its own
+    # config from $HOME. That is a host setup gap, not a defect in the rules under test.
+    shell = find_powershell(dict(os.environ, HOME=str(tmp_path), PATH=path))
     if not shell:
         if os.name == "nt":
             pytest.fail("native Windows acceptance requires PowerShell")

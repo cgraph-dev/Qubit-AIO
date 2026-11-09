@@ -72,12 +72,31 @@ def test_installer_marker_is_the_only_dirty_state_a_driver_accepts(tmp_path):
     assert refused.returncode != 0 and "M tracked" in refused.stderr
 
 
+def _runs(pwsh: str, env: dict[str, str] | None = None) -> bool:
+    """Whether *pwsh* can actually start with *env*, not merely resolve on PATH."""
+    try:
+        probe = subprocess.run(
+            [pwsh, "-NoProfile", "-NonInteractive", "-Command", "exit 0"],
+            capture_output=True, text=True, timeout=20, env=env,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return probe.returncode == 0
+
+
 @pytest.mark.platforms("windows", "posix")
 def test_powershell_selects_exact_exe_or_cmd_and_legacy_fallback(tmp_path):
     # These are file-selection rules, not Windows execution emulation. Run
     # them in real PowerShell on any host that supplies it (native CI included).
     path = os.pathsep.join(p for p in os.get_exec_path() if ".hermes" not in Path(p).parts)
     pwsh = shutil.which("pwsh", path=path) or shutil.which("powershell", path=path)
+    # Probe with the SAME environment the selection harness will get below (HOME is a
+    # tmp_path there). A version-manager shim can resolve on PATH and still die under that
+    # HOME — `mise` reads $HOME/.config/mise/config.toml — which is a host setup gap, not a
+    # defect in the rules under test.
+    probe_env = dict(os.environ, HOME=str(tmp_path))
+    if pwsh and not _runs(pwsh, probe_env):
+        pwsh = None
     if not pwsh:
         if os.name == "nt":
             pytest.fail("native Windows acceptance requires PowerShell")

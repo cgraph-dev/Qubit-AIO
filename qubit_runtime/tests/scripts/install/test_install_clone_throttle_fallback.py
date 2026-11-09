@@ -9,7 +9,11 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent.parent.parent
-POWERSHELL = shutil.which("pwsh") or shutil.which("powershell")
+# Resolved by probing, not by which(): this file runs the interpreter with HOME=tmp_path,
+# where an unpinned mise shim dies ("No version is set for shim: pwsh").
+from tests.scripts._powershell import find_powershell  # noqa: E402
+
+POWERSHELL = find_powershell(dict(os.environ, HOME=os.environ.get("TMPDIR", "/tmp")))
 
 def _run_repository_stage(installer: str, tmp_path: Path, install: Path, origin_url: str) -> subprocess.CompletedProcess:
     env = dict(os.environ, HOME=tmp_path.as_posix(), QUBIT_HOME=(tmp_path / "home").as_posix(),
