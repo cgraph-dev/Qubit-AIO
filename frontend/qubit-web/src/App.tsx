@@ -259,6 +259,29 @@ function UnknownRouteFallback({ pluginsLoading }: { pluginsLoading: boolean }) {
   return <Navigate to="/sessions" replace />;
 }
 
+/**
+ * Hands the browser off to a page the PYTHON server owns, at the same path.
+ *
+ * `/qubit-workbench` is not a React page: `webui.py:_serve_workbench_ui` serves
+ * a whole HTML document there (the ported upstream workbench — its own
+ * HTML/CSS/JS, 223 KB) and redirects to `/qubit-workbench/session/<id>`. React
+ * Router claims the path on the first client-side click, finds no matching
+ * Route, and the `*` catch-all bounces the user to `/sessions` — measured live:
+ * clicking the sidebar row from `/chat` (and from the workbench itself) landed
+ * on `/sessions`, so the surface was unreachable by clicking anywhere.
+ *
+ * `window.location.replace` re-requests the path from the server, which is the
+ * only way to reach a non-SPA document. Through the router it would be a
+ * pushState that renders this component again in an endless loop, so a real
+ * document navigation is the correct tool here, not a workaround.
+ */
+function ServerDocumentHandoff({ path }: { path: string }) {
+  useEffect(() => {
+    window.location.replace(path);
+  }, [path]);
+  return null;
+}
+
 const CHAT_NAV_ITEM: NavItem = {
   path: "/chat",
   labelKey: "chat",
@@ -363,6 +386,9 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/qubit-office": () => <PluginPage name="qubit-office" />,
   "/qubit-office2": () => <PluginPage name="qubit-office2" />,
   "/qubit-office3": () => <PluginPage name="qubit-office3" />,
+  // The workbench is a SERVER-served document (webui.py:_serve_workbench_ui),
+  // not a plugin bundle or a React page — see ServerDocumentHandoff.
+  "/qubit-workbench": () => <ServerDocumentHandoff path="/qubit-workbench" />,
 };
 
 // Route placeholder for /chat.  The persistent ChatPage host (rendered
