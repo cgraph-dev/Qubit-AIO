@@ -56,6 +56,7 @@
 | 20 | **Design-token systems fail when base tokens are reused everywhere instead of semantic/component aliases; hover/disabled states must be explicit tokens** (HN/SO design-system postmortems) | `https://news.ycombinator.com/item?id=26291215`, `https://stackoverflow.blog/2020/03/31/building-dark-mode-on-stack-overflow/` | Tokens are semantic; `--ui-bg-hover` and muted/disabled pairs are explicit and contrast-checked; no runtime color math (`darken()` does not work on CSS vars). |
 | 21 | **Pixel fonts do not scale; non-integer browser zoom distorts pixel art** (r/gamedev, r/aigamedev) | `https://www.reddit.com/r/gamedev/comments/dxe5mz/`, `https://www.reddit.com/r/aigamedev/comments/1qbm96r/` | Portrait atlas is native 32 px at 32 CSS px; goldens at DPR 1/2; document that fractional browser zoom is out of our control. |
 | 22 | **A third-party tool must not become integral to theming** (Figma/Themer postmortem) | `https://blog.bakarema.com/2022/10/05/my-five-biggest-design-system-mistakes-by-steve-dennis-sep-2022-2/` | No design tool/service at runtime; Pillow is a build-time library; tokens are plain JSON in the repo. |
+| 23 | **The two purchased generators share one part set** (verified: 9 skins, 7 eyes, 200 hairstyles, 84–85 accessories in both), so the same part indices produce a matching body and portrait | local inspection of the two archives, 2026-11-09 | The pack stores one `agents.json` recipe per slug (skin/eyes/hair/outfit/accessory); the builder renders **both** a portrait and a body from it. |
 
 ---
 
@@ -103,22 +104,32 @@
     "index": "portraits/index.json",
     "size": 32, "cols": 20, "rows": 15
   },
+  "bodies": {
+    "atlas": "bodies/atlas32.png",
+    "index": "bodies/index.json",
+    "size": 32, "frame": { "w": 32, "h": 64 },
+    "cols": 20, "rows": 15
+  },
   "slices": {},
   "files": {
     "portraits/atlas32.png": { "sha256": "<64 hex>", "bytes": 48123 },
-    "portraits/index.json":  { "sha256": "<64 hex>", "bytes": 9123 }
+    "portraits/index.json":  { "sha256": "<64 hex>", "bytes": 9123 },
+    "bodies/atlas32.png":    { "sha256": "<64 hex>", "bytes": 96000 },
+    "bodies/index.json":     { "sha256": "<64 hex>", "bytes": 9123 },
+    "agents.json":           { "sha256": "<64 hex>", "bytes": 21000 }
   },
-  "limits": { "max_total_bytes": 25000000, "max_files": 16 }
+  "limits": { "max_total_bytes": 25000000, "max_files": 20 }
 }
 ```
 
 `index.json`: `{"schema":1,"size":32,"cols":20,"cells":{"ceo":[0,0],"lead-quality":[1,0]}}`.
+`agents.json`: `{"schema":1,"recipes":{"ceo":{"skin":2,"eyes":1,"hair":1,"outfit":1,"accessory":1}}}` — the **same indices** drive the portrait and the body.
 
 Validation:
 - exact format/schema; id `^[a-z0-9][a-z0-9-]{0,39}$`; non-empty credit/license; `source` is a description, not a path (no `/home/`, `~/`, drive/UNC).
 - files: relative, `[A-Za-z0-9._/-]`, no `.`/`..`, no Windows reserved basename, allowlisted suffix, no symlink, exists, `bytes`/`sha256` match; case-insensitive duplicates refused; totals within limits.
 - tokens: key `^[a-z][a-z0-9-]{1,40}$`; **typed values only** — colors `^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$`, lengths `^(0|[1-9][0-9]{0,3})(px|rem|em)$`; reject `url(`, `image-set(`, `src(`, `var(`, `attr(`, `@`, `\`, `;`, `}` anywhere.
-- portraits: atlas/index declared; size ∈ {16,32,48}; index schema matches; every slug cell inside `cols×rows`; atlas pixel size == `cols×rows×size`; the index may not contain local paths or scripts.
+- portraits/bodies: atlas/index declared; size ∈ {16,32,48}; frame `{w,h}` positive; every slug cell inside `cols×rows`; atlas pixel size == `cols×rows×size` (bodies: `cols×frame_w` by `rows×frame_h`); indices may not contain local paths or scripts; `agents.json` recipes only reference indices that exist in the part sets.
 - slices (optional): 4 positive ints, `width` px, `repeat ∈ stretch|round|repeat`, `src` declared.
 - contrast: `color-text-primary` vs `color-surface` ≥ 4.5; `color-text-muted` vs `color-surface` ≥ 3.0; `color-text-primary` vs `color-surface-raised` ≥ 4.5; `color-text-muted` vs `color-surface-hover` ≥ 3.0 (disabled reads at 3.0). Status/level colours (`--st-*`, `--lv-*`) must reach 3.0 against `color-surface`.
 
@@ -138,8 +149,9 @@ Not themed: `--side-w`, `--drawer-w`, `--top-h`, `--gap`, `--free-*`, `--font-*`
 | `voicebridge/office/agent_panel.py` | Optional `portrait` field (atlas cell) via injected resolver |
 | `voicebridge/webui.py` | `_serve_app_html`: inject the generated office theme `<style>`; read authority for `/api/office/theme` |
 | `voicebridge/qubit_compat.py` | `GET /api/office/theme` (+ `?theme=`), panel call |
-| `scripts/office_theme_build.py` | Atlas + index + manifest + QA (deterministic) |
-| `scripts/office_theme_extract.py` | Read owner packs in memory → portrait layers (32/48) + contact sheet + `--check` |
+| `scripts/office_theme_build.py` | Portraits + bodies + `agents.json` + indexes + manifest + QA (deterministic) |
+| `scripts/office_theme_extract.py` | Read the Portrait + Character Generator archives in memory → portrait/body layers, part lists, labelled calibration grids + `--check` |
+| `scripts/office_agent_calibrate.py` | Emit labelled frame grids for the body sheets and validate `agent_sheets.json` (front idle frame, layer order) |
 | `scripts/office_theme_audit.py` | Drift report: `.ui-root` variables in the vendored CSS vs `ALLOWED_THEME_VARS` (warning, exit 0) |
 | `frontend/qubit-web/public/plugins/qubit-office/themes/limezu/…` | Generated, committed pack |
 | `frontend/qubit-app/plugins/qubit-office/game/app/office-theme.ts` | Fetch theme, host tokens/classes, portrait readiness |
@@ -192,13 +204,13 @@ def test_token_css_only_allowlisted_vars():
 
 ---
 
-### Task 2: Atlas builder (deterministic, QA-gated)
+### Task 2: Portrait + body atlas builder (deterministic, QA-gated)
 
 **Files:** create `scripts/office_theme_build.py`; test `tests/test_office_theme_build.py`.
 
-- [ ] **Step 1: failing tests** — same slug ⇒ same decoded pixels; different slug ⇒ different; atlas dimensions = `cols×rows×size`; index has every slug in bounds; QA rejects blank/overfull tiles; empty license/credit refuses; manifest has sha+bytes for every file.
+- [ ] **Step 1: failing tests** — same slug ⇒ same decoded pixels; different slug ⇒ different; portrait atlas = `cols×rows×size`; body atlas = `cols×frame_w` by `rows×frame_h`; both indexes have every slug in bounds; **the recipe indices are identical for the portrait and the body of one slug**; QA rejects blank/overfull tiles; empty license/credit refuses; manifest has sha+bytes for every file.
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement** deterministic recipes, compose at 48, downscale `Image.NEAREST` to 32 for the atlas, QA each tile (alpha 2–98 %, non-empty bounds), pack into one RGBA PNG, write `index.json`, manifest sorted by key.
+- [ ] **Step 3: implement** deterministic recipes (`skin/eyes/hair/outfit/accessory`), compose the portrait (Skins→Eyes→Hairstyles→Accessories, 64 px cells at the 32 tier → `NEAREST` to 32) and the body (`Bodies→Outfits→Eyes→Hairstyles→Accessories`, 32×64 frame), QA each tile (alpha 2–98 %, non-empty bounds, feet inside the frame), pack both atlases, write `agents.json` + both indexes, manifest sorted by key.
 - [ ] **Step 4: run tests.**
 - [ ] **Step 5: commit**.
 
@@ -210,7 +222,7 @@ def test_token_css_only_allowlisted_vars():
 
 - [ ] **Step 1: failing tests** — in-memory read of `modernuserinterface-win.zip` yields non-empty skin/eyes/hair/accessory layers; missing zip → typed error; `--check` returns differences when a committed tile changes.
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement** in-memory zip reads, 48 px folder mapping, optional contact sheet for future slices, `--check` comparing **decoded pixels** (atlas + individual tiles) and sorted JSON (raw PNG bytes may differ across Pillow/zlib; the manifest sha pins committed bytes).
+- [ ] **Step 3: implement** in-memory zip reads for **both** generators (`Character Pieces/{Bodies,Outfits,Eyes,Hairstyles,Accessories}/{16,32,48}` and `Portrait Pieces/Portrait_Generator - {16,32,48}/{Skins,Eyes,Hairstyles,Accessories}`), the 2×-cell portrait convention (64 px cell at the 32 tier), the 32×64 body frame, and `--calibrate` which writes a labelled frame grid per body sheet. Record the chosen **front-idle frame** and the layer order in `agent_sheets.json` (human-reviewed once), then `--check` compares decoded pixels + sorted JSON.
 - [ ] **Step 4: build the real pack**, then `--check`.
 - [ ] **Step 5: commit**.
 
@@ -234,7 +246,7 @@ def test_token_css_only_allowlisted_vars():
 
 - [ ] **Step 1: failing tests** — a seat’s cell renders a 32×32 sprite span with `role="img"` + `aria-label="<name> portrait"`; the emoji stays in the DOM as the visible fallback until the sheet is ready and is `aria-hidden="true"` only once the sheet is confirmed; a broken sheet keeps emojis visible and announced; no per-seat `<img>` requests; keyboard/AT focus order unchanged.
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement** — preload `atlas` once, add `office-portraits-ready` to the panel root on success, position via `background-position: calc(-1 * var(--cell-x) * 32px) calc(-1 * var(--cell-y) * 32px)`, `image-rendering: pixelated`, fixed 32×32 box (no layout shift).
+- [ ] **Step 3: implement** — preload both atlases once, add `office-portraits-ready` on success, position via `background-position: calc(-1 * var(--cell-x) * 32px) calc(-1 * var(--cell-y) * 32px)`, `image-rendering: pixelated`, fixed 32×32 box (no layout shift). The **body atlas** feeds a small character card on row hover/focus (`--body-x`/`--body-y`, 32×64 native, shown at 32×64) so both generators are used; the card is keyboard-reachable and `aria-hidden` unless focused.
 - [ ] **Step 4: run** office-app Vitest.
 - [ ] **Step 5: commit**.
 
@@ -309,7 +321,7 @@ def test_token_css_only_allowlisted_vars():
 **Files:** `docs/OFFICE-UI-THEMES.md`, `LICENSE-ASSETS`, `docs/ATTRIBUTION-OFFICE.md`, `THIRD_PARTY_NOTICES.md`, `docs/STATUS.md`.
 
 - [ ] **Step 1: `LICENSE-ASSETS`** — MIT code vs LimeZu art; credit link; no resale/redistribution; no NFT; **LimeZu is CC-BY, not CC-BY-SA — no source-sharing obligation**; credit placement (“Credits menu or end of game”); the free pack is non-commercial and not used; CC-BY TASL + changes for Serene Village; a note that the art is sliced/positioned by the build (not used to train or generate art).
-- [ ] **Step 2: `docs/OFFICE-UI-THEMES.md`** — contract, install paths, CLI, pack creation (extractor/build/contact sheet), sharing, allowlisted variables, upgrade playbook.
+- [ ] **Step 2: `docs/OFFICE-UI-THEMES.md`** — contract, install paths, CLI, pack creation (extractor/build/calibration/contact sheet), sharing, allowlisted variables, upgrade playbook. Document that **Character Generator 2.0** (art: LimeZu “official character generator” included with the complete pack; tool not shipped) and **Portrait Generator 1.5.0** (Gray Matter Studios app; art: LimeZu) are used as *art sources only*, the part indices are shared, and the tools themselves are never redistributed.
 - [ ] **Step 3: `docs/ATTRIBUTION-OFFICE.md`** — TASL, changes, exact files. Add a **persistent Credits/About** entry (office footer or Settings) so the credit does not depend on a theme being active.
 - [ ] **Step 4: notices + STATUS** with the two new packs and this session’s evidence.
 - [ ] **Step 5: commit**.
