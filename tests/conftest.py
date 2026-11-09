@@ -232,3 +232,40 @@ def _isolate_install_state(tmp_path, monkeypatch):
     install_state.probe.cache_clear()
     yield
     install_state.probe.cache_clear()
+
+
+@pytest.fixture(autouse=True)
+def _close_cached_session_dbs():
+    """Evict every ``SessionDB`` the chat store cached for THIS test.
+
+    ``chat_transport.store(cfg)`` -> ``QubitSessionStore`` -> ``_db_for`` keeps one
+    ``SessionDB`` per database path in the process-global ``qubit_session_store._DBS``
+    map, and constructs one on a miss. Nothing in the store closes it (it is a
+    process-wide shared writer by design, matching production where the process
+    exits), so under the test runner every file that merely *calls* ``CT.store``
+    leaked a live writer connection plus its pooled read connections.
+
+    That leak is what the ``unclosed database`` ResourceWarnings were: the suite runs
+    with ``filterwarnings = error``, so the warnings failed the otherwise-green
+    files at teardown. ``close_cached_db`` is the store's documented eviction seam
+    (it closes the writer and releases the state-db writer claim).
+
+    Snapshotting before and evicting only NEW paths is deliberate: an entry another
+    module cached for a longer-lived home (or a test that asserts on the cache) is
+    left alone, and eviction is idempotent for paths already gone.
+    """
+    try:
+        from voicebridge import qubit_session_store as _qss
+    except Exception:  # pragma: no cover - vendored tree absent
+        yield
+        return
+    with _qss._DBS_LOCK:
+        before = set(_qss._DBS)
+    yield
+    with _qss._DBS_LOCK:
+        new_paths = [p for p in _qss._DBS if p not in before]
+    for path in new_paths:
+        try:
+            _qss.close_cached_db(path)
+        except Exception:  # pragma: no cover - teardown must never fail a test
+            pass
