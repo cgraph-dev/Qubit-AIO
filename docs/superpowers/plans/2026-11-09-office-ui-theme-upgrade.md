@@ -51,6 +51,11 @@
 | 15 | **An allowlist of third-party variables can drift** (Netflix rejected an allowlist for that reason) | `https://github.com/Netflix/metaflow-ui/pull/204` | Deliberate, versioned allowlist + a **drift report** that lists `.ui-root` variables in the vendored CSS not yet themed; it warns, never fails the build. |
 | 16 | **Local paths must not ship** (repo clean-tree rule; a committed `theme.json` could carry `/home/<user>/…`) | repo `AGENTS.md` clean-tree/provenance rules | `source` is a sanitised description, never a filesystem path; a guard scans committed theme JSON for `/home/`, `~/`, `C:\Users`, `\\`. |
 | 17 | **`?theme=` must reach the framed document too**, or host and iframe disagree | local design review | The override is propagated on the iframe URL and read by `_serve_app_html`; both sides use the same validated payload. |
+| 18 | **Embeddable-widget threads converge on “let the host pass style options as JSON”, not raw CSS** (r/webdev) | `https://www.reddit.com/r/webdev/comments/qi4ltd/iframe_accessing_parent_windows_css_resources/` | Packs carry **tokens**; Qubit maps them to its own variable names. A pack never names Habblaud internals, so upstream renames don’t leak into packs. |
+| 19 | **LimeZu is CC-BY (not CC-BY-SA); no source-sharing obligation; credit must be *somewhere persistent* (credits menu / end of game), not a tooltip** (artist comments) | `https://itch.io/post/2185336`, `https://limezu.itch.io/moderninteriors/comments`, `https://github.com/chaitanyagiri/munder-difflin/blob/main/src/renderer/src/assets/ATTRIBUTION.md` | A persistent **Credits/About** surface (office footer or Settings) always names LimeZu; the theme-active banner is additional, never the only credit. |
+| 20 | **Design-token systems fail when base tokens are reused everywhere instead of semantic/component aliases; hover/disabled states must be explicit tokens** (HN/SO design-system postmortems) | `https://news.ycombinator.com/item?id=26291215`, `https://stackoverflow.blog/2020/03/31/building-dark-mode-on-stack-overflow/` | Tokens are semantic; `--ui-bg-hover` and muted/disabled pairs are explicit and contrast-checked; no runtime color math (`darken()` does not work on CSS vars). |
+| 21 | **Pixel fonts do not scale; non-integer browser zoom distorts pixel art** (r/gamedev, r/aigamedev) | `https://www.reddit.com/r/gamedev/comments/dxe5mz/`, `https://www.reddit.com/r/aigamedev/comments/1qbm96r/` | Portrait atlas is native 32 px at 32 CSS px; goldens at DPR 1/2; document that fractional browser zoom is out of our control. |
+| 22 | **A third-party tool must not become integral to theming** (Figma/Themer postmortem) | `https://blog.bakarema.com/2022/10/05/my-five-biggest-design-system-mistakes-by-steve-dennis-sep-2022-2/` | No design tool/service at runtime; Pillow is a build-time library; tokens are plain JSON in the repo. |
 
 ---
 
@@ -59,12 +64,13 @@
 - **`classic` default.** `office.theme` unset ⇒ today’s look. `QUBIT_OFFICE_THEME` = process override; `?theme=` = one-page read-only override.
 - **Habblaud read-only.** `python3 scripts/vendor_habblaud.py --check` must stay green; no file under `habblaud/` changes.
 - **Packs are data.** `.png`, `.jpg`, `.jpeg`, `.webp`, `.json`, `.txt` only; no CSS/JS/HTML/symlinks/remote URLs.
-- **Credits required.** Pack carries `credit` + `license`; the office surfaces the credit when a theme is active.
+- **Credits required.** Pack carries `credit` + `license`; a **persistent Credits/About surface** (office footer or Settings) always names LimeZu, and the active-theme line is additional — never the only credit. Serene Village (CC-BY 4.0) additionally carries TASL + changes.
 - **No raw archives in the tree.** Derived files only, each sha256 + byte length.
 - **Owner decision O1/C4:** no celebrity/meme sprite families.
 - **No new polling/remounts.** Docks keep stable identity (`c5bd8a69b`).
 - **No operator paths in shipped files.** Theme manifests use a sanitised `source` description; `/home/…`, `~/`, `C:\Users\…` and UNC paths are refused and scanned for.
 - **Archive installs are hostile input.** NFC/case-insensitive duplicate checks, no symlinks/encrypted entries/unsupported compression, depth/size/ratio caps, atomic publish.
+- **Pixel zoom caveat:** native 32 px at 32 CSS px with `image-rendering: pixelated`; goldens at DPR 1 and 2. Fractional browser zoom is a known browser limitation and is documented, not “fixed” with non-integer scaling.
 - **No source-shape tests.** Behaviour and artifacts only.
 - **No service restart during implementation;** focused tests; `VERIFIED` not claimed.
 
@@ -85,6 +91,7 @@
   "tokens": {
     "color-surface": "#0d0d1a",
     "color-surface-raised": "#161a23",
+    "color-surface-hover": "#1d2230",
     "color-text-primary": "#e9edf7",
     "color-text-muted": "#8a93a8",
     "color-border": "#334155",
@@ -113,7 +120,9 @@ Validation:
 - tokens: key `^[a-z][a-z0-9-]{1,40}$`; **typed values only** — colors `^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$`, lengths `^(0|[1-9][0-9]{0,3})(px|rem|em)$`; reject `url(`, `image-set(`, `src(`, `var(`, `attr(`, `@`, `\`, `;`, `}` anywhere.
 - portraits: atlas/index declared; size ∈ {16,32,48}; index schema matches; every slug cell inside `cols×rows`; atlas pixel size == `cols×rows×size`; the index may not contain local paths or scripts.
 - slices (optional): 4 positive ints, `width` px, `repeat ∈ stretch|round|repeat`, `src` declared.
-- contrast: `color-text-primary` vs `color-surface` ≥ 4.5; `color-text-muted` vs `color-surface` ≥ 3.0.
+- contrast: `color-text-primary` vs `color-surface` ≥ 4.5; `color-text-muted` vs `color-surface` ≥ 3.0; `color-text-primary` vs `color-surface-raised` ≥ 4.5; `color-text-muted` vs `color-surface-hover` ≥ 3.0 (disabled reads at 3.0). Status/level colours (`--st-*`, `--lv-*`) must reach 3.0 against `color-surface`.
+
+Token names are **semantic** (`color-surface`, `color-text-primary`); the pack never names a Habblaud variable. Qubit owns the mapping table below, so an upstream variable rename is a one-line change here, not a pack migration.
 
 **Allowlisted Habblaud variables** (the only ones a theme may set):
 `--ui-bg`, `--ui-bg-soft`, `--ui-bg-solid`, `--ui-bg-hover`, `--ui-line`, `--ui-line-strong`, `--ui-text`, `--ui-muted`, `--ui-faint`, `--ui-accent`, `--ui-accent-soft`, `--radius`, `--radius-sm`, `--st-working`, `--st-waiting`, `--st-done`, `--st-idle`, `--st-offline`, `--st-shell`, `--lv-ok`, `--lv-warn`, `--lv-crit`.
@@ -289,7 +298,7 @@ def test_token_css_only_allowlisted_vars():
   - **contrast matrix** passes for text, muted, accent, border, status and level colours against the two surfaces (4.5 text / 3.0 non-text), and disabled states are ≥ 3.0;
   - **allowlist drift report:** `python3 scripts/office_theme_audit.py` lists `.ui-root` variables in the vendored CSS that are not in `ALLOWED_THEME_VARS` (warning only; no build failure).
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement the visual probe.** `QUBIT_OFFICE_VISUAL=1`; loopback `WebUI`; stub tower/stream/panel; Playwright at DPR 1 and 2; animations off, caret hidden, clock fixed; element screenshots of the Agents panel and the menu group; baselines committed and updated only after review.
+- [ ] **Step 3: implement the visual probe.** `QUBIT_OFFICE_VISUAL=1`; loopback `WebUI`; stub tower/stream/panel; Playwright at DPR 1 and 2; animations off, caret hidden, clock fixed; element screenshots of the Agents panel, the menu group, and one **keyboard-focus** state (focus ring visible and contrast-checked); baselines committed and updated only after review.
 - [ ] **Step 4: run guards + probe + `vendor_habblaud.py --check`.**
 - [ ] **Step 5: commit**.
 
@@ -299,9 +308,9 @@ def test_token_css_only_allowlisted_vars():
 
 **Files:** `docs/OFFICE-UI-THEMES.md`, `LICENSE-ASSETS`, `docs/ATTRIBUTION-OFFICE.md`, `THIRD_PARTY_NOTICES.md`, `docs/STATUS.md`.
 
-- [ ] **Step 1: `LICENSE-ASSETS`** — MIT code vs LimeZu art; credit link; no resale/redistribution; no NFT; CC-BY TASL + changes for Serene Village.
+- [ ] **Step 1: `LICENSE-ASSETS`** — MIT code vs LimeZu art; credit link; no resale/redistribution; no NFT; **LimeZu is CC-BY, not CC-BY-SA — no source-sharing obligation**; credit placement (“Credits menu or end of game”); the free pack is non-commercial and not used; CC-BY TASL + changes for Serene Village; a note that the art is sliced/positioned by the build (not used to train or generate art).
 - [ ] **Step 2: `docs/OFFICE-UI-THEMES.md`** — contract, install paths, CLI, pack creation (extractor/build/contact sheet), sharing, allowlisted variables, upgrade playbook.
-- [ ] **Step 3: `docs/ATTRIBUTION-OFFICE.md`** — TASL, changes, exact files.
+- [ ] **Step 3: `docs/ATTRIBUTION-OFFICE.md`** — TASL, changes, exact files. Add a **persistent Credits/About** entry (office footer or Settings) so the credit does not depend on a theme being active.
 - [ ] **Step 4: notices + STATUS** with the two new packs and this session’s evidence.
 - [ ] **Step 5: commit**.
 
