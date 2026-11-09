@@ -4,19 +4,29 @@ Every row carries owner/rollback/tests/manual steps; every claimed CLI
 path parses, every claimed voice id exists in the registry (hence the
 dashboard Tier-1 catalog), and every cited test file exists. The MD
 companion lists every row id.
+
+The matrix itself was purged with the rest of the archive markdown
+(eafb54e26) and must not be re-authored, so it is read READ-ONLY from
+pre-purge history via ``_purged_ledger``. Every assertion below still runs —
+this checks the ledger's content, not merely that a path exists.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
+LEDGER_DIR = "docs/archive/2026-09-21"
 
 
 def _rows():
-    data = json.loads(
-        (REPO / "docs/archive/2026-09-21" / "NATIVE_EQUIVALENTS_8U.json").read_text())
+    data = json.loads(require_ledger(f"{LEDGER_DIR}/NATIVE_EQUIVALENTS_8U.json"))
     assert data["schema"] == "qubit-native-equivalents/1"
     return data["rows"]
 
@@ -26,7 +36,7 @@ def test_matrix_schema_and_companion():
     assert len(rows) >= 15
     ids = [r["id"] for r in rows]
     assert len(set(ids)) == len(ids), "duplicate row ids"
-    md = (REPO / "docs/archive/2026-09-21" / "NATIVE_EQUIVALENTS_8U.md").read_text()
+    md = require_ledger(f"{LEDGER_DIR}/NATIVE_EQUIVALENTS_8U.md")
     for r in rows:
         assert r["status"] in ("IMPLEMENTED", "IMPLEMENTED-EQUIVALENT",
                                "OPERATOR-QUALIFICATION",
