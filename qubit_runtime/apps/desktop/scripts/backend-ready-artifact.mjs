@@ -19,11 +19,18 @@ const require = createRequire(import.meta.url)
 
 const PACKAGED_MAIN_MODULE = 'dist/electron-main.mjs'
 const READY_TOKENS = ['QUBIT_BACKEND_READY', 'QUBIT_DASHBOARD_READY']
-// The esbuild-bundled regex source for the dual-token readiness matcher. The
-// bundle keeps the source literal verbatim, so the packaged text contains the
-// (unexecuted) source form `QUBIT_(?:BACKEND|DASHBOARD)_READY`; the parens
-// and `?` are escaped here to match that substring as text.
-const READY_MATCHER_SOURCE = /QUBIT_\(\?:BACKEND\|DASHBOARD\)_READY/
+// The esbuild-bundled regex source for the readiness matcher. The bundle keeps the
+// source literal verbatim, so the packaged text contains it as written in
+// electron/backend-ready.ts.
+//
+// That source is `(?:QUBIT|HERMES)_(?:BACKEND|DASHBOARD)_READY` — the brand is a
+// GROUP, because the matcher keeps reading the pre-rebrand spelling so a packaged
+// Desktop still attaches to an older backend. This check previously demanded the
+// pre-rebrand shape `QUBIT_(?:BACKEND|DASHBOARD)_READY`, with the brand as a bare
+// literal, and so failed every build once the two spellings were grouped. Match
+// either shape: the invariant is that the bundle accepts a real ready token, not
+// which of the two equivalent regex spellings produced it.
+const READY_MATCHER_SOURCE = /(?:\?:QUBIT\|HERMES\)_|QUBIT_)\(\?:BACKEND\|DASHBOARD\)_READY/
 
 function resolvePackagedAsarPath(context) {
   const appOutDir = context?.appOutDir
