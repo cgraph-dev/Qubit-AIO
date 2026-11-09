@@ -57,6 +57,10 @@
 | 21 | **Pixel fonts do not scale; non-integer browser zoom distorts pixel art** (r/gamedev, r/aigamedev) | `https://www.reddit.com/r/gamedev/comments/dxe5mz/`, `https://www.reddit.com/r/aigamedev/comments/1qbm96r/` | Portrait atlas is native 32 px at 32 CSS px; goldens at DPR 1/2; document that fractional browser zoom is out of our control. |
 | 22 | **A third-party tool must not become integral to theming** (Figma/Themer postmortem) | `https://blog.bakarema.com/2022/10/05/my-five-biggest-design-system-mistakes-by-steve-dennis-sep-2022-2/` | No design tool/service at runtime; Pillow is a build-time library; tokens are plain JSON in the repo. |
 | 23 | **The two purchased generators share one part set** (verified: 9 skins, 7 eyes, 200 hairstyles, 84–85 accessories in both), so the same part indices produce a matching body and portrait | local inspection of the two archives, 2026-11-09 | The pack stores one `agents.json` recipe per slug (skin/eyes/hair/outfit/accessory); the builder renders **both** a portrait and a body from it. |
+| 24 | **DiceBear derives every choice from `hash(seed + ":" + component)`**, so adding a new component later never reshuffles existing avatars; styles are declarative JSON | `https://www.dicebear.com/understand/how-avatars-are-made/`, `https://www.dicebear.com/create-styles/implement-dicebear-core/` | Per-part key-based derivation (`sha256(slug + ":hair")`), and the chosen recipe is stored in `agents.json` so it is frozen even if the part list grows. |
+| 25 | **LPC generator keeps explicit z-order per category in JSON** and ships shareable, versioned presets | `https://github.com/sanderfrenken/lpc-spritesheet-generator-v2`, `https://github.com/LiberatedPixelCup/Universal-LPC-Spritesheet-Character-Generator` | `agent_sheets.json` records the layer order + z-index and the confirmed frame; recipes are shareable/versioned. |
+| 26 | **Agent-avatar guidance**: fallback hierarchy (photo → generated → initials), deterministic seed = cacheability, version the template so a restyle regenerates | `https://github.com/agentsorg/design-engineering/blob/main/skills/design-engineering/references/components/avatar-systems.md`, `https://docs.ability.ai/guides/agent-avatars`, `https://next.jqueryscript.net/next-js/avatar-facehash/` | Panel fallback chain: generated portrait → initials chip → emoji; pack carries `template_version`, atlas URLs use `?v=<template_version>`. |
+| 27 | **WebP/AVIF + lazy loading + reserved space** are baseline UI-quality rules; the static server already serves `.webp` | `skills/ui-ux-pro-max` (local skill), `voicebridge/webui.py` MIME table | Optional lossless WebP atlas; fixed 32×32/32×64 boxes (no CLS); one atlas request. |
 
 ---
 
@@ -89,6 +93,7 @@
   "license": "LimeZu … redistribution prohibited; credit required",
   "credit": "LimeZu — https://limezu.itch.io",
   "source": "owner purchase of LimeZu Modern Interiors + Modern User Interface, 2026-11-09",
+  "template_version": 1,
   "tokens": {
     "color-surface": "#0d0d1a",
     "color-surface-raised": "#161a23",
@@ -123,13 +128,13 @@
 ```
 
 `index.json`: `{"schema":1,"size":32,"cols":20,"cells":{"ceo":[0,0],"lead-quality":[1,0]}}`.
-`agents.json`: `{"schema":1,"recipes":{"ceo":{"skin":2,"eyes":1,"hair":1,"outfit":1,"accessory":1}}}` — the **same indices** drive the portrait and the body.
+`agents.json`: `{"schema":1,"templateVersion":1,"recipes":{"ceo":{"skin":2,"eyes":1,"hair":1,"outfit":1,"accessory":1}}}` — the same indices drive the portrait and the body. `agent_sheets.json` (build-side) records the layer z-order and the calibrated frame.
 
 Validation:
 - exact format/schema; id `^[a-z0-9][a-z0-9-]{0,39}$`; non-empty credit/license; `source` is a description, not a path (no `/home/`, `~/`, drive/UNC).
 - files: relative, `[A-Za-z0-9._/-]`, no `.`/`..`, no Windows reserved basename, allowlisted suffix, no symlink, exists, `bytes`/`sha256` match; case-insensitive duplicates refused; totals within limits.
 - tokens: key `^[a-z][a-z0-9-]{1,40}$`; **typed values only** — colors `^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$`, lengths `^(0|[1-9][0-9]{0,3})(px|rem|em)$`; reject `url(`, `image-set(`, `src(`, `var(`, `attr(`, `@`, `\`, `;`, `}` anywhere.
-- portraits/bodies: atlas/index declared; size ∈ {16,32,48}; frame `{w,h}` positive; every slug cell inside `cols×rows`; atlas pixel size == `cols×rows×size` (bodies: `cols×frame_w` by `rows×frame_h`); indices may not contain local paths or scripts; `agents.json` recipes only reference indices that exist in the part sets.
+- portraits/bodies: atlas/index declared; size ∈ {16,32,48}; frame `{w,h}` positive; every slug cell inside `cols×rows`; atlas pixel size == `cols×rows×size` (bodies: `cols×frame_w` by `rows×frame_h`); indices may not contain local paths or scripts; `agents.json` recipes only reference indices that exist in the part sets; `template_version` is a positive integer and every atlas URL carries `?v=<template_version>`.
 - slices (optional): 4 positive ints, `width` px, `repeat ∈ stretch|round|repeat`, `src` declared.
 - contrast: `color-text-primary` vs `color-surface` ≥ 4.5; `color-text-muted` vs `color-surface` ≥ 3.0; `color-text-primary` vs `color-surface-raised` ≥ 4.5; `color-text-muted` vs `color-surface-hover` ≥ 3.0 (disabled reads at 3.0). Status/level colours (`--st-*`, `--lv-*`) must reach 3.0 against `color-surface`.
 
@@ -140,6 +145,17 @@ Token names are **semantic** (`color-surface`, `color-text-primary`); the pack n
 Not themed: `--side-w`, `--drawer-w`, `--top-h`, `--gap`, `--free-*`, `--font-*`, `--ease`.
 
 ---
+
+## Skills we will use (and the one we won't invent)
+
+Local skills that apply:
+- `skills/ui-ux-pro-max` — contrast, alt text, focus rings, WebP/lazy loading, semantic tokens.
+- `skills/anthropic-frontend-design` / `skills/bencium-controlled-ux-designer` — visual polish of the host docks/menu.
+- `skills/vercel-react-best-practices` — stable component identity, no inline component factories (the refresh-loop class).
+- `qubit_runtime/optional-skills/creative/pixel-art` — only for a promo/OG image or palette study; it does **not** compose layered sprite parts.
+- Superpowers: `test-driven-development`, `verification-before-completion`, `executing-plans` / `subagent-driven-development`.
+
+There is **no skill for layered sprite composition / asset-pack provenance**. We will not invent one up front; if the pipeline proves reusable after Part A ships, author a `qubit-office-theme` skill with `writing-skills` (the plan's commands become its steps).
 
 ## File structure (nothing under `habblaud/` changes)
 
@@ -210,7 +226,7 @@ def test_token_css_only_allowlisted_vars():
 
 - [ ] **Step 1: failing tests** — same slug ⇒ same decoded pixels; different slug ⇒ different; portrait atlas = `cols×rows×size`; body atlas = `cols×frame_w` by `rows×frame_h`; both indexes have every slug in bounds; **the recipe indices are identical for the portrait and the body of one slug**; QA rejects blank/overfull tiles; empty license/credit refuses; manifest has sha+bytes for every file.
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement** deterministic recipes (`skin/eyes/hair/outfit/accessory`), compose the portrait (Skins→Eyes→Hairstyles→Accessories, 64 px cells at the 32 tier → `NEAREST` to 32) and the body (`Bodies→Outfits→Eyes→Hairstyles→Accessories`, 32×64 frame), QA each tile (alpha 2–98 %, non-empty bounds, feet inside the frame), pack both atlases, write `agents.json` + both indexes, manifest sorted by key.
+- [ ] **Step 3: implement** **key-based** deterministic recipes (`sha256(slug + ":" + part)` mod list length) stored in `agents.json`, an explicit z-order in `agent_sheets.json`, compose the portrait (Skins→Eyes→Hairstyles→Accessories, 64 px cells at the 32 tier → `NEAREST` to 32) and the body (`Bodies→Outfits→Eyes→Hairstyles→Accessories`, 32×64 frame), QA each tile (alpha 2–98 %, non-empty bounds, feet inside the frame), pack both atlases (lossless WebP when smaller, PNG otherwise — the server serves both), write `agents.json` + both indexes, manifest sorted by key, and stamp `template_version`.
 - [ ] **Step 4: run tests.**
 - [ ] **Step 5: commit**.
 
@@ -244,7 +260,7 @@ def test_token_css_only_allowlisted_vars():
 
 **Files:** `agents-panel.ts`, `AgentsPanel.tsx`; test `agents-panel.test.ts`.
 
-- [ ] **Step 1: failing tests** — a seat’s cell renders a 32×32 sprite span with `role="img"` + `aria-label="<name> portrait"`; the emoji stays in the DOM as the visible fallback until the sheet is ready and is `aria-hidden="true"` only once the sheet is confirmed; a broken sheet keeps emojis visible and announced; no per-seat `<img>` requests; keyboard/AT focus order unchanged.
+- [ ] **Step 1: failing tests** — a seat’s cell renders a 32×32 sprite span with `role="img"` + `aria-label="<name> portrait"`; the fallback chain is generated portrait → initials chip (agent name) → emoji, with the initials/emoji visible until the sheet is ready and `aria-hidden="true"` only once the sheet is confirmed; a broken sheet keeps the initials/emoji visible and announced; no per-seat `<img>` requests; keyboard/AT focus order unchanged.
 - [ ] **Step 2: run → FAIL.**
 - [ ] **Step 3: implement** — preload both atlases once, add `office-portraits-ready` on success, position via `background-position: calc(-1 * var(--cell-x) * 32px) calc(-1 * var(--cell-y) * 32px)`, `image-rendering: pixelated`, fixed 32×32 box (no layout shift). The **body atlas** feeds a small character card on row hover/focus (`--body-x`/`--body-y`, 32×64 native, shown at 32×64) so both generators are used; the card is keyboard-reachable and `aria-hidden` unless focused.
 - [ ] **Step 4: run** office-app Vitest.
