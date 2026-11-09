@@ -1,6 +1,18 @@
-"""A managed worker turn never offers ``delegate_task``: its child would need an owner-registered
-execution this single-turn worker cannot reserve, so the tool's only outcome would be a refusal
-(real daemon, real managed worker, loopback model)."""
+"""A managed worker turn IS offered ``delegate_task``, and any child it spawns is reserved by the
+owner under the worker's execution (#141793) — never self-registered by the worker.
+
+This file used to pin the retired contract ("a single-turn worker cannot reserve a child, so never
+offer the tool"). That held only while ``run_agent`` passed
+``disabled_toolsets=list(WORKER_DISABLED_TOOLSETS)`` with ``WORKER_DISABLED_TOOLSETS = ('delegation',)``.
+Both the constant and the argument are gone from ``agent/managed_worker.py``; a child is now
+reserved by the owner in ``gateway/session_worker_child.py::reserve_child_execution`` over the
+worker's ``child.reserve`` RPC (``agent/runtime_session_child.py::reserve_child_store``).
+The behavioural successor — a full delegation round trip, per-child lineage and restarts — is
+``qubit_runtime/tests/gateway/test_managed_worker_delegation.py``. This file keeps the original
+"what tools does the worker's turn actually carry" probe and asserts the live contract.
+
+(real daemon, real managed worker, loopback model)
+"""
 import asyncio
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -40,7 +52,7 @@ class Model(BaseHTTPRequestHandler):
 
 
 @pytest.mark.platforms("linux")
-def test_managed_worker_turn_does_not_offer_delegate_task(tmp_path):
+def test_managed_worker_turn_offers_delegate_task(tmp_path):
     root = Path(__file__).resolve().parents[2]
     home, user = tmp_path / 'state', tmp_path / 'user'
     home.mkdir(mode=0o700)
@@ -55,11 +67,11 @@ def test_managed_worker_turn_does_not_offer_delegate_task(tmp_path):
         'auxiliary': {'title_generation': {'enabled': False}},
         'platform_toolsets': {'cli': ['delegation', 'todo']}}))
     env = {k: os.environ[k] for k in ('PATH', 'LANG', 'TZ') if k in os.environ}
-    env.update(HOME=str(user), USERPROFILE=str(user), HERMES_HOME=str(home), PYTHONPATH=str(root),
+    env.update(HOME=str(user), USERPROFILE=str(user), QUBIT_HOME=str(home), HERMES_HOME=str(home), PYTHONPATH=str(root),
                OPENAI_API_KEY='loopback-only', OPENAI_BASE_URL=url)
 
     def rows(sql):
-        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True)) as db:
+        with closing(sqlite3.connect(f'file:{home / "state.db"}?mode=ro', uri=True, timeout=2)) as db:
             return db.execute(sql).fetchall()
 
     async def exercise(desc):
@@ -79,7 +91,20 @@ def test_managed_worker_turn_does_not_offer_delegate_task(tmp_path):
         peer.shutdown()
         peer.server_close()
     assert peer.offered, 'the managed worker never reached the model'
-    assert all('todo_list' in tools for tools in peer.offered), peer.offered  # the turn kept its other tools
-    assert not any('delegate_task' in tools for tools in peer.offered), peer.offered
+    # One tool-name set per request the worker's turn made to the model. A greedy loop nests the
+    # deferred-tool calls inside delegate_task's own parameters, so parse it top-level only.
+    offered = [{tool['function']['name'] for tool in json.loads(payload, parse_constant=str)} for payload in peer.offered]
+    assert offered, peer.offered
+    # The live contract (#141793): delegate_task is offered, where it used to be filtered out by the
+    # since-deleted WORKER_DISABLED_TOOLSETS constant. This is the assertion that used to fail.
+    assert all('delegate_task' in names for names in offered), offered
+    # And it is offered alongside the turn's other tools rather than instead of them: the probe still
+    # receives a full toolset, so the assertion above is not satisfied by an empty or truncated one.
+    assert all(len(names) > 1 and 'tool_search' in names for names in offered), offered
+    # Nothing was delegated in this plain turn, and the worker did NOT self-register an execution:
+    # the only rows are the admission's own. Children only ever arrive via the owner's
+    # ``child.reserve`` (gateway/session_worker_child.py), which the worker cannot issue for itself.
+    assert not rows("SELECT kind FROM worker_executions WHERE kind='child'"), rows(
+        'SELECT kind, status FROM worker_executions')
 
 
