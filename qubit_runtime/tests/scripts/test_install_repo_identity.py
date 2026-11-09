@@ -16,6 +16,10 @@ ROOT = Path(__file__).resolve().parents[2]
 INSTALL_SH = ROOT / "scripts" / "install.sh"
 INSTALL_PS1 = ROOT / "scripts" / "install.ps1"
 QUBIT = "https://github.com/cgraph-dev/Qubit.git"
+# The installer's default source: it moved from Qubit.git (publishes releases,
+# receives no commits) to Qubit-AIO.git (receives them, publishes no releases),
+# so a bare install ships current code instead of the old release tag.
+DEFAULT_SOURCE = "cgraph-dev/Qubit-AIO.git"
 HERMES = "https://github.com/NousResearch/hermes-agent.git"
 
 
@@ -24,10 +28,15 @@ def test_installer_defaults_name_qubit_not_hermes():
     ps1 = INSTALL_PS1.read_text(encoding="utf-8")
     sh_default = next(line for line in sh.splitlines() if line.startswith("REPO_URL="))
     ps1_default = next(line for line in ps1.splitlines() if line.startswith("$RepoUrl ="))
-    assert "cgraph-dev/Qubit.git" in sh_default
-    assert "cgraph-dev/Qubit.git" in ps1_default
+    assert DEFAULT_SOURCE in sh_default
     assert "hermes-agent" not in sh_default
     assert "hermes-agent" not in ps1_default
+    # The two installers are one product: both name an official cgraph-dev Qubit
+    # repository, so neither can quietly start installing a different source.
+    assert "cgraph-dev/" in ps1_default
+    # install.ps1 has no release lookup; it clones the branch, and only the
+    # branch. Everything the release default touches lives in install.sh.
+    assert "releases/latest" not in ps1
 
 
 def _fake_git(bin_dir: Path) -> Path:
@@ -49,9 +58,9 @@ def _fake_git(bin_dir: Path) -> Path:
 
 @pytest.mark.platforms("posix")
 @pytest.mark.parametrize("env_override,expected", [
-    ({}, QUBIT),
-    ({"QUBIT_REPO_URL": "https://github.com/cgraph-dev/Qubit-AIO.git"},
-     "https://github.com/cgraph-dev/Qubit-AIO.git"),
+    ({}, "https://github.com/" + DEFAULT_SOURCE),
+    ({"QUBIT_REPO_URL": "https://github.com/cgraph-dev/Qubit.git"},
+     "https://github.com/cgraph-dev/Qubit.git"),
     ({"HERMES_REPO_URL": "https://example.invalid/legacy.git"},
      "https://example.invalid/legacy.git"),
 ])

@@ -11,7 +11,25 @@ import subprocess
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-OFFICIAL = "https://github.com/cgraph-dev/Qubit.git"
+
+
+def _installer_default_url() -> str:
+    """The URL a bare `install.sh` clones when nothing overrides it.
+
+    Read from the installer instead of hardcoded: the default is an install-policy
+    choice (it moved from `Qubit.git`, which publishes releases but receives no
+    commits, to `Qubit-AIO.git`, which receives them), and the point of this file
+    is that whatever that default is, an official source lands on its latest
+    stable release.
+    """
+    for line in (ROOT / "scripts" / "install.sh").read_text(encoding="utf-8").splitlines():
+        if line.startswith("REPO_URL="):
+            # REPO_URL="${QUBIT_REPO_URL:-${HERMES_REPO_URL:-<default>}}"
+            return line.rsplit(":-", 1)[1].rstrip("}\"")
+    raise AssertionError("install.sh has no REPO_URL default")
+
+
+OFFICIAL = _installer_default_url()
 
 pytestmark = pytest.mark.platforms("posix")
 
