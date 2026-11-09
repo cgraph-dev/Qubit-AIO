@@ -986,3 +986,60 @@ statement in distributions:
 > LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
+
+## LimeZu — purchased office art (office UI upgrade)
+
+Owner-purchased pixel-art packs held outside the repository at
+`/home/trick/Desktop/UI Office` (not vendored wholesale; only chosen
+files/slices would be added, each with its licence recorded here). Owner
+ruling 14 in `docs/DECISIONS.md` permits in-game use with credit.
+
+| Pack | File | sha256 | Licence |
+|---|---|---|---|
+| Modern Interiors (full) | `moderninteriors-win.zip` | `095a8bc7ea5e7e121003db562187892081c0ca2ff58af35e4df94a63948546a4` | Commercial/non-commercial use; **resale/redistribution prohibited**; credit required |
+| Modern Interiors RPG Maker | `Modern_Interiors_RPG_Maker_Version.zip` | `b1f18ecd99f99435782ca33c3de56391d5b70ad5d6ffd4ae04153f82565ffbe1` | Same as full pack |
+| Modern Interiors Free v2.2 | `Modern_Interiors_Free_v2.2.zip` (+ byte-identical `(1)`) | `1e38aae8896ec14764a5484a6d6a90a5026c233560ee97865dc8751053fba7f0` | **Non-commercial only**; not used in the product |
+| Serene Village revamped v1.9 | `Serene_Village_revamped_v1.9.zip` | `22f5b68d950fd8eeafe65690daa1723c74b68ccbc3db7240c3bd4935915e9041` | CC-BY 4.0 (publisher page; no licence file in archive) |
+| Character Generator 2.0 (tool) | `Character Generator 2.0 Linux Build.zip`, `Character Generator 2.0 Setup.exe` | `d1d27147db929e4ab7ee563cabc50290c0ba494f0c465504da9588653a2348a9`, `02a368bfa70e0f0e0b36f1757cdf02b85ca2d74fe01b404f8ad81129706e3075` | No licence in archive; art is paid LimeZu content — not redistributable |
+
+Upstream author and credit line: **LimeZu — https://limezu.itch.io**
+(Modern Interiors: https://limezu.itch.io/moderninteriors; Serene Village:
+https://limezu.itch.io/serenevillagerevamped).
+
+Modern Interiors `LICENSE.txt` (quoted verbatim from the purchased archive):
+
+```text
+MODERN INTERIORS FULL VERSION LICENSE
+-
+YOU CAN:
+-Edit and use the asset in any commercial  or non commercial project
+-Use the asset in any commercial  or non commercial project
+-
+YOU CAN'T:
+- Resell or distribute the asset to others
+- Edit and resell the asset to others
+-
+- Credits required (limezu.itch.io)
+```
+
+Modern Interiors Free v2.2 `Modern tiles_Free/LICENSE.txt` (quoted verbatim):
+
+```text
+FREE VERSION LICENSE:
+
+CAN:
+YOU CAN USE THE ASSET IN NON COMMERCIAL PROJECTS
+YOU CAN EDIT THE SPRITES AND USE THEM IN NON COMMERCIAL PROJECTS
+
+CAN'T:
+YOU CAN'T USE THE ASSET IN COMMERCIAL PROJECTS
+YOU CAN'T EDIT THE SPRITES AND USE THEM IN COMMERCIAL PROJECTS
+YOU CAN'T EDIT AND RESELL THE SPRITES
+```
+
+Serene Village carries **no licence file in the archive**; the publisher page
+states `Asset license: Creative Commons Attribution v4.0 International`.
+Any redistributed Serene Village material requires attribution, a link to the
+licence, and an indication of changes.
+
+Local divergence: none yet — no pack file has been added to the tree.

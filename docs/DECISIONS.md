@@ -154,3 +154,24 @@ done
     evidence and file:line citations in `docs/CHAT_REPLACE_SCOPE.md`.
     A future agent must not read "full replace" as authority to delete the
     voice path; re-raise with the owner if the voice requirement changes.
+
+14. **Owner-purchased LimeZu art may be used in Qubit Office (owner ruling, 2026-11-09).**
+    The owner purchased the LimeZu packs inventoried in `THIRD_PARTY_NOTICES.md`
+    §"LimeZu — purchased office art" and directed that they be used to upgrade
+    Qubit Office ("its free to use in your game"). The Modern Interiors licence
+    permits editing and use in any commercial or non-commercial project and
+    requires credit to `limezu.itch.io`; it forbids reselling or distributing
+    the asset to others. Rules for agents, in order:
+    (a) credit LimeZu on any surface that ships the art;
+    (b) record a pack's name, sha256 and licence text in
+    `THIRD_PARTY_NOTICES.md` before using it;
+    (c) the purchase does **not** resolve exposing the raw `.zip` packs through
+    the public repo or release — do not add the downloaded packs themselves to
+    the tree; assets used by the product are chosen files/slices with their
+    provenance recorded;
+    (d) if a specific asset still cannot be shipped, stop with
+    `BLOCKED — LICENSE REVIEW REQUIRED` and name the asset; never silently strip
+    or substitute it.
+    → Provenance: owner session 2026-11-09; inventory, licence quotes and
+    sha256s in `THIRD_PARTY_NOTICES.md`. Source files live at
+    `/home/trick/Desktop/UI Office` and are not part of the repo.
