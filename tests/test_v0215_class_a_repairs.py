@@ -8,8 +8,9 @@ rename/merge cannot silently re-break it.
 
 Repairs covered:
 
-* A1/A9 — synthesized platform toolsets must use the registry's ``hermes-<platform>``
-  name, not a ``qubit-`` spelling that resolves to no tools.
+* A1/A9 — synthesized platform toolsets must use a name that resolves to real tools.
+  ``qubit-<platform>`` is canonical now that ``toolsets.py`` publishes both spellings;
+  the fix these pin is that neither spelling resolves to an empty list.
 * A2/A6 — ``qubit_*`` first-party modules must be recognized as Qubit's own.
 * A4 — the ``hermes`` launcher delegates to ``qubit_cli.main``.
 * A8 — a legacy ``hermes pid=<pid>`` worktree lock is read-old as live.
@@ -26,16 +27,28 @@ from rebase_bucket_support import RUNTIME, runtime_on_path  # noqa: F401
 
 
 def test_a1_platform_toolset_fallback_uses_registry_name(runtime_on_path):
+    import toolsets
     from qubit_cli.tools_config import _platform_default_toolset
 
-    assert _platform_default_toolset("acp") == "hermes-acp"
-    assert _platform_default_toolset("widget-plugin") == "hermes-widget-plugin"
+    # The registry publishes both spellings for every platform bundle, so the
+    # fallback may name either; what it must never do is name one that resolves to
+    # no tools (the A1 regression: ACP lost its whole surface).
+    for platform in ("acp", "widget-plugin"):
+        name = _platform_default_toolset(platform)
+        assert name in (f"qubit-{platform}", f"hermes-{platform}"), name
+    # A registered platform's fallback must resolve to real tools; an unregistered
+    # plugin platform's implicit bundle is empty until the plugin registers it.
+    assert toolsets.resolve_toolset(_platform_default_toolset("acp")) == \
+        toolsets.resolve_toolset("hermes-acp")
 
 
 def test_a1_toolset_validation_fallback_uses_registry_name(runtime_on_path):
+    import toolsets
     from qubit_cli.toolset_validation import _platform_default_toolset
 
-    assert _platform_default_toolset("acp") == "hermes-acp"
+    name = _platform_default_toolset("acp")
+    assert name in ("qubit-acp", "hermes-acp"), name
+    assert toolsets.resolve_toolset(name), f"{name!r} resolves to no tools"
 
 
 def test_a2_a6_qubit_first_party_roots_are_recognized(runtime_on_path):
@@ -74,16 +87,35 @@ def test_a4_hermes_launcher_delegates_to_qubit_cli(runtime_on_path, monkeypatch)
     assert called == ["qubit_cli.main"]
 
 
-def test_a8_legacy_hermes_lock_reason_is_read_old(runtime_on_path, monkeypatch):
+def test_a8_legacy_hermes_lock_reason_is_read_old(runtime_on_path, tmp_path):
+    """A lock written before the rebrand (``hermes pid=<pid>``) still reads as live.
+
+    The reader takes the reason raw from the tree's admin dir, so the fixture is a
+    real worktree with a real ``git worktree lock`` reason, not a patched listing.
+    """
+    import subprocess
+
     from qubit_cli import worktree_ops
 
-    listing = (
-        "worktree /tmp/wt-a8\nHEAD deadbeef\nbranch refs/heads/x\n"
-        f"locked hermes pid={os.getpid()}\n"
-    )
-    monkeypatch.setattr(worktree_ops, "_git_out", lambda *a, **k: listing)
+    repo = tmp_path / "repo"
+    subprocess.run(["git", "init", str(repo)], capture_output=True, check=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "-c", "user.name=T", "-c", "user.email=t@t",
+         "commit", "--allow-empty", "-m", "init"],
+        capture_output=True, check=True)
+    tree = repo / ".worktrees" / "wt-a8"
+    (repo / ".worktrees").mkdir(exist_ok=True)
+    subprocess.run(["git", "worktree", "add", str(tree), "-b", "qubit/wt-a8", "HEAD"],
+                   cwd=repo, capture_output=True, check=True)
+    subprocess.run(["git", "worktree", "lock", "--reason", f"hermes pid={os.getpid()}", str(tree)],
+                   cwd=repo, capture_output=True, check=True)
 
-    assert worktree_ops._worktree_lock_is_live("/repo", "/tmp/wt-a8") == "live"
+    assert worktree_ops._worktree_lock_is_live(str(repo), str(tree)) == "live"
+    # The canonical spelling the fork writes reads identically.
+    subprocess.run(["git", "worktree", "unlock", str(tree)], cwd=repo, capture_output=True, check=True)
+    subprocess.run(["git", "worktree", "lock", "--reason", f"qubit pid={os.getpid()}", str(tree)],
+                   cwd=repo, capture_output=True, check=True)
+    assert worktree_ops._worktree_lock_is_live(str(repo), str(tree)) == "live"
 
 
 def test_over_rebrand_keeps_openclaw_as_external_source(runtime_on_path, tmp_path):
