@@ -95,8 +95,16 @@ def _route_test_reachable(routes: List[str], tests_text: str) -> bool:
 
 
 def _defined_functions(path: Path) -> Set[str]:
+    """Module-level functions defined in ``path``.
+
+    Only top-level ``def``s count: methods on classes in this module (the
+    ``BaseHTTPRequestHandler.redirect_request`` override, the lazy
+    ``__getattr__`` hook) are protocol members dispatched by their class, not
+    callable module functions, and listing them here reported them as dead
+    module code forever.
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"))
-    return {n.name for n in ast.walk(tree)
+    return {n.name for n in tree.body
             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
 
 
@@ -191,6 +199,16 @@ def _reference_index() -> Dict[str, Dict[str, List[str]]]:
                     names.append(node.id)
                 elif isinstance(node, ast.Attribute):
                     names.append(node.attr)
+                elif (isinstance(node, ast.Call)
+                      and isinstance(node.func, ast.Name)
+                      and node.func.id in ("getattr", "hasattr")
+                      and len(node.args) >= 2
+                      and isinstance(node.args[1], ast.Constant)
+                      and isinstance(node.args[1].value, str)):
+                    # ``getattr(HC, "_family_mutation")`` is a real call site
+                    # the Name/Attribute scan cannot see; the attribute name is
+                    # a literal argument, not prose, so it still counts.
+                    names.append(node.args[1].value)
                 for name in names:
                     index.setdefault(name, {}).setdefault(rel, []).append(
                         f"{node.lineno}: {lines[node.lineno-1].strip()[:120]}")
