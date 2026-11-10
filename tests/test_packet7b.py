@@ -106,7 +106,13 @@ def test_rollback_drill_script_passes(tmp_path):
     report = RD.run_drill()
     assert report["user_data_preserved"] is True
     assert report["all_ok"] is True
-    assert len(report["flags"]) == 6
+    # Every registered flag is drilled — assert against the registry rather
+    # than a frozen count so adding a flag cannot silently go untested.
+    from voicebridge import feature_flags as FF
+
+    assert len(report["flags"]) == len(FF.FLAGS), (
+        sorted(r["flag"] for r in report["flags"]),
+        sorted(f.name for f in FF.FLAGS))
     for r in report["flags"]:
         assert r["ok"], r
 

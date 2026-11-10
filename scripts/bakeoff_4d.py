@@ -30,6 +30,9 @@ import urllib.request
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+#: The commit that purged docs/archive/2026-09-21 markdown + ledgers (eafb54e26).
+#: Frozen evidence is read-only recoverable from ``PURGE_COMMIT^``.
+PURGE_COMMIT = "eafb54e26"
 sys.path.insert(0, str(REPO_ROOT))
 
 from voicebridge.benchmarking import harness as H  # noqa: E402
@@ -96,14 +99,44 @@ def download(filename: str, expect_sha: str, expect_size: int) -> Path:
 
 def _aligned_persona() -> str:
     """Winning persona from docs/archive/2026-09-21/ALIGN_4D_winner.json (acceptance-validated),
-    falling back to the v2 inline persona when alignment output is absent."""
-    winner = REPO_ROOT / "docs/archive/2026-09-21" / "ALIGN_4D_winner.json"
+    falling back to the v2 inline persona when alignment output is absent.
+
+    ``ALIGN_4D_winner.json`` was purged from the tree in ``eafb54e26`` (it is
+    frozen historical evidence, and AGENTS.md forbids re-authoring it). The
+    acceptance-validated persona is still the source of the Modelfile's safety
+    block, so it is recovered read-only from the pre-purge commit — the same
+    rule ``tests/_purged_ledger.py`` states — instead of silently degrading to
+    the weaker inline persona and shipping a candidate without the destruction
+    refusal clause.
+    """
+    rel = "docs/archive/2026-09-21/ALIGN_4D_winner.json"
+    texts = []
     try:
-        cfg = json.loads(winner.read_text())
-        if cfg.get("persona"):
-            return cfg["persona"]
-    except Exception:
+        texts.append((REPO_ROOT / rel).read_text())
+    except Exception:  # noqa: BLE001 - purged from the tree; history is the source
         pass
+    try:
+        import subprocess
+
+        # NOT subprocess.run: callers (and their tests) legitimately stub the
+        # ``ollama`` CLI through subprocess.run, and a ledger read must not be
+        # captured by that stub. Use the low-level Popen contract instead.
+        proc = subprocess.Popen(
+            ["git", "show", f"{PURGE_COMMIT}^:{rel}"],
+            cwd=str(REPO_ROOT), stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL, text=True)
+        out_text, _ = proc.communicate(timeout=30)
+        if proc.returncode == 0 and out_text:
+            texts.append(out_text)
+    except Exception:  # noqa: BLE001 - no git/history: keep the inline fallback
+        pass
+    for text in texts:
+        try:
+            cfg = json.loads(text)
+        except Exception:  # noqa: BLE001 - a corrupt copy falls through
+            continue
+        if isinstance(cfg, dict) and cfg.get("persona"):
+            return cfg["persona"]
     return (
         "You are Qubit, a local voice assistant. Direct and concise, "
         "no filler; English only. Exact scope compliance: do only what was "

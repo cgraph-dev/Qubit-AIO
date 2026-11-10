@@ -2212,12 +2212,23 @@ class WebUIHandler(BaseHTTPRequestHandler):
     #: Kept as an ALLOWLIST so this front door can only ever answer the office
     #: client's own dialect and never shadows a Qubit-owned API path.
     #:
+    #: NOTE the BARE ``/api/permissions`` is Qubit's OWN Packet 7E route
+    #: (``GET /api/permissions`` returns the permission profile + grants +
+    #: skills under token auth). The office client does ask for
+    #: ``/api/permissions/<id>`` and ``/api/permissions/<id>/decision``, so the
+    #: root must stay in this list — but matching the bare root would shadow
+    #: Qubit's route and answer it with a 401, so the front door requires a
+    #: sub-path here (see ``_is_office_client_path``).
     OFFICE_CLIENT_ROOTS: tuple = (
         "/api/sessions", "/api/timeline", "/api/spawn", "/api/deliveries",
         "/api/permissions", "/api/messages", "/api/agents", "/api/rooms",
         "/api/updates", "/api/remote", "/api/stats", "/api/dictation",
         "/api/pty", "/api/demo",
     )
+
+    #: Roots under which Qubit owns the BARE path itself, so only a sub-path may
+    #: be claimed by the office front door.
+    OFFICE_CLIENT_SUBPATH_ONLY: tuple = ("/api/permissions",)
 
     def _is_office_client_path(self, path: str) -> bool:
         """True when ``path`` is one the vendored office client asks for.
@@ -2233,7 +2244,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
         """
         bare = path or "/api"
         for root in self.OFFICE_CLIENT_ROOTS:
-            if bare == root or bare.startswith(root + "/"):
+            if bare == root:
+                # Qubit owns the bare route under these roots; the office
+                # client's dialect is the ``/:id`` sub-path only.
+                return root not in self.OFFICE_CLIENT_SUBPATH_ONLY
+            if bare.startswith(root + "/"):
                 return True
         return False
 
