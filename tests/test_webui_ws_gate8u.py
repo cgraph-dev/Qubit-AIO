@@ -5,11 +5,19 @@ WebSocket endpoints answer with a TYPED HTTP 426 JSON envelope carrying the
 existing GATED codes (``PTY_NO_SHELL`` / ``WS_SINGLE_PATH``) — never a bare
 connection error, a silent hang, or an uncaught exception.
 
-The single exception is Qubit's own terminal socket at ``/agent/api/pty``: it is
-a real, supported WebSocket (owner PTY-policy exception, docs/archive/2026-09-21/QUBIT_PTY_POLICY_EXCEPTION_2026-09-17.md)
-that requires a short-lived scoped ticket, so an unauthenticated upgrade is a
-typed 401 ``TICKET_REQUIRED`` rather than a 426 refusal. Raw ``/api/pty`` HTTP
-(no upgrade) and every other upstream socket stay refused.
+Two endpoints are real sockets rather than 426 refusals:
+
+* Qubit's own terminal socket at ``/agent/api/pty`` — a real, supported
+  WebSocket (owner PTY-policy exception,
+  docs/archive/2026-09-21/QUBIT_PTY_POLICY_EXCEPTION_2026-09-17.md) that
+  requires a short-lived scoped ticket, so an unauthenticated upgrade is a
+  typed 401 ``TICKET_REQUIRED``.
+* ``/agent/api/events`` — served as a real WebSocket (``events_ws``) because the
+  dashboard sidebar dials it with unmodified upstream client code. An upgrade
+  without the dashboard session token (or a scoped ticket) is a typed 401
+  ``TOKEN_REQUIRED``.
+
+Raw ``/api/pty`` HTTP (no upgrade) and every other upstream socket stay refused.
 
 Hermetic live-server checks (no browser, no WS library): a real ``WebUI`` is
 booted on loopback and raw ``http.client`` requests carry the upgrade headers.
@@ -36,7 +44,6 @@ WS_API_PATHS = [
     ("/api/pty", "PTY_NO_SHELL"),
     ("/api/console", "PTY_NO_SHELL"),
     ("/api/ws", "WS_SINGLE_PATH"),
-    ("/api/events", "WS_SINGLE_PATH"),
     ("/api/pub", "WS_SINGLE_PATH"),
     ("/api/audio/speak-stream", "WS_SINGLE_PATH"),
     # Vendored Kanban plugin live-update socket: typed refusal, not a bare 401.
@@ -46,12 +53,16 @@ WS_API_PATHS = [
     ("/api/display/ws", "WS_DESKTOP_CLIENT_ONLY"),
 ]
 
-# The refused upgrade endpoints (all but the supported Qubit PTY terminal).
+# The refused upgrade endpoints (all but the two real sockets).
 WS_PATHS = [("/agent" + path, code) for path, code in WS_API_PATHS
             if path != "/api/pty"]
 
 # Qubit's supported terminal socket: a real WS that requires a scoped ticket.
 PTY_WS_PATHS = ("/agent/api/pty", "/api/pty")
+
+# The events feed is a real WS too; without a token/ticket the upgrade is a
+# typed 401 TOKEN_REQUIRED (see voicebridge/events_ws.py).
+EVENTS_WS_PATHS = ("/agent/api/events", "/api/events")
 
 
 def _start(tmp_path):
@@ -121,7 +132,9 @@ def _http(port, method, path, body=None, token="test-token"):
 
 def test_ws_gate_mapping_is_exactly_the_gated_endpoints():
     from voicebridge.webui import QUBIT_WS_GATE_CODES, qubit_ws_gate_code
-    assert len(QUBIT_WS_GATE_CODES) == len(WS_API_PATHS) == 8
+    assert len(QUBIT_WS_GATE_CODES) == len(WS_API_PATHS) == 7
+    # The events feed is served as a real socket, so it is NOT in the gate map.
+    assert "/api/events" not in QUBIT_WS_GATE_CODES
     assert set(QUBIT_WS_GATE_CODES) == {p for p, _ in WS_API_PATHS}
     for path, code in WS_API_PATHS:
         assert qubit_ws_gate_code(path) == code, path
@@ -172,6 +185,24 @@ def test_pty_upgrade_requires_a_scoped_ticket(server, path):
     assert "application/json" in ctype, (path, ctype)
     out = json.loads(body)
     assert out["code"] == "TICKET_REQUIRED", (path, out)
+    assert out["state"] == "UNAVAILABLE", (path, out)
+    assert out["ok"] is False, (path, out)
+    assert out["owner"] == "qubit-policy", (path, out)
+    assert out["rollback"], (path, out)
+
+
+@pytest.mark.parametrize("path", EVENTS_WS_PATHS)
+def test_events_upgrade_requires_the_session_token(server, path):
+    """The events feed is a real WebSocket, not a 426 refusal.
+
+    An unauthenticated upgrade is a typed 401 naming the owner and rollback; the
+    socket never opens without the token or a scoped ticket.
+    """
+    status, ctype, body = _upgrade(server, path)
+    assert status == 401, (path, status, body[:200])
+    assert "application/json" in ctype, (path, ctype)
+    out = json.loads(body)
+    assert out["code"] == "TOKEN_REQUIRED", (path, out)
     assert out["state"] == "UNAVAILABLE", (path, out)
     assert out["ok"] is False, (path, out)
     assert out["owner"] == "qubit-policy", (path, out)
@@ -236,8 +267,8 @@ def test_no_ws_response_is_uncaught_or_500(server):
         status, _, body = _upgrade(server, path)
         assert status == 426, (path, status, body[:200])
         assert status != 500, path
-    # The supported PTY terminal must also be a typed envelope (401), never 500.
-    for path in PTY_WS_PATHS:
+    # The two real sockets must also answer a typed envelope (401), never 500.
+    for path in PTY_WS_PATHS + EVENTS_WS_PATHS:
         status, _, body = _upgrade(server, path)
         assert status == 401, (path, status, body[:200])
         assert status != 500, path
