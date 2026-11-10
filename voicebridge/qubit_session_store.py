@@ -888,7 +888,17 @@ class QubitSessionStore:
                 return {"state": "EXISTS", "code": "SESSION_EXISTS",
                         "detail": f"session {sid!r} already exists"}
         if existing_rec is not None and (overwrite or repair):
-            self._db.delete_session(sid)
+            if repair:
+                # A repair REPLACES a partial import of the same id, so the id
+                # must stay creatable. ``delete_session`` retires a permanent
+                # RETIRED_PREFIX fence ("a deleted id cannot be reused"), and
+                # ``create_session`` then raises RuntimeStoreError('not_found')
+                # — which left the session DELETED with zero messages. Use the
+                # create-time compensation, which removes the row without
+                # fencing the id (the case it exists for).
+                self._db.rollback_created_session(sid)
+            else:
+                self._db.delete_session(sid)
         name = _bounded(src.get("name") or src.get("display_name") or "",
                         MAX_NAME_CHARS).strip() or None
         source = str(src.get("source") or SOURCE)
