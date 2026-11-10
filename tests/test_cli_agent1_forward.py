@@ -68,7 +68,10 @@ def test_mcp_reads_are_native_on_the_canonical_registry():
         assert ("mcp", sub) in FORWARD_TABLE, sub  # ledger classification
         assert ("mcp", sub) in NATIVE_MCP_READS, sub
     assert _qubit_subcommands()["mcp"] == {
-        "status", "list", "ls", "config", "picker", "invoke"}
+        "status", "list", "ls", "config", "picker", "invoke",
+        # Mutating verbs: remove/rm/delete + disable route through
+        # _cmd_mcp_mutate (dashboard mutation authority + confirm journal).
+        "remove", "rm", "delete", "disable"}
 
 
 @pytest.mark.parametrize("pair", sorted(FORWARD_TABLE))

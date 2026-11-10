@@ -62,7 +62,10 @@ def _http(port, method, path):
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, json.loads(r.read() or b"{}")
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read() or b"{}")
+        try:
+            return e.code, json.loads(e.read() or b"{}")
+        finally:
+            e.close()  # HTTPError owns an unclosed fp; unclosed it warns at GC.
 
 
 @_needs_dist

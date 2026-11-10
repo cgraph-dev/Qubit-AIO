@@ -35,16 +35,45 @@ VENDOR_MANIFEST = GENERATED_DIR / "QUBIT_HERMES_VENDOR_MANIFEST.json"
 
 
 def _frozen_fixture(name: str) -> Path:
-    """Canonical generated fixture, else the frozen archive copy read-only.
+    """Canonical generated fixture, else the frozen archive copy, else git history.
 
     The OpenClaw env/config fixtures are pinned upstream-source inventories
     with no regenerator in this repo; the canonical copy lives in
     ``docs/generated/`` and the archive copy is an explicit read-only fallback.
+
+    ``eafb54e26`` purged ``docs/archive/2026-09-21/`` (AGENTS.md forbids
+    re-authoring it), so on a fresh checkout the archive copy is gone and this
+    generator silently emitted empty OpenClaw rows. The frozen record is still
+    retrievable read-only from the pre-purge tree, exactly as
+    ``tests/_purged_ledger.py`` does it; recover it into the (git-ignored)
+    generated dir so the manifest still covers the pinned surface.
     """
     candidate = GENERATED_DIR / name
     if candidate.is_file():
         return candidate
-    return ARCHIVE_DIR / name
+    archived = ARCHIVE_DIR / name
+    if archived.is_file():
+        return archived
+    return _recover_from_history(name, candidate)
+
+
+def _recover_from_history(name: str, dest: Path) -> Path:
+    """Materialize a purged frozen fixture from ``eafb54e26^`` into ``dest``.
+
+    Returns ``dest`` on success, or the (absent) archive path so the existing
+    ``OSError`` guards in the callers degrade to a typed empty surface.
+    """
+    import subprocess
+
+    out = subprocess.run(
+        ["git", "show", f"eafb54e26^:docs/archive/2026-09-21/{name}"],
+        cwd=REPO, capture_output=True,
+    )
+    if out.returncode != 0:
+        return ARCHIVE_DIR / name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(out.stdout)
+    return dest
 
 SECRET_SUFFIXES = (
     "_secret", "_password", "_passwd", "_token", "_key", "_apikey",

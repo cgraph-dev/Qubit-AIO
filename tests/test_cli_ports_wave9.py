@@ -55,6 +55,22 @@ def _sandbox_env(home: Path, qubit_home: Path) -> dict:
     return env
 
 
+def _disable_external_vault_backends(qubit_home: Path) -> None:
+    """Opt 1Password/Bitwarden out in the sandbox config so `vault list` is host-independent."""
+    import yaml
+
+    qh = Path(qubit_home)
+    qh.mkdir(parents=True, exist_ok=True)
+    path = qh / "config.yaml"
+    cfg = {}
+    if path.is_file():
+        cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    vault = cfg.setdefault("vault", {})
+    vault["onepassword"] = {"enabled": False}
+    vault["bitwarden"] = {"enabled": False}
+    path.write_text(yaml.safe_dump(cfg), encoding="utf-8")
+
+
 def _run_agent(tmp_path, argv, *, home=None, qubit_home=None, timeout=180):
     """Run the production ``qubit agent <argv>`` passthrough in a scratch HOME."""
     home = home or (tmp_path / "home")
@@ -118,7 +134,7 @@ def test_vault_family_is_a_real_fork_parser_family():
     assert "vault" in subparsers.choices
     vault = subparsers.choices["vault"]
     subs = next(a for a in vault._actions if isinstance(a, _ap._SubParsersAction))
-    assert set(subs.choices) == {"add", "list", "rm", "sources"}
+    assert set(subs.choices) == {"add", "list", "rm", "sources", "key"}
 
 
 def test_vault_forward_route_is_classified():
@@ -173,6 +189,10 @@ def test_add_then_list_is_metadata_only_and_encrypted_at_rest(tmp_path):
 def test_cli_list_shows_metadata_only_then_rm(tmp_path):
     qh = tmp_path / "home" / "qh"
     _add_dummy_login(qh)
+    # Hermetic: an installed `op`/`bw` on the host PATH would make `vault list`
+    # report "<manager> is enabled but locked" instead of the empty-vault line
+    # (external backends are enabled zero-config whenever their CLI is found).
+    _disable_external_vault_backends(qh)
 
     r_list = _run_agent(tmp_path, ["vault", "list"], qubit_home=qh)
     assert r_list.returncode == 0, (r_list.returncode, r_list.stderr[-600:])

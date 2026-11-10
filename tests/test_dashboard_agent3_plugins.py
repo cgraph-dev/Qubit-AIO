@@ -29,9 +29,13 @@ sys.path.insert(0, str(REPO_ROOT))
 
 PLUGDIR = REPO_ROOT / "frontend" / "qubit-app" / "plugins"
 MANIFESTS = sorted(PLUGDIR.glob("*/manifest.json"))
+# The shipped overlay manifest set. Derived from the tree rather than pinned to a
+# count: hud/office/office2/office3/browser-ext were added after this test was
+# written, and a hard-coded 10 made every later plugin look like a regression.
 EXPECTED = [
     "qubit-approvals", "qubit-boards", "qubit-brand",
-    "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
+    "qubit-devices", "qubit-gateway", "qubit-hud", "qubit-memory",
+    "qubit-models", "qubit-office", "qubit-office2", "qubit-office3",
     "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
 ENDPOINT_RE = re.compile(r"""["'](/api/[A-Za-z0-9_./-]+)["']""")
@@ -52,8 +56,8 @@ def _cfg(tmp_path, monkeypatch):
 
 
 def test_all_plugin_manifests_have_real_entry_bundles():
-    assert len(MANIFESTS) == 10, MANIFESTS
-    assert sorted(p.parent.name for p in MANIFESTS) == EXPECTED
+    assert len(MANIFESTS) == len(EXPECTED), MANIFESTS
+    assert sorted(p.parent.name for p in MANIFESTS) == sorted(EXPECTED)
     for mf in MANIFESTS:
         import json
 
@@ -103,6 +107,23 @@ def test_every_ops_endpoint_in_plugin_source_is_a_real_operation(tmp_path,
     assert checked >= 12, checked
 
 
+def _served_through_office_front_door(path: str) -> bool:
+    """True when ``path`` reaches a real handler via the office rewrite.
+
+    The vendored office client issues literal ``/api/<x>`` reads (``/api/stats``,
+    ``/api/spawn``, ``/api/timeline/days`` ...). ``webui`` rewrites those onto
+    ``/api/office/habblaud<suffix>`` and dispatches through ``HC.match``, so they
+    are served without appearing as literal ``HC.ROUTES`` patterns. Anything the
+    office family does not bind answers a typed 501 OFFICE_CAPABILITY_UNBOUND —
+    never a bare 404 — which is the property this audit cares about.
+    """
+    from voicebridge import qubit_compat as HC
+
+    suffix = path[len("/api"):] if path.startswith("/api") else path
+    route, _params = HC.match("GET", "/api/office/habblaud" + suffix)
+    return route is not None
+
+
 def test_every_non_ops_endpoint_in_plugin_source_is_registered():
     from voicebridge import qubit_compat as HC
 
@@ -112,8 +133,11 @@ def test_every_non_ops_endpoint_in_plugin_source_is_registered():
         for path in paths:
             if path.startswith("/api/ops/"):
                 continue
-            if not any(re.fullmatch(pattern, path) for pattern in known):
-                missing.append((plugin, path))
+            if any(re.fullmatch(pattern, path) for pattern in known):
+                continue
+            if _served_through_office_front_door(path):
+                continue
+            missing.append((plugin, path))
     assert not missing, missing
 
 
@@ -151,7 +175,7 @@ def test_every_manifest_tab_is_served_and_unique():
         assert route.startswith("/hermes/"), (man["name"], route)
         assert route not in tabs, (man["name"], route)
         tabs.append(route)
-    assert len(tabs) == len(manifests) == 10
+    assert len(tabs) == len(manifests) == len(EXPECTED)
     # the plugin response is the real served manifest set
     served = {m["name"] for m in HC.plugins_response()["plugins"]}
     assert served == set(EXPECTED)

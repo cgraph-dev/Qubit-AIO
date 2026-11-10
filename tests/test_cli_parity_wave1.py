@@ -319,8 +319,19 @@ def test_family_forward_names_are_declared_in_live_parser():
     for action in CLI.build_parser()._actions:
         if isinstance(action, argparse._SubParsersAction):
             names.update(action.choices)
-    assert set(HF.FAMILY_FORWARD) <= names, sorted(
-        set(HF.FAMILY_FORWARD) - names)
+    # ``cli_qubit_forward.route()`` resolves BEFORE argparse runs, so a family
+    # can be reachable by forwarding without a Qubit parser entry — that is
+    # exactly how ddc4056ab made ``qubit connectors status`` reachable. The
+    # real invariant is therefore: every FAMILY_FORWARD family must resolve to
+    # a typed route — forwarded, confirm-gated, or a documented refusal. The
+    # failure this guards is ``None``, which lets mainstream argparse raise
+    # "invalid choice" for a family Qubit claims to expose.
+    for family in sorted(HF.FAMILY_FORWARD):
+        r = HF.route([family])
+        assert r is not None, family
+        assert r.kind in ("forward", "needs-confirm", "refused"), (family, r)
+    assert "connectors" in HF.FAMILY_FORWARD  # routed-before-argparse family
+    assert "connectors" not in names  # ...and deliberately absent from argparse
 
 
 def test_wave1_family_names_confirmed_in_parser():

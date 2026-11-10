@@ -219,9 +219,21 @@ def test_register_and_activate_is_recorded_for_remote_endpoint(tmp_path,
     assert out["kind"] == R.PLUGIN and out["local"] is False
     prof = R.get_profile(cfg, "qa-remote-endpoint")
     assert prof is not None and prof.egress_consent == "deny"
+    # The activation is recorded as the active pointer...
+    active = R.get_active_profile(cfg)
+    assert active["state"] == "OK" and active["active"] == "qa-remote-endpoint"
+    # ...but a no-pin turn never selects it. Since af8df125a the ACTIVE pointer
+    # must clear the same usability bar as a configured default, and an
+    # unreachable .invalid host leaves the 4096 creation default in place, so
+    # resolution falls through to the operator default instead of dialing it.
     resolved = R.resolve_model(cfg)
-    assert resolved.get("ok") is False
-    assert resolved.get("code") == "EGRESS_DENIED"
+    assert resolved["profile_id"] != "qa-remote-endpoint", resolved
+    assert resolved["source"] != "active", resolved
+    # Activation is not an egress bypass: asking for the profile directly is
+    # still refused by the frontier policy (never executable, never dialed).
+    explicit = R.resolve_model(cfg, "qa-remote-endpoint")
+    assert explicit.get("ok") is False, explicit
+    assert explicit.get("code") == "EGRESS_DENIED", explicit
 
 
 def test_register_and_activate_refuses_incomplete(tmp_path, monkeypatch):

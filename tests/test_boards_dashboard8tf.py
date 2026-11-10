@@ -63,7 +63,10 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read())
+        try:
+            return e.code, json.loads(e.read())
+        finally:
+            e.close()  # HTTPError owns an unclosed fp; unclosed it warns at GC.
 
 
 def _stage_confirm(port, method, path, body):
