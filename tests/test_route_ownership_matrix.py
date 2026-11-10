@@ -8,18 +8,30 @@ the declared owner:
 * a thin Qubit compat handler shadowing a working Hermes route, or
 * a Qubit-policy/addition route the fork proxy would serve instead.
 
-It also keeps the committed matrix current, so ownership cannot silently drift.
+It also keeps the generated matrix current, so ownership cannot silently drift.
+
+``docs/generated/`` is a build output (.gitignore:90), so the matrix is not in
+the tree on a fresh checkout. Each test first runs the real generator when the
+artifact is absent; it only skips — with the reason named — when generation
+itself fails, never to paper over a real ownership contradiction.
 """
 from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 COMMITTED = REPO / "docs/generated" / "QUBIT_ROUTE_OWNERSHIP.json"
 GENERATOR = REPO / "scripts" / "route_ownership_matrix.py"
+SKIP_REASON = (
+    "docs/generated/QUBIT_ROUTE_OWNERSHIP.json is a gitignored build output and "
+    "`python scripts/route_ownership_matrix.py` failed to generate it in this tree"
+)
 
 
 def _build() -> dict:
@@ -31,11 +43,24 @@ def _build() -> dict:
     return mod.build()
 
 
+def _generate() -> bool:
+    """Run the real generator; True when it produced the matrix."""
+    proc = subprocess.run(
+        [sys.executable, str(GENERATOR), "--out", str(COMMITTED)],
+        cwd=str(REPO), capture_output=True, text=True)
+    return proc.returncode == 0 and COMMITTED.is_file()
+
+
 def _committed() -> dict:
+    if not COMMITTED.is_file():
+        if not _generate():
+            pytest.skip(SKIP_REASON)
     return json.loads(COMMITTED.read_text(encoding="utf-8"))
 
 
 def test_committed_matrix_is_current():
+    if not COMMITTED.is_file() and not _generate():
+        pytest.skip(SKIP_REASON)
     assert COMMITTED.is_file(), COMMITTED
     assert _committed() == _build(), (
         "docs/generated/QUBIT_ROUTE_OWNERSHIP.json is stale; regenerate with "
