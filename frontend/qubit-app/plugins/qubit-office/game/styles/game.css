@@ -442,7 +442,7 @@
   box-shadow: var(--office-shadow);
 }
 
-.agents-panel {
+.office-game .agents-panel {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -451,12 +451,12 @@
   color: var(--office-ink);
 }
 
-.agents-panel[data-state="loading"],
-.agents-panel__error {
+.office-game .agents-panel[data-state="loading"],
+.office-game .agents-panel__error {
   color: var(--office-muted);
 }
 
-.agents-panel__error {
+.office-game .agents-panel__error {
   border: 1px solid var(--office-bad, #e0554a);
   border-radius: var(--office-radius);
   color: var(--office-bad, #e0554a);
@@ -464,7 +464,7 @@
   padding: var(--office-s2);
 }
 
-.agents-panel__summary {
+.office-game .agents-panel__summary {
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   padding-bottom: var(--office-s2);
@@ -472,12 +472,12 @@
   margin-bottom: var(--office-s2);
 }
 
-.agents-panel__division {
+.office-game .agents-panel__division {
   border-bottom: var(--office-border);
   padding: var(--office-s1) 0;
 }
 
-.agents-panel__divisionHead {
+.office-game .agents-panel__divisionHead {
   display: flex;
   gap: var(--office-s3);
   align-items: baseline;
@@ -485,29 +485,29 @@
   padding: var(--office-s1) 0;
 }
 
-.agents-panel__divisionHead::marker,
-.agents-panel__divisionHead::-webkit-details-marker {
+.office-game .agents-panel__divisionHead::marker,
+.office-game .agents-panel__divisionHead::-webkit-details-marker {
   color: var(--office-muted);
 }
 
-.agents-panel__divisionLabel {
+.office-game .agents-panel__divisionLabel {
   flex: 1 1 auto;
   font-weight: 600;
 }
 
-.agents-panel__divisionMeta {
+.office-game .agents-panel__divisionMeta {
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   white-space: nowrap;
 }
 
-.agents-panel__seats {
+.office-game .agents-panel__seats {
   list-style: none;
   margin: 0;
   padding: 0 0 var(--office-s1) var(--office-s3);
 }
 
-.agents-panel__seat {
+.office-game .agents-panel__seat {
   display: flex;
   gap: var(--office-s2);
   align-items: baseline;
@@ -515,22 +515,22 @@
   font-size: var(--office-fs-xs);
 }
 
-.agents-panel__emoji {
+.office-game .agents-panel__emoji {
   width: 1.2em;
   flex: 0 0 auto;
 }
 
-.agents-panel__name {
+.office-game .agents-panel__name {
   flex: 0 0 auto;
 }
 
-.agents-panel__meta {
+.office-game .agents-panel__meta {
   color: var(--office-muted);
   flex: 1 1 auto;
   overflow-wrap: anywhere;
 }
 
-.agents-panel__types {
+.office-game .agents-panel__types {
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   padding-top: var(--office-s2);
