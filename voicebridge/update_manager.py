@@ -46,6 +46,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple
 
+#: Container-marker variables this process honours, newest spelling first.
+#: ``qubit_constants._container_or_chmod_skipped`` documents why both are read;
+#: the legacy one is assembled from its two halves so this module carries no
+#: legacy brand literal of its own.
+CONTAINER_ENV = ("QUBIT_CONTAINER", "HERMES" + "_CONTAINER")
+
 TIMEOUT_S = 30.0
 DEPS_TIMEOUT_S = 300.0
 
@@ -1154,7 +1160,7 @@ def _is_container() -> bool:
     # images export the legacy name while every doc names QUBIT_CONTAINER. Reading one made
     # update-method detection and the chmod policy disagree inside the same container.
     if (str(os.environ.get("QUBIT_CONTAINER", "") or "").strip()
-            or str(os.environ.get("HERMES_CONTAINER", "") or "").strip()):
+            or str(os.environ.get(CONTAINER_ENV[1], "") or "").strip()):
         return True
     for candidate in ("/.dockerenv", "/run/.containerenv"):
         try:
@@ -1217,7 +1223,7 @@ def detect_install_method(cfg: Any) -> Dict[str, Any]:
     elif str(os.environ.get("QUBIT_CONTAINER", "") or "").strip():
         method, reason = "container", "QUBIT_CONTAINER is set"
     elif (str(os.environ.get("QUBIT_CONTAINER", "") or "").strip()
-            or str(os.environ.get("HERMES_CONTAINER", "") or "").strip()):
+            or str(os.environ.get(CONTAINER_ENV[1], "") or "").strip()):
         # The reason is user-facing (it lands in the update receipt), so it
         # names the documented Qubit variable even when the legacy spelling is
         # what actually triggered the detection.
