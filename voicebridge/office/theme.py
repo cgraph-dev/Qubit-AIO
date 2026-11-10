@@ -119,6 +119,25 @@ STATUS_TOKENS: Dict[str, Sequence[str]] = {
 }
 
 KNOWN_PARTS: Sequence[str] = ("skin", "eyes", "hair", "outfit", "accessory")
+
+#: Habblaud's floor kinds (``client/src/art/api.ts``), in its declared order.
+#: A pack may supply art for any subset; the others keep Habblaud's procedural
+#: floor. The set is closed because the client switch only understands these.
+FLOOR_KINDS: Sequence[str] = (
+    "carpet",
+    "wood",
+    "tile_check",
+    "tile_white",
+    "concrete",
+    "marble",
+    "grass",
+    "sidewalk",
+    "street",
+)
+#: Floor art is a tile image, never JSON/JPEG. The loader serves the declared
+#: file through the same confined static route as the atlases.
+SURFACE_SUFFIXES: Set[str] = {".png", ".webp"}
+
 ALLOWED_SUFFIXES: Set[str] = {".png", ".jpg", ".jpeg", ".webp", ".json", ".txt"}
 WINDOWS_RESERVED: Set[str] = {
     "CON", "PRN", "AUX", "NUL",
@@ -191,6 +210,7 @@ class Theme:
     slices: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     portraits: Mapping[str, Any] = field(default_factory=dict)
     bodies: Mapping[str, Any] = field(default_factory=dict)
+    surfaces: Mapping[str, Any] = field(default_factory=dict)
     files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     agents: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
@@ -737,6 +757,81 @@ def _validate_asset_section(name: str, section: Any,
 
 
 # --------------------------------------------------------------------------
+# Floor surfaces
+# --------------------------------------------------------------------------
+def _validate_surfaces_full(surfaces: Any, files: Optional[Set[str]]) -> List[str]:
+    """Validate the full-pack ``surfaces`` block (declared art files)."""
+    if surfaces is None:
+        return []
+    if not isinstance(surfaces, dict):
+        return ["surfaces: must be an object"]
+    problems: List[str] = []
+    cell = surfaces.get("cell")
+    if not isinstance(cell, int) or isinstance(cell, bool) or cell <= 0:
+        problems.append("surfaces.cell: must be a positive integer")
+    floor = surfaces.get("floor")
+    if not isinstance(floor, dict) or not floor:
+        problems.append("surfaces.floor: must be a non-empty object")
+        return problems
+    for kind, relative in floor.items():
+        if not isinstance(kind, str) or kind not in FLOOR_KINDS:
+            problems.append(
+                f"surfaces.floor: unknown floor kind {kind!r} "
+                f"(allowed: {', '.join(FLOOR_KINDS)})")
+            continue
+        if not isinstance(relative, str) or not relative:
+            problems.append(f"surfaces.floor.{kind}: path is required")
+            continue
+        problems.extend(
+            f"surfaces.floor.{kind}: {p}" for p in _path_problems(relative))
+        suffix = os.path.splitext(relative)[1].lower()
+        if suffix not in SURFACE_SUFFIXES:
+            problems.append(
+                f"surfaces.floor.{kind}: suffix {suffix or '(none)'} not allowed")
+        if files is not None and relative not in files:
+            problems.append(
+                f"surfaces.floor.{kind}: {relative!r} is not a declared file")
+    return problems
+
+
+def _validate_surfaces_recipe(surfaces: Any) -> List[str]:
+    """Validate the recipe ``surfaces`` block (coordinates only, no art)."""
+    if surfaces is None:
+        return []
+    if not isinstance(surfaces, dict):
+        return ["surfaces: must be an object"]
+    problems: List[str] = []
+    cell = surfaces.get("cell")
+    if not isinstance(cell, int) or isinstance(cell, bool) or cell <= 0:
+        problems.append("surfaces.cell: must be a positive integer")
+    floor = surfaces.get("floor")
+    if not isinstance(floor, dict) or not floor:
+        problems.append("surfaces.floor: must be a non-empty object")
+        return problems
+    for kind, descriptor in floor.items():
+        if not isinstance(kind, str) or kind not in FLOOR_KINDS:
+            problems.append(
+                f"surfaces.floor: unknown floor kind {kind!r} "
+                f"(allowed: {', '.join(FLOOR_KINDS)})")
+            continue
+        if not isinstance(descriptor, dict):
+            problems.append(f"surfaces.floor.{kind}: must be an object")
+            continue
+        sheet = descriptor.get("sheet")
+        if not isinstance(sheet, str) or not sheet:
+            problems.append(f"surfaces.floor.{kind}.sheet: is required")
+        else:
+            problems.extend(
+                f"surfaces.floor.{kind}.sheet: {p}" for p in _path_problems(sheet))
+        for key in ("col", "row"):
+            value = descriptor.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                problems.append(
+                    f"surfaces.floor.{kind}.{key}: must be a non-negative integer")
+    return problems
+
+
+# --------------------------------------------------------------------------
 # Manifest / recipe / theme validation
 # --------------------------------------------------------------------------
 def _looks_like_path(value: str) -> bool:
@@ -801,6 +896,7 @@ def _validate_common(doc: Any, require_files: bool) -> List[str]:
 
     if not require_files:
         problems.extend(_validate_slices(doc.get("slices"), None))
+        problems.extend(_validate_surfaces_recipe(doc.get("surfaces")))
     problems.extend(_validate_parts(doc.get("parts")))
     problems.extend(_validate_agents(doc.get("agents"), doc.get("parts")))
 
@@ -831,6 +927,7 @@ def validate_manifest(manifest: Any, root: Optional[Path] = None) -> List[str]:
                                         manifest.get("limits")))
     declared = set(files) if isinstance(files, dict) else set()
     problems.extend(_validate_slices(manifest.get("slices"), declared))
+    problems.extend(_validate_surfaces_full(manifest.get("surfaces"), declared))
     for section_name in ("portraits", "bodies"):
         problems.extend(_validate_asset_section(
             section_name, manifest.get(section_name), declared))
@@ -989,6 +1086,7 @@ def load_theme(root: Any) -> Theme:
         slices=dict(manifest.get("slices") or {}),
         portraits=dict(manifest.get("portraits") or {}),
         bodies=dict(manifest.get("bodies") or {}),
+        surfaces=dict(manifest.get("surfaces") or {}),
         files=dict(files),
         agents=dict(agents),
     )
@@ -1021,6 +1119,7 @@ def _classic_payload(reason: Optional[str]) -> Dict[str, Any]:
         "bodies": {"atlas": None, "index": None, "size": None, "frame": None},
         "tokens": {},
         "slices": {},
+        "surfaces": None,
         "reason": reason or "",
     }
 
@@ -1034,6 +1133,18 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
 
     portraits = theme.portraits or {}
     bodies = theme.bodies or {}
+    raw_surfaces = theme.surfaces or {}
+    surfaces_payload: Optional[Dict[str, Any]] = None
+    if raw_surfaces:
+        floor = raw_surfaces.get("floor")
+        surfaces_payload = {
+            "cell": raw_surfaces.get("cell"),
+            "floor": {
+                kind: url(relative)
+                for kind, relative in (floor or {}).items()
+                if isinstance(relative, str) and relative
+            },
+        }
     return {
         "id": theme.id,
         "label": theme.label,
@@ -1053,6 +1164,7 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
         },
         "tokens": dict(theme.tokens),
         "slices": dict(theme.slices),
+        "surfaces": surfaces_payload,
         "reason": "",
     }
 
@@ -1072,6 +1184,34 @@ def theme_payload(cfg: Any, requested: Optional[str] = None) -> Dict[str, Any]:
     except ThemeError as exc:
         return _classic_payload("theme invalid: " + "; ".join(exc.problems))
     return _active_payload(theme)
+
+
+def _script_json(value: Any) -> str:
+    """JSON that is safe to inline inside a ``<script>`` element.
+
+    JSON itself may contain ``</script>`` or ``<!--`` in pack-provided text
+    (labels, credit, tokens). Escaping ``<``/``>``/``&`` and the JS line
+    separators means the string cannot close the element or start an HTML
+    comment, while ``json.loads``/JS still parse it to the same value.
+    """
+    return (json.dumps(value)
+            .replace("<", "\\u003c")
+            .replace(">", "\\u003e")
+            .replace("&", "\\u0026")
+            .replace("\u2028", "\\u2028")
+            .replace("\u2029", "\\u2029"))
+
+
+def office_document_script(cfg: Any, requested: Optional[str] = None) -> str:
+    """The office app document's ``window.__QUBIT_OFFICE_THEME__`` global.
+
+    The theme payload is resolved once (env beats ``?theme=`` beats config) and
+    inlined for the same-origin Habblaud iframe. It is always emitted — classic
+    is a valid payload — because the client needs to distinguish "no theme" from
+    "theme not loaded yet". Pack text is JSON-encoded and inline-script escaped.
+    """
+    return ("<script>window.__QUBIT_OFFICE_THEME__=%s;</script>"
+            % _script_json(theme_payload(cfg, requested)))
 
 
 # --------------------------------------------------------------------------

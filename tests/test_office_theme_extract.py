@@ -173,10 +173,33 @@ def _fallback_members(size: int, skins: int = 3, eyes: int = 3,
     }
 
 
+def _floor_cell_color(col: int, row: int) -> tuple[int, int, int, int]:
+    """A per-cell colour, so a cropped pixel names its source coordinate."""
+    return ((col * 13 + 7) % 256, (row * 11 + 3) % 256,
+            ((col + row) * 5 + 1) % 256, 255)
+
+
+def _floor_sheet() -> Image.Image:
+    tile = E.FLOOR_TILE
+    sheet = Image.new("RGBA", (15 * tile, 40 * tile), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(sheet)
+    for col, row in E.FLOOR_MAP.values():
+        draw.rectangle(
+            [col * tile, row * tile,
+             col * tile + tile - 1, row * tile + tile - 1],
+            fill=_floor_cell_color(col, row))
+    return sheet
+
+
+def _interior_members() -> dict[str, bytes]:
+    return {E.FLOOR_SHEET: _png(_floor_sheet())}
+
+
 def _make_purchase(tmp_path: Path, *, size: int = 32, portrait: bool = True,
                    fallback: bool = False, character: bool = True,
-                   skins: int = 3, eyes: int = 3, hair: int = 3,
-                   outfits: int = 3, bodies: int = 3, body_tint: int = 0) -> Path:
+                   interior: bool = True, skins: int = 3, eyes: int = 3,
+                   hair: int = 3, outfits: int = 3, bodies: int = 3,
+                   body_tint: int = 0) -> Path:
     root = tmp_path / "UI Office"
     root.mkdir(parents=True)
     if character:
@@ -190,6 +213,8 @@ def _make_purchase(tmp_path: Path, *, size: int = 32, portrait: bool = True,
     if fallback:
         _write_zip(root / E.FALLBACK_ZIP_NAMES[0],
                    _fallback_members(size, skins=skins, eyes=eyes, hair=hair))
+    if interior:
+        _write_zip(root / E.INTERIOR_ZIP_NAMES[0], _interior_members())
     return root
 
 
@@ -562,7 +587,72 @@ def test_calibrate_out_without_calibrate_is_a_usage_error(tmp_path, capsys):
     assert "--calibrate-out requires --calibrate" in capsys.readouterr().err
 
 
+# ------------------------------------------------------------ floor surfaces
+def test_extract_floor_tiles_crops_the_mapped_cells(tmp_path):
+    root = _make_purchase(tmp_path)
+    out = tmp_path / "pack" / "limezu"
+    written = E.extract_floor_tiles(str(root), str(out))
+
+    assert set(written) == set(E.FLOOR_MAP)
+    assert set(written) == {"wood", "carpet", "tile_check", "tile_white",
+                            "marble", "concrete"}
+    for kind, (col, row) in E.FLOOR_MAP.items():
+        path = written[kind]
+        assert path == out / "surfaces" / f"floor_{kind}.png"
+        assert path.is_file()
+        with Image.open(path) as tile:
+            assert tile.size == (E.FLOOR_TILE, E.FLOOR_TILE)
+            assert tile.convert("RGBA").getpixel((8, 8)) == _floor_cell_color(
+                col, row)
+    # Unmapped kinds are absent, never invented.
+    files = {p.name for p in (out / "surfaces").iterdir()}
+    assert files == {f"floor_{kind}.png" for kind in E.FLOOR_MAP}
+
+
+def test_extract_floor_tiles_missing_sheet_is_a_typed_error(tmp_path):
+    root = _make_purchase(tmp_path, interior=False)
+    with pytest.raises(B.ThemeBuildError) as info:
+        E.extract_floor_tiles(str(root), str(tmp_path / "out"))
+    assert E.FLOOR_SHEET in str(info.value)
+    assert not (tmp_path / "out").exists()
+
+
+def test_extract_floor_tiles_accepts_a_direct_zip(tmp_path):
+    root = _make_purchase(tmp_path)
+    archive = root / E.INTERIOR_ZIP_NAMES[0]
+    written = E.extract_floor_tiles(str(archive), str(tmp_path / "out"))
+    assert set(written) == set(E.FLOOR_MAP)
+
+
+def test_extract_floor_tiles_refuses_repository_output(tmp_path):
+    root = _make_purchase(tmp_path)
+    with pytest.raises(B.ThemeBuildError) as info:
+        E.extract_floor_tiles(str(root), str(REPO / "floor-out"))
+    assert "inside the repository" in str(info.value)
+    assert not (REPO / "floor-out").exists()
+
+
+def test_extract_floor_tiles_only_crops_16px_cells(tmp_path):
+    root = _make_purchase(tmp_path)
+    with pytest.raises(B.ThemeBuildError) as info:
+        E.extract_floor_tiles(str(root), str(tmp_path / "out"), size=32)
+    assert "16px" in str(info.value)
+
+
 # ------------------------------------------------------------- real purchase
+@pytest.mark.skipif(
+    not os.environ.get("QUBIT_UI_OFFICE"),
+    reason="set QUBIT_UI_OFFICE to the purchased art directory to run")
+def test_real_purchase_extracts_the_floor_tiles(tmp_path):
+    written = E.extract_floor_tiles(
+        os.environ["QUBIT_UI_OFFICE"], str(tmp_path / "pack"))
+    assert set(written) == set(E.FLOOR_MAP)
+    for path in written.values():
+        with Image.open(path) as tile:
+            assert tile.size == (E.FLOOR_TILE, E.FLOOR_TILE)
+            assert tile.convert("RGBA").getchannel("A").getbbox() is not None
+
+
 @pytest.mark.skipif(
     not os.environ.get("QUBIT_UI_OFFICE"),
     reason="set QUBIT_UI_OFFICE to the purchased art directory to run")

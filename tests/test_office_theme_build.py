@@ -411,6 +411,101 @@ def test_built_pack_passes_the_real_contract(tmp_path):
     assert T.validate_recipe(B.shareable_recipe(manifest, recipes)) == []
 
 
+# ---------------------------------------------------------- floor surfaces
+def _floor_png(color=(168, 138, 68, 255), size: int = 16) -> bytes:
+    return _png(Image.new("RGBA", (size, size), color))
+
+
+SURFACES = {
+    "cell": 16,
+    "floor": {"wood": {"sheet": "floors.png", "col": 0, "row": 13}},
+}
+
+
+def test_build_includes_surface_tiles_and_manifest(tmp_path):
+    floors = {"wood": _floor_png((168, 138, 68, 255)),
+              "marble": _floor_png((146, 147, 141, 255))}
+    out, manifest = _build(tmp_path, floors=floors)
+
+    assert manifest["surfaces"] == {
+        "cell": 16,
+        "floor": {
+            "marble": "surfaces/floor_marble.png",
+            "wood": "surfaces/floor_wood.png",
+        },
+    }
+    for kind, png in floors.items():
+        rel = f"surfaces/floor_{kind}.png"
+        data = (out / rel).read_bytes()
+        assert manifest["files"][rel] == {
+            "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+        with Image.open(io.BytesIO(data)) as tile:
+            decoded = tile.convert("RGBA")
+            assert decoded.size == (16, 16)
+            assert decoded.getpixel((8, 8)) == Image.open(
+                io.BytesIO(png)).convert("RGBA").getpixel((8, 8))
+    assert T.validate_theme(out) == []
+
+
+def test_build_rejects_unknown_and_wrong_size_floors(tmp_path):
+    with pytest.raises(B.ThemeBuildError) as info:
+        _build(tmp_path / "unknown", floors={"lava": _floor_png()})
+    assert "lava" in str(info.value)
+    with pytest.raises(B.ThemeBuildError) as info:
+        _build(tmp_path / "big", floors={"wood": _floor_png(size=32)})
+    assert "16px" in str(info.value)
+
+
+def test_recipe_carries_surface_coordinates_without_art(tmp_path):
+    recipe_path = tmp_path / "limezu" / "theme.recipe.json"
+    recipe = B.build_recipe(B.DEFAULT_SOURCE, recipe_path,
+                            personas=PERSONAS, layers=_layers(),
+                            surfaces=SURFACES)
+    assert recipe["surfaces"] == SURFACES
+    assert T.validate_recipe(recipe) == []
+    assert "files" not in recipe
+    assert "surfaces/floor_" not in json.dumps(recipe)
+    # A recipe with coordinates is still the only file written.
+    assert sorted(p.name for p in recipe_path.parent.iterdir()) == [
+        "theme.recipe.json"]
+
+
+def test_cli_recipe_out_writes_surface_coordinates(tmp_path, monkeypatch):
+    monkeypatch.setattr(B, "extract_layers", lambda source, size=32: _layers())
+    monkeypatch.setattr(B, "_default_personas", lambda: list(PERSONAS))
+    monkeypatch.setattr(
+        B, "_floor_inputs",
+        lambda source: ({"wood": _floor_png()}, SURFACES))
+    recipe_path = tmp_path / "limezu" / "theme.recipe.json"
+
+    assert B.main(["--source", str(tmp_path / "purchase"),
+                   "--recipe-out", str(recipe_path)]) == 0
+    recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
+    assert recipe["surfaces"] == SURFACES
+    assert "files" not in recipe
+
+
+def test_cli_build_includes_floors_and_check_reproduces(tmp_path, monkeypatch):
+    monkeypatch.setattr(B, "extract_layers", lambda source, size=32: _layers())
+    monkeypatch.setattr(B, "_default_personas", lambda: list(PERSONAS))
+    monkeypatch.setattr(
+        B, "_floor_inputs",
+        lambda source: ({"wood": _floor_png(), "marble": _floor_png()},
+                        SURFACES))
+    out = tmp_path / "demo"
+
+    assert B.main(["--source", str(tmp_path / "purchase"),
+                   "--out", str(out)]) == 0
+    manifest = _read_json(out / "theme.json")
+    assert manifest["surfaces"]["floor"]["wood"] == "surfaces/floor_wood.png"
+    assert manifest["surfaces"]["floor"]["marble"] == "surfaces/floor_marble.png"
+    assert (out / "surfaces/floor_wood.png").is_file()
+    assert (out / "surfaces/floor_marble.png").is_file()
+    assert T.validate_theme(out) == []
+    assert B.main(["--source", str(tmp_path / "purchase"),
+                   "--out", str(out), "--check"]) == 0
+
+
 def test_build_recipe_writes_only_a_valid_art_free_recipe(tmp_path):
     recipe_path = tmp_path / "limezu" / "theme.recipe.json"
     recipe = B.build_recipe(B.DEFAULT_SOURCE, recipe_path,

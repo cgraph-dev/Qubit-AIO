@@ -91,6 +91,7 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import re
 import sys
 import zipfile
@@ -122,6 +123,26 @@ _SIZES = (16, 32, 48)
 
 #: Body-side part directories under ``Character Pieces``.
 _BODY_PARTS = ("Bodies", "Outfits", "Eyes", "Hairstyles")
+
+#: Canonical interior archive, searched when the source names a directory.
+INTERIOR_ZIP_NAMES: Tuple[str, ...] = ("moderninteriors-win.zip",)
+
+#: The measured floor sheet inside the interior archive (16px tiles).
+FLOOR_SHEET = "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+FLOOR_TILE = 16
+
+#: ``FloorKind`` -> ``(col, row)`` on :data:`FLOOR_SHEET` (measured 2026-11-09).
+#: Only the six kinds the interior pack actually contains are mapped; grass,
+#: street and sidewalk are absent from this sheet and keep Habblaud's
+#: procedural floor.
+FLOOR_MAP: Dict[str, Tuple[int, int]] = {
+    "wood": (0, 13),
+    "carpet": (0, 16),
+    "tile_check": (0, 2),
+    "tile_white": (0, 5),
+    "marble": (12, 6),
+    "concrete": (12, 17),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +451,131 @@ def extract_layers(source: str, *, size: int = 32) -> Dict[str, List[object]]:
     if not layers.get("skin"):
         raise ThemeBuildError("skin: no portrait skins were extracted")
     return layers
+
+
+# ---------------------------------------------------------------------------
+# Floor surfaces (B1)
+# ---------------------------------------------------------------------------
+def _inside_repository(path: os.PathLike | str) -> bool:
+    resolved = Path(path).resolve()
+    return resolved == _REPO_ROOT or _REPO_ROOT in resolved.parents
+
+
+def _floor_member(names: Sequence[str]) -> Optional[str]:
+    """The archive member holding the floor sheet, matched by suffix."""
+    normalized = [name.replace("\\", "/") for name in names]
+    basename = FLOOR_SHEET.rsplit("/", 1)[-1]
+    for name in normalized:
+        if name == FLOOR_SHEET or name.endswith("/" + FLOOR_SHEET):
+            return name
+    for name in normalized:
+        if name.rsplit("/", 1)[-1] == basename:
+            return name
+    return None
+
+
+def _archive_names(path: Path) -> Optional[List[str]]:
+    try:
+        with zipfile.ZipFile(path) as archive:
+            return archive.namelist()
+    except (zipfile.BadZipFile, OSError):
+        return None
+
+
+def _resolve_floor_zip(source: str) -> Tuple[Path, str]:
+    """Return ``(archive, member)`` for the measured floor sheet."""
+    if not isinstance(source, str) or not source.strip():
+        raise ThemeBuildError("source: a purchase directory or zip path is required")
+    path = Path(source).expanduser()
+    if path.is_file():
+        if path.suffix.lower() != ".zip":
+            raise ThemeBuildError(
+                f"{path.name}: expected a .zip purchase archive, got "
+                f"{path.suffix or 'no extension'}")
+        names = _archive_names(path)
+        if names is None:
+            raise ThemeBuildError(
+                f"{path.name}: not a valid zip archive")
+        member = _floor_member(names)
+        if member is not None:
+            return path, member
+        search_dir = path.parent
+    elif path.is_dir():
+        search_dir = path
+    else:
+        raise ThemeBuildError(f"{path}: source not found")
+
+    candidates: List[Path] = []
+    for name in INTERIOR_ZIP_NAMES:
+        candidate = search_dir / name
+        if candidate.is_file():
+            candidates.append(candidate)
+    for candidate in sorted(search_dir.glob("*.zip"), key=lambda p: p.name):
+        if candidate.is_file() and candidate not in candidates:
+            candidates.append(candidate)
+    for candidate in candidates:
+        names = _archive_names(candidate)
+        if names is None:
+            continue
+        member = _floor_member(names)
+        if member is not None:
+            return candidate, member
+    raise ThemeBuildError(
+        f"{FLOOR_SHEET}: not found under {search_dir} "
+        f"(the interior pack {INTERIOR_ZIP_NAMES[0]} supplies the floors)")
+
+
+def extract_floor_tiles(source: str, out_dir: str, *,
+                        size: int = FLOOR_TILE) -> Dict[str, Path]:
+    """Crop the mapped floor tiles from the interior purchase, in memory.
+
+    The sheet is read straight from the zip and each mapped 16x16 cell is
+    written as ``<out_dir>/surfaces/floor_<kind>.png``. Only the mapped kinds
+    are emitted; an unmapped ``FloorKind`` is absent, so the client keeps its
+    procedural floor. Raises :class:`office_theme_build.ThemeBuildError` when
+    the sheet is missing/undecodable or a mapped cell lies outside it, and it
+    refuses to write the paid art inside the repository.
+    """
+    if (not isinstance(size, int) or isinstance(size, bool)
+            or size != FLOOR_TILE):
+        raise ThemeBuildError(
+            f"size: floor tiles are {FLOOR_TILE}px (got {size!r})")
+    target = Path(out_dir)
+    if _inside_repository(target):
+        raise ThemeBuildError(
+            f"floor output: refusing to write inside the repository ({target}); "
+            "the purchased art must stay outside the tree")
+
+    archive_path, member = _resolve_floor_zip(source)
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            data = archive.read(member)
+    except (KeyError, OSError, RuntimeError, zipfile.BadZipFile) as exc:
+        raise ThemeBuildError(
+            f"{archive_path.name}: cannot read {member} ({exc})") from exc
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+    except Exception as exc:  # noqa: BLE001 - any decode failure is typed
+        raise ThemeBuildError(
+            f"{archive_path.name}: {member} is not a decodable image "
+            f"({exc})") from exc
+    image = image.convert("RGBA")
+
+    surfaces = target / "surfaces"
+    surfaces.mkdir(parents=True, exist_ok=True)
+    written: Dict[str, Path] = {}
+    for kind, (col, row) in FLOOR_MAP.items():
+        x, y = col * size, row * size
+        if x + size > image.width or y + size > image.height:
+            raise ThemeBuildError(
+                f"floor {kind}: cell ({col},{row}) is outside the "
+                f"{image.width}x{image.height} sheet")
+        tile = image.crop((x, y, x + size, y + size))
+        path = surfaces / f"floor_{kind}.png"
+        tile.save(path, format="PNG")
+        written[kind] = path
+    return written
 
 
 # ---------------------------------------------------------------------------
@@ -822,9 +968,14 @@ __all__ = [
     "CHARACTER_ZIP_NAMES",
     "DEFAULT_TOKENS",
     "FALLBACK_ZIP_NAMES",
+    "FLOOR_MAP",
+    "FLOOR_SHEET",
+    "FLOOR_TILE",
+    "INTERIOR_ZIP_NAMES",
     "PORTRAIT_ZIP_NAMES",
     "SEMANTIC_TOKENS",
     "derive_tokens",
+    "extract_floor_tiles",
     "extract_layers",
     "load_ui_sheet",
     "main",

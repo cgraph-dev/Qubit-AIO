@@ -97,6 +97,9 @@ DEFAULT_LICENSE = (
 DEFAULT_COLS = 20
 BODY_VARIANT = 0
 
+#: Floor tiles are integer 16px cells (the measured interior sheet).
+FLOOR_TILE = 16
+
 #: Z-order, exactly as measured. The body draws the base body first, then the
 #: outfit's rows, then the shared eyes and hair. The portrait draws the skin,
 #: then eyes, hair, and (optional) an accessory.
@@ -667,6 +670,58 @@ def _resolve_personas(personas: Any) -> List[str]:
     return sorted(slugs)
 
 
+def _prepare_floors(floors: Any) -> Dict[str, bytes]:
+    """Decode + normalise supplied floor tiles to 16px PNG bytes.
+
+    Returns ``{kind: png_bytes}``. Every tile must be a square 16x16 image: the
+    client repeats it as one floor cell, so a different size would be scaled by
+    the renderer and drift from the measured sheet. The art is re-encoded to
+    PNG so the manifest's ``.png`` name is truthful whatever the input format.
+    """
+    if floors is None:
+        return {}
+    if not isinstance(floors, Mapping):
+        raise ThemeBuildError(
+            "floors: must be a mapping of FloorKind -> image bytes")
+    prepared: Dict[str, bytes] = {}
+    problems: List[str] = []
+    for kind, data in floors.items():
+        if not isinstance(kind, str) or kind not in theme_contract.FLOOR_KINDS:
+            problems.append(f"floors: unknown floor kind {kind!r}")
+            continue
+        if not isinstance(data, (bytes, bytearray)) or not data:
+            problems.append(f"floors.{kind}: must be non-empty image bytes")
+            continue
+        image = _decode(bytes(data))
+        if image is None:
+            problems.append(f"floors.{kind}: not a decodable image")
+            continue
+        if image.width != image.height:
+            problems.append(f"floors.{kind}: tile must be square")
+            continue
+        if image.width != FLOOR_TILE:
+            problems.append(
+                f"floors.{kind}: tile must be {FLOOR_TILE}px "
+                f"(got {image.width})")
+            continue
+        prepared[kind] = _encode_png(image)
+    if problems:
+        raise ThemeBuildError(problems)
+    return prepared
+
+
+def _floor_surfaces_block(floors: Mapping[str, bytes]) -> Optional[Dict[str, Any]]:
+    """The full-pack ``surfaces`` block for prepared floor tiles."""
+    if not floors:
+        return None
+    return {
+        "cell": FLOOR_TILE,
+        "floor": {
+            kind: f"surfaces/floor_{kind}.png" for kind in sorted(floors)
+        },
+    }
+
+
 def _json_bytes(document: Any) -> bytes:
     return (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
@@ -676,9 +731,16 @@ def _sha(data: bytes) -> str:
 
 
 def shareable_recipe(manifest: Mapping[str, Any],
-                     recipes: Mapping[str, Mapping[str, int]]) -> Dict[str, Any]:
-    """The shareable ``theme.recipe.json`` derived from a built manifest."""
-    return {
+                     recipes: Mapping[str, Mapping[str, int]],
+                     surfaces: Optional[Mapping[str, Any]] = None
+                     ) -> Dict[str, Any]:
+    """The shareable ``theme.recipe.json`` derived from a built manifest.
+
+    ``surfaces`` is the *recipe* form (``{cell, floor:{kind:{sheet,col,row}}}``);
+    the full pack's file form is never copied into the shareable recipe, which
+    must carry coordinates only (no art, no file map).
+    """
+    recipe = {
         "format": manifest["format"],
         "schema": manifest["schema"],
         "id": manifest["id"],
@@ -693,6 +755,9 @@ def shareable_recipe(manifest: Mapping[str, Any],
         "parts": dict(manifest["parts"]),
         "agents": {slug: dict(recipe) for slug, recipe in recipes.items()},
     }
+    if surfaces is not None:
+        recipe["surfaces"] = dict(surfaces)
+    return recipe
 
 
 def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
@@ -701,6 +766,7 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
                  credit: str = DEFAULT_CREDIT,
                  tokens: Optional[Mapping[str, str]] = None,
                  slices: Optional[Mapping[str, Mapping[str, Any]]] = None,
+                 surfaces: Optional[Mapping[str, Any]] = None,
                  label: Optional[str] = None) -> Dict[str, Any]:
     """Write ONLY the shareable ``theme.recipe.json`` for a purchase.
 
@@ -757,7 +823,7 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
         "slices": dict(slices or {}),
         "parts": parts,
     }
-    recipe = shareable_recipe(manifest, recipes)
+    recipe = shareable_recipe(manifest, recipes, surfaces=surfaces)
     recipe_problems = theme_contract.validate_recipe(recipe)
     if recipe_problems:
         raise ThemeBuildError(recipe_problems)
@@ -792,7 +858,8 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
                 personas: Any = None, layers: Any = None,
                 license: str = DEFAULT_LICENSE,
                 credit: str = DEFAULT_CREDIT,
-                tokens: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
+                tokens: Optional[Mapping[str, str]] = None,
+                floors: Optional[Mapping[str, bytes]] = None) -> Dict[str, Any]:
     """Build a local theme pack and return its manifest.
 
     ``layers`` must be supplied (Task 3's extractor does that for the CLI);
@@ -831,6 +898,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
 
     normalized = _normalize_layers(layers)
     _require(normalized, ("skin", "eyes", "hair", "outfit", "body"))
+    floor_png = _prepare_floors(floors)
     slugs = _resolve_personas(personas)
     cols = DEFAULT_COLS
     rows = max(1, math.ceil(len(slugs) / cols))
@@ -903,6 +971,9 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         "agents.json": _json_bytes(agents_doc),
         "agent_sheets.json": _json_bytes(sheets_doc),
     }
+    for kind, data in floor_png.items():
+        payloads[f"surfaces/floor_{kind}.png"] = data
+    surfaces_block = _floor_surfaces_block(floor_png)
 
     label = out_path.name.replace("-", " ").replace("_", " ").title()
     manifest: Dict[str, Any] = {
@@ -939,6 +1010,8 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         },
         "limits": {"max_total_bytes": 64 * 1024 * 1024, "max_files": 32},
     }
+    if surfaces_block is not None:
+        manifest["surfaces"] = surfaces_block
 
     structural = theme_contract.validate_manifest(manifest)
     if structural:
@@ -1178,14 +1251,53 @@ def extract_layers(source: str, *, size: int = 32) -> Dict[str, List[Sheet]]:
     return function(source, size=size)
 
 
+def _floor_inputs(source: str) -> Tuple[Dict[str, bytes],
+                                        Optional[Dict[str, Any]]]:
+    """Read the measured floor tiles and their recipe coordinates.
+
+    The interior pack is optional: a purchase without it builds a pack with no
+    ``surfaces`` (Habblaud keeps its procedural floor). A present-but-broken
+    sheet is a warning, not a build failure, so a partial purchase still yields
+    the portrait/body pack.
+    """
+    try:
+        import office_theme_extract as extractor  # type: ignore
+    except Exception:  # noqa: BLE001 - the extractor is optional here
+        return {}, None
+    function = getattr(extractor, "extract_floor_tiles", None)
+    if not callable(function):
+        return {}, None
+    floors: Dict[str, bytes] = {}
+    with tempfile.TemporaryDirectory(prefix="office-theme-floors-") as work:
+        try:
+            paths = function(source, work)
+        except ThemeBuildError as exc:
+            print(f"warning: floor surfaces skipped: {exc}", file=sys.stderr)
+            return {}, None
+        floors = {kind: path.read_bytes() for kind, path in paths.items()}
+    floor_map = getattr(extractor, "FLOOR_MAP", {})
+    sheet = getattr(extractor, "FLOOR_SHEET", "")
+    cell = getattr(extractor, "FLOOR_TILE", FLOOR_TILE)
+    surfaces = {
+        "cell": cell,
+        "floor": {
+            kind: {"sheet": sheet, "col": col, "row": row}
+            for kind, (col, row) in floor_map.items() if kind in floors
+        },
+    }
+    return floors, (surfaces if surfaces["floor"] else None)
+
+
 def _check(args: argparse.Namespace,
-           layers: Mapping[str, List[Sheet]]) -> int:
+           layers: Mapping[str, List[Sheet]],
+           floors: Optional[Mapping[str, bytes]] = None) -> int:
     out = Path(args.out)
     if not out.is_dir():
         raise ThemeBuildError(f"check: {out} does not exist")
     with tempfile.TemporaryDirectory(prefix="office-theme-check-") as work:
         rebuilt = Path(work) / out.name
-        build_theme(DEFAULT_SOURCE, rebuilt, size=args.size, layers=layers)
+        build_theme(DEFAULT_SOURCE, rebuilt, size=args.size, layers=layers,
+                    floors=floors)
         problems = compare_packs(out, rebuilt)
     if problems:
         for problem in problems:
@@ -1237,8 +1349,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
     try:
         layers = extract_layers(args.source, size=args.size)
+        floors: Dict[str, bytes] = {}
+        surfaces: Optional[Dict[str, Any]] = None
+        if not args.calibrate:
+            floors, surfaces = _floor_inputs(args.source)
         if args.check:
-            return _check(args, layers)
+            return _check(args, layers, floors)
         if args.calibrate:
             return _calibrate(args, layers)
         tokens = None
@@ -1253,7 +1369,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     print(f"warning: palette fallback: {reason}", file=sys.stderr)
         if args.recipe_out:
             recipe = build_recipe(DEFAULT_SOURCE, args.recipe_out,
-                                  size=args.size, layers=layers, tokens=tokens)
+                                  size=args.size, layers=layers, tokens=tokens,
+                                  surfaces=surfaces)
             print(json.dumps({
                 "ok": True,
                 "recipe": str(Path(args.recipe_out)),
@@ -1262,7 +1379,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             }, indent=2, sort_keys=True))
             return 0
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
-                               layers=layers, tokens=tokens)
+                               layers=layers, tokens=tokens, floors=floors)
         recipes = json.loads(
             (Path(args.out) / "agents.json").read_text(encoding="utf-8")
         )["recipes"]

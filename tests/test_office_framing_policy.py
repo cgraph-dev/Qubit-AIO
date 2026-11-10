@@ -138,6 +138,7 @@ def _write_pack(home):
     write("bodies/index.json", json.dumps(
         {"schema": 1, "size": 32, "frame": {"w": 32, "h": 64},
          "cols": 4, "rows": 4, "cells": {}}).encode())
+    write("surfaces/floor_wood.png", b"\x89PNG\r\n\x1a\nfloor")
     manifest = {
         "format": T.FORMAT, "schema": T.SCHEMA, "id": THEME_ID,
         "label": "Demo", "version": "1.0.0",
@@ -156,6 +157,8 @@ def _write_pack(home):
                    "index": "bodies/index.json",
                    "size": 32, "cols": 4, "rows": 4,
                    "frame": {"w": 32, "h": 64}},
+        "surfaces": {"cell": 16,
+                     "floor": {"wood": "surfaces/floor_wood.png"}},
     }
     (root / "theme.json").write_text(json.dumps(manifest), encoding="utf-8")
     return root
@@ -276,6 +279,62 @@ def test_token_and_stream_globals_survive_the_style(plugin_root, themed_home):
     assert "window.__QUBIT_SESSION_TOKEN__=" in body
     assert "window.__QUBIT_OFFICE_STREAM_URL__=" in body
     assert len(_style_blocks(body)) == 1
+
+
+# --------------------------------------------------------------------------
+# 3b. The office app DOCUMENT gets its own theme global (the iframe reads it)
+# --------------------------------------------------------------------------
+def _office_global(body):
+    match = re.search(
+        r"window\.__QUBIT_OFFICE_THEME__=(\{.*?\});</script>", body, re.S)
+    assert match, body
+    return json.loads(match.group(1))
+
+
+def test_office_app_document_injects_the_theme_global(plugin_root, themed_home):
+    h = _make_handler(sub="qubit-office/habblaud/?theme=demo")
+    h._serve_plugin_app("qubit-office/habblaud/?theme=demo")
+    body = _body(h)
+
+    payload = _office_global(body)
+    assert payload["id"] == THEME_ID and payload["active"] is True
+    assert payload["surfaces"]["cell"] == 16
+    assert payload["surfaces"]["floor"]["wood"].endswith(
+        "surfaces/floor_wood.png?v=1.0.0")
+    assert "files" not in payload
+    assert body.index("__QUBIT_OFFICE_THEME__") < body.index("</head>")
+
+
+def test_classic_office_app_still_gets_the_classic_global(plugin_root,
+                                                         themed_home):
+    h = _make_handler(sub="qubit-office/habblaud/")
+    h._serve_plugin_app("qubit-office/habblaud/")
+    body = _body(h)
+    payload = _office_global(body)
+    assert payload["id"] == "classic"
+    assert payload["surfaces"] is None
+    # The classic style is still absent; only the global distinguishes it.
+    assert "data-office-theme" not in body
+
+
+def test_other_plugin_app_gets_no_office_theme_global(plugin_root, themed_home):
+    h = _make_handler(sub="other/app/?theme=demo")
+    h._serve_plugin_app("other/app/?theme=demo")
+    assert "__QUBIT_OFFICE_THEME__" not in _body(h)
+
+
+def test_office_app_global_escapes_pack_text(plugin_root, themed_home):
+    manifest_path = themed_home / "office/themes" / THEME_ID / "theme.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest["label"] = '</script><script>alert(1)</script>'
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    h = _make_handler(sub="qubit-office/habblaud/?theme=demo")
+    h._serve_plugin_app("qubit-office/habblaud/?theme=demo")
+    body = _body(h)
+    assert "<script>alert(1)</script>" not in body
+    assert "\\u003c/script\\u003e" in body
+    assert _office_global(body)["label"] == manifest["label"]
 
 
 def test_csp_still_allows_inline_styles():

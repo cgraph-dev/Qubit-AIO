@@ -3168,14 +3168,35 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # Only the Qubit Office document gets the theme. The style carries
             # allowlisted variables only (no slices, so no ``url(``); a classic
             # or invalid theme yields "" and nothing is injected.
+            cfg = getattr(getattr(self.app, "orch", None), "cfg", None)
+            style_html = ""
             try:
                 from .office import theme as _office_theme
-                cfg = getattr(getattr(self.app, "orch", None), "cfg", None)
                 style_html = _office_theme.theme_style_html(
                     cfg, requested=requested_theme)
             except Exception as exc:  # noqa: BLE001 - a broken theme must not break the app
                 log.warning("office theme style skipped: %s", exc)
-                style_html = ""
+                _office_theme = None
+            # The iframe is a SEPARATE same-origin document, so the host
+            # shell's theme global does not reach it. Emit the same resolved
+            # payload here as ``window.__QUBIT_OFFICE_THEME__`` so the vendored
+            # client can read real floor surfaces. Classic is included (small
+            # JSON); the payload carries URLs, never the file/hash map. Pack
+            # text is JSON-encoded and inline-script escaped, so a label cannot
+            # close the <script> element.
+            script_html = ""
+            if _office_theme is not None:
+                try:
+                    script_html = _office_theme.office_document_script(
+                        cfg, requested=requested_theme)
+                except Exception as exc:  # noqa: BLE001 - never break the app
+                    log.warning("office theme global skipped: %s", exc)
+                    script_html = ""
+            if script_html:
+                if "</head>" in html:
+                    html = html.replace("</head>", script_html + "</head>", 1)
+                else:
+                    html = script_html + html
             if style_html:
                 if "</head>" in html:
                     html = html.replace("</head>", style_html + "</head>", 1)

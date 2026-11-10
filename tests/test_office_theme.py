@@ -114,6 +114,20 @@ def _pack(root, source="owner purchase, 2026-11-09", tokens=None):
     return root
 
 
+def _add_surfaces(pack, kinds=("wood", "marble")):
+    """Declare floor surfaces on an already-written pack (arbitrary PNG bytes)."""
+    manifest = json.loads((pack / "theme.json").read_text())
+    floor = {}
+    for kind in kinds:
+        rel = f"surfaces/floor_{kind}.png"
+        manifest["files"][rel] = _write(
+            pack, rel, f"PNG-FLOOR-{kind}".encode())
+        floor[kind] = rel
+    manifest["surfaces"] = {"cell": 16, "floor": floor}
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    return pack
+
+
 def _recipe(**overrides):
     recipe = {
         "format": T.FORMAT,
@@ -164,6 +178,112 @@ def test_valid_pack_validates_and_loads(tmp_path):
 
 def test_valid_recipe_validates_without_art(tmp_path):
     assert T.validate_recipe(_recipe()) == []
+
+
+# ------------------------------------------------------------- surfaces
+def test_valid_pack_with_surfaces_validates_and_loads(tmp_path):
+    pack = _add_surfaces(_pack(tmp_path))
+    assert T.validate_theme(pack) == []
+    theme = T.load_theme(pack)
+    assert theme.surfaces["cell"] == 16
+    assert theme.surfaces["floor"]["wood"] == "surfaces/floor_wood.png"
+
+
+def test_surfaces_relpath_must_be_declared(tmp_path):
+    pack = _pack(tmp_path)
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["surfaces"] = {
+        "cell": 16, "floor": {"wood": "surfaces/floor_wood.png"}}
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    problems = T.validate_manifest(manifest)
+    assert any("declared file" in p for p in problems), problems
+
+
+@pytest.mark.parametrize("kind", ["lava", "carpet2", "Wood", ""])
+def test_surfaces_unknown_kind_is_refused(tmp_path, kind):
+    pack = _add_surfaces(_pack(tmp_path))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["surfaces"]["floor"] = {kind: "surfaces/floor_wood.png"}
+    assert any("kind" in p for p in T.validate_manifest(manifest))
+
+
+def test_surfaces_suffix_must_be_png_or_webp(tmp_path):
+    pack = _pack(tmp_path)
+    manifest = json.loads((pack / "theme.json").read_text())
+    rel = "surfaces/floor_wood.json"
+    manifest["files"][rel] = _write(pack, rel, b"{}")
+    manifest["surfaces"] = {"cell": 16, "floor": {"wood": rel}}
+    problems = T.validate_manifest(manifest)
+    assert any("suffix" in p for p in problems), problems
+
+
+def test_surfaces_cell_must_be_positive(tmp_path):
+    pack = _add_surfaces(_pack(tmp_path))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["surfaces"]["cell"] = 0
+    assert any("cell" in p for p in T.validate_manifest(manifest))
+
+
+def test_recipe_surfaces_accept_coordinates_without_art():
+    recipe = _recipe(surfaces={
+        "cell": 16,
+        "floor": {"wood": {"sheet": "floors.png", "col": 0, "row": 13}},
+    })
+    assert T.validate_recipe(recipe) == []
+
+
+@pytest.mark.parametrize("surfaces", [
+    {"cell": 0, "floor": {"wood": {"sheet": "f.png", "col": 0, "row": 0}}},
+    {"cell": 16, "floor": {"lava": {"sheet": "f.png", "col": 0, "row": 0}}},
+    {"cell": 16, "floor": {"wood": {"sheet": "f.png", "col": -1, "row": 0}}},
+    {"cell": 16, "floor": {"wood": {"sheet": "f.png", "col": 0, "row": True}}},
+    {"cell": 16, "floor": {"wood": {"sheet": "../escape.png", "col": 0, "row": 0}}},
+    {"cell": 16, "floor": {"wood": {"col": 0, "row": 0}}},
+])
+def test_recipe_surfaces_reject_bad_coordinates(surfaces):
+    assert T.validate_recipe(_recipe(surfaces=surfaces))
+
+
+def test_recipe_surfaces_are_never_files(tmp_path):
+    recipe = _recipe(surfaces={
+        "cell": 16,
+        "floor": {"wood": {"sheet": "floors.png", "col": 0, "row": 13}},
+    })
+    assert "files" not in recipe
+    assert T.validate_recipe(recipe) == []
+
+
+def test_payload_exposes_surface_urls_and_no_file_map(tmp_path, monkeypatch):
+    pack = _add_surfaces(_pack(tmp_path))
+    monkeypatch.setattr(T, "theme_roots", lambda: [tmp_path])
+    monkeypatch.delenv("QUBIT_OFFICE_THEME", raising=False)
+    payload = T.theme_payload({}, requested="demo")
+    assert payload["surfaces"]["cell"] == 16
+    wood = payload["surfaces"]["floor"]["wood"]
+    assert wood.endswith("surfaces/floor_wood.png?v=1.0.0")
+    assert "files" not in payload
+    assert str(pack) not in json.dumps(payload)
+
+
+def test_classic_payload_has_no_surfaces():
+    assert T._classic_payload(None)["surfaces"] is None
+    assert T.theme_payload({}, requested="nope")["surfaces"] is None
+
+
+def test_office_document_script_emits_classic_and_escapes(monkeypatch):
+    script = T.office_document_script(None)
+    match = re.search(
+        r"window\.__QUBIT_OFFICE_THEME__=(\{.*?\});</script>", script, re.S)
+    assert match and json.loads(match.group(1))["id"] == "classic"
+    payload = T._classic_payload(None)
+    payload["label"] = "</script><script>alert(1)</script>"
+    monkeypatch.setattr(T, "theme_payload", lambda cfg, requested=None: payload)
+    script = T.office_document_script(None)
+    assert "<script>alert(1)</script>" not in script
+    assert "\\u003c/script\\u003e" in script
+    match = re.search(
+        r"window\.__QUBIT_OFFICE_THEME__=(\{.*?\});</script>", script, re.S)
+    assert json.loads(match.group(1))["label"] == payload["label"]
 
 
 # -------------------------------------------------------- required fields
