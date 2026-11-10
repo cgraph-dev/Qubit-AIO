@@ -2800,9 +2800,21 @@ def _profiles_module(cfg: Any):
 
     qubit_runtime.ensure_path()
     try:
-        qubit_runtime.use_qubit_home(cfg)
+        home = qubit_runtime.use_qubit_home(cfg)
     except Exception:  # noqa: BLE001 - a resolution miss must not 500 the read
-        pass
+        home = None
+    # The vendored registry memoises its default root per process (PRB-03) and
+    # ignores ``QUBIT_HOME`` once memoised, so a home bound here would list the
+    # PREVIOUS home's profiles and drop the built-in ``default``. Rebinding the
+    # home must invalidate that memo for the read to follow the authority we
+    # just published (the vendored CLI's own migrate reader does the same).
+    if home is not None:
+        try:
+            import qubit_constants as _K
+
+            _K._default_qubit_root_memo = None
+        except Exception:  # noqa: BLE001 - memo clear is best-effort
+            pass
     from qubit_cli import profiles as P  # type: ignore
     return P
 

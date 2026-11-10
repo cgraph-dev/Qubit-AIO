@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "Skarp i alle størrelser",
   "ui.staff": "Stav",
   "ui.the.caduceus": "Caduceus-staven",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "Udvidelsens logo",
   "ui.replace.text.automatically": "Erstat tekst automatisk",
   "ui.undo.is.always.one.click.away": "Fortryd er altid ét klik væk",

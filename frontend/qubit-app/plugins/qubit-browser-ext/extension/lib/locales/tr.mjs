@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "Her boyutta net",
   "ui.staff": "Asa",
   "ui.the.caduceus": "Caduceus",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "Uzantının logosu",
   "ui.replace.text.automatically": "Metni otomatik değiştir",
   "ui.undo.is.always.one.click.away": "Geri almak her zaman tek tık uzakta",

@@ -232,14 +232,31 @@ def test_chat_stream_api_profile_emits_truthful_envelope(tmp_path, monkeypatch):
 
     cfg = _cfg(tmp_path, monkeypatch, frontier=True)
     R.upsert_model_profile(cfg, _api_profile(), confirm=True)
-    monkeypatch.setattr(GW, "run", lambda req, cfg, **kw: ProviderResult(
+    # The remote stream path executes through ``gateway.run_stream`` (the
+    # provider's own SSE chunks), not ``gateway.run``: a stub on ``run`` never
+    # fires and the turn reaches a live provider. Stream two real chunks so
+    # the envelope's deltas are genuine.
+    chunks = ["streamed ", "remote"]
+
+    def fake_run_stream(req, cfg_, on_delta, **kw):
+        for chunk in chunks:
+            on_delta(chunk)
+        return ProviderResult(
+            ok=True, text="".join(chunks), provider="openai",
+            model="gpt-4o-mini", identity="openai/gpt-4o-mini",
+            details={"streaming": True})
+
+    monkeypatch.setattr(GW, "run_stream", fake_run_stream)
+    monkeypatch.setattr(GW, "run", lambda req, cfg_, **kw: ProviderResult(
         ok=True, text="streamed remote", provider="openai",
         model="gpt-4o-mini", identity="openai/gpt-4o-mini"))
     events = list(CT.stream_turn(cfg, "hi", model="my-api", session="s2"))
     kinds = [e["event"] for e in events]
-    assert kinds == ["start", "delta", "done"]
+    assert kinds == ["start", "delta", "delta", "done"]
+    assert "".join(e["text"] for e in events if e["event"] == "delta") \
+        == "streamed remote"
     assert events[-1]["reply"] == "streamed remote"
-    assert events[-1]["receipt"]["streaming"] is False
+    assert events[-1]["receipt"]["streaming"] is True
 
 
 # ------------------------------------------------------------- session stats

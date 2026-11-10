@@ -561,6 +561,31 @@ def _is_comment_line(stripped: str) -> bool:
             or stripped.startswith("*") or stripped.startswith("<!--"))
 
 
+#: Third-party attribution / record TYPE names. A prose word whose whole line
+#: reads as a licence or provenance record for vendored material is legal
+#: attribution (``docs/BRAND.md`` §2: the required exception), not product
+#: copy — the bundled font faces are shipped under a third party's commercial
+#: licence and the attribution must stay exact. Public *sentences* that merely
+#: mention the same names ("Qubit | Nous Research", a docs URL) do not match.
+THIRD_PARTY_RECORD_RE = re.compile(
+    r"(?:commercial|software|apache|mit|bsd|open\s+font|licen[cs]e|"
+    r"copyright|©|attribution|provenance)",
+    re.IGNORECASE)
+
+
+def _is_third_party_record(stripped: str) -> bool:
+    return bool(THIRD_PARTY_RECORD_RE.search(stripped))
+
+
+#: Legacy brand words that may also appear as product PROSE (capitalised or
+#: not). ``TS_TOKEN_RE`` only matches identifiers glued around those tokens, so
+#: a sentence such as ``| Hermes |`` or ``the openclaw gateway`` used to scan
+#: clean — a blind spot, not a classification.
+TS_PROSE_WORD_RE = re.compile(
+    r"(?<![A-Za-z0-9_\-./@:\\#])(?:Hermes|OpenClaw|NousResearch|NousPortal|Nous)"
+    r"(?![A-Za-z0-9_\-./@:\\#])", re.IGNORECASE)
+
+
 def scan_bundles() -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     findings: List[Dict[str, Any]] = []
     allow: Dict[str, int] = {}
@@ -620,8 +645,20 @@ def scan_bundles() -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
                         [x.group(0) for x in UPSTREAM_URL_RE.finditer(line)]
                         + [x.group(0) for x in UPSTREAM_DOMAIN_RE.finditer(line)]
                         + [x.group(0) for x in HANDLE_RE.finditer(line)]
-                        + [x.group(0) for x in PROSE_RE.finditer(line)]))
+                        + [x.group(0) for x in PROSE_RE.finditer(line)]
+                        + [x.group(0) for x in TS_PROSE_WORD_RE.finditer(line)]))
                     for token in toks:
+                        # Decision 1: the switch below is classified first.
+                        if _is_third_party_record(stripped):
+                            _allow(allow, "bundles", "third_party_attribution",
+                                   token)
+                            continue
+                        if TS_GUARD_RE.search(line):
+                            _allow(allow, "bundles", "guard", token)
+                            continue
+                        if TS_HOST_MATCH_RE.search(line):
+                            _allow(allow, "bundles", "wire_identifier", token)
+                            continue
                         findings.append(_leak(
                             "bundles", token, file=rel_s, line=i, text=line,
                             classification="public_brand"))
@@ -634,6 +671,28 @@ def scan_bundles() -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
 # ---------------------------------------------------------------------------
 # f. source user-facing strings
 # ---------------------------------------------------------------------------
+def _py_comment_lines(source: str) -> set:
+    """Line numbers carrying a ``#`` comment OUTSIDE a string literal.
+
+    A bare ``line.strip().startswith('#')`` test misreads two shapes: a
+    multi-line string literal whose line begins with ``#``, and a trailer
+    comment on a code line. Both hide a real string from the scan (a guard
+    that reads as commented-out code is invisible in the report). Tokenising is
+    exact and cheap for these small files.
+    """
+    import io
+    import tokenize
+
+    out: set = set()
+    try:
+        for tok in tokenize.generate_tokens(io.StringIO(source).readline):
+            if tok.type == tokenize.COMMENT:
+                out.add(tok.start[0])
+    except (tokenize.TokenError, IndentationError, SyntaxError):
+        pass
+    return out
+
+
 def _docstring_ranges(source: str) -> List[Tuple[int, int]]:
     ranges: List[Tuple[int, int]] = []
     try:
@@ -711,6 +770,7 @@ def _scan_py_source(rel: str, line_ranges: Optional[List[Tuple[int, int]]] = Non
     source = path.read_text(encoding="utf-8", errors="replace")
     lines = source.splitlines()
     docstrings = _docstring_ranges(source)
+    comments = _py_comment_lines(source)
     guards = PY_GUARD_PATTERNS.get(rel, ())
     for i, line in enumerate(lines, 1):
         if line_ranges is not None and not any(a <= i <= b for a, b in line_ranges):
@@ -718,13 +778,17 @@ def _scan_py_source(rel: str, line_ranges: Optional[List[Tuple[int, int]]] = Non
         if not LEGACY_RE.search(line):
             continue
         stripped = line.strip()
-        if stripped.startswith("#"):
+        if i in comments:
             for token in _hits(line):
                 _allow(allow, "source_strings", "comment", token)
             continue
         if _in_ranges(i, docstrings):
             for token in _hits(line):
                 _allow(allow, "source_strings", "docstring", token)
+            continue
+        if _is_third_party_record(stripped):
+            for token in _hits(line):
+                _allow(allow, "source_strings", "third_party_attribution", token)
             continue
         # A guard may span lines (e.g. ``_LEGACY_BRAND_RE = re.compile(`` on the
         # previous line), so match the pattern against a small backward window.
@@ -794,6 +858,7 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
         spans = _merge_spans(url_spans + domain_spans)
 
         emitted: set = set()
+        record = _is_third_party_record(stripped)
         for m in UPSTREAM_URL_RE.finditer(line):
             url = m.group(0)
             if url in emitted:
@@ -801,6 +866,8 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
             emitted.add(url)
             if is_test:
                 _allow(allow, "source_strings", "test_fixture", url)
+            elif record:
+                _allow(allow, "source_strings", "third_party_attribution", url)
             else:
                 findings.append(_leak("source_strings", url, file=rel, line=i,
                                       text=line, classification="upstream_url"))
@@ -814,6 +881,8 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
             prefix = line[max(0, m.start() - 60):m.start()]
             if is_test:
                 _allow(allow, "source_strings", "test_fixture", dom)
+            elif record:
+                _allow(allow, "source_strings", "third_party_attribution", dom)
             elif TS_HOST_MATCH_RE.search(prefix):
                 _allow(allow, "source_strings", "wire_identifier", dom)
             else:
@@ -830,6 +899,9 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
             if PROSE_RE.search(token):
                 if is_test:
                     _allow(allow, "source_strings", "test_fixture", token)
+                elif record:
+                    _allow(allow, "source_strings", "third_party_attribution",
+                           token)
                 else:
                     findings.append(_leak(
                         "source_strings", token, file=rel, line=i, text=line,

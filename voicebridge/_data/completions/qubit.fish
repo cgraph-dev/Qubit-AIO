@@ -19,7 +19,6 @@ complete -c qubit -n '__fish_use_subcommand' -f -a channels
 complete -c qubit -n '__fish_use_subcommand' -f -a chat-sessions
 complete -c qubit -n '__fish_use_subcommand' -f -a chat_sessions
 complete -c qubit -n '__fish_use_subcommand' -f -a checkpoints
-complete -c qubit -n '__fish_use_subcommand' -f -a claw
 complete -c qubit -n '__fish_use_subcommand' -f -a completion
 complete -c qubit -n '__fish_use_subcommand' -f -a computer-use
 complete -c qubit -n '__fish_use_subcommand' -f -a config
@@ -64,6 +63,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a model
 complete -c qubit -n '__fish_use_subcommand' -f -a monitor
 complete -c qubit -n '__fish_use_subcommand' -f -a msg
 complete -c qubit -n '__fish_use_subcommand' -f -a node
+complete -c qubit -n '__fish_use_subcommand' -f -a office
 complete -c qubit -n '__fish_use_subcommand' -f -a once
 complete -c qubit -n '__fish_use_subcommand' -f -a opencode
 complete -c qubit -n '__fish_use_subcommand' -f -a package
@@ -85,6 +85,7 @@ complete -c qubit -n '__fish_use_subcommand' -f -a reasoning
 complete -c qubit -n '__fish_use_subcommand' -f -a recall
 complete -c qubit -n '__fish_use_subcommand' -f -a receipts
 complete -c qubit -n '__fish_use_subcommand' -f -a reports
+complete -c qubit -n '__fish_use_subcommand' -f -a restart
 complete -c qubit -n '__fish_use_subcommand' -f -a roundtrip
 complete -c qubit -n '__fish_use_subcommand' -f -a run
 complete -c qubit -n '__fish_use_subcommand' -f -a runtime

@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "คมชัดทุกขนาด",
   "ui.staff": "คทา",
   "ui.the.caduceus": "คทาคาดูเซียส",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "โลโก้ของส่วนขยาย",
   "ui.replace.text.automatically": "แทนที่ข้อความโดยอัตโนมัติ",
   "ui.undo.is.always.one.click.away": "เลิกทำได้ในคลิกเดียวเสมอ",

@@ -1,7 +1,7 @@
 /* Bundled Latin faces for the extension UI only.
    Google Fonts files in assets/fonts/google are SIL Open Font License subsets.
    Rules signature faces in assets/fonts/Rules*.woff2 are Blaze Type, used under
-   Nous Research's commercial license (see extension/assets/fonts/README.md).
+   the upstream commercial license recorded in extension/assets/fonts/README.md.
    Space Grotesk (UI) and QubitDisplay/Sigurd (display) remain bundled fallbacks
    when a @font-face fails to load at runtime. */
 

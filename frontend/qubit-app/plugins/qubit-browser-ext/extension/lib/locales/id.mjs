@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "Jelas di ukuran apa pun",
   "ui.staff": "Tongkat",
   "ui.the.caduceus": "Kaduseus",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "Logo ekstensi",
   "ui.replace.text.automatically": "Ganti teks secara otomatis",
   "ui.undo.is.always.one.click.away": "Urungkan selalu tinggal satu klik",

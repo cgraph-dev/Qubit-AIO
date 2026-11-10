@@ -4,7 +4,7 @@ import { atom } from 'nanostores'
 import { recordOnboarding, setDesktopMetricsGate } from './desktop-metrics'
 
 /** Public page describing exactly what shared metrics contain and how consent windows work. */
-export const SHARED_METRICS_DOCS_URL = 'https://qubit.nousresearch.com/docs/developer-guide/relay-shared-metrics'
+export const SHARED_METRICS_DOCS_URL = ''
 
 export type SharedMetricsConsent = SharedMetricsConsentResult
 

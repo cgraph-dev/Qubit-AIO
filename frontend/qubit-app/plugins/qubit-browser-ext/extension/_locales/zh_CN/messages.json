@@ -6584,7 +6584,7 @@
     "description": "Runtime interface message ui.notice"
   },
   "runtime_ui_nous_girl": {
-    "message": "Nous girl",
+    "message": "Qubit assistant",
     "description": "Runtime interface message ui.nous.girl"
   },
   "runtime_ui_now": {

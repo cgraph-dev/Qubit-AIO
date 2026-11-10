@@ -105,8 +105,15 @@ def test_catalog_search_filters_real_entries(tmp_path, monkeypatch):
     code, out = _catalog(cfg, {"q": "browser", "source": "bundled"})
     assert code == 200
     ids = {e["id"] for e in out["entries"]}
-    assert ids == {"browser/browser_use", "browser/browserbase",
-                   "browser/firecrawl"}, ids
+    # The two sibling bundled plugins whose OWN name matches the query are
+    # listed too; the browser PROVIDERS are the pinned set.
+    assert {"browser-companion", "jev-workflows"} <= ids, ids
+    assert {e for e in ids if "/" in e} == {
+        "browser/browser_use", "browser/browserbase",
+        "browser/firecrawl"}, ids
+    for entry in out["entries"]:
+        assert entry["source"] == "bundled", entry
+        assert entry["installed"], entry
     code, out = _catalog(cfg, {"q": "spotify"})
     assert code == 200
     assert {e["id"] for e in out["entries"]} == {"spotify"}
