@@ -1,0 +1,62 @@
+Qubit Office — asset licence and attribution
+============================================
+
+This file covers the office's bundled and user-built THEME ART only. Qubit's
+source code is licensed under the MIT licence in LICENSE; nothing here changes
+that licence.
+
+Code vs art
+-----------
+* Qubit code, including the theme contract, the local theme builder, the
+  extractor, the calibration tool, the sprite/card renderers and the shipped
+  game bundle, is original Qubit material under the root LICENSE (MIT).
+* The office art is not Qubit's to relicense. The art listed below remains the
+  property of its author and is used under the terms stated for each pack.
+
+LimeZu — Modern Interiors and the character/portrait art
+--------------------------------------------------------
+The owner purchased the LimeZu packs used to build local office themes. Credit
+is required on every surface that ships the art:
+
+    Office art: LimeZu — https://limezu.itch.io
+
+The Modern Interiors licence permits editing and use in any commercial or
+non-commercial project and requires credit to the artist. It forbids reselling
+or redistributing the asset to others.
+
+Therefore:
+
+* The repository ships the theme RECIPE (semantic tokens, part indices and
+  template metadata), never the purchased atlases, the raw .zip packs, the
+  extracted parts, or a derived atlas. Each person builds locally from their own
+  purchase.
+* No resale, redistribution, sublicensing or NFT minting of the art is allowed.
+* The art is sliced, positioned and composited by the local builder. It is not
+  used to train models and it is not used to generate new art.
+
+LimeZu's art packs are CC-BY, not CC-BY-SA: attribution is required, and there
+is no source-sharing obligation. The CC-BY TASL form (Title, Author, Source,
+Licence) applies to any CC-BY pack, including Serene Village:
+
+    Title:   Serene Village (and the other packs named in THIRD_PARTY_NOTICES.md)
+    Author:  LimeZu
+    Source:  https://limezu.itch.io
+    Licence: CC-BY 4.0 — https://creativecommons.org/licenses/by/4.0/
+    Changes: sliced into cells and positioned by the Qubit Office theme builder;
+             no other modification.
+
+Credit placement
+----------------
+The office shows the active theme's credit; the persistent Credits/About entry
+required by the plan must also name LimeZu with the link above, so the credit
+does not depend on a theme being active.
+
+Not used
+--------
+The free LimeZu pack is non-commercial only and is not used by Qubit Office.
+
+Scope check
+-----------
+This file records the licence boundary; it does not grant rights to any pack.
+If a specific asset's provenance or licence is uncertain, stop and report
+`BLOCKED — LICENSE REVIEW REQUIRED` rather than shipping it.
