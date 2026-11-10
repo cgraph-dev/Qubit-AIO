@@ -164,12 +164,12 @@ def test_handle_approve_surfaces_overwritten_entry(qubit_home):
     entry = "RULE A: gate merges. RULE B: ci per HEAD. RULE C: never squash."
     store.add("memory", entry)
     wa.stage_write("memory", {"action": "batch", "target": "memory", "operations": [
-        {"action": "replace", "old_text": "RULE B: ci per HEAD.", "content": "RULE B: CI is per-head.",
-         "matched_entry": entry}]},
+        {"action": "patch", "old_text": "ci per HEAD", "content": "CI is per-head", "matched_entry": entry}]},
         summary="batch", origin="background_review")
     out = handle_pending_subcommand(wa.MEMORY, ["approve", "all"], memory_store=store)
-    assert "Approved 1" in out and entry in out
-    assert store.memory_entries == ["RULE B: CI is per-head."]
+    assert "Patched entry (as it was before the edit):" in out and entry in out
+    assert "Overwrote" not in out
+    assert store.memory_entries == ["RULE A: gate merges. RULE B: CI is per-head. RULE C: never squash."]
 
 
 _KEPT = "Repo lives in ~/src/app; tests via make test"
@@ -205,7 +205,9 @@ def test_approve_refuses_staged_remove_whose_entry_changed(qubit_home, shape):
     from tools import write_approval as wa
     store, pid = _review_stages_remove(shape)
     newer = "Staging DB: pg-staging-3 (migrated 2026-09-20, creds in vault 'stg')"
-    assert json.loads(memory_tool(action="replace", old_text="pg-staging-2", content=newer, store=store))["success"]
+    # ``replace`` was retired in favour of ``patch``: old_text is the exact span to
+    # change and the rest of the entry is kept (a whole-entry span rewrites it).
+    assert json.loads(memory_tool(action="patch", old_text=_REVIEWED, content=newer, store=store))["success"]
 
     out = handle_pending_subcommand(wa.MEMORY, ["approve", pid], memory_store=load_on_disk_store())
 
