@@ -1504,7 +1504,18 @@ export const api = {
     profile = getManagementProfile(),
     confirm = false,
     onConfirm?: (detail: string) => boolean | Promise<boolean>,
-  ) =>
+  ) => {
+    // ``terminal.*`` is read-only by contract: the server refuses a PUT carrying
+    // it with READ_ONLY_SECTION ("switch the /chat model from /chat or the Models
+    // page"). GET serves that block for display, so a whole-tree Save round-trips
+    // it straight back and the Save button 403s every time -- measured live by
+    // scripts/controls_e2e_audit.py as
+    //   [E2E_FAIL] /config config_save_confirm :: client error 403 READ_ONLY_SECTION
+    // Drop it here, at the one place every caller funnels through, so the UI keeps
+    // showing the slot without trying to own it.
+    const { terminal: _terminalSlot, ...writable } = config;
+    void _terminalSlot;
+    return (
     // ``config_save`` stages a typed 409 without ``confirm``; the shared
     // round-trip re-issues with it (an explicit ``confirm=true`` call goes
     // straight through, preserving the legacy signature).
@@ -1513,10 +1524,12 @@ export const api = {
         fetchJSON<{ ok: boolean }>(appendProfileParam("/api/config", profile), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(confirm ? { config, confirm: true } : { config }),
+          body: JSON.stringify(confirm ? { config: writable, confirm: true } : { config: writable }),
         }),
       onConfirm,
-    ),
+    )
+    );
+  },
   // Raw YAML config read/write (`/api/config/raw`) is refused by Qubit policy
   // (SECRET_NEVER_SERVED): the reference endpoint serves full plaintext secrets,
   // so no wrapper is offered. The structured ConfigPage form (`PUT /api/config`)
