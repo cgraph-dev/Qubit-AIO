@@ -195,7 +195,7 @@ def test_served_spa_shell_is_qubit_branded(tmp_path):
         status, ctype, body = _get(port, "/chat")
         assert status == 200 and "text/html" in ctype
         html = body.decode("utf-8")
-        assert "<title>Qubit Agent" in html, html[:200]
+        assert "<title>Qubit AiO" in html, html[:200]
         for bad in ("Hermes Agent", "OpenClaw"):
             assert bad not in html, f"served shell still exposes {bad!r}"
     finally:
@@ -245,7 +245,7 @@ def test_built_spa_bundle_has_no_product_facing_upstream_names():
     if not index.is_file():
         pytest.skip("frontend/qubit-dist not built in this checkout")
     html = index.read_text(encoding="utf-8")
-    assert "<title>Qubit Agent" in html, html[:200]
+    assert "<title>Qubit AiO" in html, html[:200]
     banned = ("Hermes Agent", "Hermes Console", "Hermes Teal",
               "Update Hermes", "Hermes gateway", "Hermes plugins",
               "Hermes RPC", "Hermes Desktop",
