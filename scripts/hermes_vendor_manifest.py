@@ -170,6 +170,24 @@ _QUBIT_PATCH_SPEC: dict[str, dict] = {
 _OPENCLAW_OVERLAY: set[str] = set()
 # Upstream files deliberately not vendored into the runtime (none at present).
 _INTENTIONAL_OMISSIONS: dict[str, str] = {}
+#: Upstream paths removed by an OWNER DIRECTIVE, not by a vendoring decision.
+#: ``eafb54e26`` "delete all non-English content; keep English only" deleted the
+#: zh-Hans docs tree and the translated top-level docs. They are recorded as
+#: MISSING (they really are absent) but are not a sync gap, so the audit can
+#: distinguish "we forgot to vendor this" from "the owner deleted it on purpose".
+#: NEVER re-create these paths.
+_OWNER_PURGED_PREFIXES: tuple[str, ...] = (
+    "website/i18n/",
+)
+_OWNER_PURGED_FILES: frozenset[str] = frozenset({
+    "CONTRIBUTING.es.md", "README.es.md", "README.zh-CN.md", "SECURITY.es.md",
+})
+
+
+def _owner_purged(rel: str) -> bool:
+    """True when *rel* was deleted by the English-only owner directive."""
+    return rel in _OWNER_PURGED_FILES or any(
+        rel.startswith(p) for p in _OWNER_PURGED_PREFIXES)
 # Upstream test trees are reference-only, never shipped product: the vendored
 # runtime ships its own test suite (repo ``tests/`` + vendored ``qubit_runtime/tests``).
 # Recording thousands of upstream pytest files as ``missing_from_local`` hid
@@ -1699,6 +1717,9 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
         "extra_local": sorted(added),
         "missing_from_local": sorted(missing),
         "intentionally_omitted": sorted(omitted),
+        # Subset of missing_from_local deleted by the English-only owner
+        # directive (eafb54e26), not a vendoring gap. Never re-create these.
+        "owner_purged": sorted(r for r in missing if _owner_purged(r)),
         "classification_counts": counts,
         "eol_normalized": eol_normalized,
         "upstream_mode_counts": _mode_counts(lambda e: e["upstream_mode"]),
