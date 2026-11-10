@@ -326,6 +326,18 @@ def test_status_colours_must_reach_three_to_one():
     assert any("contrast" in p for p in T.validate_tokens(tokens))
 
 
+def test_faint_text_must_reach_three_to_one_on_both_surfaces():
+    """``color-text-faint`` emits ``--ui-faint``; the contract must check it."""
+    tokens = {
+        "color-surface": "#17110d",
+        "color-surface-raised": "#241b15",
+        "color-text-faint": "#1a130e",
+    }
+    problems = T.validate_tokens(tokens)
+    assert any("--ui-faint" in problem and "contrast" in problem
+               for problem in problems), problems
+
+
 # ------------------------------------------------------------------- slices
 def test_slice_descriptor_requires_valid_shape():
     manifest = _manifest(slices={

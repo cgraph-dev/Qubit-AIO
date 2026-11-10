@@ -333,12 +333,13 @@ def _effective_token_map(tokens: Mapping[str, Any]) -> Dict[str, str]:
 
 
 #: Token variables whose foreground must clear 4.5:1 against BOTH office
-#: surfaces. ``--ui-text-faint`` is the disabled text colour: WCAG allows 3:1
-#: for disabled controls, and we hold it to that floor deliberately.
+#: surfaces. ``--ui-faint`` is the disabled text colour (the variable
+#: ``color-text-faint`` emits): WCAG allows 3:1 for disabled controls, and we
+#: hold it to that floor deliberately.
 _TEXT_CONTRAST_VARS: Sequence[Tuple[str, float]] = (
     ("--ui-text", 4.5),
     ("--ui-muted", 4.5),
-    ("--ui-text-faint", 3.0),
+    ("--ui-faint", 3.0),
 )
 
 #: Non-text colours the office actually paints (accents, borders, the status

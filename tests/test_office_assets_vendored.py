@@ -631,7 +631,7 @@ MATRIX_TOKENS = {
 #: status/level dots and disabled text are non-text/large and need 3:1.
 CONTRAST_FLOORS = {
     "color-text-primary": 4.5,
-    "color-text-muted": 3.0,
+    "color-text-muted": 4.5,
     "color-text-faint": 3.0,
     "color-accent": 3.0,
     "color-accent-soft": 3.0,
