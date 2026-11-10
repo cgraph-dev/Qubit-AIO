@@ -140,10 +140,13 @@ def test_json_shape_is_stable(tmp_path):
 
     d = _make_plugin(tmp_path, manifest=dict(BASE_MANIFEST))
     payload = validate_plugin_dir(d).to_dict()
-    assert set(payload) == {"ok", "checks", "warnings"}
+    # ``isolation`` is the plugin-host readiness audit; to_dict emits it
+    # unconditionally (informational, it never fails a check).
+    assert set(payload) == {"ok", "checks", "warnings", "isolation"}
     assert isinstance(payload["ok"], bool)
     assert payload["checks"] and all(set(c) == {"name", "ok", "detail"} for c in payload["checks"])
     assert isinstance(payload["warnings"], list)
+    assert isinstance(payload["isolation"], dict)
 
 
 def test_undeclared_tool_registration_fails(tmp_path):
@@ -177,13 +180,17 @@ def test_desktop_surface_violation_fails(tmp_path):
 
     d = _make_plugin(tmp_path, manifest=dict(BASE_MANIFEST, name="desk"), init_py=None)
     (d / "desktop").mkdir()
+    # Dynamic code evaluation is a refused move (plugin_validate_desktop._FORBIDDEN).
+    # Prototype writes are deliberately NOT linted any more (bundled libraries set
+    # fields on their own classes and no regex can tell those from patching a
+    # renderer global), so the old Storage.prototype fixture no longer fails.
     (d / "desktop" / "plugin.js").write_text(
-        "Storage.prototype.setItem = function () {}\n", encoding="utf-8")
+        "eval('1')\n", encoding="utf-8")
     report = validate_plugin_dir(d)
     failed = {name: detail for name, ok, detail in report.checks if not ok}
     assert "desktop surface" in failed
-    assert "prototype patching (desktop/plugin.js:1)" in failed["desktop surface"]
-    assert desktop_surface_hits(d) == ["prototype patching (desktop/plugin.js:1)"]
+    assert "dynamic code evaluation (desktop/plugin.js:1)" in failed["desktop surface"]
+    assert desktop_surface_hits(d) == ["dynamic code evaluation (desktop/plugin.js:1)"]
     assert is_desktop_surface("desktop/plugin.js") and not is_desktop_surface("sidecar/x.mjs")
 
 
@@ -227,7 +234,7 @@ def test_cli_json_output_is_stable_and_exits_nonzero(tmp_path):
                    home=home, qubit_home=home / "qh")
     assert r.returncode == 1, (r.returncode, r.stdout[-400:], r.stderr[-400:])
     payload = json.loads(r.stdout)
-    assert set(payload) == {"ok", "checks", "warnings"}
+    assert set(payload) == {"ok", "checks", "warnings", "isolation"}
     assert payload["ok"] is False
     assert all(set(c) == {"name", "ok", "detail"} for c in payload["checks"])
     assert any(c["name"] == "manifest fields" and not c["ok"] for c in payload["checks"])
