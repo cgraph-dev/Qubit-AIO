@@ -17,9 +17,14 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
 
 from voicebridge import foundation as F  # noqa: E402
 from voicebridge.providers import credentials as C  # noqa: E402
+
+FEATURE_MATRIX = "docs/archive/2026-09-21/FEATURE_MATRIX_8U.json"
 
 
 # ---------------------------------------------------------------------------
@@ -227,7 +232,8 @@ def test_uninstall_preserves_state_by_default():
 
 
 def test_provenance_pins_match_matrix():
-    matrix = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "FEATURE_MATRIX_8U.json").read_text())
+    # Purged in eafb54e26; read read-only from pre-purge history.
+    matrix = json.loads(require_ledger(FEATURE_MATRIX))
     for key in ("hermes-agent", "openclaw"):
         pin = matrix["upstreams"][key]["commit"]
         assert len(pin) == 40 and all(c in "0123456789abcdef" for c in pin)
