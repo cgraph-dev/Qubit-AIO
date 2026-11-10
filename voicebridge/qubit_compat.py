@@ -4016,6 +4016,11 @@ def h_mcp_servers(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         "error": (MS._redact_probe(str(s.get("error")))[:240]
                   if s.get("error") else None),
         "source": str(s.get("source", "qubit-registry")),
+        # Whether this row's enable/disable control can act (``set_enabled``
+        # writes the registry store only). A ``qubit-config`` row is read-only
+        # inventory and must render no toggle. Default True keeps a registry
+        # row editable, matching ``MS._public``.
+        "editable": bool(s.get("editable", True)),
         "policy": "config registry; no unauthenticated mount",
     } for s in listing.get("servers", [])]
     return _ok(servers=servers, state="OK" if not servers else "CONFIGURED",

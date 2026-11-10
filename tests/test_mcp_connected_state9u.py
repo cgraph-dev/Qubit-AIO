@@ -27,6 +27,9 @@ EXPECTED_ROW_KEYS = {
     "name", "transport", "auth", "command", "args", "url", "env",
     "capabilities", "enabled", "connected", "invocable", "invocation_code",
     "status", "source", "error",
+    # Whether the row's enable/disable control can act: a qubit-config row is
+    # read-only inventory (set_enabled writes the registry store only).
+    "editable",
 }
 
 

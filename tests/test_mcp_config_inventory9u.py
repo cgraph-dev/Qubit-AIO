@@ -233,3 +233,28 @@ def test_config_rows_advertise_editable_false(tmp_path, monkeypatch):
     assert row["editable"] is True, row
     # set_enabled acts on it -- the exact call that 404'd for a config row.
     assert MS.set_enabled(cfg, "rea", False)["server"]["enabled"] is False
+
+
+def test_served_wire_row_carries_editable(tmp_path, monkeypatch):
+    """``GET /api/mcp/servers`` must carry ``editable`` through its whitelist.
+
+    ``h_mcp_servers`` builds an explicit ``McpServer`` wire shape and silently
+    dropped any field not listed, so ``editable: False`` never reached the SPA
+    and the dashboard rendered a live toggle for a config.yaml row whose
+    endpoint answers MCP_NOT_FOUND. Pin the field on the served row.
+    """
+    from voicebridge import mcp_servers as MS
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch, runtime_yaml=RUNTIME_CONFIG)
+    status, body = HC.dispatch(cfg, "GET", "/api/mcp/servers")
+    assert status == 200, body
+    rows = {r["name"]: r for r in body["servers"]}
+    assert rows["rea"]["source"] == "qubit-config"
+    assert rows["rea"]["editable"] is False, rows["rea"]
+
+    MS.upsert(cfg, "rea", {"transport": "stdio", "command": "rea-local",
+                           "enabled": True})
+    status, body = HC.dispatch(cfg, "GET", "/api/mcp/servers")
+    rows = {r["name"]: r for r in body["servers"]}
+    assert rows["rea"]["editable"] is True, rows["rea"]
