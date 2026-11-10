@@ -281,8 +281,10 @@ function createPanelHarness() {
   const states: unknown[] = [];
   const effectDeps: Array<unknown[] | undefined> = [];
   const cleanups: Array<(() => void) | undefined> = [];
+  const refSlots: Array<{ current: unknown }> = [];
   let hookIndex = 0;
   let effectIndex = 0;
+  let refIndex = 0;
   let dirty = false;
   let Component: (props: Record<string, unknown>) => unknown;
   let props: Record<string, unknown> = {};
@@ -324,13 +326,17 @@ function createPanelHarness() {
       effectDeps[slot] = deps ? deps.slice() : undefined;
     },
     useRef(initial: unknown) {
-      return { current: initial };
+      const slot = refSlots[refIndex]
+        ?? (refSlots[refIndex] = { current: initial });
+      refIndex += 1;
+      return slot;
     },
   };
 
   const render = () => {
     hookIndex = 0;
     effectIndex = 0;
+    refIndex = 0;
     tree.length = 0;
     Component(props);
   };
@@ -344,6 +350,7 @@ function createPanelHarness() {
       states.length = 0;
       effectDeps.length = 0;
       cleanups.length = 0;
+      refSlots.length = 0;
       dirty = false;
       render();
     },
@@ -623,7 +630,7 @@ describe("atlas portraits in the agents panel", () => {
     h.cleanup();
   });
 
-  it("renders the active-seat dialogue card and wires focusable row handlers", async () => {
+  it("keeps exactly one row tabbable and follows hover/focus", async () => {
     const h = await mountPanel(
       activeTheme(),
       oneDivision([
@@ -649,13 +656,18 @@ describe("atlas portraits in the agents panel", () => {
 
     const row = (slug: string) => byTestId(h, "agents-panel-seat")
       .find((element) => element.props["data-seat-slug"] === slug);
-    // A dead onFocus was the finding: the row must be a real tab stop.
+    // ROVING TABINDEX: exactly one row is in the tab order, and it is the one
+    // the card currently reads.
     expect(row("first")?.props.tabIndex).toBe(0);
-    expect(row("second")?.props.tabIndex).toBe(0);
+    expect(row("second")?.props.tabIndex).toBe(-1);
+    expect(row("first")?.props["aria-current"]).toBe("true");
     (row("second")?.props.onMouseEnter as () => void)();
     h.flush();
 
     expect(card()?.props["data-seat-slug"]).toBe("second");
+    expect(row("first")?.props.tabIndex).toBe(-1);
+    expect(row("second")?.props.tabIndex).toBe(0);
+    expect(row("second")?.props["aria-current"]).toBe("true");
     body = withClass(h, "agents-panel__body")[0];
     expect(body?.props["aria-label"]).toBe("Second Agent body");
     bodyStyle = body?.props.style as Record<string, unknown>;
@@ -664,6 +676,8 @@ describe("atlas portraits in the agents panel", () => {
     (row("first")?.props.onFocus as () => void)();
     h.flush();
     expect(card()?.props["data-seat-slug"]).toBe("first");
+    expect(row("first")?.props.tabIndex).toBe(0);
+    expect(row("second")?.props.tabIndex).toBe(-1);
     h.cleanup();
   });
 

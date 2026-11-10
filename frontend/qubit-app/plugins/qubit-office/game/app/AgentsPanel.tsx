@@ -57,6 +57,25 @@ export interface AgentsPanelProps {
 /** The panel portrait box. The payload's portrait tier is 32px (see Task 4). */
 const PORTRAIT_PX = 32;
 
+/** The bit of a React keyboard event the roving row needs. */
+interface SeatKeyEvent {
+  key: string;
+  preventDefault: () => void;
+}
+
+/**
+ * The roving-focus wiring shared by every rendered row. One row is tabbable
+ * (`tabIndex: 0`); the rest are `-1` and are reached with the arrow keys, which
+ * also move the active seat the card reads. `registerRow` lets the component
+ * focus the target row after the (possibly closed) division has opened.
+ */
+interface SeatInteraction {
+  activeSlug: string | null;
+  onActivate: (slug: string) => void;
+  onKeyNavigate: (slug: string, key: string) => boolean;
+  registerRow: (slug: string, node: HTMLElement | null) => void;
+}
+
 function seatMeta(seat: AgentSeat): string[] {
   const meta: string[] = [seatTypeLabel(seat.seat_type)];
   if (seat.room) meta.push(seat.room === "boardroom" ? "Boardroom" : seat.room);
@@ -130,22 +149,29 @@ function seatRow(
   index: number,
   theme: OfficeTheme | null | undefined,
   ready: boolean,
-  onActivate: (slug: string) => void,
+  interaction: SeatInteraction,
 ) {
   const meta = seatMeta(seat);
+  const active = interaction.activeSlug === seat.slug;
   return R.createElement("li", {
     key: `${seat.slug}:${index}`,
     className: "agents-panel__seat",
     "data-testid": "agents-panel-seat",
     "data-seat-slug": seat.slug,
     "data-seat-type": seat.seat_type,
-    // A REAL focus target. `onFocus` without a focusable element was a dead
-    // handler: keyboard/AT users could never leave the first-seat default.
-    // Rows are the navigation surface (the card is the readout), so each seat
-    // participates in the normal tab order in the roster's reading order.
-    tabIndex: 0,
-    onMouseEnter: () => onActivate(seat.slug),
-    onFocus: () => onActivate(seat.slug),
+    // ROVING TABINDEX: exactly one row is in the tab order. Arrow/Home/End
+    // move both focus and this active seat; the card is the live readout.
+    tabIndex: active ? 0 : -1,
+    // Native `<ul>/<li>` semantics are kept (the listbox pattern does not fit
+    // several division lists sharing one selection); `aria-current` marks the
+    // row feeding the card without overriding the list-item role.
+    "aria-current": active ? "true" : undefined,
+    ref: (node: HTMLElement | null) => interaction.registerRow(seat.slug, node),
+    onMouseEnter: () => interaction.onActivate(seat.slug),
+    onFocus: () => interaction.onActivate(seat.slug),
+    onKeyDown: (event: SeatKeyEvent) => {
+      if (interaction.onKeyNavigate(seat.slug, event.key)) event.preventDefault();
+    },
   }, [
     R.createElement("span", {
       key: "a", className: "agents-panel__avatar",
@@ -222,7 +248,8 @@ function divisionGroup(
   open: boolean,
   theme: OfficeTheme | null | undefined,
   ready: boolean,
-  onActivate: (slug: string) => void,
+  interaction: SeatInteraction,
+  onToggle: (open: boolean) => void,
 ) {
   const boardroom = division.slug === "";
   const heading = `${division.label} \u2014 ${division.headcount} `
@@ -239,6 +266,8 @@ function divisionGroup(
     "data-division": division.slug,
     "data-headcount": String(division.headcount),
     open,
+    onToggle: (event: { currentTarget: { open: boolean } }) =>
+      onToggle(event.currentTarget.open),
   }, [
     R.createElement("summary", {
       key: "s", className: "agents-panel__divisionHead",
@@ -257,7 +286,7 @@ function divisionGroup(
     R.createElement("ul", {
       key: "u", className: "agents-panel__seats",
     }, division.seats.map((seat, i) =>
-      seatRow(R, seat, i, theme, ready, onActivate))),
+      seatRow(R, seat, i, theme, ready, interaction))),
   ]);
 }
 
@@ -265,7 +294,7 @@ export function createAgentsPanel(
   R: OfficeGameShellProps["React"],
   hooks: OfficeGameShellProps["hooks"],
 ) {
-  const { useState, useEffect } = hooks;
+  const { useState, useEffect, useRef } = hooks;
 
   return function AgentsPanel(props: AgentsPanelProps) {
     const [state, setState] = useState<AgentPanelState>({ kind: "loading" });
@@ -285,6 +314,14 @@ export function createAgentsPanel(
     // Which seat the dialogue card previews. null means "the first seat", so
     // the initial render is deterministic before any pointer event.
     const [activeSlug, setActiveSlug] = useState<string | null>(null);
+    // Which divisions the reader opened. Managed here so keyboard navigation
+    // can open the target's division before focusing its row (a row inside a
+    // closed <details> cannot take focus).
+    const [openDivisions, setOpenDivisions] = useState<Record<string, boolean>>({});
+    // A row to focus after the render that opens its division. Cleared once the
+    // effect has moved focus.
+    const [pendingFocus, setPendingFocus] = useState<string | null>(null);
+    const rowRefs = useRef<Map<string, HTMLElement>>(new Map());
 
     useEffect(() => {
       let live = true;
@@ -317,6 +354,14 @@ export function createAgentsPanel(
       // same URLs must not re-download them.
     }, [atlasKey]);
 
+    // Focus the roving target AFTER the render that opened its division.
+    useEffect(() => {
+      if (!pendingFocus) return;
+      const node = rowRefs.current.get(pendingFocus);
+      if (node) node.focus();
+      setPendingFocus(null);
+    }, [pendingFocus]);
+
     if (state.kind === "loading") {
       return R.createElement("div", {
         className: "agents-panel",
@@ -340,11 +385,55 @@ export function createAgentsPanel(
     const groups = data.divisions ?? [];
     const boardroom = groups.find((g) => g.slug === "");
     const divisions = groups.filter((g) => g.slug !== "");
-    const seats = data.seats ?? [];
+    // The visual order: the boardroom is rendered first, then the divisions in
+    // the payload's order. Arrow navigation follows what the reader sees rather
+    // than the plan's flat seat list.
+    const orderedSeats = [
+      ...(boardroom ? boardroom.seats : []),
+      ...divisions.flatMap((division) => division.seats),
+    ];
     const activeSeat = (activeSlug
-      ? seats.find((seat) => seat.slug === activeSlug)
-      : undefined) ?? seats[0] ?? null;
-    const activate = (slug: string) => setActiveSlug(slug);
+      ? orderedSeats.find((seat) => seat.slug === activeSlug)
+      : undefined) ?? orderedSeats[0] ?? null;
+    const divisionBySeat = new Map<string, string>();
+    for (const group of groups) {
+      for (const seat of group.seats) divisionBySeat.set(seat.slug, group.slug);
+    }
+
+    const registerRow = (slug: string, node: HTMLElement | null) => {
+      if (node) rowRefs.current.set(slug, node);
+      else rowRefs.current.delete(slug);
+    };
+    const toggleDivision = (slug: string, open: boolean) => {
+      setOpenDivisions((previous) =>
+        previous[slug] === open ? previous : { ...previous, [slug]: open });
+    };
+    const navigate = (slug: string, key: string): boolean => {
+      const current = orderedSeats.findIndex((seat) => seat.slug === slug);
+      if (current < 0) return false;
+      let next = current;
+      // Clamp at the ends (no wrap): Home/End are the explicit jumps.
+      if (key === "ArrowDown") next = Math.min(orderedSeats.length - 1, current + 1);
+      else if (key === "ArrowUp") next = Math.max(0, current - 1);
+      else if (key === "Home") next = 0;
+      else if (key === "End") next = orderedSeats.length - 1;
+      else return false;
+      const target = orderedSeats[next];
+      setActiveSlug(target.slug);
+      const division = divisionBySeat.get(target.slug);
+      if (division !== undefined) {
+        setOpenDivisions((previous) =>
+          previous[division] ? previous : { ...previous, [division]: true });
+      }
+      setPendingFocus(target.slug);
+      return true;
+    };
+    const interaction: SeatInteraction = {
+      activeSlug: activeSeat ? activeSeat.slug : null,
+      onActivate: (slug: string) => setActiveSlug(slug),
+      onKeyNavigate: navigate,
+      registerRow,
+    };
 
     return R.createElement("div", {
       className: "agents-panel" + (portraitsReady ? " office-portraits-ready" : ""),
@@ -364,10 +453,14 @@ export function createAgentsPanel(
       // places above every division. It is rendered first and named as such,
       // so the per-division list below is exactly the roster's divisions.
       boardroom
-        ? divisionGroup(R, boardroom, false, props.theme, portraitsReady, activate)
+        ? divisionGroup(R, boardroom, Boolean(openDivisions[boardroom.slug]),
+            props.theme, portraitsReady, interaction,
+            (open) => toggleDivision(boardroom.slug, open))
         : null,
       ...divisions.map((d) =>
-        divisionGroup(R, d, false, props.theme, portraitsReady, activate)),
+        divisionGroup(R, d, Boolean(openDivisions[d.slug]),
+          props.theme, portraitsReady, interaction,
+          (open) => toggleDivision(d.slug, open))),
       counts
         ? R.createElement("div", {
             key: "types",

@@ -83,14 +83,15 @@ afterEach(async () => {
 });
 
 describe("the agents panel's real keyboard path", () => {
-  it("moves the dialogue card when a seat row receives DOM focus", async () => {
+  it("keeps one tabbable row and moves focus/card with arrows, Home and End", async () => {
     const seats = [
       seat({ slug: "first", name: "First Agent" }),
       seat({ slug: "second", name: "Second Agent" }),
+      seat({ slug: "third", name: "Third Agent" }),
     ];
     const Panel = createAgentsPanel(
       React as never,
-      { useState: React.useState, useEffect: React.useEffect } as never,
+      { useState: React.useState, useEffect: React.useEffect, useRef: React.useRef } as never,
     );
     const fetchImpl = (async () => respond(payload(seats))) as unknown as typeof fetch;
 
@@ -106,22 +107,58 @@ describe("the agents panel's real keyboard path", () => {
       });
     }
 
-    const rows = host.querySelectorAll<HTMLElement>(
-      "[data-testid=agents-panel-seat]");
-    expect(rows).toHaveLength(2);
-    // A real tab stop, not just a wired callback.
-    expect(rows[0].tabIndex).toBe(0);
-    expect(rows[1].tabIndex).toBe(0);
-
+    const rows = Array.from(host.querySelectorAll<HTMLElement>(
+      "[data-testid=agents-panel-seat]"));
+    expect(rows).toHaveLength(3);
     const card = () => host.querySelector<HTMLElement>(
       "[data-testid=agents-panel-card]");
+
+    // Exactly ONE row is in the tab order, and it is the active one.
+    expect(rows.filter((row) => row.tabIndex === 0)).toHaveLength(1);
+    expect(rows[0].tabIndex).toBe(0);
+    expect(rows[1].tabIndex).toBe(-1);
+    expect(rows[2].tabIndex).toBe(-1);
+    expect(rows[0].getAttribute("aria-current")).toBe("true");
     expect(card()?.dataset.seatSlug).toBe("first");
 
-    await act(async () => { rows[1].focus(); });
+    // Open the group the way a reader does, then put DOM focus on the row.
+    const details = host.querySelector("details") as HTMLDetailsElement;
+    details.open = true;
+    await act(async () => { rows[0].focus(); });
+    expect(document.activeElement).toBe(rows[0]);
+
+    // ArrowDown: real keydown -> focus AND the live card move together.
+    await act(async () => {
+      rows[0].dispatchEvent(new KeyboardEvent("keydown", {
+        key: "ArrowDown", bubbles: true,
+      }));
+    });
     expect(document.activeElement).toBe(rows[1]);
     expect(card()?.dataset.seatSlug).toBe("second");
+    expect(rows[1].tabIndex).toBe(0);
+    expect(rows[0].tabIndex).toBe(-1);
 
-    await act(async () => { rows[0].focus(); });
+    // End: jump to the last seat.
+    await act(async () => {
+      (document.activeElement as HTMLElement).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "End", bubbles: true }));
+    });
+    expect(document.activeElement).toBe(rows[2]);
+    expect(card()?.dataset.seatSlug).toBe("third");
+
+    // Home: jump to the first seat.
+    await act(async () => {
+      (document.activeElement as HTMLElement).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
+    });
+    expect(document.activeElement).toBe(rows[0]);
+    expect(card()?.dataset.seatSlug).toBe("first");
+
+    // Clamp (documented): ArrowUp at the top stays on the first seat.
+    await act(async () => {
+      (document.activeElement as HTMLElement).dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    });
     expect(document.activeElement).toBe(rows[0]);
     expect(card()?.dataset.seatSlug).toBe("first");
   });
