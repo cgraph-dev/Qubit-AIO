@@ -322,7 +322,13 @@ def test_env_reference_add_update_remove(cfg):
                            "confirm": True})
     assert code == 200 and out["ok"] is True and out["value"] == "vault:alpha", out
     code, out = _dispatch(cfg, "GET", "/api/env")
-    assert out["CLOSURE_REF"]["is_set"] is True, out.get("CLOSURE_REF")
+    # ``is_set`` is the HONEST presence of a resolvable secret, not "a registry
+    # row exists" (voicebridge/env_store.is_resolved): ``env:``/``file:``
+    # resolve locally, ``vault:``/``ref:`` have no Qubit-side resolver and are
+    # reported not-set. The reference round-trips either way -- the registry row
+    # and its description are what this test owns.
+    assert out["CLOSURE_REF"]["is_set"] is False, out.get("CLOSURE_REF")
+    assert "vault:alpha" in out["CLOSURE_REF"]["description"], out["CLOSURE_REF"]
 
     # Update: same key, new reference.
     code, out = _dispatch(cfg, "PUT", "/api/env",
@@ -340,11 +346,20 @@ def test_env_reference_add_update_remove(cfg):
     assert "CLOSURE_REF" not in out, out
 
 
-def test_env_reference_rejects_raw_secret_and_estop(cfg):
+def test_env_write_accepts_referenceless_value_and_stays_estop_gated(cfg):
+    """A raw pasted value is stored as a secret, never refused (2e2377168).
+
+    The Keys page pastes a provider API key and expects it stored: a value that
+    is not an ``env:``/``vault:``/``file:`` reference goes to the canonical
+    runtime ``.env`` via ``env_store.write_secret`` -- atomic, chmod 600, never
+    echoed or logged. The write is still confirm- and e-stop-gated.
+    """
     code, out = _dispatch(cfg, "PUT", "/api/env",
-                          {"name": "RAW", "value": "sk-live-rawsecret",
+                          {"name": "RAW", "value": "sk-liveValue123",
                            "confirm": True})
-    assert code == 403 and out["code"] == "SECRET_WRITE_REFUSED", out
+    assert code == 200 and out["ok"] is True and out["state"] == "SET", out
+    # the value is never echoed back on the response
+    assert "sk-liveValue123" not in json.dumps(out), out
     _estop(cfg, True)
     code, out = _dispatch(cfg, "PUT", "/api/env",
                           {"name": "CLOSURE_REF", "value": "vault:alpha",
