@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -121,5 +122,9 @@ def test_dashboard_inventory_carries_capabilities(tmp_path, monkeypatch):
     inv = runtime_inventory(cfg)
     assert inv["capabilities"]["total"] > 100
     blob = json.dumps(inv).lower()
-    for secret in ("sk-", "token:", "cookie"):
+    # No credential material may reach the dashboard inventory. "sk-" must be
+    # a leading key prefix, not a substring of a word like "disk-cleanup".
+    assert not re.search(r"(?<![a-z])sk-[a-z0-9]", blob), \
+        "provider key material in the inventory"
+    for secret in ("token:", "cookie"):
         assert secret not in blob
