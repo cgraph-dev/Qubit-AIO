@@ -232,13 +232,21 @@ def _raw_theme_id(cfg: Any, requested: Optional[str] = None) -> str:
 def active_theme_id(cfg: Any, requested: Optional[str] = None) -> str:
     """The validated active theme id, or ``classic``.
 
-    A well-formed id whose pack does not exist is ``classic`` too: the caller
-    must never build a host URL that the server would refuse to theme.
+    A well-formed id whose pack does not exist **or fails validation** is
+    ``classic`` too: the caller must never build a host URL that the server
+    would refuse to theme.
     """
     raw = _raw_theme_id(cfg, requested)
     if not raw or raw == CLASSIC or not _ID_RE.fullmatch(raw):
         return CLASSIC
-    return raw if find_theme(raw) is not None else CLASSIC
+    theme_dir = find_theme(raw)
+    if theme_dir is None:
+        return CLASSIC
+    try:
+        load_theme(theme_dir)
+    except ThemeError:
+        return CLASSIC
+    return raw
 
 
 def find_theme(theme_id: str) -> Optional[Path]:
@@ -256,7 +264,7 @@ def find_theme(theme_id: str) -> Optional[Path]:
 # Token validation
 # --------------------------------------------------------------------------
 def _hex_rgb(value: str) -> Optional[tuple]:
-    if not _COLOR_RE.fullmatch(value or ""):
+    if not isinstance(value, str) or not _COLOR_RE.fullmatch(value or ""):
         return None
     raw = value[1:]
     if len(raw) == 3:
@@ -289,27 +297,29 @@ def contrast_ratio(first: str, second: str) -> float:
     return (hi + 0.05) / (lo + 0.05)
 
 
-def _first_token(tokens: Mapping[str, Any], names: Sequence[str]) -> Optional[str]:
-    for name in names:
-        value = tokens.get(name)
-        if isinstance(value, str):
-            return value
-    return None
+def _effective_token_map(tokens: Mapping[str, Any]) -> Dict[str, str]:
+    """The variable map ``token_css`` would emit (first token per variable)."""
+    effective: Dict[str, str] = {}
+    for token, variable in TOKEN_MAP.items():
+        if token in tokens and variable not in effective:
+            effective[variable] = tokens[token]
+    return effective
 
 
 def _contrast_problems(tokens: Mapping[str, Any]) -> List[str]:
     problems: List[str] = []
-    surface = _first_token(tokens, ("color-surface",))
-    raised = _first_token(tokens, ("color-surface-raised",))
-    hover = _first_token(tokens, ("color-surface-hover",))
-    text = _first_token(tokens, ("color-text-primary",))
-    muted = _first_token(tokens, ("color-text-muted",))
+    effective = _effective_token_map(tokens)
+    surface = effective.get("--ui-bg")
+    raised = effective.get("--ui-bg-solid")
+    hover = effective.get("--ui-bg-hover")
+    text = effective.get("--ui-text")
+    muted = effective.get("--ui-muted")
 
     pairs = [
-        ("color-text-primary", text, "color-surface", surface, 4.5),
-        ("color-text-muted", muted, "color-surface", surface, 3.0),
-        ("color-text-primary", text, "color-surface-raised", raised, 4.5),
-        ("color-text-muted", muted, "color-surface-hover", hover, 3.0),
+        ("--ui-text", text, "--ui-bg", surface, 4.5),
+        ("--ui-muted", muted, "--ui-bg", surface, 3.0),
+        ("--ui-text", text, "--ui-bg-solid", raised, 4.5),
+        ("--ui-muted", muted, "--ui-bg-hover", hover, 3.0),
     ]
     for first_name, first, second_name, second, floor in pairs:
         if first is None or second is None:
@@ -323,14 +333,14 @@ def _contrast_problems(tokens: Mapping[str, Any]) -> List[str]:
                 f"{ratio:.2f}:1; needs >= {floor}:1")
 
     if surface is not None and _hex_rgb(surface) is not None:
-        for _var, names in STATUS_TOKENS.items():
-            value = _first_token(tokens, names)
+        for variable in STATUS_TOKENS:
+            value = effective.get(variable)
             if value is None or _hex_rgb(value) is None:
                 continue
             ratio = contrast_ratio(value, surface)
             if ratio + 1e-9 < 3.0:
                 problems.append(
-                    f"token contrast: {names[0]} vs color-surface is "
+                    f"token contrast: {variable} vs --ui-bg is "
                     f"{ratio:.2f}:1; needs >= 3.0:1")
     return problems
 
@@ -467,6 +477,19 @@ def _inside_root(root: Path, relative: str) -> Optional[Path]:
         return None
 
 
+def _symlink_component(root: Path, relative: str) -> Optional[str]:
+    """The first symlinked component of ``relative``, checked before resolving."""
+    current = root
+    for part in relative.split("/"):
+        current = current / part
+        try:
+            if current.is_symlink():
+                return part
+        except OSError:
+            return part
+    return None
+
+
 def _validate_files(files: Any, root: Optional[Path],
                     limits: Any) -> List[str]:
     if not isinstance(files, dict) or not files:
@@ -489,15 +512,17 @@ def _validate_files(files: Any, root: Optional[Path],
             total_bytes += size
         if root is None or path_problems:
             continue
+        link = _symlink_component(root, relative)
+        if link is not None:
+            problems.append(
+                f"file {relative}: symlink component {link!r} is not allowed")
+            continue
         candidate = _inside_root(root, relative)
         if candidate is None:
             problems.append(f"file {relative}: resolves outside the theme root")
             continue
         if not candidate.is_file():
             problems.append(f"file {relative}: missing")
-            continue
-        if candidate.is_symlink():
-            problems.append(f"file {relative}: symlinks are not allowed")
             continue
         try:
             actual_size = candidate.stat().st_size

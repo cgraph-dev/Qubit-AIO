@@ -188,21 +188,29 @@ def test_recipe_with_files_is_refused():
 
 
 # -------------------------------------------------------------- file paths
-@pytest.mark.parametrize("bad", [
-    "../escape.png",
-    "/absolute.png",
-    "a//b.png",
-    "./same.png",
-    "portraits/CON.png",
-    "portraits/aux.txt",
-    "portraits/x.svg",
-    "portraits/x.css",
-    "portraits/x.js",
-    "portraits/x.html",
+@pytest.mark.parametrize(("bad", "reason"), [
+    ("../escape.png", "segment"),
+    ("/absolute.png", "relative"),
+    ("a//b.png", "segment"),
+    ("./same.png", "segment"),
+    ("portraits/CON.png", "reserved"),
+    ("portraits/aux.txt", "reserved"),
+    ("portraits/x.svg", "suffix"),
+    ("portraits/x.css", "suffix"),
+    ("portraits/x.js", "suffix"),
+    ("portraits/x.html", "suffix"),
 ])
-def test_traversal_reserved_and_unsupported_suffixes_are_refused(bad):
+def test_traversal_reserved_and_unsupported_suffixes_are_refused(bad, reason):
     manifest = _manifest(files={bad: {"sha256": "0" * 64, "bytes": 1}})
-    assert T.validate_manifest(manifest), bad
+    problems = T.validate_manifest(manifest)
+    assert any(reason in p for p in problems), (bad, problems)
+
+
+def test_a_valid_manifest_has_no_path_problems(tmp_path):
+    """The control the parametrised path test needs: a good path is silent."""
+    pack = _pack(tmp_path)
+    manifest = json.loads((pack / "theme.json").read_text())
+    assert T.validate_manifest(manifest) == []
 
 
 def test_case_insensitive_duplicate_is_refused():
@@ -227,6 +235,17 @@ def test_hash_mismatch_is_refused(tmp_path):
     (pack / "portraits/atlas32.png").write_bytes(b"TAMPERED")
     problems = T.validate_theme(pack)
     assert any("sha256" in p or "bytes" in p for p in problems), problems
+
+
+def test_symlinked_file_is_refused(tmp_path):
+    pack = _pack(tmp_path)
+    target = pack / "portraits/real.png"
+    target.write_bytes((pack / "portraits/atlas32.png").read_bytes())
+    atlas = pack / "portraits/atlas32.png"
+    atlas.unlink()
+    atlas.symlink_to(target)
+    problems = T.validate_theme(pack)
+    assert any("symlink" in p for p in problems), problems
 
 
 def test_declared_size_mismatch_is_refused(tmp_path):
@@ -271,6 +290,11 @@ def test_untyped_token_values_are_refused(value):
     assert T.validate_tokens({"color-accent": value}), value
 
 
+def test_non_string_token_value_is_refused_without_crashing():
+    problems = T.validate_tokens({"color-surface": 123})
+    assert any("token" in p for p in problems), problems
+
+
 def test_low_contrast_is_reported():
     tokens = {
         "color-surface": "#000000",
@@ -281,6 +305,19 @@ def test_low_contrast_is_reported():
     }
     problems = T.validate_tokens(tokens)
     assert any("contrast" in p for p in problems), problems
+
+
+def test_contrast_gate_cannot_be_bypassed_through_the_surface_alias():
+    """``color-surface-solid`` emits ``--ui-bg-solid`` just like the raised key."""
+    tokens = {
+        "color-surface": "#000000",
+        "color-surface-solid": "#ffffff",
+        "color-text-primary": "#808080",
+    }
+    problems = T.validate_tokens(tokens)
+    assert any("contrast" in p for p in problems), problems
+    with pytest.raises(ValueError):
+        T.token_css(tokens, {}, "/plugins/x", "1.0.0")
 
 
 def test_status_colours_must_reach_three_to_one():
@@ -425,6 +462,17 @@ def test_active_theme_id_returns_an_existing_pack(tmp_path, monkeypatch):
     monkeypatch.setattr(T, "theme_roots", lambda: [tmp_path])
     monkeypatch.delenv("QUBIT_OFFICE_THEME", raising=False)
     assert T.active_theme_id({}, requested="demo") == "demo"
+
+
+def test_active_theme_id_is_classic_when_the_pack_is_invalid(tmp_path, monkeypatch):
+    pack = _pack(tmp_path)
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest.pop("credit")
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    monkeypatch.setattr(T, "theme_roots", lambda: [tmp_path])
+    monkeypatch.delenv("QUBIT_OFFICE_THEME", raising=False)
+    assert T.active_theme_id({}, requested="demo") == "classic"
+    assert T.theme_payload({}, requested="demo")["id"] == "classic"
 
 
 def test_env_wins_over_requested_and_config(tmp_path, monkeypatch):
