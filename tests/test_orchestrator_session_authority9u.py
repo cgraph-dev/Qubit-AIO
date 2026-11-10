@@ -57,7 +57,7 @@ def _stub_local(monkeypatch, reply="stub reply"):
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
-              reasoning=None):
+              reasoning=None, cancel=None):
         calls.append({"text": text, "model": model,
                       "conversation_prompt": conversation_prompt,
                       "context": context})
@@ -73,6 +73,25 @@ def _no_plan(monkeypatch):
     import voicebridge.planner as _pl
 
     monkeypatch.setattr(_pl, "plan", lambda _t: None)
+
+
+def _no_vendored(monkeypatch):
+    """Take the planner path deliberately.
+
+    ``run_session`` prefers the tool-capable vendored ``AIAgent`` and only
+    falls back to the planner when that runtime is not importable. These tests
+    assert on the SESSION AUTHORITY (one canonical store, continuous across
+    surfaces), not on the turn's transport: on a checkout where the vendored
+    runtime IS importable the real agent dials the configured provider and its
+    retry backoff hangs the suite on a live network call instead of testing
+    what the file is named for.
+    """
+    import voicebridge.agent as A
+
+    def _unavailable(*_a, **_kw):
+        return None
+
+    monkeypatch.setattr(A, "_run_vendored_session", _unavailable)
 
 
 def _runtime_home(cfg):
@@ -102,6 +121,7 @@ def test_voice_run_session_and_qubit_chat_share_one_transcript(
 
     cfg = _cfg(tmp_path, monkeypatch)
     _no_plan(monkeypatch)
+    _no_vendored(monkeypatch)
     voice_stub = _stub_local(monkeypatch, "voice answer")
 
     sid = "voice9u-shared"
@@ -164,6 +184,7 @@ def test_orchestrator_worker_task_persists_through_canonical_store(
 
     cfg = _cfg(tmp_path, monkeypatch)
     _no_plan(monkeypatch)
+    _no_vendored(monkeypatch)
     _stub_local(monkeypatch, "worker answer")
 
     orch = object.__new__(VoiceOrchestrator)          # skip heavy __init__
@@ -210,6 +231,7 @@ def test_run_session_store_failure_does_not_change_return_contract(
 
     cfg = _cfg(tmp_path, monkeypatch)
     _no_plan(monkeypatch)
+    _no_vendored(monkeypatch)
     _stub_local(monkeypatch, "answer despite store fault")
 
     def _boom(_cfg):
