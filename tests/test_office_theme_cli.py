@@ -27,6 +27,7 @@ import hashlib
 import io
 import json
 import os
+import shutil
 import stat
 import warnings
 import zipfile
@@ -516,3 +517,69 @@ def test_zip_unsupported_compression_is_refused(tmp_path, monkeypatch, capsys):
     rc, out, _ = _hostile_install(tmp_path, monkeypatch, capsys, archive)
     assert rc == 2
     assert "THEME_ZIP_COMPRESSION" in out
+
+
+# ---------------------------------------------- export / IO error contract
+def test_export_of_a_pack_missing_a_field_exits_2(tmp_path, monkeypatch,
+                                                  capsys):
+    """A hand-edited pack is a typed refusal, never a KeyError traceback."""
+    home = tmp_path / "home"
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    pack = _pack_dir(tmp_path, "broken")
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest.pop("credit")
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    # Simulate an owner's local pack that was edited after it was built.
+    target = home / "office" / "themes" / "broken"
+    shutil.copytree(pack, target)
+
+    rc, out, err = _run(_Cfg(), ["export", "broken", str(tmp_path / "b.zip")],
+                        capsys)
+    assert rc == 2, out
+    assert "THEME_EXPORT_INVALID" in out
+    assert "credit" in out
+    assert "Traceback" not in out and "Traceback" not in err
+
+
+def test_export_unwritable_destination_exits_2(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    assert _run(_Cfg(), ["install", str(_recipe_dir(tmp_path))], capsys)[0] == 0
+    blocker = tmp_path / "blocked"
+    blocker.write_text("not a directory")
+    rc, out, err = _run(_Cfg(), ["export", "demo", str(blocker / "demo.zip")],
+                        capsys)
+    assert rc == 2, out
+    assert "THEME_IO_ERROR" in out
+    assert "Traceback" not in out and "Traceback" not in err
+
+
+def test_install_unwritable_home_exits_2(tmp_path, monkeypatch, capsys):
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / "office").write_text("not a directory")
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    rc, out, err = _run(_Cfg(), ["install", str(_recipe_dir(tmp_path))], capsys)
+    assert rc == 2, out
+    assert "THEME_IO_ERROR" in out
+    assert "Traceback" not in out and "Traceback" not in err
+
+
+@pytest.mark.parametrize("bad", ["aux.txt", "CON/x.png", "portraits. /x.png"])
+def test_zip_windows_unsafe_names_are_refused(tmp_path, monkeypatch, capsys,
+                                              bad):
+    archive = _zip(tmp_path / "win.zip", [
+        ("theme.recipe.json", json.dumps(_recipe())),
+        (bad, b"x"),
+    ])
+    rc, out, _ = _hostile_install(tmp_path, monkeypatch, capsys, archive)
+    assert rc == 2
+    assert "THEME_ZIP_WINDOWS_NAME" in out
+
+
+def test_recipe_from_pack_guard_is_typed():
+    """The field guard is a typed refusal even if a caller skips validation."""
+    with pytest.raises(theme_cli.ThemeCLIError) as caught:
+        theme_cli._recipe_from_pack(Path("/nonexistent"), {"format": T.FORMAT})
+    assert caught.value.code == "THEME_EXPORT_INVALID"
+    assert any("credit" in problem for problem in caught.value.problems)

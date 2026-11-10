@@ -22,7 +22,9 @@ and executable content are refused with typed reasons **before** anything is
 written. The staged copy is validated, moved into place, and read back; a
 failure restores whatever was there before.
 
-No network, no service restart, no writes outside the target theme root.
+No network and no service restart. ``install`` writes only under
+``$QUBIT_HOME/office/themes`` (plus a sibling staging dir that is removed);
+``export`` writes exactly the requested destination archive and nothing else.
 """
 from __future__ import annotations
 
@@ -184,6 +186,28 @@ def _entry_name_problems(name: str) -> List[str]:
     return problems
 
 
+def _windows_name_problems(name: str) -> List[str]:
+    """Reserved Windows basenames and trailing dot/space, per path segment.
+
+    This mirrors ``theme._path_problems`` for manifest paths. A zip entry that
+    could not be extracted on Windows (``aux.txt``, ``CON/x.png``, ``x.``) is
+    refused here rather than installing a pack that fails only on one host.
+    """
+    problems: List[str] = []
+    for segment in name.rstrip("/").split("/"):
+        if not segment:
+            continue
+        suffix = os.path.splitext(segment)[1].lower()
+        stem = segment[:-len(suffix)] if suffix else segment
+        if (stem.upper() in T.WINDOWS_RESERVED
+                or segment.upper() in T.WINDOWS_RESERVED):
+            problems.append(f"entry {name!r}: Windows reserved name {segment!r}")
+        if segment != segment.rstrip(" ."):
+            problems.append(
+                f"entry {name!r}: trailing dot or space in {segment!r}")
+    return problems
+
+
 def _duplicate_problems(names: Sequence[str]) -> List[str]:
     problems: List[str] = []
     seen_nfc: Dict[str, str] = {}
@@ -244,6 +268,10 @@ def _inspect_zip(path: Path) -> List[zipfile.ZipInfo]:
             if name_problems:
                 raise ThemeCLIError(
                     "THEME_ZIP_UNSAFE_PATH", "; ".join(name_problems))
+            windows_problems = _windows_name_problems(name)
+            if windows_problems:
+                raise ThemeCLIError(
+                    "THEME_ZIP_WINDOWS_NAME", "; ".join(windows_problems))
             if info.compress_type not in (zipfile.ZIP_STORED,
                                           zipfile.ZIP_DEFLATED):
                 raise ThemeCLIError(
@@ -588,7 +616,19 @@ def _find_any(theme_id: str) -> Optional[Tuple[Path, str, Path]]:
     return None
 
 
+_RECIPE_FIELDS: Sequence[str] = (
+    "format", "schema", "id", "label", "version", "credit", "license",
+    "template_version",
+)
+
+
 def _recipe_from_pack(root: Path, manifest: Dict[str, Any]) -> Dict[str, Any]:
+    missing = [key for key in _RECIPE_FIELDS if key not in manifest]
+    if missing:
+        raise ThemeCLIError(
+            "THEME_EXPORT_INVALID",
+            problems=[f"theme.json: missing required field {key!r}"
+                      for key in missing])
     files = manifest.get("files") if isinstance(manifest.get("files"), dict) else {}
     agents = manifest.get("agents") if isinstance(manifest.get("agents"), dict) else {}
     parts = manifest.get("parts") if isinstance(manifest.get("parts"), dict) else {}
@@ -629,9 +669,14 @@ def _command_export(cfg: Any, theme_id: str, out: str,
             f"theme {theme_id!r} is not installed or bundled")
     root, kind, document = found
     if kind == "pack":
+        # Validate the LOCAL pack before deriving a recipe: a hand-edited pack
+        # with a missing field is a typed refusal, never a KeyError traceback.
+        problems = T.validate_theme(root)
+        if problems:
+            raise ThemeCLIError("THEME_EXPORT_INVALID", problems=problems)
         manifest = _read_json(document)
         if not isinstance(manifest, dict):
-            raise ThemeCLIError("THEME_INSTALL_INVALID",
+            raise ThemeCLIError("THEME_EXPORT_INVALID",
                                 problems=["theme.json: must be an object"])
         recipe = _recipe_from_pack(root, manifest)
     else:
@@ -712,4 +757,12 @@ def run(cfg: Any, args: Any) -> int:
         return 2
     except ThemeCLIError as exc:
         print(json.dumps(exc.as_dict(), indent=2))
+        return 2
+    except OSError as exc:
+        # A permission/unwritable-path failure is a refusal, not a traceback.
+        print(json.dumps({
+            "state": "REFUSED",
+            "code": "THEME_IO_ERROR",
+            "detail": str(exc)[:400],
+        }, indent=2))
         return 2

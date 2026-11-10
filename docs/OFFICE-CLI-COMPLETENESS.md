@@ -34,9 +34,11 @@ invocation settles it.
   branch (site 3 present for all).
 - **0** verbs raised a Python exception / traceback → every local import
   resolves (site 1 present for all).
-- **40** mutating verbs refuse with `OFFICE_CONFIRM_REQUIRED` when invoked
-  without `--confirm` — a typed refusal, never a traceback, and the store is
-  never touched.
+- **41** verbs are mutating in at least one form. **40** refuse with
+  `OFFICE_CONFIRM_REQUIRED` when invoked bare without `--confirm` — a typed
+  refusal, never a traceback, and the store is never touched. The 41st,
+  `theme`, is a family: `theme install`/`theme export` write, while a bare
+  `office theme` defaults to the read-only `list`.
 
 ### Full verb table
 
@@ -121,7 +123,7 @@ store. "traceback?" is whether any Python traceback/`NameError` was produced.
 | `task-trail` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `tasks` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `terminate` | mutating | 2 | `OFFICE_CONFIRM_REQUIRED` | no | WIRED (gated) |
-| `theme` | read-only | 0 | `OK` | no | WIRED (read-only) |
+| `theme` | mutating (family) | 0 (bare = `list`) | `OK` | no | WIRED (family; install/export write) |
 | `tick` | read-only | 0 | `OK` | no | WIRED (read-only) |
 | `tower` | read-only | 0 | `-` | no | WIRED (read-only) |
 | `trace` | read-only | 0 | `OK` | no | WIRED (read-only) |
@@ -137,9 +139,9 @@ store. "traceback?" is whether any Python traceback/`NameError` was produced.
 | `OFFICE_CONFIRM_REQUIRED` | the mutation was refused before touching the store (Bare mutation without `--confirm`) | the 40 mutating verbs |
 | `OFFICE_NOT_FOUND` | a read-only verb named an entity this fixture has none of (`business-pnl 1`) | `business-pnl` |
 | `OFFICE_ADMISSION_REFUSED` | the read-only admission gate applied the caps to the estimate | `admit` |
-| `OK` / `preview` / (no state key) | the read-only verb ran | the remaining 44 read-only verbs |
+| `OK` / `preview` / (no state key) | the read-only verb ran | the remaining 43 read-only verbs |
 
-40 + 44 = 84, the full parser surface: the two columns above partition it.
+41 + 43 = 84, the full parser surface: the two columns above partition it.
 
 `OFFICE_UNSUPPORTED` is **absent** — its presence for any parser-exposed verb is
 the four-site bug (site 3).
@@ -153,7 +155,8 @@ the four-site bug (site 3).
 - asserts the count equals the pinned `EXPECTED_VERB_COUNT = 84`;
 - invokes **every** verb (real parser + real dispatcher) and fails on any
   traceback or any `OFFICE_UNSUPPORTED`;
-- asserts every mutating verb refuses typed without `--confirm`;
+- asserts every mutating verb refuses typed without `--confirm`, except the
+  `theme` family whose bare form (`list`) is read-only;
 - asserts every read-only verb succeeds (or refuses typed on a missing entity);
 - re-runs all 84 verbs bare and asserts **no row count changed** — proving a bare
   invocation never writes;
