@@ -414,11 +414,20 @@ def test_plugin_fleet_discovery_lists_vendored_plugins(tmp_path, monkeypatch):
                         if m["name"] == "qubit-achievements")
     assert achievements["entry"] == "dist/index.js", achievements
     assert achievements["tab"]["path"] == "/achievements", achievements
-    # The vendored fleet view is additive: the overlay list is unchanged.
+    # The overlay list is the reference route: a bare manifest array. It must
+    # still carry the Qubit overlay plugins, and serving the bundled dashboard
+    # plugins alongside them is the reference's own behaviour (the vendored
+    # ``GET /api/dashboard/plugins`` returns full discovery, which includes the
+    # bundled kanban/qubit-achievements dashboards; see
+    # qubit_runtime/tests/qubit_cli/test_web_server.py on "real bundled plugins
+    # — kanban, qubit-achievements"). The SPA dedupes by name, so the fleet
+    # view stays additive rather than duplicating tabs.
     code, overlays = HC.dispatch(cfg, "GET", "/api/dashboard/plugins", {}, {})
     assert code == 200 and isinstance(overlays, list)
-    assert {m["name"] for m in overlays}.isdisjoint(
-        {"qubit-achievements", "kanban"}), overlays
+    overlay_names = {m["name"] for m in overlays}
+    assert {"qubit-approvals", "qubit-boards"} <= overlay_names, overlay_names
+    assert len(overlay_names) == len(overlays), "plugin names must not repeat"
+    assert {m["name"] for m in out["plugins"]} <= overlay_names | names, (names, overlay_names)
 
 
 # ---------------------------------------------------------------------------
