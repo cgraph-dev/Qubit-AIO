@@ -18,18 +18,21 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
 
 
 def _surface():
-    path = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_SURFACE.json"
-    assert path.is_file(), "regenerate via scripts/hermes_surface.py"
-    return json.loads(path.read_text())
+    # HERMES_SURFACE.json was purged in eafb54e26 (regenerate with
+    # scripts/hermes_surface.py); require_ledger reads it read-only from
+    # pre-purge history and fails loudly if it was never generated.
+    return json.loads(require_ledger("docs/archive/2026-09-21/HERMES_SURFACE.json"))
 
 
 def _matrix():
-    path = REPO_ROOT / "docs/archive/2026-09-21" / "PARITY_HERMES.json"
-    assert path.is_file()
-    return json.loads(path.read_text())
+    # PARITY_HERMES.json survived the purge; require_ledger prefers the tree.
+    return json.loads(require_ledger("docs/archive/2026-09-21/PARITY_HERMES.json"))
 
 
 # ---------------------------------------------------------------------------
