@@ -79,7 +79,14 @@ def test_chat_sidebar_uses_the_chat_store_and_loads_the_transcript(tmp_path):
             page.on("request", _record)
             page.goto(f"http://127.0.0.1:{port}/qubit-chat?resume={SEED_ID}",
                       timeout=30000)
-            page.wait_for_timeout(3000)
+            # Wait for the three assertions' elements instead of sampling once
+            # at a fixed 3 s: the transcript lands only after the SPA chunk
+            # loads and the authoritative `/<id>` probe + `/messages` reads
+            # settle, which on a cold bundle takes ~4 s. A fixed sleep sampled
+            # mid-load and reported a blank transcript that was still arriving.
+            page.wait_for_selector("text=Agent3 Seed", timeout=30000)
+            page.wait_for_selector(f"text={SEED_USER}", timeout=30000)
+            page.wait_for_selector(f"text={SEED_REPLY}", timeout=30000)
             body = page.inner_text("body")
 
             # Sidebar lists the seeded chat-store session.
