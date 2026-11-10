@@ -595,6 +595,12 @@ def validate_agent_sheets(document: Any) -> List[str]:
 # ---------------------------------------------------------------------------
 # Manifest helpers
 # ---------------------------------------------------------------------------
+def _inside_repository(path: os.PathLike | str) -> bool:
+    """True when ``path`` resolves to the checkout or anywhere under it."""
+    resolved = Path(path).resolve()
+    return resolved == _REPO_ROOT or _REPO_ROOT in resolved.parents
+
+
 def _check_size(size: int) -> None:
     if size not in (16, 32, 48):
         raise ThemeBuildError(f"size: must be 16, 32, or 48 (got {size!r})")
@@ -810,6 +816,12 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         problems.append("license: must be a non-empty string")
 
     out_path = Path(out)
+    if _inside_repository(out_path):
+        problems.append(
+            "out: refusing to write a theme pack inside the repository "
+            f"({out_path}); the pack carries paid art and must stay outside "
+            "the tree (use $QUBIT_HOME/office/themes/<id>, /tmp, or another "
+            "path outside the checkout)")
     if not _theme_id_ok(out_path.name):
         problems.append(
             "id: output directory name must match ^[a-z0-9][a-z0-9-]{0,39}$ "

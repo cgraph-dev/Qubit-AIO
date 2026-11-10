@@ -25,7 +25,7 @@ import {
 } from "./office-api";
 
 /** Always-present art credit; it must not depend on a theme being active. */
-export const OFFICE_ART_CREDIT = "Office art: LimeZu — limezu.itch.io";
+export const OFFICE_ART_CREDIT = "Office art: LimeZu — https://limezu.itch.io";
 export const OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
 
 export interface OfficeAppProps {

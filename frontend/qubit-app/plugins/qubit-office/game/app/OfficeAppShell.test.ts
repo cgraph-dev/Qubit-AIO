@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createOfficeApp } from "./OfficeAppShell";
+import { createOfficeApp, OFFICE_ART_CREDIT } from "./OfficeAppShell";
 
 const createHarness = () => {
   const frame = {
@@ -76,10 +76,14 @@ describe("Habblaud embedding", () => {
     const credits = h.tree.find(
       (e) => e.props["data-testid"] === "office-app-credits");
     expect(credits).toBeDefined();
-    const link = h.tree.find(
-      (e) => e.props.href === "https://limezu.itch.io");
+    const children = credits?.props.children as Array<{
+      props: Record<string, unknown>;
+    }>;
+    const link = children.find(
+      (child) => child.props.href === "https://limezu.itch.io");
     expect(link).toBeDefined();
-    expect(String((link?.props.children as unknown[])[0])).toContain("LimeZu");
+    expect(String((link?.props.children as unknown[])[0]))
+      .toBe(OFFICE_ART_CREDIT);
     // Classic payload: no theme class and still the same persistent credit.
     expect(h.tree.find((e) => e.props["data-office-theme"])).toBeUndefined();
   });

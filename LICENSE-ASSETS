@@ -27,7 +27,8 @@ non-commercial project and requires credit to the artist. It forbids reselling
 or redistributing the asset to others.
 
 The Modern User Interface licence says the same, and additionally excludes NFT
-minting:
+minting (summary; the verbatim archive text is quoted in
+`THIRD_PARTY_NOTICES.md`):
 
     YOU CAN: edit and use the asset in any commercial or non commercial
     project, except NFT minting.
@@ -78,8 +79,9 @@ modified, or redistributed** by Qubit:
 * Portrait Generator 1.5.0 — a Gray Matter Studios application; art: LimeZu;
   no licence file is present in the archive.
 
-The build reads their archives in memory. A shared theme is the recipe only; it
-does not carry the tool or the art.
+The build reads their archives in memory. The Character Generator archive is
+the body-side build input; the full Modern Interiors archive is not a build
+input. A shared theme is the recipe only; it does not carry the tool or the art.
 
 Credit placement
 ----------------

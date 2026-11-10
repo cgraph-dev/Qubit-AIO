@@ -3,8 +3,10 @@
 **Status:** operational guide for the `qubit-office-theme/1` contract shipped
 with Qubit Office. This document makes no `VERIFIED`, release, or parity claim.
 Every command below was exercised in the theme worktree against the tree that
-ships the builder and the committed recipe; the exact evidence is in
-`docs/STATUS.md` (the office UI theme lane entry).
+ships the builder and the committed recipe. Evidence: the office UI theme lane
+entry in `docs/STATUS.md`, and the Task 1-10 lane reports under
+`.superpowers/sdd/2026-11-09-office-ui-theme-upgrade/`. The strongest single
+check is the focused set printed in §10; the vendor and audit gates are in §9.
 
 ---
 
@@ -89,9 +91,15 @@ python3 scripts/office_theme_build.py \
 ```
 
 `--out` defaults to `$QUBIT_HOME/office/themes/<id>`, where `<id>` is the output
-directory name (lowercase, `^[a-z0-9][a-z0-9-]{0,39}$`). The builder never
-writes inside the checkout, stages into a temporary sibling, validates with the
-real contract, and only then moves the pack into place.
+directory name (lowercase, `^[a-z0-9][a-z0-9-]{0,39}$`). A full-pack `--out`
+inside the repository checkout is a typed refusal: the pack carries paid art
+and must stay outside the tree. `$QUBIT_HOME`, `/tmp`, and other paths outside
+the checkout are allowed. The builder stages into a temporary sibling,
+validates with the real contract, and only then moves the pack into place.
+
+The one deliberate in-repo output is `--recipe-out`, which writes **only** the
+shareable `theme.recipe.json` (no atlas, no art). Use it for the committed seed
+recipe; never use a full-pack `--out` for an in-repo build.
 
 Useful modes:
 
@@ -108,7 +116,7 @@ python3 scripts/office_theme_build.py --source "<purchase dir>" \
 python3 scripts/office_theme_build.py --source "<purchase dir>" \
   --out "$QUBIT_HOME/office/themes/limezu" --ui-sheet "<modern UI sheet or zip>"
 
-# Emit only the shareable recipe (no atlas, no art):
+# Emit ONLY the shareable recipe (the one repo-safe output; no atlas, no art):
 python3 scripts/office_theme_build.py --source "<purchase dir>" \
   --recipe-out frontend/qubit-web/public/plugins/qubit-office/themes/limezu/theme.recipe.json
 ```
@@ -129,7 +137,11 @@ this order:
 
 The portrait generator is preferred for portraits; when it is absent, the
 portrait pieces carried inside the Modern UI pack are used. A missing or
-invalid archive is a typed error naming the file.
+invalid archive is a typed error naming the file. The **Character Generator
+archive is the build input** for the body-side sheets. The **full Modern
+Interiors archive is not a build input** (it is recorded for provenance in
+`THIRD_PARTY_NOTICES.md`); the Modern UI archive supplies the sampled palette
+and the portrait fallback.
 
 ---
 
@@ -443,3 +455,22 @@ cd frontend/qubit-web && npx vite build --config vite.office-game.config.ts
 - **No full matrix and no live restart were performed for this lane.** The
   focused theme suite, the visual probe and the committed recipe are the
   evidence. `VERIFIED` is not claimed.
+
+### Evidence commands
+
+```bash
+PYTHONPATH=. TMPDIR=/tmp python3 -m pytest -q \
+  tests/test_office_assets_vendored.py tests/test_office_theme.py \
+  tests/test_office_theme_build.py tests/test_office_theme_extract.py \
+  tests/test_office_theme_serve.py tests/test_office_theme_cli.py \
+  tests/test_office_framing_policy.py tests/test_office_agents_panel.py \
+  tests/test_office_vendor_habblaud.py
+QUBIT_OFFICE_VISUAL=1 PYTHONPATH=. TMPDIR=/tmp python3 -m pytest -q \
+  tests/test_office_visual_regression.py
+python3 scripts/vendor_habblaud.py --check
+python3 scripts/office_theme_audit.py
+cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts
+```
+
+The exact counts and the real-build output are recorded in `docs/STATUS.md`
+and in the Task 1-10 lane reports, not guessed here.

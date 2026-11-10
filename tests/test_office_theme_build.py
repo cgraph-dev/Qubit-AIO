@@ -361,6 +361,15 @@ def test_source_must_be_a_description_not_a_path(tmp_path):
     assert not (tmp_path / "demo").exists()
 
 
+def test_output_inside_the_repository_is_refused(tmp_path):
+    out = REPO / ".office-theme-in-repo-refusal" / "demo"
+    with pytest.raises(B.ThemeBuildError) as info:
+        B.build_theme(B.DEFAULT_SOURCE, out, personas=["alpha"],
+                      layers=_layers())
+    assert "inside the repository" in str(info.value)
+    assert not out.parent.exists()
+
+
 def test_layers_are_required_and_name_task_3(tmp_path):
     with pytest.raises(B.ThemeBuildError) as info:
         B.build_theme(B.DEFAULT_SOURCE, tmp_path / "demo",

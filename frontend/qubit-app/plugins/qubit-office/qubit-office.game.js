@@ -193762,7 +193762,7 @@ create: function(game) {
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
 	/** Always-present art credit; it must not depend on a theme being active. */
-	var OFFICE_ART_CREDIT = "Office art: LimeZu — limezu.itch.io";
+	var OFFICE_ART_CREDIT = "Office art: LimeZu — https://limezu.itch.io";
 	var OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
 	/**
 	* The theme the host page asked for (`/qubit-office?theme=<id>`).

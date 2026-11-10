@@ -1088,6 +1088,8 @@ Legendaryswordsman2, GPLv3 upstream; art is LimeZu's official character
 generator included with the complete pack) and Portrait Generator 1.5.0 (Gray
 Matter Studios; no licence file in the archive; art is LimeZu). They are read
 in memory as art sources. The Modern User Interface pack supplies the sampled
-palette and the portrait fallback pieces; it is not shipped either. The build
-slices, positions and composites pixels; it does not train or generate art, and
-no art is minted as an NFT.
+palette and the portrait fallback pieces; it is not shipped either. The
+Character Generator archive is the body-side build input; the full Modern
+Interiors archive is recorded here for provenance but is not read by the v1
+build. The build slices, positions and composites pixels; it does not train or
+generate art, and no art is minted as an NFT.
