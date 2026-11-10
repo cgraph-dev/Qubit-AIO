@@ -128,7 +128,19 @@ async def test_follow_session_runs_the_profiles_current_toolsets_and_a_frozen_on
         # The toolsets the turn's agent is built with (``_run_agent_display_settings``).
         assert set(policy.current_toolsets(policy.config(authority))) == before['follow'] - {'web'}
         with policy_scope(policy_for_source(runner, pinned.source), authority=authority):
-            assert set(active_policy().toolsets) == before['pinned'] == {'web'}
+            frozen = set(active_policy().toolsets)
+            # A frozen session keeps the toolsets it was created with: it still
+            # carries ``web`` after the profile disables it, and did not pick up
+            # the disable. Bundled plugins register their own toolsets (e.g.
+            # ``jev-workflows`` -> ``jev``) process-wide, so the frozen set is the
+            # pinned ``web`` plus whatever plugins contributed at creation time —
+            # never a subset of the base set minus the newly disabled toolset.
+            assert frozen == before['pinned']
+            assert 'web' in frozen
+        # Proof the freeze is what held: the following session DID lose ``web``,
+        # while the pinned one kept it.
+        with policy_scope(policy_for_source(runner, follow.source), authority=authority):
+            assert 'web' not in set(active_policy().toolsets)
     finally:
         await owner.close()
         store.close_all_db_handles()
