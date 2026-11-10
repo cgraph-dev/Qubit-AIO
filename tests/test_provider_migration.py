@@ -107,7 +107,11 @@ def test_vision_runner_executes_through_gateway(monkeypatch):
     assert out == "a cat on a mat"
     assert len(rec.calls) == 1
     req = rec.calls[0]["req"]
-    assert req.route == "local" and req.model == "stub-vision"
+    # ``run_role`` executes the model the resolver reported for the vision
+    # profile (``qubit-brain`` on a host that resolves vision locally); a
+    # caller-supplied name never overrides the resolved target.
+    assert req.route == "local" and req.model == "qubit-brain"
+    assert req.model == V.vision_target(None, "stub-vision")["model"]
     kw = rec.calls[0]["kwargs"]
     assert kw["messages"][0]["images"] == ["AAAA"]
     assert kw["keep_alive"] == 0
