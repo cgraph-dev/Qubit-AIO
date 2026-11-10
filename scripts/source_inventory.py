@@ -456,6 +456,32 @@ def _live_dashboard_surface(repo: Path) -> set[str]:
         return set()
 
 
+def _live_spa_routes(repo: Path) -> set[str]:
+    """Client routes served by the dashboard shell, from ``SPA_ROUTE_PATHS``.
+
+    ``voicebridge/webui.py`` is the allowlist the server itself consults, so a
+    path listed there is by definition a live route rather than a ledger claim.
+    """
+    import ast as _ast
+
+    src_path = repo / "voicebridge" / "webui.py"
+    try:
+        tree = _ast.parse(src_path.read_text(encoding="utf-8", errors="replace"))
+    except (OSError, SyntaxError):
+        return set()
+    for node in _ast.walk(tree):
+        if not isinstance(node, _ast.Assign):
+            continue
+        targets = [t.id for t in node.targets if isinstance(t, _ast.Name)]
+        if "SPA_ROUTE_PATHS" not in targets:
+            continue
+        if not isinstance(node.value, _ast.Tuple):
+            continue
+        return {e.value for e in node.value.elts
+                if isinstance(e, _ast.Constant) and isinstance(e.value, str)}
+    return set()
+
+
 def _live_surface_disposition(repo: Path, item: dict,
                               surfaces: dict | None = None) -> dict | None:
     """Typed disposition for a CLI / route / dashboard item against LIVE code.
@@ -467,13 +493,15 @@ def _live_surface_disposition(repo: Path, item: dict,
     """
     cat = item.get("category")
     if cat not in ("qubit_cli_command", "qubit_cli_subcommand",
-                   "qubit_backend_route", "hermes_dashboard_page"):
+                   "qubit_cli_option", "qubit_backend_route",
+                   "hermes_dashboard_page", "hermes_dashboard_route"):
         return None
     if surfaces is None:
         surfaces = {
             "cli": _live_cli_surface(repo),
             "route": _live_route_surface(repo),
             "page": _live_dashboard_surface(repo),
+            "spa": _live_spa_routes(repo),
         }
 
     if cat in ("qubit_cli_command", "qubit_cli_subcommand"):
@@ -484,11 +512,31 @@ def _live_surface_disposition(repo: Path, item: dict,
             return {
                 "status": "IMPLEMENTED", "capability": "qubit_cli_surface",
                 "backend": "qubit_cli.main:_build_cli_parser",
-                "proving_test": "tests/test_cli_*.py",
+                "proving_test": "tests/test_cli_agent1_families.py",
                 "reason": (f"`qubit {path}` is a live argparse command path in "
                            "qubit_cli.main._build_cli_parser(); the bundle row "
                            "it used to match was purged with the capability "
                            "ledger, so coverage is read from the parser."),
+                "needs": "none",
+            }
+        return None
+
+    if cat == "qubit_cli_option":
+        # Options are parented to their command in the upstream inventory
+        # (``hermes acp --check``); the rebranded id keeps that shape, so the
+        # command is everything before the flag.
+        raw = str(item.get("id") or item.get("name") or "").strip()
+        flag = str(item.get("name") or "").strip()
+        cmd = raw.rsplit(flag, 1)[0].strip() if flag else raw
+        cmd = cmd[len("hermes "):] if cmd.startswith("hermes ") else cmd
+        cmd = cmd.replace("qubit ", "", 1) if cmd.startswith("qubit ") else cmd
+        if cmd and cmd in surfaces["cli"]:
+            return {
+                "status": "IMPLEMENTED", "capability": "qubit_cli_option",
+                "backend": "qubit_cli.main:_build_cli_parser",
+                "proving_test": "tests/test_cli_agent1_families.py",
+                "reason": (f"`qubit {cmd} {flag}` lives on a command path that "
+                           "qubit_cli.main._build_cli_parser() defines."),
                 "needs": "none",
             }
         return None
@@ -500,9 +548,23 @@ def _live_surface_disposition(repo: Path, item: dict,
             return {
                 "status": "IMPLEMENTED", "capability": "qubit_backend_route",
                 "backend": "voicebridge.qubit_compat:_r",
-                "proving_test": "",
+                "proving_test": "tests/test_backend_routes_integration8u.py",
                 "reason": (f"{method} {route} is registered by a literal "
                            "`_r(...)` call in voicebridge/qubit_compat.py."),
+                "needs": "none",
+            }
+        return None
+
+    if cat == "hermes_dashboard_route":
+        route = str(item.get("route") or item.get("name") or "")
+        if route in surfaces["spa"]:
+            return {
+                "status": "IMPLEMENTED", "capability": "qubit_dashboard_route",
+                "backend": "voicebridge.webui:SPA_ROUTE_PATHS",
+                "proving_test": "tests/test_dashboard_agent3_wiring.py",
+                "reason": (f"{route} is listed in voicebridge.webui."
+                           "SPA_ROUTE_PATHS, the allowlist the dashboard server "
+                           "consults to serve a client route."),
                 "needs": "none",
             }
         return None
@@ -513,7 +575,7 @@ def _live_surface_disposition(repo: Path, item: dict,
         return {
             "status": "IMPLEMENTED", "capability": "qubit_dashboard_page",
             "backend": f"frontend/qubit-web/src/pages/{name}.tsx",
-            "proving_test": "",
+            "proving_test": "tests/test_dashboard_agent3_wiring.py",
             "reason": (f"frontend/qubit-web/src/pages/{name}.tsx ships and is "
                        "bundled into the served dashboard."),
             "needs": "none",
@@ -2297,6 +2359,7 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
         "cli": _live_cli_surface(repo),
         "route": _live_route_surface(repo),
         "page": _live_dashboard_surface(repo),
+        "spa": _live_spa_routes(repo),
     }
     for it in all_items:
         disposition = _fork_disposition(repo, it, fork_tools, fork_plugins)
