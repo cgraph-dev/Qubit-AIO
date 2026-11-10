@@ -1,8 +1,9 @@
-// Dev-server fixtures for the billing settings screen. The billing portal
-// itself is the upstream vendor's, so its origin is assembled from its parts
-// instead of being spelled out: this file ships in the dev-only chunk and the
-// public-surface scan must not read a product source file as a public link.
-const NOUS_PORTAL = ['https://portal.', 'nous', 'research', '.com'].join('')
+// Dev-server fixtures for the billing settings screen. These are DEV-ONLY
+// sample payloads (never shipped copy), but the public-surface scan still reads
+// this product source tree, so the portal origin must not name the upstream
+// vendor: a neutral placeholder origin keeps the shape (absolute URL + path)
+// without publishing a real vendor portal link.
+const DEV_PORTAL_ORIGIN = 'https://billing.example.com'
 
 import type { BillingResult } from './api'
 import type { BillingStateResponse, SubscriptionStateResponse, SubscriptionTierOption } from './types'
@@ -57,7 +58,7 @@ export const todayBillingState = {
   },
   ok: true,
   org_name: 'sid-5',
-  portal_url: `${NOUS_PORTAL}/billing`,
+  portal_url: `${DEV_PORTAL_ORIGIN}/billing`,
   role: 'OWNER',
   usage: {
     available: true,
@@ -81,7 +82,7 @@ export const todaySubscriptionState = {
   ok: true,
   org_id: 'sid-5',
   org_name: 'sid-5',
-  portal_url: `${NOUS_PORTAL}/billing`,
+  portal_url: `${DEV_PORTAL_ORIGIN}/billing`,
   role: 'OWNER',
   tiers: [
     {
@@ -194,7 +195,7 @@ export const loggedOutBillingState = {
   logged_in: false,
   monthly_cap: null,
   org_name: null,
-  portal_url: `${NOUS_PORTAL}/login`,
+  portal_url: `${DEV_PORTAL_ORIGIN}/login`,
   role: null,
   usage: undefined
 } satisfies BillingStateResponse
@@ -207,7 +208,7 @@ export const loggedOutSubscriptionState = {
   logged_in: false,
   org_id: null,
   org_name: null,
-  portal_url: `${NOUS_PORTAL}/login`,
+  portal_url: `${DEV_PORTAL_ORIGIN}/login`,
   role: null,
   tiers: [],
   usage: undefined
