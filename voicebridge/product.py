@@ -1786,6 +1786,10 @@ def _migrate_rollback_apply(paths: ProductPaths,
                 failed.append(f"alias-remove:{legacy}: {exc}")
         if canonical.exists() and not legacy.exists():
             try:
+                # Mirror _migrate_apply: the legacy parent may not exist at all
+                # (a fresh home never had ~/.local/state, so moving the state
+                # tree back raised ENOENT and failed the whole rollback).
+                legacy.parent.mkdir(parents=True, exist_ok=True)
                 canonical.rename(legacy)
                 _fsync_dir(legacy.parent)
                 restored.append(f"moved-back:{legacy}")
