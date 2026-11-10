@@ -131,14 +131,62 @@ def _channel_names() -> list:
 # Coverage: the table is exactly the remaining inventory rows
 # ---------------------------------------------------------------------------
 def test_wave5_is_exactly_the_remaining_inventory_rows() -> None:
+    """Wave 5 covers ITS rows, and no inventory row without a disposition.
+
+    ``scripts/rebuild_ledger_qubit.py`` ingests the direct source inventory and
+    emits an ``inv:openclaw-ext:<name>`` row for every extension it cannot match
+    to a ledger row (138 on the current worktree). Wave 4's frozen map
+    (``EXTENSION_MAP``, 154 v2026.9.4 extensions) dispositions 130 of those and
+    24 more were closed by wave 5; the other 8 wave-5 names map onto a
+    wave-4 parent and therefore carry no ``inv:`` row of their own.
+
+    So the ledger-side invariant is: every inventory extension row is covered
+    by the audited map (wave 4 or wave 5) — an ``inv:`` row outside both tables
+    is an undocumented gap, not a wave-5 omission. The per-row disposition for
+    wave 5 itself is asserted by ``test_every_wave5_extension_is_mapped_and_typed``.
+    """
     assert len(WAVE5) == 30
     assert tuple(rebuild.WAVE5_EXTENSIONS) == WAVE5
-    # Every currently-MISSING inv:openclaw-ext row must be dispositioned.
-    if QUBIT_SECTION_PATH.is_file():
-        section = json.loads(QUBIT_SECTION_PATH.read_text(encoding="utf-8"))
-        named = {row["id"][len("inv:openclaw-ext:"):] for row in section["rows"]
-                 if row["id"].startswith("inv:openclaw-ext:")}
-        assert named <= set(WAVE5), sorted(named - set(WAVE5))
+    assert set(WAVE5) <= set(rebuild.EXTENSION_MAP), (
+        sorted(set(WAVE5) - set(rebuild.EXTENSION_MAP)))
+    if not QUBIT_SECTION_PATH.is_file():
+        pytest.skip(
+            "docs/generated/QUBIT_GAP_LEDGER.qubit.json is a gitignored "
+            "generated artifact; regenerate it with "
+            "scripts/rebuild_ledger_qubit.py to check the extension map "
+            "against the live inventory ingestion")
+    section = json.loads(QUBIT_SECTION_PATH.read_text(encoding="utf-8"))
+    inv = section.get("inventory") or {}
+    assert inv.get("present") is True, (
+        "the Qubit section was not built from a source inventory, so its "
+        "inv:openclaw-ext rows attest nothing")
+    assert int(inv.get("items_total") or 0) > 0, inv
+    inventory_extension_rows = {
+        row["id"].split("inv:openclaw-ext:", 1)[1]
+        for row in section["rows"] if row["id"].startswith("inv:openclaw-ext:")}
+    #: Extensions the CURRENT inventory names but both audit tables predate.
+    #: ``WAVE4``/``WAVE5`` are frozen to v2026.9.4; the inventory tracks the
+    #: current pin, so newly added extensions arrive as open ``inv:`` rows and
+    #: are ledger work for a NEXT wave, not a wave-5 regression.
+    newer_than_the_audit = {"codex-supervisor", "media-understanding-core",
+                            "open-prose", "phone-control", "qa-matrix",
+                            "qqbot", "thread-ownership",
+                            "video-generation-core"}
+    undispositioned = sorted(inventory_extension_rows
+                             - set(rebuild.EXTENSION_MAP))
+    assert set(undispositioned) <= newer_than_the_audit, (
+        "inventory extension rows lost an audited disposition: "
+        f"{sorted(set(undispositioned) - newer_than_the_audit)}")
+    # The post-audit set is a real gap, and it must be visible in the ledger
+    # as open rows — never silently dropped from the inventory.
+    ledger_status = {row["id"].split("inv:openclaw-ext:", 1)[1]: row["status"]
+                     for row in section["rows"]
+                     if row["id"].startswith("inv:openclaw-ext:")}
+    for name in newer_than_the_audit & inventory_extension_rows:
+        assert ledger_status.get(name) not in (
+            "IMPLEMENTED", "SAFE_EQUIVALENT", "OPERATOR_ONLY"), (
+            f"{name} is reported closed but no audited disposition covers it")
+    assert inventory_extension_rows, "inventory carried no extension rows"
 
 
 def test_every_wave5_extension_is_mapped_and_typed() -> None:
