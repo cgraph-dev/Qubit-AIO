@@ -590,6 +590,11 @@ def _openclaw_disposition(item: dict) -> dict | None:
     wave-5 form/proof table so the two never drift.  A ``parent``/``distinct``
     disposition with a real Qubit form + proving test is IMPLEMENTED; a gate is
     a typed credential/hardware/owner refusal.
+
+    Wave 6 (:data:`WAVE6_AUDIT`) carries the audited answer for extensions on
+    the CURRENT pin that the frozen wave-4/5 tables predate.  An extension in
+    neither table has no Qubit equivalent and gets no disposition, so its row
+    stays an honest MISSING.
     """
     if item.get("category") != "openclaw_extension":
         return None
@@ -598,9 +603,30 @@ def _openclaw_disposition(item: dict) -> dict | None:
         scripts_dir = str(Path(__file__).resolve().parent)
         if scripts_dir not in sys.path:
             sys.path.insert(0, scripts_dir)
-        from rebuild_ledger_openclaw import EXTENSION_MAP, WAVE5_FORMS
+        from rebuild_ledger_openclaw import EXTENSION_MAP, WAVE5_FORMS, WAVE6_AUDIT
     except Exception:
         return None
+    audit = WAVE6_AUDIT.get(name)
+    if isinstance(audit, dict):
+        status = str(audit.get("status") or "")
+        if status == "implemented":
+            status = "IMPLEMENTED"
+        elif status == "gated":
+            status = "GATED"
+        else:  # pragma: no cover - table is validated by its own test
+            return None
+        return {
+            "status": status,
+            "capability": f"openclaw extension {name}",
+            "backend": str(audit.get("form") or ""),
+            "proving_test": str(audit.get("proving") or ""),
+            "reason": (f"OpenClaw extension {name!r} -> wave-6 audit: "
+                       f"{audit.get('why') or ''} "
+                       f"(parent={audit.get('parent') or 'distinct'}, "
+                       f"gate={audit.get('gate') or 'none'}).").strip(),
+            "needs": str(audit.get("needs")
+                         or ("creds" if status == "GATED" else "none")),
+        }
     disp = EXTENSION_MAP.get(name)
     if disp is None:
         return None
