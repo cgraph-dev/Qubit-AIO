@@ -16,10 +16,13 @@ to make impossible.
 """
 from __future__ import annotations
 
+import os
+import shutil
 import sqlite3
 import time
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterator, Optional
 
 from .errors import (BAD_INPUT_CODE, CONFIRM_CODE, IO_CODE, OfficeError)
 
@@ -41,15 +44,195 @@ MAX_SPAN = 7          # D34: a manager carries at most 7 direct reports
 MAX_FLOORS = 60       # D13 (revised)
 CHAIN_MAX_HOPS = 8    # the chain must terminate at the CEO well inside this
 
-
 def db_path(cfg: Any) -> Path:
     return Path(cfg.state_dir()) / DIR_NAME / DB_NAME
+
+
+def legacy_db_path() -> Optional[Path]:
+    """The pre-``QUBIT_HOME`` XDG office store, ``read-old`` only.
+
+    The voice-layout change moved the canonical store to
+    ``$QUBIT_HOME/voice/state/office/office.db``. Existing installs kept their
+    data at the old XDG path, so a reinstall/layout reset can leave a populated
+    legacy DB beside an empty canonical one. This returns that path for
+    :func:`_adopt_legacy_if_needed` to read; the resolver is imported lazily so
+    an install without ``voicebridge.paths`` simply has no legacy source.
+    """
+    try:
+        from ..paths import read_old_voice_dirs
+
+        return Path(read_old_voice_dirs()["state"]) / DIR_NAME / DB_NAME
+    except Exception:  # pragma: no cover - resolver absent in a stripped tree
+        return None
+
+
+def _count_rows(path: Path, table: str) -> int:
+    """Committed row count via a read-only connection; 0 on any problem.
+
+    A missing file, a non-database file, or a pre-schema store (no such table)
+    all read as "empty" here, which is exactly what the adoption rule wants:
+    only a store that genuinely holds departments/agents blocks adoption.
+    """
+    if not path.exists():
+        return 0
+    uri = f"file:{path}?mode=ro"
+    try:
+        conn = sqlite3.connect(uri, uri=True, timeout=5.0)
+    except sqlite3.Error:
+        return 0
+    try:
+        row = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()
+        return int(row[0] or 0) if row is not None else 0
+    except sqlite3.Error:
+        return 0
+    finally:
+        conn.close()
+
+
+def _is_populated(path: Path) -> bool:
+    """True when the store holds a real org (a department or an agent)."""
+    return (_count_rows(path, "office_department") > 0
+            or _count_rows(path, "office_agent") > 0)
+
+
+@contextmanager
+def _adoption_lock(directory: Path) -> Iterator[None]:
+    """Serialize adoption across processes sharing the canonical directory.
+
+    ``flock`` is released by the kernel if the process dies, so a crashed
+    adopter cannot wedge a later start. Platforms without ``fcntl`` fall back
+    to the unlocked path; the re-check inside the lock keeps that safe because
+    the replace is atomic.
+    """
+    try:
+        import fcntl
+    except ImportError:  # pragma: no cover - non-POSIX fallback
+        yield
+        return
+    path = directory / "office-adopt.lock"
+    with open(path, "a+") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            try:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError:  # pragma: no cover - best effort
+                pass
+
+
+def _fsync_file(path: Path) -> None:
+    try:
+        with open(path, "rb") as handle:
+            os.fsync(handle.fileno())
+    except OSError:  # pragma: no cover - filesystems without fsync support
+        pass
+
+
+def _copy_legacy_into(canonical: Path, legacy: Path) -> Optional[Path]:
+    """Copy ``legacy`` into ``canonical`` atomically, backing up any empty file.
+
+    The legacy database is only ever *read*: its main file plus ``-wal``/
+    ``-shm`` sidecars are copied into a private staging directory, normalized
+    through SQLite's backup API into one clean file, fsynced, and then
+    ``os.replace``d over the canonical path. An existing (necessarily empty)
+    canonical DB is moved aside with its sidecars first, so a stale WAL can
+    never be replayed against the adopted database. Returns the backup path.
+    """
+    directory = canonical.parent
+    token = f"{os.getpid()}-{int(time.time() * 1000)}"
+    stage = directory / f".office-adopt-{token}"
+    stage.mkdir(parents=True, exist_ok=True)
+    try:
+        source_copy = stage / DB_NAME
+        shutil.copy2(legacy, source_copy)
+        for suffix in ("-wal", "-shm"):
+            side = Path(str(legacy) + suffix)
+            if side.exists():
+                shutil.copy2(side, Path(str(source_copy) + suffix))
+
+        adopted = stage / "adopted.db"
+        src = sqlite3.connect(str(source_copy), timeout=30.0)
+        try:
+            dst = sqlite3.connect(str(adopted), timeout=30.0)
+            try:
+                src.backup(dst)
+                dst.commit()
+            finally:
+                dst.close()
+        finally:
+            src.close()
+        _fsync_file(adopted)
+
+        backup: Optional[Path] = None
+        if canonical.exists():
+            stamp = time.strftime("%Y%m%d-%H%M%S")
+            backup = canonical.with_name(
+                f"{DB_NAME}.pre-adopt-{stamp}-{token}.bak")
+            os.replace(canonical, backup)
+            for suffix in ("-wal", "-shm"):
+                side = Path(str(canonical) + suffix)
+                if side.exists():
+                    try:
+                        os.replace(side, Path(str(backup) + suffix))
+                    except OSError:  # pragma: no cover - best effort
+                        pass
+        os.replace(adopted, canonical)
+        return backup
+    finally:
+        shutil.rmtree(stage, ignore_errors=True)
+
+
+def _adopt_legacy_if_needed(canonical: Path) -> Optional[Path]:
+    """Adopt a populated legacy office DB when the canonical store is empty.
+
+    Rules (least surprising, canonical always wins):
+
+    * canonical populated -> do nothing, even if legacy is populated;
+    * canonical absent **or** logically empty (no department/agent rows) and a
+      populated legacy DB exists -> copy it into the canonical path;
+    * same path (a read-old install already resolves to the legacy DB), no
+      legacy DB, or an empty legacy DB -> do nothing.
+
+    Idempotent: after a successful adoption the canonical store is populated,
+    so a repeat call is a no-op. The legacy DB is never moved, deleted, or
+    written to.
+    """
+    legacy = legacy_db_path()
+    if legacy is None:
+        return None
+    try:
+        if canonical.resolve() == legacy.resolve():
+            return None
+    except OSError:  # pragma: no cover - unresolvable path
+        if str(canonical) == str(legacy):
+            return None
+    if not legacy.is_file():
+        return None
+    if canonical.exists() and _is_populated(canonical):
+        return None
+
+    with _adoption_lock(canonical.parent):
+        # Re-check under the lock: another process may have just adopted.
+        if canonical.exists() and _is_populated(canonical):
+            return None
+        if not legacy.is_file() or not _is_populated(legacy):
+            return None
+        return _copy_legacy_into(canonical, legacy)
 
 
 def connect(cfg: Any) -> sqlite3.Connection:
     path = db_path(cfg)
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
+        # Read-old adoption runs before the canonical file is opened/created,
+        # so an empty store is never mistaken for "no data" while a populated
+        # legacy store sits beside it. Failure here must never block the store:
+        # the canonical path is still a valid (possibly empty) database.
+        try:
+            _adopt_legacy_if_needed(path)
+        except Exception:
+            pass
         conn = sqlite3.connect(str(path), timeout=30.0,
                                check_same_thread=False)
         conn.row_factory = sqlite3.Row
