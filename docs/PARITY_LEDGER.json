@@ -16,7 +16,7 @@
   "plan": "docs/PARITY_PLAN.md (Phase 0)",
   "surfaces": {
     "hud": {
-      "clone": "/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch/hermes-hudui",
+      "clone": "$QUBIT_SCRATCH_DIR/hermes-hudui",
       "repo": "hermes-hudui",
       "pin": "be83208f48b7a1c67b7816837c8df71a61ef7edf",
       "maps_to": "frontend/qubit-app/plugins/qubit-hud",
@@ -26,7 +26,7 @@
       "our_inventory_lines": 4379
     },
     "webui": {
-      "clone": "/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch/hermes-webui",
+      "clone": "$QUBIT_SCRATCH_DIR/hermes-webui",
       "repo": "hermes-webui",
       "pin": "f328d3f8e17f92a72fd71cc05f1e45665f2bc662",
       "maps_to": "voicebridge/workbench_ui",
@@ -36,7 +36,7 @@
       "our_inventory_lines": 135379
     },
     "extension": {
-      "clone": "/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch/hermes-browser-extension",
+      "clone": "$QUBIT_SCRATCH_DIR/hermes-browser-extension",
       "repo": "hermes-browser-extension",
       "pin": "a0fa4e828deb0802a6950bf3ef55e93a7f096f20",
       "maps_to": "frontend/qubit-app/plugins/qubit-browser-ext",

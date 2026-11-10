@@ -10,7 +10,7 @@ keys, cookies, raw paths, audio, or page text).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 from . import foundation as F
 from . import read_cache as RC
@@ -110,13 +110,31 @@ def _adapters(cfg: Any) -> Dict[str, Any]:
                                "broker (pinned, confirmed)"}}
 
 
+def free_vram_mib() -> Optional[int]:
+    """Live free-VRAM gauge (MiB); typed None when it cannot be measured.
+
+    This is the ONE live hardware metric the `status` payload carries, so the
+    dashboard / voice / CLI parity comparison can scrub exactly this key and
+    compare everything else exactly. It is a read-only probe (the same
+    measurement the VRAM guard makes before a load); it never caches, because
+    a cached gauge is not live.
+    """
+    try:
+        from .vram_guard import free_vram_mib as _free
+
+        return _free()
+    except Exception:  # noqa: BLE001 - unmeasurable -> typed None
+        return None
+
+
 def _providers(cfg: Any) -> Dict[str, Any]:
     get = (lambda *p, default=None: cfg.get(*p, default=default)) \
         if hasattr(cfg, "get") else (lambda *p, default=None: default)
     return {"resident_alias": str(get("intent", "runner", "alias",
                                       default="qubit-brain")),
             "frontier": "disabled by default (explicit allowlist + budgets)",
-            "credentials": "env:/file: references only; values never shown"}
+            "credentials": "env:/file: references only; values never shown",
+            "free_vram_mib": free_vram_mib()}
 
 
 def _vision(cfg: Any) -> Dict[str, Any]:

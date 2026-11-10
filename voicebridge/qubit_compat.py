@@ -7794,6 +7794,11 @@ _CHAT_PICKER_OVERFETCH = 4
 #: signals above stay count-independent and still catch named artifacts at any
 #: length.
 _CHAT_PICKER_NOISE_MAX_MSGS = 1
+#: Message count at which a title-less, caller-named row is a real chat: a
+#: completed exchange (the user turn + its reply) is the smallest evidence of a
+#: human conversation, and probe tooling mints neither a human-shaped id nor a
+#: reply.
+_CHAT_PICKER_REAL_MSGS = 2
 #: Session names probe and smoke tooling mints. Matched exactly (never a
 #: substring) so a real conversation titled similarly is never hidden.
 _CHAT_PICKER_NOISE_NAMES = frozenset({
@@ -7873,6 +7878,18 @@ def _is_chat_picker_noise(record: Any) -> bool:
     except (TypeError, ValueError):
         msgs = 0
     if msgs > _CHAT_PICKER_NOISE_MAX_MSGS:
+        return False
+    # A NAMED session that holds a completed exchange is a real conversation.
+    # ``ensure()`` creates the row with NO title whenever a caller names the id
+    # itself (``/api/qubit/chat`` with ``session=new-chat``, the PTY surface,
+    # the voice command lane), so the store reports ``title == id`` for it —
+    # exactly the placeholder shape Signal 2 below treats as machine noise.
+    # Without this, a two-message chat the user just had vanished from the
+    # picker whenever its id did not carry the ``dashboard-`` prefix.
+    if (title == sid and not _DASHBOARD_AUTO_ID_RE.match(sid)
+            and msgs >= _CHAT_PICKER_REAL_MSGS
+            and not title.lower().startswith(("e2e", "probe", "smoke",
+                                              "verify", "hygiene"))):
         return False
     source = str(record.get("created_source") or record.get("source") or "")
     return source in ("dashboard", "oneshot")
@@ -7973,11 +7990,24 @@ def h_chat_sessions_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     # Over-fetch so filtering does not shrink the page the caller asked for.
     fetch = min(limit * _CHAT_PICKER_OVERFETCH + offset, 1000)
     res = CT.store(cfg).list(limit=fetch, offset=0, query=query)
+    total = int(res.get("total") or 0)
     rows = [_rebrand_chat_record(r) for r in res.get("sessions", [])]
     kept = [r for r in rows if not _is_chat_picker_noise(r)]
-    total = len(kept)
+    # The filtered page can be ENTIRELY noise (measured: 187 zero-message rows
+    # outrank a fresh two-message conversation by recency, so the picker showed
+    # "no conversations" while real ones sat past the page). Walk the advanced
+    # window until enough real rows are kept (or the store is exhausted).
+    seen = len(rows)
+    while len(kept) < total and len(kept) < offset + limit and seen < 1000:
+        more = CT.store(cfg).list(limit=1000 - seen, offset=seen, query=query)
+        batch = more.get("sessions", []) or []
+        if not batch:
+            break
+        seen += len(batch)
+        kept.extend(r for r in (_rebrand_chat_record(b) for b in batch)
+                    if not _is_chat_picker_noise(r))
     return _ok(sessions=kept[offset:offset + limit],
-               total=total,
+               total=len(kept),
                limit=limit, offset=offset,
                state="OK", code=None, source="qubit-chat-store")
 
