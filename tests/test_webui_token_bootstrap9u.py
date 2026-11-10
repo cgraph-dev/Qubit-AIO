@@ -27,6 +27,8 @@ class _App:
 def _handler(*, peer="127.0.0.1", host="127.0.0.1", headers=None):
     handler = object.__new__(ui.WebUIHandler)
     handler.client_address = (peer, 50000)
+    # The request path: `_serve_qubit_index` reads it for the HUD frame grant.
+    handler.path = "/"
     handler.headers = {"Host": host}
     handler.headers.update(headers or {})
     handler.server = type("S", (), {"app": _App()})()
