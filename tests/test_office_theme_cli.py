@@ -24,7 +24,6 @@ Hermetic: throwaway ``QUBIT_HOME`` roots only, no network, no service.
 from __future__ import annotations
 
 import hashlib
-import io
 import json
 import os
 import shutil
