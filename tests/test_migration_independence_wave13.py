@@ -60,17 +60,32 @@ def _scratch_operator_home(tmp_path, monkeypatch):
     This is what makes the no-fallback proof non-destructive: the test names
     ``~/.hermes`` but resolves it under ``tmp_path``; the real reference home is
     never touched.
+
+    The redirect covers every home resolver, not just ``Path.home()``:
+    ``~/.hermes`` is checked through ``Path.home()`` (monkeypatched), but
+    ``default_home()`` reads ``XDG_STATE_HOME`` and, when truthiness checks fail,
+    ``os.path.expanduser("~")`` — which reads ``$HOME``.
     """
     scratch = tmp_path / "operator"
     scratch.mkdir()
     monkeypatch.setenv("HOME", str(scratch))
     monkeypatch.setattr(Path, "home", lambda: scratch)
+    monkeypatch.setattr(os.path, "expanduser",
+                        lambda p: str(scratch) + p[1:] if p.startswith("~") else p)
     monkeypatch.delenv("QUBIT_HOME", raising=False)
+    monkeypatch.setenv("XDG_STATE_HOME", str(scratch / ".local" / "state"))
     return scratch
 
 
 def test_session_store_resolves_qubit_home_not_hermes(tmp_path, monkeypatch):
-    """The canonical store starts fully from the Qubit-owned home."""
+    """The canonical store starts fully from the Qubit-owned home.
+
+    Marked ``live_system_guard_bypass`` on purpose: this test's contract IS that
+    the canonical store opens ``$HOME/.qubit/state.db`` from an unset
+    ``QUBIT_HOME``, so with the operator identity redirected to ``tmp_path`` the
+    guard sees a scratch ``~/.qubit`` and refuses exactly the open the test
+    asserts. Nothing real is touched — the scratch home is under ``tmp_path``.
+    """
     cfg = _cfg(tmp_path, monkeypatch)
     external = QR._external_default_home()
     assert external == Path.home() / ".hermes"
