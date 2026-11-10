@@ -932,21 +932,30 @@ def audit_mcp(h: Harness) -> None:
           "click Test connection on the cgraph-graft server", test_conn)
 
     def toggle():
-        loc = h.page.locator('button[aria-label="Disable"]')
+        # Only a registry-backed row is editable. A config.yaml-declared row
+        # renders its toggle disabled (`editable: false`, read-only inventory),
+        # so clicking it would probe a control the product deliberately does not
+        # offer. Target an enabled toggle instead; when every row is
+        # config-declared there is no editable row and this is honestly SKIP.
+        loc = h.page.locator('button[aria-label="Disable"]:not([disabled])')
         if loc.count() == 0:
-            loc = h.page.locator('button[aria-label="Enable"]')
+            loc = h.page.locator('button[aria-label="Enable"]:not([disabled])')
         if loc.count() == 0:
-            return {"disposition": "E2E_SKIP", "state": "no server row",
-                    "detail": "no MCP server configured"}
-        was_disable = h.page.locator('button[aria-label="Disable"]').count() > 0
+            return {"disposition": "E2E_SKIP",
+                    "state": "no editable server row",
+                    "detail": "every listed MCP server is declared in config.yaml "
+                              "(read-only); add one to the registry to toggle it"}
+        was_disable = (
+            h.page.locator(
+                'button[aria-label="Disable"]:not([disabled])').count() > 0)
         loc.first.click()
         h.page.wait_for_timeout(1500)
         if was_disable:
-            en = h.page.locator('button[aria-label="Enable"]')
+            en = h.page.locator('button[aria-label="Enable"]:not([disabled])')
             if en.count():
                 en.first.click()
         else:
-            dis = h.page.locator('button[aria-label="Disable"]')
+            dis = h.page.locator('button[aria-label="Disable"]:not([disabled])')
             if dis.count():
                 dis.first.click()
         h.page.wait_for_timeout(1200)

@@ -3074,6 +3074,12 @@ export interface McpServer {
   invocation_code?: string | null;
   /** Which store the row was read from (`qubit-registry`). */
   source?: string;
+  /** Whether this row's enable/disable control can act. A `qubit-config` row is
+   *  read-only inventory (PRB-01): `set_enabled` writes the canonical registry
+   *  store only, and the runtime MCP client loads every `mcp_servers` entry
+   *  without consulting `enabled`, so toggling it would neither persist nor
+   *  switch anything. Edit `config.yaml` instead. */
+  editable?: boolean;
   /** The mount policy attached to the row (Qubit never auto-mounts). */
   policy?: string;
 }
