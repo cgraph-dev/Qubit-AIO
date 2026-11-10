@@ -269,9 +269,14 @@ def test_byte_diff_is_reported(inventory):
     # The inventory's raw byte diff counts reference-only upstream test trees
     # as ``missing``; the canonical manifest records those as
     # ``intentionally_omitted`` (owner policy). The recorded unported set is
-    # therefore the union of the manifest's product misses and its omissions.
+    # therefore the union of the manifest's product misses and its omissions,
+    # PLUS ``owner_purged``: the 297 upstream translation/i18n files deleted by
+    # the English-only owner directive (eafb54e26). Those are absent on purpose
+    # and must never be re-created, but the raw diff still counts them unless
+    # they are included here.
     missing = (set(manifest.get("missing_from_local") or [])
-               | set(manifest.get("intentionally_omitted") or []))
+               | set(manifest.get("intentionally_omitted") or [])
+               | set(manifest.get("owner_purged") or []))
 
     # Internal arithmetic of the diff.
     assert counts["local_files"] == (counts["identical"] + counts["changed"]

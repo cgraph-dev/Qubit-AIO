@@ -295,6 +295,11 @@ _EXTRA_PATH_RENAMES: dict[str, str] = {
     "docker/hermes-exec-shim.sh": "docker/qubit-exec-shim.sh",
     "nix/hermes-agent.nix": "nix/qubit-runtime.nix",
     "ui-tui/src/types/hermes-ink.d.ts": "ui-tui/src/types/qubit-ink.d.ts",
+    # Compound segment the per-segment translator cannot catch (the basename is
+    # ``hermes-kanban-dispatcher.service``, not a bare ``hermes`` segment).
+    # The Qubit copy is byte-identical apart from the rebrand.
+    "plugins/kanban/systemd/hermes-kanban-dispatcher.service":
+        "qubit_runtime/plugins/kanban/systemd/qubit-kanban-dispatcher.service",
     "web/src/components/HermesConsoleModal.tsx":
         "web/src/components/QubitConsoleModal.tsx",
     # desktop product asset renamed by the deep rebrand
@@ -1628,7 +1633,13 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
                         if r in upstream_local}
     for rel in sorted(set(tree) - covered_upstream):
         reason = _intentional_omission_reason(rel)
-        if reason is None:
+        if reason is None and _owner_purged(rel):
+            # Deleted by the English-only owner directive, not a sync gap.
+            # Classified as omitted so it never enters ``blockers``: an owner
+            # decision must not be reported as an unexplained divergence.
+            classification = INTENTIONALLY_OMITTED
+            omitted.append(rel)
+        elif reason is None:
             classification = MISSING
             missing.append(rel)
             blockers.append(rel)
