@@ -59,7 +59,28 @@ def _empty(detail: str) -> Dict[str, Any]:
             "detail": detail, "divisions": [], "seats": [], "counts": {}}
 
 
-def panel(root: Optional[Path] = None) -> Dict[str, Any]:
+def _cell(callback: Any, slugs: List[str]) -> Optional[List[int]]:
+    """Ask a cell callback for the first slug it knows; a theme failure is None.
+
+    The panel must keep rendering even if a theme index is unreadable, so a
+    callback that raises is treated as "no cell" rather than crashing the route.
+    """
+    if callback is None:
+        return None
+    for slug in slugs:
+        if not slug:
+            continue
+        try:
+            cell = callback(slug)
+        except Exception:  # noqa: BLE001 - a broken theme must not break seats
+            return None
+        if cell is not None:
+            return cell
+    return None
+
+
+def panel(root: Optional[Path] = None, *, portrait: Any = None,
+          body: Any = None) -> Dict[str, Any]:
     """The panel payload: divisions, their seats, and the real counts.
 
     Returns::
@@ -70,10 +91,16 @@ def panel(root: Optional[Path] = None) -> Dict[str, Any]:
                      floors, boardroom_seats, seat_types, per_division},
           "divisions": [ {slug, label, kind, floor, headcount,
                           seats: [ {slug, name, seat_type, supervisor,
-                                    room, emoji, color} ]} ],
+                                    room, emoji, color, portrait, body} ]} ],
           "seats": [ every seat, in plan order ],
           "detail",
         }
+
+    ``portrait``/``body`` are optional ``slug -> [col, row] | None`` callbacks
+    (the active theme's atlas index). Each seat row always carries both keys;
+    the value is ``None`` when no theme is active or the index does not list the
+    seat's persona. The persona slug is tried first, then the seat slug, so a
+    theme may key cells by either.
 
     ``divisions`` is sorted by slug with the boardroom bucket LAST (it has no
     slug, so sorting it among the divisions would put it first for no reason a
@@ -100,20 +127,25 @@ def panel(root: Optional[Path] = None) -> Dict[str, Any]:
     rows: List[Dict[str, Any]] = []
     for seat in seats:
         division = seat.get("division") or BOARDROOM_KEY
+        seat_slug = str(seat.get("slug") or "")
+        # A promoted seat carries `-N` on its slug, so it is not a roster key.
+        # The roster slug is the one the persona is ON DISK (and in the atlas
+        # index) under.
+        persona_slug = (seat_slug.rsplit("-", 1)[0]
+                        if seat_slug.rsplit("-", 1)[-1].isdigit()
+                        else seat_slug)
         row = {
-            "slug": seat.get("slug") or "",
+            "slug": seat_slug,
             "name": seat.get("name") or "",
             "seat_type": seat.get("seat_type") or "",
             "supervisor": seat.get("supervisor"),
             "division": division,
             "room": seat.get("room") or "",
-            # A promoted seat carries `-N` on its slug, so it is not a roster
-            # key. The roster slug is the one the persona is ON DISK under.
-            "persona_slug": (str(seat.get("slug") or "").rsplit("-", 1)[0]
-                             if str(seat.get("slug") or "").rsplit("-", 1)[-1]
-                             .isdigit() else (seat.get("slug") or "")),
+            "persona_slug": persona_slug,
             "emoji": seat.get("persona_emoji") or "",
             "color": seat.get("persona_color") or "",
+            "portrait": _cell(portrait, [persona_slug, seat_slug]),
+            "body": _cell(body, [persona_slug, seat_slug]),
         }
         rows.append(row)
 

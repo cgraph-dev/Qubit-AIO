@@ -448,8 +448,20 @@ def transform_tree(dest: Path) -> None:
             mf.write_text(rewritten, encoding="utf-8")
 
 
-def write_record(dest: Path, commit: str) -> dict:
+def write_record(
+    dest: Path,
+    commit: str,
+    local_commit: str | None = None,
+    local_changes: list[str] | None = None,
+) -> dict:
     """Hash the tree and publish ``PROVENANCE.json`` (see the barrier note below).
+
+    ``commit`` is the UPSTREAM pin the tree was built from. ``local_commit`` is
+    the source checkout's HEAD, which differs from it when the checkout carries
+    an additive patch (the floor-surface provider). ``local_changes`` documents
+    those patches by name. A clean vendor has ``local_commit == commit`` and an
+    empty ``local_changes`` list; the record still names both so a reader can
+    tell the two cases apart instead of assuming the tree is pristine.
 
     A reader either finds no record (and can skip) or finds the complete new
     one: the record is unlinked first and renamed in last, so it never describes
@@ -459,16 +471,28 @@ def write_record(dest: Path, commit: str) -> dict:
         p for p in dest.rglob("*")
         if p.is_file() and p.name != "PROVENANCE.json"
     )
+    local_commit = local_commit or commit
+    local_changes = list(local_changes or [])
+    note = (
+        "Vendored build output of the Habblaud client. Client-side only: the "
+        "server, the Claude Code mod, and the Docker setup are NOT vendored. "
+        "Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to "
+        "en by scripts/vendor_habblaud.py (English-only authoring ruling)."
+    )
+    if local_changes:
+        note += (
+            " This tree carries documented local changes on top of the upstream "
+            "pin: `commit` names the upstream commit it was built from, "
+            "`local_commit` names the source checkout HEAD that added them, and "
+            "`local_changes` lists them."
+        )
     record = {
         "source": "https://github.com/marmottajr/habblaud",
         "commit": commit,
+        "local_commit": local_commit,
+        "local_changes": local_changes,
         "licence": "MIT",
-        "note": (
-            "Vendored build output of the Habblaud client. Client-side only: the "
-            "server, the Claude Code mod, and the Docker setup are NOT vendored. "
-            "Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to "
-            "en by scripts/vendor_habblaud.py (English-only authoring ruling)."
-        ),
+        "note": note,
         "files": [
             {"path": str(p.relative_to(dest)), "sha256": sha256(p),
              "bytes": p.stat().st_size}
@@ -489,7 +513,13 @@ def write_record(dest: Path, commit: str) -> dict:
     return record
 
 
-def vendor(src: Path, dest: Path, skip_build: bool) -> dict:
+def vendor(
+    src: Path,
+    dest: Path,
+    skip_build: bool,
+    upstream_commit: str | None = None,
+    local_changes: list[str] | None = None,
+) -> dict:
     # Build OUTSIDE the destination. An earlier version staged into
     # `dest/.staging` and then deleted `dest` before reading from it, so the
     # build was destroyed by the very step meant to publish it.
@@ -545,14 +575,19 @@ def vendor(src: Path, dest: Path, skip_build: bool) -> dict:
     transform_tree(dest)
 
     # --- provenance -----------------------------------------------------
-    commit = "unknown"
+    # `local_commit` is the source checkout HEAD; `commit` is the upstream pin
+    # the tree claims to be built from. They are the same for a clean vendor and
+    # differ for an additive local patch, which is exactly what
+    # --upstream-commit + --local-change exist to record honestly.
+    local_commit = "unknown"
     try:
-        commit = subprocess.run(
+        local_commit = subprocess.run(
             ["git", "rev-parse", "HEAD"], cwd=src,
             capture_output=True, text=True, timeout=30,
         ).stdout.strip() or "unknown"
     except OSError:
         pass
+    commit = upstream_commit or local_commit
     licence = src / "LICENSE"
     if licence.is_file():
         # `copy2` truncates the destination before writing, so a concurrent
@@ -563,7 +598,29 @@ def vendor(src: Path, dest: Path, skip_build: bool) -> dict:
         shutil.copy2(licence, tmp_licence)
         os.replace(tmp_licence, dest / "LICENSE")
 
-    return write_record(dest, commit)
+    # PRUNE STALE BUILD OUTPUT. `copytree(dirs_exist_ok=True)` leaves hash-named
+    # chunks from a PREVIOUS build in place, and the record then blesses them as
+    # if the current build produced them (measured: a re-vendor grew the tree
+    # with four dead chunks, and `--check` still passed because it hashes
+    # whatever is on disk). Remove every file this build did not emit, BEFORE the
+    # record is written. Readers either see no record (and skip) or see the
+    # complete new tree, so the publish barrier is unchanged.
+    expected: set[str] = {"index.html", "LICENSE", "PROVENANCE.json"}
+    for staged in (staging / "bundle").rglob("*"):
+        if staged.is_file():
+            expected.add(str(Path("bundle") / staged.relative_to(staging / "bundle")))
+    if public.is_dir():
+        for item in public.rglob("*"):
+            if item.is_file():
+                expected.add(str(item.relative_to(public)))
+    for leftover in sorted(dest.rglob("*"), reverse=True):
+        if leftover.is_file() and str(leftover.relative_to(dest)) not in expected:
+            leftover.unlink()
+    for leftover in sorted(dest.rglob("*"), reverse=True):
+        if leftover.is_dir() and leftover != dest and not any(leftover.iterdir()):
+            leftover.rmdir()
+
+    return write_record(dest, commit, local_commit, local_changes)
 
 
 def verify_tree() -> int:
@@ -614,6 +671,15 @@ def main() -> int:
                          "(required to vendor; not needed for --check)")
     ap.add_argument("--skip-build", action="store_true",
                     help="reuse an existing dist/client instead of rebuilding")
+    ap.add_argument("--upstream-commit", metavar="SHA",
+                    help="the upstream Habblaud commit this tree was built "
+                         "from (default: the --src checkout HEAD). Set this when "
+                         "--src carries local patches on top of the upstream pin.")
+    ap.add_argument("--local-change", metavar="TEXT", action="append",
+                    dest="local_changes",
+                    help="document one local change carried by the --src "
+                         "checkout (repeatable). Recorded in PROVENANCE.json so "
+                         "the tree never claims to be a pristine upstream build.")
     ap.add_argument("--check", action="store_true",
                     help="verify the vendored tree against PROVENANCE.json "
                          "without a source checkout")
@@ -650,7 +716,12 @@ def main() -> int:
         index.write_text(
             rewrite_index(index.read_text(encoding="utf-8")), encoding="utf-8")
         transform_tree(DEST)
-        fresh = write_record(DEST, record["commit"])
+        fresh = write_record(
+            DEST,
+            record["commit"],
+            record.get("local_commit"),
+            record.get("local_changes"),
+        )
         print(f"retransformed {len(fresh['files'])} files, "
               f"{fresh['total_bytes']} bytes, commit {fresh['commit'][:12]}")
         return 0
@@ -661,7 +732,9 @@ def main() -> int:
     if not (src / "client" / "index.html").is_file():
         sys.exit(f"{src} does not look like a habblaud checkout")
 
-    record = vendor(src, DEST, args.skip_build)
+    record = vendor(
+        src, DEST, args.skip_build, args.upstream_commit, args.local_changes,
+    )
     print(f"vendored {len(record['files'])} files, "
           f"{record['total_bytes']} bytes from {record['commit'][:12]}")
     return 0

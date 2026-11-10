@@ -133,12 +133,20 @@ def test_a_seat_row_carries_only_fields_the_plan_has():
     # promoted seat (the plan suffixes `-N` onto the SEAT slug).
     plan_keys = set(plan["seats"][0])
     renamed = {"persona_emoji": "emoji", "persona_color": "color"}
-    allowed = (plan_keys - set(renamed)) | set(renamed.values()) | {"persona_slug"}
+    # `portrait`/`body` are the active theme's atlas cells (Task 4). They are
+    # None when no theme is active; they are never a plan field, but they are
+    # part of the seats-panel contract, so they are allowed here explicitly
+    # rather than silently omitted from the "no invented field" gate.
+    theme_keys = {"portrait", "body"}
+    allowed = ((plan_keys - set(renamed)) | set(renamed.values())
+               | {"persona_slug"} | theme_keys)
     for row in PANEL.panel()["seats"]:
         extra = set(row) - allowed
         assert not extra, (
             f"seat {row.get('slug')!r} carries keys {sorted(extra)} that the "
             f"plan's seat record does not have")
+        # No theme is active without callbacks, so the cells are empty.
+        assert row["portrait"] is None and row["body"] is None
         # The values are copied, not defaulted.
         source = next(s for s in plan["seats"] if s["slug"] == row["slug"])
         assert row["name"] == source["name"]

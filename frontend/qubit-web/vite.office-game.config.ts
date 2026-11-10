@@ -18,15 +18,70 @@
  * The output lands beside the hand-built bundle under a DIFFERENT filename so
  * nothing that currently serves can break by this config existing.
  */
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "node:path";
 
 const PLUGIN_DIR = path.resolve(
   __dirname, "../qubit-app/plugins/qubit-office");
 
+/**
+ * Remove builder-relative module annotations from the SERVED bundle.
+ *
+ * Rollup emits a `// ../..` comment before modules whose path escapes the
+ * package (phaser is resolved through `node_modules`). In this build that
+ * comment carried the builder's checkout path
+ * (`../../../../Projects/Repos/Qubit/...`), which makes the committed artifact
+ * machine-specific and lets the public exporter classify the whole entry as a
+ * personal path. The comment is build metadata, never behaviour, so it is
+ * normalized here at build time rather than hand-edited after the fact.
+ *
+ * The guard also refuses an operator path that survives anywhere else in the
+ * emitted chunk, so a future dependency cannot reintroduce the leak silently.
+ */
+const OPERATOR_PATH_PATTERNS: RegExp[] = [
+  /\/home\//,
+  /Projects\/Repos\//i,
+  /[A-Za-z]:\\+Users/i,
+];
+// A module annotation with a builder/package-relative origin. Two-level
+// source comments (`// ../qubit-app/...`) are portable and stay; a path that
+// escapes several package levels, a `node_modules` path, or an operator home
+// is build metadata tied to one machine.
+const BUILD_ORIGIN_COMMENT =
+  /^\s*\/\/.*(?:node_modules\/|(?:\.\.\/){2,}).*$/;
+
+function scrubBuildPaths(): Plugin {
+  return {
+    name: "qubit-scrub-build-paths",
+    apply: "build",
+    renderChunk(code: string) {
+      const kept: string[] = [];
+      for (const line of code.split("\n")) {
+        if (BUILD_ORIGIN_COMMENT.test(line)) continue;
+        if (/^\s*\/\//.test(line)
+            && OPERATOR_PATH_PATTERNS.some((pattern) => pattern.test(line))) {
+          continue;
+        }
+        kept.push(line);
+      }
+      const scrubbed = kept.join("\n");
+      for (const pattern of OPERATOR_PATH_PATTERNS) {
+        if (pattern.test(scrubbed)) {
+          throw new Error(
+            `qubit-scrub-build-paths: emitted bundle still contains an `
+            + `operator/build path matching ${pattern}; the served plugin `
+            + `artifact must be portable`,
+          );
+        }
+      }
+      return { code: scrubbed, map: null };
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), scrubBuildPaths()],
 
   // The plugin's source lives OUTSIDE this package's directory, so bare
   // specifiers like `phaser` and `react` do not resolve from where the files

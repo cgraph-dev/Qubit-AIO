@@ -12,9 +12,18 @@
 
 ---
 
-## Owner constraint
+## Owner constraint (amended 2026-11-09)
 
 > “dont fuck habblaud we just update ui to make it better and easier to upgrade in the future”
+>
+> “you can touch habblaud, i meant not break whats currently working cos we need add more things”
+
+**Amendment (ruling 16):** Part A stays a shell-only, read-only-Habblaud lane and is
+complete. **Part B may modify/re-vendor Habblaud**, provided it is additive and
+never regresses current behavior: every change sits behind `office.theme`
+(`classic` = today), keeps the stream/panel/menu/283-seat contracts, updates
+`PROVENANCE.json`, and has before/after goldens + rollback. Paid art stays out of
+the repo; the patched client loads the owner-built local pack at runtime.
 
 - `frontend/qubit-app/plugins/qubit-office/habblaud/` is **read-only**: no edits, no rebuild, no re-vendor for UI.
 - The only runtime interaction is a **server-injected `<style>`** (document head, after the app’s own stylesheet) that sets an allowlisted subset of `.ui-root` variables, plus class hooks/DOM on **elements we already inject** (the two menu buttons).
@@ -23,7 +32,7 @@
 ## Non-goals
 
 - No changes to the office engine, simulation, room layout, canvas art, stream, tools, writes, or approvals.
-- **Do not repurpose Habblaud’s own `theme` field** (`none|halloween|christmas`, upstream-owned seasonal art — verified in `docs/world/privacidade.md` and the world payload). Room art is deferred and needs a new owner decision.
+- **Do not repurpose Habblaud’s own `theme` field** (`none|halloween|christmas`, upstream-owned seasonal art — verified in `docs/world/privacidade.md` and the world payload). Room/interior art is now **in scope under Part B** (ruling 16), added behind the theme flag; the developer's screenshots confirm top-down orthogonal rooms (RPG Maker), which the patched renderer will consume additively.
 - No external network calls. One local theme read only when a theme is active.
 - No new core tool/plugin; one config key (`office.theme`).
 - No pack-supplied CSS/JS/HTML/SVG/remote URLs.
@@ -208,6 +217,21 @@ Tasks add: `--ui-contact-sheet` (labelled grid of the Modern UI sheets, for auth
 `theme.recipe.json:slices`) and a palette sampler that writes the token values; the reference
 moodboard is not ingested.
 
+## Developer usage screenshots (owner-supplied, 2026-11-09)
+
+The pack author's own screenshots show the intended composition. What they prove, and what we adopt:
+
+| Pattern in the screenshots | Meaning for us |
+|---|---|
+| **Dialogue boxes**: a framed portrait + a name tab + text (Sarah/Morgan/Chris); the author says “Portrait Generator + the versatility of the frames” makes dialogue boxes | Our **agent card** should follow this: portrait inside a UI frame, name on the tab, body sprite to the side. Not a bare avatar row. |
+| **Character panel**: portrait + full-body character + stats in one framed panel | Confirms the portrait/body pairing from the two generators; our recipe (shared indices) is the right model. |
+| **Frames, tabs, icon grids, controller prompts, market panels** | The Modern UI sheets supply 9-slice frames, tabs, buttons and small icons. Our **docks/agent card/menu controls** use these (validated slices); the two menu glyphs stay the owner-traced icons. |
+| **Interiors**: top-down orthogonal rooms (walls, doors, windows, tile grid), shops/hospital/office floors | The interior pack is **RPG-Maker top-down**, not isometric. Habblaud is procedural 3/4 and has no image slots, so these cannot be dropped in without changing Habblaud. **Still deferred** — the screenshots are the reference for a future Qubit-owned room renderer, not a now-change. |
+
+Consequences baked in: Task 5 builds the dialogue-style agent card (portrait + name +
+body), Task 7 themes it with the UI frame/tab/button slices, and the room-art deferral
+is now backed by evidence rather than preference.
+
 ## Skills we will use (and the one we won't invent)
 
 Local skills that apply:
@@ -324,7 +348,7 @@ def test_token_css_only_allowlisted_vars():
 
 - [ ] **Step 1: failing tests** — a seat’s cell renders a 32×32 sprite span with `role="img"` + `aria-label="<name> portrait"`; the fallback chain is generated portrait → initials chip (agent name) → emoji, with the initials/emoji visible until the sheet is ready and `aria-hidden="true"` only once the sheet is confirmed; a broken sheet keeps the initials/emoji visible and announced; no per-seat `<img>` requests; keyboard/AT focus order unchanged.
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement** — preload both atlases once, add `office-portraits-ready` on success, position via `background-position: calc(-1 * var(--cell-x) * 32px) calc(-1 * var(--cell-y) * 32px)`, `image-rendering: pixelated`, fixed 32×32 box (no layout shift). The **body atlas** feeds a small character card on row hover/focus (`--body-x`/`--body-y`, 32×64 native, shown at 32×64) so both generators are used; the card is keyboard-reachable and `aria-hidden` unless focused.
+- [ ] **Step 3: implement** — preload both atlases once, add `office-portraits-ready` on success, position via `background-position: calc(-1 * var(--cell-x) * 32px) calc(-1 * var(--cell-y) * 32px)`, `image-rendering: pixelated`, fixed 32×32 box (no layout shift). The **body atlas** feeds a **dialogue-style agent card** on row hover/focus: the portrait in a framed box (UI slice from Task 7), the agent name on the tab, and the 32×64 body beside it — the pattern the pack author demonstrates. The card is keyboard-reachable and `aria-hidden` unless focused; without Task 7's slices it renders with a plain border.
 - [ ] **Step 4: run** office-app Vitest.
 - [ ] **Step 5: commit**.
 
@@ -353,9 +377,9 @@ def test_token_css_only_allowlisted_vars():
 
 **Files:** `office-theme.ts`, `OfficeAppShell.tsx`, `office-menu.ts`; test `src/lib/office-theme.test.ts`.
 
-- [ ] **Step 1: failing tests** — docks/buttons carry stable theme classes; tokens appear as CSS vars; a declared slice emits `border-image` with `border-image-width` equal to the CSS border; no slice ⇒ no `border-image`; no rule touches layout/pointer/z-index.
+- [ ] **Step 1: failing tests** — docks/buttons/card carry stable theme classes; tokens appear as CSS vars; a declared slice emits `border-image` with `border-image-width` equal to the CSS border; no slice ⇒ no `border-image`; no rule touches layout/pointer/z-index.
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement** token styles for our elements only; optional validated 9-slice CSS.
+- [ ] **Step 3: implement** token styles for our elements only; optional validated 9-slice CSS for the **dialogue/agent card**, dock panel, tab and button (normal/hover/pressed), plus the close icon. Author the slice table from the Modern UI contact sheet, using the developer's dialogue-box/character-panel screenshots as the layout reference.
 - [ ] **Step 4: run tests.**
 - [ ] **Step 5: commit**.
 
@@ -388,7 +412,7 @@ def test_token_css_only_allowlisted_vars():
   - **contrast matrix** passes for text, muted, accent, border, status and level colours against the two surfaces (4.5 text / 3.0 non-text), and disabled states are ≥ 3.0;
   - **allowlist drift report:** `python3 scripts/office_theme_audit.py` lists `.ui-root` variables in the vendored CSS that are not in `ALLOWED_THEME_VARS` (warning only; no build failure).
 - [ ] **Step 2: run → FAIL.**
-- [ ] **Step 3: implement the visual probe.** `QUBIT_OFFICE_VISUAL=1`; loopback `WebUI`; stub tower/stream/panel; Playwright at DPR 1 and 2; animations off, caret hidden, clock fixed; element screenshots of the Agents panel, the menu group, and one **keyboard-focus** state (focus ring visible and contrast-checked); baselines committed and updated only after review.
+- [ ] **Step 3: implement the visual probe.** `QUBIT_OFFICE_VISUAL=1`; loopback `WebUI`; stub tower/stream/panel; Playwright at DPR 1 and 2; animations off, caret hidden, clock fixed; element screenshots of the Agents panel (including the dialogue-style agent card), the menu group, and one **keyboard-focus** state (focus ring visible and contrast-checked); baselines committed and updated only after review.
 - [ ] **Step 4: run guards + probe + `vendor_habblaud.py --check`.**
 - [ ] **Step 5: commit**.
 
@@ -445,7 +469,7 @@ def test_token_css_only_allowlisted_vars():
 
 ## Self-review
 
-- **Owner constraint:** zero Habblaud edits; `vendor_habblaud.py --check` is a gate; room art deferred; the upstream `theme` field is not repurposed.
+- **Owner constraint:** Part A has zero Habblaud edits; Part B may extend it additively (ruling 16) with goldens/rollback/provenance; `vendor_habblaud.py --check` remains the drift gate; the upstream `theme` field is not repurposed.
 - **Security:** typed tokens (CSS-exfil vectors rejected), no pack CSS, server-side injection, CSP contract test.
 - **Performance:** one atlas request, native 32 px, no lazy-flood; palette/contrast validated.
 - **Test honesty:** behaviour + artifacts only.

@@ -972,6 +972,10 @@ QUBIT_READ_AUTHORITY: tuple = (
     # The office tower is the Qubit office store authority; never read the
     # upstream Habblaud backend's unrelated organization.
     "/api/office/tower",
+    # The office theme payload is Qubit's local, data-only theme contract
+    # (voicebridge.office.theme). Proxying it would serve the fork's unrelated
+    # theme/overlay store; the compat handler is the authority.
+    "/api/office/theme",
     # Public liveness for port/health checks and the reference dashboard's
     # ``GET /api/health`` contract. The compat handler is the authority.
     "/api/health",
@@ -2468,6 +2472,57 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         break
         except Exception:  # noqa: BLE001 - theme boost is best-effort
             pass
+        # THE OFFICE HOST THEME GLOBAL.
+        #
+        # The Qubit shell AROUND the office iframe (our Agents/HUD docks) needs
+        # the SAME resolved office-theme payload the iframe document gets. A
+        # first-paint fetch would be an auth/timing gap: the payload can come
+        # from config/env with no `?theme=` at all. So the server injects the
+        # validated payload as a global on the office route only. Classic is
+        # included too (small JSON), and there is no file map or filesystem
+        # path. Pack-provided text is JSON-encoded AND inline-script escaped
+        # (`<`/`>`/`&`/U+2028/9) so a label can never break out of <script>.
+        office_theme_script = ""
+        try:
+            route = (self.path.split("?", 1)[0].rstrip("/") or "/")
+            if route == "/qubit-office":
+                from urllib.parse import parse_qs
+                raw_query = self.path.split("?", 1)[1] if "?" in self.path else ""
+                requested = (parse_qs(raw_query).get("theme") or [""])[0] or None
+                from .office import theme as _OT
+                _cfg = getattr(getattr(self.app, "orch", None), "cfg", None)
+                _payload = _OT.theme_payload(_cfg, requested=requested)
+                _host_payload = {
+                    "id": _payload.get("id", "classic"),
+                    "label": _payload.get("label", "Classic"),
+                    "active": bool(_payload.get("active")),
+                    "version": _payload.get("version", ""),
+                    "credit": _payload.get("credit", ""),
+                    "license": _payload.get("license", ""),
+                    "templateVersion": _payload.get("templateVersion"),
+                    # Route URLs (the validated asset base and atlas/index),
+                    # never a filesystem path.
+                    "assetBase": _payload.get("assetBase", ""),
+                    "atlas": _payload.get("atlas"),
+                    "index": _payload.get("index"),
+                    "bodies": _payload.get("bodies") or {
+                        "atlas": None, "index": None,
+                        "size": None, "frame": None,
+                    },
+                    "tokens": _payload.get("tokens") or {},
+                    "slices": _payload.get("slices") or {},
+                }
+                _json = json.dumps(_host_payload)
+                _json = (_json.replace("<", "\\u003c")
+                         .replace(">", "\\u003e")
+                         .replace("&", "\\u0026")
+                         .replace("\u2028", "\\u2028")
+                         .replace("\u2029", "\\u2029"))
+                office_theme_script = (
+                    "<script>window.__QUBIT_OFFICE_THEME__=%s;</script>"
+                    % _json)
+        except Exception as exc:  # noqa: BLE001 - never fail the shell
+            log.warning("office host theme global skipped: %s", exc)
         # THE TOKEN IS INJECTED FOR LOOPBACK CALLERS ONLY — same rule as
         # `_serve_app_html`, and for the same reason. This injector had NO peer
         # guard, so it was the WIDER leak: a non-local peer fetching `/chat`
@@ -2522,7 +2577,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             '#qubit-boot button{color:%s !important;background:%s !important;}'
             '</style>' % (_boot_bg, _boot_mid, _boot_bg, _boot_fg, _boot_bg, _boot_fg)
         )
-        inject = boot_style + inject
+        inject = office_theme_script + boot_style + inject
         if "</head>" in html:
             html = html.replace("</head>", inject + "</head>", 1)
         else:
@@ -2585,8 +2640,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
         finally:
             self._allow_same_origin_frame = False
 
+    # Office theme packs live outside the built dashboard. URLs carry ``?v=``,
+    # so an hour of caching is safe and matches other stable-name assets.
+    _THEME_STATIC_PREFIX = "plugins/qubit-office/themes/"
+    _THEME_CTYPES = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".json": "application/json",
+        ".txt": "text/plain; charset=utf-8",
+    }
+
     def _serve_qubit_static(self, sub: str) -> None:
-        dist = self._qubit_dist()
         from urllib.parse import unquote
 
         # The route suffix is request-controlled. Decode once, normalise the
@@ -2597,6 +2663,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if not rel or ".." in rel.split("/"):
             self._send(404, b"not found")
             return
+        # Office theme packs are NOT part of the built dashboard: the full pack
+        # lives only under ``$QUBIT_HOME/office/themes/<id>`` and is served from
+        # there. This branch runs before the dist resolution so an unknown or
+        # classic id 404s instead of falling back to a dist copy.
+        if rel.startswith(self._THEME_STATIC_PREFIX):
+            self._serve_theme_static(rel)
+            return
+        dist = self._qubit_dist()
         try:
             base = Path(dist).resolve()
             fp = (base / rel).resolve()
@@ -2635,6 +2709,63 @@ class WebUIHandler(BaseHTTPRequestHandler):
         else:
             cache_control = "public, max-age=3600"
         self._file(fp, ctype, cache_control=cache_control)
+
+    def _serve_theme_static(self, rel: str) -> None:
+        """Serve one file from a local office theme pack, or answer 404.
+
+        ``voicebridge.office.theme.theme_asset_path`` owns every rule (id must
+        resolve through ``find_theme``; the path is relative, suffix-allowlisted,
+        symlink-free and confined to the pack root). Nothing is ever read from
+        the build tree, so a classic/unknown id is a 404 rather than a fallback.
+        """
+        from .office import theme as OT
+
+        rest = rel[len(self._THEME_STATIC_PREFIX):]
+        theme_id, _, asset_rel = rest.partition("/")
+        if asset_rel == "theme.css":
+            self._serve_theme_host_css(theme_id)
+            return
+        path = OT.theme_asset_path(theme_id, asset_rel)
+        if path is None:
+            self._send(404, b"not found")
+            return
+        ctype = self._THEME_CTYPES.get(
+            path.suffix.lower(), "application/octet-stream")
+        self._file(path, ctype, cache_control="public, max-age=3600")
+
+    def _serve_theme_host_css(self, theme_id: str) -> None:
+        """Serve the dashboard host's generated theme stylesheet.
+
+        This is a VIRTUAL file: it does not exist in the pack and no pack CSS
+        is ever served (packs may not contain ``.css`` at all). The CSS is
+        generated from the same validated tokens the office document receives,
+        scoped to the host element (``:root[data-office-theme="<id>"]``), so
+        Task 7's dock rules inherit the variables without a second token map in
+        TypeScript. The URL carries ``?v=<version>``, so an hour of caching is
+        safe. A classic/unknown/invalid pack is a 404, never a fallback.
+        """
+        from .office import theme as OT
+
+        if not isinstance(theme_id, str) or not OT._ID_RE.fullmatch(theme_id):
+            self._send(404, b"not found")
+            return
+        theme_dir = OT.user_theme_root() / theme_id
+        if not (theme_dir / "theme.json").is_file():
+            self._send(404, b"not found")
+            return
+        try:
+            theme = OT.load_theme(theme_dir)
+            css = OT.host_token_css(
+                theme.tokens, theme.id, theme.version, theme.slices,
+                asset_base=f"{OT.ASSET_BASE}/{theme.id}")
+        except (OT.ThemeError, ValueError, OSError, RuntimeError):
+            self._send(404, b"not found")
+            return
+        if not css:
+            self._send(404, b"not found")
+            return
+        self._send(200, css.encode("utf-8"), "text/css; charset=utf-8",
+                   cache_control="public, max-age=3600")
 
     def _serve_office_stream(self) -> None:
         """GET /api/stream — the office client's live feed.
@@ -2853,8 +2984,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
         is re-checked against the plugin root so a symlink cannot escape either.
         """
         from . import resources as _resources
+        from urllib.parse import parse_qs
 
-        rel = sub.lstrip("/").split("?")[0]
+        raw_sub = sub.lstrip("/")
+        rel, _, raw_query = raw_sub.partition("?")
+        requested_theme = (parse_qs(raw_query).get("theme") or [""])[0]
         parts = [p for p in rel.split("/") if p not in ("", ".")]
         if not parts or ".." in parts:
             self._send(404, b"not found")
@@ -2931,7 +3065,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # non-loopback callers are treated identically: the token is only in
             # the response body of a route the caller already fetched, and the
             # gate itself is unchanged.
-            self._serve_app_html(target)
+            self._serve_app_html(
+                target, office=(parts[0] == "qubit-office"),
+                requested_theme=requested_theme)
             return
         self._file(target, ctype)
 
@@ -2987,8 +3123,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return False
         return True
 
-    def _serve_app_html(self, target: Path) -> None:
+    def _serve_app_html(self, target: Path, *, office: bool = False,
+                        requested_theme: Optional[str] = None) -> None:
         """Serve a plugin-app HTML document with the session token injected.
+
+        ``office`` marks the ONE plugin app the dashboard embeds as the Qubit
+        Office. Only that document receives the theme style; every other plugin
+        app is served byte-for-byte as its own HTML (the theme is a Qubit
+        contract, not an upstream one). The style is generated from the
+        validated theme payload by ``voicebridge.office.theme.theme_style_html``
+        and inserted after the app's own stylesheet link (immediately before
+        ``</head>``), so it overrides Habblaud's ``.ui-root`` variables without
+        a client-side race. ``classic``/invalid ids produce no style at all.
 
         THE TOKEN IS INJECTED FOR LOOPBACK CALLERS ONLY. The earlier revision
         injected for every caller, on the premise that "the token is ALSO
@@ -3041,6 +3187,44 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 html = html.replace("</head>", inject + "</head>", 1)
             else:
                 html = inject + html
+        if office:
+            # Only the Qubit Office document gets the theme. The style carries
+            # allowlisted variables only (no slices, so no ``url(``); a classic
+            # or invalid theme yields "" and nothing is injected.
+            cfg = getattr(getattr(self.app, "orch", None), "cfg", None)
+            style_html = ""
+            try:
+                from .office import theme as _office_theme
+                style_html = _office_theme.theme_style_html(
+                    cfg, requested=requested_theme)
+            except Exception as exc:  # noqa: BLE001 - a broken theme must not break the app
+                log.warning("office theme style skipped: %s", exc)
+                _office_theme = None
+            # The iframe is a SEPARATE same-origin document, so the host
+            # shell's theme global does not reach it. Emit the same resolved
+            # payload here as ``window.__QUBIT_OFFICE_THEME__`` so the vendored
+            # client can read real floor surfaces. Classic is included (small
+            # JSON); the payload carries URLs, never the file/hash map. Pack
+            # text is JSON-encoded and inline-script escaped, so a label cannot
+            # close the <script> element.
+            script_html = ""
+            if _office_theme is not None:
+                try:
+                    script_html = _office_theme.office_document_script(
+                        cfg, requested=requested_theme)
+                except Exception as exc:  # noqa: BLE001 - never break the app
+                    log.warning("office theme global skipped: %s", exc)
+                    script_html = ""
+            if script_html:
+                if "</head>" in html:
+                    html = html.replace("</head>", script_html + "</head>", 1)
+                else:
+                    html = script_html + html
+            if style_html:
+                if "</head>" in html:
+                    html = html.replace("</head>", style_html + "</head>", 1)
+                else:
+                    html = style_html + html
         # This document is the ONE same-origin iframe the dashboard embeds
         # (the Office plugin app). It gets SAMEORIGIN rather than DENY so the
         # intentional embedding keeps working; everything else refuses frames.
@@ -4076,7 +4260,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(404, b"not found")
             return
         if path.startswith("/plugin-apps/"):
-            self._serve_plugin_app(path[len("/plugin-apps/"):])
+            # Pass the RAW path: its query carries `?theme=` to the office app
+            # document. `_serve_plugin_app` still strips the query before
+            # resolving the static file, so path confinement is unchanged.
+            self._serve_plugin_app(self.path[len("/plugin-apps/"):])
             return
         # A Vite preload helper in the vendored Habblaud client can turn a
         # correctly-origin-qualified path into `/http://<host>/plugin-apps/...`
@@ -4085,7 +4272,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # serve arbitrary path-embedded URLs or rewrite other API paths.
         app_path = f"/http://{self.headers.get('Host', '')}/plugin-apps/"
         if path.startswith(app_path):
-            self._serve_plugin_app(path[len(app_path):])
+            # Raw path again, so the office `?theme=` survives to the document.
+            self._serve_plugin_app(self.path[len(app_path):])
             return
         # The office client's live feed. `/api/stream` is what the vendored app
         # asks for; Qubit's own API lives under `/agent/api/`, so this one path

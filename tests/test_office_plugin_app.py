@@ -46,6 +46,18 @@ PREFIX = "/plugin-apps/"
 SAMPLE_HTML = b"<!doctype html><html><body>office</body></html>"
 #: Stand-in for the server-issued office load nonce (see `_make_handler`).
 _OFFICE_NONCE = "test-office-nonce-abc123"
+_OFFICE_GLOBAL_OPEN = b"<script>window.__QUBIT_OFFICE_THEME__="
+
+
+def _strip_office_global(body: bytes) -> bytes:
+    """Remove the injected office theme global (the app body is otherwise kept)."""
+    start = body.find(_OFFICE_GLOBAL_OPEN)
+    if start == -1:
+        return body
+    end = body.find(b"</script>", start)
+    if end == -1:
+        return body
+    return body[:start] + body[end + len(b"</script>"):]
 
 
 # --------------------------------------------------------------------------
@@ -341,14 +353,19 @@ def test_directory_request_gets_index_html_handler(plugin_root):
             assert h._captured["code"] == 404, (sub, h._captured)
         else:
             assert h._captured["code"] == 200, (sub, h._captured)
-            assert h._captured["body"] == SAMPLE_HTML, (sub, h._captured)
+            body = h._captured["body"]
+            # The office document intentionally carries the classic theme
+            # global (the iframe reads it); the rest of the app is untouched.
+            assert b"window.__QUBIT_OFFICE_THEME__=" in body, (sub, h._captured)
+            assert _strip_office_global(body) == SAMPLE_HTML, (sub, h._captured)
 
 
 def test_directory_request_serves_index_over_http(plugin_root):
     """[wire] ``GET /plugin-apps/qubit-office/`` returns the app's index.html."""
     code, body = _http_get("/plugin-apps/qubit-office/", plugin_root=plugin_root)
     assert code == 200, (code, body)
-    assert body == SAMPLE_HTML, body
+    assert b"window.__QUBIT_OFFICE_THEME__=" in body, body
+    assert _strip_office_global(body) == SAMPLE_HTML, body
 
 
 def test_habblaud_index_injects_encoded_stream_url_before_module(tmp_path):

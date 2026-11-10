@@ -5931,6 +5931,24 @@ def _save_curator_control(cfg: Any, state: Dict[str, Any]) -> None:
     _save_json_store(_curator_control_path(cfg), state)
 
 
+def h_office_theme(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/theme -> the active office theme payload (or classic).
+
+    READ-ONLY and data-only: the payload carries the theme's validated tokens,
+    slice descriptors and the ``/plugins/qubit-office/themes/<id>`` asset base
+    (URLs, never a filesystem path or a file/hash map). ``?theme=<id>`` asks
+    about one pack; a missing or invalid id falls back to ``classic`` with a
+    ``reason``. It writes nothing and never serves a file — the atlas bytes go
+    through :meth:`WebUIHandler._serve_qubit_static` from the local pack root.
+    """
+    from .office import theme as OT
+
+    requested = (q or {}).get("theme")
+    return _ok(schema="qubit-office-theme-payload/1",
+               **OT.theme_payload(cfg, requested=requested))
+
+
 def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/office/tower -> the renderable office, derived from the store.
@@ -6179,8 +6197,19 @@ def h_office_habblaud_agents_panel(cfg: Any, q: Dict[str, str],
     would otherwise resolve ``panel`` as an agent id.
     """
     from .office import agent_panel as PANEL
+    from .office import theme as OT
 
-    out = PANEL.panel()
+    # An explicit ``?theme=`` request themes the panel's cells too, exactly as
+    # it themes the iframe document and the host payload. Without this the
+    # cells would silently follow config/env only, so a `?theme=demo` office
+    # would show the demo chrome but classic (blank) avatars.
+    requested = (q or {}).get("theme")
+    out = PANEL.panel(
+        portrait=lambda slug: OT.cell_for(cfg, slug, "portraits",
+                                          requested=requested),
+        body=lambda slug: OT.cell_for(cfg, slug, "bodies",
+                                     requested=requested),
+    )
     if not out.get("ok"):
         return 503, out
     return _ok(**out)
@@ -11965,6 +11994,10 @@ _r("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "h_oauth_disconnect")
 _r("GET", r"/api/curator", "h_curator")
 # M4: the tower. Read-only; the plugin renders it and nothing else.
 _r("GET", r"/api/office/tower", "h_office_tower")
+# The office theme payload (tokens, slice descriptors, local asset base). A
+# read: it never serves the atlas bytes (those come from the pack root through
+# the static handler) and never writes.
+_r("GET", r"/api/office/theme", "h_office_theme")
 # --- Habblaud office-client compat surface (see handlers above) ------------
 # The vendored office client requests these paths through the api-bridge, which
 # rewrites them onto /agent/api/office/habblaud/<path>. Every sub-path the
@@ -20496,6 +20529,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_oauth_disconnect": h_oauth_disconnect,
     "h_curator": h_curator, "h_curator_paused": h_curator_paused,
     "h_office_tower": h_office_tower,
+    "h_office_theme": h_office_theme,
     "h_office_habblaud_access": h_office_habblaud_access,
     "h_office_habblaud_status": h_office_habblaud_status,
     "h_office_habblaud_snapshot": h_office_habblaud_snapshot,

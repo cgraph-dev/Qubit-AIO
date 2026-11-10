@@ -89,6 +89,63 @@
   background: #12151d;
 }
 
+/* Host-rendered menu fallback (when the app's own Panels group is missing).
+   The iframe above is absolutely positioned at inset: 0, so an IN-FLOW
+   fallback would be painted underneath it and could never be clicked. This is
+   a visible host toolbar ON TOP of the frame: higher z-index than the frame
+   (and the loading/error overlays at z-index 1); it exists only while the
+   fallback is shown. The container is pointer-transparent so it never blocks
+   the game unless the operator actually aims at a button. */
+.office-game__menuFallback {
+  position: absolute;
+  z-index: 5;
+  top: var(--office-s2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--office-s1);
+  padding: var(--office-s1);
+  border-radius: var(--office-radius);
+  border: var(--office-border);
+  background: var(--office-void);
+  color: var(--office-ink);
+  pointer-events: none;
+}
+
+.office-game__menuFallback > button {
+  pointer-events: auto;
+}
+
+/* The persistent Credits/About surface. It belongs to the Qubit shell (never
+   the vendored client, never the pack), so LimeZu attribution is present with
+   `classic` and survives a theme change. Only the link takes pointer events. */
+.office-game__credits {
+  position: absolute;
+  z-index: 3;
+  bottom: var(--office-s2);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: var(--office-radius, 6px);
+  background: rgba(11, 15, 22, 0.78);
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.office-game__credits a {
+  color: inherit;
+  pointer-events: auto;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.office-game__credits a:hover {
+  color: var(--office-accent, #7dd3c8);
+}
+
 .office-game__loading,
 .office-game__error {
   position: absolute;
@@ -510,7 +567,7 @@
 .office-game .agents-panel__seat {
   display: flex;
   gap: var(--office-s2);
-  align-items: baseline;
+  align-items: center;
   padding: 2px 0;
   font-size: var(--office-fs-xs);
 }
@@ -534,4 +591,194 @@
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   padding-top: var(--office-s2);
+}
+
+/* --- portraits: one atlas request per sheet, CSS-positioned cells ---------
+   The panel paints a seat's portrait as a BACKGROUND SPRITE, never an <img>.
+   One 32px portrait atlas (plus one body atlas for the dialogue card) covers
+   every seat, so opening a 283-row roster costs two image requests instead of
+   283. `image-rendering: pixelated` keeps the generated pixel art crisp when a
+   HiDPI display would otherwise smooth it into mush.
+
+   The cell offset comes from the inline custom properties (`--cell-x/y`,
+   `--body-x/y`) the panel sets from the theme payload; the 32px boxes are
+   fixed here so swapping packs cannot shift the list. */
+
+.office-game .agents-panel__avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+}
+
+.office-game .agents-panel__portrait {
+  display: block;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  /* `auto` = the atlas' own pixel size; scaling it would blur the cells. */
+  background-repeat: no-repeat;
+  background-size: auto;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+.office-game .agents-panel__initials {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* The emoji is the LAST fallback (a seat with no letters in its name), so it
+   owns the same fixed box the portrait/initials occupy. */
+.office-game .agents-panel__avatar > .agents-panel__emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: calc(16px * var(--office-scale));
+  background: transparent;
+}
+
+/* --- the dialogue-style agent card ---------------------------------------
+   Portrait in a frame, the name on the tab, the 32x64 body beside it — the
+   pack author's own dialogue-box pattern. Fixed height (64px body + padding)
+   and a fixed grid so following the hovered row never reflows the roster. */
+
+.office-game .agents-panel__card {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: var(--office-s2);
+  box-sizing: border-box;
+  height: 72px;
+  padding: var(--office-s1) var(--office-s2);
+  margin: 0 0 var(--office-s2);
+  overflow: hidden;
+  border: var(--office-border-strong);
+  border-radius: var(--office-radius);
+  background: var(--office-ground);
+}
+
+.office-game .agents-panel__card:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 1px;
+}
+
+.office-game .agents-panel__cardPortrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+}
+
+.office-game .agents-panel__cardTab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.office-game .agents-panel__cardName {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-game .agents-panel__cardMeta {
+  overflow: hidden;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.office-game .agents-panel__body {
+  display: block;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 64px;
+  background-repeat: no-repeat;
+  background-size: auto;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+
+/* --- host theme chrome (Task 7) ------------------------------------------
+   The tokens below come from the generated HOST stylesheet (theme.css, scoped
+   to :root[data-office-theme]) and apply ONLY to Qubit-owned elements in THIS
+   document: the two docks, the agent card, the close buttons and the fallback
+   menu buttons. The vendored app document is themed by the server and is never
+   touched here. Every fallback reproduces the classic palette, so an absent
+   theme is byte-for-byte the old look.
+
+   PAINT ONLY: no rule in this section changes layout, pointer-events or
+   stacking, so the iframe keeps its exact frame and the docks keep their
+   geometry. The optional 9-slice border-image is generated server-side (it
+   alone reserves its border width) and targets [data-office-slice] elements
+   only, which are opt-in per pack. */
+
+.office-game .office-theme-dock {
+  background: var(--ui-bg, var(--office-void));
+  color: var(--ui-text, var(--office-ink));
+  border-color: var(--ui-line, var(--office-line));
+}
+
+.office-game .office-theme-dock-head {
+  border-color: var(--ui-line, var(--office-line));
+}
+
+.office-game .office-theme-dock-title,
+.office-game .office-theme-dock-link {
+  color: var(--ui-muted, var(--office-muted));
+}
+
+.office-game .office-theme-dock-close,
+.office-game .office-theme-menu-btn {
+  color: var(--ui-text, var(--office-ink));
+  background: var(--ui-bg-solid, var(--office-plate));
+  border-color: var(--ui-line, var(--office-line));
+}
+
+.office-game .office-theme-dock-close:hover,
+.office-game .office-theme-menu-btn:hover {
+  background: var(--ui-bg-hover, var(--office-plate));
+  border-color: var(--ui-accent, var(--office-accent));
+}
+
+.office-game .office-theme-card {
+  background: var(--ui-bg-solid, var(--office-ground));
+  border-color: var(--ui-line-strong, var(--office-line-strong));
+}
+
+.office-game .office-theme-card .agents-panel__cardName {
+  color: var(--ui-text, var(--office-ink));
+}
+
+.office-game .office-theme-card .agents-panel__cardMeta {
+  color: var(--ui-muted, var(--office-muted));
 }

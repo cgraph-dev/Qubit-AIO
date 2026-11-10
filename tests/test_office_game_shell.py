@@ -484,6 +484,28 @@ def test_high_contrast_swaps_tokens_rather_than_filtering():
         "scene's own state colours survive")
 
 
+def test_high_contrast_redeclares_the_border_shorthands():
+    """A nested `var()` resolves where the property is DECLARED.
+
+    `--office-border` is a :root shorthand over `var(--office-line)`, so a
+    high-contrast block that only overrides `--office-line` would leave the
+    actual border colour on the classic value. The block must restate the
+    shorthands on the same attribute-scoped element.
+    """
+    tokens = (STYLES / "tokens.css").read_text()
+    match = re.search(r'\[data-office-contrast="high"\]\s*\{([^}]*)\}', tokens)
+    assert match, "the high-contrast token block is missing"
+    body = match.group(1)
+    assert "--office-line:" in body
+    assert "--office-line-strong:" in body
+    assert "--office-border:" in body, (
+        "high contrast does not redeclare --office-border, so classic borders "
+        "keep the :root value (nested var resolves at the declaring element)")
+    assert "--office-border-strong:" in body
+    assert "var(--office-line)" in body
+    assert "var(--office-line-strong)" in body
+
+
 def test_focus_is_never_removed():
     game = (STYLES / "game.css").read_text()
     assert ":focus-visible" in game, (
@@ -938,3 +960,66 @@ def test_the_host_message_guard_accepts_only_our_own_marker(tmp_path):
     assert got["number"] is False and got["array"] is False, (
         "a non-object payload was accepted; the guard must reject primitives "
         "and arrays")
+
+
+# ======================================================================
+# 7 — Task 7 host chrome: tokens only, on OUR elements, paint only
+# ======================================================================
+def _selector_bodies(css: str) -> list[tuple[str, str]]:
+    """Every top-level/at-rule ``selector { body }`` pair (comments stripped)."""
+    body = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    rules: list[tuple[str, str]] = []
+    for match in re.finditer(r"([^{}]+)\{([^{}]*)\}", body):
+        selector = " ".join(match.group(1).split())
+        if not selector or selector.startswith("@") or "@" in selector:
+            continue
+        rules.append((selector, match.group(2)))
+    return rules
+
+
+def test_host_theme_chrome_targets_our_elements_with_ui_tokens():
+    """The docks/card/buttons consume the generated host `--ui-*` variables.
+
+    The vendored app document is themed by the server; this file only styles
+    the Qubit shell AROUND the iframe, and only through the stable classes
+    Task 6 added.
+    """
+    rules = _selector_bodies((STYLES / "game.css").read_text())
+    themed = [(sel, body) for sel, body in rules if "var(--ui-" in body]
+    assert themed, "no shell rule consumes the host --ui-* variables"
+    for selector, body in themed:
+        assert ".office-game" in selector, (
+            f"a host-theme rule could leak into the dashboard: {selector}")
+        assert any(
+            marker in selector
+            for marker in (".office-theme-", ".agents-panel__card")), (
+            f"a host-theme rule is not scoped to a Qubit shell element: {selector}")
+        assert any(token in body for token in (
+            "--ui-bg", "--ui-text", "--ui-line", "--ui-muted",
+            "--ui-accent", "--ui-bg-solid", "--ui-bg-hover")), selector
+
+
+def test_host_theme_chrome_is_paint_only():
+    """Theming must not move, resize, restack or block the game underneath."""
+    rules = _selector_bodies((STYLES / "game.css").read_text())
+    themed = [(sel, body) for sel, body in rules if "var(--ui-" in body]
+    banned = (
+        "display", "position", "pointer-events", "z-index", "width:",
+        "height:", "margin", "padding", "inset", "top:", "right:",
+        "bottom:", "left:", "flex", "grid", "overflow", "transform:",
+    )
+    for selector, body in themed:
+        for prop in banned:
+            assert prop not in body, (
+                f"{selector} changes layout/pointer/stacking via {prop!r}")
+
+
+def test_agents_panel_rules_are_scoped_to_the_shell():
+    """The panel's styles live under `.office-game`, so they cannot restyle
+    the dashboard (the guard above checks every rule; this names the panel)."""
+    rules = _selector_bodies((STYLES / "game.css").read_text())
+    panel = [(sel, body) for sel, body in rules if ".agents-panel" in sel]
+    assert panel, "the agents-panel rules vanished"
+    for selector, _body in panel:
+        assert ".office-game" in selector, (
+            f"unscoped agents-panel selector: {selector}")

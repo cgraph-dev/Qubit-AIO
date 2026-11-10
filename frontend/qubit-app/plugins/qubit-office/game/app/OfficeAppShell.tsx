@@ -9,13 +9,24 @@ import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
-import { installOfficeMenuButtons, type OfficeMenuController } from "./office-menu";
+import {
+  installOfficeMenuButtons, menuIconGeometry, MENU_BUTTONS,
+  type MenuButtonSpec, type OfficeMenuController,
+} from "./office-menu";
 import { createSeatModelPanel } from "./SeatModelPanel";
 import { createAgentsPanel } from "./AgentsPanel";
+import {
+  applyHostTheme, loadOfficeTheme, officeSliceName, officeThemeClass,
+  type OfficeTheme,
+} from "./office-theme";
 import {
   POLL_INTERVAL_MS, SNAPSHOT_ROUTE, STREAM_ROUTE,
   bindingSummary, bindingVerdict,
 } from "./office-api";
+
+/** Always-present art credit; it must not depend on a theme being active. */
+export const OFFICE_ART_CREDIT = "Office art: LimeZu — https://limezu.itch.io";
+export const OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
 
 export interface OfficeAppProps {
   /** The dashboard's base path (empty at the root). */
@@ -54,6 +65,20 @@ export interface OfficeAppProps {
   officeError?: string;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
+}
+
+/**
+ * The theme the host page asked for (`/qubit-office?theme=<id>`).
+ *
+ * Read from the host document, not from a prop: the plugin component receives
+ * no props in production. `classic` is the default and is not propagated (the
+ * iframe URL stays clean and the host loads nothing).
+ */
+function hostThemeRequest(): string {
+  if (typeof window === "undefined") return "";
+  const search = (window.location && window.location.search) || "";
+  const value = (new URLSearchParams(search).get("theme") || "").trim();
+  return value === "classic" ? "" : value;
 }
 
 function connectionText(props: OfficeAppProps): string {
@@ -147,12 +172,46 @@ export function createOfficeApp(
     // does. See app/AgentsPanel.tsx for why that is the only mechanism that
     // can cross the document boundary.
     const [agentsOpen, setAgentsOpen] = useState(false);
+    // The host's theme (the shell AROUND the iframe). The app document is
+    // themed by the server (`_serve_app_html`); this copy only styles OUR
+    // docks and the Agents panel, from the same validated payload.
+    const [officeTheme, setOfficeTheme] = useState<OfficeTheme | null>(null);
+    // The menu fallback: if the app's Panels group never appears (an upstream
+    // DOM change), the shell keeps the Agents/HUD controls by rendering its own
+    // traced-icon buttons after a bounded wait. Injection suppresses them the
+    // moment it attaches, so the two are never visible at once.
+    const [menuFallback, setMenuFallback] = useState(false);
+    const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
     const menuRef = useRef<OfficeMenuController | null>(null);
+
+    // Load the host theme ONCE per request/base. The server injects the
+    // resolved payload as `window.__QUBIT_OFFICE_THEME__` (config/env included),
+    // so this normally makes NO request; the authenticated fetch is the
+    // fallback for a shell served outside Qubit. A classic payload is a valid
+    // answer and simply applies nothing.
+    useEffect(() => {
+      let cancelled = false;
+      const hostWindow = typeof window === "undefined" ? null : window;
+      const fetchImpl = (hostWindow && typeof hostWindow.fetch === "function")
+        ? hostWindow.fetch.bind(hostWindow) : null;
+      loadOfficeTheme(fetchImpl as never, props.base, requestedTheme, hostWindow)
+        .then((theme) => { if (!cancelled) setOfficeTheme(theme); })
+        .catch(() => { if (!cancelled) setOfficeTheme(null); });
+      return () => { cancelled = true; };
+    }, [props.base, requestedTheme]);
+
+    // Apply the host theme to THIS document (the shell around the iframe).
+    // `applyHostTheme` returns a disposer that removes only what it installed,
+    // so a classic/reload/teardown leaves no attribute or link behind.
+    useEffect(() => {
+      if (typeof document === "undefined") return;
+      return applyHostTheme(document, officeTheme);
+    }, [officeTheme]);
 
     useEffect(() => {
       const frame = frameRef.current;
@@ -180,9 +239,12 @@ export function createOfficeApp(
         // buttons. The document is same-origin, so the shell can append to the
         // group; the buttons drive THIS component's dock state.
         menuRef.current?.dispose();
+        setMenuFallback(false);
         menuRef.current = installOfficeMenuButtons(win, {
           onToggleAgents: () => setAgentsOpen((v: boolean) => !v),
           onToggleHud: () => setHudOpen((v: boolean) => !v),
+          onFallback: (show: boolean) => setMenuFallback(show),
+          onAttach: () => setMenuFallback(false),
         });
         menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
         props.onReady?.();
@@ -192,7 +254,9 @@ export function createOfficeApp(
       frame.addEventListener("error", onError);
       setFailed(null);
       setLoaded(false);
-      frame.src = officeAppSrc({ base: props.base, mock: props.mock });
+      frame.src = officeAppSrc({
+        base: props.base, mock: props.mock, theme: requestedTheme,
+      });
       return () => {
         frame.removeEventListener("load", onLoad);
         frame.removeEventListener("error", onError);
@@ -200,13 +264,19 @@ export function createOfficeApp(
         menuRef.current = null;
         restoreBridge?.();
       };
-    }, [props.base, props.mock]);
+    }, [props.base, props.mock, requestedTheme]);
 
     // Mirror the dock state onto the injected buttons after every render: the
     // office paints its own active state from `aria-pressed`.
     useEffect(() => {
       menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
     });
+
+    // Optional 9-slice: the pack declares which shell roles carry art, and
+    // only those elements opt in. The generated host stylesheet targets
+    // [data-office-slice], so an absent/classic theme emits no border-image.
+    const dockSlice = officeSliceName(officeTheme, "dock");
+    const buttonSlice = officeSliceName(officeTheme, "button");
 
     const children: unknown[] = [
       R.createElement("iframe", {
@@ -232,6 +302,21 @@ export function createOfficeApp(
         id: "office-app-description",
         className: "office-game__sr-only",
       }, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled."),
+      // The persistent Credits/About surface. It is part of the Qubit shell,
+      // not the vendored client and not the theme, so the LimeZu attribution
+      // stays visible with `classic` and after a theme is removed.
+      R.createElement("div", {
+        key: "credits",
+        className: "office-game__credits",
+        "data-testid": "office-app-credits",
+        role: "note",
+        "aria-label": "Art credit",
+      }, R.createElement("a", {
+        key: "limezu",
+        href: OFFICE_ART_CREDIT_URL,
+        target: "_blank",
+        rel: "noopener noreferrer",
+      }, OFFICE_ART_CREDIT)),
     ];
 
     if (!loaded && !failed) {
@@ -347,20 +432,25 @@ export function createOfficeApp(
       children.push(R.createElement("div", {
         key: "agents-dock",
         id: "office-game-agents-dock",
-        className: "office-game__dock office-game__agentsDock office-game__panel",
+        className: "office-game__dock office-game__agentsDock office-game__panel office-theme-dock office-theme-agents-dock",
         "data-testid": "office-game-agents-dock",
+        "data-office-dock": "agents",
+        "data-office-slice": dockSlice,
         role: "region",
         "aria-label": "Office agents",
       }, [
-        R.createElement("div", { key: "head", className: "office-game__dockHead" }, [
-          R.createElement("span", { key: "t" }, "Agents"),
+        R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
+          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Agents"),
           R.createElement("button", {
-            key: "x", type: "button", className: "office-game__btn",
+            key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
+            "data-office-slice": buttonSlice,
             onClick: () => setAgentsOpen(false),
           }, "Close"),
         ]),
-        R.createElement(AgentsPanel as never, { key: "body", base: props.base }),
+        R.createElement(AgentsPanel as never, {
+          key: "body", base: props.base, theme: officeTheme,
+        }),
       ]));
     }
 
@@ -373,22 +463,25 @@ export function createOfficeApp(
       children.push(R.createElement("div", {
         key: "hud-dock",
         id: "office-game-hud-dock",
-        className: "office-game__dock office-game__panel",
+        className: "office-game__dock office-game__panel office-theme-dock office-theme-hud-dock",
         "data-testid": "office-game-hud-dock",
+        "data-office-dock": "hud",
+        "data-office-slice": dockSlice,
         role: "region",
         "aria-label": "HUD",
       }, [
-        R.createElement("div", { key: "head", className: "office-game__dockHead" }, [
-          R.createElement("span", { key: "t" }, "HUD"),
+        R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
+          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "HUD"),
           R.createElement("a", {
             key: "open",
-            className: "office-game__hudLink",
+            className: "office-game__hudLink office-theme-dock-link",
             "data-testid": "office-game-hud-open-link",
             href: hudFrameSrc(props.base),
           }, "Open HUD"),
           R.createElement("button", {
-            key: "x", type: "button", className: "office-game__btn",
+            key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-hud-close", "aria-label": "Close HUD",
+            "data-office-slice": buttonSlice,
             onClick: () => setHudOpen(false),
           }, "Close"),
         ]),
@@ -396,9 +489,54 @@ export function createOfficeApp(
       ]));
     }
 
+    // HOST-RENDERED MENU FALLBACK. The app's own Panels group can disappear
+    // across an upstream DOM change; the injected icons would then vanish with
+    // it. After the bounded wait the controller asks for these shell buttons,
+    // and the first successful injection removes them again.
+    if (menuFallback) {
+      children.push(R.createElement("div", {
+        key: "menu-fallback",
+        className: "office-game__menuFallback office-theme-menu-fallback",
+        "data-testid": "office-menu-fallback",
+        role: "group",
+        "aria-label": "Office panels",
+      }, MENU_BUTTONS.map((spec: MenuButtonSpec) => {
+        const geometry = menuIconGeometry(spec);
+        const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
+        const onActivate = spec.id === "agents"
+          ? () => setAgentsOpen((v: boolean) => !v)
+          : () => setHudOpen((v: boolean) => !v);
+        return R.createElement("button", {
+          key: spec.id,
+          type: "button",
+          className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
+          "data-testid": `${spec.testId}-fallback`,
+          "aria-label": spec.label,
+          title: spec.title,
+          "aria-pressed": pressed ? "true" : "false",
+          "data-office-slice": buttonSlice,
+          onClick: onActivate,
+        }, R.createElement("svg", {
+          className: "ui-px-icon",
+          width: geometry.width,
+          height: geometry.height,
+          viewBox: geometry.viewBox,
+          shapeRendering: "crispEdges",
+          "aria-hidden": "true",
+          focusable: "false",
+        }, R.createElement("path", {
+          fill: "currentColor",
+          d: geometry.d,
+        })));
+      })));
+    }
+
+    const rootClass = ["office-game", officeThemeClass(officeTheme)]
+      .filter(Boolean).join(" ");
     return R.createElement("div", {
       "data-testid": "office-app",
-      className: "office-game",
+      "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
+      className: rootClass,
     }, children);
   };
 }

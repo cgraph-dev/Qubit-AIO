@@ -120,3 +120,98 @@ describe("office menu integration", () => {
     }
   });
 });
+
+describe("office menu fallback (upstream DOM changes)", () => {
+  const noRaf = () => {
+    const real = window.requestAnimationFrame;
+    (window as unknown as { requestAnimationFrame?: unknown })
+      .requestAnimationFrame = undefined;
+    return () => {
+      (window as unknown as { requestAnimationFrame?: unknown })
+        .requestAnimationFrame = real;
+    };
+  };
+
+  it("shows a fallback after the bounded wait, then hands off when the group appears", async () => {
+    vi.useFakeTimers();
+    const restoreRaf = noRaf();
+    try {
+      document.body.innerHTML = "";
+      const onFallback = vi.fn();
+      const onAttach = vi.fn();
+      const menu = installOfficeMenuButtons(window, {
+        onToggleAgents: () => {},
+        onToggleHud: () => {},
+        fallbackAfterMs: 1500,
+        onFallback,
+        onAttach,
+      });
+      expect(menu?.attached()).toBe(false);
+      expect(onFallback).not.toHaveBeenCalledWith(true);
+
+      vi.advanceTimersByTime(1500);
+      expect(onFallback).toHaveBeenCalledWith(true);
+
+      // The group appears later (an app mount after the load event).
+      const group = makeMenu();
+      await Promise.resolve();
+      vi.advanceTimersByTime(10);
+      await Promise.resolve();
+
+      expect(onFallback).toHaveBeenLastCalledWith(false);
+      expect(onAttach).toHaveBeenCalledTimes(1);
+      expect(menu?.attached()).toBe(true);
+      // Never both: one injected pair, and the shell was told to hide its own.
+      expect(group.querySelectorAll('[data-testid="office-menu-agents"]')).toHaveLength(1);
+      expect(group.querySelectorAll('[data-testid="office-menu-hud"]')).toHaveLength(1);
+      menu?.dispose();
+    } finally {
+      restoreRaf();
+      vi.useRealTimers();
+    }
+  });
+
+  it("shows no fallback when the group is already there", () => {
+    vi.useFakeTimers();
+    const restoreRaf = noRaf();
+    try {
+      makeMenu();
+      const onFallback = vi.fn();
+      const menu = installOfficeMenuButtons(window, {
+        onToggleAgents: () => {},
+        onToggleHud: () => {},
+        fallbackAfterMs: 1500,
+        onFallback,
+      });
+      expect(menu?.attached()).toBe(true);
+      vi.advanceTimersByTime(1500);
+      expect(onFallback).not.toHaveBeenCalledWith(true);
+      menu?.dispose();
+    } finally {
+      restoreRaf();
+      vi.useRealTimers();
+    }
+  });
+
+  it("dispose clears a shown fallback", () => {
+    vi.useFakeTimers();
+    const restoreRaf = noRaf();
+    try {
+      document.body.innerHTML = "";
+      const onFallback = vi.fn();
+      const menu = installOfficeMenuButtons(window, {
+        onToggleAgents: () => {},
+        onToggleHud: () => {},
+        fallbackAfterMs: 1500,
+        onFallback,
+      });
+      vi.advanceTimersByTime(1500);
+      expect(onFallback).toHaveBeenCalledWith(true);
+      menu?.dispose();
+      expect(onFallback).toHaveBeenLastCalledWith(false);
+    } finally {
+      restoreRaf();
+      vi.useRealTimers();
+    }
+  });
+});

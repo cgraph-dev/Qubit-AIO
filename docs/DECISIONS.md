@@ -191,3 +191,19 @@ done
     --check` must stay green and the vendored hashes unchanged in every lane.
     → Provenance: owner session 2026-11-09 ("dont fuck habblaud we just update ui
     to make it better and easier to upgrade in the future").
+
+
+16. **Habblaud may be extended additively for the Office UI (owner ruling, 2026-11-09; supersedes ruling 15's absolute "no edits" clause).**
+    The owner permits changing and re-vendoring Habblaud for the upgrade, with one
+    hard condition: **do not break what currently works**. Every Habblaud change
+    must be additive and behind the theme flag (`office.theme`; `classic` is the
+    current behavior), preserve the office stream, 283-seat panel, menu and
+    interaction contracts, carry before/after goldens and a documented rollback,
+    and update `PROVENANCE.json` for the local changes. Paid art still may not be
+    committed: the patched client loads the owner-built local theme pack at
+    runtime. `vendor_habblaud.py --check` remains the drift gate against the
+    updated provenance. Room/interior art is now in scope. Cost if wrong:
+    regressions in the live office; mitigated by the flag, goldens and the
+    classic default.
+    → Provenance: owner session 2026-11-09 ("you can touch habblaud, i meant not
+    break whats currently working cos we need add more things").

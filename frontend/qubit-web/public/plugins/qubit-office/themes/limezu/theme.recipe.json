@@ -1,0 +1,1778 @@
+{
+  "agents": {
+    "academic-anthropologist": {
+      "eyes": 4,
+      "hair": 26,
+      "outfit": 15,
+      "skin": 4
+    },
+    "academic-geographer": {
+      "eyes": 4,
+      "hair": 1,
+      "outfit": 13,
+      "skin": 0
+    },
+    "academic-historian": {
+      "eyes": 6,
+      "hair": 16,
+      "outfit": 28,
+      "skin": 4
+    },
+    "academic-narratologist": {
+      "eyes": 4,
+      "hair": 1,
+      "outfit": 18,
+      "skin": 8
+    },
+    "academic-psychologist": {
+      "eyes": 4,
+      "hair": 18,
+      "outfit": 24,
+      "skin": 5
+    },
+    "academic-statistician": {
+      "eyes": 4,
+      "hair": 21,
+      "outfit": 27,
+      "skin": 8
+    },
+    "accounts-payable-agent": {
+      "eyes": 4,
+      "hair": 28,
+      "outfit": 8,
+      "skin": 8
+    },
+    "agentic-identity-trust": {
+      "eyes": 1,
+      "hair": 16,
+      "outfit": 9,
+      "skin": 3
+    },
+    "agents-orchestrator": {
+      "eyes": 4,
+      "hair": 21,
+      "outfit": 17,
+      "skin": 4
+    },
+    "automation-governance-architect": {
+      "eyes": 0,
+      "hair": 16,
+      "outfit": 14,
+      "skin": 6
+    },
+    "blender-addon-engineer": {
+      "eyes": 2,
+      "hair": 8,
+      "outfit": 13,
+      "skin": 8
+    },
+    "business-strategist": {
+      "eyes": 3,
+      "hair": 2,
+      "outfit": 24,
+      "skin": 8
+    },
+    "change-management-consultant": {
+      "eyes": 2,
+      "hair": 25,
+      "outfit": 17,
+      "skin": 8
+    },
+    "chief-financial-officer": {
+      "eyes": 4,
+      "hair": 27,
+      "outfit": 5,
+      "skin": 1
+    },
+    "corporate-training-designer": {
+      "eyes": 5,
+      "hair": 26,
+      "outfit": 6,
+      "skin": 7
+    },
+    "customer-service": {
+      "eyes": 4,
+      "hair": 11,
+      "outfit": 25,
+      "skin": 7
+    },
+    "customer-success-manager": {
+      "eyes": 4,
+      "hair": 21,
+      "outfit": 26,
+      "skin": 6
+    },
+    "data-consolidation-agent": {
+      "eyes": 3,
+      "hair": 14,
+      "outfit": 6,
+      "skin": 8
+    },
+    "data-privacy-officer": {
+      "eyes": 4,
+      "hair": 7,
+      "outfit": 12,
+      "skin": 2
+    },
+    "design-brand-guardian": {
+      "eyes": 0,
+      "hair": 27,
+      "outfit": 31,
+      "skin": 4
+    },
+    "design-image-prompt-engineer": {
+      "eyes": 2,
+      "hair": 19,
+      "outfit": 19,
+      "skin": 3
+    },
+    "design-inclusive-visuals-specialist": {
+      "eyes": 5,
+      "hair": 0,
+      "outfit": 12,
+      "skin": 7
+    },
+    "design-persona-walkthrough": {
+      "eyes": 4,
+      "hair": 12,
+      "outfit": 20,
+      "skin": 5
+    },
+    "design-ui-designer": {
+      "eyes": 0,
+      "hair": 14,
+      "outfit": 24,
+      "skin": 3
+    },
+    "design-ui-finish-gate-reviewer": {
+      "eyes": 1,
+      "hair": 26,
+      "outfit": 7,
+      "skin": 3
+    },
+    "design-ux-architect": {
+      "eyes": 3,
+      "hair": 2,
+      "outfit": 13,
+      "skin": 2
+    },
+    "design-ux-researcher": {
+      "eyes": 3,
+      "hair": 20,
+      "outfit": 27,
+      "skin": 8
+    },
+    "design-visual-storyteller": {
+      "eyes": 6,
+      "hair": 3,
+      "outfit": 24,
+      "skin": 4
+    },
+    "design-whimsy-injector": {
+      "eyes": 4,
+      "hair": 2,
+      "outfit": 20,
+      "skin": 7
+    },
+    "economy-designer": {
+      "eyes": 5,
+      "hair": 21,
+      "outfit": 25,
+      "skin": 6
+    },
+    "engineering-ai-data-remediation-engineer": {
+      "eyes": 1,
+      "hair": 20,
+      "outfit": 14,
+      "skin": 5
+    },
+    "engineering-ai-engineer": {
+      "eyes": 3,
+      "hair": 9,
+      "outfit": 4,
+      "skin": 6
+    },
+    "engineering-api-platform-engineer": {
+      "eyes": 5,
+      "hair": 21,
+      "outfit": 8,
+      "skin": 7
+    },
+    "engineering-ats-validator-architect": {
+      "eyes": 6,
+      "hair": 2,
+      "outfit": 7,
+      "skin": 7
+    },
+    "engineering-autonomous-optimization-architect": {
+      "eyes": 0,
+      "hair": 14,
+      "outfit": 10,
+      "skin": 0
+    },
+    "engineering-backend-architect": {
+      "eyes": 3,
+      "hair": 22,
+      "outfit": 32,
+      "skin": 2
+    },
+    "engineering-china-network-engineer": {
+      "eyes": 5,
+      "hair": 16,
+      "outfit": 18,
+      "skin": 1
+    },
+    "engineering-cms-developer": {
+      "eyes": 3,
+      "hair": 23,
+      "outfit": 5,
+      "skin": 3
+    },
+    "engineering-code-reviewer": {
+      "eyes": 3,
+      "hair": 23,
+      "outfit": 13,
+      "skin": 7
+    },
+    "engineering-codebase-onboarding-engineer": {
+      "eyes": 6,
+      "hair": 9,
+      "outfit": 14,
+      "skin": 0
+    },
+    "engineering-data-engineer": {
+      "eyes": 6,
+      "hair": 28,
+      "outfit": 19,
+      "skin": 3
+    },
+    "engineering-data-visualization-engineer": {
+      "eyes": 5,
+      "hair": 5,
+      "outfit": 24,
+      "skin": 1
+    },
+    "engineering-database-optimizer": {
+      "eyes": 1,
+      "hair": 5,
+      "outfit": 28,
+      "skin": 5
+    },
+    "engineering-database-reliability-engineer": {
+      "eyes": 4,
+      "hair": 24,
+      "outfit": 18,
+      "skin": 1
+    },
+    "engineering-desktop-app-engineer": {
+      "eyes": 2,
+      "hair": 9,
+      "outfit": 21,
+      "skin": 6
+    },
+    "engineering-developer-tooling-engineer": {
+      "eyes": 1,
+      "hair": 25,
+      "outfit": 8,
+      "skin": 7
+    },
+    "engineering-devops-automator": {
+      "eyes": 2,
+      "hair": 14,
+      "outfit": 24,
+      "skin": 7
+    },
+    "engineering-drupal-performance": {
+      "eyes": 1,
+      "hair": 0,
+      "outfit": 4,
+      "skin": 2
+    },
+    "engineering-drupal-shopping-cart": {
+      "eyes": 5,
+      "hair": 28,
+      "outfit": 10,
+      "skin": 4
+    },
+    "engineering-electrical-engineer": {
+      "eyes": 5,
+      "hair": 7,
+      "outfit": 27,
+      "skin": 1
+    },
+    "engineering-email-intelligence-engineer": {
+      "eyes": 5,
+      "hair": 2,
+      "outfit": 6,
+      "skin": 6
+    },
+    "engineering-embedded-firmware-engineer": {
+      "eyes": 0,
+      "hair": 23,
+      "outfit": 16,
+      "skin": 7
+    },
+    "engineering-feishu-integration-developer": {
+      "eyes": 5,
+      "hair": 3,
+      "outfit": 2,
+      "skin": 5
+    },
+    "engineering-filament-optimization-specialist": {
+      "eyes": 2,
+      "hair": 0,
+      "outfit": 18,
+      "skin": 7
+    },
+    "engineering-finops-engineer": {
+      "eyes": 0,
+      "hair": 20,
+      "outfit": 6,
+      "skin": 3
+    },
+    "engineering-frontend-developer": {
+      "eyes": 1,
+      "hair": 21,
+      "outfit": 9,
+      "skin": 0
+    },
+    "engineering-gaussdb-expert": {
+      "eyes": 1,
+      "hair": 20,
+      "outfit": 8,
+      "skin": 5
+    },
+    "engineering-git-workflow-master": {
+      "eyes": 6,
+      "hair": 4,
+      "outfit": 19,
+      "skin": 8
+    },
+    "engineering-i18n-engineer": {
+      "eyes": 0,
+      "hair": 21,
+      "outfit": 11,
+      "skin": 3
+    },
+    "engineering-identity-access-engineer": {
+      "eyes": 4,
+      "hair": 9,
+      "outfit": 13,
+      "skin": 0
+    },
+    "engineering-incident-response-commander": {
+      "eyes": 3,
+      "hair": 12,
+      "outfit": 28,
+      "skin": 0
+    },
+    "engineering-iot-fleet-engineer": {
+      "eyes": 1,
+      "hair": 14,
+      "outfit": 9,
+      "skin": 8
+    },
+    "engineering-it-service-manager": {
+      "eyes": 3,
+      "hair": 25,
+      "outfit": 21,
+      "skin": 6
+    },
+    "engineering-knowledge-graph-engineer": {
+      "eyes": 0,
+      "hair": 4,
+      "outfit": 27,
+      "skin": 5
+    },
+    "engineering-llm-post-training-engineer": {
+      "eyes": 5,
+      "hair": 27,
+      "outfit": 25,
+      "skin": 6
+    },
+    "engineering-minimal-change-engineer": {
+      "eyes": 4,
+      "hair": 17,
+      "outfit": 15,
+      "skin": 1
+    },
+    "engineering-mobile-app-builder": {
+      "eyes": 0,
+      "hair": 24,
+      "outfit": 4,
+      "skin": 4
+    },
+    "engineering-mobile-release-engineer": {
+      "eyes": 1,
+      "hair": 5,
+      "outfit": 17,
+      "skin": 5
+    },
+    "engineering-multi-agent-systems-architect": {
+      "eyes": 0,
+      "hair": 14,
+      "outfit": 4,
+      "skin": 5
+    },
+    "engineering-network-engineer": {
+      "eyes": 1,
+      "hair": 28,
+      "outfit": 27,
+      "skin": 3
+    },
+    "engineering-orgscript-engineer": {
+      "eyes": 3,
+      "hair": 13,
+      "outfit": 23,
+      "skin": 4
+    },
+    "engineering-payments-billing-engineer": {
+      "eyes": 0,
+      "hair": 23,
+      "outfit": 17,
+      "skin": 4
+    },
+    "engineering-pdf-engine-architect": {
+      "eyes": 2,
+      "hair": 24,
+      "outfit": 11,
+      "skin": 3
+    },
+    "engineering-platform-engineer": {
+      "eyes": 1,
+      "hair": 1,
+      "outfit": 13,
+      "skin": 7
+    },
+    "engineering-privacy-engineer": {
+      "eyes": 2,
+      "hair": 14,
+      "outfit": 28,
+      "skin": 3
+    },
+    "engineering-prompt-engineer": {
+      "eyes": 4,
+      "hair": 6,
+      "outfit": 19,
+      "skin": 1
+    },
+    "engineering-rag-pipeline-engineer": {
+      "eyes": 4,
+      "hair": 4,
+      "outfit": 11,
+      "skin": 0
+    },
+    "engineering-rapid-prototyper": {
+      "eyes": 1,
+      "hair": 5,
+      "outfit": 15,
+      "skin": 4
+    },
+    "engineering-realtime-collaboration-engineer": {
+      "eyes": 4,
+      "hair": 5,
+      "outfit": 27,
+      "skin": 8
+    },
+    "engineering-rust-refactoring-specialist": {
+      "eyes": 2,
+      "hair": 5,
+      "outfit": 4,
+      "skin": 7
+    },
+    "engineering-search-relevance-engineer": {
+      "eyes": 5,
+      "hair": 19,
+      "outfit": 23,
+      "skin": 1
+    },
+    "engineering-section-508-specialist": {
+      "eyes": 4,
+      "hair": 17,
+      "outfit": 27,
+      "skin": 4
+    },
+    "engineering-senior-developer": {
+      "eyes": 2,
+      "hair": 7,
+      "outfit": 28,
+      "skin": 8
+    },
+    "engineering-servicenow-developer-mentor": {
+      "eyes": 2,
+      "hair": 27,
+      "outfit": 29,
+      "skin": 1
+    },
+    "engineering-software-architect": {
+      "eyes": 2,
+      "hair": 27,
+      "outfit": 7,
+      "skin": 3
+    },
+    "engineering-solidity-smart-contract-engineer": {
+      "eyes": 4,
+      "hair": 5,
+      "outfit": 17,
+      "skin": 2
+    },
+    "engineering-sre": {
+      "eyes": 3,
+      "hair": 21,
+      "outfit": 24,
+      "skin": 3
+    },
+    "engineering-technical-writer": {
+      "eyes": 6,
+      "hair": 13,
+      "outfit": 9,
+      "skin": 0
+    },
+    "engineering-universal-document-compiler": {
+      "eyes": 6,
+      "hair": 7,
+      "outfit": 26,
+      "skin": 7
+    },
+    "engineering-uswds-developer": {
+      "eyes": 4,
+      "hair": 17,
+      "outfit": 31,
+      "skin": 3
+    },
+    "engineering-video-streaming-engineer": {
+      "eyes": 5,
+      "hair": 20,
+      "outfit": 23,
+      "skin": 1
+    },
+    "engineering-voice-ai-integration-engineer": {
+      "eyes": 5,
+      "hair": 28,
+      "outfit": 6,
+      "skin": 0
+    },
+    "engineering-webassembly-engineer": {
+      "eyes": 6,
+      "hair": 16,
+      "outfit": 14,
+      "skin": 8
+    },
+    "engineering-wechat-mini-program-developer": {
+      "eyes": 4,
+      "hair": 5,
+      "outfit": 25,
+      "skin": 5
+    },
+    "engineering-wordpress-performance": {
+      "eyes": 3,
+      "hair": 11,
+      "outfit": 30,
+      "skin": 4
+    },
+    "engineering-wordpress-shopping-cart": {
+      "eyes": 3,
+      "hair": 27,
+      "outfit": 2,
+      "skin": 0
+    },
+    "esg-sustainability-officer": {
+      "eyes": 2,
+      "hair": 20,
+      "outfit": 6,
+      "skin": 6
+    },
+    "finance-bookkeeper-controller": {
+      "eyes": 0,
+      "hair": 19,
+      "outfit": 28,
+      "skin": 7
+    },
+    "finance-financial-analyst": {
+      "eyes": 3,
+      "hair": 20,
+      "outfit": 0,
+      "skin": 6
+    },
+    "finance-fpa-analyst": {
+      "eyes": 5,
+      "hair": 10,
+      "outfit": 31,
+      "skin": 8
+    },
+    "finance-investment-researcher": {
+      "eyes": 6,
+      "hair": 27,
+      "outfit": 31,
+      "skin": 8
+    },
+    "finance-tax-strategist": {
+      "eyes": 1,
+      "hair": 26,
+      "outfit": 15,
+      "skin": 3
+    },
+    "game-audio-engineer": {
+      "eyes": 0,
+      "hair": 20,
+      "outfit": 26,
+      "skin": 1
+    },
+    "game-designer": {
+      "eyes": 3,
+      "hair": 9,
+      "outfit": 7,
+      "skin": 5
+    },
+    "gis-3d-scene-developer": {
+      "eyes": 4,
+      "hair": 3,
+      "outfit": 4,
+      "skin": 2
+    },
+    "gis-analyst": {
+      "eyes": 0,
+      "hair": 23,
+      "outfit": 17,
+      "skin": 5
+    },
+    "gis-bim-specialist": {
+      "eyes": 1,
+      "hair": 21,
+      "outfit": 28,
+      "skin": 7
+    },
+    "gis-cartography-designer": {
+      "eyes": 5,
+      "hair": 22,
+      "outfit": 13,
+      "skin": 5
+    },
+    "gis-drone-reality-mapping": {
+      "eyes": 2,
+      "hair": 10,
+      "outfit": 18,
+      "skin": 1
+    },
+    "gis-geoai-ml-engineer": {
+      "eyes": 4,
+      "hair": 24,
+      "outfit": 6,
+      "skin": 7
+    },
+    "gis-geoprocessing-specialist": {
+      "eyes": 3,
+      "hair": 5,
+      "outfit": 22,
+      "skin": 5
+    },
+    "gis-qa-engineer": {
+      "eyes": 2,
+      "hair": 26,
+      "outfit": 20,
+      "skin": 5
+    },
+    "gis-solution-engineer": {
+      "eyes": 5,
+      "hair": 6,
+      "outfit": 11,
+      "skin": 0
+    },
+    "gis-spatial-data-engineer": {
+      "eyes": 6,
+      "hair": 0,
+      "outfit": 19,
+      "skin": 1
+    },
+    "gis-spatial-data-scientist": {
+      "eyes": 4,
+      "hair": 3,
+      "outfit": 22,
+      "skin": 8
+    },
+    "gis-technical-consultant": {
+      "eyes": 3,
+      "hair": 20,
+      "outfit": 22,
+      "skin": 2
+    },
+    "gis-web-gis-developer": {
+      "eyes": 1,
+      "hair": 4,
+      "outfit": 14,
+      "skin": 8
+    },
+    "godot-gameplay-scripter": {
+      "eyes": 3,
+      "hair": 27,
+      "outfit": 26,
+      "skin": 7
+    },
+    "godot-multiplayer-engineer": {
+      "eyes": 0,
+      "hair": 1,
+      "outfit": 11,
+      "skin": 1
+    },
+    "godot-shader-developer": {
+      "eyes": 3,
+      "hair": 19,
+      "outfit": 11,
+      "skin": 1
+    },
+    "government-digital-presales-consultant": {
+      "eyes": 1,
+      "hair": 2,
+      "outfit": 12,
+      "skin": 8
+    },
+    "grant-writer": {
+      "eyes": 2,
+      "hair": 26,
+      "outfit": 4,
+      "skin": 3
+    },
+    "healthcare-aging-parent-care-companion": {
+      "eyes": 1,
+      "hair": 12,
+      "outfit": 3,
+      "skin": 5
+    },
+    "healthcare-clinical-evidence-agent": {
+      "eyes": 0,
+      "hair": 7,
+      "outfit": 19,
+      "skin": 5
+    },
+    "healthcare-customer-service": {
+      "eyes": 1,
+      "hair": 24,
+      "outfit": 13,
+      "skin": 1
+    },
+    "healthcare-innovation-strategist": {
+      "eyes": 2,
+      "hair": 23,
+      "outfit": 23,
+      "skin": 5
+    },
+    "healthcare-marketing-compliance": {
+      "eyes": 6,
+      "hair": 0,
+      "outfit": 11,
+      "skin": 4
+    },
+    "healthcare-sovereign-health-systems-agent": {
+      "eyes": 1,
+      "hair": 6,
+      "outfit": 7,
+      "skin": 1
+    },
+    "hospitality-guest-services": {
+      "eyes": 3,
+      "hair": 0,
+      "outfit": 10,
+      "skin": 2
+    },
+    "hr-onboarding": {
+      "eyes": 3,
+      "hair": 3,
+      "outfit": 19,
+      "skin": 3
+    },
+    "identity-graph-operator": {
+      "eyes": 2,
+      "hair": 18,
+      "outfit": 2,
+      "skin": 6
+    },
+    "language-translator": {
+      "eyes": 2,
+      "hair": 26,
+      "outfit": 3,
+      "skin": 2
+    },
+    "legal-billing-time-tracking": {
+      "eyes": 2,
+      "hair": 5,
+      "outfit": 22,
+      "skin": 3
+    },
+    "legal-client-intake": {
+      "eyes": 2,
+      "hair": 0,
+      "outfit": 4,
+      "skin": 3
+    },
+    "legal-document-review": {
+      "eyes": 5,
+      "hair": 11,
+      "outfit": 16,
+      "skin": 8
+    },
+    "level-designer": {
+      "eyes": 4,
+      "hair": 23,
+      "outfit": 16,
+      "skin": 5
+    },
+    "loan-officer-assistant": {
+      "eyes": 2,
+      "hair": 17,
+      "outfit": 1,
+      "skin": 5
+    },
+    "lsp-index-engineer": {
+      "eyes": 3,
+      "hair": 8,
+      "outfit": 13,
+      "skin": 8
+    },
+    "ma-integration-manager": {
+      "eyes": 2,
+      "hair": 24,
+      "outfit": 26,
+      "skin": 3
+    },
+    "macos-spatial-metal-engineer": {
+      "eyes": 0,
+      "hair": 6,
+      "outfit": 6,
+      "skin": 0
+    },
+    "marketing-aeo-foundations": {
+      "eyes": 0,
+      "hair": 21,
+      "outfit": 8,
+      "skin": 6
+    },
+    "marketing-agentic-search-optimizer": {
+      "eyes": 2,
+      "hair": 20,
+      "outfit": 6,
+      "skin": 6
+    },
+    "marketing-ai-citation-strategist": {
+      "eyes": 3,
+      "hair": 28,
+      "outfit": 17,
+      "skin": 8
+    },
+    "marketing-app-store-optimizer": {
+      "eyes": 0,
+      "hair": 12,
+      "outfit": 6,
+      "skin": 8
+    },
+    "marketing-baidu-seo-specialist": {
+      "eyes": 3,
+      "hair": 7,
+      "outfit": 31,
+      "skin": 5
+    },
+    "marketing-bilibili-content-strategist": {
+      "eyes": 5,
+      "hair": 3,
+      "outfit": 12,
+      "skin": 4
+    },
+    "marketing-book-co-author": {
+      "eyes": 5,
+      "hair": 3,
+      "outfit": 16,
+      "skin": 8
+    },
+    "marketing-carousel-growth-engine": {
+      "eyes": 3,
+      "hair": 23,
+      "outfit": 7,
+      "skin": 7
+    },
+    "marketing-china-ecommerce-operator": {
+      "eyes": 2,
+      "hair": 11,
+      "outfit": 19,
+      "skin": 7
+    },
+    "marketing-china-market-localization-strategist": {
+      "eyes": 3,
+      "hair": 4,
+      "outfit": 2,
+      "skin": 1
+    },
+    "marketing-content-creator": {
+      "eyes": 0,
+      "hair": 6,
+      "outfit": 8,
+      "skin": 1
+    },
+    "marketing-cross-border-ecommerce": {
+      "eyes": 1,
+      "hair": 28,
+      "outfit": 32,
+      "skin": 7
+    },
+    "marketing-developer-community-builder": {
+      "eyes": 1,
+      "hair": 5,
+      "outfit": 18,
+      "skin": 6
+    },
+    "marketing-douyin-strategist": {
+      "eyes": 2,
+      "hair": 3,
+      "outfit": 16,
+      "skin": 0
+    },
+    "marketing-email-strategist": {
+      "eyes": 1,
+      "hair": 23,
+      "outfit": 12,
+      "skin": 8
+    },
+    "marketing-global-podcast-strategist": {
+      "eyes": 4,
+      "hair": 16,
+      "outfit": 24,
+      "skin": 4
+    },
+    "marketing-growth-hacker": {
+      "eyes": 6,
+      "hair": 14,
+      "outfit": 26,
+      "skin": 1
+    },
+    "marketing-instagram-curator": {
+      "eyes": 6,
+      "hair": 28,
+      "outfit": 16,
+      "skin": 2
+    },
+    "marketing-kuaishou-strategist": {
+      "eyes": 4,
+      "hair": 25,
+      "outfit": 24,
+      "skin": 4
+    },
+    "marketing-linkedin-content-creator": {
+      "eyes": 3,
+      "hair": 20,
+      "outfit": 11,
+      "skin": 5
+    },
+    "marketing-livestream-commerce-coach": {
+      "eyes": 4,
+      "hair": 19,
+      "outfit": 7,
+      "skin": 1
+    },
+    "marketing-multi-platform-publisher": {
+      "eyes": 1,
+      "hair": 15,
+      "outfit": 20,
+      "skin": 2
+    },
+    "marketing-podcast-strategist": {
+      "eyes": 0,
+      "hair": 4,
+      "outfit": 16,
+      "skin": 5
+    },
+    "marketing-pr-communications-manager": {
+      "eyes": 1,
+      "hair": 3,
+      "outfit": 2,
+      "skin": 8
+    },
+    "marketing-private-domain-operator": {
+      "eyes": 6,
+      "hair": 23,
+      "outfit": 28,
+      "skin": 4
+    },
+    "marketing-reddit-community-builder": {
+      "eyes": 1,
+      "hair": 1,
+      "outfit": 4,
+      "skin": 0
+    },
+    "marketing-seo-specialist": {
+      "eyes": 0,
+      "hair": 3,
+      "outfit": 15,
+      "skin": 4
+    },
+    "marketing-short-video-editing-coach": {
+      "eyes": 3,
+      "hair": 3,
+      "outfit": 17,
+      "skin": 2
+    },
+    "marketing-social-media-strategist": {
+      "eyes": 2,
+      "hair": 18,
+      "outfit": 10,
+      "skin": 2
+    },
+    "marketing-tiktok-strategist": {
+      "eyes": 4,
+      "hair": 19,
+      "outfit": 22,
+      "skin": 3
+    },
+    "marketing-twitter-engager": {
+      "eyes": 5,
+      "hair": 5,
+      "outfit": 28,
+      "skin": 4
+    },
+    "marketing-video-optimization-specialist": {
+      "eyes": 1,
+      "hair": 10,
+      "outfit": 14,
+      "skin": 8
+    },
+    "marketing-wechat-official-account": {
+      "eyes": 5,
+      "hair": 14,
+      "outfit": 15,
+      "skin": 8
+    },
+    "marketing-weibo-strategist": {
+      "eyes": 4,
+      "hair": 7,
+      "outfit": 16,
+      "skin": 8
+    },
+    "marketing-x-twitter-intelligence-analyst": {
+      "eyes": 6,
+      "hair": 28,
+      "outfit": 23,
+      "skin": 2
+    },
+    "marketing-xiaohongshu-specialist": {
+      "eyes": 0,
+      "hair": 1,
+      "outfit": 31,
+      "skin": 8
+    },
+    "marketing-zhihu-strategist": {
+      "eyes": 3,
+      "hair": 18,
+      "outfit": 30,
+      "skin": 5
+    },
+    "medical-billing-coding-specialist": {
+      "eyes": 6,
+      "hair": 17,
+      "outfit": 32,
+      "skin": 3
+    },
+    "narrative-designer": {
+      "eyes": 2,
+      "hair": 4,
+      "outfit": 9,
+      "skin": 0
+    },
+    "operations-manager": {
+      "eyes": 1,
+      "hair": 17,
+      "outfit": 3,
+      "skin": 4
+    },
+    "organizational-psychologist": {
+      "eyes": 2,
+      "hair": 19,
+      "outfit": 3,
+      "skin": 7
+    },
+    "paid-media-auditor": {
+      "eyes": 0,
+      "hair": 0,
+      "outfit": 6,
+      "skin": 0
+    },
+    "paid-media-creative-strategist": {
+      "eyes": 3,
+      "hair": 16,
+      "outfit": 19,
+      "skin": 4
+    },
+    "paid-media-paid-social-strategist": {
+      "eyes": 2,
+      "hair": 17,
+      "outfit": 23,
+      "skin": 7
+    },
+    "paid-media-ppc-strategist": {
+      "eyes": 4,
+      "hair": 27,
+      "outfit": 12,
+      "skin": 2
+    },
+    "paid-media-programmatic-buyer": {
+      "eyes": 6,
+      "hair": 20,
+      "outfit": 6,
+      "skin": 7
+    },
+    "paid-media-search-query-analyst": {
+      "eyes": 2,
+      "hair": 3,
+      "outfit": 0,
+      "skin": 2
+    },
+    "paid-media-tracking-specialist": {
+      "eyes": 2,
+      "hair": 5,
+      "outfit": 0,
+      "skin": 6
+    },
+    "personal-growth-mentor": {
+      "eyes": 1,
+      "hair": 24,
+      "outfit": 2,
+      "skin": 3
+    },
+    "product-behavioral-nudge-engine": {
+      "eyes": 1,
+      "hair": 5,
+      "outfit": 14,
+      "skin": 4
+    },
+    "product-dx-engineer": {
+      "eyes": 2,
+      "hair": 25,
+      "outfit": 29,
+      "skin": 0
+    },
+    "product-feedback-synthesizer": {
+      "eyes": 4,
+      "hair": 28,
+      "outfit": 25,
+      "skin": 0
+    },
+    "product-manager": {
+      "eyes": 6,
+      "hair": 1,
+      "outfit": 17,
+      "skin": 2
+    },
+    "product-sprint-prioritizer": {
+      "eyes": 0,
+      "hair": 14,
+      "outfit": 2,
+      "skin": 3
+    },
+    "product-trend-researcher": {
+      "eyes": 5,
+      "hair": 2,
+      "outfit": 29,
+      "skin": 1
+    },
+    "project-management-experiment-tracker": {
+      "eyes": 4,
+      "hair": 2,
+      "outfit": 15,
+      "skin": 8
+    },
+    "project-management-jira-workflow-steward": {
+      "eyes": 6,
+      "hair": 27,
+      "outfit": 29,
+      "skin": 4
+    },
+    "project-management-meeting-notes-specialist": {
+      "eyes": 1,
+      "hair": 9,
+      "outfit": 20,
+      "skin": 7
+    },
+    "project-management-project-shepherd": {
+      "eyes": 5,
+      "hair": 19,
+      "outfit": 10,
+      "skin": 0
+    },
+    "project-management-studio-operations": {
+      "eyes": 1,
+      "hair": 28,
+      "outfit": 20,
+      "skin": 5
+    },
+    "project-management-studio-producer": {
+      "eyes": 4,
+      "hair": 13,
+      "outfit": 4,
+      "skin": 8
+    },
+    "project-manager-senior": {
+      "eyes": 1,
+      "hair": 19,
+      "outfit": 3,
+      "skin": 6
+    },
+    "real-estate-buyer-seller": {
+      "eyes": 1,
+      "hair": 15,
+      "outfit": 14,
+      "skin": 6
+    },
+    "recruitment-specialist": {
+      "eyes": 2,
+      "hair": 4,
+      "outfit": 17,
+      "skin": 6
+    },
+    "report-distribution-agent": {
+      "eyes": 3,
+      "hair": 4,
+      "outfit": 15,
+      "skin": 4
+    },
+    "research-synthesist": {
+      "eyes": 4,
+      "hair": 9,
+      "outfit": 22,
+      "skin": 1
+    },
+    "resume-tailor": {
+      "eyes": 0,
+      "hair": 5,
+      "outfit": 20,
+      "skin": 2
+    },
+    "retail-customer-returns": {
+      "eyes": 2,
+      "hair": 1,
+      "outfit": 3,
+      "skin": 6
+    },
+    "roblox-avatar-creator": {
+      "eyes": 3,
+      "hair": 17,
+      "outfit": 6,
+      "skin": 1
+    },
+    "roblox-experience-designer": {
+      "eyes": 4,
+      "hair": 22,
+      "outfit": 7,
+      "skin": 4
+    },
+    "roblox-systems-scripter": {
+      "eyes": 0,
+      "hair": 11,
+      "outfit": 12,
+      "skin": 3
+    },
+    "sales-account-strategist": {
+      "eyes": 1,
+      "hair": 4,
+      "outfit": 7,
+      "skin": 6
+    },
+    "sales-coach": {
+      "eyes": 1,
+      "hair": 6,
+      "outfit": 6,
+      "skin": 1
+    },
+    "sales-data-extraction-agent": {
+      "eyes": 0,
+      "hair": 9,
+      "outfit": 24,
+      "skin": 2
+    },
+    "sales-deal-strategist": {
+      "eyes": 5,
+      "hair": 13,
+      "outfit": 11,
+      "skin": 8
+    },
+    "sales-discovery-coach": {
+      "eyes": 3,
+      "hair": 14,
+      "outfit": 14,
+      "skin": 6
+    },
+    "sales-engineer": {
+      "eyes": 5,
+      "hair": 19,
+      "outfit": 9,
+      "skin": 2
+    },
+    "sales-offer-lead-gen-strategist": {
+      "eyes": 2,
+      "hair": 27,
+      "outfit": 9,
+      "skin": 7
+    },
+    "sales-outbound-strategist": {
+      "eyes": 0,
+      "hair": 2,
+      "outfit": 5,
+      "skin": 0
+    },
+    "sales-outreach": {
+      "eyes": 0,
+      "hair": 3,
+      "outfit": 19,
+      "skin": 7
+    },
+    "sales-pipeline-analyst": {
+      "eyes": 1,
+      "hair": 3,
+      "outfit": 3,
+      "skin": 3
+    },
+    "sales-proposal-strategist": {
+      "eyes": 2,
+      "hair": 2,
+      "outfit": 12,
+      "skin": 8
+    },
+    "security-ai-generated-code-auditor": {
+      "eyes": 3,
+      "hair": 3,
+      "outfit": 1,
+      "skin": 8
+    },
+    "security-appsec-engineer": {
+      "eyes": 3,
+      "hair": 4,
+      "outfit": 18,
+      "skin": 2
+    },
+    "security-architect": {
+      "eyes": 3,
+      "hair": 13,
+      "outfit": 21,
+      "skin": 6
+    },
+    "security-blockchain-security-auditor": {
+      "eyes": 2,
+      "hair": 18,
+      "outfit": 24,
+      "skin": 2
+    },
+    "security-cloud-security-architect": {
+      "eyes": 3,
+      "hair": 24,
+      "outfit": 24,
+      "skin": 5
+    },
+    "security-compliance-auditor": {
+      "eyes": 3,
+      "hair": 16,
+      "outfit": 17,
+      "skin": 8
+    },
+    "security-incident-responder": {
+      "eyes": 2,
+      "hair": 12,
+      "outfit": 4,
+      "skin": 7
+    },
+    "security-penetration-tester": {
+      "eyes": 1,
+      "hair": 0,
+      "outfit": 10,
+      "skin": 0
+    },
+    "security-secrets-credential-engineer": {
+      "eyes": 5,
+      "hair": 0,
+      "outfit": 20,
+      "skin": 7
+    },
+    "security-senior-secops": {
+      "eyes": 5,
+      "hair": 23,
+      "outfit": 9,
+      "skin": 7
+    },
+    "security-threat-detection-engineer": {
+      "eyes": 1,
+      "hair": 0,
+      "outfit": 14,
+      "skin": 1
+    },
+    "security-threat-intelligence-analyst": {
+      "eyes": 4,
+      "hair": 25,
+      "outfit": 8,
+      "skin": 4
+    },
+    "specialized-chief-of-staff": {
+      "eyes": 1,
+      "hair": 14,
+      "outfit": 1,
+      "skin": 1
+    },
+    "specialized-civil-engineer": {
+      "eyes": 0,
+      "hair": 14,
+      "outfit": 20,
+      "skin": 2
+    },
+    "specialized-codebase-archaeologist": {
+      "eyes": 1,
+      "hair": 25,
+      "outfit": 20,
+      "skin": 8
+    },
+    "specialized-cultural-intelligence-strategist": {
+      "eyes": 4,
+      "hair": 24,
+      "outfit": 4,
+      "skin": 1
+    },
+    "specialized-developer-advocate": {
+      "eyes": 6,
+      "hair": 12,
+      "outfit": 28,
+      "skin": 7
+    },
+    "specialized-document-generator": {
+      "eyes": 0,
+      "hair": 10,
+      "outfit": 2,
+      "skin": 0
+    },
+    "specialized-fedramp-rmf-compliance": {
+      "eyes": 6,
+      "hair": 0,
+      "outfit": 9,
+      "skin": 8
+    },
+    "specialized-focus-music-architect": {
+      "eyes": 5,
+      "hair": 12,
+      "outfit": 7,
+      "skin": 3
+    },
+    "specialized-french-consulting-market": {
+      "eyes": 3,
+      "hair": 13,
+      "outfit": 29,
+      "skin": 3
+    },
+    "specialized-korean-business-navigator": {
+      "eyes": 5,
+      "hair": 14,
+      "outfit": 8,
+      "skin": 3
+    },
+    "specialized-master-plan-architect": {
+      "eyes": 1,
+      "hair": 1,
+      "outfit": 26,
+      "skin": 2
+    },
+    "specialized-mcp-builder": {
+      "eyes": 5,
+      "hair": 19,
+      "outfit": 1,
+      "skin": 5
+    },
+    "specialized-model-qa": {
+      "eyes": 6,
+      "hair": 13,
+      "outfit": 14,
+      "skin": 5
+    },
+    "specialized-pricing-analyst": {
+      "eyes": 6,
+      "hair": 3,
+      "outfit": 27,
+      "skin": 7
+    },
+    "specialized-salesforce-architect": {
+      "eyes": 5,
+      "hair": 12,
+      "outfit": 10,
+      "skin": 6
+    },
+    "specialized-strategy-duel-agent": {
+      "eyes": 6,
+      "hair": 11,
+      "outfit": 30,
+      "skin": 8
+    },
+    "specialized-workflow-architect": {
+      "eyes": 2,
+      "hair": 0,
+      "outfit": 30,
+      "skin": 5
+    },
+    "study-abroad-advisor": {
+      "eyes": 3,
+      "hair": 18,
+      "outfit": 31,
+      "skin": 2
+    },
+    "supply-chain-strategist": {
+      "eyes": 0,
+      "hair": 2,
+      "outfit": 8,
+      "skin": 8
+    },
+    "support-analytics-reporter": {
+      "eyes": 2,
+      "hair": 5,
+      "outfit": 6,
+      "skin": 6
+    },
+    "support-executive-summary-generator": {
+      "eyes": 2,
+      "hair": 25,
+      "outfit": 26,
+      "skin": 7
+    },
+    "support-finance-tracker": {
+      "eyes": 6,
+      "hair": 18,
+      "outfit": 28,
+      "skin": 6
+    },
+    "support-infrastructure-maintainer": {
+      "eyes": 2,
+      "hair": 23,
+      "outfit": 1,
+      "skin": 2
+    },
+    "support-legal-compliance-checker": {
+      "eyes": 4,
+      "hair": 10,
+      "outfit": 17,
+      "skin": 2
+    },
+    "support-support-responder": {
+      "eyes": 4,
+      "hair": 10,
+      "outfit": 10,
+      "skin": 1
+    },
+    "technical-artist": {
+      "eyes": 5,
+      "hair": 17,
+      "outfit": 10,
+      "skin": 0
+    },
+    "terminal-integration-specialist": {
+      "eyes": 0,
+      "hair": 8,
+      "outfit": 23,
+      "skin": 6
+    },
+    "testing-accessibility-auditor": {
+      "eyes": 0,
+      "hair": 24,
+      "outfit": 8,
+      "skin": 6
+    },
+    "testing-api-tester": {
+      "eyes": 1,
+      "hair": 5,
+      "outfit": 4,
+      "skin": 2
+    },
+    "testing-evidence-collector": {
+      "eyes": 4,
+      "hair": 16,
+      "outfit": 18,
+      "skin": 7
+    },
+    "testing-performance-benchmarker": {
+      "eyes": 4,
+      "hair": 24,
+      "outfit": 16,
+      "skin": 6
+    },
+    "testing-reality-checker": {
+      "eyes": 4,
+      "hair": 28,
+      "outfit": 17,
+      "skin": 0
+    },
+    "testing-test-automation-engineer": {
+      "eyes": 0,
+      "hair": 20,
+      "outfit": 8,
+      "skin": 8
+    },
+    "testing-test-results-analyzer": {
+      "eyes": 4,
+      "hair": 13,
+      "outfit": 16,
+      "skin": 2
+    },
+    "testing-tool-evaluator": {
+      "eyes": 4,
+      "hair": 12,
+      "outfit": 19,
+      "skin": 0
+    },
+    "testing-workflow-optimizer": {
+      "eyes": 4,
+      "hair": 2,
+      "outfit": 24,
+      "skin": 2
+    },
+    "unity-architect": {
+      "eyes": 4,
+      "hair": 15,
+      "outfit": 4,
+      "skin": 3
+    },
+    "unity-editor-tool-developer": {
+      "eyes": 4,
+      "hair": 16,
+      "outfit": 29,
+      "skin": 4
+    },
+    "unity-multiplayer-engineer": {
+      "eyes": 1,
+      "hair": 16,
+      "outfit": 11,
+      "skin": 8
+    },
+    "unity-shader-graph-artist": {
+      "eyes": 0,
+      "hair": 25,
+      "outfit": 11,
+      "skin": 2
+    },
+    "unreal-multiplayer-architect": {
+      "eyes": 1,
+      "hair": 21,
+      "outfit": 20,
+      "skin": 7
+    },
+    "unreal-systems-engineer": {
+      "eyes": 0,
+      "hair": 4,
+      "outfit": 16,
+      "skin": 5
+    },
+    "unreal-technical-artist": {
+      "eyes": 0,
+      "hair": 21,
+      "outfit": 31,
+      "skin": 2
+    },
+    "unreal-world-builder": {
+      "eyes": 4,
+      "hair": 17,
+      "outfit": 22,
+      "skin": 7
+    },
+    "visionos-spatial-engineer": {
+      "eyes": 6,
+      "hair": 22,
+      "outfit": 14,
+      "skin": 6
+    },
+    "xr-cockpit-interaction-specialist": {
+      "eyes": 3,
+      "hair": 7,
+      "outfit": 3,
+      "skin": 3
+    },
+    "xr-immersive-developer": {
+      "eyes": 3,
+      "hair": 28,
+      "outfit": 17,
+      "skin": 7
+    },
+    "xr-interface-architect": {
+      "eyes": 2,
+      "hair": 12,
+      "outfit": 1,
+      "skin": 0
+    },
+    "zk-steward": {
+      "eyes": 5,
+      "hair": 25,
+      "outfit": 30,
+      "skin": 8
+    }
+  },
+  "credit": "LimeZu \u2014 https://limezu.itch.io",
+  "format": "qubit-office-theme",
+  "id": "limezu",
+  "label": "Limezu",
+  "license": "LimeZu \u2014 Modern Interiors / Modern User Interface licence; redistribution prohibited; credit required",
+  "parts": {
+    "eyes": 7,
+    "hair": 29,
+    "outfit": 33,
+    "skin": 9
+  },
+  "schema": 1,
+  "slices": {},
+  "source": "owner purchase of LimeZu Modern Interiors + Modern User Interface (built locally, 2026-11-09)",
+  "surfaces": {
+    "cell": 16,
+    "floor": {
+      "carpet": {
+        "col": 0,
+        "row": 16,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "concrete": {
+        "col": 12,
+        "row": 17,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "marble": {
+        "col": 12,
+        "row": 6,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "tile_check": {
+        "col": 0,
+        "row": 2,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "tile_white": {
+        "col": 0,
+        "row": 5,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "wood": {
+        "col": 0,
+        "row": 13,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      }
+    }
+  },
+  "template_version": 1,
+  "tokens": {
+    "color-accent": "#ffb066",
+    "color-accent-soft": "#ffc891",
+    "color-border": "#9a7b5a",
+    "color-border-strong": "#c9a676",
+    "color-level-crit": "#ff6b5e",
+    "color-level-ok": "#8bd17c",
+    "color-level-warn": "#ffc857",
+    "color-status-done": "#8bd17c",
+    "color-status-idle": "#c9b69c",
+    "color-status-offline": "#ff7a6b",
+    "color-status-shell": "#d3a4ff",
+    "color-status-waiting": "#ffd166",
+    "color-status-working": "#7fc8ff",
+    "color-surface": "#17110d",
+    "color-surface-hover": "#2e221a",
+    "color-surface-raised": "#241b15",
+    "color-surface-soft": "#1f1711",
+    "color-surface-solid": "#241b15",
+    "color-text-faint": "#a99276",
+    "color-text-muted": "#c9b69c",
+    "color-text-primary": "#f6ecdd",
+    "radius-control": "4px",
+    "radius-panel": "8px"
+  },
+  "version": "1.0.0"
+}

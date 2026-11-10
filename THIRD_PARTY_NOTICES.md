@@ -1000,7 +1000,9 @@ ruling 14 in `docs/DECISIONS.md` permits in-game use with credit.
 | Modern Interiors RPG Maker | `Modern_Interiors_RPG_Maker_Version.zip` | `b1f18ecd99f99435782ca33c3de56391d5b70ad5d6ffd4ae04153f82565ffbe1` | Same as full pack |
 | Modern Interiors Free v2.2 | `Modern_Interiors_Free_v2.2.zip` (+ byte-identical `(1)`) | `1e38aae8896ec14764a5484a6d6a90a5026c233560ee97865dc8751053fba7f0` | **Non-commercial only**; not used in the product |
 | Serene Village revamped v1.9 | `Serene_Village_revamped_v1.9.zip` | `22f5b68d950fd8eeafe65690daa1723c74b68ccbc3db7240c3bd4935915e9041` | CC-BY 4.0 (publisher page; no licence file in archive) |
+| Modern User Interface (full) | `modernuserinterface-win.zip` | `d0c07a24d63296b2973246aec042b941c43c17f6a4dc918fa6692973f1a1fe12` | Commercial/non-commercial use **except NFT minting**; **resale/redistribution prohibited**; credit required |
 | Character Generator 2.0 (tool) | `Character Generator 2.0 Linux Build.zip`, `Character Generator 2.0 Setup.exe` | `d1d27147db929e4ab7ee563cabc50290c0ba494f0c465504da9588653a2348a9`, `02a368bfa70e0f0e0b36f1757cdf02b85ca2d74fe01b404f8ad81129706e3075` | No licence in archive; art is paid LimeZu content — not redistributable |
+| Portrait Generator 1.5.0 (tool) | `Portrait_Generator_1.5.0_Linux_Build.zip`, `Portrait_Generator_Setup.exe` | `88023e668b38117fc1a11eeb5ee48b6ebee648f5dd92669a981c7f19d4d3d037`, `7590c0a8b566510281590587bd5143bd8430039794849b6c12d59957ae9c8855` | No licence file in archive; art is LimeZu's paid content — not redistributed |
 
 Upstream author and credit line: **LimeZu — https://limezu.itch.io**
 (Modern Interiors: https://limezu.itch.io/moderninteriors; Serene Village:
@@ -1022,6 +1024,22 @@ YOU CAN'T:
 - Credits required (limezu.itch.io)
 ```
 
+Modern User Interface `LICENSE.txt` (quoted verbatim from the purchased archive):
+
+```text
+MODERN USER INTERFACE LICENSE
+-
+YOU CAN:
+-Edit and use the asset in any commercial or non commercial project, expect NFT minting
+-Use the asset in any commercial  or non commercial project, except NFT minting
+-
+YOU CAN'T:
+- Resell or distribute the asset to others
+- Edit and resell the asset to others
+-
+- Credits required
+```
+
 Modern Interiors Free v2.2 `Modern tiles_Free/LICENSE.txt` (quoted verbatim):
 
 ```text
@@ -1037,18 +1055,21 @@ YOU CAN'T EDIT THE SPRITES AND USE THEM IN COMMERCIAL PROJECTS
 YOU CAN'T EDIT AND RESELL THE SPRITES
 ```
 
-Licence clarification recorded from the publisher's page and comment history: LimeZu
-licenses these packs under **CC-BY 4.0, not CC-BY-SA** — the itch.io information tab
-once showed CC-BY-SA by mistake and the artist corrected it. Using the art does not
-impose ShareAlike on Qubit's source code. Credit is required even for the paid
-version, and the artist asks for it **somewhere persistent** ("maybe in the Credits
-menu or at the end of your game"), not a tooltip. The free pack is non-commercial-only
-and is not used. Credit line: `LimeZu — https://limezu.itch.io`.
+Licence clarification recorded from the publisher's page and comment history: the
+paid packs (Modern Interiors, Modern User Interface, and the character/portrait
+generators) are governed by LimeZu's **own paid-art licence, not a Creative
+Commons licence**. That licence permits commercial and non-commercial use and
+requires credit to the artist, and it expressly forbids reselling or
+redistributing the assets. Credit is required even for the paid version, and the
+artist asks for it **somewhere persistent** ("maybe in the Credits menu or at
+the end of your game"), not a tooltip. The free pack is non-commercial-only and
+is not used. Credit line: `LimeZu — https://limezu.itch.io`.
 
-Serene Village carries **no licence file in the archive**; the publisher page
-states `Asset license: Creative Commons Attribution v4.0 International`.
-Any redistributed Serene Village material requires attribution, a link to the
-licence, and an indication of changes.
+Serene Village is the only CC-BY pack: it carries **no licence file in the
+archive**, and the publisher page states `Asset license: Creative Commons
+Attribution v4.0 International` (CC-BY 4.0, not CC-BY-SA). Serene Village is
+**not used** by the Office v1 theme. Any redistributed Serene Village material
+requires attribution, a link to the licence, and an indication of changes.
 
 Local divergence: none yet — no pack file has been added to the tree.
 
@@ -1064,7 +1085,14 @@ copy. This follows the upstream generator fork's explicit rule ("Never
 redistribute. Every user must buy their own copy") and LimeZu's licence
 ("you can't resell or distribute the asset to others"). In-game use is allowed.
 
-The two generator applications are **tools only and are not shipped**:
-Character Generator 2.0 (Gray Matter Studios / Legendaryswordsman2, GPLv3
-upstream) and Portrait Generator 1.5.0 (Gray Matter Studios; no licence file in
-the archive). Neither is modified or redistributed.
+The two generator applications are **tools only and are not shipped, modified
+or redistributed**: Character Generator 2.0 (Gray Matter Studios /
+Legendaryswordsman2, GPLv3 upstream; art is LimeZu's official character
+generator included with the complete pack) and Portrait Generator 1.5.0 (Gray
+Matter Studios; no licence file in the archive; art is LimeZu). They are read
+in memory as art sources. The Modern User Interface pack supplies the sampled
+palette and the portrait fallback pieces; it is not shipped either. The
+Character Generator archive is the body-side build input; the full Modern
+Interiors archive is recorded here for provenance but is not read by the v1
+build. The build slices, positions and composites pixels; it does not train or
+generate art, and no art is minted as an NFT.

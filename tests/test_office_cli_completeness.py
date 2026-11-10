@@ -58,10 +58,11 @@ from voicebridge import config as C
 
 # The expected subcommand count for `qubit office`. Pinned so a verb silently
 # dropping off the parser turns this guard RED instead of quietly shrinking.
-# 83 = the original 81 surface plus `orphans` (the orphan report) and `reap`
+# 84 = the original 81 surface plus `orphans` (the orphan report) and `reap`
 # (the orphan reaper's write half, both added with the D15 reconciliation that
-# un-jams an org blocked by a crashed turn).
-EXPECTED_VERB_COUNT = 83
+# un-jams an org blocked by a crashed turn), plus `theme` (the recipe-only
+# office theme CLI added by the office UI theme upgrade).
+EXPECTED_VERB_COUNT = 84
 
 # The dialect of typed refusal that means "no dispatch branch reached this
 # verb" — i.e. the FOUR-SITE BUG (site 3 missing). It must NEVER appear for a
@@ -143,8 +144,8 @@ _READ_ONLY = {
     "org-facts", "orphans", "penalty", "pnl", "programme", "proposals",
     "receipts",
     "reconcile", "reports", "requests", "reviews", "roster", "runway",
-    "separation", "spot-audit", "task-trail", "tasks", "tick", "tower", "trace",
-    "tree", "turn-budgets", "unsettled",
+    "separation", "spot-audit", "task-trail", "tasks", "tick", "tower",
+    "trace", "tree", "turn-budgets", "unsettled",
 }
 
 # Read-only verbs that may return a TYPED 2 (not CONFIRM_REQUIRED, not
@@ -165,8 +166,14 @@ _MUTATING = {
     "request-decide",
     "revenue", "reverse", "review", "room-create", "run", "run-begin",
     "run-finish", "run-halt", "seat-move", "settle", "task-claim",
-    "task-create", "task-review", "terminate", "turn-cap",
+    "task-create", "task-review", "terminate", "theme", "turn-cap",
 }
+
+# Family verbs are mutating in some subcommand but their BARE invocation is a
+# read-only default, so they do not carry a `--confirm` refusal. `theme`
+# defaults to `list`; `theme install`/`theme export` are the writers and each
+# validates before touching anything.
+_FAMILY_MUTATING = {"theme"}
 
 
 def _enumerate_office_verbs() -> list[str]:
@@ -188,6 +195,22 @@ def _enumerate_office_verbs() -> list[str]:
 
 
 VERBS = _enumerate_office_verbs()
+
+
+def test_theme_family_is_mutating_and_bare_invocation_is_read_only(seeded):
+    """`theme` is a mutating family; its bare form defaults to read-only list.
+
+    The classification is the contract: install/export write, so the family
+    must never be mislabelled read-only, while a bare `office theme` must still
+    be safe (it lists) and never require `--confirm`.
+    """
+    cfg, _ids = seeded
+    assert "theme" in _MUTATING and "theme" not in _READ_ONLY
+    assert "theme" in _FAMILY_MUTATING
+    rc, obj, out, err = _invoke(cfg, ["office", "theme"])
+    assert rc == 0, f"bare `office theme` returned rc={rc}: {out} {err}"
+    assert obj.get("code") != UNSUPPORTED_CODE
+    assert "Traceback" not in out and "Traceback" not in err
 
 
 @pytest.fixture(scope="session")
@@ -395,7 +418,7 @@ def test_every_verb_invokes_without_a_traceback(seeded, verb):
     assert rc in (0, 2, 3), f"`office {verb}` returned rc={rc}"
 
 
-@pytest.mark.parametrize("verb", sorted(_MUTATING))
+@pytest.mark.parametrize("verb", sorted(_MUTATING - _FAMILY_MUTATING))
 def test_mutating_verb_refuses_without_confirm(seeded, verb):
     """A mutating verb invoked bare must refuse TYPED, before touching anything.
 

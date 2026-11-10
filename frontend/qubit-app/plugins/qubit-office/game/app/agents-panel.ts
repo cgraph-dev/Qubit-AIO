@@ -35,11 +35,19 @@ export const API_PREFIX = "/agent";
  */
 export const AGENTS_PANEL_PATH = "/api/office/habblaud/agents/panel";
 
-/** The full URL, rebased onto the host's base path when the SPA is served one. */
-export function agentsPanelUrl(base?: string): string {
+/** The full URL, rebased onto the host's base path when the SPA is served one.
+ *
+ * An active theme id is appended as ``?theme=<id>`` so the route resolves the
+ * panel's atlas cells for the SAME pack the host painted. ``classic`` (or no
+ * id) adds nothing, keeping the classic request byte-identical to before.
+ */
+export function agentsPanelUrl(base?: string, theme?: string): string {
   const raw = base === undefined ? hostBasePath() : base;
   const b = raw.endsWith("/") ? raw.slice(0, -1) : raw;
-  return `${b}${API_PREFIX}${AGENTS_PANEL_PATH}`;
+  const url = `${b}${API_PREFIX}${AGENTS_PANEL_PATH}`;
+  const id = String(theme ?? "").trim();
+  if (!id || id === "classic") return url;
+  return `${url}?theme=${encodeURIComponent(id)}`;
 }
 
 /** The dashboard's base path, from the host's injected global (may be absent). */
@@ -72,7 +80,14 @@ export function readToken(win?: Window | null): string {
   }
 }
 
-/** One seat as the route serves it. Every field is copied, never defaulted. */
+/**
+ * One seat as the route serves it. Every field is copied, never defaulted.
+ *
+ * ``portrait`` and ``body`` are the active theme's atlas cells for this seat
+ * (Task 4): ``[col, row]`` or ``null`` when no theme/index lists the persona.
+ * They are data, not a claim — the panel only paints them once the atlases have
+ * actually decoded, and falls back to initials/emoji otherwise.
+ */
 export interface AgentSeat {
   slug: string;
   name: string;
@@ -82,6 +97,8 @@ export interface AgentSeat {
   room: string;
   emoji: string;
   color: string;
+  portrait: [number, number] | null;
+  body: [number, number] | null;
 }
 
 /** One division bucket. The boardroom tier has `slug === ""`. */
@@ -177,10 +194,12 @@ export async function fetchAgentPanel(opts: {
   fetchImpl?: typeof fetch;
   win?: Window | null;
   base?: string;
+  /** The active theme id (the host payload's ``id``); classic adds nothing. */
+  theme?: string;
   signal?: AbortSignal;
 } = {}): Promise<AgentPanelState> {
   const f = opts.fetchImpl ?? fetch;
-  const url = agentsPanelUrl(opts.base);
+  const url = agentsPanelUrl(opts.base, opts.theme);
   const token = readToken(opts.win);
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers["X-Qubit-Session-Token"] = token;

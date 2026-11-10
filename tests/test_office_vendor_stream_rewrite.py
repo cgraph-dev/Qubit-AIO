@@ -32,9 +32,18 @@ def test_all_built_stream_chunks_use_host_stream_url_override():
 
 
 def test_real_shipped_callsite_is_rewritten_and_preserves_upstream_fallback():
-    bundle = REPO / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/app-U4Pwh2XA.js"
-    text = bundle.read_text(errors="ignore")
-    assert "openStream(window.__QUBIT_OFFICE_STREAM_URL__||`/api/stream`)" in text
+    # Chunk names are content-hashed and change on every real rebuild, so resolve
+    # the shipped chunk by its marker instead of pinning a hash that re-vendoring
+    # is expected to rotate.
+    bundle_dir = REPO / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle"
+    bundles = [
+        p for p in bundle_dir.glob("*.js")
+        if "window.__QUBIT_OFFICE_STREAM_URL__" in p.read_text(errors="ignore")
+    ]
+    assert bundles, "no built client chunk carries the rewritten stream factory call"
+    for bundle in bundles:
+        text = bundle.read_text(errors="ignore")
+        assert "openStream(window.__QUBIT_OFFICE_STREAM_URL__||`/api/stream`)" in text, bundle
     assert "window.__QUBIT_OFFICE_STREAM_URL__" in VENDOR.rewrite_js(
         "x.openStream('/api/stream')")
 
@@ -68,8 +77,14 @@ def test_vite_dynamic_preload_paths_stay_inside_embedded_app():
 
 
 def test_shipped_main_chunk_rewrites_vite_preload_helper():
-    chunk = REPO / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/main-DND_b4_E.js"
-    assert chunk.is_file()
+    main_chunks = list(
+        (REPO / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle").glob("main-*.js")
+    )
+    assert main_chunks, "the vendored tree has no main-*.js chunk"
+    chunk = next(
+        p for p in main_chunks
+        if "new URL(d[i]" in p.read_text(errors="ignore")
+    )
     text = chunk.read_text(errors="ignore")
     # The SHIPPED artifact must carry the anchored form (see the sibling test for why
     # the assertion is on the resolution, not one spelling of it).
