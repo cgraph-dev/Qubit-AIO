@@ -13062,7 +13062,34 @@ def _platform_test_resolve(cfg: Any, platform_id: str
                 "error_code": row.get("error_code"),
                 "link": {},
             }
+    # A known Qubit account whose provider folds into a catalog platform has no
+    # row keyed by its OWN id -- ``_platform_rows`` merges it into that
+    # platform's row (``by_platform``) because one platform can carry several
+    # accounts. The id is NOT unknown (``_platform_resolve`` returned it), so
+    # reporting 404 MSG_NOT_FOUND contradicts the caller's own contract, and
+    # answering with the catalog row would report the PLATFORM's state, not
+    # this account's link. Build the account's own payload instead -- the same
+    # ``_account_platform_payload`` shape the list uses for an account row.
+    if kind == "account" and _account:
+        aid = str(_account.get("id", "") or platform_id)
+        return _account_platform_payload(
+            cfg, _account, _platform_record(_platform_store(cfg), aid),
+            _platform_gateway_running(cfg))
     return None
+
+
+def _platform_gateway_running(cfg: Any) -> bool:
+    """One gateway-liveness measurement shared by every platform row.
+
+    ``gateway_supervisor.status`` performs a bounded TCP probe, so two calls in
+    one request can disagree under load. Read it once per call site so a row's
+    ``configured``/``state`` and its ``gateway_running`` are consistent.
+    """
+    try:
+        from . import gateway_supervisor as GS
+        return bool(GS.status(cfg).get("running"))
+    except Exception:
+        return False
 
 
 def h_msg_test_live(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
