@@ -12,7 +12,9 @@
 # sha256sum/shasum/openssl + tar for model assets. Keys (optional, for
 # complex/web answers): DEEPSEEK_API_KEY and PERPLEXITY_API_KEY in the
 # config dir printed by --dry-run (new installs: $QUBIT_HOME/voice/config;
-# existing XDG installs keep ~/.config/qubit-voicebridge read-old).
+# existing XDG installs keep ~/.config/qubit-voicebridge read-old). The file
+# is <config dir>/.env; for the read-old XDG layout that is
+# ~/.config/qubit-voicebridge/.env.
 # See .env.example.
 set -euo pipefail
 
@@ -436,6 +438,7 @@ print_layout() {
     printf '    models    : %s\n' "$MODELS"
   fi
   printf '    config    : %s/voice.yaml\n' "$CONFIG_DIR"
+  printf '    env       : %s/.env (provider keys; never committed)\n' "$CONFIG_DIR"
   printf '    state     : %s\n' "$STATE_DIR"
   printf '    cache     : %s\n' "$CACHE_DIR"
   printf '    launcher  : %s/qubit\n' "$LAUNCHER_DIR"

@@ -34,8 +34,14 @@ def test_installer_and_examples_use_canonical_paths():
         assert not re.search(
             r"(>>\s*|key_env[\"']?\s*[:=]\s*|_env:\s*)['\"]?~/.hermes", text), \
             f"{rel}: configured operator-Hermes path"
-        assert "~/.config/qubit-voicebridge/.env" in text, \
-            f"{rel}: must document the canonical env file"
+        # The canonical env file is documented in ONE of the two supported
+        # layouts: the new tree ($QUBIT_HOME/voice/config/.env) or the read-old
+        # XDG one (~/.config/qubit-voicebridge/.env, kept for migrations). The
+        # concrete path depends on the live layout, so match the shape.
+        assert re.search(
+            r"(?:QUBIT_HOME|\$HOME|~)[^\s'\"]*/(?:voice/)?config/\.env"
+            r"|~/\.config/qubit-voicebridge/\.env",
+            text), f"{rel}: must document the canonical env file"
     defaults = (REPO / "voicebridge" / "config.py").read_text()
     assert "~/.hermes/.env" not in defaults, \
         "no default credential path may point at the operator install"
@@ -68,6 +74,14 @@ def test_completions_carry_qubit_identity_only():
 
 
 def test_orchestrator_hints_use_canonical_paths():
-    text = (REPO / "voicebridge" / "orchestrator.py").read_text()
-    assert "set DEEPSEEK_API_KEY in ~/.config/qubit-voicebridge/.env" in text
-    assert "set PERPLEXITY_API_KEY in ~/.config/qubit-voicebridge/.env" in text
+    import ast
+
+    src = (REPO / "voicebridge" / "orchestrator.py").read_text()
+    # Read the hints as RENDERED strings. Adjacent literals are concatenated
+    # at compile time, so the PERPLEXITY hint is split over two source lines
+    # for width while the operator sees one string.
+    rendered = [n.value for n in ast.walk(ast.parse(src))
+                if isinstance(n, ast.Constant) and isinstance(n.value, str)]
+    joined = "\n".join(rendered)
+    assert "set DEEPSEEK_API_KEY in ~/.config/qubit-voicebridge/.env" in joined
+    assert "set PERPLEXITY_API_KEY in ~/.config/qubit-voicebridge/.env" in joined
