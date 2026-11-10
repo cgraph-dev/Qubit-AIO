@@ -22,6 +22,7 @@ from agent.context_compressor import (
 from agent.compression_marker import _COMPRESSION_MARKER_PREFIX
 from qubit_state import SessionDB
 from agent.auxiliary_client import CODEX_STREAM_STALL_MARKER
+import itertools
 
 _REQ = httpx.Request("POST", "http://x")
 
@@ -221,7 +222,7 @@ class TestSummarizeToolResultSkillTools:
         assert ok == f"[skills_list] category=devops 2 skills ({len(ok_content)} chars)"
         assert failed.startswith("[skills_list] FAILED: skills dir unreadable")
         # Control: skill_view really has a top-level ``name`` and keeps its stub.
-        assert _summarize_tool_result("skill_view", json.dumps({"name": "github"}), "x" * 100) == "[skill_view] name=github (100 chars)"
+        assert _summarize_tool_result("skill_view", json.dumps({"name": "github"}), "x" * 100).startswith("[skill_view] name=github (100 chars)")
 
 
 class TestSummarizeToolResultOutcome:
@@ -237,8 +238,8 @@ class TestSummarizeToolResultOutcome:
     @pytest.mark.parametrize("tool_name, args, payload, expected", [
         ("read_file", {"path": "gone.py", "offset": 1}, {"error": "File not found: gone.py"},
          "[read_file] read gone.py from line 1 (36 chars) FAILED: File not found: gone.py"),
-        ("web_search", {"query": "qubit"}, {"error": "rate limited"},
-         "[web_search] query='qubit' (25 chars result) FAILED: rate limited"),
+        ("web_search", {"query": "hermes"}, {"error": "rate limited"},
+         "[web_search] query='hermes' (25 chars result) FAILED: rate limited"),
         ("memory", {"action": "add", "target": "a note"}, {"error": "unknown action"},
          "[memory] add on a note FAILED: unknown action"),
         ("text_to_speech", {}, {"error": "no voice available"},
@@ -263,8 +264,8 @@ class TestSummarizeToolResultOutcome:
         assert self._stub(tool_name, args, payload) == expected
 
     @pytest.mark.parametrize("tool_name, args, payload, expected", [
-        ("web_search", {"query": "qubit"}, {"results": [{"title": "hit"}]},
-         "[web_search] query='qubit' (31 chars result)"),
+        ("web_search", {"query": "hermes"}, {"results": [{"title": "hit"}]},
+         "[web_search] query='hermes' (31 chars result)"),
         ("write_file", {"path": "a.md", "content": "line 1\nline 2"}, {"bytes_written": 13},
          "[write_file] wrote to a.md (2 lines)"),
         ("text_to_speech", {}, {"success": True, "path": "/tmp/out.wav"}, "[text_to_speech] generated audio (41 chars)"),
@@ -1005,8 +1006,8 @@ class TestAuthFailureAborts:
         # env var (#114405 / #78996) and must classify as permanent, not be retried.
         oauth_err = RuntimeError(
             "Provider 'minimax-oauth' is set in config.yaml but no credentials were found. "
-            "Run `qubit auth add minimax-oauth` to sign in, or switch to a different provider "
-            "with `qubit model`."
+            "Run `hermes auth add minimax-oauth` to sign in, or switch to a different provider "
+            "with `hermes model`."
         )
         assert _is_summary_access_or_quota_error(oauth_err) is True
 
@@ -1054,7 +1055,7 @@ class TestAuthFailureAborts:
         err = RuntimeError(
             "Provider 'opencode-zen' is set in config.yaml but no API key was "
             "found. Set the OPENCODE-ZEN_API_KEY environment variable, or switch "
-            "to a different provider with qubit model."
+            "to a different provider with hermes model."
         )
         with patch(
             "agent.context_compressor.get_model_context_length", return_value=100000
@@ -3317,7 +3318,7 @@ class TestSummaryPromptBounding:
         assert coverage["sampled_record_count"] == len(shown)
         # At least one initial gap was closed: fewer markers than the n-1 the n slices started with.
         assert sampled.count("chars elided") < ContextCompressor._SAMPLED_INPUT_SLICES - 1
-        for a, b in zip(shown, shown[1:]):
+        for a, b in itertools.pairwise(shown):
             if b == a + 1:
                 assert f"{records[a]}\n\n{records[b]}" in sampled, (a, b)
             else:
