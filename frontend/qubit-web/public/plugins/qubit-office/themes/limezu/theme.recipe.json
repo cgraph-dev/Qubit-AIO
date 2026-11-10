@@ -1713,6 +1713,41 @@
   "schema": 1,
   "slices": {},
   "source": "owner purchase of LimeZu Modern Interiors + Modern User Interface (built locally, 2026-11-09)",
+  "surfaces": {
+    "cell": 16,
+    "floor": {
+      "carpet": {
+        "col": 0,
+        "row": 16,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "concrete": {
+        "col": 12,
+        "row": 17,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "marble": {
+        "col": 12,
+        "row": 6,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "tile_check": {
+        "col": 0,
+        "row": 2,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "tile_white": {
+        "col": 0,
+        "row": 5,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      },
+      "wood": {
+        "col": 0,
+        "row": 13,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Floors_16x16.png"
+      }
+    }
+  },
   "template_version": 1,
   "tokens": {
     "color-accent": "#ffb066",
