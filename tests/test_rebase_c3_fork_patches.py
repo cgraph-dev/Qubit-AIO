@@ -166,9 +166,11 @@ def test_toolsets_core_bundle_and_client_surfaces(runtime_on_path):
     # toolset); the fork patch must keep carrying ``desktop_ui`` and ``project``.
     assert ts.CLIENT_SURFACE_TOOLSETS == frozenset({"project", "desktop_ui", "catalog"})
     names = ts.get_toolset_names()
-    assert "setup" in names
+    # ``setup`` was dropped by the upstream re-pin (4f032e270: the role-reserved
+    # setup surface is gone); the client surfaces and the fork's own bundles stay.
     assert "desktop_ui" in names
     assert "project" in names
+    assert "catalog" in names
     assert ts.resolve_toolset("desktop_ui")
     src = (RUNTIME / "toolsets.py").read_text(encoding="utf-8")
     assert "_HERMES_CORE_TOOLS" not in src
