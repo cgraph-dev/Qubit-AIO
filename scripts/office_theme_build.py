@@ -41,8 +41,10 @@ tiers (the frame is ``size x 2*size``).
 To review the calibration against the real sheets, ``--calibrate`` writes one
 labelled frame-grid PNG per body-view sheet (body / hair / eyes / outfit) with
 row/column labels, separators and a green outline on every currently calibrated
-frame. It is read-only on the purchase zips and defaults to
-``<out>/calibrate`` (use ``--calibrate-out DIR`` to keep it elsewhere).
+frame. It is read-only on the purchase zips and defaults to the sibling
+``<out>.calibrate`` so the grids never land inside a pack directory and a
+later ``--check`` stays clean (use ``--calibrate-out DIR`` for an explicit
+location).
 
 NO DUPLICATED CONTRACT LOGIC
 ----------------------------
@@ -983,13 +985,23 @@ def _labelled_grid(sheet: Image.Image, *, part: str, size: int,
     return Image.alpha_composite(grid, overlay)
 
 
+def default_calibrate_out(out: os.PathLike | str) -> Path:
+    """The default ``--calibrate`` directory: a sibling of the pack.
+
+    It must never be *inside* the pack: ``compare_packs`` walks every file and
+    would report the grids as ``extra``/``missing`` on the next ``--check``.
+    """
+    out_path = Path(out)
+    return out_path.with_name(f"{out_path.name}.calibrate")
+
+
 def _calibrate(args: argparse.Namespace,
                layers: Mapping[str, List[Sheet]]) -> int:
     """Write one labelled frame-grid PNG per body-view sheet."""
     size = args.size
     frame_w, frame_h = size, size * 2
     out = Path(args.calibrate_out) if args.calibrate_out \
-        else Path(args.out) / "calibrate"
+        else default_calibrate_out(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
     parts: Dict[str, List[Dict[str, Any]]] = {}
@@ -1098,10 +1110,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
              "sheets instead of building a pack (read-only on the zips)")
     parser.add_argument(
         "--calibrate-out", default=None,
-        help="directory for --calibrate output (default: <out>/calibrate)")
+        help="directory for --calibrate output "
+             "(default: <out>.calibrate, beside the pack)")
     parser.add_argument("--size", type=int, default=32, choices=(16, 32, 48),
                         help="tile size (default 32)")
     args = parser.parse_args(argv)
+    if args.calibrate_out and not args.calibrate:
+        parser.error("--calibrate-out requires --calibrate")
     args.out = args.out or str(default_out(args.source))
 
     try:

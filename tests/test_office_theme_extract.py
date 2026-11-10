@@ -511,11 +511,45 @@ def test_calibrate_defaults_beside_the_theme_not_in_the_repo(
     root = _make_purchase(tmp_path / "src")
     assert B.main(["--source", str(root), "--calibrate",
                    "--size", "32"]) == 0
-    out = home / "office" / "themes" / "ui-office" / "calibrate"
+    out = home / "office" / "themes" / "ui-office.calibrate"
     assert (out / "body_01.png").is_file()
     assert (out / "calibrate.json").is_file()
+    # The sibling is beside the pack, never inside the pack directory.
+    assert not (home / "office" / "themes" / "ui-office" / "calibrate").exists()
     # No art or grid was written inside the checkout.
     assert not (REPO / "calibrate").exists()
+
+
+def test_default_calibrate_keeps_a_built_pack_check_clean(
+        tmp_path, monkeypatch):
+    root = _make_purchase(tmp_path)
+    out = tmp_path / "pack" / "limezu"
+    monkeypatch.setattr(B, "_default_personas", lambda: list(PERSONAS))
+    assert B.main(["--source", str(root), "--out", str(out)]) == 0
+    assert T.validate_theme(out) == []
+
+    # Default --calibrate against the *built pack*: the grids go to the
+    # sibling, not inside the pack.
+    assert B.main(["--source", str(root), "--out", str(out),
+                   "--calibrate"]) == 0
+    grids = tmp_path / "pack" / "limezu.calibrate"
+    assert (grids / "body_01.png").is_file()
+    assert (grids / "calibrate.json").is_file()
+    assert not (out / "calibrate").exists()
+    assert not any(path.name == "calibrate" for path in out.iterdir())
+
+    # And a rebuild from the same source is still identical.
+    assert B.main(["--source", str(root), "--out", str(out),
+                   "--check"]) == 0
+
+
+def test_calibrate_out_without_calibrate_is_a_usage_error(tmp_path, capsys):
+    root = _make_purchase(tmp_path)
+    with pytest.raises(SystemExit) as info:
+        B.main(["--source", str(root), "--calibrate-out",
+                str(tmp_path / "calibrate")])
+    assert info.value.code == 2
+    assert "--calibrate-out requires --calibrate" in capsys.readouterr().err
 
 
 # ------------------------------------------------------------- real purchase
