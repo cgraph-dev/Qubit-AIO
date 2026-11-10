@@ -208,107 +208,107 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/ar/messages.json",
-    "qubit_sha256": "113e0143d8ebb06b0a2cc64de000e660012a517167fd60c5d2e82424b8405366",
+    "qubit_sha256": "eac33c900aac4ec59235b68c148b468f12cb73812d52fe8321b2045022c0e442",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/da/messages.json",
-    "qubit_sha256": "870eac65fdc4307da0ed53f88a00130b4e682f48d5123cc5293ed5123f9a8178",
+    "qubit_sha256": "8778bd0cbe117ba2048c9d01bba78bead4aada6d45932975c08b60cb160a58cf",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/de/messages.json",
-    "qubit_sha256": "23fce3cf1884c6b8cb91813eb7e373e19bad19dc78deb33c47109eb91e9c99e1",
+    "qubit_sha256": "b56af28ea568ef882937c0318c0322ecac19d960e0373d4c7c9129d8aa208fae",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/en/messages.json",
-    "qubit_sha256": "9397b1c38c208a6450ace2590a00af0baf3ee8b59c7b2d73afe79377ddc365b6",
+    "qubit_sha256": "8931a99b3f011b42081c7b34a944ab9649a2169059a6b8fdf8babb73c5e95257",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/es/messages.json",
-    "qubit_sha256": "ea24079d178f8c35b8067e5dbb7dae1849466871c24004eef873021e6c7a1929",
+    "qubit_sha256": "d2402cad1ae749b24ebe3642f65a77b2ac7ceee88037aca4718e50d728add522",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/fr/messages.json",
-    "qubit_sha256": "2a53a0c8988b678d0a3d0667d1a94e01e2a340f1fc0aa7850f2c60708e85a32a",
+    "qubit_sha256": "2fd257c89927217ba615d3d71a57f4dc3a548ec0fd153c9f8163cb8a5cd91380",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/hi/messages.json",
-    "qubit_sha256": "ed35814de2b607591a23a779ae356ef193fded2a546ec03c7d59922e16c0c6fc",
+    "qubit_sha256": "147b60d523362f4d5e7c01ec1b63acfc90aa841df9ba9c16cb7fac0a45e59877",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/id/messages.json",
-    "qubit_sha256": "a8e64d3bb973b49b93e9efb5cc625bfd95979d3acb4c0d455e842f040edb9084",
+    "qubit_sha256": "7774ea646729277fc4773df2c24db9cc283d46b3fdd44369e257706ae33ca542",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/it/messages.json",
-    "qubit_sha256": "ec7b9a7c12edeac68634ef5c16fecedaa2c61d63663094243b07a019875423ee",
+    "qubit_sha256": "6dd5529c76384a6f41a83fadb3b3a837cc6dfee22bfdc2ceaabf22d74314a8f8",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/ja/messages.json",
-    "qubit_sha256": "25617b16fd7d14de998b6f92bbe15c0a6e5690d52e0a79a3c3e8bab81cb792a2",
+    "qubit_sha256": "65a730ba66b9e87752c6ee098d6c96705e0fad156545567aa1f6e016da029404",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/ko/messages.json",
-    "qubit_sha256": "643b9771152e77930275c5da7c4834d1e15f1a51ea44412aa5c0d4182fd94dcb",
+    "qubit_sha256": "e029d49de753bc13f56765c3dbbc2c0ef4fd5548ffca7985cc2c2e005444244b",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/nl/messages.json",
-    "qubit_sha256": "e596deea88e5babb5092e3495e9f4bf4d27fd59dd517877f7f04f05e34182db8",
+    "qubit_sha256": "f464c03e91c6aa9930d443101d5e080b6742c32d80e4f6b3df67146866cfd42c",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/pl/messages.json",
-    "qubit_sha256": "5756a6535fdd8f45db7b309e656927b9b6f7487ec4596ba87c3f8654a8f34774",
+    "qubit_sha256": "9c3006b5dd5045fbaa471d10e1d2339e429c696746b98e9b57b68a3849441b48",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/pt_BR/messages.json",
-    "qubit_sha256": "399322e363d72280259fa9c33c6194f076da4bc4745237beeeb64dc8e127b039",
+    "qubit_sha256": "0abf7a8301006b8ed3ecbf868faf94cfe62b35a0c694488449f30800b0bcc1ff",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/ru/messages.json",
-    "qubit_sha256": "ea80bdcd23048a626dd8727d8049680d2e4197172e21fd18101c7eb8f83d9190",
+    "qubit_sha256": "640c3767a333a8809b3d7b74f628dc22dc69eb0ff58cd4ddf661620b3dfd7439",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/th/messages.json",
-    "qubit_sha256": "a7c61fc43a5dc611ae33ce3ddc8ae84877abe83144f98d2f91f685c86e13a121",
+    "qubit_sha256": "ce70f4509458bb7dafda77299d69b5ec15ebf0032ba8a6c92ea6df5864e82c74",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/tr/messages.json",
-    "qubit_sha256": "263232405f32b5e16204a32e0f56b9687d9104a507ea2537d3b61f04ee9d3f40",
+    "qubit_sha256": "2345de7d3b4233a242b02b171ba150be9247639022415affee9f7af2e0c9a9da",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/uk/messages.json",
-    "qubit_sha256": "68244e07bee86b2f14005e73a4a8a6985cc4977fcd3e4af269c2dc176e736604",
+    "qubit_sha256": "a468d5918c56fe75c46c65c22c346d25fd30a73e15992fac543322681fb7af45",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/vi/messages.json",
-    "qubit_sha256": "189519886b99d4e8611b92cbdf19743d9d688179a7cfe9f8d3c89256a9240cea",
+    "qubit_sha256": "6ac6f116ca20dc3294699d8491b02afe08fd5429401fc19f8d8a10049cf0e0f6",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/zh_CN/messages.json",
-    "qubit_sha256": "8bc902398ff24233cba4f6374e9caf4d1aa9a7e1252dfa7af67f94908bd05180",
+    "qubit_sha256": "b02158d45e06f978638ea49c2ffa22f6e3b9f9f020d4abd34ed00efb1a24f574",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/_locales/zh_TW/messages.json",
-    "qubit_sha256": "e4ebc92742a04a43471120d32d7dfe05b355082cc0f3a4d5bde414ee87322b25",
+    "qubit_sha256": "99318d5794a4a98c1907596b8cdf6a69555d233c937b007e3a2364160134386e",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -1578,7 +1578,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/fonts.css",
-    "qubit_sha256": "ee5f5c8920d1cc52137aadbcea1aa8bb2a68a92a2a2e80405e42fc302d62181e",
+    "qubit_sha256": "27470f85dc52b3171858e47b018a1b05fe1874593a8559f1cf04fa48666d4fe0",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -1728,107 +1728,107 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/ar.mjs",
-    "qubit_sha256": "9f99e749adf964ea9f9ab186bbcfa787216e6d417031cf57d36d4802e3d213ff",
+    "qubit_sha256": "6123912eaf01b677cb914b8a0cdbc685e71550ce0c99bc4fa61f81affebdb739",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/da.mjs",
-    "qubit_sha256": "56b5acabb2f0330839663bc9c2581c1b4d2d329330116bb102143b2f5ce97e5e",
+    "qubit_sha256": "07c715322bc584b86985c6ae3d12cdeab2b49eedf95c5eb47eadac81a3361059",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/de.mjs",
-    "qubit_sha256": "308e7652716d06abd942a340e3b9a9398833890bb712050ebf135992b7365c10",
+    "qubit_sha256": "675d62ef72186670b5639de0a57d8777eb9c7657aae20a2170fc38c286818984",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/en.mjs",
-    "qubit_sha256": "2e41f2984238ef047338e49165a5230ff54825a0354c42052cea6d0b7bb11929",
+    "qubit_sha256": "cc6b58ca3b49c8b05afe0cc1cdaedd8b9f2452c5b09c186f975649d31fa6cf44",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/es.mjs",
-    "qubit_sha256": "15372ec74dd099e316e8899e8ca86b4b60fcc447ad69c03093d99ca5b38c8082",
+    "qubit_sha256": "a2dc272210a63a21454ace90f10379e54fdb4bdff1a47117c68a12fce54e931e",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/fr.mjs",
-    "qubit_sha256": "34b81476f55838c34b98c6e0a8462f1d297668f9f4de351869241f40c47a01a7",
+    "qubit_sha256": "f4f8f144e068a2bd4dbb47be2346f992ca6420b65f617e784039915216254810",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/hi.mjs",
-    "qubit_sha256": "4d121487337774ff961765aeb2d0450ce5fecb5b8fa807eeda26c9b94b580d8c",
+    "qubit_sha256": "0a4bb1c05434dd78feb47453db3567d6f55b7cdbe7c199d6488598effe56abcf",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/id.mjs",
-    "qubit_sha256": "ce49717fdbf5136e90af99076a47bdaa7645d36c88ee53df77bce59807b57198",
+    "qubit_sha256": "4854b5fb9acb2e2551f69ec808d9db49964dacb60bb6b7a714faa4d9dcfbf5c7",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/it.mjs",
-    "qubit_sha256": "5487c672ad1d8fcb64ac1c0106a263c19a93555a4f445bf99477ece2ce0c4b37",
+    "qubit_sha256": "b6c0f87940d060a8d94eb6312e7f1cb128cce98482a5cc858c18374eb1a1b478",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/ja.mjs",
-    "qubit_sha256": "0a652fd6af261ef02a0c22f23fd90c299172038a7bf510f1d538773b06298f11",
+    "qubit_sha256": "5d03ac4fb7a54a62a9d443495d78b470e6a1de37f9923da2aac3104a9f334a0a",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/ko.mjs",
-    "qubit_sha256": "6e6c2ea35155a3ec1de68f208e463ee8158c147d1a774040beb62d91cae8abef",
+    "qubit_sha256": "0d8e543d77e36ab88d128a2c867d68f5a8e53493a8bb9fa308b32677abf029aa",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/nl.mjs",
-    "qubit_sha256": "9bbbb45494a414e55f73240b16e71c719d06f7a398da5bd6191d970319352268",
+    "qubit_sha256": "a6a9f930c918ad4faf27ff274fa271e71d900db3ab08d32c733f7a2f500ed6f5",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/pl.mjs",
-    "qubit_sha256": "46cf4396b4c158b2bd3e30f0bcde3a782cb59a624740e957245c2f4170a02f5e",
+    "qubit_sha256": "ae234784e6712d384dfd72ef64c1e38fa1e4448eeb7f303e2c7b1066222b964b",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/pt-BR.mjs",
-    "qubit_sha256": "203c08d6ef28abc1eac6da8a4811c04fa89c74c5bdcd7deffb40b5f3cf34eeef",
+    "qubit_sha256": "7ed7314184a681f8ff6777c1cd50b22789b5380fe12333967c5f9dacae5d60c2",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/ru.mjs",
-    "qubit_sha256": "4bb96d3bba0ad2289f8104edb5e8df3cbcc7e58fa634c8beec53fac21a34e89f",
+    "qubit_sha256": "3922089dcdab23520a3f12dc0e18796daf9d4f4b86bd6088f616867026588a20",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/th.mjs",
-    "qubit_sha256": "56fe5e3584393d76e8e8c3082503ddc69f06be3906af0feaa04dd0601bf92be1",
+    "qubit_sha256": "05ff095b0b68ae511c9efbf052910df8704b30515994d9af0125559fd1367447",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/tr.mjs",
-    "qubit_sha256": "130f2de31336dbc8f07dc3d0ce2b895a11a52391d0f665653ad86dfe78825722",
+    "qubit_sha256": "d64338b3eee6edb713e93be0d4d1b27ee063fc13a13aa09b6544f7eaad3171a4",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/uk.mjs",
-    "qubit_sha256": "fed5e9b8210239eacb5ff6ac97d8546010f90fde4efb0e589a135f1ab59279d1",
+    "qubit_sha256": "d041f6faffd3b6a27bf99ad4f273fe7ebbcc66f7975a1eb2ab162bc3876062dc",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/vi.mjs",
-    "qubit_sha256": "713863f9614754989480b643e6f554b12525e7acfbd4a3ab4f321780d6fcfe85",
+    "qubit_sha256": "fd2b90ee97e4c6d4844978b4521c7e99b5205321ffc3e8320926f87f9057f8c5",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/zh-CN.mjs",
-    "qubit_sha256": "f12aba2bf809c0324742ca0246b1eddd21ef9128d726f5eadd37170aadfe0a70",
+    "qubit_sha256": "29686c2c0172e2f9e43920aa438fbdfac28d36bf173ed1c37ba8adec740040db",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/lib/locales/zh-TW.mjs",
-    "qubit_sha256": "eb501634437a285601469d5cf9cac732a9081ef788dc10ddf69a2e0f8ee41239",
+    "qubit_sha256": "29ef4457641f009074369b700cc7ab5b76a556d48e44ffc665c777c101a352b2",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2513,7 +2513,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/sidepanel-preview.html",
-    "qubit_sha256": "2ff392163522d4cb9a9e989642c2eb47f475282b32effaa2db076f49df1f5fc1",
+    "qubit_sha256": "1f2abdf13d7459c73d0eff275eac7d284461a6e22f7a6fcc227237ab4ab20642",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2523,12 +2523,12 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/sidepanel.css",
-    "qubit_sha256": "e9419236524b5a599fa5a34649c9b46ac2aa1e8006f36406c2d61cffc18abad3",
+    "qubit_sha256": "c095977ec78ef111e6c70a509237e7a1bd6d9b6584ebb726e34c85720e1aacd1",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-browser-ext/extension/sidepanel.html",
-    "qubit_sha256": "e32a65ee4e1dbcd556eb456efd6086e18010bbce97bb9fbb4eb5d689f613d3d2",
+    "qubit_sha256": "419728ab644dc711a3e458e3f1da3554f01c59ea696ae77d2f000105f69881bd",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2663,17 +2663,17 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/AgentsPanel.tsx",
-    "qubit_sha256": "d2d698f87f066d343aa317ae7e02d4f0b942f0df9a21c0e4506322c8f66356af",
+    "qubit_sha256": "2cc7eb16ccc79a0edc2fe3634f3c4e9a2ea84704813b33909c4f8b692558349f",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.test.ts",
-    "qubit_sha256": "fdadbaa8a4d1b5c1d1d56ec52a92cb95046d7dd46de42dd176ebb434c2fa4358",
+    "qubit_sha256": "fb2faaafa145a5952d5927998c130b66db018f6ce1c1045d929746667ca46f21",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx",
-    "qubit_sha256": "c5262bf8c7869237309bc533527be15194dac574ab5b85c30455cf9af1ddb543",
+    "qubit_sha256": "dc3b667fafe8ef386a432c11246e7c77b91067865844f9c4af63e81a54f9c14d",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2682,13 +2682,18 @@
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
+    "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/agents-panel.focus.test.ts",
+    "qubit_sha256": "808c10e5ae62e1d2ffa943714676442dae037d9b22c943b1d63e1c622406e7d5",
+    "role": "Qubit overlay plugin asset (manifest/bundle)."
+   },
+   {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/agents-panel.test.ts",
-    "qubit_sha256": "a35010336b8dbe0424637adb65d333b0af5ae9f611c5191f8505686d39984276",
+    "qubit_sha256": "212b37aef7f56a5cf0d599d05a83b564ec2c1f87510b0c6837d4c207a383e28b",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/agents-panel.ts",
-    "qubit_sha256": "920e97c7c5db9e6cefb9d0bfbf8d39e29addae45aa1a9644ca8fc2739f313ecc",
+    "qubit_sha256": "229a1e20ec976e95126c9ab0428433c33f20d6b1d7000dbb38e1ba311f79feae",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2699,6 +2704,11 @@
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/api-bridge.ts",
     "qubit_sha256": "8822920c01f5f34d58eab1b4869aff15ed57243ec84894b8249e583204b407e5",
+    "role": "Qubit overlay plugin asset (manifest/bundle)."
+   },
+   {
+    "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/dock-layout.test.ts",
+    "qubit_sha256": "7228d17f381df94a5ddce7147acbf00d46f7d82a9ff565e1eafe2d2702e4af57",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2713,17 +2723,22 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/office-app.ts",
-    "qubit_sha256": "538ad459108405bff51193a765f354d7dbacc69050330ae964c73c0de47b5cbd",
+    "qubit_sha256": "d7d30b56881a5c66dd1441f947089d6e55cfdb33ad7b7af74fa8fc54f4fb270e",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/office-menu.test.ts",
-    "qubit_sha256": "ca1f254e7bc7c2612d81613ae434fa50232647e7d0146b7073d32ed4c80a27a1",
+    "qubit_sha256": "7ade506ebf0233e148aa597df20c41ff8c6bb6d767c92fc1496ff0f420d75659",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/office-menu.ts",
-    "qubit_sha256": "56e147742326bd74742c3c5d48b49afbd96e84b59bbabd18ddf2c9e523d3ea69",
+    "qubit_sha256": "41fbda41cfbeb461e4040a5fdaf85a8b1537f1f9353bb4ecc2b589cbff8dbaa5",
+    "role": "Qubit overlay plugin asset (manifest/bundle)."
+   },
+   {
+    "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/office-theme.ts",
+    "qubit_sha256": "77f8689cb749c788b4e85f4a0fff6e5ee0750da3c8875fc236eaf342a43123f9",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2788,12 +2803,12 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/styles/game.css",
-    "qubit_sha256": "09499d9cd394d7c9941e0bfa9b43fda04d7e3ac5518f61b4dfbe899270600cad",
+    "qubit_sha256": "9063822bfd80402475c0506781008c720ae1eb126e77251c36acf71899e129da",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/styles/tokens.css",
-    "qubit_sha256": "9385431db50b5ee7e89ae2d9a60bfa059422b89359c145f994104632f379868a",
+    "qubit_sha256": "12aa60f5bf4fdda6402869d409ecbf03135e1865825015a8818b70f67cf92339",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2883,7 +2898,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/PROVENANCE.json",
-    "qubit_sha256": "8e0e5f1985b97abca5f0d5cd8550457c5e10fd7ba2271b10dd8f5baa9fd43956",
+    "qubit_sha256": "4190cbd8dfc7adfa0b84796ffe09cd47d27118ff777d1b7a99f6e5e900e4bfbd",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -3092,18 +3107,18 @@
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
+    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/app-0Gqa7aIn.js",
+    "qubit_sha256": "f6b63a3a95b0e4ba28a423a17351882ee152dd5c47b313314c000677ed39104d",
+    "role": "Qubit overlay plugin asset (manifest/bundle)."
+   },
+   {
     "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/app-BW61bUik.css",
     "qubit_sha256": "2be3803177e97e74f62009495ad23c5f49d10ad3e544ed0987552fd90b2731f3",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
-    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/app-U4Pwh2XA.js",
-    "qubit_sha256": "367365c9200c34898ceaa7e74c558031f9d92b6eb543094341ea71cfaeb27c9b",
-    "role": "Qubit overlay plugin asset (manifest/bundle)."
-   },
-   {
-    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/daystats-CUw1NUBG.js",
-    "qubit_sha256": "2c528ab63470a371474bdc47f683ab397ca903f1f05d0dbee6d6c45dd14cf941",
+    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/daystats-I5nXHlX6.js",
+    "qubit_sha256": "89fc6a24067ee7fbda4e729c60cbea49f671f467823b32839eb5b42245eb719f",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -3122,8 +3137,8 @@
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
-    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/main-DND_b4_E.js",
-    "qubit_sha256": "e823327b4310ed7287dc0612f704fa085b094d4c0d31b0f30cdcdcfec5d0fba3",
+    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/main-FPel1-E-.js",
+    "qubit_sha256": "2c161ca3d675bc010e93a9c5e9fa26116dd504d22a22a9772c14ac7e69835e66",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -3247,18 +3262,18 @@
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
+    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/ptypane-BOKFnEaN.js",
+    "qubit_sha256": "008b07a31ea54ac0c522f40e7b4f5d8bea8ecc716bc6094fb5ddbf23da34bee3",
+    "role": "Qubit overlay plugin asset (manifest/bundle)."
+   },
+   {
     "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/ptypane-BrP-ENHg.css",
     "qubit_sha256": "0e5386f16cb4be78a2fe911e014a810da76ea2db47d8c8b2a966516b2fd5270b",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
-    "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/ptypane-DxPqTDKo.js",
-    "qubit_sha256": "60fa0392fda300bf4c8e8426c5e78540547d4e55c5452ad35b5ddcb9e36e6054",
-    "role": "Qubit overlay plugin asset (manifest/bundle)."
-   },
-   {
     "qubit": "frontend/qubit-app/plugins/qubit-office/habblaud/index.html",
-    "qubit_sha256": "f10757687bb60efd5415aaae333ad9277c73eb41ad8b6daede197597587f65df",
+    "qubit_sha256": "ce7e36de5894bd815de214f8610f332c00a0ddbb24e617388aa178226cea1cd7",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -3288,12 +3303,12 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/qubit-office.game.css",
-    "qubit_sha256": "eb0a9f547e67c1a0f133bb574600279092dfa6dd9a8e3f0e528ab962ffbed4a7",
+    "qubit_sha256": "fe74bca45bd2d76330bf3101ec7840abfc4e1e5bbf8c1f120bbb47dfc96fb590",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/qubit-office.game.js",
-    "qubit_sha256": "64c777a7b26ddb5993fc1c79d6f5cbcfcfd29613aee556ff861228a3b15f15c8",
+    "qubit_sha256": "085063efb935ed02e5121ece8c042894af63aa371e118612cfdc6addf1e2bfa5",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -4302,10 +4317,10 @@
    "upstream_sha256": "bc8a217831c6f66d36a8925ea612414f9d5f4c882c64287e5e604041b5dbfd6b",
    "qubit": "frontend/qubit-web/src/i18n/index.ts",
    "qubit_sha256": "5a0226f44c76476a40831e0b2e596325082f5a4a29a91dc6a129f4b36ac58c21",
-   "patch": null,
-   "reason": "Hermes React dashboard source; vendored byte-identical as the Qubit baseline.",
+   "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
+   "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "bc8a217831c6f66d36a8925ea612414f9d5f4c882c64287e5e604041b5dbfd6b",
-   "affected_regression_test": "tests/test_qubit_vendor8tf.py"
+   "affected_regression_test": "tests/test_dashboard_branding_wave1.py"
   },
   {
    "scope": "hermes-agent/web",
@@ -4496,7 +4511,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
    "qubit": "frontend/qubit-web/src/lib/api.ts",
-   "qubit_sha256": "1b528dda8a5ad33d79cdbe701bde56f5f7dd72c5467b7d1ac1c387722d15ed99",
+   "qubit_sha256": "825c453c770e9e95368474cefafb4b212609a2499eb8887c4a507c106ad2045a",
    "patch": "wave2/public-rebrand-api-prefix + Qubit config confirm flag",
    "reason": "Qubit-owned public API prefix (/api/<x> -> /agent/api/<x>) plus a confirm flag on saveConfig so the Settings page can complete the confirm-gated settings write. No vendor business logic changed.",
    "upstream_blob_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
@@ -5705,7 +5720,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "897737151545182966b07b32a044c5f6ee9df79923f5982d6821c1b911526f5e",
    "qubit": "frontend/qubit-web/src/pages/McpPage.tsx",
-   "qubit_sha256": "8b2068bfb534ff899e56093d8c9e06894b74df759df1eec6abe436b9a54095aa",
+   "qubit_sha256": "26ada4a07bd5b8195279f9d92eaf1456bd0ee788348aa8ea33fad79e9153c637",
    "patch": "Qubit product rebrand: replace upstream product name/labels in product-facing dashboard strings",
    "reason": "Qubit rebrand of product-facing dashboard strings (owner directive 2026-09-12); no logic, route, or backend-route change.",
    "upstream_blob_sha256": "897737151545182966b07b32a044c5f6ee9df79923f5982d6821c1b911526f5e",
