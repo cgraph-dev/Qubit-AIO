@@ -31,8 +31,8 @@ FEATURE_MATRIX = "docs/archive/2026-09-21/FEATURE_MATRIX_8U.json"
 # Identity
 # ---------------------------------------------------------------------------
 def test_identity_constants():
-    assert F.PRODUCT_NAME == "Qubit Agent"
-    assert F.PUBLIC_IDENTITY == "Qubit Agent"
+    assert F.PRODUCT_NAME == "Qubit AiO"
+    assert F.PUBLIC_IDENTITY == "Qubit AiO"
     assert F.VOICE_SUBSYSTEM == "Qubit VoiceBridge"
     assert F.INSTALL_IDENTITY == "qubit-voicebridge"
     assert F.IMPORT_PACKAGE == "voicebridge"
@@ -40,7 +40,7 @@ def test_identity_constants():
     assert F.AGENT_TURN_PATH == "voicebridge.agent.turn"
     assert F.AGENT_SESSION_PATH == "voicebridge.agent.run_session"
     receipt = F.identity_receipt()
-    assert receipt["product"] == "Qubit Agent"
+    assert receipt["product"] == "Qubit AiO"
     assert receipt["agent_turn"] == "voicebridge.agent.turn"
 
 
@@ -206,7 +206,13 @@ def test_migrate_apply_idempotent_and_rollback_restores(tmp_path):
                            "--backup-dir", str(backup)], env)
     assert applied.returncode == 0, applied.stderr[-1500:]
     assert "OK" in applied.stdout
-    canonical = home / ".config" / "qubit-voicebridge" / "notes.txt"
+    # Canonical destination is the QUBIT_HOME tree ($QUBIT_HOME/voice/config),
+    # not the retired ~/.config/qubit-voicebridge XDG path, which voice_layout
+    # now only READS (voicebridge/paths.py::voice_home / read_old_voice_dirs).
+    from voicebridge import paths as P
+
+    canonical_dir = P.voice_layout(dict(env)).effective["config"]
+    canonical = canonical_dir / "notes.txt"
     assert canonical.read_text() == "keepme-8tf"
 
     rerun = _run_bridge(["product", "migrate", "--apply",
