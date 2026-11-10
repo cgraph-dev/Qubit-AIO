@@ -77,7 +77,41 @@ def _stub_gateway_role(monkeypatch, *, capture, text="stub reply"):
                 identity="local/qubit-brain", latency_ms=1),
             details=details)
 
+    def _fake_run(req, cfg, **kw):
+        capture.update(kw)
+        capture["_prompt"] = req.prompt
+        return _fake(req.prompt, cfg, **kw)
+
+    def _fake_agent_turn(cfg, text, **kw):
+        """Stub ``AG.run_agent_turn`` — the seam ``turn`` really takes.
+
+        ``turn`` routes through ``voicebridge.agent.run_agent_turn``
+        (chat_transport.py:4531), a Third seam the provider stubs never touched:
+        the real agent built an OpenAI client against ``localhost:11434`` and
+        streamed from ollama, which is not installed here, so the retry ladder
+        ran 5 cycles of backoff and the file looked hung. Stub the seam and
+        record the reasoning level the turn actually threaded.
+        """
+        capture.update(kw)
+        capture["_agent_text"] = text
+        from voicebridge.local_llm import resolve_reasoning_budget
+
+        details = {}
+        if kw.get("reasoning") is not None:
+            details["reasoning_applied"] = {
+                "level": kw["reasoning"],
+                "max_tokens": resolve_reasoning_budget(kw["reasoning"])}
+        # ``run_session``-shaped: state/reply/code/receipt. ``turn`` reads these
+        # to build its own outcome, so the old ProviderResult-shaped dict came
+        # back as code MODEL_ERROR with an empty detail.
+        return {"state": "OK", "reply": text, "code": None,
+                "session_id": kw.get("session"), "receipt": details,
+                "provider": "local", "model": "qubit-brain"}
+
     monkeypatch.setattr(Gw, "run_role", _fake)
+    monkeypatch.setattr(Gw, "run", _fake_run)
+    import voicebridge.agent as AG
+    monkeypatch.setattr(AG, "run_agent_turn", _fake_agent_turn)
 
 
 def test_turn_threads_reasoning_to_gateway_and_receipts_it(tmp_path,
