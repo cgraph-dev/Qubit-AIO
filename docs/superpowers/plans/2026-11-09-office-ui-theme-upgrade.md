@@ -12,9 +12,18 @@
 
 ---
 
-## Owner constraint
+## Owner constraint (amended 2026-11-09)
 
 > “dont fuck habblaud we just update ui to make it better and easier to upgrade in the future”
+>
+> “you can touch habblaud, i meant not break whats currently working cos we need add more things”
+
+**Amendment (ruling 16):** Part A stays a shell-only, read-only-Habblaud lane and is
+complete. **Part B may modify/re-vendor Habblaud**, provided it is additive and
+never regresses current behavior: every change sits behind `office.theme`
+(`classic` = today), keeps the stream/panel/menu/283-seat contracts, updates
+`PROVENANCE.json`, and has before/after goldens + rollback. Paid art stays out of
+the repo; the patched client loads the owner-built local pack at runtime.
 
 - `frontend/qubit-app/plugins/qubit-office/habblaud/` is **read-only**: no edits, no rebuild, no re-vendor for UI.
 - The only runtime interaction is a **server-injected `<style>`** (document head, after the app’s own stylesheet) that sets an allowlisted subset of `.ui-root` variables, plus class hooks/DOM on **elements we already inject** (the two menu buttons).
@@ -23,7 +32,7 @@
 ## Non-goals
 
 - No changes to the office engine, simulation, room layout, canvas art, stream, tools, writes, or approvals.
-- **Do not repurpose Habblaud’s own `theme` field** (`none|halloween|christmas`, upstream-owned seasonal art — verified in `docs/world/privacidade.md` and the world payload). Room art is deferred and needs a new owner decision; the developer's interior screenshots confirm top-down orthogonal rooms (RPG Maker), which Habblaud's procedural 3/4 renderer cannot consume without a change.
+- **Do not repurpose Habblaud’s own `theme` field** (`none|halloween|christmas`, upstream-owned seasonal art — verified in `docs/world/privacidade.md` and the world payload). Room/interior art is now **in scope under Part B** (ruling 16), added behind the theme flag; the developer's screenshots confirm top-down orthogonal rooms (RPG Maker), which the patched renderer will consume additively.
 - No external network calls. One local theme read only when a theme is active.
 - No new core tool/plugin; one config key (`office.theme`).
 - No pack-supplied CSS/JS/HTML/SVG/remote URLs.
@@ -460,7 +469,7 @@ def test_token_css_only_allowlisted_vars():
 
 ## Self-review
 
-- **Owner constraint:** zero Habblaud edits; `vendor_habblaud.py --check` is a gate; room art deferred; the upstream `theme` field is not repurposed.
+- **Owner constraint:** Part A has zero Habblaud edits; Part B may extend it additively (ruling 16) with goldens/rollback/provenance; `vendor_habblaud.py --check` remains the drift gate; the upstream `theme` field is not repurposed.
 - **Security:** typed tokens (CSS-exfil vectors rejected), no pack CSS, server-side injection, CSP contract test.
 - **Performance:** one atlas request, native 32 px, no lazy-flood; palette/contrast validated.
 - **Test honesty:** behaviour + artifacts only.
