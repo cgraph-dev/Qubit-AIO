@@ -32,6 +32,7 @@ import importlib.util
 import inspect
 import io
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -39,12 +40,14 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-# Canonical generated location (finding N3): the deterministic generator writes
-# docs/generated/, never the frozen archive. Prefer canonical, fall back to the
-# frozen record read-only only if the generated artifact is absent.
-LEDGER = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.openclaw.json"
-if not LEDGER.exists():
-    LEDGER = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
+# The canonical generated location (finding N3) and its frozen archive fallback
+# were both purged in eafb54e26, so the section is read read-only from
+# pre-purge history. Order preserved: canonical first, frozen record second.
+LEDGER = "docs/generated/QUBIT_GAP_LEDGER.openclaw.json"
 GEN = REPO_ROOT / "scripts" / "rebuild_ledger_openclaw.py"
 
 
@@ -340,7 +343,7 @@ def test_gateway_rpc_opens_no_listener_and_delegates():
 
 # ------------------------------------------------ terminal classification
 def test_terminal_openclaw_rows_are_honestly_classified():
-    rows = {r["id"]: r for r in json.loads(LEDGER.read_text())["rows"]}
+    rows = {r["id"]: r for r in json.loads(require_ledger(LEDGER))["rows"]}
     allowed_needs = {"creds", "hardware", "owner"}
     for row in rows.values():
         if row["status"] == "OPERATOR_ONLY":
@@ -354,7 +357,7 @@ def test_terminal_openclaw_rows_are_honestly_classified():
 
 
 def test_oc34_note_no_longer_claims_a_pending_cli_handoff():
-    rows = {r["id"]: r for r in json.loads(LEDGER.read_text())["rows"]}
+    rows = {r["id"]: r for r in json.loads(require_ledger(LEDGER))["rows"]}
     note = rows["OC-34"]["note"]
     assert "tracked cross-boundary handoff" not in note
     assert "kanban restore" in note.lower()
@@ -362,18 +365,62 @@ def test_oc34_note_no_longer_claims_a_pending_cli_handoff():
 
 
 def test_oc68_voice_counts_match_the_live_registry():
+    """The OC-68 row's voice counts must equal the live registry's counts.
+
+    The committed section was purged in eafb54e26 and is frozen at 554 entries,
+    so the frozen copy can never track a live registry. The row the generator
+    renders today is what has to match, and the frozen copy must still be
+    internally consistent with the registry size at freeze time.
+    """
+    import importlib.util
+
     from voicebridge import voice_commands as VC
 
-    rows = {r["id"]: r for r in json.loads(LEDGER.read_text())["rows"]}
+    spec = importlib.util.spec_from_file_location(
+        "rebuild_ledger_openclaw_agent4_oc68", GEN)
+    assert spec is not None and spec.loader is not None
+    gen = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gen)
+
     expected = (f"{len(VC.REGISTRY)} entries/{len(VC.VOICE_GUARDS)} guards")
-    assert rows["OC-68"]["voice"] == expected, rows["OC-68"]["voice"]
+    rendered = {r["id"]: r for r in gen.build_ledger()["rows"]}
+    assert rendered["OC-68"]["voice"] == expected, rendered["OC-68"]["voice"]
+
+    rows = {r["id"]: r for r in json.loads(require_ledger(LEDGER))["rows"]}
+    m = re.fullmatch(r"(\d+) entries/(\d+) guards", rows["OC-68"]["voice"])
+    assert m is not None, rows["OC-68"]["voice"]
+    frozen_entries, frozen_guards = int(m.group(1)), int(m.group(2))
+    # Guards are stable; the registry has only grown since the freeze.
+    assert frozen_guards == len(VC.VOICE_GUARDS), rows["OC-68"]["voice"]
+    assert frozen_entries <= len(VC.REGISTRY), rows["OC-68"]["voice"]
 
 
-def test_openclaw_ledger_regenerates_clean():
-    out = subprocess.run([sys.executable, str(GEN), "--check"],
+def test_openclaw_ledger_regenerates_clean(tmp_path):
+    """``--check`` passes on a freshly generated section and catches drift.
+
+    The canonical docs/generated/ section was purged in eafb54e26, so the check
+    runs against a rendered copy in ``tmp_path`` (never under ``docs/``); drift
+    is proven by a deliberately mutated copy.
+    """
+    out = subprocess.run([sys.executable, str(GEN), "--out",
+                          str(tmp_path / "fresh.json")],
+                         cwd=str(REPO_ROOT), capture_output=True, text=True)
+    assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
+    fresh = tmp_path / "fresh.json"
+    out = subprocess.run([sys.executable, str(GEN), "--check",
+                          "--out", str(fresh)],
                          cwd=str(REPO_ROOT), capture_output=True, text=True)
     assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
     assert "up to date" in out.stdout
+
+    drifted = json.loads(fresh.read_text(encoding="utf-8"))
+    drifted["rows"][0]["note"] = (drifted["rows"][0]["note"] or "") + " x"
+    (tmp_path / "drift.json").write_text(json.dumps(drifted), encoding="utf-8")
+    out = subprocess.run([sys.executable, str(GEN), "--check",
+                          "--out", str(tmp_path / "drift.json")],
+                         cwd=str(REPO_ROOT), capture_output=True, text=True)
+    assert out.returncode == 1, (out.returncode, out.stdout, out.stderr)
+    assert "STALE" in out.stderr
 
 
 if __name__ == "__main__":  # pragma: no cover
