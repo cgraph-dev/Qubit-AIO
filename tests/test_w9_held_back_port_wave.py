@@ -8,6 +8,7 @@ real behavior the port exists for, not just importability.
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -27,12 +28,50 @@ def _owner(home: Path) -> dict:
     }
 
 
-def test_bot_live_delivery_admit_claim_complete_round_trip(tmp_path):
+def _admit_to_mailbox(monkeypatch, delivery, home: Path):
+    """Stub the authority seam so admission writes the real durable mailbox.
+
+    ``deliver_to_live_owner`` calls ``authority_delivery``, which dials this
+    profile's live gateway over a websocket. These tests are about the durable
+    admit/claim/complete state machine, not about a running gateway, so the
+    seam returns the same receipt shape the authority would: a ``queued`` ticket
+    persisted under the profile mailbox (idempotent on id + payload, refusing a
+    different payload for the same id).
+    """
+    import json
+
+    def _admit(_home, params):
+        root = delivery._root(home)
+        path = root / f"{params['id']}.json"
+        existing = delivery._read(path)
+        if existing is not None:
+            if existing.get("message") != params["message"]:
+                raise ValueError("delivery id reused with a different payload")
+            return existing
+        with delivery._locked(home) as locked:
+            created = time.time_ns()
+            record = {
+                "id": params["id"],
+                "delivery_id": params["id"],
+                "message": params["message"],
+                "status": "queued",
+                "owner": delivery._owner(home, _owner(home)),
+                "created_at": created,
+                "sequence": delivery._next_sequence(locked),
+            }
+            delivery._write(locked / f"{params['id']}.json", record)
+            return json.loads((locked / f"{params['id']}.json").read_text())
+
+    monkeypatch.setattr(delivery, "authority_delivery", _admit)
+
+
+def test_bot_live_delivery_admit_claim_complete_round_trip(tmp_path, monkeypatch):
     """A single private record advances queued -> claimed -> terminal, durably."""
     delivery = __import__("tools.bot_live_delivery", fromlist=["x"])
     home = tmp_path / "home"
     home.mkdir()
     owner = _owner(home)
+    _admit_to_mailbox(monkeypatch, delivery, home)
 
     record = delivery.deliver_to_live_owner(home, owner, "hello", delivery_id="a" * 32)
     assert record["status"] == "queued"
@@ -52,11 +91,12 @@ def test_bot_live_delivery_admit_claim_complete_round_trip(tmp_path):
         delivery.complete_delivery(home, "a" * 32, status="failed")
 
 
-def test_bot_live_delivery_rejects_different_payload_for_same_id(tmp_path):
+def test_bot_live_delivery_rejects_different_payload_for_same_id(tmp_path, monkeypatch):
     delivery = __import__("tools.bot_live_delivery", fromlist=["x"])
     home = tmp_path / "home"
     home.mkdir()
     owner = _owner(home)
+    _admit_to_mailbox(monkeypatch, delivery, home)
     delivery.deliver_to_live_owner(home, owner, "one", delivery_id="b" * 32)
     with pytest.raises(ValueError):
         delivery.deliver_to_live_owner(home, owner, "two", delivery_id="b" * 32)
