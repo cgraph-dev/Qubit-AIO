@@ -875,7 +875,12 @@ def test_render_units_has_project_dir_injected():
     assert "__PROJECT_DIR__" not in units["qubit-communications-monitor.service"]
     svc = units["qubit-communications-monitor.service"]
     assert "Type=oneshot" in svc
-    assert "communications_monitor.py --hourly" in svc
+    # The script and its mode flag must both be invoked. They are NOT adjacent:
+    # 5b4339250 quotes each ExecStart argument ("...python" ".../monitor.py")
+    # so a project dir containing spaces still parses, which splits the pair.
+    assert "communications_monitor.py" in svc
+    assert "--hourly" in svc
+    assert "ExecStart=" in svc
     tmr = units["qubit-communications-monitor.timer"]
     assert "OnCalendar=hourly" in tmr and "Persistent=true" in tmr
 
