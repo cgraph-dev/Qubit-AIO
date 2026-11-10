@@ -128,7 +128,11 @@ def test_scanner_cli_help_args_are_widened(scanner):
 def test_scanner_wire_regex_preserves_ids_flags_product_copy(scanner):
     rx = scanner.CLI_WIRE_IDENTIFIER_RE
     assert rx.search("HERMES_INFERENCE_MODEL")
-    assert rx.search("X-Qubit-Session-Token")
+    # The session-token header is a preserved wire identifier. Its live spelling
+    # is ``X-Hermes-Session-Token`` (what ``plugins_activation`` still sends to
+    # the serve backend), not a rebranded alias -- the scanner must mask that
+    # exact token, or every file carrying the header reads as a public leak.
+    assert rx.search("X-Hermes-Session-Token")
     assert not rx.search("hermes-agent-dev")
     assert not rx.search("~/.hermes/.env")
     assert not rx.search("Run 'hermes' to use the CLI")

@@ -99,7 +99,12 @@ def _get(port, path):
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("Content-Type", ""), e.read()
+        # HTTPError IS a response object (it owns a socket and a temp-file
+        # buffer); reading it without closing leaks both.
+        try:
+            return e.code, e.headers.get("Content-Type", ""), e.read()
+        finally:
+            e.close()
 
 
 @pytest.fixture

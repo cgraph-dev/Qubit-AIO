@@ -103,12 +103,66 @@ def _env(root: Path, extra=None) -> dict:
     return env
 
 
-def _run(root: Path, flag: str, extra=None, timeout=1800):
+def _run(root: Path, flag: str, extra=None, timeout=1800, cwd=None, script=None):
     return subprocess.run(
-        ["bash", str(SCRIPT), flag],
-        cwd=str(REPO), env=_env(root, extra), capture_output=True, text=True,
+        ["bash", str(script or SCRIPT), flag],
+        cwd=str(cwd or REPO), env=_env(root, extra), capture_output=True, text=True,
         timeout=timeout,
     )
+
+
+def _tmp_candidate(tmp_path: Path, name: str = "cand") -> Path:
+    """A candidate root under ``/tmp``.
+
+    ``tmp_path`` can live outside ``/tmp`` (this suite's TMPDIR falls back to the
+    runtime scratch dir), which would trip the non-tmp guard before the guard
+    under test is reached.
+    """
+    base = Path("/tmp") / f"qubit-rebase-cand-{os.getpid()}-{tmp_path.name}"
+    return base / name
+
+
+def _sandbox_root(tmp_path: Path) -> Path:
+    """A ``/tmp``-rooted, symlink-free base for live-root sandboxes.
+
+    The script resolves its guard paths with ``realpath``; ``tmp_path`` sits
+    under the runtime state dir, whose real path differs from the textual one,
+    so a sandbox built there never matches the declared live root.
+    """
+    base = Path("/tmp") / f"qubit-rebase-live-{os.getpid()}-{tmp_path.name}"
+    base = base.resolve()
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+
+def _script_copy(dest: Path) -> Path:
+    """A runnable copy of the script (plus its sibling engines) in ``dest``.
+
+    ``REPO_ROOT`` is ``<script dir>/..``, so placing the copy decides which guard
+    is reachable: inside a sandbox live root trips the from-live guard, outside
+    it lets the containment guard fire.
+    """
+    dest.mkdir(parents=True, exist_ok=True)
+    # The script shells out to its sibling engines (qubit_rebrand.py, ...), so
+    # copy the whole scripts dir, not just the entry point.
+    for src in SCRIPT.parent.glob("*.py"):
+        (dest / src.name).write_bytes(src.read_bytes())
+    script = dest / SCRIPT.name
+    script.write_bytes(SCRIPT.read_bytes())
+    return script
+
+
+def _stub_pin(live_root: Path) -> Path:
+    """A minimal staged pinned source for the guard tests.
+
+    The guards are the subject here, not the pin.  A present (but empty) pin lets
+    the script reach the same guards and the same post-guard validation as a real
+    run, so the guard tests assert on the guard's own refusal rather than on a
+    missing-pin death or on a full build.
+    """
+    pin = live_root.parent / "pinned"
+    (pin / "qubit_runtime").mkdir(parents=True, exist_ok=True)
+    return pin
 
 
 def test_help_starts_with_usage():
@@ -246,9 +300,22 @@ def test_check_rebuilds_stale_or_partial_candidate(candidate):
 
 
 def test_refuses_to_run_from_live_tree(tmp_path):
-    """Finding 2: the live-root guard refuses (no build, no writes)."""
-    res = _run(tmp_path / "cand", "--check",
-               extra={"QUBIT_LIVE_ROOT": str(REPO)})
+    """Finding 2: the live-root guard refuses (no build, no writes).
+
+    ``REPO_ROOT`` is the script's own tree, so this guard is only reachable when
+    the script lives inside the declared live root: run a copy from a sandbox
+    that the guard protects.
+    """
+    sandbox = _sandbox_root(tmp_path) / "live"
+    sandbox.mkdir()
+    # The script derives REPO_ROOT as ``<its dir>/..``, so the copy under test
+    # must live INSIDE the declared live root for this guard to be reachable.
+    script = _script_copy(sandbox / "scripts")
+    candidate = _tmp_candidate(tmp_path, "elsewhere")
+    res = _run(candidate, "--check",
+               extra={"QUBIT_LIVE_ROOT": str(sandbox),
+                      "QUBIT_PINNED_SOURCE": str(_stub_pin(sandbox))},
+               cwd=sandbox, script=script)
     assert res.returncode != 0
     assert "live product tree" in res.stderr, res.stderr
 
@@ -258,7 +325,18 @@ def test_refuses_candidate_root_inside_live_tree(tmp_path):
     if not LIVE_ROOT.is_dir():
         pytest.skip(f"no live root at {LIVE_ROOT}")
     probe = LIVE_ROOT / ".rebase-guard-probe"
-    res = _run(probe, "--check")
+    # A sandbox live root that contains the candidate: the in-tree guard is
+    # reached only when the candidate root really sits inside the live root.
+    sandbox = _sandbox_root(tmp_path) / "live"
+    sandbox.mkdir()
+    candidate_root = sandbox / "inside-candidate"
+    # Script copy outside the live root, so the from-live guard passes and the
+    # containment guard below is the one that fires.
+    script = _script_copy(sandbox.parent / "runner" / "scripts")
+    res = _run(candidate_root, "--check",
+               extra={"QUBIT_LIVE_ROOT": str(sandbox),
+                      "QUBIT_PINNED_SOURCE": str(_stub_pin(sandbox))},
+               cwd=tmp_path, script=script)
     assert res.returncode != 0
     assert "inside the live product tree" in res.stderr, res.stderr
     assert not probe.exists(), "guard created a directory inside the live tree"
@@ -280,12 +358,31 @@ def test_refuses_non_tmp_candidate_root(tmp_path):
     assert not probe.exists(), "guard created a non-tmp candidate root"
 
 
-def test_candidate_never_written_to_live_tree():
-    """Finding 2: the v0.21.5-only module must not appear in the live runtime."""
+def test_candidate_never_written_to_live_tree(tmp_path):
+    """Finding 2: generating a candidate must leave the live tree byte-identical.
+
+    ``NEW_MODULE`` is no longer candidate-only -- ``08754e088`` (Task 6) merged
+    it into the product tree on purpose -- so "the module is absent from the live
+    runtime" is no longer the invariant.  The invariant that still holds is that
+    the generator never writes there: run it against a live root and require the
+    tree to hash the same afterwards.
+    """
     if not LIVE_ROOT.is_dir():
         pytest.skip(f"no live root at {LIVE_ROOT}")
-    assert not (LIVE_ROOT / "qubit_runtime" / NEW_MODULE).exists(), (
-        "the candidate module leaked into the live product tree")
+    assert (LIVE_ROOT / "qubit_runtime" / NEW_MODULE).is_file(), (
+        "the Task 6 merge should have landed the module in the product tree")
+    sandbox = _sandbox_root(tmp_path) / "live"
+    (sandbox / "qubit_runtime").mkdir(parents=True)
+    sentinel = sandbox / "qubit_runtime" / "SENTINEL"
+    sentinel.write_text("untouched", encoding="utf-8")
+    before = _tree_hash(sandbox, exclude_names=("V0_21_5_DELTA.json",))
+    _run(_tmp_candidate(tmp_path), "--check",
+         extra={"QUBIT_LIVE_ROOT": str(sandbox),
+                "QUBIT_PINNED_SOURCE": str(_stub_pin(sandbox))},
+         cwd=sandbox)
+    assert _tree_hash(sandbox, exclude_names=("V0_21_5_DELTA.json",)) == before, (
+        "candidate generation wrote into the live product tree")
+    assert sentinel.read_text(encoding="utf-8") == "untouched"
 
 
 def test_declared_live_root_untouched_on_reuse(candidate, tmp_path):

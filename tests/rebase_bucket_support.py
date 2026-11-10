@@ -21,7 +21,13 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 RUNTIME = REPO / "qubit_runtime"
-AUDIT = REPO / "docs" / "generated" / "audit" / "V0_21_5_MERGE.json"
+AUDIT_REL = "docs/generated/audit/V0_21_5_MERGE.json"
+AUDIT = REPO / AUDIT_REL
+
+#: ``eafb54e26`` purged the generated docs tree, this audit included.  Re-authoring
+#: it is forbidden (AGENTS.md), so the gate reads the recorded audit from history
+#: through ``_purged_ledger`` and still asserts its CONTENT.
+from _purged_ledger import require_ledger  # noqa: E402
 
 
 @pytest.fixture
@@ -44,8 +50,7 @@ def assert_imports(modules: list[str]) -> None:
 
 
 def assert_bucket_audit(bucket: str, min_conflicts: int = 0) -> dict:
-    assert AUDIT.is_file(), f"merge audit missing: {AUDIT}"
-    data = json.loads(AUDIT.read_text(encoding="utf-8"))
+    data = json.loads(require_ledger(AUDIT_REL))
     assert data["schema"] == "qubit-v0215-task6-merge/1"
     rows = [r for r in data["files"] if r["bucket"] == bucket]
     assert rows, f"bucket {bucket!r} has no audit records"

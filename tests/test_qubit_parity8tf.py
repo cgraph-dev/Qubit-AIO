@@ -131,10 +131,15 @@ def test_same_store_dashboard_voice(tmp_path):
                      if isinstance(s, dict))
     assert "parity-hook" in names_d and "parity-hook" in names_v
     # schedules: same-store check
-    from voicebridge import schedules as S
-    job = S.create(cfg, "parity-job", "parity task text", "once in 60 minutes",
-                   requested_by="parity", confirmed=True)
-    jid = str(job.get("job", {}).get("id", ""))
+    # /api/cron/jobs is served from the REAL scheduler store (voicebridge.
+    # cron_bridge -> <QUBIT_HOME>/cron/jobs.json), not the legacy
+    # voicebridge.schedules SQLite store: see cron_bridge's module docstring for
+    # the read/write split-brain that repoint fixed. Create through the same
+    # store the surface reads, or the job is correctly invisible.
+    from voicebridge import cron_bridge as CB
+    job = CB.create(cfg, name="parity-job", prompt="parity task text",
+                    schedule="in 60m")
+    jid = str(job.get("id", ""))
     code, dout = HC.dispatch(cfg, "GET", "/api/cron/jobs", {}, {})
     assert code == 200 and isinstance(dout, list)
     assert jid in [j.get("id", "") for j in dout], dout
@@ -144,4 +149,7 @@ def test_same_store_dashboard_voice(tmp_path):
     res = res.get("result", res) if isinstance(res, dict) else {}
     sched = res.get("schedules", res) if isinstance(res, dict) else {}
     jobs = sched.get("jobs", []) if isinstance(sched, dict) else []
+    # Same store, same id: the voice surface must list the job the dashboard
+    # lists (a "nowhere" answer would pass a membership test on an empty list).
+    assert jobs, "voice schedules surface returned no jobs"
     assert jid in [str(j.get("id", "")) for j in jobs if isinstance(j, dict)]

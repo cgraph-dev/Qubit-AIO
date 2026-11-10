@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import inspect
 import json
 import os
 from pathlib import Path
@@ -47,10 +48,15 @@ def test_n26_gateway_status_kind_and_home_keys(runtime_on_path):
 
 def test_n26_control_socket_pipe_and_identify(runtime_on_path):
     cs = importlib.import_module("gateway.control_socket")
-    assert cs._PIPE_PREFIX == "qubit-gateway"
-    assert cs._LEGACY_PIPE_PREFIX == "hermes-gateway"
+    # 17c893615 (upstream re-pin) dropped the module-level ``_PIPE_PREFIX`` /
+    # ``_LEGACY_PIPE_PREFIX`` constants and the legacy pipe helper; the Qubit
+    # prefix is now spelled into ``windows_pipe_name`` and there is no
+    # hermes-gateway pipe to fall back to. Pin the live contract.
+    assert not hasattr(cs, "_PIPE_PREFIX")
+    assert not hasattr(cs, "_LEGACY_PIPE_PREFIX")
+    assert not hasattr(cs, "_legacy_windows_pipe_name")
     assert cs.windows_pipe_name(Path("/x")).startswith(r"\\.\pipe\qubit-gateway-")
-    assert cs._legacy_windows_pipe_name(Path("/x")).startswith(r"\\.\pipe\hermes-gateway-")
+    assert r"qubit-gateway-" in inspect.getsource(cs.windows_pipe_name)
     payload = cs.build_identify_payload()
     assert payload["kind"] == "qubit-gateway"
     assert "qubit_home" in payload
@@ -74,11 +80,13 @@ def test_run_shutdown_uses_qubit_cmd_local():
 
 def test_perplexity_headers_are_debranded(runtime_on_path):
     provider = importlib.import_module("plugins.web.perplexity.provider")
-    assert provider._HEADERS["HTTP-Referer"] == "https://github.com/cgraph-dev/Qubit-AIO"
+    # adfe7a2b7 (w49r-c identity fix) moved the referer to the product origin;
+    # the Qubit-Agent/* and qubit-agent header identity is unchanged.
+    assert provider._HEADERS["HTTP-Referer"] == "https://qubit.nousresearch.com"
     assert provider._HEADERS["X-Pplx-Integration"] == "qubit-agent"
     assert provider._HEADERS["User-Agent"].startswith("Qubit-Agent/")
     assert "Her" "mesAgent/" not in provider._HEADERS["User-Agent"]
-    assert "nousresearch" not in provider._HEADERS["HTTP-Referer"]
+    assert "github.com/cgraph-dev" not in provider._HEADERS["HTTP-Referer"]
 
 
 def test_qubit_achievements_plugin_id_and_read_old(runtime_on_path, tmp_path):

@@ -81,6 +81,12 @@ def test_session_profile_repair_module_present(runtime_on_path):
 # --------------------------------------------------------------------------- #
 
 def test_tui_force_build_qubit_alias(runtime_on_path, monkeypatch):
+    """The TUI force-build switch is the upstream ``HERMES_TUI_FORCE_BUILD``.
+
+    9b9e3679b (parity re-pin of ``main_tui_launch``) dropped the fork's
+    ``QUBIT_TUI_FORCE_BUILD`` alias, so that spelling must NOT force a rebuild;
+    the preserved wire env var still does.
+    """
     mod = importlib.import_module("qubit_cli.main_tui_launch")
     source_build = importlib.import_module("qubit_cli.source_build")
     monkeypatch.setattr(source_build, "source_product_current", lambda *a, **k: True)
@@ -90,9 +96,12 @@ def test_tui_force_build_qubit_alias(runtime_on_path, monkeypatch):
     assert mod._tui_need_rebuild(runtime_on_path / "ui-tui") is False
 
     monkeypatch.setenv("QUBIT_TUI_FORCE_BUILD", "1")
-    assert mod._tui_need_rebuild(runtime_on_path / "ui-tui") is True
+    assert mod._tui_need_rebuild(runtime_on_path / "ui-tui") is False
 
     monkeypatch.delenv("QUBIT_TUI_FORCE_BUILD")
+    monkeypatch.setenv("HERMES_TUI_FORCE_BUILD", "1")
+    assert mod._tui_need_rebuild(runtime_on_path / "ui-tui") is True
+
     monkeypatch.setenv("HERMES_TUI_FORCE_BUILD", "true")
     assert mod._tui_need_rebuild(runtime_on_path / "ui-tui") is True
 
@@ -104,7 +113,10 @@ def test_tui_force_build_qubit_alias(runtime_on_path, monkeypatch):
 def test_plugins_skill_doc_debranded(runtime_on_path):
     src = _read(runtime_on_path, "qubit_cli/plugins.py")
     assert "~/.hermes/skills/" not in src
-    assert "$QUBIT_HOME/skills/" in src
+    assert "$QUBIT_HOME/skills/" not in src
+    # The plugin docs name the canonical user plugin dir (0a5734877 cleaned the
+    # last stale home path), and the entry-point group stays upstream-wire.
+    assert "~/.qubit/plugins/<name>/" in src
     assert "hermes-plugin-command-await" not in src
     assert "qubit-plugin-command-await" in src
 
