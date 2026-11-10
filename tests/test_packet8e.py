@@ -1857,10 +1857,21 @@ def test_dashboard_auth_fail_closed_headers_and_pair_message(tmp_path):
         with urllib.request.urlopen(  # noqa: S310
                 req("/api/status", {"X-Api-Token": "secret-token"})) as r:
             assert r.status == 200
-        # static settings page is served WITHOUT auth (the API calls inside it
-        # carry the header token and fail closed individually)
-        with urllib.request.urlopen(req("/settings")) as r:  # noqa: S310
-            assert r.status == 200
+        # settings page: /settings is a public alias onto the Qubit-owned /config
+        # route, so it answers 302 without auth (the API calls inside the page
+        # carry the header token and fail closed individually). Read with
+        # http.client so the redirect is observed rather than followed -- urllib
+        # follows it and reports the /config shell's status instead.
+        import http.client
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            conn.request("GET", "/settings")
+            resp = conn.getresponse()
+            resp.read()
+            assert resp.status == 302, resp.status
+            assert resp.getheader("Location") == "/config"
+        finally:
+            conn.close()
     finally:
         ui.stop()
 
