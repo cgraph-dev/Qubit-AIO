@@ -9,7 +9,10 @@ import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
-import { installOfficeMenuButtons, type OfficeMenuController } from "./office-menu";
+import {
+  installOfficeMenuButtons, menuIconGeometry, MENU_BUTTONS,
+  type MenuButtonSpec, type OfficeMenuController,
+} from "./office-menu";
 import { createSeatModelPanel } from "./SeatModelPanel";
 import { createAgentsPanel } from "./AgentsPanel";
 import {
@@ -169,6 +172,11 @@ export function createOfficeApp(
     // themed by the server (`_serve_app_html`); this copy only styles OUR
     // docks and the Agents panel, from the same validated payload.
     const [officeTheme, setOfficeTheme] = useState<OfficeTheme | null>(null);
+    // The menu fallback: if the app's Panels group never appears (an upstream
+    // DOM change), the shell keeps the Agents/HUD controls by rendering its own
+    // traced-icon buttons after a bounded wait. Injection suppresses them the
+    // moment it attaches, so the two are never visible at once.
+    const [menuFallback, setMenuFallback] = useState(false);
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
@@ -177,19 +185,17 @@ export function createOfficeApp(
     // controller lives for one iframe load; a reload (or a new base) swaps it.
     const menuRef = useRef<OfficeMenuController | null>(null);
 
-    // Load the host theme ONCE per request/base. Classic (no `?theme=`) makes
-    // no request at all; the server resolves the env kill switch, so an active
-    // response is what the iframe document is actually themed with.
+    // Load the host theme ONCE per request/base. The server injects the
+    // resolved payload as `window.__QUBIT_OFFICE_THEME__` (config/env included),
+    // so this normally makes NO request; the authenticated fetch is the
+    // fallback for a shell served outside Qubit. A classic payload is a valid
+    // answer and simply applies nothing.
     useEffect(() => {
-      if (!requestedTheme) {
-        setOfficeTheme(null);
-        return;
-      }
       let cancelled = false;
-      const fetchImpl = (typeof window !== "undefined"
-        && typeof window.fetch === "function")
-        ? window.fetch.bind(window) : null;
-      loadOfficeTheme(fetchImpl as never, props.base, requestedTheme)
+      const hostWindow = typeof window === "undefined" ? null : window;
+      const fetchImpl = (hostWindow && typeof hostWindow.fetch === "function")
+        ? hostWindow.fetch.bind(hostWindow) : null;
+      loadOfficeTheme(fetchImpl as never, props.base, requestedTheme, hostWindow)
         .then((theme) => { if (!cancelled) setOfficeTheme(theme); })
         .catch(() => { if (!cancelled) setOfficeTheme(null); });
       return () => { cancelled = true; };
@@ -229,9 +235,12 @@ export function createOfficeApp(
         // buttons. The document is same-origin, so the shell can append to the
         // group; the buttons drive THIS component's dock state.
         menuRef.current?.dispose();
+        setMenuFallback(false);
         menuRef.current = installOfficeMenuButtons(win, {
           onToggleAgents: () => setAgentsOpen((v: boolean) => !v),
           onToggleHud: () => setHudOpen((v: boolean) => !v),
+          onFallback: (show: boolean) => setMenuFallback(show),
+          onAttach: () => setMenuFallback(false),
         });
         menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
         props.onReady?.();
@@ -449,6 +458,47 @@ export function createOfficeApp(
         ]),
         R.createElement(HudDock as never, { key: "body" }),
       ]));
+    }
+
+    // HOST-RENDERED MENU FALLBACK. The app's own Panels group can disappear
+    // across an upstream DOM change; the injected icons would then vanish with
+    // it. After the bounded wait the controller asks for these shell buttons,
+    // and the first successful injection removes them again.
+    if (menuFallback) {
+      children.push(R.createElement("div", {
+        key: "menu-fallback",
+        className: "office-game__menuFallback office-theme-menu-fallback",
+        "data-testid": "office-menu-fallback",
+        role: "group",
+        "aria-label": "Office panels",
+      }, MENU_BUTTONS.map((spec: MenuButtonSpec) => {
+        const geometry = menuIconGeometry(spec);
+        const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
+        const onActivate = spec.id === "agents"
+          ? () => setAgentsOpen((v: boolean) => !v)
+          : () => setHudOpen((v: boolean) => !v);
+        return R.createElement("button", {
+          key: spec.id,
+          type: "button",
+          className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
+          "data-testid": `${spec.testId}-fallback`,
+          "aria-label": spec.label,
+          title: spec.title,
+          "aria-pressed": pressed ? "true" : "false",
+          onClick: onActivate,
+        }, R.createElement("svg", {
+          className: "ui-px-icon",
+          width: geometry.width,
+          height: geometry.height,
+          viewBox: geometry.viewBox,
+          shapeRendering: "crispEdges",
+          "aria-hidden": "true",
+          focusable: "false",
+        }, R.createElement("path", {
+          fill: "currentColor",
+          d: geometry.d,
+        })));
+      })));
     }
 
     const rootClass = ["office-game", officeThemeClass(officeTheme)]

@@ -133,17 +133,18 @@ def main() -> int:
          "--moduleResolution", "node", "--ignoreDeprecations", "6.0",
          "--outDir", str(stage), "--skipLibCheck", "--noEmitOnError", "false",
          str(APP_DIR / "agents-panel.ts"), str(APP_DIR / "AgentsPanel.tsx"),
-         str(APP_DIR / "office-theme.ts")],
+         str(APP_DIR / "office-theme.ts"), str(APP_DIR / "office-app.ts")],
         capture_output=True, text=True, timeout=300, cwd=str(APP_DIR))
     if not (stage / "agents-panel.js").is_file() or \
             not (stage / "AgentsPanel.js").is_file() or \
-            not (stage / "office-theme.js").is_file():
+            not (stage / "office-theme.js").is_file() or \
+            not (stage / "office-app.js").is_file():
         print("PROBE DEFECT: the panel did not compile")
         print(proc.stdout[-2000:])
         print(proc.stderr[-3000:])
         return 2
     # The check imports `./agents-panel.mjs` / `./AgentsPanel.mjs`.
-    for name in ("agents-panel", "AgentsPanel", "office-theme"):
+    for name in ("agents-panel", "AgentsPanel", "office-theme", "office-app"):
         shutil.move(str(stage / f"{name}.js"), str(stage / f"{name}.mjs"))
     # `AgentsPanel` imports its local modules with no extension; Node's ESM
     # loader needs one, so the imports are rewritten in the transpiled copy.
@@ -151,6 +152,9 @@ def main() -> int:
     tsx = tsx.replace('from "./agents-panel"', 'from "./agents-panel.mjs"')
     tsx = tsx.replace('from "./office-theme"', 'from "./office-theme.mjs"')
     (stage / "AgentsPanel.mjs").write_text(tsx)
+    theme = (stage / "office-theme.mjs").read_text()
+    theme = theme.replace('from "./office-app"', 'from "./office-app.mjs"')
+    (stage / "office-theme.mjs").write_text(theme)
     # A package.json makes `createRequire` resolve react/jsdom from the web
     # package (its node_modules is the repo's only React).
     (stage / "package.json").write_text(json.dumps({"type": "module"}))

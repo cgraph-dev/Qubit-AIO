@@ -58,6 +58,11 @@ function fakeFetch(payload: OfficeTheme | null = activeTheme) {
 }
 
 function resetHost() {
+  delete (window as { __QUBIT_OFFICE_THEME__?: unknown })
+    .__QUBIT_OFFICE_THEME__;
+  delete (window as { __QUBIT_SESSION_TOKEN__?: string })
+    .__QUBIT_SESSION_TOKEN__;
+  delete (window as { __QUBIT_BASE_PATH__?: string }).__QUBIT_BASE_PATH__;
   document.documentElement.removeAttribute("data-office-theme");
   document.head.innerHTML = "";
   document.body.innerHTML = "";
@@ -69,21 +74,41 @@ afterEach(() => {
 });
 
 describe("loadOfficeTheme", () => {
-  it("classic makes no request", async () => {
+  it("uses the server-injected global and makes no request", async () => {
+    (window as { __QUBIT_OFFICE_THEME__?: unknown }).__QUBIT_OFFICE_THEME__ =
+      activeTheme;
     const { impl } = fakeFetch();
-    expect(await loadOfficeTheme(impl as never, "", undefined)).toBeNull();
-    expect(await loadOfficeTheme(impl as never, "", "")).toBeNull();
-    expect(await loadOfficeTheme(impl as never, "", "classic")).toBeNull();
+    await expect(loadOfficeTheme(impl as never, "", undefined)).resolves
+      .toMatchObject({ id: "demo", active: true });
     expect(impl).not.toHaveBeenCalled();
   });
 
-  it("makes exactly one no-store request for an active theme", async () => {
+  it("a classic global applies nothing and makes no request", async () => {
+    (window as { __QUBIT_OFFICE_THEME__?: unknown }).__QUBIT_OFFICE_THEME__ =
+      classicTheme;
+    const { impl } = fakeFetch();
+    expect(await loadOfficeTheme(impl as never, "", undefined))
+      .toMatchObject({ id: "classic", active: false });
+    expect(impl).not.toHaveBeenCalled();
+  });
+
+  it("falls back to one authenticated fetch when the global is absent", async () => {
+    (window as { __QUBIT_SESSION_TOKEN__?: string }).__QUBIT_SESSION_TOKEN__ =
+      "tok-123";
     const { impl, calls } = fakeFetch();
     const theme = await loadOfficeTheme(impl as never, "", "demo");
     expect(theme?.id).toBe("demo");
     expect(impl).toHaveBeenCalledTimes(1);
     expect(calls[0].url).toBe("/agent/api/office/theme?theme=demo");
     expect(calls[0].init).toMatchObject({ cache: "no-store" });
+    expect((calls[0].init?.headers as Record<string, string>)
+      ["X-Qubit-Session-Token"]).toBe("tok-123");
+  });
+
+  it("fetches without a theme query when none was requested", async () => {
+    const { impl, calls } = fakeFetch();
+    await loadOfficeTheme(impl as never, "", undefined);
+    expect(calls[0].url).toBe("/agent/api/office/theme");
   });
 
   it("encodes the requested id and honours a dashboard base", async () => {
@@ -92,9 +117,20 @@ describe("loadOfficeTheme", () => {
     expect(calls[0].url).toBe("/dash/agent/api/office/theme?theme=demo%20pack");
   });
 
-  it("an invalid override falls back to classic (no fabricated pack)", async () => {
+  it("an invalid override resolves the server's classic answer", async () => {
     const { impl } = fakeFetch(classicTheme);
-    expect(await loadOfficeTheme(impl as never, "", "nope")).toBeNull();
+    expect(await loadOfficeTheme(impl as never, "", "nope"))
+      .toMatchObject({ id: "classic", active: false });
+  });
+
+  it("an invalid global shape falls through to the fetch", async () => {
+    (window as { __QUBIT_OFFICE_THEME__?: unknown }).__QUBIT_OFFICE_THEME__ =
+      { id: "", active: "yes" };
+    const { impl } = fakeFetch();
+    expect(await loadOfficeTheme(impl as never, "", "demo")).toMatchObject({
+      id: "demo",
+    });
+    expect(impl).toHaveBeenCalledTimes(1);
   });
 
   it("a failed request resolves null", async () => {
@@ -146,6 +182,12 @@ describe("applyHostTheme", () => {
     expect(themeCss(classicTheme)).toBe("");
     expect(themeCss(activeTheme)).toBe(
       "/plugins/qubit-office/themes/demo/theme.css?v=1.0.0");
+  });
+
+  it("themeCss honours the dashboard base path (subpath deployments)", () => {
+    (window as { __QUBIT_BASE_PATH__?: string }).__QUBIT_BASE_PATH__ = "/dash/";
+    expect(themeCss(activeTheme)).toBe(
+      "/dash/plugins/qubit-office/themes/demo/theme.css?v=1.0.0");
   });
 });
 

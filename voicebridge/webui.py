@@ -2449,6 +2449,57 @@ class WebUIHandler(BaseHTTPRequestHandler):
                         break
         except Exception:  # noqa: BLE001 - theme boost is best-effort
             pass
+        # THE OFFICE HOST THEME GLOBAL.
+        #
+        # The Qubit shell AROUND the office iframe (our Agents/HUD docks) needs
+        # the SAME resolved office-theme payload the iframe document gets. A
+        # first-paint fetch would be an auth/timing gap: the payload can come
+        # from config/env with no `?theme=` at all. So the server injects the
+        # validated payload as a global on the office route only. Classic is
+        # included too (small JSON), and there is no file map or filesystem
+        # path. Pack-provided text is JSON-encoded AND inline-script escaped
+        # (`<`/`>`/`&`/U+2028/9) so a label can never break out of <script>.
+        office_theme_script = ""
+        try:
+            route = (self.path.split("?", 1)[0].rstrip("/") or "/")
+            if route == "/qubit-office":
+                from urllib.parse import parse_qs
+                raw_query = self.path.split("?", 1)[1] if "?" in self.path else ""
+                requested = (parse_qs(raw_query).get("theme") or [""])[0] or None
+                from .office import theme as _OT
+                _cfg = getattr(getattr(self.app, "orch", None), "cfg", None)
+                _payload = _OT.theme_payload(_cfg, requested=requested)
+                _host_payload = {
+                    "id": _payload.get("id", "classic"),
+                    "label": _payload.get("label", "Classic"),
+                    "active": bool(_payload.get("active")),
+                    "version": _payload.get("version", ""),
+                    "credit": _payload.get("credit", ""),
+                    "license": _payload.get("license", ""),
+                    "templateVersion": _payload.get("templateVersion"),
+                    # Route URLs (the validated asset base and atlas/index),
+                    # never a filesystem path.
+                    "assetBase": _payload.get("assetBase", ""),
+                    "atlas": _payload.get("atlas"),
+                    "index": _payload.get("index"),
+                    "bodies": _payload.get("bodies") or {
+                        "atlas": None, "index": None,
+                        "size": None, "frame": None,
+                    },
+                    "tokens": _payload.get("tokens") or {},
+                    "slices": _payload.get("slices") or {},
+                }
+                _json = json.dumps(_host_payload)
+                _json = (_json.replace("<", "\\u003c")
+                         .replace(">", "\\u003e")
+                         .replace("&", "\\u0026")
+                         .replace("\u2028", "\\u2028")
+                         .replace("\u2029", "\\u2029"))
+                office_theme_script = (
+                    "<script>window.__QUBIT_OFFICE_THEME__=%s;</script>"
+                    % _json)
+        except Exception as exc:  # noqa: BLE001 - never fail the shell
+            log.warning("office host theme global skipped: %s", exc)
         # THE TOKEN IS INJECTED FOR LOOPBACK CALLERS ONLY — same rule as
         # `_serve_app_html`, and for the same reason. This injector had NO peer
         # guard, so it was the WIDER leak: a non-local peer fetching `/chat`
@@ -2503,7 +2554,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             '#qubit-boot button{color:%s !important;background:%s !important;}'
             '</style>' % (_boot_bg, _boot_mid, _boot_bg, _boot_fg, _boot_bg, _boot_fg)
         )
-        inject = boot_style + inject
+        inject = office_theme_script + boot_style + inject
         if "</head>" in html:
             html = html.replace("</head>", inject + "</head>", 1)
         else:
@@ -2672,6 +2723,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
         """
         from .office import theme as OT
 
+        if not isinstance(theme_id, str) or not OT._ID_RE.fullmatch(theme_id):
+            self._send(404, b"not found")
+            return
         theme_dir = OT.user_theme_root() / theme_id
         if not (theme_dir / "theme.json").is_file():
             self._send(404, b"not found")
@@ -3117,7 +3171,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 cfg = getattr(getattr(self.app, "orch", None), "cfg", None)
                 style_html = _office_theme.theme_style_html(
                     cfg, requested=requested_theme)
-            except Exception:  # noqa: BLE001 - a broken theme must not break the app
+            except Exception as exc:  # noqa: BLE001 - a broken theme must not break the app
+                log.warning("office theme style skipped: %s", exc)
                 style_html = ""
             if style_html:
                 if "</head>" in html:

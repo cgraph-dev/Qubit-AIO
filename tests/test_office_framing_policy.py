@@ -305,3 +305,98 @@ def test_host_theme_stylesheet_404s_for_classic_and_unknown(themed_home):
         h = _make_handler()
         h._serve_theme_static(f"{W.WebUIHandler._THEME_STATIC_PREFIX}{theme_id}/theme.css")
         assert h._captured["code"] == 404, (theme_id, h._captured)
+
+
+# --------------------------------------------------------------------------
+# 5. The dashboard shell injects the resolved host payload (office route only)
+# --------------------------------------------------------------------------
+def _shell_body(tmp_path, path, index_html=None):
+    dist = tmp_path / "dist"
+    dist.mkdir(parents=True, exist_ok=True)
+    (dist / "index.html").write_text(
+        index_html or
+        "<!doctype html><html><head></head><body>shell</body></html>",
+        encoding="utf-8")
+    h = _make_handler(path=path)
+    h._qubit_dist = lambda: dist  # type: ignore[method-assign]
+    h._serve_qubit_index()
+    return _body(h)
+
+
+def _theme_global(body):
+    match = re.search(
+        r"window\.__QUBIT_OFFICE_THEME__=(\{.*?\});</script>", body, re.S)
+    assert match, body
+    return json.loads(match.group(1))
+
+
+def test_office_route_injects_the_classic_global(tmp_path, themed_home):
+    body = _shell_body(tmp_path, "/qubit-office")
+    payload = _theme_global(body)
+    assert payload["id"] == "classic"
+    assert payload["active"] is False
+    # The small host payload shape, with no file map and no filesystem path.
+    for key in ("label", "version", "credit", "license", "templateVersion",
+                "assetBase", "atlas", "index", "bodies", "tokens", "slices"):
+        assert key in payload, key
+    assert "files" not in payload
+    assert "/home/" not in json.dumps(payload)
+
+
+def test_office_route_injects_the_env_active_theme(tmp_path, themed_home,
+                                                  monkeypatch):
+    monkeypatch.setenv("QUBIT_OFFICE_THEME", THEME_ID)
+    body = _shell_body(tmp_path, "/qubit-office/")
+    payload = _theme_global(body)
+    assert payload["id"] == THEME_ID
+    assert payload["active"] is True
+    assert payload["tokens"]["color-surface"] == THEME_TOKEN_VALUE
+    assert payload["assetBase"].endswith(f"/themes/{THEME_ID}")
+    assert "files" not in payload
+
+
+def test_office_route_honours_the_theme_query(tmp_path, themed_home):
+    body = _shell_body(tmp_path, f"/qubit-office?theme={THEME_ID}")
+    payload = _theme_global(body)
+    assert payload["id"] == THEME_ID
+    assert payload["active"] is True
+
+
+def test_office_route_invalid_override_is_classic(tmp_path, themed_home):
+    body = _shell_body(tmp_path, "/qubit-office?theme=Not_An_Id")
+    payload = _theme_global(body)
+    assert payload["id"] == "classic"
+    assert payload["active"] is False
+
+
+@pytest.mark.parametrize("path", ["/chat", "/sessions", "/qubit-office2",
+                                  "/qubit-office-extra"])
+def test_other_shell_routes_get_no_office_theme_global(tmp_path, themed_home,
+                                                       path):
+    body = _shell_body(tmp_path, path)
+    assert "__QUBIT_OFFICE_THEME__" not in body, (path, body)
+
+
+def test_pack_text_cannot_break_out_of_the_script(tmp_path, themed_home,
+                                                  monkeypatch):
+    payload = T._classic_payload(None)
+    payload["label"] = '</script><script>alert(1)</script>'
+    monkeypatch.setattr(
+        T, "theme_payload",
+        lambda cfg, requested=None: dict(payload))
+    body = _shell_body(tmp_path, "/qubit-office")
+    assert "<script>alert(1)</script>" not in body
+    assert "\\u003c/script\\u003e" in body
+    # The real global still parses after escaping.
+    assert _theme_global(body)["label"] == payload["label"]
+
+
+def test_host_stylesheet_rejects_an_invalid_theme_id(themed_home):
+    # A directory alone must not make an id valid: _ID_RE is checked first.
+    bad = T.user_theme_root() / "Demo"
+    bad.mkdir(parents=True, exist_ok=True)
+    (bad / "theme.json").write_text("{}", encoding="utf-8")
+    h = _make_handler()
+    h._serve_theme_static(
+        f"{W.WebUIHandler._THEME_STATIC_PREFIX}Demo/theme.css")
+    assert h._captured["code"] == 404

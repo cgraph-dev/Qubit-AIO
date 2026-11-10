@@ -96,6 +96,19 @@ export interface OfficeMenuState {
 export interface OfficeMenuOptions {
   onToggleAgents: () => void;
   onToggleHud: () => void;
+  /**
+   * How long to wait for the app's own Panels group before telling the shell
+   * to render its fallback buttons. Default 1500 ms.
+   */
+  fallbackAfterMs?: number;
+  /**
+   * Show/hide the host-rendered fallback. Called ``true`` once the bounded
+   * wait expires with no group, and ``false`` as soon as injection attaches
+   * (or on dispose), so the two are never visible at the same time.
+   */
+  onFallback?: (show: boolean) => void;
+  /** The injected controls attached to the app's own group. */
+  onAttach?: () => void;
 }
 
 export interface OfficeMenuController {
@@ -103,6 +116,8 @@ export interface OfficeMenuController {
   update(state: OfficeMenuState): void;
   /** Remove the buttons and stop watching the document. */
   dispose(): void;
+  /** Whether the injected buttons are currently mounted in the app group. */
+  attached(): boolean;
 }
 
 /**
@@ -116,6 +131,22 @@ export interface OfficeMenuController {
  * nothing (the Agents plus lost its crossbar at 22 px).
  */
 const MAX_ICON_PX = 28;
+
+/** The traced icon's native geometry (shared by injected and fallback buttons). */
+export function menuIconGeometry(spec: MenuButtonSpec): {
+  width: number;
+  height: number;
+  viewBox: string;
+  d: string;
+} {
+  const scale = Math.min(1, MAX_ICON_PX / spec.icon.cols);
+  return {
+    width: Math.max(1, Math.round(spec.icon.cols * scale)),
+    height: Math.max(1, Math.round(spec.icon.rows * scale)),
+    viewBox: `0 0 ${spec.icon.cols} ${spec.icon.rows}`,
+    d: spec.icon.d,
+  };
+}
 
 /** Build one button with the app's own classes and icon convention. */
 function buildButton(
@@ -138,19 +169,17 @@ function buildButton(
 
   const ns = "http://www.w3.org/2000/svg";
   const svg = doc.createElementNS(ns, "svg");
-  const scale = Math.min(1, MAX_ICON_PX / spec.icon.cols);
-  const width = Math.max(1, Math.round(spec.icon.cols * scale));
-  const height = Math.max(1, Math.round(spec.icon.rows * scale));
+  const geometry = menuIconGeometry(spec);
   svg.setAttribute("class", "ui-px-icon");
-  svg.setAttribute("width", String(width));
-  svg.setAttribute("height", String(height));
-  svg.setAttribute("viewBox", `0 0 ${spec.icon.cols} ${spec.icon.rows}`);
+  svg.setAttribute("width", String(geometry.width));
+  svg.setAttribute("height", String(geometry.height));
+  svg.setAttribute("viewBox", geometry.viewBox);
   svg.setAttribute("shape-rendering", "crispEdges");
   svg.setAttribute("aria-hidden", "true");
   svg.setAttribute("focusable", "false");
   const path = doc.createElementNS(ns, "path");
   path.setAttribute("fill", "currentColor");
-  path.setAttribute("d", spec.icon.d);
+  path.setAttribute("d", geometry.d);
   svg.appendChild(path);
   button.appendChild(svg);
   return button;
@@ -175,8 +204,20 @@ export function installOfficeMenuButtons(
     hud: null,
   };
   const state: OfficeMenuState = { agents: false, hud: false };
+  let fallbackShown = false;
+  let attachedOnce = false;
 
   const findGroup = (): Element | null => doc.querySelector(PANELS_GROUP_SELECTOR);
+
+  const isAttached = (): boolean => Boolean(
+    byId.agents && byId.agents.isConnected
+    && byId.hud && byId.hud.isConnected);
+
+  const setFallback = (show: boolean): void => {
+    if (fallbackShown === show) return;
+    fallbackShown = show;
+    opts.onFallback?.(show);
+  };
 
   const insert = (group: Element, button: HTMLButtonElement): void => {
     // Before the two utilities (Settings, Help), after the tools: the added
@@ -199,12 +240,23 @@ export function installOfficeMenuButtons(
       byId[spec.id] = button;
       insert(group, button);
     }
-    return true;
+    if (!attachedOnce && isAttached()) {
+      attachedOnce = true;
+      clearTimeout(fallbackTimer);
+      setFallback(false);
+      opts.onAttach?.();
+    }
+    return isAttached();
   };
 
   // A group that is not in the document yet is picked up by the observer below
   // rather than treated as a failure: a mount that happens after the load
-  // event must not lose the buttons.
+  // event must not lose the buttons. If it NEVER appears, the shell is told to
+  // render its own fallback icons after a bounded wait, so an upstream DOM
+  // change cannot silently remove the only way to open the Agents/HUD docks.
+  const fallbackTimer = setTimeout(() => {
+    if (!isAttached()) setFallback(true);
+  }, Math.max(0, opts.fallbackAfterMs ?? 1500));
   attach();
 
   let scheduled = false;
@@ -229,8 +281,13 @@ export function installOfficeMenuButtons(
         if (button) button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
       }
     },
+    attached(): boolean {
+      return isAttached();
+    },
     dispose(): void {
       observer.disconnect();
+      clearTimeout(fallbackTimer);
+      setFallback(false);
       for (const spec of MENU_BUTTONS) {
         const button = byId[spec.id];
         if (button && button.isConnected) button.remove();

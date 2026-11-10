@@ -24,6 +24,8 @@
  * ``null`` so a caller can fall back instead of emitting a broken request.
  */
 
+import { hostBasePath } from "./office-app";
+
 /** A ``[col, row]`` atlas cell, or nothing when the pack does not list it. */
 export type AtlasCell = readonly [number, number] | null | undefined;
 
@@ -265,6 +267,32 @@ export type ThemeFetch = (
 /** The compat route the dashboard token gate already authorizes. */
 export const OFFICE_THEME_ROUTE = "/agent/api/office/theme";
 
+/** The route namespace the server serves theme assets under. */
+export const OFFICE_THEME_ASSET_BASE = "/plugins/qubit-office/themes";
+
+/** The server-injected global that carries the resolved host payload. */
+export const OFFICE_THEME_GLOBAL = "__QUBIT_OFFICE_THEME__";
+
+type ThemeWindow = (Window & {
+  __QUBIT_SESSION_TOKEN__?: string;
+  __QUBIT_OFFICE_THEME__?: unknown;
+}) | null | undefined;
+
+/** The window this module should read the global/token from. */
+function themeWindow(win?: Window | null): ThemeWindow {
+  if (win !== undefined) return win as ThemeWindow;
+  if (typeof window === "undefined") return null;
+  return window as ThemeWindow;
+}
+
+/** Prefix a root-relative URL with the dashboard base (subpath deployments). */
+function withHostBase(url: string): string {
+  const base = hostBasePath();
+  if (!url || !base || !url.startsWith("/")) return url;
+  if (url === base || url.startsWith(`${base}/`)) return url;
+  return `${base}${url}`;
+}
+
 /** The class the shell root carries so Task 7 can scope its own chrome. */
 export function officeThemeClass(
   theme: OfficeTheme | null | undefined,
@@ -277,53 +305,108 @@ export function officeThemeClass(
  *
  * The CSS is generated server-side from the SAME validated payload: a classic
  * theme has no stylesheet, and every URL carries `?v=<version>` so it can be
- * cached for an hour (the version names the bytes).
+ * cached for an hour (the version names the bytes). ``assetBase`` is a route
+ * URL from the server; when it is absent (a hand-built/legacy payload) the
+ * known namespace is used, and the dashboard's own base path is prefixed so a
+ * subpath deployment resolves it (same rule as ``agentsPanelUrl``).
  */
 export function themeCss(theme: OfficeTheme | null | undefined): string {
   if (!theme || !theme.active || !theme.id) return "";
-  const base = String(theme.assetBase || "").replace(/\/+$/, "");
+  const base = String(
+    theme.assetBase || `${OFFICE_THEME_ASSET_BASE}/${theme.id}`,
+  ).replace(/\/+$/, "");
   if (!base) return "";
   const version = encodeURIComponent(theme.version || "");
-  return `${base}/theme.css?v=${version}`;
+  return withHostBase(`${base}/theme.css?v=${version}`);
 }
 
 /** Normalise a dashboard base path the same way `office-app.ts` does. */
 function themeBase(base?: string): string {
-  const raw = base ?? "";
+  const raw = base === undefined ? hostBasePath() : base;
   return raw.endsWith("/") ? raw.slice(0, -1) : raw;
 }
 
+/** Read the document's injected session token (or the parent's, in an app). */
+function sessionToken(win?: Window | null): string {
+  const w = themeWindow(win);
+  if (!w) return "";
+  if (typeof w.__QUBIT_SESSION_TOKEN__ === "string"
+      && w.__QUBIT_SESSION_TOKEN__) {
+    return w.__QUBIT_SESSION_TOKEN__;
+  }
+  try {
+    const parent = (w as unknown as {
+      parent?: { __QUBIT_SESSION_TOKEN__?: string };
+    }).parent;
+    return (parent && parent.__QUBIT_SESSION_TOKEN__) || "";
+  } catch {
+    return "";
+  }
+}
+
 /**
- * Load the active theme for the host, with ONE `no-store` request.
+ * The server-injected host payload, when the shell is served by Qubit.
  *
- * Classic (no requested id, or the literal `classic`) resolves `null` WITHOUT
- * a request: there is nothing to theme, and an idle page must not poll. A
- * requested id asks the server, whose answer is authoritative — an unknown or
- * invalid override falls back to `classic` (`active: false`) and so does a
- * failed/garbage response, never a fabricated pack.
+ * The global is the PRIMARY source: it is generated on the server from the
+ * same resolved payload as the iframe (so config/env themes work with no
+ * `?theme=` and no first-paint fetch/auth gap). It is validated here rather
+ * than trusted: an object with a non-empty string ``id`` and a boolean
+ * ``active``. An absent/invalid global falls through to the authenticated
+ * fetch below.
+ */
+export function readOfficeThemeGlobal(
+  win?: Window | null,
+): OfficeTheme | null {
+  const raw = themeWindow(win)?.[OFFICE_THEME_GLOBAL];
+  if (!raw || typeof raw !== "object") return null;
+  const candidate = raw as Partial<OfficeTheme>;
+  if (typeof candidate.id !== "string" || !candidate.id) return null;
+  if (typeof candidate.active !== "boolean") return null;
+  if (candidate.active) {
+    if (typeof candidate.tokens !== "object" || candidate.tokens === null) {
+      return null;
+    }
+  }
+  return candidate as OfficeTheme;
+}
+
+/**
+ * Load the resolved office theme for the host.
  *
- * The env kill switch (`QUBIT_OFFICE_THEME`) is applied by the SAME server
- * handler, so the returned payload is what the iframe is actually themed with;
- * `?theme=` is a request, not a client-side decision.
+ * ORDER MATTERS. The server-injected global wins: it already contains the
+ * config/env/`?theme=` resolution (the env kill switch still applies on the
+ * server), so the host paints the same theme as the iframe with no request.
+ * Only when the global is absent (an older server, or the shell embedded
+ * outside Qubit) does this make ONE authenticated `no-store` request.
+ *
+ * Classic is a valid answer from both paths and results in no class/link; an
+ * unknown/invalid override or a failed response is also `null`, never a
+ * fabricated pack.
  */
 export async function loadOfficeTheme(
   fetchImpl: ThemeFetch | null | undefined,
   base?: string,
   requested?: string | null,
+  win?: Window | null,
 ): Promise<OfficeTheme | null> {
-  const want = String(requested ?? "").trim();
-  if (!want || want === "classic") return null;
+  const injected = readOfficeThemeGlobal(win);
+  if (injected) return injected;
   if (typeof fetchImpl !== "function") return null;
-  const url = `${themeBase(base)}${OFFICE_THEME_ROUTE}?theme=${encodeURIComponent(want)}`;
+  const want = String(requested ?? "").trim();
+  const query = want ? `?theme=${encodeURIComponent(want)}` : "";
+  const url = `${themeBase(base)}${OFFICE_THEME_ROUTE}${query}`;
+  const token = sessionToken(win);
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) headers["X-Qubit-Session-Token"] = token;
   try {
     const response = await fetchImpl(url, {
       cache: "no-store",
       credentials: "same-origin",
-      headers: { Accept: "application/json" },
+      headers,
     });
     if (!response || response.ok === false) return null;
     const payload = await response.json() as OfficeTheme | null;
-    if (!payload || payload.active !== true) return null;
+    if (!payload || typeof payload.active !== "boolean") return null;
     if (typeof payload.id !== "string" || !payload.id) return null;
     return payload;
   } catch {

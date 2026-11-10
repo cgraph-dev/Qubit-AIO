@@ -318,4 +318,38 @@ describe("host theme + rerender stability", () => {
     expect(root?.props["data-office-theme"]).toBeUndefined();
     h.cleanup();
   });
+
+  it("renders host fallback icons when the app menu never appears", () => {
+    // State order: loaded, failed, panelOpen, hudOpen, agentsOpen, officeTheme,
+    // menuFallback. The controller's bounded wait reported the fallback.
+    const h = createStatefulHarness({ 6: true });
+    h.render({});
+    const fallback = h.tree.find(
+      (e) => e.props["data-testid"] === "office-menu-fallback");
+    expect(fallback).toBeDefined();
+    const agents = h.tree.find(
+      (e) => e.props["data-testid"] === "office-menu-agents-fallback");
+    const hud = h.tree.find(
+      (e) => e.props["data-testid"] === "office-menu-hud-fallback");
+    expect(agents).toBeDefined();
+    expect(hud).toBeDefined();
+    // Same stable theme hooks as the injected controls.
+    expect(String(agents?.props.className)).toContain("office-theme-menu-btn");
+    expect(String(agents?.props.className)).toContain("office-theme-menu-agents");
+    expect(String(agents?.props.className)).toContain("office-theme-menu-fallback-btn");
+    expect(agents?.props["aria-label"]).toBe("Agents");
+    // The traced SVG is present (not a text placeholder).
+    const svg = (agents as { props: { children: unknown[] } })
+      .props.children[0] as { type: unknown };
+    expect(svg.type).toBe("svg");
+    h.cleanup();
+  });
+
+  it("renders no fallback while injection is available", () => {
+    const h = createStatefulHarness();
+    h.render({});
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-menu-fallback")).toBeUndefined();
+    h.cleanup();
+  });
 });
