@@ -38,6 +38,9 @@ from voicebridge.communications.reports import ReportStore  # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
 
 FIX = REPO_ROOT / "tests" / "fixtures" / "communications"
 
@@ -1199,7 +1202,8 @@ def test_cli_help_and_docs_syntax_identical(tmp_path):
     assert "VOICE_BRIDGE_MONITOR_ENABLE" in help_text
     # the invalid documented syntax is gone from the repo
     assert "--dry-run=false" not in help_text
-    docs = (REPO_ROOT / "docs/archive/2026-09-21" / "OPERATIONS_8D.md").read_text()
+    # Purged in eafb54e26; read read-only from pre-purge history.
+    docs = require_ledger("docs/archive/2026-09-21/OPERATIONS_8D.md")
     assert "--dry-run=false" not in docs
     assert "VOICE_BRIDGE_MONITOR_ENABLE=1" in docs
     assert "--install --enable" in docs
