@@ -666,3 +666,29 @@ def test_contact_sheet_refuses_to_write_inside_the_repo(tmp_path):
         E.write_contact_sheet(image, str(REPO / "ui-contact-sheet"))
     assert "inside the repository" in str(caught.value)
     assert not (REPO / "ui-contact-sheet").exists()
+
+
+def test_cli_source_reports_parts_and_check_is_reproducible(tmp_path, capsys):
+    root = _make_purchase(tmp_path)
+    assert E.main(["--source", str(root)]) == 0
+    first = json.loads(capsys.readouterr().out)
+    assert first["ok"] is True
+    assert first["size"] == 32
+    assert set(first["parts"]) == {"body", "eyes", "hair", "outfit", "skin"}
+    assert all(count > 0 for count in first["parts"].values())
+    assert len(first["digest"]) == 64
+    # No art, no archive, no pack was written by the read-only report.
+    assert not list(tmp_path.rglob("*.png"))
+    assert not list(tmp_path.rglob("theme.json"))
+
+    assert E.main(["--source", str(root), "--check"]) == 0
+    second = json.loads(capsys.readouterr().out)
+    assert second["checked"] is True
+    assert second["digest"] == first["digest"]
+    assert second["parts"] == first["parts"]
+
+
+def test_cli_check_requires_source(capsys):
+    with pytest.raises(SystemExit) as info:
+        E.main(["--check"])
+    assert info.value.code == 2

@@ -88,6 +88,7 @@ is a typed refusal. The derived sheet is authoring aid only and is not shipped.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import io
 import json
 import re
@@ -715,6 +716,25 @@ def write_contact_sheet(image: Image.Image, out: str, *,
     return path
 
 
+def _summarize_layers(layers: Mapping[str, Sequence[object]]) -> Dict[str, object]:
+    """Counts plus a decoded-pixel digest; no art, names, or filesystem paths."""
+    summary: Dict[str, int] = {}
+    digest = hashlib.sha256()
+    for part in sorted(layers):
+        sheets = layers[part]
+        summary[part] = len(sheets)
+        digest.update(part.encode("utf-8"))
+        for sheet in sheets:
+            views = sheet if isinstance(sheet, Mapping) else {"": sheet}
+            for view in sorted(views):
+                image = views[view]
+                rgba = image.convert("RGBA")
+                digest.update(view.encode("utf-8"))
+                digest.update(f"{rgba.width}x{rgba.height}".encode("ascii"))
+                digest.update(rgba.tobytes())
+    return {"parts": summary, "digest": digest.hexdigest()}
+
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = argparse.ArgumentParser(
         prog="office_theme_extract.py",
@@ -724,12 +744,23 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "9-slice coordinates. Never writes the purchase into the repo."))
     action = parser.add_mutually_exclusive_group(required=True)
     action.add_argument(
+        "--source", metavar="PATH",
+        help="read the purchased generator zips in memory and report the "
+             "discovered parts (counts + a decoded-pixel digest); writes nothing")
+    action.add_argument(
         "--tokens", metavar="SHEET",
         help="sample the dominant Modern UI colours and print the validated "
              "semantic tokens (png/jpg/webp or a zip member)")
     action.add_argument(
         "--ui-contact-sheet", metavar="SHEET",
         help="write a labelled coordinate grid of the sheet (requires --out)")
+    parser.add_argument(
+        "--check", action="store_true",
+        help="with --source, extract twice and verify the decoded pixels and "
+             "part counts are identical")
+    parser.add_argument(
+        "--size", type=int, default=32, choices=(16, 32, 48),
+        help="tier to read with --source (default 32)")
     parser.add_argument("--out", default=None,
                         help="output directory for --ui-contact-sheet")
     parser.add_argument("--member", default=None,
@@ -739,7 +770,26 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--ui-grid", type=int, default=16,
                         help="contact-sheet grid step in source pixels (default 16)")
     args = parser.parse_args(argv)
+    if args.check and not args.source:
+        parser.error("--check requires --source")
     try:
+        if args.source:
+            first = _summarize_layers(extract_layers(args.source, size=args.size))
+            if args.check:
+                second = _summarize_layers(
+                    extract_layers(args.source, size=args.size))
+                if first != second:
+                    print(
+                        "error: extraction is not reproducible across two reads",
+                        file=sys.stderr)
+                    return 1
+            print(json.dumps({
+                "ok": True,
+                "size": args.size,
+                "checked": bool(args.check),
+                **first,
+            }, indent=2, sort_keys=True))
+            return 0
         if args.tokens:
             result = derive_tokens(args.tokens, member=args.member)
             print(json.dumps({

@@ -117,6 +117,35 @@
   pointer-events: auto;
 }
 
+/* The persistent Credits/About surface. It belongs to the Qubit shell (never
+   the vendored client, never the pack), so LimeZu attribution is present with
+   `classic` and survives a theme change. Only the link takes pointer events. */
+.office-game__credits {
+  position: absolute;
+  z-index: 3;
+  bottom: var(--office-s2);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 6px;
+  border-radius: var(--office-radius, 6px);
+  background: rgba(11, 15, 22, 0.78);
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  line-height: 1.2;
+  pointer-events: none;
+}
+
+.office-game__credits a {
+  color: inherit;
+  pointer-events: auto;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.office-game__credits a:hover {
+  color: var(--office-accent, #7dd3c8);
+}
+
 .office-game__loading,
 .office-game__error {
   position: absolute;

@@ -24,6 +24,10 @@ import {
   bindingSummary, bindingVerdict,
 } from "./office-api";
 
+/** Always-present art credit; it must not depend on a theme being active. */
+export const OFFICE_ART_CREDIT = "Office art: LimeZu — limezu.itch.io";
+export const OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
+
 export interface OfficeAppProps {
   /** The dashboard's base path (empty at the root). */
   base?: string;
@@ -298,6 +302,21 @@ export function createOfficeApp(
         id: "office-app-description",
         className: "office-game__sr-only",
       }, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled."),
+      // The persistent Credits/About surface. It is part of the Qubit shell,
+      // not the vendored client and not the theme, so the LimeZu attribution
+      // stays visible with `classic` and after a theme is removed.
+      R.createElement("div", {
+        key: "credits",
+        className: "office-game__credits",
+        "data-testid": "office-app-credits",
+        role: "note",
+        "aria-label": "Art credit",
+      }, R.createElement("a", {
+        key: "limezu",
+        href: OFFICE_ART_CREDIT_URL,
+        target: "_blank",
+        rel: "noopener noreferrer",
+      }, OFFICE_ART_CREDIT)),
     ];
 
     if (!loaded && !failed) {

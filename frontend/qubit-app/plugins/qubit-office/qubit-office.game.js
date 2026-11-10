@@ -193761,6 +193761,9 @@ create: function(game) {
 		return `${v.bound.length} bound · ${v.missing.length} unavailable · ${v.gated.length} confirmation-gated`;
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
+	/** Always-present art credit; it must not depend on a theme being active. */
+	var OFFICE_ART_CREDIT = "Office art: LimeZu — limezu.itch.io";
+	var OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
 	/**
 	* The theme the host page asked for (`/qubit-office?theme=<id>`).
 	*
@@ -193920,29 +193923,44 @@ create: function(game) {
 			});
 			const dockSlice = officeSliceName(officeTheme, "dock");
 			const buttonSlice = officeSliceName(officeTheme, "button");
-			const children = [R.createElement("iframe", {
-				key: "frame",
-				ref: frameRef,
-				title: "Habblaud virtual office",
-				"data-testid": "office-app-frame",
-				className: "office-game__frame",
-				"aria-label": "Habblaud office game",
-				"aria-describedby": "office-app-description",
-				"aria-busy": !loaded && !failed,
-				"data-state": failed ? "error" : loaded ? "ready" : "loading",
-				sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
-				allow: "clipboard-read; clipboard-write",
-				style: {
-					border: "0",
-					width: "100%",
-					height: "100%",
-					display: "block"
-				}
-			}), R.createElement("p", {
-				key: "description",
-				id: "office-app-description",
-				className: "office-game__sr-only"
-			}, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled.")];
+			const children = [
+				R.createElement("iframe", {
+					key: "frame",
+					ref: frameRef,
+					title: "Habblaud virtual office",
+					"data-testid": "office-app-frame",
+					className: "office-game__frame",
+					"aria-label": "Habblaud office game",
+					"aria-describedby": "office-app-description",
+					"aria-busy": !loaded && !failed,
+					"data-state": failed ? "error" : loaded ? "ready" : "loading",
+					sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
+					allow: "clipboard-read; clipboard-write",
+					style: {
+						border: "0",
+						width: "100%",
+						height: "100%",
+						display: "block"
+					}
+				}),
+				R.createElement("p", {
+					key: "description",
+					id: "office-app-description",
+					className: "office-game__sr-only"
+				}, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled."),
+				R.createElement("div", {
+					key: "credits",
+					className: "office-game__credits",
+					"data-testid": "office-app-credits",
+					role: "note",
+					"aria-label": "Art credit"
+				}, R.createElement("a", {
+					key: "limezu",
+					href: OFFICE_ART_CREDIT_URL,
+					target: "_blank",
+					rel: "noopener noreferrer"
+				}, OFFICE_ART_CREDIT))
+			];
 			if (!loaded && !failed) children.push(R.createElement("div", {
 				key: "loading",
 				className: "office-game__panel office-game__loading",

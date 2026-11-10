@@ -69,6 +69,21 @@ describe("Habblaud embedding", () => {
     expect(h.frame.removeEventListener).toHaveBeenCalledWith("load", expect.any(Function));
   });
 
+  it("always names the LimeZu art credit, independent of a theme", () => {
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({});
+    const credits = h.tree.find(
+      (e) => e.props["data-testid"] === "office-app-credits");
+    expect(credits).toBeDefined();
+    const link = h.tree.find(
+      (e) => e.props.href === "https://limezu.itch.io");
+    expect(link).toBeDefined();
+    expect(String((link?.props.children as unknown[])[0])).toContain("LimeZu");
+    // Classic payload: no theme class and still the same persistent credit.
+    expect(h.tree.find((e) => e.props["data-office-theme"])).toBeUndefined();
+  });
+
   it("has no seat-model control when no seat is named", () => {
     // The default office view must stay exactly the game.
     const h = createHarness();
