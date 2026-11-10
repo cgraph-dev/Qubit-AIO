@@ -122,6 +122,43 @@ def runner():
     return _load_runner()
 
 
+@pytest.fixture(scope="module", autouse=True)
+def _byte_manifest_from_history(tmp_path_factory, request):
+    """Make the purged Hermes byte manifest readable for this module.
+
+    ``docs/differential/`` (the frozen v1 interface plus the byte manifest) was
+    purged in ``eafb54e26``. The runner's fail-closed ``byte_parity`` gate reads
+    that manifest, so without it two checks fail on absence rather than on
+    content. The artifact is a real generator output that still exists verbatim
+    at ``eafb54e26^``; materialise it read-only in a temp dir and point the
+    runner at it through ``QUBIT_DIFFERENTIAL_BYTE_MANIFEST`` (the runner's own
+    documented override). Nothing is written into the tree and nothing is
+    hand-authored — when history does not have it either, the gate stays
+    fail-closed and this module skips with the named reason.
+    """
+    import _purged_ledger as PL
+
+    rel = "docs/differential/byte_manifest/hermes/HERMES_BYTE_MANIFEST.json"
+    if PL.is_in_tree(rel):
+        yield None
+        return
+    text = PL.read_pre_purge_text(rel)
+    if text is None:
+        yield None
+        return
+    path = tmp_path_factory.mktemp("byte_manifest") / rel.rsplit("/", 1)[-1]
+    path.write_text(text, encoding="utf-8")
+    old = os.environ.get("QUBIT_DIFFERENTIAL_BYTE_MANIFEST")
+    os.environ["QUBIT_DIFFERENTIAL_BYTE_MANIFEST"] = str(path)
+    try:
+        yield path
+    finally:
+        if old is None:
+            os.environ.pop("QUBIT_DIFFERENTIAL_BYTE_MANIFEST", None)
+        else:
+            os.environ["QUBIT_DIFFERENTIAL_BYTE_MANIFEST"] = old
+
+
 # --------------------------------------------------------------- shared helpers
 def _canonical(obj) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"),
