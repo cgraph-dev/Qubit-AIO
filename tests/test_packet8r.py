@@ -1221,8 +1221,12 @@ def test_dashboard_opencode_readonly_behavioral(tmp_path):
             urllib.request.urlopen(req, timeout=10)
             posted = True
         except urllib.error.HTTPError as exc:
-            posted = False
-            assert exc.code == 404
+            # HTTPError holds the response body fp; close it or it leaks.
+            try:
+                posted = False
+                assert exc.code == 404
+            finally:
+                exc.close()
         assert posted is False
         # Nothing executed: no receipts exist for this config scope.
         recs = OC.opencode_runner(cfg).receipts(10)["receipts"]

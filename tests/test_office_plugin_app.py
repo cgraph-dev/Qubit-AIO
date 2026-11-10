@@ -90,11 +90,16 @@ def _make_handler(*, sub="", path=None, headers=None, peer="127.0.0.1",
     h.server = type("S", (), {"app": _app})()
     captured: dict = {}
 
-    def _send(code, body, ctype="text/plain", extra_headers=None):
+    def _send(code, body, ctype="text/plain", extra_headers=None,
+              cache_control="no-store"):
+        # Mirror WebUIHandler._send exactly: production threads `cache_control`
+        # through here, so a stub without it raises TypeError on every served
+        # asset instead of exercising the security contract.
         captured["code"] = code
         captured["body"] = body
         captured["ctype"] = ctype
         captured["extra_headers"] = extra_headers
+        captured["cache_control"] = cache_control
 
     h._send = _send  # type: ignore[method-assign]
     h._captured = captured

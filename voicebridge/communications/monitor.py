@@ -442,8 +442,12 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
     if lease_clamped:
         lease_ttl = LEASE_MIN_TTL_S
     st = store or communications_store(cfg)
+    # Only close what we opened: a caller that passes a store keeps ownership.
+    owned = store is None
     owner = f"monitor-{uuid.uuid4().hex[:8]}"
     if not st.acquire_lease(MONITOR_LEASE, owner, ttl_s=lease_ttl):
+        if owned:
+            st.close()
         return {"state": "degraded", "code": "OVERLAP",
                 "detail": "another monitor run holds the hourly lease",
                 "exit_code": 1}
@@ -628,6 +632,8 @@ def run_hourly(cfg, *, platforms: Optional[List[str]] = None,
         return out
     finally:
         st.release_lease(MONITOR_LEASE, owner)
+        if owned:
+            st.close()
 
 
 def _retry_pending_notifications(cfg, st, *, max_retries: Optional[int] = None,
@@ -793,6 +799,8 @@ def monitor_health(cfg, store=None) -> Dict[str, Any]:
     """Typed monitor health: CDP precondition, timer/service state, last scan,
     notification backlog, report/evidence counts."""
     st = store or communications_store(cfg)
+    # Only close what we opened: a caller that passes a store keeps ownership.
+    owned = store is None
     out: Dict[str, Any] = {
         "cdp": cdp_precondition(cfg),
         "lease_held": st.lease_ok(MONITOR_LEASE),
@@ -824,6 +832,9 @@ def monitor_health(cfg, store=None) -> Dict[str, Any]:
         out["legacy_count"] = len(idx["legacy"])
     except Exception:
         pass
+    finally:
+        if owned:
+            st.close()
     return out
 
 

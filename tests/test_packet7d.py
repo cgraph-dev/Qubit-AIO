@@ -720,11 +720,14 @@ def test_settings_page_served(tmp_path, monkeypatch):
         import http.client
         conn = http.client.HTTPConnection(
             "127.0.0.1", ui._server.server_port, timeout=5)
-        conn.request("GET", "/settings")
-        resp = conn.getresponse()
-        resp.read()
-        assert resp.status == 302, resp.status
-        assert resp.getheader("Location") == "/config"
+        try:
+            conn.request("GET", "/settings")
+            resp = conn.getresponse()
+            resp.read()
+            assert resp.status == 302, resp.status
+            assert resp.getheader("Location") == "/config"
+        finally:
+            conn.close()
         # The labelled /classic/ fallback still serves the static page.
         import urllib.request
         with urllib.request.urlopen(

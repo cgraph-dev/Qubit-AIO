@@ -20,6 +20,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 from voicebridge.communications.adapters.registry import (  # noqa: E402
     communications_store, run_scan,
 )
@@ -38,6 +40,39 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 FIX = REPO_ROOT / "tests" / "fixtures" / "communications"
+
+
+@pytest.fixture(autouse=True)
+def _close_stores(monkeypatch):
+    """Close every CommunicationsStore the test opens.
+
+    The store owns a sqlite3 connection; a test that drops its handle without
+    closing it leaves the fd to the GC, which finalises it under whichever test
+    happens to trigger collection -- a ResourceWarning/PytestUnraisableException
+    that fails an unrelated test under `-n auto`. Wrapping the module-level
+    factory keeps that ownership here instead of at thirty call sites.
+    """
+    opened = []
+
+    def _tracking_store(cfg):
+        st = _real_store(cfg)
+        opened.append(st)
+        return st
+
+    _real_store = communications_store
+    monkeypatch.setattr(
+        "voicebridge.communications.adapters.registry.communications_store",
+        _tracking_store)
+    monkeypatch.setattr(sys.modules[__name__], "communications_store",
+                        _tracking_store)
+    try:
+        yield
+    finally:
+        for st in opened:
+            try:
+                st.close()
+            except Exception:
+                pass
 
 
 class _SyncThread:

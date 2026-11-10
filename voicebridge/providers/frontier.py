@@ -60,6 +60,10 @@ def urllib_transport(url: str, headers: Dict[str, str], payload: Dict[str, Any],
             raw = he.read().decode() or "{}"
         except Exception:
             raw = "{}"
+        finally:
+            # HTTPError holds the response body fp; closing it is what stops every
+            # non-2xx provider response from leaking a socket to the GC.
+            he.close()
         try:
             body = json.loads(raw)
         except Exception:

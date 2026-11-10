@@ -308,6 +308,7 @@ def test_receipt_carries_resolved_identity(monkeypatch):
 
 def test_chat_transport_receipt_keeps_local_identity(tmp_path, monkeypatch):
     from voicebridge import chat_transport as CT
+    import voicebridge.agent as AG
     import voicebridge.local_llm as LL
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -315,6 +316,16 @@ def test_chat_transport_receipt_keeps_local_identity(tmp_path, monkeypatch):
     def _fake_chat_local(text, conversation_prompt="", **kw):
         return "answer"
 
+    # `turn` routes a general conversation through the tool-capable agent
+    # (_agent_chat -> AG.run_agent_turn). This test owns the receipt identity of
+    # the LEGACY local path, so pin the agent seam to "no runtime": _agent_chat
+    # then returns None and the turn falls back to the stubbed chat_local.
+    # Leaving it live dials the real provider and sits in the API-retry backoff
+    # (the 3-minute run) and spawns a gateway.
+    def _no_runtime(*a, **kw):
+        raise RuntimeError("no vendored runtime in this test")
+
+    monkeypatch.setattr(AG, "run_agent_turn", _no_runtime)
     monkeypatch.setattr(LL, "chat_local", _fake_chat_local)
     res = CT.turn(cfg, "hi", session="ident")
     receipt = res["receipt"]

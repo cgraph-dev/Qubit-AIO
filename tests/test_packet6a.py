@@ -46,11 +46,15 @@ def _http_post_json(url: str, obj: dict):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        body = e.read()
+        # HTTPError holds the response body fp; close it or the socket leaks.
         try:
-            return e.code, json.loads(body.decode())
-        except Exception:
-            return e.code, {"raw": body.decode(errors="replace")}
+            body = e.read()
+            try:
+                return e.code, json.loads(body.decode())
+            except Exception:
+                return e.code, {"raw": body.decode(errors="replace")}
+        finally:
+            e.close()
 
 
 def _http_get(url: str):
@@ -58,11 +62,15 @@ def _http_get(url: str):
         with urllib.request.urlopen(url, timeout=5) as r:
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        body = e.read()
+        # HTTPError holds the response body fp; close it or the socket leaks.
         try:
-            return e.code, json.loads(body.decode())
-        except Exception:
-            return e.code, {"raw": body.decode(errors="replace")}
+            body = e.read()
+            try:
+                return e.code, json.loads(body.decode())
+            except Exception:
+                return e.code, {"raw": body.decode(errors="replace")}
+        finally:
+            e.close()
 
 
 # ========================================================================

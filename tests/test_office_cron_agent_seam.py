@@ -40,6 +40,26 @@ def test_agent_cron_context_and_permissions(tmp_path, monkeypatch, agent_fails):
             captured['closed'] = True
 
     monkeypatch.setattr(run_agent, 'AIAgent', ControlledAgent)
+    # `run_job` delegates agent jobs to run_canonical_job, which reaches the gateway
+    # owner over RPC (connect_gateway -> ensure_gateway_runtime, which SPAWNS a real
+    # `qubit_cli.main gateway run` daemon that outlives the test and is never reaped,
+    # so its Popen finalises inside whatever test the GC runs next). This test owns
+    # cron prompt/scope/agent construction, not gateway admission: run the job in
+    # process by giving it a bound execution, and stamp the authority seam so no
+    # daemon is ever started.
+    import cron.scheduler_authority as authority
+    from gateway.session_cron import _execution, bind_execution
+
+    def _in_process(job, **kwargs):
+        return sched.run_job(
+            job, extra_prompt=kwargs.get('extra_prompt'),
+            execution_id='test-execution')
+
+    monkeypatch.setattr(authority, 'run_canonical_job', _in_process)
+    monkeypatch.setattr(sched, 'run_canonical_job', _in_process, raising=False)
+    exec_token = bind_execution(
+        'test-authority', 'cron_test_session', 'office-agent-context',
+        'test-execution')
     token = set_qubit_home_override(str(home))
     try:
         job = {'id': 'office-agent-context', 'name': 'isolated seam',
@@ -61,4 +81,5 @@ def test_agent_cron_context_and_permissions(tmp_path, monkeypatch, agent_fails):
         assert 'unique-office-run-context' not in job['prompt']
         assert get_session_env('HERMES_SESSION_PLATFORM') != 'cron'
     finally:
+        _execution.reset(exec_token)
         reset_qubit_home_override(token)

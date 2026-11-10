@@ -91,12 +91,16 @@ def _http(port, method, path, body=None, token="test-token", raw=False,
             return r.status, dict(r.headers), (payload if raw else
                                                json.loads(payload or b"{}"))
     except urllib.error.HTTPError as e:
-        payload = e.read()
+        # HTTPError holds the response body fp; close it or the socket leaks.
         try:
-            parsed = json.loads(payload or b"{}")
-        except ValueError:
-            parsed = payload
-        return e.code, dict(e.headers), parsed
+            payload = e.read()
+            try:
+                parsed = json.loads(payload or b"{}")
+            except ValueError:
+                parsed = payload
+            return e.code, dict(e.headers), parsed
+        finally:
+            e.close()
 
 
 def _raw_status(port, path):

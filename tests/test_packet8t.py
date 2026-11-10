@@ -598,7 +598,11 @@ def _dash_http(port, method, path, body=None, raw=None, token=_DASH_TOKEN):
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, r.read()
     except _err.HTTPError as e:
-        return e.code, e.read()
+        # HTTPError holds the response body fp; close it or it leaks.
+        try:
+            return e.code, e.read()
+        finally:
+            e.close()
 
 
 def _production_service_state():
@@ -618,11 +622,14 @@ def test_setup_page_served_without_token_leak(tmp_path):
         # Hermes-first: /setup aliases into the Hermes shell (System).
         import http.client
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-        conn.request("GET", "/setup")
-        resp = conn.getresponse()
-        resp.read()
-        assert resp.status == 302, resp.status
-        assert resp.getheader("Location") == "/system"
+        try:
+            conn.request("GET", "/setup")
+            resp = conn.getresponse()
+            resp.read()
+            assert resp.status == 302, resp.status
+            assert resp.getheader("Location") == "/system"
+        finally:
+            conn.close()
         # The labelled /classic/ fallback still serves the static setup page
         # and carries no secret.
         status, body = _dash_http(port, "GET", "/classic/setup", token="")
