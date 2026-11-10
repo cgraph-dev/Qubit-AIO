@@ -10,37 +10,20 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 ## Summary
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
-- Inventory items (all categories): **8196**
-- Candidate omissions (uncovered surface items): **1760**
-- Distinct capability gaps (no parent row): **731**
-- Parented surfaces needing parent closure (parent not IMPLEMENTED): **1029**
-- Parented surfaces covered by an IMPLEMENTED parent: **0**
-- Distinct capabilities total: **906**; parented surfaces total: **1029**
-- Fork-runtime dispositions (tools/skills/plugins): **175** (IMPLEMENTED 137, GATED 38)
+- Inventory items (all categories): **8201**
+- Candidate omissions (uncovered surface items): **5**
+- Distinct capability gaps (no parent row): **0**
+- Parented surfaces needing parent closure (parent not IMPLEMENTED): **5**
+- Parented surfaces covered by an IMPLEMENTED parent: **1024**
+- Distinct capabilities total: **911**; parented surfaces total: **1029**
+- Fork-runtime dispositions (tools/skills/plugins): **1094** (IMPLEMENTED 1078, GATED 16)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
-- Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=20650 identical=7116 missing=321 extra=4893 changed=8641
+- Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=21122 identical=7075 missing=321 extra=5365 changed=8682
 
 ### Omission counts by category (all uncovered)
 
-- `hermes_dashboard_component`: 17
-- `hermes_dashboard_dialog`: 10
-- `hermes_dashboard_form`: 2
-- `hermes_dashboard_nav`: 18
-- `hermes_dashboard_page`: 19
-- `hermes_dashboard_plugin`: 2
-- `hermes_dashboard_route`: 18
-- `hermes_model`: 232
-- `hermes_plugin_api`: 2
 - `hermes_plugin_asset`: 4
-- `hermes_plugin_test`: 1
-- `hermes_provider`: 39
-- `hermes_workflow`: 132
-- `openclaw_extension`: 116
-- `qubit_backend_route`: 291
-- `qubit_cli_command`: 76
-- `qubit_cli_option`: 407
-- `qubit_cli_positional`: 129
-- `qubit_cli_subcommand`: 245
+- `qubit_cli_option`: 1
 
 ### Evidence-only surface counts (not candidate rows)
 
@@ -48,2371 +31,228 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - `hermes_locale_key`: 370
 - `hermes_upstream_test`: 5145
 
-## Distinct capability gaps (731)
+## Distinct capability gaps (0)
 
 No parent capability row exists; these remain explicit open rows.
 
-### hermes_dashboard_page (19)
-
-- `page:AnalyticsPage` — source `web/src/pages/AnalyticsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/AnalyticsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:ChannelsPage` — source `web/src/pages/ChannelsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/ChannelsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:ChatPage` — source `web/src/pages/ChatPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/ChatPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:ConfigPage` — source `web/src/pages/ConfigPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/ConfigPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:CronPage` — source `web/src/pages/CronPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/CronPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:DocsPage` — source `web/src/pages/DocsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/DocsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:EnvPage` — source `web/src/pages/EnvPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/EnvPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:FilesPage` — source `web/src/pages/FilesPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/FilesPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:LogsPage` — source `web/src/pages/LogsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/LogsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:McpPage` — source `web/src/pages/McpPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/McpPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:ModelsPage` — source `web/src/pages/ModelsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/ModelsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:PairingPage` — source `web/src/pages/PairingPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/PairingPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:PluginsPage` — source `web/src/pages/PluginsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/PluginsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:ProfileBuilderPage` — source `web/src/pages/ProfileBuilderPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/ProfileBuilderPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:ProfilesPage` — source `web/src/pages/ProfilesPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/ProfilesPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:SessionsPage` — source `web/src/pages/SessionsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/SessionsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:SkillsPage` — source `web/src/pages/SkillsPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/SkillsPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:SystemPage` — source `web/src/pages/SystemPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/SystemPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-- `page:WebhooksPage` — source `web/src/pages/WebhooksPage.tsx`; category `hermes_dashboard_page`; CLI=none; dashboard=`web/src/pages/WebhooksPage.tsx`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard page is a distinct capability with no implementing ledger row.
-
-### hermes_dashboard_route (18)
-
-- `dashboard-route:/analytics` — source `web/src/App.tsx:197`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:197`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/channels` — source `web/src/App.tsx:213`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:213`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/chat` — source `web/src/App.tsx:141`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:141`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/config` — source `web/src/App.tsx:217`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:217`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/cron` — source `web/src/App.tsx:209`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:209`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/docs` — source `web/src/App.tsx:221`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:221`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/env` — source `web/src/App.tsx:218`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:218`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/files` — source `web/src/App.tsx:195`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:195`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/logs` — source `web/src/App.tsx:208`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:208`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/mcp` — source `web/src/App.tsx:212`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:212`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/models` — source `web/src/App.tsx:203`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:203`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/pairing` — source `web/src/App.tsx:215`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:215`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/plugins` — source `web/src/App.tsx:211`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:211`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/profiles` — source `web/src/App.tsx:216`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:216`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/sessions` — source `web/src/App.tsx:190`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:190`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/skills` — source `web/src/App.tsx:210`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:210`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/system` — source `web/src/App.tsx:219`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:219`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-- `dashboard-route:/webhooks` — source `web/src/App.tsx:214`; category `hermes_dashboard_route`; CLI=none; dashboard=`web/src/App.tsx:214`; voice=candidate; no parent row and no ledger row. Reason: upstream hermes dashboard route is a distinct capability with no implementing ledger row.
-
-### openclaw_extension (116)
-
-- `openclaw-ext:acpx` — source `extensions/acpx/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/acpx/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/acpx/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:active-memory` — source `extensions/active-memory/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/active-memory/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/active-memory/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:admin-http-rpc` — source `extensions/admin-http-rpc/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/admin-http-rpc/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/admin-http-rpc/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:alibaba` — source `extensions/alibaba/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/alibaba/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/alibaba/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:amazon-bedrock` — source `extensions/amazon-bedrock/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/amazon-bedrock/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/amazon-bedrock/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:amazon-bedrock-mantle` — source `extensions/amazon-bedrock-mantle/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/amazon-bedrock-mantle/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/amazon-bedrock-mantle/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:anthropic` — source `extensions/anthropic/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/anthropic/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/anthropic/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:anthropic-vertex` — source `extensions/anthropic-vertex/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/anthropic-vertex/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/anthropic-vertex/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:arcee` — source `extensions/arcee/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/arcee/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/arcee/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:azure-speech` — source `extensions/azure-speech/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/azure-speech/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/azure-speech/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:bonjour` — source `extensions/bonjour/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/bonjour/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/bonjour/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:brave` — source `extensions/brave/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/brave/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/brave/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:browser` — source `extensions/browser/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/browser/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/browser/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:byteplus` — source `extensions/byteplus/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/byteplus/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/byteplus/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:canvas` — source `extensions/canvas/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/canvas/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/canvas/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:cerebras` — source `extensions/cerebras/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/cerebras/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/cerebras/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:chutes` — source `extensions/chutes/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/chutes/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/chutes/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:cloudflare-ai-gateway` — source `extensions/cloudflare-ai-gateway/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/cloudflare-ai-gateway/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/cloudflare-ai-gateway/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:codex` — source `extensions/codex/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/codex/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/codex/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:codex-supervisor` — source `extensions/codex-supervisor/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/codex-supervisor/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/codex-supervisor/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:cohere` — source `extensions/cohere/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/cohere/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/cohere/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:comfy` — source `extensions/comfy/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/comfy/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/comfy/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:copilot` — source `extensions/copilot/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/copilot/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/copilot/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:copilot-proxy` — source `extensions/copilot-proxy/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/copilot-proxy/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/copilot-proxy/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:deepgram` — source `extensions/deepgram/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/deepgram/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/deepgram/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:deepinfra` — source `extensions/deepinfra/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/deepinfra/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/deepinfra/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:deepseek` — source `extensions/deepseek/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/deepseek/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/deepseek/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:diagnostics-otel` — source `extensions/diagnostics-otel/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/diagnostics-otel/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/diagnostics-otel/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:diagnostics-prometheus` — source `extensions/diagnostics-prometheus/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/diagnostics-prometheus/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/diagnostics-prometheus/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:diffs-language-pack` — source `extensions/diffs-language-pack/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/diffs-language-pack/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/diffs-language-pack/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:discord` — source `extensions/discord/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/discord/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/discord/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:document-extract` — source `extensions/document-extract/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/document-extract/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/document-extract/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:duckduckgo` — source `extensions/duckduckgo/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/duckduckgo/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/duckduckgo/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:elevenlabs` — source `extensions/elevenlabs/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/elevenlabs/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/elevenlabs/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:exa` — source `extensions/exa/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/exa/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/exa/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:fal` — source `extensions/fal/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/fal/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/fal/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:feishu` — source `extensions/feishu/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/feishu/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/feishu/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:file-transfer` — source `extensions/file-transfer/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/file-transfer/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/file-transfer/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:firecrawl` — source `extensions/firecrawl/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/firecrawl/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/firecrawl/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:fireworks` — source `extensions/fireworks/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/fireworks/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/fireworks/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:github-copilot` — source `extensions/github-copilot/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/github-copilot/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/github-copilot/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:gmi` — source `extensions/gmi/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/gmi/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/gmi/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:google` — source `extensions/google/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/google/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/google/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:google-meet` — source `extensions/google-meet/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/google-meet/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/google-meet/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:gradium` — source `extensions/gradium/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/gradium/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/gradium/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:groq` — source `extensions/groq/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/groq/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/groq/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:huggingface` — source `extensions/huggingface/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/huggingface/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/huggingface/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:imessage` — source `extensions/imessage/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/imessage/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/imessage/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:inworld` — source `extensions/inworld/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/inworld/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/inworld/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:kilocode` — source `extensions/kilocode/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/kilocode/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/kilocode/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:kimi-coding` — source `extensions/kimi-coding/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/kimi-coding/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/kimi-coding/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:litellm` — source `extensions/litellm/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/litellm/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/litellm/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:llama-cpp` — source `extensions/llama-cpp/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/llama-cpp/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/llama-cpp/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:lmstudio` — source `extensions/lmstudio/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/lmstudio/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/lmstudio/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:matrix` — source `extensions/matrix/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/matrix/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/matrix/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:media-understanding-core` — source `extensions/media-understanding-core/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/media-understanding-core/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=none. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:memory-core` — source `extensions/memory-core/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/memory-core/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/memory-core/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:memory-lancedb` — source `extensions/memory-lancedb/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/memory-lancedb/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/memory-lancedb/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:memory-wiki` — source `extensions/memory-wiki/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/memory-wiki/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/memory-wiki/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:microsoft` — source `extensions/microsoft/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/microsoft/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/microsoft/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:microsoft-foundry` — source `extensions/microsoft-foundry/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/microsoft-foundry/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/microsoft-foundry/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:migrate-claude` — source `extensions/migrate-claude/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/migrate-claude/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/migrate-claude/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:migrate-hermes` — source `extensions/migrate-hermes/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/migrate-hermes/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/migrate-hermes/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:minimax` — source `extensions/minimax/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/minimax/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/minimax/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:mistral` — source `extensions/mistral/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/mistral/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/mistral/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:moonshot` — source `extensions/moonshot/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/moonshot/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/moonshot/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:novita` — source `extensions/novita/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/novita/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/novita/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:nvidia` — source `extensions/nvidia/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/nvidia/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/nvidia/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:ollama` — source `extensions/ollama/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/ollama/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/ollama/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:open-prose` — source `extensions/open-prose/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/open-prose/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/open-prose/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:openai` — source `extensions/openai/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/openai/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/openai/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:opencode` — source `extensions/opencode/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/opencode/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/opencode/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:opencode-go` — source `extensions/opencode-go/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/opencode-go/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/opencode-go/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:openrouter` — source `extensions/openrouter/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/openrouter/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/openrouter/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:openshell` — source `extensions/openshell/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/openshell/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/openshell/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:parallel` — source `extensions/parallel/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/parallel/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/parallel/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:perplexity` — source `extensions/perplexity/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/perplexity/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/perplexity/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:phone-control` — source `extensions/phone-control/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/phone-control/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/phone-control/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:pixverse` — source `extensions/pixverse/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/pixverse/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/pixverse/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:policy` — source `extensions/policy/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/policy/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/policy/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:qa-lab` — source `extensions/qa-lab/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/qa-lab/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/qa-lab/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:qa-matrix` — source `extensions/qa-matrix/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/qa-matrix/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/qa-matrix/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:qianfan` — source `extensions/qianfan/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/qianfan/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/qianfan/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:qqbot` — source `extensions/qqbot/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/qqbot/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/qqbot/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:qwen` — source `extensions/qwen/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/qwen/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/qwen/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:runway` — source `extensions/runway/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/runway/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/runway/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:searxng` — source `extensions/searxng/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/searxng/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/searxng/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:senseaudio` — source `extensions/senseaudio/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/senseaudio/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/senseaudio/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:sglang` — source `extensions/sglang/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/sglang/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/sglang/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:signal` — source `extensions/signal/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/signal/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/signal/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:slack` — source `extensions/slack/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/slack/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/slack/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:stepfun` — source `extensions/stepfun/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/stepfun/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/stepfun/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:synthetic` — source `extensions/synthetic/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/synthetic/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/synthetic/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:talk-voice` — source `extensions/talk-voice/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/talk-voice/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/talk-voice/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:tavily` — source `extensions/tavily/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/tavily/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/tavily/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:telegram` — source `extensions/telegram/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/telegram/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/telegram/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:tencent` — source `extensions/tencent/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/tencent/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/tencent/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:thread-ownership` — source `extensions/thread-ownership/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/thread-ownership/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/thread-ownership/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:together` — source `extensions/together/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/together/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/together/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:tokenjuice` — source `extensions/tokenjuice/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/tokenjuice/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/tokenjuice/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:tts-local-cli` — source `extensions/tts-local-cli/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/tts-local-cli/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/tts-local-cli/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:venice` — source `extensions/venice/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/venice/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/venice/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:vercel-ai-gateway` — source `extensions/vercel-ai-gateway/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/vercel-ai-gateway/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/vercel-ai-gateway/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:video-generation-core` — source `extensions/video-generation-core/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/video-generation-core/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=none. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:vllm` — source `extensions/vllm/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/vllm/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/vllm/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:voice-call` — source `extensions/voice-call/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/voice-call/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/voice-call/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:volcengine` — source `extensions/volcengine/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/volcengine/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/volcengine/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:voyage` — source `extensions/voyage/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/voyage/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/voyage/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:vydra` — source `extensions/vydra/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/vydra/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/vydra/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:web-readability` — source `extensions/web-readability/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/web-readability/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/web-readability/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:webhooks` — source `extensions/webhooks/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/webhooks/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/webhooks/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:whatsapp` — source `extensions/whatsapp/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/whatsapp/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/whatsapp/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:workboard` — source `extensions/workboard/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/workboard/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/workboard/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:xai` — source `extensions/xai/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/xai/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/xai/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:xiaomi` — source `extensions/xiaomi/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/xiaomi/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/xiaomi/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-- `openclaw-ext:zai` — source `extensions/zai/`; category `openclaw_extension`; CLI=none; dashboard=`extensions/zai/`; voice=candidate; no parent row and no ledger row (not enumerated in AUDIT_OPENCLAW_2026-09-11.md or AUDIT_OPENCLAW_V2026_9_4_DELTA.md) categories=none manifest=extensions/zai/openclaw.plugin.json. Reason: upstream openclaw extension is a distinct capability with no implementing ledger row.
-
-### qubit_backend_route (290)
-
-- `api:DELETE /api/credentials/pool/{provider}/{index}` — source `hermes_cli/web_routers/ops.py:421`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:421`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/cron/jobs/{job_id}` — source `hermes_cli/web_routers/cron.py:297`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:297`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/dashboard/agent-plugins/{name:path}` — source `hermes_cli/web_routers/dashboard_ui.py:284`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:284`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/env` — source `hermes_cli/web_routers/config_env.py:957`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:957`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/files` — source `hermes_cli/web_routers/files.py:586`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:586`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/learning/node` — source `hermes_cli/web_routers/status.py:701`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:701`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/local-models/models/{model_id}` — source `hermes_cli/web_routers/local_models.py:730`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:730`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/mcp/oauth/flows/{flow_id}` — source `hermes_cli/web_routers/mcp.py:316`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:316`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/mcp/servers/{name}` — source `hermes_cli/web_routers/mcp.py:174`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:174`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/messaging/telegram/onboarding/{pairing_id}` — source `hermes_cli/web_routers/messaging.py:799`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:799`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/messaging/whatsapp/onboarding/{pairing_id}` — source `hermes_cli/web_routers/messaging.py:640`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:640`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/ops/hooks` — source `hermes_cli/web_routers/ops.py:756`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:756`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/profiles/{name}` — source `hermes_cli/web_routers/profiles.py:869`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:869`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/providers/custom-endpoints/{endpoint_id}` — source `hermes_cli/web_routers/config_env.py:746`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:746`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/providers/oauth/sessions/{session_id}` — source `hermes_cli/web_routers/oauth.py:775`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/oauth.py:775`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/providers/oauth/{provider_id}` — source `hermes_cli/web_routers/oauth.py:665`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/oauth.py:665`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/sessions/empty` — source `hermes_cli/web_routers/sessions.py:473`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:473`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/sessions/{session_id}` — source `hermes_cli/web_routers/sessions.py:706`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:706`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:DELETE /api/webhooks/{name}` — source `hermes_cli/web_routers/ops.py:251`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:251`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/actions/{name}/status` — source `hermes_cli/web_routers/actions.py:345`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:345`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/analytics/models` — source `hermes_cli/web_routers/analytics.py:305`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/analytics.py:305`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/analytics/usage` — source `hermes_cli/web_routers/analytics.py:143`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/analytics.py:143`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/audio/elevenlabs/voices` — source `hermes_cli/web_routers/audio.py:207`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:207`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/audio/voice-config` — source `hermes_cli/web_routers/audio.py:140`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:140`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/audio/voice-live/status` — source `hermes_cli/web_routers/audio.py:167`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:167`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/auth/me` — source `hermes_cli/dashboard_auth/routes.py:449`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:449`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/auth/providers` — source `hermes_cli/dashboard_auth/routes.py:183`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:183`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/chat/workspaces` — source `hermes_cli/web_routers/chat_workspaces.py:64`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_workspaces.py:64`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/config` — source `hermes_cli/web_routers/config_env.py:81`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:81`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/config/defaults` — source `hermes_cli/web_routers/config_env.py:95`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:95`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/config/raw` — source `hermes_cli/web_routers/analytics.py:33`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/analytics.py:33`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/config/schema` — source `hermes_cli/web_routers/config_env.py:100`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:100`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/credentials/pool` — source `hermes_cli/web_routers/ops.py:334`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:334`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/cron/blueprints` — source `hermes_cli/web_routers/cron.py:393`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:393`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/cron/delivery-targets` — source `hermes_cli/web_routers/cron.py:253`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:253`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/cron/jobs` — source `hermes_cli/web_routers/cron.py:233`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:233`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/cron/jobs/{job_id}` — source `hermes_cli/web_routers/cron.py:238`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:238`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/cron/jobs/{job_id}/runs` — source `hermes_cli/web_routers/cron.py:243`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:243`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/curator` — source `hermes_cli/web_routers/status.py:621`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:621`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/dashboard/font` — source `hermes_cli/web_routers/dashboard_ui.py:90`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:90`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/dashboard/plugins` — source `hermes_cli/web_routers/dashboard_ui.py:131`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:131`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/dashboard/plugins/catalog` — source `hermes_cli/web_routers/dashboard_ui.py:181`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:181`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/dashboard/plugins/hub` — source `hermes_cli/web_routers/dashboard_ui.py:156`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:156`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/dashboard/plugins/rescan` — source `hermes_cli/web_routers/dashboard_ui.py:149`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:149`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/dashboard/themes` — source `hermes_cli/web_routers/dashboard_ui.py:51`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:51`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/egress/status` — source `hermes_cli/web_routers/config_env.py:110`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:110`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/env` — source `hermes_cli/web_routers/config_env.py:232`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:232`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/files` — source `hermes_cli/web_routers/files.py:367`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:367`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/files/download` — source `hermes_cli/web_routers/files.py:453`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:453`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/files/read` — source `hermes_cli/web_routers/files.py:416`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:416`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/files/stream` — source `hermes_cli/web_routers/files.py:473`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:473`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/fs/default-cwd` — source `hermes_cli/web_routers/files.py:757`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:757`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/fs/download` — source `hermes_cli/web_routers/files.py:733`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:733`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/fs/git-root` — source `hermes_cli/web_routers/files.py:746`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:746`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/fs/list` — source `hermes_cli/web_routers/files.py:617`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:617`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/fs/read-data-url` — source `hermes_cli/web_routers/files.py:719`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:719`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/fs/read-text` — source `hermes_cli/web_routers/files.py:640`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:640`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/gateway/migrate/plan` — source `hermes_cli/web_routers/actions.py:148`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:148`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/base-branches` — source `hermes_cli/web_routers/git.py:118`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:118`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/branches` — source `hermes_cli/web_routers/git.py:113`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:113`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/file-diff` — source `hermes_cli/web_routers/git.py:135`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:135`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/gh-auth` — source `hermes_cli/web_routers/git.py:82`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:82`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/review/commit-context` — source `hermes_cli/web_routers/git.py:140`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:140`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/review/diff` — source `hermes_cli/web_routers/git.py:128`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:128`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/review/list` — source `hermes_cli/web_routers/git.py:123`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:123`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/review/rev-parse` — source `hermes_cli/web_routers/git.py:145`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:145`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/review/ship-info` — source `hermes_cli/web_routers/git.py:150`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:150`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/status` — source `hermes_cli/web_routers/git.py:48`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:48`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/git/worktrees` — source `hermes_cli/web_routers/git.py:108`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:108`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/health` — source `hermes_cli/web_routers/status.py:116`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:116`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/health/idle` — source `hermes_cli/web_routers/status.py:143`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:143`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/hermes/update/check` — source `hermes_cli/web_routers/actions.py:262`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:262`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/hermes/update/receipt` — source `hermes_cli/web_routers/actions.py:427`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:427`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/host/identity` — source `hermes_cli/web_routers/status.py:124`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:124`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/learning/graph` — source `hermes_cli/web_routers/status.py:669`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:669`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/learning/node` — source `hermes_cli/web_routers/status.py:694`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:694`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/local-models/catalog` — source `hermes_cli/web_routers/local_models.py:611`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:611`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/local-models/hardware` — source `hermes_cli/web_routers/local_models.py:538`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:538`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/local-models/jobs` — source `hermes_cli/web_routers/local_models.py:900`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:900`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/local-models/jobs/{job_id}` — source `hermes_cli/web_routers/local_models.py:910`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:910`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/local-models/search` — source `hermes_cli/web_routers/local_models.py:920`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:920`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/local-models/search/files` — source `hermes_cli/web_routers/local_models.py:929`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:929`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/local-models/status` — source `hermes_cli/web_routers/local_models.py:491`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:491`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/logs` — source `hermes_cli/web_routers/status.py:807`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:807`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/mcp/catalog` — source `hermes_cli/web_routers/mcp.py:430`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:430`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/mcp/oauth/callback/{server_name:path}` — source `hermes_cli/web_routers/mcp.py:330`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:330`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/mcp/oauth/flows/{flow_id}` — source `hermes_cli/web_routers/mcp.py:304`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:304`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/mcp/servers` — source `hermes_cli/web_routers/mcp.py:94`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:94`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/media` — source `hermes_cli/web_routers/files.py:251`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:251`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/memory` — source `hermes_cli/web_routers/ops.py:481`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:481`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/memory/providers/{name}/config` — source `hermes_cli/web_routers/memory_providers.py:508`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/memory_providers.py:508`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/messaging/platforms` — source `hermes_cli/web_routers/messaging.py:809`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:809`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/messaging/telegram/onboarding/{pairing_id}` — source `hermes_cli/web_routers/messaging.py:720`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:720`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/messaging/whatsapp/onboarding/{pairing_id}` — source `hermes_cli/web_routers/messaging.py:600`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:600`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/model/auxiliary` — source `hermes_cli/web_routers/models.py:176`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/models.py:176`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/model/info` — source `hermes_cli/web_routers/models.py:53`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/models.py:53`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/model/moa` — source `hermes_cli/web_routers/models.py:204`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/models.py:204`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/model/options` — source `hermes_cli/web_routers/models.py:101`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/models.py:101`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/model/recommended-default` — source `hermes_cli/web_routers/models.py:139`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/models.py:139`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/ops/backup/download` — source `hermes_cli/web_routers/ops.py:585`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:585`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/ops/checkpoints` — source `hermes_cli/web_routers/ops.py:791`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:791`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/ops/hooks` — source `hermes_cli/web_routers/ops.py:656`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:656`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/pairing` — source `hermes_cli/web_routers/ops.py:84`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:84`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/portal` — source `hermes_cli/web_routers/status.py:720`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:720`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles` — source `hermes_cli/web_routers/profiles.py:699`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:699`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/active` — source `hermes_cli/web_routers/profiles.py:777`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:777`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/projects/tree` — source `hermes_cli/web_routers/profiles.py:611`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:611`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/sessions` — source `hermes_cli/web_routers/profiles.py:411`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:411`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/sessions/sidebar` — source `hermes_cli/web_routers/profiles.py:465`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:465`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/{name}/desktop-overlay` — source `hermes_cli/web_routers/profiles.py:1034`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:1034`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/{name}/setup-command` — source `hermes_cli/web_routers/profiles.py:807`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:807`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/{name}/soul` — source `hermes_cli/web_routers/profiles.py:890`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:890`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/providers/custom-endpoints` — source `hermes_cli/web_routers/config_env.py:664`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:664`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/providers/oauth` — source `hermes_cli/web_routers/oauth.py:619`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/oauth.py:619`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/providers/oauth/{provider_id}/poll/{session_id}` — source `hermes_cli/web_routers/oauth.py:751`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/oauth.py:751`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions` — source `hermes_cli/web_routers/sessions.py:173`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:173`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/empty/count` — source `hermes_cli/web_routers/sessions.py:465`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:465`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/search` — source `hermes_cli/web_routers/sessions.py:278`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:278`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/stats` — source `hermes_cli/web_routers/sessions.py:491`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:491`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/{session_id}` — source `hermes_cli/web_routers/sessions.py:510`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:510`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/{session_id}/export` — source `hermes_cli/web_routers/sessions.py:797`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:797`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/{session_id}/latest-descendant` — source `hermes_cli/web_routers/sessions.py:526`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:526`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/{session_id}/messages` — source `hermes_cli/web_routers/sessions.py:606`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:606`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/{session_id}/messages/around` — source `hermes_cli/web_routers/sessions.py:683`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:683`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/{session_id}/timeline` — source `hermes_cli/web_routers/sessions.py:661`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:661`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/skills` — source `hermes_cli/web_routers/skills.py:343`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:343`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/skills/content` — source `hermes_cli/web_routers/skills.py:392`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:392`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/skills/hub/official` — source `hermes_cli/web_routers/skills.py:123`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:123`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/skills/hub/preview` — source `hermes_cli/web_routers/skills.py:227`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:227`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/skills/hub/scan` — source `hermes_cli/web_routers/skills.py:265`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:265`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/skills/hub/search` — source `hermes_cli/web_routers/skills.py:185`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:185`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/skills/hub/sources` — source `hermes_cli/web_routers/skills.py:147`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:147`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/ssh/ownership` — source `hermes_cli/web_routers/status.py:106`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:106`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/status` — source `hermes_cli/web_routers/status.py:458`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:458`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/system/stats` — source `hermes_cli/web_routers/status.py:561`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:561`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/tools/computer-use/status` — source `hermes_cli/web_routers/tools.py:683`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:683`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/tools/terminal/backends` — source `hermes_cli/web_routers/tools.py:634`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:634`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/tools/toolsets` — source `hermes_cli/web_routers/tools.py:230`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:230`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/tools/toolsets/{name}/config` — source `hermes_cli/web_routers/tools.py:345`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:345`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/tools/toolsets/{name}/models` — source `hermes_cli/web_routers/tools.py:421`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:421`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/webhooks` — source `hermes_cli/web_routers/ops.py:154`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:154`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /auth/callback` — source `hermes_cli/dashboard_auth/routes.py:290`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:290`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /auth/login` — source `hermes_cli/dashboard_auth/routes.py:197`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:197`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /auth/native/authorize` — source `hermes_cli/dashboard_auth/routes.py:242`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:242`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /dashboard-plugins/{plugin_name}/{file_path:path}` — source `hermes_cli/web_routers/dashboard_ui.py:383`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:383`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /login` — source `hermes_cli/dashboard_auth/routes.py:176`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:176`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /{full_path:path}` — source `hermes_cli/web_server_dashboard.py:112`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_server_dashboard.py:112`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:HEAD /api/files/stream` — source `hermes_cli/web_routers/files.py:474`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:474`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PATCH /api/profiles/{name}` — source `hermes_cli/web_routers/profiles.py:850`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:850`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PATCH /api/sessions/{session_id}` — source `hermes_cli/web_routers/sessions.py:760`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:760`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/audio/speak` — source `hermes_cli/web_routers/audio.py:284`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:284`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/audio/transcribe` — source `hermes_cli/web_routers/audio.py:77`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:77`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/audio/tts-lease` — source `hermes_cli/web_routers/audio.py:341`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:341`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/audio/voice-live/session` — source `hermes_cli/web_routers/audio.py:177`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:177`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/auth/ws-ticket` — source `hermes_cli/dashboard_auth/routes.py:458`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:458`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/chat/image-upload` — source `hermes_cli/web_routers/files.py:330`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:330`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/credentials/pool` — source `hermes_cli/web_routers/ops.py:363`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:363`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/cron/blueprints/instantiate` — source `hermes_cli/web_routers/cron.py:424`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:424`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/cron/fire` — source `hermes_cli/web_routers/cron.py:302`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:302`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/cron/jobs` — source `hermes_cli/web_routers/cron.py:248`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:248`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/cron/jobs/{job_id}/pause` — source `hermes_cli/web_routers/cron.py:282`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:282`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/cron/jobs/{job_id}/resume` — source `hermes_cli/web_routers/cron.py:287`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:287`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/cron/jobs/{job_id}/trigger` — source `hermes_cli/web_routers/cron.py:292`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:292`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/curator/run` — source `hermes_cli/web_routers/status.py:660`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:660`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/dashboard/agent-plugins/activate` — source `hermes_cli/web_routers/dashboard_ui.py:290`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:290`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/dashboard/agent-plugins/install` — source `hermes_cli/web_routers/dashboard_ui.py:222`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:222`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/dashboard/agent-plugins/{name:path}/disable` — source `hermes_cli/web_routers/dashboard_ui.py:262`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:262`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/dashboard/agent-plugins/{name:path}/enable` — source `hermes_cli/web_routers/dashboard_ui.py:255`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:255`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/dashboard/agent-plugins/{name:path}/update` — source `hermes_cli/web_routers/dashboard_ui.py:269`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:269`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/dashboard/plugins/{name:path}/visibility` — source `hermes_cli/web_routers/dashboard_ui.py:345`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:345`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/env/reveal` — source `hermes_cli/web_routers/config_env.py:975`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:975`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/files/mkdir` — source `hermes_cli/web_routers/files.py:576`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:576`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/files/upload` — source `hermes_cli/web_routers/files.py:501`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:501`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/files/upload-stream` — source `hermes_cli/web_routers/files.py:555`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:555`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/fs/write-text` — source `hermes_cli/web_routers/files.py:659`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/files.py:659`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/gateway/drain` — source `hermes_cli/web_routers/actions.py:166`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:166`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/gateway/migrate` — source `hermes_cli/web_routers/actions.py:156`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:156`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/gateway/restart` — source `hermes_cli/web_routers/actions.py:140`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:140`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/gateway/start` — source `hermes_cli/web_routers/ops.py:282`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:282`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/gateway/stop` — source `hermes_cli/web_routers/ops.py:295`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:295`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/branch/switch` — source `hermes_cli/web_routers/git.py:207`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:207`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/review/commit` — source `hermes_cli/web_routers/git.py:175`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:175`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/review/create-pr` — source `hermes_cli/web_routers/git.py:185`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:185`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/review/pr-list` — source `hermes_cli/web_routers/git.py:155`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:155`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/review/push` — source `hermes_cli/web_routers/git.py:180`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:180`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/review/revert` — source `hermes_cli/web_routers/git.py:170`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:170`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/review/stage` — source `hermes_cli/web_routers/git.py:160`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:160`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/review/unstage` — source `hermes_cli/web_routers/git.py:165`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:165`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/worktree/add` — source `hermes_cli/web_routers/git.py:190`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:190`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/git/worktree/remove` — source `hermes_cli/web_routers/git.py:200`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/git.py:200`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/health/retirement` — source `hermes_cli/web_routers/status.py:151`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:151`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/hermes/update` — source `hermes_cli/web_routers/actions.py:220`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:220`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/activate` — source `hermes_cli/web_routers/local_models.py:873`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:873`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/download` — source `hermes_cli/web_routers/local_models.py:691`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:691`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/download-browsed` — source `hermes_cli/web_routers/local_models.py:938`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:938`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/download/pause` — source `hermes_cli/web_routers/local_models.py:708`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:708`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/download/resume` — source `hermes_cli/web_routers/local_models.py:721`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:721`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/eject` — source `hermes_cli/web_routers/local_models.py:855`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:855`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/quickstart` — source `hermes_cli/web_routers/local_models.py:772`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:772`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/runtime/install` — source `hermes_cli/web_routers/local_models.py:656`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:656`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/server` — source `hermes_cli/web_routers/local_models.py:838`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:838`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/local-models/sideload` — source `hermes_cli/web_routers/local_models.py:961`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/local_models.py:961`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/mcp/catalog/install` — source `hermes_cli/web_routers/mcp.py:492`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:492`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/mcp/servers` — source `hermes_cli/web_routers/mcp.py:110`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:110`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/mcp/servers/{name}/auth` — source `hermes_cli/web_routers/mcp.py:245`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:245`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/mcp/servers/{name}/test` — source `hermes_cli/web_routers/mcp.py:195`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:195`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/memory/providers/{name}/setup` — source `hermes_cli/web_routers/memory_providers.py:528`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/memory_providers.py:528`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/memory/reset` — source `hermes_cli/web_routers/ops.py:518`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:518`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/messaging/platforms/{platform_id}/test` — source `hermes_cli/web_routers/messaging.py:942`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:942`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/messaging/telegram/onboarding/start` — source `hermes_cli/web_routers/messaging.py:697`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:697`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/messaging/telegram/onboarding/{pairing_id}/apply` — source `hermes_cli/web_routers/messaging.py:759`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:759`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/messaging/whatsapp/onboarding/start` — source `hermes_cli/web_routers/messaging.py:566`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:566`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/messaging/whatsapp/onboarding/{pairing_id}/apply` — source `hermes_cli/web_routers/messaging.py:609`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:609`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/model/set` — source `hermes_cli/web_routers/models.py:275`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/models.py:275`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/backup` — source `hermes_cli/web_routers/ops.py:566`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:566`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/checkpoints/prune` — source `hermes_cli/web_routers/ops.py:821`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:821`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/config-migrate` — source `hermes_cli/web_routers/status.py:780`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:780`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/debug-share` — source `hermes_cli/web_routers/status.py:785`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:785`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/doctor` — source `hermes_cli/web_routers/ops.py:546`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:546`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/dump` — source `hermes_cli/web_routers/status.py:775`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:775`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/hooks` — source `hermes_cli/web_routers/ops.py:705`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:705`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/import` — source `hermes_cli/web_routers/ops.py:612`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:612`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/import-upload` — source `hermes_cli/web_routers/ops.py:631`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:631`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/prompt-size` — source `hermes_cli/web_routers/status.py:770`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:770`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/security-audit` — source `hermes_cli/web_routers/ops.py:552`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:552`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/pairing/approve` — source `hermes_cli/web_routers/ops.py:90`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:90`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/pairing/clear-pending` — source `hermes_cli/web_routers/ops.py:127`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:127`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/pairing/revoke` — source `hermes_cli/web_routers/ops.py:116`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:116`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles` — source `hermes_cli/web_routers/profiles.py:704`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:704`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles/active` — source `hermes_cli/web_routers/profiles.py:796`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:796`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles/import` — source `hermes_cli/web_routers/profiles.py:1005`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:1005`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles/sessions/pull-requests` — source `hermes_cli/web_routers/profiles.py:661`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:661`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles/{name}/describe-auto` — source `hermes_cli/web_routers/profiles.py:956`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:956`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles/{name}/export` — source `hermes_cli/web_routers/profiles.py:987`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:987`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles/{name}/open-terminal` — source `hermes_cli/web_routers/profiles.py:828`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:828`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/providers/custom-endpoints` — source `hermes_cli/web_routers/config_env.py:677`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:677`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/providers/custom-endpoints/validate` — source `hermes_cli/web_routers/config_env.py:774`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:774`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/providers/custom-endpoints/{endpoint_id}/activate` — source `hermes_cli/web_routers/config_env.py:694`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:694`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/providers/oauth/{provider_id}/start` — source `hermes_cli/web_routers/oauth.py:720`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/oauth.py:720`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/providers/oauth/{provider_id}/submit` — source `hermes_cli/web_routers/oauth.py:742`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/oauth.py:742`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/providers/validate` — source `hermes_cli/web_routers/config_env.py:887`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:887`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/sessions/bulk-delete` — source `hermes_cli/web_routers/sessions.py:424`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:424`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/sessions/import` — source `hermes_cli/web_routers/sessions.py:442`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:442`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/sessions/owner-backfill` — source `hermes_cli/web_routers/sessions.py:721`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:721`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/sessions/prune` — source `hermes_cli/web_routers/sessions.py:832`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:832`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/skills` — source `hermes_cli/web_routers/skills.py:413`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:413`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/skills/hub/install` — source `hermes_cli/web_routers/skills.py:97`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:97`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/skills/hub/uninstall` — source `hermes_cli/web_routers/skills.py:106`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:106`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/skills/hub/update` — source `hermes_cli/web_routers/skills.py:115`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:115`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/tools/computer-use/permissions/grant` — source `hermes_cli/web_routers/tools.py:692`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:692`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/tools/toolsets/{name}/post-setup` — source `hermes_cli/web_routers/tools.py:615`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:615`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/webhooks` — source `hermes_cli/web_routers/ops.py:190`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:190`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/webhooks/enable` — source `hermes_cli/web_routers/ops.py:172`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:172`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /auth/logout` — source `hermes_cli/dashboard_auth/routes.py:421`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:421`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /auth/native/refresh` — source `hermes_cli/dashboard_auth/routes.py:496`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:496`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /auth/native/token` — source `hermes_cli/dashboard_auth/routes.py:476`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:476`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /auth/password-login` — source `hermes_cli/dashboard_auth/routes.py:372`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/dashboard_auth/routes.py:372`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/config` — source `hermes_cli/web_routers/config_env.py:118`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:118`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/config/raw` — source `hermes_cli/web_routers/analytics.py:52`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/analytics.py:52`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/cron/jobs/{job_id}` — source `hermes_cli/web_routers/cron.py:277`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/cron.py:277`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/curator/paused` — source `hermes_cli/web_routers/status.py:641`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:641`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/dashboard/font` — source `hermes_cli/web_routers/dashboard_ui.py:100`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:100`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/dashboard/plugin-providers` — source `hermes_cli/web_routers/dashboard_ui.py:317`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:317`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/dashboard/theme` — source `hermes_cli/web_routers/dashboard_ui.py:71`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:71`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/env` — source `hermes_cli/web_routers/config_env.py:292`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/config_env.py:292`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/learning/node` — source `hermes_cli/web_routers/status.py:709`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:709`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/mcp/servers` — source `hermes_cli/web_routers/mcp.py:151`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:151`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/mcp/servers/{name}/enabled` — source `hermes_cli/web_routers/mcp.py:363`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/mcp.py:363`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/memory/provider` — source `hermes_cli/web_routers/ops.py:497`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:497`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/memory/providers/{name}/config` — source `hermes_cli/web_routers/memory_providers.py:551`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/memory_providers.py:551`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/messaging/platforms/{platform_id}` — source `hermes_cli/web_routers/messaging.py:868`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/messaging.py:868`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/model/moa` — source `hermes_cli/web_routers/models.py:235`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/models.py:235`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/profiles/{name}/description` — source `hermes_cli/web_routers/profiles.py:927`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:927`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/profiles/{name}/model` — source `hermes_cli/web_routers/profiles.py:941`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:941`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/profiles/{name}/soul` — source `hermes_cli/web_routers/profiles.py:905`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:905`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/skills/content` — source `hermes_cli/web_routers/skills.py:427`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:427`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/skills/toggle` — source `hermes_cli/web_routers/skills.py:374`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/skills.py:374`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/tools/terminal/backend` — source `hermes_cli/web_routers/tools.py:661`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:661`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/tools/toolsets/{name}` — source `hermes_cli/web_routers/tools.py:280`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:280`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/tools/toolsets/{name}/env` — source `hermes_cli/web_routers/tools.py:574`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:574`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/tools/toolsets/{name}/model` — source `hermes_cli/web_routers/tools.py:461`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:461`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/tools/toolsets/{name}/provider` — source `hermes_cli/web_routers/tools.py:493`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:493`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/webhooks/{name}/enabled` — source `hermes_cli/web_routers/ops.py:264`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:264`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/audio/speak-stream` — source `hermes_cli/web_routers/audio.py:473`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:473`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/console` — source `hermes_cli/web_routers/chat_ws.py:277`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:277`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/display/ws` — source `hermes_cli/web_routers/display.py:74`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/display.py:74`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/events` — source `hermes_cli/web_routers/chat_ws.py:644`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:644`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/pty` — source `hermes_cli/web_routers/chat_ws.py:438`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:438`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/pub` — source `hermes_cli/web_routers/chat_ws.py:632`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:632`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/ws` — source `hermes_cli/web_routers/chat_ws.py:593`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:593`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-
-### qubit_cli_command (76)
-
-- `hermes acp` — source `hermes_cli/subcommands/acp.py`; category `qubit_cli_command`; CLI=`hermes acp`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes approvals` — source `hermes_cli/subcommands/approvals.py`; category `qubit_cli_command`; CLI=`hermes approvals`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes auth` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_command`; CLI=`hermes auth`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes backup` — source `hermes_cli/subcommands/backup.py`; category `qubit_cli_command`; CLI=`hermes backup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes browser` — source `hermes_cli/subcommands/browser.py`; category `qubit_cli_command`; CLI=`hermes browser`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes bundles` — source `hermes_cli/subcommands/bundles.py`; category `qubit_cli_command`; CLI=`hermes bundles`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes chat` — source `hermes_cli/_parser.py`; category `qubit_cli_command`; CLI=`hermes chat`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes checkpoints` — source `hermes_cli/subcommands/checkpoints.py`; category `qubit_cli_command`; CLI=`hermes checkpoints`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes claw` — source `hermes_cli/subcommands/claw.py`; category `qubit_cli_command`; CLI=`hermes claw`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes codex-runtime` — source `hermes_cli/subcommands/codex_runtime.py`; category `qubit_cli_command`; CLI=`hermes codex-runtime`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes completion` — source `hermes_cli/subcommands/completion.py`; category `qubit_cli_command`; CLI=`hermes completion`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes computer-use` — source `hermes_cli/subcommands/computer_use.py`; category `qubit_cli_command`; CLI=`hermes computer-use`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes config` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_command`; CLI=`hermes config`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes console` — source `hermes_cli/subcommands/console.py`; category `qubit_cli_command`; CLI=`hermes console`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes cron` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_command`; CLI=`hermes cron`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes curator` — source `hermes_cli/subcommands/curator.py`; category `qubit_cli_command`; CLI=`hermes curator`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes dashboard` — source `hermes_cli/subcommands/dashboard.py`; category `qubit_cli_command`; CLI=`hermes dashboard`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes debug` — source `hermes_cli/subcommands/debug.py`; category `qubit_cli_command`; CLI=`hermes debug`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes desktop` — source `hermes_cli/subcommands/gui.py`; category `qubit_cli_command`; CLI=`hermes desktop`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes doctor` — source `hermes_cli/subcommands/doctor.py`; category `qubit_cli_command`; CLI=`hermes doctor`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes dump` — source `hermes_cli/subcommands/dump.py`; category `qubit_cli_command`; CLI=`hermes dump`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes egress` — source `hermes_cli/subcommands/egress.py`; category `qubit_cli_command`; CLI=`hermes egress`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes fallback` — source `hermes_cli/subcommands/fallback.py`; category `qubit_cli_command`; CLI=`hermes fallback`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes gateway` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_command`; CLI=`hermes gateway`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes gui` — source `hermes_cli/subcommands/gui.py`; category `qubit_cli_command`; CLI=`hermes gui`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes hooks` — source `hermes_cli/subcommands/hooks.py`; category `qubit_cli_command`; CLI=`hermes hooks`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes import` — source `hermes_cli/subcommands/import_cmd.py`; category `qubit_cli_command`; CLI=`hermes import`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes import-agent` — source `hermes_cli/subcommands/import_agent.py`; category `qubit_cli_command`; CLI=`hermes import-agent`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes insights` — source `hermes_cli/subcommands/insights.py`; category `qubit_cli_command`; CLI=`hermes insights`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes journey` — source `hermes_cli/subcommands/journey.py`; category `qubit_cli_command`; CLI=`hermes journey`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes kanban` — source `hermes_cli/kanban_parser.py`; category `qubit_cli_command`; CLI=`hermes kanban`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes learning` — source `hermes_cli/subcommands/journey.py`; category `qubit_cli_command`; CLI=`hermes learning`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes login` — source `hermes_cli/subcommands/login.py`; category `qubit_cli_command`; CLI=`hermes login`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes logout` — source `hermes_cli/subcommands/logout.py`; category `qubit_cli_command`; CLI=`hermes logout`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes logs` — source `hermes_cli/subcommands/logs.py`; category `qubit_cli_command`; CLI=`hermes logs`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes lsp` — source `agent/lsp/cli.py`; category `qubit_cli_command`; CLI=`hermes lsp`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes mcp` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_command`; CLI=`hermes mcp`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes memory` — source `hermes_cli/subcommands/memory.py`; category `qubit_cli_command`; CLI=`hermes memory`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes memory-graph` — source `hermes_cli/subcommands/journey.py`; category `qubit_cli_command`; CLI=`hermes memory-graph`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes migrate` — source `hermes_cli/subcommands/migrate.py`; category `qubit_cli_command`; CLI=`hermes migrate`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes moa` — source `hermes_cli/subcommands/moa.py`; category `qubit_cli_command`; CLI=`hermes moa`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes model` — source `hermes_cli/subcommands/model.py`; category `qubit_cli_command`; CLI=`hermes model`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes monitoring` — source `hermes_cli/subcommands/monitoring.py`; category `qubit_cli_command`; CLI=`hermes monitoring`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes pairing` — source `hermes_cli/subcommands/pairing.py`; category `qubit_cli_command`; CLI=`hermes pairing`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes pause` — source `hermes_cli/subcommands/pause.py`; category `qubit_cli_command`; CLI=`hermes pause`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes peer` — source `hermes_cli/subcommands/peer.py`; category `qubit_cli_command`; CLI=`hermes peer`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes pets` — source `hermes_cli/subcommands/pets.py`; category `qubit_cli_command`; CLI=`hermes pets`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes plugins` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_command`; CLI=`hermes plugins`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes portal` — source `hermes_cli/portal_cli.py`; category `qubit_cli_command`; CLI=`hermes portal`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes profile` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_command`; CLI=`hermes profile`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes project` — source `hermes_cli/projects_cmd.py`; category `qubit_cli_command`; CLI=`hermes project`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes prompt-size` — source `hermes_cli/subcommands/prompt_size.py`; category `qubit_cli_command`; CLI=`hermes prompt-size`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes proxy` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_command`; CLI=`hermes proxy`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes resume` — source `hermes_cli/subcommands/pause.py`; category `qubit_cli_command`; CLI=`hermes resume`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes screen` — source `hermes_cli/subcommands/computer_use_screen.py`; category `qubit_cli_command`; CLI=`hermes screen`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes secrets` — source `hermes_cli/subcommands/secrets.py`; category `qubit_cli_command`; CLI=`hermes secrets`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes security` — source `hermes_cli/subcommands/security.py`; category `qubit_cli_command`; CLI=`hermes security`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes send` — source `hermes_cli/send_cmd.py`; category `qubit_cli_command`; CLI=`hermes send`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes serve` — source `hermes_cli/subcommands/dashboard.py`; category `qubit_cli_command`; CLI=`hermes serve`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes sessions` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_command`; CLI=`hermes sessions`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes setup` — source `hermes_cli/subcommands/setup.py`; category `qubit_cli_command`; CLI=`hermes setup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes skills` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_command`; CLI=`hermes skills`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes skin` — source `hermes_cli/subcommands/skin.py`; category `qubit_cli_command`; CLI=`hermes skin`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes slack` — source `hermes_cli/subcommands/slack.py`; category `qubit_cli_command`; CLI=`hermes slack`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes status` — source `hermes_cli/subcommands/status.py`; category `qubit_cli_command`; CLI=`hermes status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes sync` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_command`; CLI=`hermes sync`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes tools` — source `hermes_cli/subcommands/tools.py`; category `qubit_cli_command`; CLI=`hermes tools`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes uninstall` — source `hermes_cli/subcommands/uninstall.py`; category `qubit_cli_command`; CLI=`hermes uninstall`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes update` — source `hermes_cli/subcommands/update.py`; category `qubit_cli_command`; CLI=`hermes update`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes usage` — source `hermes_cli/subcommands/usage.py`; category `qubit_cli_command`; CLI=`hermes usage`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes vault` — source `hermes_cli/subcommands/vault.py`; category `qubit_cli_command`; CLI=`hermes vault`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes verify` — source `hermes_cli/subcommands/verify.py`; category `qubit_cli_command`; CLI=`hermes verify`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes webhook` — source `hermes_cli/subcommands/webhook.py`; category `qubit_cli_command`; CLI=`hermes webhook`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes whatsapp` — source `hermes_cli/subcommands/whatsapp.py`; category `qubit_cli_command`; CLI=`hermes whatsapp`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes whatsapp-cloud` — source `hermes_cli/subcommands/whatsapp.py`; category `qubit_cli_command`; CLI=`hermes whatsapp-cloud`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-- `hermes worktree` — source `hermes_cli/subcommands/worktree.py`; category `qubit_cli_command`; CLI=`hermes worktree`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli command is a distinct capability with no implementing ledger row.
-
-### qubit_cli_subcommand (212)
-
-- `hermes approvals suggest` — source `hermes_cli/subcommands/approvals.py`; category `qubit_cli_subcommand`; CLI=`hermes approvals suggest`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes approvals test` — source `hermes_cli/subcommands/approvals.py`; category `qubit_cli_subcommand`; CLI=`hermes approvals test`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth add` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth list` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth logout` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth logout`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth priority` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth priority`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth refresh` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth refresh`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth remove` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth reset` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth reset`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth spotify` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth spotify`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth status` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes auth upgrade` — source `hermes_cli/subcommands/auth.py`; category `qubit_cli_subcommand`; CLI=`hermes auth upgrade`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes browser close-profile` — source `hermes_cli/subcommands/browser.py`; category `qubit_cli_subcommand`; CLI=`hermes browser close-profile`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes claw cleanup` — source `hermes_cli/subcommands/claw.py`; category `qubit_cli_subcommand`; CLI=`hermes claw cleanup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes claw migrate` — source `hermes_cli/subcommands/claw.py`; category `qubit_cli_subcommand`; CLI=`hermes claw migrate`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes codex-runtime migrate` — source `hermes_cli/subcommands/codex_runtime.py`; category `qubit_cli_subcommand`; CLI=`hermes codex-runtime migrate`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use doctor` — source `hermes_cli/subcommands/computer_use.py`; category `qubit_cli_subcommand`; CLI=`hermes computer-use doctor`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use install` — source `hermes_cli/subcommands/computer_use.py`; category `qubit_cli_subcommand`; CLI=`hermes computer-use install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use permissions` — source `hermes_cli/subcommands/computer_use.py`; category `qubit_cli_subcommand`; CLI=`hermes computer-use permissions`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use permissions grant` — source `hermes_cli/subcommands/computer_use.py`; category `qubit_cli_subcommand`; CLI=`hermes computer-use permissions grant`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use permissions status` — source `hermes_cli/subcommands/computer_use.py`; category `qubit_cli_subcommand`; CLI=`hermes computer-use permissions status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes computer-use status` — source `hermes_cli/subcommands/computer_use.py`; category `qubit_cli_subcommand`; CLI=`hermes computer-use status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config check` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config check`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config edit` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config edit`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config env-path` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config env-path`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config get` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config get`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config migrate` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config migrate`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config path` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config path`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config set` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config set`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config show` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config show`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes config unset` — source `hermes_cli/subcommands/config.py`; category `qubit_cli_subcommand`; CLI=`hermes config unset`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron create` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron create`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron doctor` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron doctor`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron edit` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron edit`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron incidents` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron incidents`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron list` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron notepad` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron notepad`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron pause` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron pause`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron remove` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron resume` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron resume`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron run` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron run`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron runs` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron runs`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron status` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes cron tick` — source `hermes_cli/subcommands/cron.py`; category `qubit_cli_subcommand`; CLI=`hermes cron tick`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes dashboard register` — source `hermes_cli/subcommands/dashboard.py`; category `qubit_cli_subcommand`; CLI=`hermes dashboard register`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes debug delete` — source `hermes_cli/subcommands/debug.py`; category `qubit_cli_subcommand`; CLI=`hermes debug delete`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes debug share` — source `hermes_cli/subcommands/debug.py`; category `qubit_cli_subcommand`; CLI=`hermes debug share`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback add` — source `hermes_cli/subcommands/fallback.py`; category `qubit_cli_subcommand`; CLI=`hermes fallback add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback clear` — source `hermes_cli/subcommands/fallback.py`; category `qubit_cli_subcommand`; CLI=`hermes fallback clear`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback list` — source `hermes_cli/subcommands/fallback.py`; category `qubit_cli_subcommand`; CLI=`hermes fallback list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes fallback remove` — source `hermes_cli/subcommands/fallback.py`; category `qubit_cli_subcommand`; CLI=`hermes fallback remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway enroll` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway enroll`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway install` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway list` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway migrate` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway migrate`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway migrate-legacy` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway migrate-legacy`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway restart` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway restart`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway run` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway run`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway setup` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway setup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway start` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway start`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway status` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway stop` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway stop`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes gateway uninstall` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes gateway uninstall`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks doctor` — source `hermes_cli/subcommands/hooks.py`; category `qubit_cli_subcommand`; CLI=`hermes hooks doctor`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks list` — source `hermes_cli/subcommands/hooks.py`; category `qubit_cli_subcommand`; CLI=`hermes hooks list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks revoke` — source `hermes_cli/subcommands/hooks.py`; category `qubit_cli_subcommand`; CLI=`hermes hooks revoke`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes hooks test` — source `hermes_cli/subcommands/hooks.py`; category `qubit_cli_subcommand`; CLI=`hermes hooks test`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp add` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp catalog` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp catalog`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp configure` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp configure`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp install` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp list` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp login` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp login`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp picker` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp picker`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp reauth` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp reauth`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp remove` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp serve` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp serve`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes mcp test` — source `hermes_cli/subcommands/mcp.py`; category `qubit_cli_subcommand`; CLI=`hermes mcp test`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory off` — source `hermes_cli/subcommands/memory.py`; category `qubit_cli_subcommand`; CLI=`hermes memory off`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory reset` — source `hermes_cli/subcommands/memory.py`; category `qubit_cli_subcommand`; CLI=`hermes memory reset`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory setup` — source `hermes_cli/subcommands/memory.py`; category `qubit_cli_subcommand`; CLI=`hermes memory setup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes memory status` — source `hermes_cli/subcommands/memory.py`; category `qubit_cli_subcommand`; CLI=`hermes memory status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes migrate relay` — source `hermes_cli/subcommands/migrate.py`; category `qubit_cli_subcommand`; CLI=`hermes migrate relay`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes migrate xai` — source `hermes_cli/subcommands/migrate.py`; category `qubit_cli_subcommand`; CLI=`hermes migrate xai`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes moa configure` — source `hermes_cli/subcommands/moa.py`; category `qubit_cli_subcommand`; CLI=`hermes moa configure`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes moa delete` — source `hermes_cli/subcommands/moa.py`; category `qubit_cli_subcommand`; CLI=`hermes moa delete`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes moa list` — source `hermes_cli/subcommands/moa.py`; category `qubit_cli_subcommand`; CLI=`hermes moa list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes monitoring status` — source `hermes_cli/subcommands/monitoring.py`; category `qubit_cli_subcommand`; CLI=`hermes monitoring status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing approve` — source `hermes_cli/subcommands/pairing.py`; category `qubit_cli_subcommand`; CLI=`hermes pairing approve`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing clear-pending` — source `hermes_cli/subcommands/pairing.py`; category `qubit_cli_subcommand`; CLI=`hermes pairing clear-pending`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing list` — source `hermes_cli/subcommands/pairing.py`; category `qubit_cli_subcommand`; CLI=`hermes pairing list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes pairing revoke` — source `hermes_cli/subcommands/pairing.py`; category `qubit_cli_subcommand`; CLI=`hermes pairing revoke`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes peer add` — source `hermes_cli/subcommands/peer.py`; category `qubit_cli_subcommand`; CLI=`hermes peer add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes peer list` — source `hermes_cli/subcommands/peer.py`; category `qubit_cli_subcommand`; CLI=`hermes peer list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes peer remove` — source `hermes_cli/subcommands/peer.py`; category `qubit_cli_subcommand`; CLI=`hermes peer remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins adopt` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins adopt`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins browse` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins browse`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins capabilities` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins capabilities`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins check-updates` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins check-updates`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins compat` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins compat`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins disable` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins disable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins doctor` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins doctor`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins enable` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins enable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins install` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins list` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins pack`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack export` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins pack export`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack install` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins pack install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins pack show` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins pack show`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins remove` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins search` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins search`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins show` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins show`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins trust-update-url` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins trust-update-url`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins update` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins update`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes plugins validate` — source `hermes_cli/subcommands/plugins.py`; category `qubit_cli_subcommand`; CLI=`hermes plugins validate`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile alias` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile alias`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile create` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile create`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile delete` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile delete`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile describe` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile describe`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile export` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile export`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile import` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile import`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile info` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile info`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile install` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile list` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile migrate-identity` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile migrate-identity`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile purge-identity` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile purge-identity`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile rename` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile rename`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile show` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile show`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile update` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile update`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes profile use` — source `hermes_cli/subcommands/profile.py`; category `qubit_cli_subcommand`; CLI=`hermes profile use`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes project create` — source `hermes_cli/projects_cmd.py`; category `qubit_cli_subcommand`; CLI=`hermes project create`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes project list` — source `hermes_cli/projects_cmd.py`; category `qubit_cli_subcommand`; CLI=`hermes project list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes project use` — source `hermes_cli/projects_cmd.py`; category `qubit_cli_subcommand`; CLI=`hermes project use`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes proxy providers` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes proxy providers`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes proxy start` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes proxy start`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes proxy status` — source `hermes_cli/subcommands/gateway.py`; category `qubit_cli_subcommand`; CLI=`hermes proxy status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes screen install` — source `hermes_cli/subcommands/computer_use_screen.py`; category `qubit_cli_subcommand`; CLI=`hermes screen install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes screen start` — source `hermes_cli/subcommands/computer_use_screen.py`; category `qubit_cli_subcommand`; CLI=`hermes screen start`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes screen status` — source `hermes_cli/subcommands/computer_use_screen.py`; category `qubit_cli_subcommand`; CLI=`hermes screen status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes screen stop` — source `hermes_cli/subcommands/computer_use_screen.py`; category `qubit_cli_subcommand`; CLI=`hermes screen stop`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes secrets bitwarden` — source `hermes_cli/subcommands/secrets.py`; category `qubit_cli_subcommand`; CLI=`hermes secrets bitwarden`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes secrets onepassword` — source `hermes_cli/subcommands/secrets.py`; category `qubit_cli_subcommand`; CLI=`hermes secrets onepassword`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes security audit` — source `hermes_cli/subcommands/security.py`; category `qubit_cli_subcommand`; CLI=`hermes security audit`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions archive` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions archive`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions browse` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions browse`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions clean-markers` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions clean-markers`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions delete` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions delete`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions export` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions export`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions import` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions import`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions list` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions optimize` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions optimize`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions optimize-storage` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions optimize-storage`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions pin` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions pin`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions pinned` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions pinned`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions prune` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions prune`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions recover` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions recover`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions rename` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions rename`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions repair` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions repair`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions repair-profiles` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions repair-profiles`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions repair-routing` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions repair-routing`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions retitle-skills` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions retitle-skills`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions set-journal-mode` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions set-journal-mode`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions stats` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions stats`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sessions unpin` — source `hermes_cli/subcommands/sessions.py`; category `qubit_cli_subcommand`; CLI=`hermes sessions unpin`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills audit` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills audit`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills browse` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills browse`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills check` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills check`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills config` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills config`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills diff` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills diff`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills inspect` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills inspect`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills install` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills install`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills list` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills list-modified` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills list-modified`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills opt-in` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills opt-in`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills opt-out` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills opt-out`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills publish` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills publish`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills repair-official` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills repair-official`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills reset` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills reset`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills search` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills search`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills snapshot` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills snapshot`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills snapshot export` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills snapshot export`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills snapshot import` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills snapshot import`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills tap` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills tap`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills tap add` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills tap add`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills tap list` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills tap list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills tap remove` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills tap remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills trust` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills trust`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills uninstall` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills uninstall`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills untrust` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills untrust`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skills update` — source `hermes_cli/subcommands/skills.py`; category `qubit_cli_subcommand`; CLI=`hermes skills update`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skin list` — source `hermes_cli/subcommands/skin.py`; category `qubit_cli_subcommand`; CLI=`hermes skin list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skin set` — source `hermes_cli/subcommands/skin.py`; category `qubit_cli_subcommand`; CLI=`hermes skin set`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes skin use` — source `hermes_cli/subcommands/skin.py`; category `qubit_cli_subcommand`; CLI=`hermes skin use`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes slack manifest` — source `hermes_cli/subcommands/slack.py`; category `qubit_cli_subcommand`; CLI=`hermes slack manifest`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync device` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync device`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync disable` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync disable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync enable` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync enable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync now` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync now`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync propose` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync propose`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync pull` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync pull`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync push` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync push`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes sync status` — source `hermes_cli/subcommands/sync.py`; category `qubit_cli_subcommand`; CLI=`hermes sync status`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes tools disable` — source `hermes_cli/subcommands/tools.py`; category `qubit_cli_subcommand`; CLI=`hermes tools disable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes tools enable` — source `hermes_cli/subcommands/tools.py`; category `qubit_cli_subcommand`; CLI=`hermes tools enable`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes tools list` — source `hermes_cli/subcommands/tools.py`; category `qubit_cli_subcommand`; CLI=`hermes tools list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes tools post-setup` — source `hermes_cli/subcommands/tools.py`; category `qubit_cli_subcommand`; CLI=`hermes tools post-setup`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook list` — source `hermes_cli/subcommands/webhook.py`; category `qubit_cli_subcommand`; CLI=`hermes webhook list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook remove` — source `hermes_cli/subcommands/webhook.py`; category `qubit_cli_subcommand`; CLI=`hermes webhook remove`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook subscribe` — source `hermes_cli/subcommands/webhook.py`; category `qubit_cli_subcommand`; CLI=`hermes webhook subscribe`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes webhook test` — source `hermes_cli/subcommands/webhook.py`; category `qubit_cli_subcommand`; CLI=`hermes webhook test`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes worktree list` — source `hermes_cli/subcommands/worktree.py`; category `qubit_cli_subcommand`; CLI=`hermes worktree list`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-- `hermes worktree prune` — source `hermes_cli/subcommands/worktree.py`; category `qubit_cli_subcommand`; CLI=`hermes worktree prune`; dashboard=none; voice=candidate; no parent row and no ledger row. Reason: upstream qubit cli subcommand is a distinct capability with no implementing ledger row.
-
-## Parented surfaces needing parent closure (1029)
+## Parented surfaces needing parent closure (5)
 
 These belong to a parent capability row that is missing or not IMPLEMENTED; close the parent (or wire the surface) to resolve them. They are not distinct capabilities.
 
-### parent `browser_status` (25; status=absent)
+### parent `cli:screen install` (1; status=absent)
 
-- `workflow:browser:hermes_cli/browser_connect.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/browser_connect.py`; parent `browser_status` status `absent`.
-- `workflow:browser:hermes_cli/subcommands/browser.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/subcommands/browser.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_camofox.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_camofox.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_camofox_state.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_camofox_state.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_cdp_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_cdp_tool.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_dialog_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_dialog_tool.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_extension_router.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_extension_router.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_lightpanda.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_lightpanda.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_supervisor.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_supervisor.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_supervisor_dialogs.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_supervisor_dialogs.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_supervisor_frames.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_supervisor_frames.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_cdp.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_cdp.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_cloud.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_cloud.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_eval_policy.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_eval_policy.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_install.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_install.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_lifecycle.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_lifecycle.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_lightpanda_fallback.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_lightpanda_fallback.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_origin.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_origin.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_real_profile.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_real_profile.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_session.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_session.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_snapshot.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_snapshot.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_tool_vision.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_tool_vision.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_use_cli.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_use_cli.py`; parent `browser_status` status `absent`.
-- `workflow:browser:tools/browser_vault_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/browser_vault_tool.py`; parent `browser_status` status `absent`.
-
-### parent `channels_status` (8; status=absent)
-
-- `workflow:messaging:hermes_cli/setup_whatsapp_cloud.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/setup_whatsapp_cloud.py`; parent `channels_status` status `absent`.
-- `workflow:messaging:hermes_cli/slack_cli.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/slack_cli.py`; parent `channels_status` status `absent`.
-- `workflow:messaging:hermes_cli/telegram_managed_bot.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/telegram_managed_bot.py`; parent `channels_status` status `absent`.
-- `workflow:messaging:hermes_cli/web_server_messaging.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/web_server_messaging.py`; parent `channels_status` status `absent`.
-- `workflow:messaging:tools/discord_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/discord_tool.py`; parent `channels_status` status `absent`.
-- `workflow:messaging:tools/feishu_doc_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/feishu_doc_tool.py`; parent `channels_status` status `absent`.
-- `workflow:messaging:tools/feishu_drive_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/feishu_drive_tool.py`; parent `channels_status` status `absent`.
-- `workflow:messaging:tools/feishu_lark.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/feishu_lark.py`; parent `channels_status` status `absent`.
-
-### parent `cli:acp` (6; status=absent)
-
-- `hermes acp --check` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/acp.py`; parent `cli:acp` status `absent`.
-- `hermes acp --setup` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/acp.py`; parent `cli:acp` status `absent`.
-- `hermes acp --setup-browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/acp.py`; parent `cli:acp` status `absent`.
-- `hermes acp --version` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/acp.py`; parent `cli:acp` status `absent`.
-- `hermes acp --yes` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/acp.py`; parent `cli:acp` status `absent`.
-- `hermes acp -y` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/acp.py`; parent `cli:acp` status `absent`.
-
-### parent `cli:approvals suggest` (5; status=absent)
-
-- `hermes approvals suggest --apply` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/approvals.py`; parent `cli:approvals suggest` status `absent`.
-- `hermes approvals suggest --days` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/approvals.py`; parent `cli:approvals suggest` status `absent`.
-- `hermes approvals suggest --db` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/approvals.py`; parent `cli:approvals suggest` status `absent`.
-- `hermes approvals suggest --limit` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/approvals.py`; parent `cli:approvals suggest` status `absent`.
-- `hermes approvals suggest --min-count` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/approvals.py`; parent `cli:approvals suggest` status `absent`.
-
-### parent `cli:approvals test` (2; status=absent)
-
-- `hermes approvals test --env-type` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/approvals.py`; parent `cli:approvals test` status `absent`.
-- `hermes approvals test command_words` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/approvals.py`; parent `cli:approvals test` status `absent`.
-
-### parent `cli:auth add` (14; status=absent)
-
-- `hermes auth add --api-key` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --ca-bundle` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --client-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --inference-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --insecure` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --label` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --no-browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --portal-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --priority` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --scope` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add --type` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-- `hermes auth add provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth add` status `absent`.
-
-### parent `cli:auth list` (1; status=absent)
-
-- `hermes auth list provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth list` status `absent`.
-
-### parent `cli:auth logout` (1; status=absent)
-
-- `hermes auth logout provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth logout` status `absent`.
-
-### parent `cli:auth priority` (3; status=absent)
-
-- `hermes auth priority priority` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth priority` status `absent`.
-- `hermes auth priority provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth priority` status `absent`.
-- `hermes auth priority target` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth priority` status `absent`.
-
-### parent `cli:auth refresh` (2; status=absent)
-
-- `hermes auth refresh provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth refresh` status `absent`.
-- `hermes auth refresh target` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth refresh` status `absent`.
-
-### parent `cli:auth remove` (2; status=absent)
-
-- `hermes auth remove provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth remove` status `absent`.
-- `hermes auth remove target` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth remove` status `absent`.
-
-### parent `cli:auth reset` (2; status=absent)
-
-- `hermes auth reset provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth reset` status `absent`.
-- `hermes auth reset target` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth reset` status `absent`.
-
-### parent `cli:auth spotify` (6; status=absent)
-
-- `hermes auth spotify --client-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth spotify` status `absent`.
-- `hermes auth spotify --no-browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth spotify` status `absent`.
-- `hermes auth spotify --redirect-uri` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth spotify` status `absent`.
-- `hermes auth spotify --scope` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth spotify` status `absent`.
-- `hermes auth spotify --timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth spotify` status `absent`.
-- `hermes auth spotify spotify_action` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth spotify` status `absent`.
-
-### parent `cli:auth status` (1; status=absent)
-
-- `hermes auth status provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth status` status `absent`.
-
-### parent `cli:auth upgrade` (2; status=absent)
-
-- `hermes auth upgrade --no-browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth upgrade` status `absent`.
-- `hermes auth upgrade --timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/auth.py`; parent `cli:auth upgrade` status `absent`.
-
-### parent `cli:backup` (8; status=absent)
-
-- `hermes backup --keep` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-- `hermes backup --label` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-- `hermes backup --output` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-- `hermes backup --quick` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-- `hermes backup -k` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-- `hermes backup -l` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-- `hermes backup -o` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-- `hermes backup -q` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/backup.py`; parent `cli:backup` status `absent`.
-
-### parent `cli:browser close-profile` (1; status=absent)
-
-- `hermes browser close-profile --browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/browser.py`; parent `cli:browser close-profile` status `absent`.
-
-### parent `cli:chat` (40; status=absent)
-
-- `hermes chat --accept-hooks` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --checkpoints` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --cli` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --continue` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --create-if-missing` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --dev` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --format` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --ignore-rules` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --ignore-user-config` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --image` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --in` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --max-turns` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --model` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --no-restore-cwd` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --oneshot` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --pass-session-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --query` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --query-file` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --quiet` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --reasoning` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --resume` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --run-budget` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --safe-mode` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --skills` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --toolsets` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --tui` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --verbose` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --worktree` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat --yolo` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -Q` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -c` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -m` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -q` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -r` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -s` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -t` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -v` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-- `hermes chat -w` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/_parser.py`; parent `cli:chat` status `absent`.
-
-### parent `cli:claw cleanup` (3; status=absent)
-
-- `hermes claw clean` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw cleanup` status `absent`.
-- `hermes claw cleanup --dry-run` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw cleanup` status `absent`.
-- `hermes claw cleanup --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw cleanup` status `absent`.
-
-### parent `cli:claw migrate` (8; status=absent)
-
-- `hermes claw migrate --dry-run` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-- `hermes claw migrate --migrate-secrets` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-- `hermes claw migrate --no-backup` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-- `hermes claw migrate --overwrite` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-- `hermes claw migrate --preset` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-- `hermes claw migrate --skill-conflict` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-- `hermes claw migrate --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-- `hermes claw migrate --workspace-target` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/claw.py`; parent `cli:claw migrate` status `absent`.
-
-### parent `cli:codex-runtime migrate` (2; status=absent)
-
-- `hermes codex-runtime migrate --dry-run` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/codex_runtime.py`; parent `cli:codex-runtime migrate` status `absent`.
-- `hermes codex-runtime migrate --json` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/codex_runtime.py`; parent `cli:codex-runtime migrate` status `absent`.
-
-### parent `cli:completion` (1; status=absent)
-
-- `hermes completion shell` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/completion.py`; parent `cli:completion` status `absent`.
-
-### parent `cli:computer-use doctor` (2; status=absent)
-
-- `hermes computer-use doctor --include` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use.py`; parent `cli:computer-use doctor` status `absent`.
-- `hermes computer-use doctor --skip` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use.py`; parent `cli:computer-use doctor` status `absent`.
-
-### parent `cli:computer-use install` (1; status=absent)
-
-- `hermes computer-use install --upgrade` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use.py`; parent `cli:computer-use install` status `absent`.
-
-### parent `cli:config get` (2; status=absent)
-
-- `hermes config get --raw` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/config.py`; parent `cli:config get` status `absent`.
-- `hermes config get key` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/config.py`; parent `cli:config get` status `absent`.
-
-### parent `cli:config set` (3; status=absent)
-
-- `hermes config set --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/config.py`; parent `cli:config set` status `absent`.
-- `hermes config set key` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/config.py`; parent `cli:config set` status `absent`.
-- `hermes config set value` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/config.py`; parent `cli:config set` status `absent`.
-
-### parent `cli:config unset` (1; status=absent)
-
-- `hermes config unset key` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/config.py`; parent `cli:config unset` status `absent`.
-
-### parent `cli:cron create` (18; status=absent)
-
-- `hermes cron add` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --continuity` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --deliver` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --failure-deliver` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --model` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --monitor-script` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --monitor-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --paused-reason` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --pin` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --reasoning-effort` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --repeat` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --script` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --skill` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create --workdir` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create prompt` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-- `hermes cron create schedule` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron create` status `absent`.
-
-### parent `cli:cron edit` (23; status=absent)
-
-- `hermes cron edit --add-skill` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --agent` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --continuity` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --deliver` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --failure-deliver` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --model` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --monitor-script` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --monitor-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --no-agent` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --no-continuity` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --pin` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --prompt` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --reasoning-effort` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --remove-skill` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --repeat` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --schedule` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --script` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --skill` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --unpin` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit --workdir` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-- `hermes cron edit job_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron edit` status `absent`.
-
-### parent `cli:cron incidents` (3; status=absent)
-
-- `hermes cron incidents --state` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron incidents` status `absent`.
-- `hermes cron incidents incident_action` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron incidents` status `absent`.
-- `hermes cron incidents incident_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron incidents` status `absent`.
-
-### parent `cli:cron notepad` (4; status=absent)
-
-- `hermes cron notepad job_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron notepad` status `absent`.
-- `hermes cron notepad key` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron notepad` status `absent`.
-- `hermes cron notepad notepad_action` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron notepad` status `absent`.
-- `hermes cron notepad value` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron notepad` status `absent`.
-
-### parent `cli:cron pause` (1; status=absent)
-
-- `hermes cron pause job_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron pause` status `absent`.
-
-### parent `cli:cron remove` (3; status=absent)
-
-- `hermes cron delete` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron remove` status `absent`.
-- `hermes cron remove job_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron remove` status `absent`.
-- `hermes cron rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron remove` status `absent`.
-
-### parent `cli:cron resume` (2; status=absent)
-
-- `hermes cron resume --at` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron resume` status `absent`.
-- `hermes cron resume job_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron resume` status `absent`.
-
-### parent `cli:cron run` (1; status=absent)
-
-- `hermes cron run job_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron run` status `absent`.
-
-### parent `cli:cron runs` (3; status=absent)
-
-- `hermes cron history` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron runs` status `absent`.
-- `hermes cron runs --limit` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron runs` status `absent`.
-- `hermes cron runs job_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/cron.py`; parent `cli:cron runs` status `absent`.
-
-### parent `cli:dashboard` (2; status=absent)
-
-- `hermes dashboard --no-open` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/dashboard.py`; parent `cli:dashboard` status `absent`.
-- `hermes dashboard --tui` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/dashboard.py`; parent `cli:dashboard` status `absent`.
-
-### parent `cli:dashboard register` (3; status=absent)
-
-- `hermes dashboard register --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/dashboard.py`; parent `cli:dashboard register` status `absent`.
-- `hermes dashboard register --portal-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/dashboard.py`; parent `cli:dashboard register` status `absent`.
-- `hermes dashboard register --redirect-uri` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/dashboard.py`; parent `cli:dashboard register` status `absent`.
-
-### parent `cli:debug delete` (1; status=absent)
-
-- `hermes debug delete urls` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug delete` status `absent`.
-
-### parent `cli:debug share` (7; status=absent)
-
-- `hermes debug share --expire` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug share` status `absent`.
-- `hermes debug share --lines` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug share` status `absent`.
-- `hermes debug share --local` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug share` status `absent`.
-- `hermes debug share --no-redact` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug share` status `absent`.
-- `hermes debug share --nous` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug share` status `absent`.
-- `hermes debug share --yes` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug share` status `absent`.
-- `hermes debug share -y` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/debug.py`; parent `cli:debug share` status `absent`.
-
-### parent `cli:desktop` (11; status=absent)
-
-- `hermes desktop --build-only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --cwd` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --fake-boot` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --force-build` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --hermes-root` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --identity` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --ignore-existing` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --local` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --setup-tcc-identity` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --skip-build` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-- `hermes desktop --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gui.py`; parent `cli:desktop` status `absent`.
-
-### parent `cli:doctor` (3; status=absent)
-
-- `hermes doctor --ack` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/doctor.py`; parent `cli:doctor` status `absent`.
-- `hermes doctor --fix` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/doctor.py`; parent `cli:doctor` status `absent`.
-- `hermes doctor --live` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/doctor.py`; parent `cli:doctor` status `absent`.
-
-### parent `cli:dump` (1; status=absent)
-
-- `hermes dump --show-keys` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/dump.py`; parent `cli:dump` status `absent`.
-
-### parent `cli:fallback list` (1; status=absent)
-
-- `hermes fallback ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/fallback.py`; parent `cli:fallback list` status `absent`.
-
-### parent `cli:fallback remove` (1; status=absent)
-
-- `hermes fallback rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/fallback.py`; parent `cli:fallback remove` status `absent`.
-
-### parent `cli:gateway enroll` (4; status=absent)
-
-- `hermes gateway enroll --connector-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway enroll` status `absent`.
-- `hermes gateway enroll --gateway-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway enroll` status `absent`.
-- `hermes gateway enroll --token` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway enroll` status `absent`.
-- `hermes gateway enroll --wake-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway enroll` status `absent`.
-
-### parent `cli:gateway install` (3; status=absent)
-
-- `hermes gateway install --no-start-now` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `absent`.
-- `hermes gateway install --no-start-on-login` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `absent`.
-- `hermes gateway install --run-as-user` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway install` status `absent`.
-
-### parent `cli:gateway run` (7; status=absent)
-
-- `hermes gateway run --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `absent`.
-- `hermes gateway run --no-supervise` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `absent`.
-- `hermes gateway run --quiet` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `absent`.
-- `hermes gateway run --replace` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `absent`.
-- `hermes gateway run --verbose` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `absent`.
-- `hermes gateway run -q` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `absent`.
-- `hermes gateway run -v` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:gateway run` status `absent`.
-
-### parent `cli:hooks list` (1; status=absent)
-
-- `hermes hooks ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/hooks.py`; parent `cli:hooks list` status `absent`.
-
-### parent `cli:hooks revoke` (3; status=absent)
-
-- `hermes hooks remove` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/hooks.py`; parent `cli:hooks revoke` status `absent`.
-- `hermes hooks revoke command` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/hooks.py`; parent `cli:hooks revoke` status `absent`.
-- `hermes hooks rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/hooks.py`; parent `cli:hooks revoke` status `absent`.
-
-### parent `cli:hooks test` (3; status=absent)
-
-- `hermes hooks test --for-tool` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/hooks.py`; parent `cli:hooks test` status `absent`.
-- `hermes hooks test --payload-file` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/hooks.py`; parent `cli:hooks test` status `absent`.
-- `hermes hooks test event` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/hooks.py`; parent `cli:hooks test` status `absent`.
-
-### parent `cli:import` (3; status=absent)
-
-- `hermes import --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/import_cmd.py`; parent `cli:import` status `absent`.
-- `hermes import -f` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/import_cmd.py`; parent `cli:import` status `absent`.
-- `hermes import zipfile` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/import_cmd.py`; parent `cli:import` status `absent`.
-
-### parent `cli:import-agent` (5; status=absent)
-
-- `hermes import-agent --dry-run` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/import_agent.py`; parent `cli:import-agent` status `absent`.
-- `hermes import-agent --overwrite` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/import_agent.py`; parent `cli:import-agent` status `absent`.
-- `hermes import-agent --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/import_agent.py`; parent `cli:import-agent` status `absent`.
-- `hermes import-agent --sync` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/import_agent.py`; parent `cli:import-agent` status `absent`.
-- `hermes import-agent agent` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/import_agent.py`; parent `cli:import-agent` status `absent`.
-
-### parent `cli:insights` (2; status=absent)
-
-- `hermes insights --days` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/insights.py`; parent `cli:insights` status `absent`.
-- `hermes insights --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/insights.py`; parent `cli:insights` status `absent`.
-
-### parent `cli:kanban` (1; status=absent)
-
-- `hermes kanban --board` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/kanban_parser.py`; parent `cli:kanban` status `absent`.
-
-### parent `cli:login` (9; status=absent)
-
-- `hermes login --ca-bundle` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --client-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --inference-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --insecure` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --no-browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --portal-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --scope` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-- `hermes login --timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/login.py`; parent `cli:login` status `absent`.
-
-### parent `cli:logout` (1; status=absent)
-
-- `hermes logout --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logout.py`; parent `cli:logout` status `absent`.
-
-### parent `cli:logs` (9; status=absent)
-
-- `hermes logs --component` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs --follow` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs --level` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs --lines` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs --session` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs --since` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs -f` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs -n` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-- `hermes logs log_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/logs.py`; parent `cli:logs` status `absent`.
-
-### parent `cli:mcp add` (8; status=absent)
-
-- `hermes mcp add --args` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-- `hermes mcp add --auth` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-- `hermes mcp add --command` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-- `hermes mcp add --connect-timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-- `hermes mcp add --env` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-- `hermes mcp add --preset` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-- `hermes mcp add --url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-- `hermes mcp add name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp add` status `absent`.
-
-### parent `cli:mcp configure` (2; status=absent)
-
-- `hermes mcp config` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp configure` status `absent`.
-- `hermes mcp configure name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp configure` status `absent`.
-
-### parent `cli:mcp install` (1; status=absent)
-
-- `hermes mcp install identifier` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp install` status `absent`.
-
-### parent `cli:mcp list` (1; status=absent)
-
-- `hermes mcp ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp list` status `absent`.
-
-### parent `cli:mcp login` (2; status=absent)
-
-- `hermes mcp login --flow` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp login` status `absent`.
-- `hermes mcp login name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp login` status `absent`.
-
-### parent `cli:mcp reauth` (2; status=absent)
-
-- `hermes mcp reauth --all` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp reauth` status `absent`.
-- `hermes mcp reauth name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp reauth` status `absent`.
-
-### parent `cli:mcp remove` (2; status=absent)
-
-- `hermes mcp remove name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp remove` status `absent`.
-- `hermes mcp rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp remove` status `absent`.
-
-### parent `cli:mcp serve` (2; status=absent)
-
-- `hermes mcp serve --verbose` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp serve` status `absent`.
-- `hermes mcp serve -v` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp serve` status `absent`.
-
-### parent `cli:mcp test` (1; status=absent)
-
-- `hermes mcp test name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/mcp.py`; parent `cli:mcp test` status `absent`.
-
-### parent `cli:memory reset` (1; status=absent)
-
-- `hermes memory reset --target` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/memory.py`; parent `cli:memory reset` status `absent`.
-
-### parent `cli:memory setup` (1; status=absent)
-
-- `hermes memory setup provider` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/memory.py`; parent `cli:memory setup` status `absent`.
-
-### parent `cli:migrate relay` (2; status=absent)
-
-- `hermes migrate relay --all-profiles` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/migrate.py`; parent `cli:migrate relay` status `absent`.
-- `hermes migrate relay --no-validate` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/migrate.py`; parent `cli:migrate relay` status `absent`.
-
-### parent `cli:migrate xai` (2; status=absent)
-
-- `hermes migrate xai --apply` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/migrate.py`; parent `cli:migrate xai` status `absent`.
-- `hermes migrate xai --no-backup` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/migrate.py`; parent `cli:migrate xai` status `absent`.
-
-### parent `cli:moa configure` (2; status=absent)
-
-- `hermes moa config` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/moa.py`; parent `cli:moa configure` status `absent`.
-- `hermes moa configure name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/moa.py`; parent `cli:moa configure` status `absent`.
-
-### parent `cli:moa delete` (2; status=absent)
-
-- `hermes moa delete name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/moa.py`; parent `cli:moa delete` status `absent`.
-- `hermes moa rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/moa.py`; parent `cli:moa delete` status `absent`.
-
-### parent `cli:moa list` (1; status=absent)
-
-- `hermes moa ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/moa.py`; parent `cli:moa list` status `absent`.
-
-### parent `cli:model` (9; status=absent)
-
-- `hermes model --ca-bundle` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --client-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --inference-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --insecure` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --no-browser` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --portal-url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --refresh` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --scope` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-- `hermes model --timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/model.py`; parent `cli:model` status `absent`.
-
-### parent `cli:pairing approve` (2; status=absent)
-
-- `hermes pairing approve code` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/pairing.py`; parent `cli:pairing approve` status `absent`.
-- `hermes pairing approve platform` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/pairing.py`; parent `cli:pairing approve` status `absent`.
-
-### parent `cli:pairing revoke` (2; status=absent)
-
-- `hermes pairing revoke platform` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/pairing.py`; parent `cli:pairing revoke` status `absent`.
-- `hermes pairing revoke user_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/pairing.py`; parent `cli:pairing revoke` status `absent`.
-
-### parent `cli:pause` (1; status=absent)
-
-- `hermes pause --reason` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/pause.py`; parent `cli:pause` status `absent`.
-
-### parent `cli:peer add` (5; status=absent)
-
-- `hermes peer add --key` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer add` status `absent`.
-- `hermes peer add --note` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer add` status `absent`.
-- `hermes peer add --url` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer add` status `absent`.
-- `hermes peer add name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer add` status `absent`.
-- `hermes peer set` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer add` status `absent`.
-
-### parent `cli:peer list` (1; status=absent)
-
-- `hermes peer ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer list` status `absent`.
-
-### parent `cli:peer remove` (2; status=absent)
-
-- `hermes peer remove name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer remove` status `absent`.
-- `hermes peer rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/peer.py`; parent `cli:peer remove` status `absent`.
-
-### parent `cli:plugins adopt` (1; status=absent)
-
-- `hermes plugins adopt name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins adopt` status `absent`.
-
-### parent `cli:plugins capabilities` (1; status=absent)
-
-- `hermes plugins capabilities name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins capabilities` status `absent`.
-
-### parent `cli:plugins check-updates` (2; status=absent)
-
-- `hermes plugins check` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins check-updates` status `absent`.
-- `hermes plugins check-updates --json` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins check-updates` status `absent`.
-
-### parent `cli:plugins compat` (2; status=absent)
-
-- `hermes plugins compat --json` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins compat` status `absent`.
-- `hermes plugins compat path` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins compat` status `absent`.
-
-### parent `cli:plugins disable` (1; status=absent)
-
-- `hermes plugins disable name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins disable` status `absent`.
-
-### parent `cli:plugins doctor` (2; status=absent)
-
-- `hermes plugins doctor --ci` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins doctor` status `absent`.
-- `hermes plugins doctor target` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins doctor` status `absent`.
-
-### parent `cli:plugins enable` (3; status=absent)
-
-- `hermes plugins enable --allow-tool-override` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins enable` status `absent`.
-- `hermes plugins enable --no-allow-tool-override` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins enable` status `absent`.
-- `hermes plugins enable name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins enable` status `absent`.
-
-### parent `cli:plugins install` (8; status=absent)
-
-- `hermes plugins install --allow-removed` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-- `hermes plugins install --enable` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-- `hermes plugins install --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-- `hermes plugins install --no-deps` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-- `hermes plugins install --no-enable` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-- `hermes plugins install --ref` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-- `hermes plugins install -f` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-- `hermes plugins install identifier` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins install` status `absent`.
-
-### parent `cli:plugins list` (5; status=absent)
-
-- `hermes plugins list --enabled` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins list` status `absent`.
-- `hermes plugins list --no-bundled` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins list` status `absent`.
-- `hermes plugins list --plain` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins list` status `absent`.
-- `hermes plugins list --user` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins list` status `absent`.
-- `hermes plugins ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins list` status `absent`.
-
-### parent `cli:plugins pack export` (2; status=absent)
-
-- `hermes plugins pack export --enabled-only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins pack export` status `absent`.
-- `hermes plugins pack export --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins pack export` status `absent`.
-
-### parent `cli:plugins pack install` (3; status=absent)
-
-- `hermes plugins pack install --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins pack install` status `absent`.
-- `hermes plugins pack install -f` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins pack install` status `absent`.
-- `hermes plugins pack install source` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins pack install` status `absent`.
-
-### parent `cli:plugins pack show` (1; status=absent)
-
-- `hermes plugins pack show source` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins pack show` status `absent`.
-
-### parent `cli:plugins remove` (3; status=absent)
-
-- `hermes plugins remove name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins remove` status `absent`.
-- `hermes plugins rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins remove` status `absent`.
-- `hermes plugins uninstall` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins remove` status `absent`.
-
-### parent `cli:plugins search` (1; status=absent)
-
-- `hermes plugins search term` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins search` status `absent`.
-
-### parent `cli:plugins show` (2; status=absent)
-
-- `hermes plugins info` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins show` status `absent`.
-- `hermes plugins show name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins show` status `absent`.
-
-### parent `cli:plugins trust-update-url` (1; status=absent)
-
-- `hermes plugins trust-update-url name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins trust-update-url` status `absent`.
-
-### parent `cli:plugins update` (1; status=absent)
-
-- `hermes plugins update name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins update` status `absent`.
-
-### parent `cli:plugins validate` (2; status=absent)
-
-- `hermes plugins validate --install-deps` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins validate` status `absent`.
-- `hermes plugins validate path` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/plugins.py`; parent `cli:plugins validate` status `absent`.
-
-### parent `cli:profile alias` (3; status=absent)
-
-- `hermes profile alias --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile alias` status `absent`.
-- `hermes profile alias --remove` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile alias` status `absent`.
-- `hermes profile alias profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile alias` status `absent`.
-
-### parent `cli:profile create` (9; status=absent)
-
-- `hermes profile create --clone` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create --clone-all` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create --clone-channels` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create --clone-from` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create --description` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create --no-alias` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create --no-skills` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create --sync-imports` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-- `hermes profile create profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile create` status `absent`.
-
-### parent `cli:profile delete` (3; status=absent)
-
-- `hermes profile delete --yes` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile delete` status `absent`.
-- `hermes profile delete -y` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile delete` status `absent`.
-- `hermes profile delete profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile delete` status `absent`.
-
-### parent `cli:profile describe` (5; status=absent)
-
-- `hermes profile describe --all` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile describe` status `absent`.
-- `hermes profile describe --auto` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile describe` status `absent`.
-- `hermes profile describe --overwrite` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile describe` status `absent`.
-- `hermes profile describe --text` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile describe` status `absent`.
-- `hermes profile describe profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile describe` status `absent`.
-
-### parent `cli:profile export` (3; status=absent)
-
-- `hermes profile export --output` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile export` status `absent`.
-- `hermes profile export -o` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile export` status `absent`.
-- `hermes profile export profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile export` status `absent`.
-
-### parent `cli:profile import` (2; status=absent)
-
-- `hermes profile import --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile import` status `absent`.
-- `hermes profile import archive` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile import` status `absent`.
-
-### parent `cli:profile info` (1; status=absent)
-
-- `hermes profile info profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile info` status `absent`.
-
-### parent `cli:profile install` (6; status=absent)
-
-- `hermes profile install --alias` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile install` status `absent`.
-- `hermes profile install --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile install` status `absent`.
-- `hermes profile install --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile install` status `absent`.
-- `hermes profile install --yes` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile install` status `absent`.
-- `hermes profile install -y` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile install` status `absent`.
-- `hermes profile install source` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile install` status `absent`.
-
-### parent `cli:profile migrate-identity` (2; status=absent)
-
-- `hermes profile migrate-identity new_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile migrate-identity` status `absent`.
-- `hermes profile migrate-identity old_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile migrate-identity` status `absent`.
-
-### parent `cli:profile purge-identity` (1; status=absent)
-
-- `hermes profile purge-identity profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile purge-identity` status `absent`.
-
-### parent `cli:profile rename` (2; status=absent)
-
-- `hermes profile rename new_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile rename` status `absent`.
-- `hermes profile rename old_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile rename` status `absent`.
-
-### parent `cli:profile show` (1; status=absent)
-
-- `hermes profile show profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile show` status `absent`.
-
-### parent `cli:profile update` (4; status=absent)
-
-- `hermes profile update --force-config` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile update` status `absent`.
-- `hermes profile update --yes` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile update` status `absent`.
-- `hermes profile update -y` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile update` status `absent`.
-- `hermes profile update profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile update` status `absent`.
-
-### parent `cli:profile use` (1; status=absent)
-
-- `hermes profile use profile_name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/profile.py`; parent `cli:profile use` status `absent`.
-
-### parent `cli:project create` (6; status=absent)
-
-- `hermes project create --board` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project create` status `absent`.
-- `hermes project create --primary` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project create` status `absent`.
-- `hermes project create --slug` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project create` status `absent`.
-- `hermes project create --use` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project create` status `absent`.
-- `hermes project create folders` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project create` status `absent`.
-- `hermes project create name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project create` status `absent`.
-
-### parent `cli:project list` (2; status=absent)
-
-- `hermes project list --all` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project list` status `absent`.
-- `hermes project ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/projects_cmd.py`; parent `cli:project list` status `absent`.
-
-### parent `cli:project use` (1; status=absent)
-
-- `hermes project use project` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/projects_cmd.py`; parent `cli:project use` status `absent`.
-
-### parent `cli:prompt-size` (1; status=absent)
-
-- `hermes prompt-size --platform` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/prompt_size.py`; parent `cli:prompt-size` status `absent`.
-
-### parent `cli:proxy start` (3; status=absent)
-
-- `hermes proxy start --host` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:proxy start` status `absent`.
-- `hermes proxy start --port` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:proxy start` status `absent`.
-- `hermes proxy start --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/gateway.py`; parent `cli:proxy start` status `absent`.
-
-### parent `cli:screen install` (2; status=absent)
-
-- `hermes screen install --yes` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use_screen.py`; parent `cli:screen install` status `absent`.
 - `hermes screen install -y` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use_screen.py`; parent `cli:screen install` status `absent`.
 
-### parent `cli:screen stop` (1; status=absent)
+### parent `plugin:kanban` (2; status=absent)
 
-- `hermes screen stop --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/computer_use_screen.py`; parent `cli:screen stop` status `absent`.
-
-### parent `cli:secrets bitwarden` (1; status=absent)
-
-- `hermes secrets bw` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/secrets.py`; parent `cli:secrets bitwarden` status `absent`.
-
-### parent `cli:secrets onepassword` (2; status=absent)
-
-- `hermes secrets 1password` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/secrets.py`; parent `cli:secrets onepassword` status `absent`.
-- `hermes secrets op` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/secrets.py`; parent `cli:secrets onepassword` status `absent`.
-
-### parent `cli:security audit` (4; status=absent)
-
-- `hermes security audit --fail-on` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/security.py`; parent `cli:security audit` status `absent`.
-- `hermes security audit --skip-mcp` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/security.py`; parent `cli:security audit` status `absent`.
-- `hermes security audit --skip-plugins` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/security.py`; parent `cli:security audit` status `absent`.
-- `hermes security audit --skip-venv` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/security.py`; parent `cli:security audit` status `absent`.
-
-### parent `cli:sessions browse` (2; status=absent)
-
-- `hermes sessions browse --limit` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions browse` status `absent`.
-- `hermes sessions browse --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions browse` status `absent`.
-
-### parent `cli:sessions delete` (1; status=absent)
-
-- `hermes sessions delete session_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions delete` status `absent`.
-
-### parent `cli:sessions export` (5; status=absent)
-
-- `hermes sessions export --format` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions export` status `absent`.
-- `hermes sessions export --lineage` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions export` status `absent`.
-- `hermes sessions export --only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions export` status `absent`.
-- `hermes sessions export --session-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions export` status `absent`.
-- `hermes sessions export output` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions export` status `absent`.
-
-### parent `cli:sessions import` (2; status=absent)
-
-- `hermes sessions import --from` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions import` status `absent`.
-- `hermes sessions import path` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions import` status `absent`.
-
-### parent `cli:sessions list` (3; status=absent)
-
-- `hermes sessions list --limit` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions list` status `absent`.
-- `hermes sessions list --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions list` status `absent`.
-- `hermes sessions list --workspace` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions list` status `absent`.
-
-### parent `cli:sessions pin` (1; status=absent)
-
-- `hermes sessions pin session_ids` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions pin` status `absent`.
-
-### parent `cli:sessions recover` (5; status=absent)
-
-- `hermes sessions recover --chunk-size` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions recover` status `absent`.
-- `hermes sessions recover --output` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions recover` status `absent`.
-- `hermes sessions recover --report` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions recover` status `absent`.
-- `hermes sessions recover --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions recover` status `absent`.
-- `hermes sessions recover --work-dir` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions recover` status `absent`.
-
-### parent `cli:sessions rename` (2; status=absent)
-
-- `hermes sessions rename session_id` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions rename` status `absent`.
-- `hermes sessions rename title` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions rename` status `absent`.
-
-### parent `cli:sessions repair-profiles` (1; status=absent)
-
-- `hermes sessions repair-profiles --legacy-main` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions repair-profiles` status `absent`.
-
-### parent `cli:sessions repair-routing` (1; status=absent)
-
-- `hermes sessions repair-routing --max-gap-seconds` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions repair-routing` status `absent`.
-
-### parent `cli:sessions retitle-skills` (1; status=absent)
-
-- `hermes sessions retitle-skills --limit` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions retitle-skills` status `absent`.
-
-### parent `cli:sessions set-journal-mode` (2; status=absent)
-
-- `hermes sessions set-journal-mode --db` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions set-journal-mode` status `absent`.
-- `hermes sessions set-journal-mode mode` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions set-journal-mode` status `absent`.
-
-### parent `cli:sessions unpin` (1; status=absent)
-
-- `hermes sessions unpin session_ids` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sessions.py`; parent `cli:sessions unpin` status `absent`.
-
-### parent `cli:setup` (6; status=absent)
-
-- `hermes setup --non-interactive` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/setup.py`; parent `cli:setup` status `absent`.
-- `hermes setup --portal` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/setup.py`; parent `cli:setup` status `absent`.
-- `hermes setup --quick` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/setup.py`; parent `cli:setup` status `absent`.
-- `hermes setup --reconfigure` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/setup.py`; parent `cli:setup` status `absent`.
-- `hermes setup --reset` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/setup.py`; parent `cli:setup` status `absent`.
-- `hermes setup section` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/setup.py`; parent `cli:setup` status `absent`.
-
-### parent `cli:skills audit` (1; status=absent)
-
-- `hermes skills audit name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills audit` status `absent`.
-
-### parent `cli:skills browse` (3; status=absent)
-
-- `hermes skills browse --page` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills browse` status `absent`.
-- `hermes skills browse --size` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills browse` status `absent`.
-- `hermes skills browse --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills browse` status `absent`.
-
-### parent `cli:skills check` (1; status=absent)
-
-- `hermes skills check name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills check` status `absent`.
-
-### parent `cli:skills diff` (1; status=absent)
-
-- `hermes skills diff name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills diff` status `absent`.
-
-### parent `cli:skills inspect` (1; status=absent)
-
-- `hermes skills inspect identifier` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills inspect` status `absent`.
-
-### parent `cli:skills install` (3; status=absent)
-
-- `hermes skills install --category` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills install` status `absent`.
-- `hermes skills install --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills install` status `absent`.
-- `hermes skills install identifier` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills install` status `absent`.
-
-### parent `cli:skills list` (1; status=absent)
-
-- `hermes skills list --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills list` status `absent`.
-
-### parent `cli:skills publish` (3; status=absent)
-
-- `hermes skills publish --repo` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills publish` status `absent`.
-- `hermes skills publish --to` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills publish` status `absent`.
-- `hermes skills publish skill_path` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills publish` status `absent`.
-
-### parent `cli:skills repair-official` (1; status=absent)
-
-- `hermes skills repair-official name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills repair-official` status `absent`.
-
-### parent `cli:skills reset` (1; status=absent)
-
-- `hermes skills reset name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills reset` status `absent`.
-
-### parent `cli:skills search` (3; status=absent)
-
-- `hermes skills search --limit` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills search` status `absent`.
-- `hermes skills search --source` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills search` status `absent`.
-- `hermes skills search query` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills search` status `absent`.
-
-### parent `cli:skills snapshot export` (1; status=absent)
-
-- `hermes skills snapshot export output` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills snapshot export` status `absent`.
-
-### parent `cli:skills snapshot import` (1; status=absent)
-
-- `hermes skills snapshot import input` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills snapshot import` status `absent`.
-
-### parent `cli:skills tap add` (1; status=absent)
-
-- `hermes skills tap add repo` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills tap add` status `absent`.
-
-### parent `cli:skills tap remove` (1; status=absent)
-
-- `hermes skills tap remove name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills tap remove` status `absent`.
-
-### parent `cli:skills trust` (1; status=absent)
-
-- `hermes skills trust path` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills trust` status `absent`.
-
-### parent `cli:skills uninstall` (1; status=absent)
-
-- `hermes skills uninstall name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills uninstall` status `absent`.
-
-### parent `cli:skills untrust` (1; status=absent)
-
-- `hermes skills untrust path` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills untrust` status `absent`.
-
-### parent `cli:skills update` (1; status=absent)
-
-- `hermes skills update name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skills.py`; parent `cli:skills update` status `absent`.
-
-### parent `cli:skin set` (3; status=absent)
-
-- `hermes skin set --skin` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/skin.py`; parent `cli:skin set` status `absent`.
-- `hermes skin set key` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skin.py`; parent `cli:skin set` status `absent`.
-- `hermes skin set value` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skin.py`; parent `cli:skin set` status `absent`.
-
-### parent `cli:skin use` (1; status=absent)
-
-- `hermes skin use name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/skin.py`; parent `cli:skin use` status `absent`.
-
-### parent `cli:slack manifest` (8; status=absent)
-
-- `hermes slack manifest --agent-view` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-- `hermes slack manifest --description` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-- `hermes slack manifest --long-description` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-- `hermes slack manifest --long-description-file` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-- `hermes slack manifest --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-- `hermes slack manifest --no-assistant` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-- `hermes slack manifest --slashes-only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-- `hermes slack manifest --write` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/slack.py`; parent `cli:slack manifest` status `absent`.
-
-### parent `cli:status` (2; status=absent)
-
-- `hermes status --all` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/status.py`; parent `cli:status` status `absent`.
-- `hermes status --deep` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/status.py`; parent `cli:status` status `absent`.
-
-### parent `cli:sync device` (1; status=absent)
-
-- `hermes sync device --name` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sync.py`; parent `cli:sync device` status `absent`.
-
-### parent `cli:sync disable` (1; status=absent)
-
-- `hermes sync disable skill` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sync.py`; parent `cli:sync disable` status `absent`.
-
-### parent `cli:sync enable` (1; status=absent)
-
-- `hermes sync enable skill` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sync.py`; parent `cli:sync enable` status `absent`.
-
-### parent `cli:sync propose` (3; status=absent)
-
-- `hermes sync propose --message` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sync.py`; parent `cli:sync propose` status `absent`.
-- `hermes sync propose -m` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/sync.py`; parent `cli:sync propose` status `absent`.
-- `hermes sync propose name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/sync.py`; parent `cli:sync propose` status `absent`.
-
-### parent `cli:tools` (1; status=absent)
-
-- `hermes tools --summary` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/tools.py`; parent `cli:tools` status `absent`.
-
-### parent `cli:tools disable` (2; status=absent)
-
-- `hermes tools disable --platform` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/tools.py`; parent `cli:tools disable` status `absent`.
-- `hermes tools disable names` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/tools.py`; parent `cli:tools disable` status `absent`.
-
-### parent `cli:tools enable` (2; status=absent)
-
-- `hermes tools enable --platform` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/tools.py`; parent `cli:tools enable` status `absent`.
-- `hermes tools enable names` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/tools.py`; parent `cli:tools enable` status `absent`.
-
-### parent `cli:tools list` (1; status=absent)
-
-- `hermes tools list --platform` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/tools.py`; parent `cli:tools list` status `absent`.
-
-### parent `cli:tools post-setup` (1; status=absent)
-
-- `hermes tools post-setup post_setup_key` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/tools.py`; parent `cli:tools post-setup` status `absent`.
-
-### parent `cli:uninstall` (6; status=absent)
-
-- `hermes uninstall --data` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/uninstall.py`; parent `cli:uninstall` status `absent`.
-- `hermes uninstall --desktop-userdata` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/uninstall.py`; parent `cli:uninstall` status `absent`.
-- `hermes uninstall --dry-run` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/uninstall.py`; parent `cli:uninstall` status `absent`.
-- `hermes uninstall --full` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/uninstall.py`; parent `cli:uninstall` status `absent`.
-- `hermes uninstall --gui` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/uninstall.py`; parent `cli:uninstall` status `absent`.
-- `hermes uninstall --gui-summary` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/uninstall.py`; parent `cli:uninstall` status `absent`.
-
-### parent `cli:update` (17; status=absent)
-
-- `hermes update --backup` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --branch` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --channel` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --check` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --force` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --force-venv` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --gateway` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --install-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --keep-stash` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --list-venv-holders` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --no-backup` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --no-gateway-restart` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --plan` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --set-channel` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --switch-branch` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update --yes` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-- `hermes update -y` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/update.py`; parent `cli:update` status `absent`.
-
-### parent `cli:usage` (2; status=absent)
-
-- `hermes usage --json` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/usage.py`; parent `cli:usage` status `absent`.
-- `hermes usage --provider` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/usage.py`; parent `cli:usage` status `absent`.
-
-### parent `cli:verify` (8; status=absent)
-
-- `hermes verify --detect-only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-- `hermes verify --phase` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-- `hermes verify --port` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-- `hermes verify --ready-timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-- `hermes verify --save` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-- `hermes verify --skip-start` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-- `hermes verify --timeout` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-- `hermes verify path` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/verify.py`; parent `cli:verify` status `absent`.
-
-### parent `cli:webhook list` (1; status=absent)
-
-- `hermes webhook ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook list` status `absent`.
-
-### parent `cli:webhook remove` (2; status=absent)
-
-- `hermes webhook remove name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook remove` status `absent`.
-- `hermes webhook rm` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook remove` status `absent`.
-
-### parent `cli:webhook subscribe` (14; status=absent)
-
-- `hermes webhook add` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --cron-job` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --deliver` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --deliver-chat-id` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --deliver-only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --description` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --events` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --mirror-to-session` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --prompt` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --route-profile` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --script` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --secret` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe --skills` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-- `hermes webhook subscribe name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook subscribe` status `absent`.
-
-### parent `cli:webhook test` (2; status=absent)
-
-- `hermes webhook test --payload` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook test` status `absent`.
-- `hermes webhook test name` — category `qubit_cli_positional`; coverage `cli-option`; source `hermes_cli/subcommands/webhook.py`; parent `cli:webhook test` status `absent`.
-
-### parent `cli:worktree list` (5; status=absent)
-
-- `hermes worktree audit` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree list` status `absent`.
-- `hermes worktree list --json` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree list` status `absent`.
-- `hermes worktree list --older-than` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree list` status `absent`.
-- `hermes worktree list --repo` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree list` status `absent`.
-- `hermes worktree ls` — category `qubit_cli_subcommand`; coverage `cli-alias`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree list` status `absent`.
-
-### parent `cli:worktree prune` (6; status=absent)
-
-- `hermes worktree prune --branches-only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree prune` status `absent`.
-- `hermes worktree prune --dry-run` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree prune` status `absent`.
-- `hermes worktree prune --json` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree prune` status `absent`.
-- `hermes worktree prune --older-than` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree prune` status `absent`.
-- `hermes worktree prune --repo` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree prune` status `absent`.
-- `hermes worktree prune --trees-only` — category `qubit_cli_option`; coverage `cli-option`; source `hermes_cli/subcommands/worktree.py`; parent `cli:worktree prune` status `absent`.
-
-### parent `computer_status` (4; status=absent)
-
-- `workflow:desktop:hermes_cli/main_desktop.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/main_desktop.py`; parent `computer_status` status `absent`.
-- `workflow:desktop:hermes_cli/subcommands/computer_use.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/subcommands/computer_use.py`; parent `computer_status` status `absent`.
-- `workflow:desktop:tools/computer_use_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/computer_use_tool.py`; parent `computer_status` status `absent`.
-- `workflow:desktop:tools/desktop_ui.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/desktop_ui.py`; parent `computer_status` status `absent`.
-
-### parent `memory_search` (32; status=absent)
-
-- `workflow:memory:hermes_cli/memory_oauth.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/memory_oauth.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_cli/memory_provider_migration.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/memory_provider_migration.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_cli/memory_setup.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/memory_setup.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_common.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_common.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_compression.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_compression.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_dbfile.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_dbfile.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_errors.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_errors.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_fts.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_fts.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_gateway.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_gateway.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_guard.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_guard.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_health.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_health.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_holders.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_holders.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_ids.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_ids.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_lockguard.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_lockguard.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_lockowners.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_lockowners.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_maintenance.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_maintenance.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_messages.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_messages.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_portability.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_portability.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_profile_repair.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_profile_repair.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_readpool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_readpool.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_registry.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_registry.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_repair.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_repair.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_rewind.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_rewind.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_schema.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_schema.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_search.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_search.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_sessions.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_sessions.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_telegram.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_telegram.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_timeline.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_timeline.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_titles.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_titles.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_usage.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_usage.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_user_copy.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_user_copy.py`; parent `memory_search` status `absent`.
-- `workflow:memory:hermes_state_wal.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_state_wal.py`; parent `memory_search` status `absent`.
-
-### parent `model` (232; status=absent)
-
-- `model:MiniMax-M2.7` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:MiniMax-M2.7-highspeed` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:MiniMax-M3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:MiniMaxAI/MiniMax-M2.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:Qwen/Qwen3.5-35B-A3B` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:Qwen/Qwen3.5-397B-A17B` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:XiaomiMiMo/MiMo-V2-Flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-fable-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-fable-5.1` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-haiku-4.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-opus-4.6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-opus-4.8` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-opus-4.8-fast` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-opus-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-opus-5-fast` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-opus-5.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-sonnet-4.6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:anthropic/claude-sonnet-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:big-pickle` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-fable-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-fable-5.1` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-haiku-4-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-haiku-4-5-20251001` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-opus-4-20250514` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-opus-4-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-opus-4-5-20251101` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-opus-4-6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-opus-4-7` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-opus-4-8` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-opus-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-sonnet-4` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-sonnet-4-20250514` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-sonnet-4-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-sonnet-4-5-20250929` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-sonnet-4-6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:claude-sonnet-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:copilot-acp` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek-ai/DeepSeek-V3.2` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek-v4-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek-v4-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek.v3.2` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek/deepseek-r1-0528` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek/deepseek-v3-0324` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek/deepseek-v4-flash-0731` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek/deepseek-v4-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek/deepseek-v4-pro-0813` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:deepseek/deepseek-v4.1-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:default` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3-pro-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.1-flash-lite-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.1-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.1-pro-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.5-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.5-flash-lite` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.6-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.7-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gemini-3.8-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-4.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-4.5-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-4.7` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-5-turbo` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-5.1` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-5.2` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-5.3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-5.3-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:glm-5v-turbo` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3-flash-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3-pro-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.1-flash-lite` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.1-flash-lite-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.1-pro-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.5-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.5-flash-lite` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.6-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.7-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:google/gemini-3.8-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-4.1` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-4o` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-4o-mini` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5-codex` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5-mini` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5-nano` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.1` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.1-codex` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.1-codex-max` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.1-codex-mini` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.2` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.2-codex` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.3-codex` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.3-codex-spark` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.4` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.4-mini` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.4-nano` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.4-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.5-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.6-luna` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.6-luna-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.6-sol` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.6-sol-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.6-terra` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-5.6-terra-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-6-luna` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-6-luna-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-6-sol` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:gpt-6-sol-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:grok-4.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:grok-4.6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:grok-build-0.1` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:hy3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:hy3-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-for-coding` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-for-coding-highspeed` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2-0905-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2-thinking` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2-thinking-turbo` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2-turbo-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2.6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2.7-code` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k2.7-code-highspeed` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:kimi-k3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:meta/muse-spark-1.2` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:meta/muse-spark-1.2-contributor` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:meta/muse-spark-1.3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:meta/muse-spark-1.3-contributor` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2-omni` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2.5-free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2.5-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2.6-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2.6-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:mimo-v2.6-pro-ultraspeed` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:minimax-m2.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:minimax-m2.7` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:minimax-m3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:minimax/minimax-m2.7` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:minimax/minimax-m3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:minimax/minimax-m3:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:minimaxai/minimax-m3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:moonshotai/Kimi-K2-Thinking` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:moonshotai/Kimi-K2.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:moonshotai/Kimi-K2.6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:moonshotai/kimi-k2.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:moonshotai/kimi-k2.6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:moonshotai/kimi-k3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:muse-spark-1.2` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:muse-spark-1.2-contributor` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:muse-spark-1.2-contributor-free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:muse-spark-1.3-contributor` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:muse-spark-1.3-contributor-free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nemotron-3-ultra-free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nemotron-3.5-lightning-free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nvidia/nemotron-3-super-120b-a12b` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nvidia/nemotron-3-super-120b-a12b:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nvidia/nemotron-3-ultra-550b-a55b` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nvidia/nemotron-3-ultra-550b-a55b:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nvidia/nemotron-3.5-lightning-30b-a3b` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:nvidia/nemotron-3.5-lightning:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai.gpt-5.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai.gpt-5.6-luna` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai.gpt-5.6-sol` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai.gpt-5.6-terra` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-5.4` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-5.4-mini` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-5.5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-5.5-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-astra` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-astra-fast` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-astra-flex` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-astra-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-astra-pro-fast` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-astra-pro-flex` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-luna` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-luna-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-sol` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openai/gpt-6-sol-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:openrouter/pareto-code` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:poolside/laguna-s-2.1:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:poolside/laguna-xs-2.1:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen/qwen3-235b-a22b-fp8` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen/qwen3.8-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen/qwen3.8-max-0902` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen3.5-plus` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen3.6-plus` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen3.7-max` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen3.7-plus` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:qwen3.8-max` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:sakana/fugu-ultra` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:stealth/union-alpha` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:step-3.5-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:step-3.5-flash-2603` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:stepfun/step-3.7-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:tencent/hy3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:tencent/hy4-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:thinkingmachines/inkling-small:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:thinkingmachines/inkling:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:trinity-large-preview` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:trinity-large-thinking` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:trinity-mini` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.amazon.nova-lite-v1:0` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.amazon.nova-micro-v1:0` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.amazon.nova-pro-v1:0` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.anthropic.claude-haiku-4-5-20251001-v1:0` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.anthropic.claude-opus-4-6-v1` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.anthropic.claude-sonnet-4-5-20250929-v1:0` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.anthropic.claude-sonnet-4-6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.anthropic.claude-sonnet-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.meta.llama4-maverick-17b-instruct-v1:0` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:us.meta.llama4-scout-17b-instruct-v1:0` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:x-ai/grok-4.6` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:x-ai/grok-4.7` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:x-preview-f-free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:xiaomi/mimo-v2.5-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:xiaomi/mimo-v2.6-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:xiaomi/mimo-v2.6-pro` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:xiaomi/mimo-v2.6-pro-ultraspeed` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:z-ai/glm-5.2` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:z-ai/glm-5.2:free` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:z-ai/glm-5.3` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:z-ai/glm-5.3-flash` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:z-ai/glm-5.3-flashx` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:zai-org/GLM-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:zai-org/GLM-5.1-FP8` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-- `model:zai-org/glm-5` — category `hermes_model`; coverage `model-entry`; source `hermes_cli/models_catalog_static.py`; parent `model` status `absent`.
-
-### parent `opencode_status` (7; status=absent)
-
-- `workflow:coding:hermes_cli/claw.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/claw.py`; parent `opencode_status` status `absent`.
-- `workflow:coding:hermes_cli/subcommands/claw.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/subcommands/claw.py`; parent `opencode_status` status `absent`.
-- `workflow:coding:tools/code_execution_env.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/code_execution_env.py`; parent `opencode_status` status `absent`.
-- `workflow:coding:tools/code_execution_rpc.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/code_execution_rpc.py`; parent `opencode_status` status `absent`.
-- `workflow:coding:tools/code_execution_tool.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/code_execution_tool.py`; parent `opencode_status` status `absent`.
-- `workflow:coding:tools/code_kernel.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/code_kernel.py`; parent `opencode_status` status `absent`.
-- `workflow:coding:tools/code_kernel_remote.py` — category `hermes_workflow`; coverage `workflow-surface`; source `tools/code_kernel_remote.py`; parent `opencode_status` status `absent`.
-
-### parent `plugin:kanban` (4; status=absent)
-
-- `plugin-api:kanban` — category `hermes_plugin_api`; coverage `plugin-surface`; source `plugins/kanban/dashboard/plugin_api.py`; parent `plugin:kanban` status `absent`.
 - `plugin-asset:kanban:index.js` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/kanban/dashboard/dist/index.js`; parent `plugin:kanban` status `absent`.
 - `plugin-asset:kanban:style.css` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/kanban/dashboard/dist/style.css`; parent `plugin:kanban` status `absent`.
-- `plugin-manifest:kanban` — category `hermes_dashboard_plugin`; coverage `plugin-surface`; source `plugins/kanban/dashboard/manifest.json`; parent `plugin:kanban` status `absent`.
 
-### parent `plugin:qubit-achievements` (5; status=absent)
+### parent `plugin:qubit-achievements` (2; status=absent)
 
-- `plugin-api:hermes-achievements` — category `hermes_plugin_api`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/plugin_api.py`; parent `plugin:qubit-achievements` status `absent`.
 - `plugin-asset:hermes-achievements:index.js` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/dist/index.js`; parent `plugin:qubit-achievements` status `absent`.
 - `plugin-asset:hermes-achievements:style.css` — category `hermes_plugin_asset`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/dist/style.css`; parent `plugin:qubit-achievements` status `absent`.
-- `plugin-manifest:hermes-achievements` — category `hermes_dashboard_plugin`; coverage `plugin-surface`; source `plugins/hermes-achievements/dashboard/manifest.json`; parent `plugin:qubit-achievements` status `absent`.
-- `plugin-test:hermes-achievements:test_achievement_engine.py` — category `hermes_plugin_test`; coverage `plugin-surface`; source `plugins/hermes-achievements/tests/test_achievement_engine.py`; parent `plugin:qubit-achievements` status `absent`.
 
-### parent `proxy_providers` (39; status=absent)
+## Parented surfaces covered by an IMPLEMENTED parent (1024)
 
-- `provider:ai-gateway` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:alibaba` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:anthropic` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:arcee` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:azure-foundry` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:bedrock` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:copilot` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:copilot-acp` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:deepseek` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:fireworks` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:gemini` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:gmi` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:huggingface` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:kilocode` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:kimi-coding` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:kimi-coding-cn` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:lmstudio` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:minimax` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:minimax-cn` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:minimax-oauth` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:moa` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:nous` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:novita` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:nvidia` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:ollama-cloud` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:openai-api` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:openai-codex` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:opencode-go` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:opencode-zen` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:openrouter` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:qwen-oauth` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:stepfun` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:tencent-tokenhub` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:tencent-tokenplan` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:vertex` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:xai` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:xai-oauth` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:xiaomi` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
-- `provider:zai` — category `hermes_provider`; coverage `provider-entry`; source `hermes_cli/models_catalog_static.py`; parent `proxy_providers` status `absent`.
+These are coverage evidence for their parent, not separate gaps.
 
-### parent `reports_list` (3; status=absent)
+- `browser_status`: 25 surface(s) — coverage `workflow-surface`
+- `channels_status`: 8 surface(s) — coverage `workflow-surface`
+- `cli:acp`: 6 surface(s) — coverage `cli-option`
+- `cli:approvals suggest`: 5 surface(s) — coverage `cli-option`
+- `cli:approvals test`: 2 surface(s) — coverage `cli-option`
+- `cli:auth add`: 14 surface(s) — coverage `cli-option`
+- `cli:auth list`: 1 surface(s) — coverage `cli-option`
+- `cli:auth logout`: 1 surface(s) — coverage `cli-option`
+- `cli:auth priority`: 3 surface(s) — coverage `cli-option`
+- `cli:auth refresh`: 2 surface(s) — coverage `cli-option`
+- `cli:auth remove`: 2 surface(s) — coverage `cli-option`
+- `cli:auth reset`: 2 surface(s) — coverage `cli-option`
+- `cli:auth spotify`: 6 surface(s) — coverage `cli-option`
+- `cli:auth status`: 1 surface(s) — coverage `cli-option`
+- `cli:auth upgrade`: 2 surface(s) — coverage `cli-option`
+- `cli:backup`: 8 surface(s) — coverage `cli-option`
+- `cli:browser close-profile`: 1 surface(s) — coverage `cli-option`
+- `cli:chat`: 40 surface(s) — coverage `cli-option`
+- `cli:claw cleanup`: 3 surface(s) — coverage `cli-option`
+- `cli:claw migrate`: 8 surface(s) — coverage `cli-option`
+- `cli:codex-runtime migrate`: 2 surface(s) — coverage `cli-option`
+- `cli:completion`: 1 surface(s) — coverage `cli-option`
+- `cli:computer-use doctor`: 2 surface(s) — coverage `cli-option`
+- `cli:computer-use install`: 1 surface(s) — coverage `cli-option`
+- `cli:config get`: 2 surface(s) — coverage `cli-option`
+- `cli:config set`: 3 surface(s) — coverage `cli-option`
+- `cli:config unset`: 1 surface(s) — coverage `cli-option`
+- `cli:cron create`: 18 surface(s) — coverage `cli-option`
+- `cli:cron edit`: 23 surface(s) — coverage `cli-option`
+- `cli:cron incidents`: 3 surface(s) — coverage `cli-option`
+- `cli:cron notepad`: 4 surface(s) — coverage `cli-option`
+- `cli:cron pause`: 1 surface(s) — coverage `cli-option`
+- `cli:cron remove`: 3 surface(s) — coverage `cli-option`
+- `cli:cron resume`: 2 surface(s) — coverage `cli-option`
+- `cli:cron run`: 1 surface(s) — coverage `cli-option`
+- `cli:cron runs`: 3 surface(s) — coverage `cli-option`
+- `cli:dashboard`: 2 surface(s) — coverage `cli-option`
+- `cli:dashboard register`: 3 surface(s) — coverage `cli-option`
+- `cli:debug delete`: 1 surface(s) — coverage `cli-option`
+- `cli:debug share`: 7 surface(s) — coverage `cli-option`
+- `cli:desktop`: 11 surface(s) — coverage `cli-option`
+- `cli:doctor`: 3 surface(s) — coverage `cli-option`
+- `cli:dump`: 1 surface(s) — coverage `cli-option`
+- `cli:fallback list`: 1 surface(s) — coverage `cli-alias`
+- `cli:fallback remove`: 1 surface(s) — coverage `cli-alias`
+- `cli:gateway enroll`: 4 surface(s) — coverage `cli-option`
+- `cli:gateway install`: 3 surface(s) — coverage `cli-option`
+- `cli:gateway run`: 7 surface(s) — coverage `cli-option`
+- `cli:hooks list`: 1 surface(s) — coverage `cli-alias`
+- `cli:hooks revoke`: 3 surface(s) — coverage `cli-option`
+- `cli:hooks test`: 3 surface(s) — coverage `cli-option`
+- `cli:import`: 3 surface(s) — coverage `cli-option`
+- `cli:import-agent`: 5 surface(s) — coverage `cli-option`
+- `cli:insights`: 2 surface(s) — coverage `cli-option`
+- `cli:kanban`: 1 surface(s) — coverage `cli-option`
+- `cli:login`: 9 surface(s) — coverage `cli-option`
+- `cli:logout`: 1 surface(s) — coverage `cli-option`
+- `cli:logs`: 9 surface(s) — coverage `cli-option`
+- `cli:mcp add`: 8 surface(s) — coverage `cli-option`
+- `cli:mcp configure`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp install`: 1 surface(s) — coverage `cli-option`
+- `cli:mcp list`: 1 surface(s) — coverage `cli-alias`
+- `cli:mcp login`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp reauth`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp remove`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp serve`: 2 surface(s) — coverage `cli-option`
+- `cli:mcp test`: 1 surface(s) — coverage `cli-option`
+- `cli:memory reset`: 1 surface(s) — coverage `cli-option`
+- `cli:memory setup`: 1 surface(s) — coverage `cli-option`
+- `cli:migrate relay`: 2 surface(s) — coverage `cli-option`
+- `cli:migrate xai`: 2 surface(s) — coverage `cli-option`
+- `cli:moa configure`: 2 surface(s) — coverage `cli-option`
+- `cli:moa delete`: 2 surface(s) — coverage `cli-option`
+- `cli:moa list`: 1 surface(s) — coverage `cli-alias`
+- `cli:model`: 9 surface(s) — coverage `cli-option`
+- `cli:pairing approve`: 2 surface(s) — coverage `cli-option`
+- `cli:pairing revoke`: 2 surface(s) — coverage `cli-option`
+- `cli:pause`: 1 surface(s) — coverage `cli-option`
+- `cli:peer add`: 5 surface(s) — coverage `cli-option`
+- `cli:peer list`: 1 surface(s) — coverage `cli-alias`
+- `cli:peer remove`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins adopt`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins capabilities`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins check-updates`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins compat`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins disable`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins doctor`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins enable`: 3 surface(s) — coverage `cli-option`
+- `cli:plugins install`: 8 surface(s) — coverage `cli-option`
+- `cli:plugins list`: 5 surface(s) — coverage `cli-option`
+- `cli:plugins pack export`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins pack install`: 3 surface(s) — coverage `cli-option`
+- `cli:plugins pack show`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins remove`: 3 surface(s) — coverage `cli-option`
+- `cli:plugins search`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins show`: 2 surface(s) — coverage `cli-option`
+- `cli:plugins trust-update-url`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins update`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins validate`: 2 surface(s) — coverage `cli-option`
+- `cli:profile alias`: 3 surface(s) — coverage `cli-option`
+- `cli:profile create`: 9 surface(s) — coverage `cli-option`
+- `cli:profile delete`: 3 surface(s) — coverage `cli-option`
+- `cli:profile describe`: 5 surface(s) — coverage `cli-option`
+- `cli:profile export`: 3 surface(s) — coverage `cli-option`
+- `cli:profile import`: 2 surface(s) — coverage `cli-option`
+- `cli:profile info`: 1 surface(s) — coverage `cli-option`
+- `cli:profile install`: 6 surface(s) — coverage `cli-option`
+- `cli:profile migrate-identity`: 2 surface(s) — coverage `cli-option`
+- `cli:profile purge-identity`: 1 surface(s) — coverage `cli-option`
+- `cli:profile rename`: 2 surface(s) — coverage `cli-option`
+- `cli:profile show`: 1 surface(s) — coverage `cli-option`
+- `cli:profile update`: 4 surface(s) — coverage `cli-option`
+- `cli:profile use`: 1 surface(s) — coverage `cli-option`
+- `cli:project create`: 6 surface(s) — coverage `cli-option`
+- `cli:project list`: 2 surface(s) — coverage `cli-option`
+- `cli:project use`: 1 surface(s) — coverage `cli-option`
+- `cli:prompt-size`: 1 surface(s) — coverage `cli-option`
+- `cli:proxy start`: 3 surface(s) — coverage `cli-option`
+- `cli:screen install`: 1 surface(s) — coverage `cli-option`
+- `cli:screen stop`: 1 surface(s) — coverage `cli-option`
+- `cli:secrets bitwarden`: 1 surface(s) — coverage `cli-alias`
+- `cli:secrets onepassword`: 2 surface(s) — coverage `cli-alias`
+- `cli:security audit`: 4 surface(s) — coverage `cli-option`
+- `cli:sessions browse`: 2 surface(s) — coverage `cli-option`
+- `cli:sessions delete`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions export`: 5 surface(s) — coverage `cli-option`
+- `cli:sessions import`: 2 surface(s) — coverage `cli-option`
+- `cli:sessions list`: 3 surface(s) — coverage `cli-option`
+- `cli:sessions pin`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions recover`: 5 surface(s) — coverage `cli-option`
+- `cli:sessions rename`: 2 surface(s) — coverage `cli-option`
+- `cli:sessions repair-profiles`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions repair-routing`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions retitle-skills`: 1 surface(s) — coverage `cli-option`
+- `cli:sessions set-journal-mode`: 2 surface(s) — coverage `cli-option`
+- `cli:sessions unpin`: 1 surface(s) — coverage `cli-option`
+- `cli:setup`: 6 surface(s) — coverage `cli-option`
+- `cli:skills audit`: 1 surface(s) — coverage `cli-option`
+- `cli:skills browse`: 3 surface(s) — coverage `cli-option`
+- `cli:skills check`: 1 surface(s) — coverage `cli-option`
+- `cli:skills diff`: 1 surface(s) — coverage `cli-option`
+- `cli:skills inspect`: 1 surface(s) — coverage `cli-option`
+- `cli:skills install`: 3 surface(s) — coverage `cli-option`
+- `cli:skills list`: 1 surface(s) — coverage `cli-option`
+- `cli:skills publish`: 3 surface(s) — coverage `cli-option`
+- `cli:skills repair-official`: 1 surface(s) — coverage `cli-option`
+- `cli:skills reset`: 1 surface(s) — coverage `cli-option`
+- `cli:skills search`: 3 surface(s) — coverage `cli-option`
+- `cli:skills snapshot export`: 1 surface(s) — coverage `cli-option`
+- `cli:skills snapshot import`: 1 surface(s) — coverage `cli-option`
+- `cli:skills tap add`: 1 surface(s) — coverage `cli-option`
+- `cli:skills tap remove`: 1 surface(s) — coverage `cli-option`
+- `cli:skills trust`: 1 surface(s) — coverage `cli-option`
+- `cli:skills uninstall`: 1 surface(s) — coverage `cli-option`
+- `cli:skills untrust`: 1 surface(s) — coverage `cli-option`
+- `cli:skills update`: 1 surface(s) — coverage `cli-option`
+- `cli:skin set`: 3 surface(s) — coverage `cli-option`
+- `cli:skin use`: 1 surface(s) — coverage `cli-option`
+- `cli:slack manifest`: 8 surface(s) — coverage `cli-option`
+- `cli:status`: 2 surface(s) — coverage `cli-option`
+- `cli:sync device`: 1 surface(s) — coverage `cli-option`
+- `cli:sync disable`: 1 surface(s) — coverage `cli-option`
+- `cli:sync enable`: 1 surface(s) — coverage `cli-option`
+- `cli:sync propose`: 3 surface(s) — coverage `cli-option`
+- `cli:tools`: 1 surface(s) — coverage `cli-option`
+- `cli:tools disable`: 2 surface(s) — coverage `cli-option`
+- `cli:tools enable`: 2 surface(s) — coverage `cli-option`
+- `cli:tools list`: 1 surface(s) — coverage `cli-option`
+- `cli:tools post-setup`: 1 surface(s) — coverage `cli-option`
+- `cli:uninstall`: 6 surface(s) — coverage `cli-option`
+- `cli:update`: 17 surface(s) — coverage `cli-option`
+- `cli:usage`: 2 surface(s) — coverage `cli-option`
+- `cli:verify`: 8 surface(s) — coverage `cli-option`
+- `cli:webhook list`: 1 surface(s) — coverage `cli-alias`
+- `cli:webhook remove`: 2 surface(s) — coverage `cli-option`
+- `cli:webhook subscribe`: 14 surface(s) — coverage `cli-option`
+- `cli:webhook test`: 2 surface(s) — coverage `cli-option`
+- `cli:worktree list`: 5 surface(s) — coverage `cli-option`
+- `cli:worktree prune`: 6 surface(s) — coverage `cli-option`
+- `computer_status`: 4 surface(s) — coverage `workflow-surface`
+- `memory_search`: 32 surface(s) — coverage `workflow-surface`
+- `model`: 232 surface(s) — coverage `model-entry`
+- `opencode_status`: 7 surface(s) — coverage `workflow-surface`
+- `plugin:kanban`: 2 surface(s) — coverage `plugin-surface`
+- `plugin:qubit-achievements`: 3 surface(s) — coverage `plugin-surface`
+- `proxy_providers`: 39 surface(s) — coverage `provider-entry`
+- `reports_list`: 3 surface(s) — coverage `workflow-surface`
+- `runtime_status`: 21 surface(s) — coverage `workflow-surface`
+- `schedules_list`: 32 surface(s) — coverage `workflow-surface`
+- `webui_status`: 48 surface(s) — coverage `dashboard-surface`
 
-- `workflow:reports:hermes_cli/doctor_report.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/doctor_report.py`; parent `reports_list` status `absent`.
-- `workflow:reports:hermes_cli/status_report.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/status_report.py`; parent `reports_list` status `absent`.
-- `workflow:reports:hermes_cli/update_cmd_drain_report.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/update_cmd_drain_report.py`; parent `reports_list` status `absent`.
-
-### parent `runtime_status` (21; status=absent)
-
-- `workflow:runtime:hermes_cli/local_runtime/__init__.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/__init__.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/binaries.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/binaries.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/bootstrap.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/bootstrap.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/capabilities.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/capabilities.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/catalog.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/catalog.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/context_policy.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/context_policy.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/detect.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/detect.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/endpoint.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/endpoint.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/estimator.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/estimator.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/gguf.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/gguf.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/growth.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/growth.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/hardware.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/hardware.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/hf_browse.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/hf_browse.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/load_progress.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/load_progress.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/presets.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/presets.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/processes.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/processes.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/recovery.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/recovery.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/local_runtime/supervisor.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/local_runtime/supervisor.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/runtime_provider.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/runtime_provider.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/runtime_provider_backends.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/runtime_provider_backends.py`; parent `runtime_status` status `absent`.
-- `workflow:runtime:hermes_cli/runtime_provider_custom.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/runtime_provider_custom.py`; parent `runtime_status` status `absent`.
-
-### parent `schedules_list` (32; status=absent)
-
-- `workflow:schedules:cron/__init__.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/__init__.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/blueprint_catalog.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/blueprint_catalog.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/bot_chat_delivery.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/bot_chat_delivery.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/constants.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/constants.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/delivery_queue.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/delivery_queue.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/env_settings.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/env_settings.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/executions.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/executions.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/incidents.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/incidents.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/job_definition.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/job_definition.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/jobs.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/jobs.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/lifecycle_guard.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/lifecycle_guard.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/monitor.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/monitor.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/notepad.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/notepad.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/occurrences.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/occurrences.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/quota_hold.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/quota_hold.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_delivery.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_delivery.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_detached_worker.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_detached_worker.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_diagnostics.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_diagnostics.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_failure_copy.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_failure_copy.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_ownership.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_ownership.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_preflight.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_preflight.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_prompt.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_prompt.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_provider.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_provider.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_script.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_script.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_thread.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_thread.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_tick.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_tick.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/scheduler_worker_env.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/scheduler_worker_env.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/suggestion_catalog.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/suggestion_catalog.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/suggestions.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/suggestions.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:cron/unreachable_retry.py` — category `hermes_workflow`; coverage `workflow-surface`; source `cron/unreachable_retry.py`; parent `schedules_list` status `absent`.
-- `workflow:schedules:hermes_cli/cron.py` — category `hermes_workflow`; coverage `workflow-surface`; source `hermes_cli/cron.py`; parent `schedules_list` status `absent`.
-
-### parent `webui_status` (48; status=absent)
-
-- `api:GET /assets/{filename}.css` — category `qubit_backend_route`; coverage `static-asset`; source `hermes_cli/web_server_dashboard.py:188`; parent `webui_status` status `absent`.
-- `component:AuthWidget` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/AuthWidget.tsx`; parent `webui_status` status `absent`.
-- `component:AutoField` — category `hermes_dashboard_form`; coverage `dashboard-surface`; source `web/src/components/AutoField.tsx`; parent `webui_status` status `absent`.
-- `component:AutomationBlueprints` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/AutomationBlueprints.tsx`; parent `webui_status` status `absent`.
-- `component:ChatSessionList` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/ChatSessionList.tsx`; parent `webui_status` status `absent`.
-- `component:ChatSidebar` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/ChatSidebar.tsx`; parent `webui_status` status `absent`.
-- `component:ChatWorkspacePicker` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/ChatWorkspacePicker.tsx`; parent `webui_status` status `absent`.
-- `component:ConfirmDialog` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/ConfirmDialog.tsx`; parent `webui_status` status `absent`.
-- `component:DeleteConfirmDialog` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/DeleteConfirmDialog.tsx`; parent `webui_status` status `absent`.
-- `component:HermesConsoleModal` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/HermesConsoleModal.tsx`; parent `webui_status` status `absent`.
-- `component:LanguageSwitcher` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/LanguageSwitcher.tsx`; parent `webui_status` status `absent`.
-- `component:LoadErrorNotice` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/LoadErrorNotice.tsx`; parent `webui_status` status `absent`.
-- `component:Markdown` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/Markdown.tsx`; parent `webui_status` status `absent`.
-- `component:MemoryPressureBanner` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/MemoryPressureBanner.tsx`; parent `webui_status` status `absent`.
-- `component:ModelInfoCard` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/ModelInfoCard.tsx`; parent `webui_status` status `absent`.
-- `component:ModelPickerDialog` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/ModelPickerDialog.tsx`; parent `webui_status` status `absent`.
-- `component:ModelReloadConfirm` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/ModelReloadConfirm.tsx`; parent `webui_status` status `absent`.
-- `component:MultiplexStandaloneBanner` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/MultiplexStandaloneBanner.tsx`; parent `webui_status` status `absent`.
-- `component:OAuthLoginModal` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/OAuthLoginModal.tsx`; parent `webui_status` status `absent`.
-- `component:OAuthProvidersCard` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/OAuthProvidersCard.tsx`; parent `webui_status` status `absent`.
-- `component:PlatformsCard` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/PlatformsCard.tsx`; parent `webui_status` status `absent`.
-- `component:ProfileScopeBanner` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/ProfileScopeBanner.tsx`; parent `webui_status` status `absent`.
-- `component:ProfileSwitcher` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/ProfileSwitcher.tsx`; parent `webui_status` status `absent`.
-- `component:ReasoningPicker` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/ReasoningPicker.tsx`; parent `webui_status` status `absent`.
-- `component:ScheduleBuilder` — category `hermes_dashboard_form`; coverage `dashboard-surface`; source `web/src/components/ScheduleBuilder.tsx`; parent `webui_status` status `absent`.
-- `component:SidebarFooter` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/SidebarFooter.tsx`; parent `webui_status` status `absent`.
-- `component:SidebarStatusStrip` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/SidebarStatusStrip.tsx`; parent `webui_status` status `absent`.
-- `component:SkillEditorDialog` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/SkillEditorDialog.tsx`; parent `webui_status` status `absent`.
-- `component:ThemeSwitcher` — category `hermes_dashboard_component`; coverage `dashboard-surface`; source `web/src/components/ThemeSwitcher.tsx`; parent `webui_status` status `absent`.
-- `component:ToolsetConfigDrawer` — category `hermes_dashboard_dialog`; coverage `dashboard-surface`; source `web/src/components/ToolsetConfigDrawer.tsx`; parent `webui_status` status `absent`.
-- `nav:/analytics` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:196`; parent `webui_status` status `absent`.
-- `nav:/channels` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:213`; parent `webui_status` status `absent`.
-- `nav:/chat` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:140`; parent `webui_status` status `absent`.
-- `nav:/config` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:217`; parent `webui_status` status `absent`.
-- `nav:/cron` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:209`; parent `webui_status` status `absent`.
-- `nav:/docs` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:220`; parent `webui_status` status `absent`.
-- `nav:/env` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:218`; parent `webui_status` status `absent`.
-- `nav:/files` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:195`; parent `webui_status` status `absent`.
-- `nav:/logs` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:208`; parent `webui_status` status `absent`.
-- `nav:/mcp` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:212`; parent `webui_status` status `absent`.
-- `nav:/models` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:202`; parent `webui_status` status `absent`.
-- `nav:/pairing` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:215`; parent `webui_status` status `absent`.
-- `nav:/plugins` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:211`; parent `webui_status` status `absent`.
-- `nav:/profiles` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:216`; parent `webui_status` status `absent`.
-- `nav:/sessions` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:189`; parent `webui_status` status `absent`.
-- `nav:/skills` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:210`; parent `webui_status` status `absent`.
-- `nav:/system` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:219`; parent `webui_status` status `absent`.
-- `nav:/webhooks` — category `hermes_dashboard_nav`; coverage `dashboard-surface`; source `web/src/App.tsx:214`; parent `webui_status` status `absent`.
-
-## Parented surfaces covered by an IMPLEMENTED parent (0)
-
-None.
-
-## Fork-runtime dispositions for tools / skills / plugins (175)
+## Fork-runtime dispositions for tools / skills / plugins (1094)
 
 Qubit executes the complete pinned Hermes fork in-process, so these are not separate Qubit modules: the fork tool/toolset registry, skill tree, and plugin fleet are the real backing surface. Every item carries an explicit typed disposition (no silent drop).
 
-### `fork_plugin_runtime` (18; IMPLEMENTED 17, GATED 1)
+### `fork_plugin_runtime` (18; IMPLEMENTED 18, GATED 0)
 
 - `plugin:browser` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:context_engine` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
@@ -2420,7 +260,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `plugin:dashboard_auth` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:disk-cleanup` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:google_meet` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
-- `plugin:hermes-achievements` — **GATED**; backend `—`; plugin 'hermes-achievements' is not present in the vendored fork plugin fleet; no Qubit wrapper.
+- `plugin:hermes-achievements` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:image_gen` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:kanban` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
 - `plugin:memory` — **IMPLEMENTED**; backend `voicebridge.qubit_plugins.plugin_fleet_audit`; vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper`
@@ -2471,28 +311,28 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `skill:skills/software-development` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for skills/software-development; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 - `skill:skills/web` — **IMPLEMENTED**; backend `qubit_runtime.skills`; vendored under qubit_runtime/ with a loadable SKILL.md for skills/web; served by the in-process fork skill runtime.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_all_inventory_skills_vendored_and_loadable`
 
-### `fork_tool_runtime` (100; IMPLEMENTED 79, GATED 21)
+### `fork_tool_runtime` (105; IMPLEMENTED 105, GATED 0)
 
 - `tool:annotate_preview` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'annotate_preview'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:apply_layout` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'apply_layout'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
-- `tool:browser_back` — **GATED**; backend `—`; tool 'browser_back' is not declared by the vendored fork tool/toolset source; no Qubit caller.
+- `tool:browser_back` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_back'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_cdp` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_cdp'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
-- `tool:browser_click` — **GATED**; backend `—`; tool 'browser_click' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_console` — **GATED**; backend `—`; tool 'browser_console' is not declared by the vendored fork tool/toolset source; no Qubit caller.
+- `tool:browser_click` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_click'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_console` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_console'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_dialog` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_dialog'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_exec` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_exec'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
-- `tool:browser_get_images` — **GATED**; backend `—`; tool 'browser_get_images' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_navigate` — **GATED**; backend `—`; tool 'browser_navigate' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_press` — **GATED**; backend `—`; tool 'browser_press' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_scroll` — **GATED**; backend `—`; tool 'browser_scroll' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_snapshot` — **GATED**; backend `—`; tool 'browser_snapshot' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:browser_type` — **GATED**; backend `—`; tool 'browser_type' is not declared by the vendored fork tool/toolset source; no Qubit caller.
+- `tool:browser_get_images` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_get_images'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_navigate` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_navigate'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_press` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_press'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_scroll` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_scroll'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_snapshot` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_snapshot'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:browser_type` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_type'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_vault_enter_code` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_enter_code'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_vault_fill` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_fill'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_vault_list` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_list'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_vault_save_login` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_save_login'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:browser_vault_unlock` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vault_unlock'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
-- `tool:browser_vision` — **GATED**; backend `—`; tool 'browser_vision' is not declared by the vendored fork tool/toolset source; no Qubit caller.
+- `tool:browser_vision` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'browser_vision'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:clarify` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'clarify'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:close_terminal` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'close_terminal'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:computer_use` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'computer_use'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
@@ -2512,10 +352,10 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `tool:file` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'file'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:focus_pane` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'focus_pane'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:gui_tour` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'gui_tour'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
-- `tool:ha_call_service` — **GATED**; backend `—`; tool 'ha_call_service' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:ha_get_state` — **GATED**; backend `—`; tool 'ha_get_state' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:ha_list_entities` — **GATED**; backend `—`; tool 'ha_list_entities' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:ha_list_services` — **GATED**; backend `—`; tool 'ha_list_services' is not declared by the vendored fork tool/toolset source; no Qubit caller.
+- `tool:ha_call_service` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_call_service'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:ha_get_state` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_get_state'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:ha_list_entities` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_list_entities'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:ha_list_services` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'ha_list_services'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:image_gen` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'image_gen'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:image_generate` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'image_generate'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:kanban_attach` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_attach'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
@@ -2534,6 +374,11 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `tool:kanban_unblock` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'kanban_unblock'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:manage_catalog` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'manage_catalog'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:manage_connections` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'manage_connections'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:meet_join` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'meet_join'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:meet_leave` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'meet_leave'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:meet_say` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'meet_say'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:meet_status` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'meet_status'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:meet_transcript` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'meet_transcript'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:memory` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'memory'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:patch` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'patch'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:process_manage` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'process_manage'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
@@ -2547,13 +392,13 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `tool:skill_manage` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'skill_manage'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:skill_view` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'skill_view'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:skills_list` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'skills_list'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
-- `tool:spotify_albums` — **GATED**; backend `—`; tool 'spotify_albums' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:spotify_devices` — **GATED**; backend `—`; tool 'spotify_devices' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:spotify_library` — **GATED**; backend `—`; tool 'spotify_library' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:spotify_playback` — **GATED**; backend `—`; tool 'spotify_playback' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:spotify_playlists` — **GATED**; backend `—`; tool 'spotify_playlists' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:spotify_queue` — **GATED**; backend `—`; tool 'spotify_queue' is not declared by the vendored fork tool/toolset source; no Qubit caller.
-- `tool:spotify_search` — **GATED**; backend `—`; tool 'spotify_search' is not declared by the vendored fork tool/toolset source; no Qubit caller.
+- `tool:spotify_albums` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_albums'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_devices` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_devices'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_library` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_library'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_playback` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_playback'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_playlists` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_playlists'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_queue` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_queue'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
+- `tool:spotify_search` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'spotify_search'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:terminal` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'terminal'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:text_to_speech` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'text_to_speech'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:todo_list` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'todo_list'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
@@ -2661,6 +506,935 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 ### `openclaw extension zalouser` (1; IMPLEMENTED 0, GATED 1)
 
 - `openclaw-ext:zalouser` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `qubit_backend_route` (178; IMPLEMENTED 178, GATED 0)
+
+- `api:DELETE /api/files` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/files is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:DELETE /api/learning/node` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/learning/node is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:DELETE /api/local-models/models/{model_id}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/local-models/models/{model_id} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:DELETE /api/messaging/telegram/onboarding/{pairing_id}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/messaging/telegram/onboarding/{pairing_id} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:DELETE /api/messaging/whatsapp/onboarding/{pairing_id}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/messaging/whatsapp/onboarding/{pairing_id} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:DELETE /api/ops/hooks` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/ops/hooks is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:DELETE /api/profiles/{name}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/profiles/{name} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:DELETE /api/sessions/empty` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/sessions/empty is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/analytics/models` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/analytics/models is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/analytics/usage` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/analytics/usage is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/audio/voice-config` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/audio/voice-config is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/audio/voice-live/status` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/audio/voice-live/status is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/auth/me` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/auth/me is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/auth/providers` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/auth/providers is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/chat/workspaces` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/chat/workspaces is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/config` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/config is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/config/defaults` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/config/defaults is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/config/schema` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/config/schema is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/cron/jobs` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/cron/jobs is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/curator` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/curator is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/dashboard/plugins` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/dashboard/plugins is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/dashboard/plugins/catalog` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/dashboard/plugins/catalog is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/dashboard/themes` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/dashboard/themes is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/egress/status` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/egress/status is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/env` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/env is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/files` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/files is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/files/read` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/files/read is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/fs/default-cwd` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/fs/default-cwd is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/fs/git-root` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/fs/git-root is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/fs/list` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/fs/list is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/fs/read-data-url` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/fs/read-data-url is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/fs/read-text` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/fs/read-text is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/gateway/migrate/plan` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/gateway/migrate/plan is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/base-branches` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/base-branches is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/branches` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/branches is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/file-diff` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/file-diff is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/review/commit-context` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/review/commit-context is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/review/diff` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/review/diff is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/review/list` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/review/list is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/review/rev-parse` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/review/rev-parse is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/status` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/status is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/git/worktrees` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/worktrees is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/health` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/health is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/health/idle` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/health/idle is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/host/identity` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/host/identity is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/learning/graph` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/learning/graph is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/learning/node` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/learning/node is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/local-models/catalog` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/local-models/catalog is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/local-models/hardware` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/local-models/hardware is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/local-models/jobs` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/local-models/jobs is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/local-models/search` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/local-models/search is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/local-models/search/files` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/local-models/search/files is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/local-models/status` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/local-models/status is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/logs` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/logs is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/mcp/catalog` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/mcp/catalog is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/mcp/servers` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/mcp/servers is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/memory` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/memory is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/messaging/platforms` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/messaging/platforms is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/messaging/telegram/onboarding/{pairing_id}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/messaging/telegram/onboarding/{pairing_id} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/messaging/whatsapp/onboarding/{pairing_id}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/messaging/whatsapp/onboarding/{pairing_id} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/model/auxiliary` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/model/auxiliary is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/model/info` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/model/info is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/model/moa` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/model/moa is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/model/options` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/model/options is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/model/recommended-default` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/model/recommended-default is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/ops/checkpoints` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/ops/checkpoints is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/ops/hooks` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/ops/hooks is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/pairing` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/pairing is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/portal` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/portal is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/profiles` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/profiles is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/profiles/active` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/profiles/active is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/profiles/projects/tree` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/profiles/projects/tree is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/profiles/sessions` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/profiles/sessions is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/profiles/sessions/sidebar` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/profiles/sessions/sidebar is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/profiles/{name}/setup-command` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/profiles/{name}/setup-command is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/profiles/{name}/soul` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/profiles/{name}/soul is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/providers/custom-endpoints` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/providers/custom-endpoints is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/providers/oauth/{provider_id}/poll/{session_id}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/providers/oauth/{provider_id}/poll/{session_id} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/sessions` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/sessions is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/sessions/search` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/sessions/search is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/sessions/stats` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/sessions/stats is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/skills` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/skills is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/skills/content` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/skills/content is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/skills/hub/official` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/skills/hub/official is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/skills/hub/preview` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/skills/hub/preview is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/skills/hub/scan` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/skills/hub/scan is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/skills/hub/search` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/skills/hub/search is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/skills/hub/sources` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/skills/hub/sources is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/status` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/status is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/system/stats` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/system/stats is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/tools/computer-use/status` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/tools/computer-use/status is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/tools/terminal/backends` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/tools/terminal/backends is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/tools/toolsets` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/tools/toolsets is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/webhooks` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/webhooks is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /auth/callback` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /auth/callback is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /auth/login` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /auth/login is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /auth/native/authorize` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /auth/native/authorize is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /login` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /login is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PATCH /api/profiles/{name}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PATCH /api/profiles/{name} is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/audio/speak` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/audio/speak is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/audio/transcribe` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/audio/transcribe is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/chat/image-upload` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/chat/image-upload is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/cron/blueprints/instantiate` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/cron/blueprints/instantiate is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/cron/jobs` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/cron/jobs is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/curator/run` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/curator/run is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/dashboard/agent-plugins/install` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/dashboard/agent-plugins/install is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/files/mkdir` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/files/mkdir is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/files/upload` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/files/upload is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/files/upload-stream` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/files/upload-stream is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/fs/write-text` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/fs/write-text is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/gateway/drain` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/gateway/drain is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/gateway/restart` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/gateway/restart is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/gateway/start` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/gateway/start is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/gateway/stop` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/gateway/stop is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/git/branch/switch` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/branch/switch is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/git/review/commit` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/review/commit is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/git/review/revert` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/review/revert is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/git/review/stage` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/review/stage is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/git/review/unstage` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/review/unstage is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/git/worktree/add` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/worktree/add is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/git/worktree/remove` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/worktree/remove is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/activate` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/activate is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/download` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/download is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/download-browsed` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/download-browsed is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/download/pause` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/download/pause is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/download/resume` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/download/resume is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/eject` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/eject is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/quickstart` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/quickstart is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/runtime/install` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/runtime/install is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/server` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/server is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/local-models/sideload` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/sideload is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/mcp/catalog/install` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/mcp/catalog/install is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/mcp/servers` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/mcp/servers is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/messaging/telegram/onboarding/start` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/messaging/telegram/onboarding/start is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/messaging/telegram/onboarding/{pairing_id}/apply` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/messaging/telegram/onboarding/{pairing_id}/apply is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/messaging/whatsapp/onboarding/start` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/messaging/whatsapp/onboarding/start is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/messaging/whatsapp/onboarding/{pairing_id}/apply` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/messaging/whatsapp/onboarding/{pairing_id}/apply is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/model/set` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/model/set is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/ops/debug-share` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/ops/debug-share is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/ops/hooks` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/ops/hooks is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/ops/import-upload` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/ops/import-upload is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/pairing/approve` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/pairing/approve is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/pairing/clear-pending` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/pairing/clear-pending is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/pairing/revoke` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/pairing/revoke is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/profiles` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/profiles is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/profiles/active` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/profiles/active is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/profiles/{name}/describe-auto` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/profiles/{name}/describe-auto is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/profiles/{name}/export` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/profiles/{name}/export is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/providers/custom-endpoints` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/providers/custom-endpoints is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/providers/oauth/{provider_id}/start` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/providers/oauth/{provider_id}/start is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/providers/oauth/{provider_id}/submit` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/providers/oauth/{provider_id}/submit is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/sessions/bulk-delete` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/sessions/bulk-delete is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/sessions/import` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/sessions/import is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/sessions/prune` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/sessions/prune is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/skills` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/skills is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/skills/hub/install` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/skills/hub/install is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/skills/hub/uninstall` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/skills/hub/uninstall is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/skills/hub/update` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/skills/hub/update is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/tools/computer-use/permissions/grant` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/tools/computer-use/permissions/grant is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/webhooks` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/webhooks is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/webhooks/enable` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/webhooks/enable is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /auth/logout` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /auth/logout is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /auth/native/refresh` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /auth/native/refresh is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /auth/native/token` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /auth/native/token is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /auth/password-login` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /auth/password-login is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/curator/paused` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/curator/paused is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/dashboard/plugin-providers` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/dashboard/plugin-providers is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/dashboard/theme` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/dashboard/theme is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/learning/node` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/learning/node is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/mcp/servers` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/mcp/servers is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/model/moa` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/model/moa is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/profiles/{name}/description` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/profiles/{name}/description is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/profiles/{name}/model` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/profiles/{name}/model is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/profiles/{name}/soul` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/profiles/{name}/soul is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/skills/content` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/skills/content is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/skills/toggle` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/skills/toggle is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:PUT /api/tools/terminal/backend` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; PUT /api/tools/terminal/backend is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:WEBSOCKET /api/pub` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; WEBSOCKET /api/pub is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+
+### `qubit_cli_option` (389; IMPLEMENTED 389, GATED 0)
+
+- `hermes acp --check` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit acp --check` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes acp --setup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit acp --setup` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes acp --setup-browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit acp --setup-browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes acp --version` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit acp --version` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes acp --yes` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit acp --yes` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes acp -y` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit acp -y` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals suggest --apply` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals suggest --apply` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals suggest --days` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals suggest --days` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals suggest --db` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals suggest --db` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals suggest --limit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals suggest --limit` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals suggest --min-count` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals suggest --min-count` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals test --env-type` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals test --env-type` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --api-key` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --api-key` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --ca-bundle` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --ca-bundle` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --client-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --client-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --inference-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --inference-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --insecure` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --insecure` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --label` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --label` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --no-browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --no-browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --portal-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --portal-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --priority` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --priority` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --scope` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --scope` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add --type` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add --type` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth spotify --client-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth spotify --client-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth spotify --no-browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth spotify --no-browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth spotify --redirect-uri` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth spotify --redirect-uri` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth spotify --scope` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth spotify --scope` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth spotify --timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth spotify --timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth upgrade --no-browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth upgrade --no-browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth upgrade --timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth upgrade --timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup --keep` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup --keep` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup --label` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup --label` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup --output` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup --output` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup --quick` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup --quick` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup -k` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup -k` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup -l` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup -l` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup -o` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup -o` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup -q` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup -q` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes browser close-profile --browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit browser close-profile --browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --accept-hooks` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --accept-hooks` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --checkpoints` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --checkpoints` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --cli` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --cli` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --continue` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --continue` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --create-if-missing` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --create-if-missing` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --dev` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --dev` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --format` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --format` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --ignore-rules` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --ignore-rules` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --ignore-user-config` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --ignore-user-config` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --image` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --image` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --in` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --in` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --max-turns` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --max-turns` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --model` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --model` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --no-restore-cwd` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --no-restore-cwd` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --oneshot` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --oneshot` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --pass-session-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --pass-session-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --provider` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --provider` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --query` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --query` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --query-file` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --query-file` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --quiet` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --quiet` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --reasoning` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --reasoning` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --resume` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --resume` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --run-budget` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --run-budget` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --safe-mode` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --safe-mode` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --skills` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --skills` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --toolsets` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --toolsets` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --tui` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --tui` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --verbose` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --verbose` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --worktree` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --worktree` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat --yolo` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat --yolo` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -Q` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -Q` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -c` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -c` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -m` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -m` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -q` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -q` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -r` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -r` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -s` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -s` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -t` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -t` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -v` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -v` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat -w` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat -w` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes codex-runtime migrate --dry-run` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit codex-runtime migrate --dry-run` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes codex-runtime migrate --json` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit codex-runtime migrate --json` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use doctor --include` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use doctor --include` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use doctor --skip` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use doctor --skip` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use install --upgrade` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use install --upgrade` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes config get --raw` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config get --raw` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes config set --force` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config set --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --continuity` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --continuity` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --deliver` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --deliver` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --failure-deliver` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --failure-deliver` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --model` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --model` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --monitor-script` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --monitor-script` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --monitor-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --monitor-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --paused-reason` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --paused-reason` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --pin` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --pin` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --provider` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --provider` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --reasoning-effort` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --reasoning-effort` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --repeat` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --repeat` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --script` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --script` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --skill` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --skill` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create --workdir` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create --workdir` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --add-skill` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --add-skill` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --agent` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --agent` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --continuity` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --continuity` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --deliver` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --deliver` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --failure-deliver` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --failure-deliver` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --model` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --model` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --monitor-script` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --monitor-script` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --monitor-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --monitor-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --no-agent` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --no-agent` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --no-continuity` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --no-continuity` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --pin` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --pin` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --prompt` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --prompt` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --provider` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --provider` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --reasoning-effort` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --reasoning-effort` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --remove-skill` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --remove-skill` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --repeat` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --repeat` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --schedule` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --schedule` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --script` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --script` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --skill` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --skill` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --unpin` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --unpin` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit --workdir` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit --workdir` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron incidents --state` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron incidents --state` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron resume --at` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron resume --at` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron runs --limit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron runs --limit` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes dashboard --no-open` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dashboard --no-open` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes dashboard --tui` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dashboard --tui` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes dashboard register --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dashboard register --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes dashboard register --portal-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dashboard register --portal-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes dashboard register --redirect-uri` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dashboard register --redirect-uri` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share --expire` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share --expire` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share --lines` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share --lines` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share --local` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share --local` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share --no-redact` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share --no-redact` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share --nous` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share --nous` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share --yes` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share --yes` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share -y` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share -y` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --build-only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --build-only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --cwd` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --cwd` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --fake-boot` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --fake-boot` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --force-build` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --force-build` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --hermes-root` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --hermes-root` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --identity` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --identity` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --ignore-existing` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --ignore-existing` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --local` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --local` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --setup-tcc-identity` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --setup-tcc-identity` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --skip-build` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --skip-build` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes doctor --ack` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit doctor --ack` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes doctor --fix` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit doctor --fix` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes doctor --live` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit doctor --live` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes dump --show-keys` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dump --show-keys` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway enroll --connector-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway enroll --connector-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway enroll --gateway-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway enroll --gateway-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway enroll --token` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway enroll --token` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway enroll --wake-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway enroll --wake-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway install --no-start-now` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway install --no-start-now` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway install --no-start-on-login` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway install --no-start-on-login` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway install --run-as-user` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway install --run-as-user` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run --force` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run --no-supervise` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run --no-supervise` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run --quiet` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run --quiet` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run --replace` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run --replace` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run --verbose` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run --verbose` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run -q` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run -q` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run -v` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run -v` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks test --for-tool` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks test --for-tool` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks test --payload-file` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks test --payload-file` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes import --force` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit import --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes import -f` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit import -f` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes insights --days` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit insights --days` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes insights --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit insights --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes kanban --board` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit kanban --board` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --ca-bundle` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --ca-bundle` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --client-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --client-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --inference-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --inference-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --insecure` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --insecure` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --no-browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --no-browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --portal-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --portal-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --provider` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --provider` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --scope` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --scope` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes login --timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login --timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logout --provider` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logout --provider` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs --component` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs --component` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs --follow` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs --follow` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs --level` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs --level` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs --lines` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs --lines` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs --session` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs --session` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs --since` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs --since` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs -f` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs -f` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs -n` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs -n` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add --args` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add --args` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add --auth` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add --auth` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add --command` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add --command` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add --connect-timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add --connect-timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add --env` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add --env` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add --preset` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add --preset` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add --url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add --url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp login --flow` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp login --flow` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp reauth --all` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp reauth --all` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp serve --verbose` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp serve --verbose` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp serve -v` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp serve -v` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes memory reset --target` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit memory reset --target` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes migrate relay --all-profiles` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit migrate relay --all-profiles` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes migrate relay --no-validate` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit migrate relay --no-validate` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes migrate xai --apply` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit migrate xai --apply` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes migrate xai --no-backup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit migrate xai --no-backup` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --ca-bundle` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --ca-bundle` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --client-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --client-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --inference-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --inference-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --insecure` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --insecure` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --no-browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --no-browser` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --portal-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --portal-url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --refresh` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --refresh` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --scope` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --scope` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes model --timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model --timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes pause --reason` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pause --reason` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer add --key` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer add --key` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer add --note` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer add --note` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer add --url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer add --url` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins check-updates --json` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins check-updates --json` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins doctor --ci` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins doctor --ci` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins enable --allow-tool-override` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins enable --allow-tool-override` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins enable --no-allow-tool-override` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins enable --no-allow-tool-override` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install --allow-removed` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install --allow-removed` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install --enable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install --enable` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install --force` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install --no-deps` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install --no-deps` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install --no-enable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install --no-enable` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install --ref` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install --ref` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install -f` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install -f` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins list --enabled` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins list --enabled` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins list --no-bundled` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins list --no-bundled` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins list --plain` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins list --plain` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins list --user` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins list --user` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack export --enabled-only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack export --enabled-only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack export --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack export --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack install --force` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack install --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack install -f` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack install -f` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins validate --install-deps` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins validate --install-deps` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile alias --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile alias --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile alias --remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile alias --remove` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --clone` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --clone` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --clone-all` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --clone-all` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --clone-channels` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --clone-channels` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --clone-from` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --clone-from` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --description` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --description` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --no-alias` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --no-alias` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --no-skills` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --no-skills` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create --sync-imports` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create --sync-imports` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile delete --yes` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile delete --yes` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile delete -y` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile delete -y` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile describe --all` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile describe --all` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile describe --auto` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile describe --auto` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile describe --overwrite` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile describe --overwrite` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile describe --text` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile describe --text` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile export --output` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile export --output` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile export -o` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile export -o` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile import --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile import --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile install --alias` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile install --alias` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile install --force` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile install --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile install --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile install --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile install --yes` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile install --yes` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile install -y` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile install -y` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile update --force-config` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile update --force-config` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile update --yes` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile update --yes` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile update -y` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile update -y` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes project create --board` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project create --board` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes project create --primary` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project create --primary` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes project create --slug` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project create --slug` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes project create --use` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project create --use` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes project list --all` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project list --all` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes prompt-size --platform` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit prompt-size --platform` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes proxy start --host` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit proxy start --host` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes proxy start --port` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit proxy start --port` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes proxy start --provider` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit proxy start --provider` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes security audit --fail-on` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit security audit --fail-on` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes security audit --skip-mcp` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit security audit --skip-mcp` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes security audit --skip-plugins` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit security audit --skip-plugins` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes security audit --skip-venv` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit security audit --skip-venv` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions browse --limit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions browse --limit` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions browse --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions browse --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions export --format` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions export --format` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions export --lineage` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions export --lineage` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions export --only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions export --only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions export --session-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions export --session-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions import --from` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions import --from` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions list --limit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions list --limit` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions list --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions list --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions list --workspace` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions list --workspace` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions recover --chunk-size` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions recover --chunk-size` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions recover --output` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions recover --output` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions recover --report` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions recover --report` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions recover --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions recover --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions recover --work-dir` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions recover --work-dir` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions repair-profiles --legacy-main` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions repair-profiles --legacy-main` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions repair-routing --max-gap-seconds` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions repair-routing --max-gap-seconds` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions retitle-skills --limit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions retitle-skills --limit` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions set-journal-mode --db` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions set-journal-mode --db` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes setup --non-interactive` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit setup --non-interactive` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes setup --portal` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit setup --portal` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes setup --quick` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit setup --quick` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes setup --reconfigure` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit setup --reconfigure` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes setup --reset` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit setup --reset` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills browse --page` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills browse --page` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills browse --size` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills browse --size` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills browse --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills browse --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills install --category` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills install --category` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills install --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills install --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills list --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills list --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills publish --repo` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills publish --repo` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills publish --to` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills publish --to` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills search --limit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills search --limit` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills search --source` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills search --source` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes skin set --skin` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skin set --skin` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --agent-view` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --agent-view` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --description` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --description` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --long-description` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --long-description` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --long-description-file` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --long-description-file` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --no-assistant` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --no-assistant` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --slashes-only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --slashes-only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest --write` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest --write` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes status --all` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit status --all` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes status --deep` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit status --deep` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync device --name` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync device --name` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync propose --message` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync propose --message` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync propose -m` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync propose -m` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools --summary` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools --summary` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools disable --platform` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools disable --platform` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools enable --platform` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools enable --platform` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools list --platform` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools list --platform` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes uninstall --data` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit uninstall --data` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes uninstall --desktop-userdata` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit uninstall --desktop-userdata` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes uninstall --dry-run` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit uninstall --dry-run` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes uninstall --full` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit uninstall --full` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes uninstall --gui` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit uninstall --gui` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes uninstall --gui-summary` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit uninstall --gui-summary` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --backup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --backup` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --branch` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --branch` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --channel` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --channel` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --check` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --check` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --force` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --force-venv` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --force-venv` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --gateway` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --gateway` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --install-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --install-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --keep-stash` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --keep-stash` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --list-venv-holders` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --list-venv-holders` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --no-backup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --no-backup` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --no-gateway-restart` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --no-gateway-restart` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --plan` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --plan` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --set-channel` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --set-channel` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --switch-branch` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --switch-branch` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update --yes` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update --yes` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes update -y` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update -y` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes usage --json` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit usage --json` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes usage --provider` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit usage --provider` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify --detect-only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify --detect-only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify --phase` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify --phase` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify --port` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify --port` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify --ready-timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify --ready-timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify --save` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify --save` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify --skip-start` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify --skip-start` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify --timeout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify --timeout` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --cron-job` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --cron-job` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --deliver` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --deliver` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --deliver-chat-id` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --deliver-chat-id` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --deliver-only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --deliver-only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --description` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --description` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --events` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --events` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --mirror-to-session` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --mirror-to-session` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --prompt` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --prompt` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --route-profile` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --route-profile` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --script` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --script` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --secret` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --secret` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe --skills` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe --skills` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook test --payload` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook test --payload` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree list --json` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree list --json` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree list --older-than` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree list --older-than` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree list --repo` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree list --repo` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree prune --branches-only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree prune --branches-only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree prune --dry-run` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree prune --dry-run` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree prune --json` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree prune --json` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree prune --older-than` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree prune --older-than` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree prune --repo` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree prune --repo` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree prune --trees-only` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree prune --trees-only` lives on a command path that qubit_cli.main._build_cli_parser() defines.; proof `tests/test_cli_agent1_families.py`
+
+### `qubit_cli_surface` (310; IMPLEMENTED 310, GATED 0)
+
+- `hermes acp` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit acp` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals suggest` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals suggest` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes approvals test` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit approvals test` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth add` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth add` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth logout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth logout` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth priority` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth priority` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth refresh` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth refresh` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth reset` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth reset` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth spotify` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth spotify` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes auth upgrade` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit auth upgrade` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes backup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit backup` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes browser` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit browser` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes browser close-profile` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit browser close-profile` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes bundles` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit bundles` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes chat` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit chat` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes checkpoints` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit checkpoints` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes codex-runtime` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit codex-runtime` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes codex-runtime migrate` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit codex-runtime migrate` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes completion` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit completion` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use doctor` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use doctor` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use install` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use permissions` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use permissions` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use permissions grant` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use permissions grant` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use permissions status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use permissions status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes computer-use status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit computer-use status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config check` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config check` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config edit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config edit` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config env-path` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config env-path` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config get` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config get` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config migrate` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config migrate` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config path` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config path` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config set` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config set` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config show` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config show` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes config unset` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit config unset` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes console` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit console` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron add` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron add` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron create` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron create` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron delete` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron delete` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron doctor` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron doctor` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron edit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron edit` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron history` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron history` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron incidents` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron incidents` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron notepad` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron notepad` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron pause` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron pause` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron resume` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron resume` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron run` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron run` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron runs` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron runs` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes cron tick` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit cron tick` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes curator` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit curator` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes dashboard` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dashboard` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes dashboard register` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dashboard register` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug delete` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug delete` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes debug share` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit debug share` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes desktop` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit desktop` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes doctor` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit doctor` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes dump` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit dump` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes egress` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit egress` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes fallback` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit fallback` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes fallback add` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit fallback add` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes fallback clear` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit fallback clear` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes fallback list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit fallback list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes fallback ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit fallback ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes fallback remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit fallback remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes fallback rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit fallback rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway enroll` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway enroll` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway install` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway migrate` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway migrate` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway migrate-legacy` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway migrate-legacy` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway restart` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway restart` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway run` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway run` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway setup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway setup` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway start` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway start` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway stop` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway stop` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gateway uninstall` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gateway uninstall` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes gui` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit gui` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks doctor` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks doctor` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks revoke` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks revoke` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes hooks test` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit hooks test` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes import` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit import` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes insights` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit insights` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes journey` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit journey` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes kanban` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit kanban` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes learning` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit learning` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes login` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit login` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes logout` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logout` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes logs` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit logs` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes lsp` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit lsp` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp add` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp add` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp catalog` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp catalog` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp config` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp config` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp configure` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp configure` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp install` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp login` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp login` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp picker` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp picker` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp reauth` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp reauth` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp serve` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp serve` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes mcp test` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit mcp test` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes memory` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit memory` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes memory off` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit memory off` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes memory reset` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit memory reset` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes memory setup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit memory setup` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes memory status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit memory status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes memory-graph` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit memory-graph` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes migrate` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit migrate` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes migrate relay` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit migrate relay` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes migrate xai` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit migrate xai` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes moa` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit moa` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes moa config` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit moa config` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes moa configure` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit moa configure` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes moa delete` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit moa delete` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes moa list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit moa list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes moa ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit moa ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes moa rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit moa rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes model` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit model` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes monitoring` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit monitoring` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes monitoring status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit monitoring status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes pairing` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pairing` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes pairing approve` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pairing approve` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes pairing clear-pending` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pairing clear-pending` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes pairing list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pairing list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes pairing revoke` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pairing revoke` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes pause` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pause` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer add` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer add` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes peer set` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit peer set` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes pets` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit pets` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins adopt` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins adopt` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins browse` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins browse` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins capabilities` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins capabilities` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins check` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins check` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins check-updates` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins check-updates` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins disable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins disable` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins doctor` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins doctor` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins enable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins enable` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins info` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins info` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins install` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack export` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack export` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack install` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins pack show` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins pack show` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins search` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins search` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins show` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins show` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins trust-update-url` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins trust-update-url` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins uninstall` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins uninstall` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins update` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins update` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes plugins validate` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit plugins validate` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes portal` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit portal` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile alias` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile alias` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile create` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile create` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile delete` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile delete` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile describe` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile describe` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile export` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile export` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile import` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile import` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile info` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile info` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile install` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile migrate-identity` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile migrate-identity` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile purge-identity` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile purge-identity` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile rename` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile rename` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile show` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile show` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile update` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile update` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes profile use` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit profile use` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes project` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes project create` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project create` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes project list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes project ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes project use` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit project use` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes prompt-size` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit prompt-size` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes proxy` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit proxy` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes proxy providers` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit proxy providers` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes proxy start` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit proxy start` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes proxy status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit proxy status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes resume` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit resume` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes secrets` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit secrets` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes secrets 1password` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit secrets 1password` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes secrets bitwarden` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit secrets bitwarden` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes secrets bw` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit secrets bw` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes secrets onepassword` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit secrets onepassword` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes secrets op` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit secrets op` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes security` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit security` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes security audit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit security audit` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes send` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit send` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes serve` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit serve` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions archive` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions archive` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions browse` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions browse` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions clean-markers` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions clean-markers` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions delete` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions delete` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions export` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions export` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions import` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions import` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions optimize` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions optimize` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions optimize-storage` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions optimize-storage` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions pin` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions pin` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions pinned` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions pinned` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions prune` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions prune` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions recover` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions recover` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions rename` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions rename` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions repair` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions repair` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions repair-profiles` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions repair-profiles` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions repair-routing` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions repair-routing` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions retitle-skills` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions retitle-skills` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions set-journal-mode` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions set-journal-mode` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions stats` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions stats` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sessions unpin` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sessions unpin` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes setup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit setup` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills audit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills audit` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills browse` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills browse` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills check` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills check` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills config` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills config` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills diff` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills diff` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills inspect` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills inspect` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills install` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills list-modified` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills list-modified` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills opt-in` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills opt-in` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills opt-out` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills opt-out` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills publish` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills publish` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills repair-official` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills repair-official` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills reset` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills reset` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills search` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills search` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills snapshot` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills snapshot` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills snapshot export` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills snapshot export` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills snapshot import` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills snapshot import` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills tap` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills tap` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills tap add` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills tap add` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills tap list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills tap list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills tap remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills tap remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills trust` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills trust` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills uninstall` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills uninstall` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills untrust` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills untrust` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skills update` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skills update` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skin` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skin` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skin list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skin list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skin set` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skin set` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes skin use` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit skin use` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes slack manifest` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit slack manifest` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync device` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync device` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync disable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync disable` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync enable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync enable` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync now` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync now` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync propose` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync propose` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync pull` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync pull` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync push` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync push` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes sync status` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit sync status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools disable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools disable` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools enable` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools enable` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes tools post-setup` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit tools post-setup` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes uninstall` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit uninstall` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes update` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit update` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes usage` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit usage` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes vault` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit vault` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes verify` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit verify` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook add` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook add` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook remove` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook remove` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook rm` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook rm` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook subscribe` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook subscribe` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes webhook test` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit webhook test` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes whatsapp` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit whatsapp` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes whatsapp-cloud` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit whatsapp-cloud` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree audit` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree audit` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree list` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree list` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree ls` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree ls` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+- `hermes worktree prune` — **IMPLEMENTED**; backend `qubit_cli.main:_build_cli_parser`; `qubit worktree prune` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser.; proof `tests/test_cli_agent1_families.py`
+
+### `qubit_dashboard_page` (19; IMPLEMENTED 19, GATED 0)
+
+- `page:AnalyticsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/AnalyticsPage.tsx`; frontend/qubit-web/src/pages/AnalyticsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:ChannelsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/ChannelsPage.tsx`; frontend/qubit-web/src/pages/ChannelsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:ChatPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/ChatPage.tsx`; frontend/qubit-web/src/pages/ChatPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:ConfigPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/ConfigPage.tsx`; frontend/qubit-web/src/pages/ConfigPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:CronPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/CronPage.tsx`; frontend/qubit-web/src/pages/CronPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:DocsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/DocsPage.tsx`; frontend/qubit-web/src/pages/DocsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:EnvPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/EnvPage.tsx`; frontend/qubit-web/src/pages/EnvPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:FilesPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/FilesPage.tsx`; frontend/qubit-web/src/pages/FilesPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:LogsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/LogsPage.tsx`; frontend/qubit-web/src/pages/LogsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:McpPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/McpPage.tsx`; frontend/qubit-web/src/pages/McpPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:ModelsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/ModelsPage.tsx`; frontend/qubit-web/src/pages/ModelsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:PairingPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/PairingPage.tsx`; frontend/qubit-web/src/pages/PairingPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:PluginsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/PluginsPage.tsx`; frontend/qubit-web/src/pages/PluginsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:ProfileBuilderPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/ProfileBuilderPage.tsx`; frontend/qubit-web/src/pages/ProfileBuilderPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:ProfilesPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/ProfilesPage.tsx`; frontend/qubit-web/src/pages/ProfilesPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:SessionsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/SessionsPage.tsx`; frontend/qubit-web/src/pages/SessionsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:SkillsPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/SkillsPage.tsx`; frontend/qubit-web/src/pages/SkillsPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:SystemPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/SystemPage.tsx`; frontend/qubit-web/src/pages/SystemPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+- `page:WebhooksPage` — **IMPLEMENTED**; backend `frontend/qubit-web/src/pages/WebhooksPage.tsx`; frontend/qubit-web/src/pages/WebhooksPage.tsx ships and is bundled into the served dashboard.; proof `tests/test_dashboard_agent3_wiring.py`
+
+### `qubit_dashboard_route` (18; IMPLEMENTED 18, GATED 0)
+
+- `dashboard-route:/analytics` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /analytics is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/channels` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /channels is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/chat` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /chat is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/config` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /config is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/cron` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /cron is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/docs` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /docs is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/env` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /env is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/files` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /files is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/logs` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /logs is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/mcp` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /mcp is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/models` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /models is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/pairing` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /pairing is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/plugins` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /plugins is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/profiles` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /profiles is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/sessions` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /sessions is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/skills` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /skills is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/system` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /system is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
+- `dashboard-route:/webhooks` — **IMPLEMENTED**; backend `voicebridge.webui:SPA_ROUTE_PATHS`; /webhooks is listed in voicebridge.webui.SPA_ROUTE_PATHS, the allowlist the dashboard server consults to serve a client route.; proof `tests/test_dashboard_agent3_wiring.py`
 
 ## Ledger rows with unreproducible evidence
 
