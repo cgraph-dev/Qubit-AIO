@@ -46,11 +46,15 @@ class _FakeStore:
         return {"state": "OK", "session": {"id": sid, "name": name,
                                            "model": self.model[sid]}}
 
-    def set_model(self, sid, model):
+    def set_model(self, sid, model, provider="", base_url="", api_mode=""):
         if sid not in self.model:
             return {"state": "MISSING", "code": "MISSING", "detail": "no row"}
         self.model[sid] = model
-        return {"state": "OK", "session": {"id": sid, "model": model}}
+        # The handler pins the model AND its route together (a bare model
+        # column would restore against the ambient provider on resume).
+        return {"state": "OK",
+                "session": {"id": sid, "model": model, "provider": provider,
+                            "base_url": base_url, "api_mode": api_mode}}
 
     def archive(self, sid, archived):
         return {"state": "OK", "session": {"id": sid, "archived": archived}}
@@ -101,11 +105,15 @@ def live_cfg(tmp_path, monkeypatch):
     store = _FakeStore()
     monkeypatch.setattr(CT, "store", lambda _cfg: store)
     # A found model validates; an explicit pin echoes as the applied model.
-    monkeypatch.setattr(CT, "resolve_model",
-                        lambda _cfg, requested=None: (
-                            {"ok": True, "model": requested}
-                            if requested else
-                            {"ok": True, "model": "qubit-brain"}))
+    # The patch handler validates a session model pin through
+    # ``CT.resolve_route`` (not ``resolve_model``), so stub THAT seam — a stub
+    # on the old function was never consulted and every pin fell through to a
+    # real registry lookup.
+    monkeypatch.setattr(CT, "resolve_route",
+                        lambda _cfg, requested=None, **_kw: {
+                            "ok": True,
+                            "model": requested or "qubit-brain",
+                            "provider": "", "base_url": "", "api_mode": ""})
     return cfg, store, hub
 
 
