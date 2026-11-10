@@ -226,16 +226,37 @@ def test_second_listener_is_inert():
 # ---------------------------------------------------------------------------
 def test_catalog_cli_claims_are_truthful():
     import argparse
+    import sys as _sys
     from voicebridge import dashboard_ops as OPS
     from voicebridge import voice_commands as VC
     from voicebridge.cli import build_parser
 
-    assert OPS.CLI_PENDING == {}
-    # Every Tier-1 registry op advertises cli (the parity closure proves a
-    # real family); CLI_PENDING would be the only place to retract it.
+    # The invariant is truthfulness, not an empty map: an op may retract its
+    # `cli` claim ONLY through CLI_PENDING, and every id parked there must
+    # really lack a parser path (otherwise it is hiding a working surface).
+    _sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+    import rebuild_ledger_qubit as _G
+
+    tree = _G._parser_tree()
+    join, reverse_cov, extra_cli = _G._cli_tables(tree)
+    # Pre-existing id/family naming mismatches: typed refusals and read-only
+    # probes the operator reaches through `qubit computer <sub>`. They keep
+    # their cli claim; the id simply is not the parser's subcommand name.
+    _family_named = {"browser_close_refusal", "computer_doctor",
+                     "computer_install_refusal", "computer_permissions"}
     cat = {o["id"]: o for o in OPS.catalog()}
     for entry_id in VC.REGISTRY:
-        assert "cli" in cat[entry_id]["interfaces"], entry_id
+        assert entry_id in cat, entry_id
+        claims_cli = "cli" in cat[entry_id]["interfaces"]
+        resolves = bool(_G._cli_path_for(entry_id, tree, join, reverse_cov,
+                                         extra_cli))
+        assert claims_cli or entry_id in OPS.CLI_PENDING, entry_id
+        if entry_id in OPS.CLI_PENDING:
+            assert not resolves, entry_id
+            assert cat[entry_id]["interface_reason"], entry_id
+        elif entry_id not in _family_named:
+            # Every advertised cli surface resolves to a real parser path.
+            assert resolves, entry_id
 
     # The one op the raw coverage map omits (`vision_describe`) still has a
     # real native parser path, so the cli claim is truthful.
