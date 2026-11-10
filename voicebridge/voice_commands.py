@@ -2362,11 +2362,15 @@ def _b_schedules(ctx, args):
     and pass confirmed=True with the canonical human principal.
     "This task" resolves to the current kanban task, exactly like the
     task_run from_current path."""
+    from . import cron_bridge as CB
     from . import schedules as SC
 
     action = args.get("action", "list")
     if action == "list":
-        return {"schedules": SC.list_jobs(ctx.cfg)}
+        # Same store as ``/api/cron/jobs`` (cron_bridge -> cron/jobs.json), not
+        # the legacy schedules.db: reading two stores made the voice surface
+        # report "no schedules" while the dashboard listed the live ones.
+        return {"schedules": {"state": "OK", "jobs": CB.list_jobs(ctx.cfg)}}
     if action == "show":
         return {"schedule": SC.show(ctx.cfg, int(args.get("job_id", 0)))}
     if action == "history":
@@ -2837,19 +2841,19 @@ def _b_plugins_install(ctx, args):
 def _b_curator(ctx, args):
     from .verified_skills import verified_skills_store
 
-    store = verified_skills_store(ctx.cfg)
-    try:
-        stats = store.stats()
-    except Exception:
-        stats = {}
-    try:
-        skills = store.list()
-        by_status: Dict[str, int] = {}
-        for rec in skills:
-            status = getattr(rec, "status", "?")
-            by_status[str(status)] = by_status.get(str(status), 0) + 1
-    except Exception:
-        by_status = {}
+    with verified_skills_store(ctx.cfg) as store:
+        try:
+            stats = store.stats()
+        except Exception:
+            stats = {}
+        try:
+            skills = store.list()
+            by_status: Dict[str, int] = {}
+            for rec in skills:
+                status = getattr(rec, "status", "?")
+                by_status[str(status)] = by_status.get(str(status), 0) + 1
+        except Exception:
+            by_status = {}
     path = Path(ctx.cfg.state_dir()) / "events.jsonl"
     from .journal_io import count_lines
     audit_tail = count_lines(path)

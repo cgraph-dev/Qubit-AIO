@@ -39,6 +39,23 @@ class VerifiedSkillStore(LifecycleMixin, RecallMixin, TransferMixin):
             except Exception:
                 pass
 
+    def __enter__(self) -> "VerifiedSkillStore":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        # Most call sites open a store for one query and drop it; without this the
+        # sqlite handle survives until the GC finalises it, which surfaces as an
+        # unclosed-database ResourceWarning in whichever thread happens to collect.
+        try:
+            conn = getattr(self, "_conn", None)
+            if conn is not None:
+                conn.close()
+        except Exception:
+            pass
+
     # --- bridge methods used by the mixins ---
     def _journal(self, action: str, payload: Dict[str, Any]) -> None:
         self._journal_obj.append(action, payload)
