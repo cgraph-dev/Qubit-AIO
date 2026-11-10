@@ -82,16 +82,65 @@ REASON_VOICE_CANONICAL = (
 # entry must still resolve to the same shared broker backend on the surfaces
 # it does declare.
 #
-# A14: this map is intentionally EMPTY because every registry op that the
-# catalog advertises as `cli` has a real `qubit <family> [<sub>]` production
-# path — either declared in `voice_commands.CLI_COVERAGE` or a native parser
-# subcommand (e.g. `vision_describe` -> `qubit vision describe`). The
-# `tests/test_qubit_command_parity8u.py` closure and
-# `tests/test_authority_unification8u.py::test_catalog_cli_claims_are_truthful`
-# re-derive that for every op, so a genuine orphan fails the gate instead of
-# being hidden here. Populate an id here only when a real CLI binding is
-# missing.
-CLI_PENDING: Dict[str, str] = {}
+# A14: this map holds every registry op whose `cli` binding is genuinely
+# missing from `voicebridge.cli.build_parser` (and absent from
+# `voice_commands.CLI_COVERAGE`). The catalog must never advertise a surface
+# that does not exist, so each of these reports dashboard+voice only. The
+# families below are registered in the vendored command palette but have no
+# `qubit <family>` subparser; remove an id here when its CLI binding lands.
+_NO_VBV_CLI = (
+    "voicebridge.cli has no subparser for this op yet; dashboard+voice only"
+)
+CLI_PENDING: Dict[str, str] = {
+    # bot: delegated bot tasks — palette-only, no `qubit bot` subparser.
+    "bot_goal_set": _NO_VBV_CLI,
+    "bot_goals_list": _NO_VBV_CLI,
+    "bot_idea_accept": _NO_VBV_CLI,
+    "bot_ideas_list": _NO_VBV_CLI,
+    "bot_task_cancel": _NO_VBV_CLI,
+    "bot_task_launch": _NO_VBV_CLI,
+    "bot_task_pause": _NO_VBV_CLI,
+    "bot_task_resume": _NO_VBV_CLI,
+    "bot_task_show": _NO_VBV_CLI,
+    "bot_tasks_list": _NO_VBV_CLI,
+    # canvas: board snapshots live on the dashboard surface.
+    "canvas_add": _NO_VBV_CLI,
+    "canvas_get": _NO_VBV_CLI,
+    "canvas_list": _NO_VBV_CLI,
+    "canvas_remove": _NO_VBV_CLI,
+    "chat_session_new": _NO_VBV_CLI,
+    "browser_cdp_open": _NO_VBV_CLI,
+    # harness: starter kits / submissions — palette-only.
+    "harness_artifact": _NO_VBV_CLI,
+    "harness_files": _NO_VBV_CLI,
+    "harness_kits": _NO_VBV_CLI,
+    "harness_list": _NO_VBV_CLI,
+    "harness_session_show": _NO_VBV_CLI,
+    "harness_submit": _NO_VBV_CLI,
+    "harness_tasks": _NO_VBV_CLI,
+    # taskflow: scheduled flow control — palette-only.
+    "taskflow_delete": _NO_VBV_CLI,
+    "taskflow_hooks": _NO_VBV_CLI,
+    "taskflow_list": _NO_VBV_CLI,
+    "taskflow_pause": _NO_VBV_CLI,
+    "taskflow_resume": _NO_VBV_CLI,
+    "taskflow_show": _NO_VBV_CLI,
+    "taskflow_trigger": _NO_VBV_CLI,
+    # viking: context-engine inspect/author — palette-only.
+    "viking_file": _NO_VBV_CLI,
+    "viking_memory_add": _NO_VBV_CLI,
+    "viking_related": _NO_VBV_CLI,
+    "viking_resource_add": _NO_VBV_CLI,
+    "viking_search": _NO_VBV_CLI,
+    "viking_sessions": _NO_VBV_CLI,
+    "viking_skills": _NO_VBV_CLI,
+    "viking_status": _NO_VBV_CLI,
+    "viking_tree": _NO_VBV_CLI,
+    # webchat: session reads — palette-only.
+    "webchat_list": _NO_VBV_CLI,
+    "webchat_resume": _NO_VBV_CLI,
+    "webchat_show": _NO_VBV_CLI,
+}
 
 
 def _redact(text: str) -> str:

@@ -186,7 +186,12 @@ def test_chat_transport_routes_reach_handlers_via_dispatch(tmp_path, monkeypatch
     p.write_text("logging:\n  jsonl: false\n")
     cfg = C.Config.load(p)
     import voicebridge.local_llm as _llm
+    from voicebridge import agent as _agent
 
+    # A general turn prefers the tool-capable agent. Return None so it takes
+    # the model path below, which is the one this test stubs — otherwise the
+    # real agent dials a live provider.
+    monkeypatch.setattr(_agent, "run_agent_turn", lambda *a, **k: None)
     monkeypatch.setattr(_llm, "chat_local",
                         lambda *a, **k: "parity reply")
     code, out = HC.dispatch(cfg, "POST", "/api/qubit/chat", {},

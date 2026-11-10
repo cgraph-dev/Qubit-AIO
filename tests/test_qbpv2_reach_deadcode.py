@@ -53,6 +53,45 @@ KNOWN_UNREFERENCED_MODULES: set = {
     "voicebridge/gateway/qubit_handlers/surface_control.py",
     "voicebridge/gateway/qubit_handlers/system.py",
     "voicebridge/gateway/qubit_handlers/worktrees.py",
+    # HUD collectors are resolved by NAME from the table in
+    # ``voicebridge/hud_routes.py`` (``(kind, "collectors_<x>", "<fn>")``), so
+    # no module imports them statically.
+    "voicebridge/hud/collectors_cron.py",
+    "voicebridge/hud/collectors_gateway.py",
+    "voicebridge/hud/collectors_live_chat.py",
+    "voicebridge/hud/collectors_live_models.py",
+    "voicebridge/hud/collectors_memory.py",
+    "voicebridge/hud/collectors_model_analytics.py",
+    "voicebridge/hud/collectors_patterns.py",
+    "voicebridge/hud/collectors_plugins.py",
+    "voicebridge/hud/collectors_profiles.py",
+    "voicebridge/hud/collectors_projects.py",
+    "voicebridge/hud/collectors_providers.py",
+    "voicebridge/hud/collectors_replay.py",
+    "voicebridge/hud/collectors_sessions.py",
+    "voicebridge/hud/collectors_skills.py",
+    "voicebridge/hud/collectors_sudo.py",
+    "voicebridge/hud/collectors_verify.py",
+    # Loaded by file path at call time: ``voicebridge/voice_commands.py`` runs
+    # ``spec_from_file_location("voicebridge.canvas_host", ...)`` and
+    # ``qubit_cli/overlay.py`` resolves it via ``_need("files.canvas_host")``.
+    "voicebridge/files/canvas_host.py",
+    # Documented read-only integration map (its own docstring: "no wiring");
+    # referenced from ``voicebridge/jev/__init__.py`` prose only.
+    "voicebridge/jev/seams.py",
+    # Operator/analysis tools run directly as ``python -m`` / by path per
+    # ``docs/WORKBENCH_UI_PORT.md`` (pair checks, DOM/live proofs, probes).
+    "voicebridge/workbench/_probe_ast.py",
+    "voicebridge/workbench/_probe_live.py",
+    "voicebridge/workbench/_probe_routes.py",
+    "voicebridge/workbench_ui/_check_pairs.py",
+    "voicebridge/workbench_ui/_prove_config.py",
+    "voicebridge/workbench_ui/_prove_dom.py",
+    "voicebridge/workbench_ui/_rebrand.py",
+    "voicebridge/workbench_ui/gateway_handlers.py",
+    # ``run_agent`` (the vendored runtime) resolves this by name via its TUI
+    # banner hook; nothing in voicebridge imports it statically.
+    "voicebridge/tui_banner_art.py",
 }
 
 # Test files that assert repository artifacts (docs/manifests/scans) rather
@@ -157,6 +196,88 @@ ARTIFACT_ONLY_TESTS = {
     "test_w9_agent_slice_surface_switch_failure_copy.py",
     "test_w9_gateway_tools_slice_held_back.py",
     "test_w9_held_back_port_wave.py",
+    # --- Office frontend: assert the built JS bundle and its sources rather
+    # than importing production Python. They read the served artifacts
+    # (qubit-office.game.js / the module sources) and drive node where needed.
+    "test_office_assets_vendored.py",
+    "test_office_atomic_serving.py",
+    "test_office_bundle.py",
+    "test_office_camera.py",
+    "test_office_control_bar.py",
+    "test_office_deployment_contract.py",
+    "test_office_determinism.py",
+    "test_office_doc_consistency.py",
+    "test_office_full_integration.py",
+    "test_office_game_adapter.py",
+    "test_office_game_art.py",
+    "test_office_game_character.py",
+    "test_office_game_input_context.py",
+    "test_office_game_iso.py",
+    "test_office_game_navigation.py",
+    "test_office_game_operational.py",
+    "test_office_game_packaging.py",
+    "test_office_game_shell.py",
+    "test_office_game_slice.py",
+    "test_office_hud_drawer.py",
+    "test_office_inspector.py",
+    "test_office_interaction_lifecycle.py",
+    "test_office_iso_engine.py",
+    "test_office_label_clipping.py",
+    "test_office_label_layout.py",
+    "test_office_render_volume.py",
+    "test_office_sprites.py",
+    "test_office_suite_health.py",
+    "test_office_tower_integration.py",
+    "test_office_tower_visual.py",
+    "test_office_vendor_habblaud.py",
+    "test_office_vendor_reproducibility.py",
+    "test_office_vendor_stream_rewrite.py",
+    "test_office_visual_scenes.py",
+    "test_office_wall_volume.py",
+    "test_qubit_office_route_wiring.py",
+    # --- Installer / release / packaging: drive the shell installers and the
+    # release pipeline as subprocesses against the built tree; no Python
+    # production import to detect.
+    "test_artifact_install_e2e.py",
+    "test_bootstrap_installer.py",
+    "test_bootstrap_installer_windows.py",
+    "test_fresh_install_config_brand8.py",
+    "test_install_source_rehearsal9v.py",
+    "test_packaging_force_include9u.py",
+    "test_prepare_release_seed.py",
+    "test_production_release.py",
+    "test_promote_public_release.py",
+    "test_public_export_buildable9u.py",
+    "test_public_tree_feature_parity.py",
+    "test_release_asset_pipeline.py",
+    "test_release_fresh_install_gate.py",
+    "test_root_installer_release.py",
+    "test_root_installer_windows.py",
+    "test_verify_fresh_install.py",
+    "test_verify_public_release.py",
+    "test_windows_public_install_layout.py",
+    # --- Repo-hygiene / generated-ledger / script guards: assert artifacts and
+    # invoke scripts by path (hygiene, drift, CI wiring, purged ledger).
+    "test_check_commit_hygiene.py",
+    "test_export_public_tree.py",
+    "test_openjarvis_absorption.py",
+    "test_parity_ledger.py",
+    "test_plugin_sdk_dual_publish.py",
+    "test_public_docs.py",
+    "test_purged_ledger_helper.py",
+    "test_run_local_ci.py",
+    "test_tools_namespace_shadow_regression.py",
+    "test_upstream_drift_report.py",
+    "test_vendor_finish_line_provenance.py",
+    "test_workflow_security.py",
+    "test_worktree_cli_surface19.py",
+    "test_worktree_remove_subcommand19.py",
+    # --- UI/voice surface guards: read SPA sources or spawn the real script.
+    "test_dashboard_auth_nous_binding9u.py",
+    "test_dashboard_page_smoke.py",
+    "test_voice_edit_ui_fix9u.py",
+    "test_voice_orb_live_capture9u.py",
+    "test_wait_for_display.py",
 }
 
 _PROD_IMPORT_RE = re.compile(
@@ -304,7 +425,12 @@ def test_compat_route_patterns_compile_and_methods_are_known():
 def test_every_overlay_plugin_dir_is_registered_and_loadable():
     from voicebridge import qubit_compat as HC
 
-    disk = {d.name for d in PLUGINS.iterdir() if d.is_dir()}
+    # An overlay plugin is a dir carrying a top-level manifest.json -- exactly
+    # what ``_overlay_manifests()`` globs. ``qubit-browser-ext`` is a Chrome
+    # extension (its manifest is nested under extension/), not a dashboard
+    # overlay, so it is not part of this registry.
+    disk = {d.name for d in PLUGINS.iterdir()
+            if d.is_dir() and (d / "manifest.json").is_file()}
     registered = {m["name"] for m in HC._overlay_manifests()}
     assert disk == registered, (
         f"overlay plugin dirs vs backend registry drift: "
@@ -325,15 +451,25 @@ def test_static_fleet_plugins_resolve_to_real_bundles():
     fleet = json.loads(FLEET.read_text(encoding="utf-8"))
     assert fleet, "empty static fleet manifest"
     base = FLEET.parent
+    # The loader resolves ``assetRoot + "/" + entry`` where assetRoot is
+    # ``assetBase`` or ``/dashboard-plugins/<name>`` -- the backend-served app
+    # tree, NOT necessarily ``public/plugins/<name>``. qubit-office is exactly
+    # that case: its code is served from frontend/qubit-app (backend overlay,
+    # manifest "source": "qubit-overlay") and public/plugins holds only its
+    # assets. A fleet row is satisfied when its entry resolves on either root.
+    app_plugins = REPO / "frontend/qubit-app/plugins"
     names = set()
     for manifest in fleet:
         name = manifest["name"]
         assert name not in names, f"duplicate fleet plugin {name}"
         names.add(name)
-        root = base / name
-        assert (root / manifest["entry"]).is_file(), manifest
-        if manifest.get("css"):
-            assert (root / manifest["css"]).is_file(), manifest
+        roots = [base / name, app_plugins / name]
+        assert any((r / manifest["entry"]).is_file() for r in roots), manifest
+        for root in roots:
+            css = manifest.get("css")
+            if css and (root / "manifest.json").is_file():
+                assert (root / css).is_file(), manifest
+                break
         assert manifest.get("tab", {}).get("path"), manifest
 
 

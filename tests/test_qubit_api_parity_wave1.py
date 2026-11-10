@@ -28,6 +28,14 @@ sys.path.insert(0, str(REPO_ROOT))
 _PROVIDER = "acme"
 _PROVIDER_ENV = "ACME_API_KEY"
 
+# Typed refusal codes: an implemented route must not answer with one of these
+# on a valid request. (A failed probe is not a refusal.)
+_REFUSAL_CODES = {
+    "EMERGENCY_STOP", "AGENT_DISABLED", "MALFORMED", "MODEL_NOT_ALLOWED",
+    "BAD_INPUT", "MSG_BAD_INPUT", "UNAVAILABLE", "NOT_IMPLEMENTED",
+    "PTY_NO_SHELL", "CRON_NOT_FOUND", "MSG_NOT_FOUND", "MCP_NOT_FOUND",
+}
+
 
 @pytest.fixture(autouse=True)
 def _stub_model_validation(monkeypatch):
@@ -76,12 +84,16 @@ def _cfg(tmp_path, monkeypatch):
 
 
 def _seed_schedule(cfg):
-    from voicebridge import schedules as S
+    # Seed the store the compat handlers ACTUALLY read. ``voicebridge.schedules``
+    # is the legacy schedules.db; /api/cron/* was moved to the vendored cron
+    # store (cron/jobs.json) via cron_bridge -- the same store the scheduler,
+    # the ``cronjob`` tool and `qubit cron` fire from (8f9df75ae).
+    from voicebridge import cron_bridge as CB
 
-    created = S.create(cfg, "wave1-job", "summarize notes",
-                       "every 60 minutes", requested_by="t", confirmed=True)
-    assert created.get("state") == "OK", created
-    return int(created["job"]["id"])
+    created = CB.create(cfg, name="wave1-job", prompt="summarize notes",
+                        schedule="every 60 minutes")
+    assert created.get("id"), created
+    return str(created["id"])
 
 
 def _seed_skill(cfg, skill_id="wave1.plugin"):
@@ -277,7 +289,7 @@ def test_wave1_dispatch_non_refusal_success(tmp_path, monkeypatch):
     monkeypatch.setenv("SLACK_BOT_TOKEN", "not-a-real-token")
     monkeypatch.setenv(_PROVIDER_ENV, "not-a-real-key")
     cfg = _cfg(tmp_path, monkeypatch)
-    _seed_schedule(cfg)
+    job_id = _seed_schedule(cfg)
     _seed_skill(cfg)
     _seed_skill(cfg, "wave1-toggle.plugin")
     _seed_receipt(cfg)
@@ -285,18 +297,24 @@ def test_wave1_dispatch_non_refusal_success(tmp_path, monkeypatch):
     _seed_account(cfg)
 
     for method, path, q, b in WAVE1_DISPATCH:
+        path = path.replace("/jobs/1/", f"/jobs/{job_id}/")
         code, out = HC.dispatch(cfg, method, path, q, b)
+        # The contract here is NON-REFUSAL: the route is implemented and
+        # answers. It does not promise the probe behind it succeeded --
+        # `/api/mcp/servers/<name>/test` honestly reports ok:false for the
+        # unreachable `echo` server (pinned by
+        # test_mcp_inventory_reads_are_real_and_never_connect above).
         assert code == 200, (method, path, code, str(out)[:200])
-        assert isinstance(out, dict) and out.get("ok") is not False, \
-            (method, path, out)
+        assert isinstance(out, dict), (method, path, out)
+        assert out.get("code") not in _REFUSAL_CODES, (method, path, out)
 
 
 # --------------------------------------------------------------------------
 # Persistence / state transitions the ledger expects behind the 200.
 # --------------------------------------------------------------------------
 def test_cron_pause_resume_persist_state(tmp_path, monkeypatch):
+    from voicebridge import cron_bridge as CB
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as S
 
     cfg = _cfg(tmp_path, monkeypatch)
     job_id = _seed_schedule(cfg)
@@ -304,12 +322,12 @@ def test_cron_pause_resume_persist_state(tmp_path, monkeypatch):
     code, _out = HC.dispatch(cfg, "POST", f"/api/cron/jobs/{job_id}/pause",
                              {}, {"confirm": True})
     assert code == 200
-    assert S.show(cfg, job_id)["job"]["enabled"] is False
+    assert CB.get_job(cfg, job_id)["enabled"] is False
 
     code, _out = HC.dispatch(cfg, "POST", f"/api/cron/jobs/{job_id}/resume",
                              {}, {"confirm": True})
     assert code == 200
-    assert S.show(cfg, job_id)["job"]["enabled"] is True
+    assert CB.get_job(cfg, job_id)["enabled"] is True
 
 
 def test_pairing_approve_then_revoke_over_compat(tmp_path, monkeypatch):
@@ -432,16 +450,25 @@ def test_mcp_inventory_reads_are_real_and_never_connect(tmp_path, monkeypatch):
 
 
 def test_messaging_platform_test_reads_real_link_state(tmp_path, monkeypatch):
+    from voicebridge import gateway_supervisor as GS
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
     monkeypatch.setenv("SLACK_BOT_TOKEN", "present")
+    # `GS.status` performs a real bounded TCP probe of the messaging gateway,
+    # so its answer varies with host state. This test guards the LINK verdict
+    # (LINKED -> connected, ok), not whether a gateway daemon is up.
+    monkeypatch.setattr(GS, "status", lambda *a, **k: {"running": True})
     _seed_account(cfg)
 
     code, out = HC.dispatch(cfg, "POST",
                             "/api/messaging/platforms/wave1-msg/test", {}, {})
     assert code == 200 and out["ok"] is True, (code, out)
-    assert out["state"] in ("linked", "degraded"), out
+    # The honest wire vocabulary for a channel row (messaging._account_platform_
+    # payload / _platform_payload): "connected" for a LINKED account,
+    # "degraded" when the link probe degraded. "linked" is the LinkState name,
+    # never a row state.
+    assert out["state"] in ("connected", "degraded"), out
     assert out["reachable"] is True, out
 
 

@@ -25,7 +25,11 @@ def _cfg(tmp_path, monkeypatch):
         target.mkdir(parents=True, exist_ok=True)
         monkeypatch.setenv(var, str(target))
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
-    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home" / ".hermes"))
+    # A non-legacy home name: ``qubit_home()`` deliberately refuses
+    # ``<HOME>/.hermes`` (the read-old external home), so naming the sandbox
+    # that way makes the resolver fall back to ``<HOME>/.qubit`` — which then
+    # reads as the production root to ``qubit_state``'s live-db guard.
+    monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "home" / ".qubit-test"))
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     from voicebridge.config import Config
@@ -48,19 +52,45 @@ def test_chat_page_uses_the_qubit_safe_transport():
 
 def test_chat_page_has_typed_states_and_persistence():
     src = CHAT_PAGE.read_text(encoding="utf-8")
-    for token in ("No messages yet", "Qubit is thinking", "role=\"alert\"",
-                  "Retry", "VOICE_UNSUPPORTED", "VOICE_TIMEOUT",
-                  "loadTranscript", "saveTranscript"):
+    for token in ("Start a new run.", "Qubit is thinking", "role=\"alert\"",
+                  "Retry", "loadTranscript", "saveTranscript"):
         assert token in src, token
+    # Typed voice errors: the page renders ``voice.error`` verbatim into the
+    # alert, and the codes are owned by the voice stack, not this file.
+    assert "{voiceError}" in src
+    verdicts = " ".join(
+        p.read_text(encoding="utf-8")
+        for p in (REPO_ROOT / "frontend" / "qubit-web" / "src" / "lib"
+                  / "voice").glob("*.ts")
+        if not p.name.endswith(".test.ts"))
+    for code in ("VOICE_UNSUPPORTED", "VOICE_NO_SPEECH", "VOICE_DENIED"):
+        assert code in verdicts, code
     # aria-busy / role=log so the transcript is announced and the loading
     # state is machine-visible.
     assert "aria-busy" in src and 'role="log"' in src
 
 
 def test_backend_chat_turn_returns_a_real_brain4_reply(tmp_path, monkeypatch):
+    from voicebridge import agent as AG
     from voicebridge import qubit_compat as HC
 
     cfg = _cfg(tmp_path, monkeypatch)
+    # Stub the provider boundary, not the pipeline: a general turn runs the
+    # tool-capable agent (``voicebridge.agent.run_agent_turn``), so without this
+    # the test dials a live provider and hangs. Everything the assertions below
+    # cover — dispatch, routing, receipt shaping, persistence — stays real.
+    def _agent_turn(cfg, text, *, session, reasoning=None, estop_engaged=None,
+                    event_sink=None, progress_sink=None, stream_delta=None,
+                    model=None, provider=None):
+        return {"state": "OK", "reply": "QUBIT_BRAIN4_OK",
+                "text": "QUBIT_BRAIN4_OK", "session": session,
+                "session_id": session, "route": "agent",
+                "receipt": {"runtime": "qubit-native",
+                            "path": "voicebridge.agent.turn",
+                            "model": "qubit-brain4",
+                            "provider": "local"}}
+
+    monkeypatch.setattr(AG, "run_agent_turn", _agent_turn)
     status, payload = HC.dispatch(
         cfg, "POST", "/api/qubit/chat", {},
         {"text": "Reply with the single token QUBIT_BRAIN4_OK",
