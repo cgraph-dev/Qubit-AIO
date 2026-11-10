@@ -46,6 +46,12 @@ def _cfg(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "c"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "s"))
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path / "d"))
+    # The vendored registry lists the built-in ``default`` profile only when the
+    # Qubit home exists (``list_profiles`` skips a missing default home). Create
+    # the canonical runtime home for this isolated machine first.
+    from voicebridge import config as C
+
+    C.canonical_runtime_home().mkdir(parents=True, exist_ok=True)
     p = tmp_path / "voice.yaml"
     p.write_text("logging:\n  jsonl: false\n")
     return C.Config.load(p)
