@@ -61,9 +61,12 @@ from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # The default upstream clone location. Overridable with --scratch / env so the
-# test suite can point the generator at synthetic fixtures.
-DEFAULT_SCRATCH = Path(
-    "/home/trick/.local/state/qubit-voicebridge/runtime/cache/scratch"
+# test suite can point the generator at synthetic fixtures. Derived from HOME, not
+# a literal absolute path: a hardcoded /home/<operator> default ships the
+# operator's username inside the published sdist.
+DEFAULT_SCRATCH = (
+    Path(os.environ.get("QUBIT_SCRATCH_DIR")
+         or Path.home() / ".local/state/qubit-voicebridge/runtime/cache/scratch")
 )
 
 #: The five statuses docs/PARITY_PLAN.md defines, plus two the data forced:

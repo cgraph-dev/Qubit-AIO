@@ -183,7 +183,7 @@ POSTs it to the companion's real aiohttp app, and confirms consume-once delivery
 
 Live status route: `GET :8642/api/plugins/browser-companion/status` → **401**
 `gateway_auth_failed`. The route exists and is auth-gated (it is not a 404); the
-`API_SERVER_KEY` in `/home/trick/.qubit/.env` is **not** the key the running gateway
+`API_SERVER_KEY` in the active `QUBIT_HOME` `.env` is **not** the key the running gateway
 accepted, so this document does **not** claim a live 200 on that path. The three
 checks above prove the pair end-to-end without it.
 

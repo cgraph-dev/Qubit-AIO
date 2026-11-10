@@ -201,7 +201,7 @@ This supersedes the earlier “commit the generated pack” approach.
 |---|---|---|
 | `modernuserinterface-win.zip` (LimeZu Modern UI) | 16/32/48 px UI sheets (`Modern_UI_Style_1`, `Style_2`, `Gamepad`), animated buttons, and the 903 portrait pieces already in use | **Token palette** sampled from the sheets + **optional 9-slice** frames for our docks/buttons; portrait pieces feed the portrait atlas |
 | `hud-agents-icons.jpeg` | The two menu glyphs | Already traced into `ui-px-icon` paths (HUD/Agents) |
-| `/home/trick/Desktop/ui elements` | WhatsApp-saved **reference** images from an “AI design studio” (watermarked concept art, e.g. crimson/ivory gothic UI) | **Reference only — never shipped, never used as a texture.** Optional: derive a second token preset (`crimson`) from its palette if the owner wants that direction |
+| `<operator Desktop>/ui elements` | WhatsApp-saved **reference** images from an “AI design studio” (watermarked concept art, e.g. crimson/ivory gothic UI) | **Reference only — never shipped, never used as a texture.** Optional: derive a second token preset (`crimson`) from its palette if the owner wants that direction |
 | `Character Generator 2.0` / `Portrait Generator 1.5.0` | Paid art + third-party tools | Art sources for the atlases (built locally); tools never shipped |
 
 Tasks add: `--ui-contact-sheet` (labelled grid of the Modern UI sheets, for authoring
@@ -258,7 +258,7 @@ def test_dangerous_token_values_are_refused(value):
     assert T.validate_tokens({"color-accent": value}), value
 
 def test_source_must_not_be_a_local_path(tmp_path):
-    pack = _pack(tmp_path / "demo", source="/home/alice/Desktop/UI Office")
+    pack = _pack(tmp_path / "demo", source="<operator Desktop>/UI Office")
     assert any("path" in p for p in T.validate_theme(pack))
 
 def test_duplicate_after_unicode_normalisation_is_refused(tmp_path):
