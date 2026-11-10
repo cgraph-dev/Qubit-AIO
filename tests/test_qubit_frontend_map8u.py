@@ -11,12 +11,20 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
+# The map survived the purge; the inventory it is cross-checked against was
+# purged in eafb54e26 and is read read-only from pre-purge history.
 MAP = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
+HERMES_INVENTORY = "docs/archive/2026-09-21/INVENTORY_HERMES.json"
 GEN = REPO_ROOT / "scripts" / "hermes_frontend_map.py"
 
 EXPECTED_ROUTES = {"/chat", "/sessions", "/files", "/analytics", "/models",
@@ -34,7 +42,7 @@ def test_map_exists_and_pins_match_provenance():
     assert doc["source"]["revision"] == \
         "2237be355906fbe6065ce1815711eee52b2d646e"
     assert doc["source"]["license"].startswith("MIT")
-    inv = json.loads((REPO_ROOT / "docs/archive/2026-09-21" / "INVENTORY_HERMES.json").read_text())
+    inv = json.loads(require_ledger(HERMES_INVENTORY))
     assert inv["commit"] == doc["source"]["revision"]
 
 
