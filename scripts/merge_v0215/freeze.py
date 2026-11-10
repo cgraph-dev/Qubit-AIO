@@ -29,10 +29,14 @@ PIN = "69948c005791d4d0e51670ca015238c2c7663749"
 AUDIT_DIR = Path(__file__).resolve().parents[2] / "docs" / "generated" / "audit"
 
 
-def _git(repo: Path, *args: str) -> str:
+def _git(repo: Path, *args: str, check: bool = True) -> str:
     res = subprocess.run(
-        ["git", *args], cwd=str(repo), capture_output=True, text=True, check=True
+        ["git", *args], cwd=str(repo), capture_output=True, text=True,
+        check=False,
     )
+    if check and res.returncode != 0:
+        raise subprocess.CalledProcessError(
+            res.returncode, res.args, res.stdout, res.stderr)
     return res.stdout
 
 
@@ -68,7 +72,7 @@ def build_freeze(repo: Path, ignore: Optional[Path] = None) -> dict:
     """Build the freeze record for *repo* without writing anything."""
     repo = Path(repo)
     sha = _git(repo, "rev-parse", "HEAD").strip()
-    branch = _git(repo, "symbolic-ref", "--short", "-q", "HEAD").strip()
+    branch = _git(repo, "symbolic-ref", "--short", "-q", "HEAD", check=False).strip()
     if not branch:
         branch = "detached"
     return {

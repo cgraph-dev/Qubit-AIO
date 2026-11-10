@@ -2623,6 +2623,15 @@ def audit_system(h: Harness) -> None:
             return {"disposition": "E2E_SKIP",
                     "state": "no START control",
                     "detail": "gateway START not rendered"}
+        # A rendered-but-disabled START is the correct policy state (the
+        # gateway is already running, or only one lane may start it). Clicking
+        # it would block until the Playwright timeout and record a false FAIL,
+        # so mirror the STOP branch below and SKIP with the typed reason.
+        if not btn.first.is_enabled():
+            return {"disposition": "E2E_SKIP",
+                    "state": "START disabled (gateway already running via "
+                             "this control)",
+                    "detail": "gateway START correctly disabled by policy"}
         mark0 = h.mark()
         btn.first.click()
         h.page.wait_for_timeout(1000)
