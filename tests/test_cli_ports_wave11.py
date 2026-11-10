@@ -193,9 +193,17 @@ def test_cmd_migrate_apply_refuses_as_operator_owned(tmp_path, monkeypatch):
     """Operator split: the destructive apply refuses with a typed code and changes nothing."""
     home = tmp_path / "qh"
     home.mkdir()
+    # The apply path only applies to a host with something to fold: a plan with
+    # a single profile returns early (len(plan.profiles) < 2 -> exit 0, "nothing
+    # to migrate"). One second standalone profile is what reaches the
+    # operator-owned refusal this test names.
+    second = tmp_path / "qh2"
+    second.mkdir()
     gm = _fresh_import("qubit_cli.gateway_migrate")
     monkeypatch.setattr(gm, "build_migration_plan", lambda: gm.MigrationPlan(
-        default_home=home, profiles=[gm.ProfileGateway("default", home)],
+        default_home=home,
+        profiles=[gm.ProfileGateway("default", home),
+                  gm.ProfileGateway("second", second)],
         multiplex_flag_on=False, live_served=None))
     buf = io.StringIO()
     with redirect_stdout(buf), pytest.raises(SystemExit) as exc:
