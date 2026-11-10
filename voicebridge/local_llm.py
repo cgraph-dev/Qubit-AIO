@@ -495,7 +495,21 @@ _COMPILER_CACHE: Dict[str, Any] = {}
 
 
 def _reset_compiler_cache() -> None:
-    """Test/diagnostic hook: rebuild the configured compiler next call."""
+    """Test/diagnostic hook: rebuild the configured compiler next call.
+
+    Closes the cached ``MemoryStore`` before dropping it. The compiler holds
+    an open ``sqlite3.Connection``; clearing the dict alone orphaned it, and
+    the connection was then finalised by the GC during whatever ran next —
+    surfacing as "ResourceWarning: unclosed database" on an unrelated test.
+    """
+    compiler = _COMPILER_CACHE.get("compiler")
+    store = getattr(compiler, "store", None)
+    closer = getattr(store, "close", None)
+    if callable(closer):
+        try:
+            closer()
+        except Exception:  # noqa: BLE001 - teardown must not raise
+            pass
     _COMPILER_CACHE.clear()
 
 
