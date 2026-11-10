@@ -22,10 +22,13 @@ operator path is read, no live service is touched.
 from __future__ import annotations
 
 import hashlib
+import http.client
+import http.server
 import json
 import re
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -400,3 +403,90 @@ def test_host_stylesheet_rejects_an_invalid_theme_id(themed_home):
     h._serve_theme_static(
         f"{W.WebUIHandler._THEME_STATIC_PREFIX}Demo/theme.css")
     assert h._captured["code"] == 404
+
+
+# --------------------------------------------------------------------------
+# 6. Real dispatch: the query survives into the plugin-app document
+# --------------------------------------------------------------------------
+def _http_get(url_path: str):
+    """GET ``url_path`` from a real in-process HTTP server.
+
+    The ``plugin_root`` fixture has already patched ``resources.resource_path``
+    for this process, so the server resolves the fixture tree. A real socket is
+    required here: the router (not the test) must be the thing that carries
+    ``?theme=`` from ``do_GET`` into ``_serve_plugin_app``.
+    """
+    class _Bound(http.server.HTTPServer):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.app = type("A", (), {"api_token": "",
+                                      "allowed_origins": ()})()
+
+    srv = _Bound(("127.0.0.1", 0), W.WebUIHandler)
+    port = srv.server_address[1]
+    thread = threading.Thread(target=srv.handle_request, daemon=True)
+    thread.start()
+    try:
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        conn.request("GET", url_path)
+        response = conn.getresponse()
+        body = response.read()
+        code = response.status
+        conn.close()
+    finally:
+        thread.join(timeout=10)
+        srv.server_close()
+    return code, body
+
+
+def test_wire_theme_query_reaches_the_iframe_document(plugin_root, themed_home):
+    code, body = _http_get(
+        "/plugin-apps/qubit-office/habblaud/?theme=demo")
+    assert code == 200, (code, body[:500])
+    text = body.decode("utf-8")
+    blocks = _style_blocks(text)
+    assert len(blocks) == 1, text
+    assert blocks[0][0] == THEME_ID
+    assert f"{THEME_TOKEN_VAR}: {THEME_TOKEN_VALUE};" in blocks[0][1]
+
+
+def test_wire_without_theme_keeps_classic(plugin_root, themed_home):
+    code, body = _http_get("/plugin-apps/qubit-office/habblaud/")
+    assert code == 200, (code, body[:500])
+    assert "data-office-theme" not in body.decode("utf-8")
+
+
+def test_wire_env_kill_switch_wins_over_the_query(plugin_root, themed_home,
+                                                 monkeypatch):
+    monkeypatch.setenv("QUBIT_OFFICE_THEME", "classic")
+    code, body = _http_get(
+        "/plugin-apps/qubit-office/habblaud/?theme=demo")
+    assert code == 200, (code, body[:500])
+    assert "data-office-theme" not in body.decode("utf-8")
+
+
+# --------------------------------------------------------------------------
+# 7. The fallback is a VISIBLE host toolbar, not an invisible in-flow child
+# --------------------------------------------------------------------------
+def _css_rule(css: str, selector: str) -> str:
+    match = re.search(re.escape(selector) + r"\s*\{([^}]*)\}", css)
+    assert match, f"no CSS rule for {selector}"
+    return match.group(1)
+
+
+def test_menu_fallback_is_positioned_above_the_iframe():
+    css = (Path(__file__).resolve().parents[1]
+           / "frontend/qubit-app/plugins/qubit-office/game/styles/game.css"
+           ).read_text(encoding="utf-8")
+    frame = _css_rule(css, ".office-game > .office-game__frame")
+    fallback = _css_rule(css, ".office-game__menuFallback")
+    assert "position: absolute" in frame, "the iframe is expected to be absolute"
+    assert "position: absolute" in fallback, fallback
+    frame_z = re.search(r"z-index:\s*(-?\d+)", frame)
+    fallback_z = re.search(r"z-index:\s*(-?\d+)", fallback)
+    assert fallback_z, fallback
+    assert int(fallback_z.group(1)) > (int(frame_z.group(1)) if frame_z else 0)
+    # The toolbar itself never eats game clicks; only its buttons do.
+    assert "pointer-events: none" in fallback, fallback
+    buttons = _css_rule(css, ".office-game__menuFallback > button")
+    assert "pointer-events: auto" in buttons, buttons

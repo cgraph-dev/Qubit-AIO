@@ -89,6 +89,34 @@
   background: #12151d;
 }
 
+/* Host-rendered menu fallback (when the app's own Panels group is missing).
+   The iframe above is absolutely positioned at inset: 0, so an IN-FLOW
+   fallback would be painted underneath it and could never be clicked. This is
+   a visible host toolbar ON TOP of the frame: higher z-index than the frame
+   (and the loading/error overlays at z-index 1); it exists only while the
+   fallback is shown. The container is pointer-transparent so it never blocks
+   the game unless the operator actually aims at a button. */
+.office-game__menuFallback {
+  position: absolute;
+  z-index: 5;
+  top: var(--office-s2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--office-s1);
+  padding: var(--office-s1);
+  border-radius: var(--office-radius);
+  border: var(--office-border);
+  background: var(--office-void);
+  color: var(--office-ink);
+  pointer-events: none;
+}
+
+.office-game__menuFallback > button {
+  pointer-events: auto;
+}
+
 .office-game__loading,
 .office-game__error {
   position: absolute;

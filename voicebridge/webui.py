@@ -4214,7 +4214,10 @@ class WebUIHandler(BaseHTTPRequestHandler):
             self._send(404, b"not found")
             return
         if path.startswith("/plugin-apps/"):
-            self._serve_plugin_app(path[len("/plugin-apps/"):])
+            # Pass the RAW path: its query carries `?theme=` to the office app
+            # document. `_serve_plugin_app` still strips the query before
+            # resolving the static file, so path confinement is unchanged.
+            self._serve_plugin_app(self.path[len("/plugin-apps/"):])
             return
         # A Vite preload helper in the vendored Habblaud client can turn a
         # correctly-origin-qualified path into `/http://<host>/plugin-apps/...`
@@ -4223,7 +4226,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # serve arbitrary path-embedded URLs or rewrite other API paths.
         app_path = f"/http://{self.headers.get('Host', '')}/plugin-apps/"
         if path.startswith(app_path):
-            self._serve_plugin_app(path[len(app_path):])
+            # Raw path again, so the office `?theme=` survives to the document.
+            self._serve_plugin_app(self.path[len(app_path):])
             return
         # The office client's live feed. `/api/stream` is what the vendored app
         # asks for; Qubit's own API lives under `/agent/api/`, so this one path
