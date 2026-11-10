@@ -35,8 +35,9 @@ PRODUCT_PYPROJECT = REPO / "pyproject.toml"
 VENDORED_PYPROJECT = RUNTIME / "pyproject.toml"
 
 # Test-only deps the A3 collection failures demanded in the product test env.
+# ``mcp`` is not pinned here: it must track the vendored ``mcp`` extra, which
+# ``test_deps_pin_matches_the_vendored_extra`` proves directly.
 TEST_ONLY_PINS = {
-    "mcp": "mcp==2.0.0",
     "jsonschema": "jsonschema==4.26.0",
     "fal-client": "fal-client==0.13.1",
 }
@@ -116,6 +117,22 @@ def test_declared_pins_match_vendored_extras():
     assert extras["fal"] == ["fal-client==0.13.1"], extras["fal"]
     dev = doc["dependency-groups"]["dev"]
     assert any(_normalized(d) == "mcp" for d in dev), dev
+
+
+def test_deps_pin_matches_the_vendored_extra():
+    """The product ``[test]`` pin for ``mcp`` tracks the vendored ``mcp`` extra.
+
+    Pinned by equality to the vendored declaration rather than to a literal, so
+    a reviewed dependency bump lands in one place instead of re-breaking here.
+    """
+    vendored = _load_toml(VENDORED_PYPROJECT)["project"]["optional-dependencies"]["mcp"]
+    vendored_pins = [d for d in vendored if _normalized(d) == "mcp"]
+    assert len(vendored_pins) == 1, vendored
+    extra = _load_toml(PRODUCT_PYPROJECT)["project"]["optional-dependencies"]["test"]
+    by_name = _dep_map(extra)
+    assert by_name.get("mcp") == vendored_pins[0], (
+        f"mcp: [test] declares {by_name.get('mcp')!r}, vendored extra pins {vendored_pins[0]!r}"
+    )
 
 
 def test_imports_are_declared_not_guarded():
