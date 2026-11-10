@@ -188,6 +188,25 @@ def test_classifier_allowlists_test_fixtures(mod, tmp_path, monkeypatch):
     assert any("test_fixture" in k for k in allow), allow
 
 
+def test_classifier_catches_tokens_assembled_from_literals(mod, tmp_path, monkeypatch):
+    """A legacy name spelled only by concatenating literals (``"Hermes" +
+    "_CONTAINER"``, ``["portal.", "nous", ...].join('')``) is what the identifier
+    regexes cannot see; it must still be classified, not read as clean."""
+    monkeypatch.setattr(mod, "REPO_ROOT", tmp_path)
+    _write(tmp_path, "web/env.ts",
+           "export const ENV = (\"QUBIT_CONTAINER\", \"Hermes\" + \"_CONTAINER\")\n")
+    findings, allow = mod._scan_ts_file("web/env.ts")
+    assert [f["token"] for f in findings] == ["Hermes"], findings
+    # The joined spelling is also what a whole-line scan reports.
+    assert "Hermes" in mod._assembled_hits(
+        "export const ENV = (\"QUBIT_CONTAINER\", \"Hermes\" + \"_CONTAINER\")")
+    _write(tmp_path, "web/login.test.ts",
+           "const p = ['https://portal.', 'nous', 'research', '.com'].join('')\n")
+    findings, allow = mod._scan_ts_file("web/login.test.ts")
+    assert findings == [], findings
+    assert any("test_fixture" in k for k in allow), allow
+
+
 # ------------------------------------------------------- determinism (pure)
 def _input_fingerprint(mod):
     """Fingerprint every worktree input the non-receipt scan reads. Other

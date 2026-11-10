@@ -1,5 +1,5 @@
 const PROVIDER_SETUP_ERROR_RE =
-  /No (?:inference|Qubit|Hermes|LLM) provider(?: is)? configured|no_provider_configured|set an API key|is set in config\.yaml but no (?:API key|credentials)/i
+  /No (?:inference|Qubit|Hermes|LLM) (?:provider|agent)(?: is)? configured|no_provider_configured|set an API key|is set in config\.yaml but no (?:API key|credentials)/i
 
 const SESSION_INFO_CREDENTIAL_WARNING_RE = /^No API key configured for provider '[^']*'\. First message will fail\.$/
 

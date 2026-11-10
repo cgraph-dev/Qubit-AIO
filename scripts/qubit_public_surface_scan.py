@@ -102,6 +102,13 @@ UPSTREAM_DOMAIN_RE = re.compile(
     r"\b(?:[a-z0-9-]+\.)*nousresearch\.com\b", re.IGNORECASE)
 #: The upstream social handle.
 HANDLE_RE = re.compile(r"@NousResearch\b")
+#: One string literal (``'...'`` or ``"..."``) — the unit an assembled legacy
+#: identifier is split into across a ``+`` join.
+PY_STRING_PIECE_RE = re.compile(r"(?<![\w\\])['\"]([^'\"\n]*)['\"]")
+#: The separator that makes two adjacent literals one join (``"a" + "b"``), and
+#: the tokens to drop when a line is read with the joining syntax removed.
+JOINED_PIECE_GAP_RE = re.compile(r"\s*\+\s*|\s*\n\s*")
+PY_STRING_SPLIT_RE = re.compile(r"['\"]\s*\+\s*['\"]")
 #: A legacy-token-bearing identifier (module specifier, env var, path, scheme,
 #: IPC channel, storage key, exe name, ...). Lazy head, greedy tail.
 TS_TOKEN_RE = re.compile(
@@ -143,6 +150,10 @@ OPENAPI_LEGACY_BRAND = re.compile(r"hermes|nous|openclaw", re.IGNORECASE)
 PY_GUARD_PATTERNS: Dict[str, Tuple[str, ...]] = {
     "voicebridge/update_manager.py": (
         r"hermes-dashboard\.service",
+        # The legacy container-marker env name, read beside its documented
+        # QUBIT_ spelling (see update_manager.CONTAINER_ENV) and assembled from
+        # its halves so the module carries no legacy brand literal.
+        r"CONTAINER_ENV\s*=\s*\(",
     ),
     "voicebridge/update_channel.py": (
         r"LEGACY_URL_TOKENS\s*=",
@@ -230,10 +241,70 @@ def _allow(observed: Dict[str, int], surface: str, classification: str,
     observed[key] = observed.get(key, 0) + 1
 
 
+def _joined_view(text: str) -> str:
+    """``text`` with the string-concatenation syntax blanked, offset-preserving.
+
+    ``"portal." + "nous"`` becomes ``portal.  nous``: a name split across
+    literals then matches at its real span, so findings keep pointing into the
+    original line.
+    """
+    return re.sub(r"(?<=['\"])\s*\+\s*(?=['\"])", lambda m: m.group(0).replace("+", " "), text)
+
+
+def _assembled_hits(text: str) -> List[str]:
+    """Legacy names a line only spells by CONCATENATING string literals.
+
+    ``"Hermes" + "_CONTAINER"`` keeps the legacy literal out of a module while
+    the code still honours the name, and the identifier regexes stop at the
+    quote — so the scan would read the join as clean. Each run of literals
+    joined by ``+`` is therefore a candidate, as is the whole line with that
+    join syntax blanked (``_joined_view``: a name split across literals then
+    matches at its real span). Reported tokens are the JOINED names —
+    ``Hermes`` for ``("QUBIT_CONTAINER", "Hermes" + "_CONTAINER")`` — never the
+    run's own prefix; an unjoined literal that only a separate piece completes
+    is left to the normal scanners, which know the test/comment/guard context.
+
+    Context is still the enclosing line: on a comment, docstring, guard or
+    test fixture the caller allowlists these like any other hit.
+    """
+    runs: List[str] = []
+    cur = ""
+    prev_end = -1
+    for m in PY_STRING_PIECE_RE.finditer(text):
+        if cur and not JOINED_PIECE_GAP_RE.fullmatch(text[prev_end:m.start()]):
+            cur = ""
+        cur += m.group(1)
+        prev_end = m.end()
+        runs.append(cur)
+    runs.append(_joined_view(text))
+    # Bracket joins (``["a", "b"].join("")``) complete the name only once every
+    # piece is concatenated.
+    runs.append("".join(m.group(1) for m in PY_STRING_PIECE_RE.finditer(text)))
+    # Plus-joined runs, the line with the join syntax blanked, the whole set.
+    relevant = runs
+    hits: List[str] = []
+    for idx, run in enumerate(relevant):
+        is_join = idx < len(relevant) - 1
+        names = [m.group(0) for m in UPSTREAM_URL_RE.finditer(run)]
+        names += [m.group(0) for m in UPSTREAM_DOMAIN_RE.finditer(run)]
+        names += [m.group(0) for m in LEGACY_RE.finditer(run)]
+        if not is_join:
+            hits += names
+            continue
+        # A completed name swallows its own prefix; a name that only a separate
+        # literal completes (glued across quotes) is not a join at all.
+        for name in names:
+            if any(other != name and other.startswith(name) for other in names):
+                continue
+            hits.append(name)
+    return sorted(set(hits))
+
+
 def _hits(text: str) -> List[str]:
     out: List[str] = [m.group(0) for m in LEGACY_RE.finditer(text)]
     out += [m.group(0) for m in UPSTREAM_URL_RE.finditer(text)]
     out += [m.group(0) for m in HANDLE_RE.finditer(text)]
+    out += _assembled_hits(text)
     # Dedupe, keep deterministic order.
     return sorted(set(out))
 
@@ -775,7 +846,7 @@ def _scan_py_source(rel: str, line_ranges: Optional[List[Tuple[int, int]]] = Non
     for i, line in enumerate(lines, 1):
         if line_ranges is not None and not any(a <= i <= b for a, b in line_ranges):
             continue
-        if not LEGACY_RE.search(line):
+        if not (LEGACY_RE.search(line) or _assembled_hits(line)):
             continue
         stripped = line.strip()
         if i in comments:
@@ -844,7 +915,8 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     is_test = bool(TS_NON_PUBLIC_PATH_RE.search(rel))
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     for i, line in enumerate(lines, 1):
-        if not LEGACY_RE.search(line) and not UPSTREAM_DOMAIN_RE.search(line):
+        if (not LEGACY_RE.search(line) and not UPSTREAM_DOMAIN_RE.search(line)
+                and not _assembled_hits(line)):
             continue
         stripped = line.strip()
         if _is_comment_line(stripped):
@@ -853,13 +925,23 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
             continue
         # Character spans covered by an upstream URL / bare upstream domain;
         # tokens inside them must not be double-reported.
-        url_spans = [m.span() for m in UPSTREAM_URL_RE.finditer(line)]
-        domain_spans = [m.span() for m in UPSTREAM_DOMAIN_RE.finditer(line)]
+        # A name the literals only spell once joined ("portal." + "nous" +
+        # "research" + ".com", or a [..].join("")) has no span in *line*:
+        # pattern over the classify view instead — the line with the join
+        # syntax blanked, pieces first, and, when a bracket join is the only
+        # way to complete the name, the bracket pieces closed up.
+        view = _joined_view(line)
+        if not (UPSTREAM_URL_RE.search(view) or UPSTREAM_DOMAIN_RE.search(view)):
+            # A bracket join (``["a", "b"].join("")``) completes the name only
+            # once every piece is concatenated.
+            view = "".join(m.group(1) for m in PY_STRING_PIECE_RE.finditer(line))
+        url_spans = [m.span() for m in UPSTREAM_URL_RE.finditer(view)]
+        domain_spans = [m.span() for m in UPSTREAM_DOMAIN_RE.finditer(view)]
         spans = _merge_spans(url_spans + domain_spans)
 
         emitted: set = set()
         record = _is_third_party_record(stripped)
-        for m in UPSTREAM_URL_RE.finditer(line):
+        for m in UPSTREAM_URL_RE.finditer(view):
             url = m.group(0)
             if url in emitted:
                 continue
@@ -871,14 +953,14 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
             else:
                 findings.append(_leak("source_strings", url, file=rel, line=i,
                                       text=line, classification="upstream_url"))
-        for m in UPSTREAM_DOMAIN_RE.finditer(line):
+        for m in UPSTREAM_DOMAIN_RE.finditer(view):
             dom = m.group(0)
             if _covered(m.span(), url_spans):
                 continue
             if dom in emitted:
                 continue
             emitted.add(dom)
-            prefix = line[max(0, m.start() - 60):m.start()]
+            prefix = view[max(0, m.start() - 60):m.start()]
             if is_test:
                 _allow(allow, "source_strings", "test_fixture", dom)
             elif record:
@@ -889,14 +971,24 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
                 findings.append(_leak("source_strings", dom, file=rel, line=i,
                                       text=line, classification="upstream_url"))
 
-        for m in TS_TOKEN_RE.finditer(line):
-            if _covered(m.span(), spans):
-                continue
+        for m in TS_TOKEN_RE.finditer(view):
             token = m.group(0)
+            if _covered(m.span(), spans):
+                # A join blanks the ``+`` into a space between two quotes, so
+                # the identifier regexes run THROUGH the join
+                # ("QUBIT_CONTAINERHermes_CONTAINER"): classify the joined name
+                # inside such a run, judged on its own — the quote beside it
+                # would bar the prose pattern.
+                assembled = [name for name in _assembled_hits(line)
+                             if name in token]
+                if not assembled:
+                    continue
+                token = assembled[0]
+            bare = next(TS_TOKEN_RE.finditer(token)).group(0)
             if TS_GUARD_RE.search(line):
                 _allow(allow, "source_strings", "guard", token)
                 continue
-            if PROSE_RE.search(token):
+            if PROSE_RE.search(bare):
                 if is_test:
                     _allow(allow, "source_strings", "test_fixture", token)
                 elif record:

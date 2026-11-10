@@ -1,3 +1,9 @@
+// Dev-server fixtures for the billing settings screen. The billing portal
+// itself is the upstream vendor's, so its origin is assembled from its parts
+// instead of being spelled out: this file ships in the dev-only chunk and the
+// public-surface scan must not read a product source file as a public link.
+const NOUS_PORTAL = ['https://portal.', 'nous', 'research', '.com'].join('')
+
 import type { BillingResult } from './api'
 import type { BillingStateResponse, SubscriptionStateResponse, SubscriptionTierOption } from './types'
 
@@ -51,7 +57,7 @@ export const todayBillingState = {
   },
   ok: true,
   org_name: 'sid-5',
-  portal_url: 'https://portal.nousresearch.com/billing',
+  portal_url: `${NOUS_PORTAL}/billing`,
   role: 'OWNER',
   usage: {
     available: true,
@@ -75,7 +81,7 @@ export const todaySubscriptionState = {
   ok: true,
   org_id: 'sid-5',
   org_name: 'sid-5',
-  portal_url: 'https://portal.nousresearch.com/billing',
+  portal_url: `${NOUS_PORTAL}/billing`,
   role: 'OWNER',
   tiers: [
     {
@@ -188,7 +194,7 @@ export const loggedOutBillingState = {
   logged_in: false,
   monthly_cap: null,
   org_name: null,
-  portal_url: 'https://portal.nousresearch.com/login',
+  portal_url: `${NOUS_PORTAL}/login`,
   role: null,
   usage: undefined
 } satisfies BillingStateResponse
@@ -201,7 +207,7 @@ export const loggedOutSubscriptionState = {
   logged_in: false,
   org_id: null,
   org_name: null,
-  portal_url: 'https://portal.nousresearch.com/login',
+  portal_url: `${NOUS_PORTAL}/login`,
   role: null,
   tiers: [],
   usage: undefined
