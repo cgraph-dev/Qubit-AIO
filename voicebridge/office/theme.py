@@ -1124,10 +1124,13 @@ def token_css(tokens: Any, slices: Any, asset_base: str, version: str,
               selector: str = "html body .ui-root") -> str:
     """Emit the allowlisted ``.ui-root`` variables and validated slices.
 
-    Raises :class:`ValueError` rather than emitting anything unsafe. The
-    returned CSS contains no layout, pointer, z-index, ``@layer``, or
-    ``!important`` declarations. Pass ``files`` (the pack's declared file
-    keys) to also require every slice ``src`` to be declared.
+    Raises :class:`ValueError` rather than emitting anything unsafe. Token
+    rules contain no layout, pointer, z-index, ``@layer``, or ``!important``
+    declarations. A slice rule is the one deliberate exception: it reserves a
+    border (``border-width``) equal to its ``border-image-width`` so the image
+    is painted into exactly the border box it was authored for. Pass ``files``
+    (the pack's declared file keys) to also require every slice ``src`` to be
+    declared.
 
     ``selector`` is the scope the variables are emitted under. It is a
     constant owned by this module, never pack data: the office app document
@@ -1168,6 +1171,11 @@ def token_css(tokens: Any, slices: Any, asset_base: str, version: str,
         lines.append(
             f'  border-image: url("{src}") '
             f"{cell[0]} {cell[1]} {cell[2]} {cell[3]} {repeat};")
+        # The themed border and the slice's paint width are the SAME value: a
+        # border-image stretched over a narrower border would overlap content,
+        # and over a wider one would leave a gap.
+        lines.append("  border-style: solid;")
+        lines.append(f"  border-width: {descriptor['width']};")
         lines.append(f"  border-image-width: {descriptor['width']};")
         lines.append("}")
     return "\n".join(lines) + "\n"
@@ -1198,18 +1206,25 @@ def theme_style_html(cfg: Any, requested: Optional[str] = None) -> str:
     return f'<style data-office-theme="{theme_id}">\n{css}</style>'
 
 
-def host_token_css(tokens: Any, theme_id: str, version: str) -> str:
+def host_token_css(tokens: Any, theme_id: str, version: str,
+                   slices: Any = None,
+                   asset_base: Optional[str] = None) -> str:
     """The same validated tokens, scoped to the dashboard host element.
 
     Served as the host's ``theme.css`` link so the semantic-token -> CSS
     variable mapping stays in ONE place (this module) instead of being mirrored
     in TypeScript. ``theme_id`` must be a validated id because it is
-    interpolated into the selector; the tokens themselves go through the same
-    :func:`token_css` validators.
+    interpolated into the selector; the tokens and optional slice descriptors
+    go through the same :func:`token_css` validators. A slice is emitted as
+    ``[data-office-slice="<name>"]`` inside the host scope, so only the Qubit
+    shell's own elements (docks, agent card, buttons) ever receive a
+    ``border-image``; the vendored app document is never targeted here.
     """
     if not isinstance(theme_id, str) or not _ID_RE.fullmatch(theme_id):
         raise ValueError("theme id: invalid")
-    if not isinstance(tokens, dict) or not tokens:
+    slices = slices or {}
+    if (not isinstance(tokens, dict) or not tokens) and not slices:
         return ""
-    return token_css(tokens, {}, ASSET_BASE, version,
+    base = asset_base if asset_base is not None else ASSET_BASE
+    return token_css(tokens or {}, slices, base, version,
                      selector=f':root[data-office-theme="{theme_id}"]')

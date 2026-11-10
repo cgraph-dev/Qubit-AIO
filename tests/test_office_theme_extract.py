@@ -385,6 +385,16 @@ def test_cli_builds_a_real_pack_and_check_reproduces_it(tmp_path, monkeypatch):
     assert _run_cli(monkeypatch, root, out, "--check") == 0
 
 
+def test_cli_ui_sheet_applies_the_sampled_tokens(tmp_path, monkeypatch):
+    root = _make_purchase(tmp_path)
+    sheet = _ui_sheet(tmp_path)
+    out = tmp_path / "pack" / "limezu"
+    assert _run_cli(monkeypatch, root, out, "--ui-sheet", str(sheet)) == 0
+    manifest = json.loads((out / "theme.json").read_text(encoding="utf-8"))
+    assert manifest["tokens"]["color-surface"] == "#e8d8b8"
+    assert T.validate_theme(out) == []
+
+
 def test_compare_packs_is_semantic_not_byte_for_byte(tmp_path, monkeypatch):
     """A re-encoded atlas and a reformatted JSON file are not differences."""
     source = _make_purchase(tmp_path / "src")
@@ -568,3 +578,91 @@ def test_real_purchase_extracts_the_calibrated_counts():
     portrait = layers["skin"][0]["portrait"]
     assert portrait.width % 64 == 0 and portrait.height % 64 == 0
     assert layers["body"][0].size == (1792, 1280)
+
+
+# ---------------------------------------------------------------------------
+# Task 7 — palette sampling + contact sheet authoring
+# ---------------------------------------------------------------------------
+def _ui_sheet(tmp_path: Path) -> Path:
+    """A synthetic Modern UI sheet with a warm, high-contrast palette."""
+    image = Image.new("RGBA", (64, 64), (232, 216, 184, 255))
+    draw = ImageDraw.Draw(image)
+    draw.rectangle([0, 0, 31, 31], fill=(243, 232, 208, 255))     # raised
+    draw.rectangle([0, 32, 15, 47], fill=(42, 32, 24, 255))       # text
+    draw.rectangle([16, 32, 31, 47], fill=(106, 90, 72, 255))     # muted
+    draw.rectangle([32, 32, 47, 47], fill=(184, 168, 136, 255))   # border
+    draw.rectangle([48, 32, 63, 47], fill=(176, 74, 58, 255))     # accent
+    path = tmp_path / "modern-ui.png"
+    image.save(path)
+    return path
+
+
+def test_palette_derives_validated_semantic_tokens(tmp_path):
+    result = E.derive_tokens(str(_ui_sheet(tmp_path)))
+    assert result["fallback"] is False, result["reasons"]
+    tokens = result["tokens"]
+    assert set(tokens) >= set(E.SEMANTIC_TOKENS)
+    assert T.validate_tokens(tokens) == []
+    surface = tokens["color-surface"]
+    assert T.contrast_ratio(tokens["color-text-primary"], surface) >= 4.5
+    assert T.contrast_ratio(tokens["color-text-muted"], surface) >= 3.0
+    assert tokens["color-surface"] != tokens["color-surface-raised"]
+    # The saturated swatch is the accent, not a neutral surface colour.
+    assert tokens["color-accent"] != surface
+    assert tokens["color-accent"] != tokens["color-text-primary"]
+
+
+def test_palette_is_deterministic(tmp_path):
+    sheet = str(_ui_sheet(tmp_path))
+    assert E.derive_tokens(sheet) == E.derive_tokens(sheet)
+
+
+def test_palette_falls_back_and_reports_why_on_low_contrast(tmp_path):
+    path = tmp_path / "flat.png"
+    Image.new("RGBA", (16, 16), (128, 128, 128, 255)).save(path)
+    result = E.derive_tokens(str(path))
+    assert result["fallback"] is True
+    assert result["tokens"] == B.DEFAULT_TOKENS
+    assert any("contrast" in reason for reason in result["reasons"]), result
+
+
+def test_cli_tokens_reads_a_sheet_and_writes_nothing(tmp_path, capsys):
+    sheet = _ui_sheet(tmp_path)
+    before = sorted(p.name for p in tmp_path.iterdir())
+    assert E.main(["--tokens", str(sheet)]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True and payload["fallback"] is False
+    assert T.validate_tokens(payload["tokens"]) == []
+    assert sorted(p.name for p in tmp_path.iterdir()) == before
+
+
+def test_cli_tokens_reads_a_zip_member(tmp_path, capsys):
+    sheet = _ui_sheet(tmp_path)
+    archive = tmp_path / "modernuserinterface-win.zip"
+    with zipfile.ZipFile(archive, "w") as bundle:
+        bundle.write(sheet, "16x16/Modern_UI_Style_1/sheet.png")
+    assert E.main(["--tokens", str(archive),
+                   "--member", "16x16/Modern_UI_Style_1/sheet.png"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["ok"] is True and payload["fallback"] is False
+
+
+def test_contact_sheet_is_written_outside_the_repo(tmp_path, capsys):
+    sheet = _ui_sheet(tmp_path)
+    out = tmp_path / "authoring"
+    assert E.main(["--ui-contact-sheet", str(sheet), "--out", str(out),
+                   "--scale", "2", "--ui-grid", "16"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    written = Path(payload["contact_sheet"])
+    assert written.is_file() and written.parent == out
+    with Image.open(written) as grid:
+        assert grid.size == (128, 128)
+
+
+def test_contact_sheet_refuses_to_write_inside_the_repo(tmp_path):
+    sheet = _ui_sheet(tmp_path)
+    image = E.load_ui_sheet(str(sheet))
+    with pytest.raises(E.ThemeBuildError) as caught:
+        E.write_contact_sheet(image, str(REPO / "ui-contact-sheet"))
+    assert "inside the repository" in str(caught.value)
+    assert not (REPO / "ui-contact-sheet").exists()

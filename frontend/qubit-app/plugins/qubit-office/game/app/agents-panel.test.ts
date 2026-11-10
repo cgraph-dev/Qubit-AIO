@@ -690,6 +690,32 @@ describe("atlas portraits in the agents panel", () => {
     h.cleanup();
   });
 
+  it("opts the agent card into a declared card 9-slice", async () => {
+    const themed = activeTheme({
+      slices: { card: { src: "ui/card.png", slice: [8, 8, 8, 8],
+                        width: "8px", repeat: "stretch" } },
+    });
+    const h = await mountPanel(
+      themed,
+      oneDivision([seat({ slug: "solo", name: "Solo Agent" })]),
+    );
+    const card = byTestId(h, "agents-panel-card")[0];
+    expect(card?.props.className).toContain("office-theme-card");
+    expect(card?.props["data-office-slice"]).toBe("card");
+    h.cleanup();
+  });
+
+  it("leaves the agent card slice-free when the pack declares none", async () => {
+    const h = await mountPanel(
+      activeTheme(),
+      oneDivision([seat({ slug: "solo", name: "Solo Agent" })]),
+    );
+    const card = byTestId(h, "agents-panel-card")[0];
+    expect(card?.props.className).toContain("office-theme-card");
+    expect(card?.props["data-office-slice"]).toBeUndefined();
+    h.cleanup();
+  });
+
   it("renders the card portrait only (no body) without a theme", async () => {
     const h = await mountPanel(
       null,

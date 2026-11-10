@@ -154,7 +154,7 @@ _ALIASES: Dict[str, str] = {
 }
 _KNOWN_PARTS = {"skin", "eyes", "hair", "outfit", "accessory", "body"}
 
-_DEFAULT_TOKENS: Dict[str, str] = {
+DEFAULT_TOKENS: Dict[str, str] = {
     "color-surface": "#0d0d1a",
     "color-surface-raised": "#161a23",
     "color-surface-hover": "#1d2230",
@@ -694,13 +694,18 @@ def _publish(temp_root: Path, out: Path) -> None:
 def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
                 personas: Any = None, layers: Any = None,
                 license: str = DEFAULT_LICENSE,
-                credit: str = DEFAULT_CREDIT) -> Dict[str, Any]:
+                credit: str = DEFAULT_CREDIT,
+                tokens: Optional[Mapping[str, str]] = None) -> Dict[str, Any]:
     """Build a local theme pack and return its manifest.
 
     ``layers`` must be supplied (Task 3's extractor does that for the CLI);
     ``source`` is the manifest *description*, never a filesystem path.
     The pack is written to a temporary sibling, validated with the real
     contract, and only then moved into place.
+
+    ``tokens`` overrides the default palette. The caller is expected to have
+    validated it (the extractor's ``--tokens`` does); an invalid map is still
+    refused by the contract when the temp pack is validated below.
     """
     problems: List[str] = []
     _check_size(size)
@@ -807,7 +812,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         "license": license,
         "source": source,
         "template_version": TEMPLATE_VERSION,
-        "tokens": dict(_DEFAULT_TOKENS),
+        "tokens": dict(tokens or DEFAULT_TOKENS),
         "slices": {},
         "portraits": {
             "atlas": portrait_atlas_rel,
@@ -1114,6 +1119,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
              "(default: <out>.calibrate, beside the pack)")
     parser.add_argument("--size", type=int, default=32, choices=(16, 32, 48),
                         help="tile size (default 32)")
+    parser.add_argument(
+        "--ui-sheet", default=None,
+        help="sample the palette from the owner's Modern UI sheet (png or zip) "
+             "and use the validated semantic tokens instead of the defaults")
     args = parser.parse_args(argv)
     if args.calibrate_out and not args.calibrate:
         parser.error("--calibrate-out requires --calibrate")
@@ -1125,8 +1134,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return _check(args, layers)
         if args.calibrate:
             return _calibrate(args, layers)
+        tokens = None
+        if args.ui_sheet:
+            # The palette sampler lives with the extractor (it already opens
+            # the purchase in memory); a missing/unsafe sheet is a typed error.
+            import office_theme_extract as extractor  # type: ignore
+            sampled = extractor.derive_tokens(args.ui_sheet)
+            tokens = sampled["tokens"]
+            if sampled["fallback"]:
+                for reason in sampled["reasons"]:
+                    print(f"warning: palette fallback: {reason}", file=sys.stderr)
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
-                               layers=layers)
+                               layers=layers, tokens=tokens)
         recipes = json.loads(
             (Path(args.out) / "agents.json").read_text(encoding="utf-8")
         )["recipes"]

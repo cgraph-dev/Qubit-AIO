@@ -319,6 +319,60 @@ describe("host theme + rerender stability", () => {
     h.cleanup();
   });
 
+  it("opts the docks and buttons into a declared 9-slice", () => {
+    const slicedTheme = {
+      id: "demo",
+      label: "Demo",
+      version: "1.0.0",
+      credit: "LimeZu",
+      license: "LimeZu",
+      active: true,
+      assetBase: "/plugins/qubit-office/themes/demo",
+      atlas: null,
+      index: null,
+      bodies: { atlas: null, index: null, size: null, frame: null },
+      tokens: {},
+      slices: { dock: { src: "ui/dock.png" }, button: { src: "ui/btn.png" } },
+    } as never;
+    // State order: loaded, failed, panelOpen, hudOpen, agentsOpen, officeTheme,
+    // menuFallback. Seed the docks open and an active theme with slices.
+    const h = createStatefulHarness({ 3: true, 4: true, 5: slicedTheme });
+    h.render({});
+    const hud = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-hud-dock");
+    const agents = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-agents-dock");
+    expect(hud?.props["data-office-slice"]).toBe("dock");
+    expect(agents?.props["data-office-slice"]).toBe("dock");
+    const close = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-hud-close");
+    expect(close?.props["data-office-slice"]).toBe("button");
+    h.cleanup();
+  });
+
+  it("leaves the docks slice-free without a declared slice", () => {
+    const plainTheme = {
+      id: "demo",
+      label: "Demo",
+      version: "1.0.0",
+      credit: "LimeZu",
+      license: "LimeZu",
+      active: true,
+      assetBase: "/plugins/qubit-office/themes/demo",
+      atlas: null,
+      index: null,
+      bodies: { atlas: null, index: null, size: null, frame: null },
+      tokens: {},
+      slices: {},
+    } as never;
+    const h = createStatefulHarness({ 3: true, 4: true, 5: plainTheme });
+    h.render({});
+    const hud = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-hud-dock");
+    expect(hud?.props["data-office-slice"]).toBeUndefined();
+    h.cleanup();
+  });
+
   it("renders host fallback icons when the app menu never appears", () => {
     // State order: loaded, failed, panelOpen, hudOpen, agentsOpen, officeTheme,
     // menuFallback. The controller's bounded wait reported the fallback.

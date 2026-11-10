@@ -2732,7 +2732,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         try:
             theme = OT.load_theme(theme_dir)
-            css = OT.host_token_css(theme.tokens, theme.id, theme.version)
+            css = OT.host_token_css(theme.tokens, theme.id, theme.version,
+                                    theme.slices)
         except (OT.ThemeError, ValueError, OSError, RuntimeError):
             self._send(404, b"not found")
             return

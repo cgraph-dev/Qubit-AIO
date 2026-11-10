@@ -543,3 +543,38 @@ def test_invalid_pack_raises_typed_error(tmp_path):
     (pack / "theme.json").write_text(json.dumps(manifest))
     with pytest.raises(T.ThemeError):
         T.load_theme(pack)
+
+
+# ----------------------------------------------------- host chrome (Task 7)
+def test_host_token_css_scopes_tokens_and_slices_to_the_host():
+    css = T.host_token_css(
+        _tokens(), "demo", "1.0.0",
+        {"dock": {"src": "ui/dock.png", "slice": [8, 8, 8, 8],
+                  "width": "8px", "repeat": "stretch"}})
+    assert ':root[data-office-theme="demo"] {' in css
+    assert ':root[data-office-theme="demo"] [data-office-slice="dock"] {' in css
+    assert 'border-image: url("/plugins/qubit-office/themes/ui/dock.png?v=1.0.0")' in css
+    # The painted slice and the reserved CSS border are the SAME width.
+    assert "border-width: 8px" in css
+    assert "border-image-width: 8px" in css
+    # Only our own elements are targeted; no pack CSS reaches Habblaud.
+    assert ".ui-root" not in css
+
+
+def test_host_token_css_without_slices_emits_no_border_image():
+    css = T.host_token_css(_tokens(), "demo", "1.0.0")
+    assert "--ui-bg:" in css
+    assert "border-image" not in css
+    assert "[data-office-slice" not in css
+
+
+def test_host_token_css_refuses_an_invalid_slice():
+    with pytest.raises(ValueError):
+        T.host_token_css(_tokens(), "demo", "1.0.0",
+                         {"dock": {"src": "../escape.png", "slice": [8, 8, 8, 8],
+                                   "width": "8px", "repeat": "stretch"}})
+
+
+def test_host_token_css_requires_a_valid_theme_id():
+    with pytest.raises(ValueError):
+        T.host_token_css(_tokens(), 'bad"id', "1.0.0")

@@ -16,7 +16,7 @@ import {
 import { createSeatModelPanel } from "./SeatModelPanel";
 import { createAgentsPanel } from "./AgentsPanel";
 import {
-  applyHostTheme, loadOfficeTheme, officeThemeClass,
+  applyHostTheme, loadOfficeTheme, officeSliceName, officeThemeClass,
   type OfficeTheme,
 } from "./office-theme";
 import {
@@ -268,6 +268,12 @@ export function createOfficeApp(
       menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
     });
 
+    // Optional 9-slice: the pack declares which shell roles carry art, and
+    // only those elements opt in. The generated host stylesheet targets
+    // [data-office-slice], so an absent/classic theme emits no border-image.
+    const dockSlice = officeSliceName(officeTheme, "dock");
+    const buttonSlice = officeSliceName(officeTheme, "button");
+
     const children: unknown[] = [
       R.createElement("iframe", {
         key: "frame",
@@ -410,6 +416,7 @@ export function createOfficeApp(
         className: "office-game__dock office-game__agentsDock office-game__panel office-theme-dock office-theme-agents-dock",
         "data-testid": "office-game-agents-dock",
         "data-office-dock": "agents",
+        "data-office-slice": dockSlice,
         role: "region",
         "aria-label": "Office agents",
       }, [
@@ -418,6 +425,7 @@ export function createOfficeApp(
           R.createElement("button", {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
+            "data-office-slice": buttonSlice,
             onClick: () => setAgentsOpen(false),
           }, "Close"),
         ]),
@@ -439,6 +447,7 @@ export function createOfficeApp(
         className: "office-game__dock office-game__panel office-theme-dock office-theme-hud-dock",
         "data-testid": "office-game-hud-dock",
         "data-office-dock": "hud",
+        "data-office-slice": dockSlice,
         role: "region",
         "aria-label": "HUD",
       }, [
@@ -453,6 +462,7 @@ export function createOfficeApp(
           R.createElement("button", {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-hud-close", "aria-label": "Close HUD",
+            "data-office-slice": buttonSlice,
             onClick: () => setHudOpen(false),
           }, "Close"),
         ]),
@@ -485,6 +495,7 @@ export function createOfficeApp(
           "aria-label": spec.label,
           title: spec.title,
           "aria-pressed": pressed ? "true" : "false",
+          "data-office-slice": buttonSlice,
           onClick: onActivate,
         }, R.createElement("svg", {
           className: "ui-px-icon",

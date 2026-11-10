@@ -36,6 +36,7 @@ import {
   type OfficeTheme,
   bodyCellStyle,
   initialsFor,
+  officeSliceName,
   portraitCellStyle,
   preloadThemeAtlases,
   themeAtlasUrls,
@@ -204,10 +205,12 @@ function agentCard(
   const showBody = Boolean(ready && urls.body && bodyStyle);
   return R.createElement("div", {
     key: "card",
-    className: "agents-panel__card",
+    className: "agents-panel__card office-theme-card",
     id: "agents-panel-card",
     "data-testid": "agents-panel-card",
     "data-seat-slug": seat.slug,
+    // Opt in to the pack's card 9-slice only when the theme declares it.
+    "data-office-slice": officeSliceName(theme, "card"),
     role: "group",
     "aria-label": "Active agent",
     // The live region is the announcement path. `aria-activedescendant` was

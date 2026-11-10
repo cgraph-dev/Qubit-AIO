@@ -470,7 +470,7 @@
   box-shadow: var(--office-shadow);
 }
 
-.agents-panel {
+.office-game .agents-panel {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -479,12 +479,12 @@
   color: var(--office-ink);
 }
 
-.agents-panel[data-state="loading"],
-.agents-panel__error {
+.office-game .agents-panel[data-state="loading"],
+.office-game .agents-panel__error {
   color: var(--office-muted);
 }
 
-.agents-panel__error {
+.office-game .agents-panel__error {
   border: 1px solid var(--office-bad, #e0554a);
   border-radius: var(--office-radius);
   color: var(--office-bad, #e0554a);
@@ -492,7 +492,7 @@
   padding: var(--office-s2);
 }
 
-.agents-panel__summary {
+.office-game .agents-panel__summary {
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   padding-bottom: var(--office-s2);
@@ -500,12 +500,12 @@
   margin-bottom: var(--office-s2);
 }
 
-.agents-panel__division {
+.office-game .agents-panel__division {
   border-bottom: var(--office-border);
   padding: var(--office-s1) 0;
 }
 
-.agents-panel__divisionHead {
+.office-game .agents-panel__divisionHead {
   display: flex;
   gap: var(--office-s3);
   align-items: baseline;
@@ -513,29 +513,29 @@
   padding: var(--office-s1) 0;
 }
 
-.agents-panel__divisionHead::marker,
-.agents-panel__divisionHead::-webkit-details-marker {
+.office-game .agents-panel__divisionHead::marker,
+.office-game .agents-panel__divisionHead::-webkit-details-marker {
   color: var(--office-muted);
 }
 
-.agents-panel__divisionLabel {
+.office-game .agents-panel__divisionLabel {
   flex: 1 1 auto;
   font-weight: 600;
 }
 
-.agents-panel__divisionMeta {
+.office-game .agents-panel__divisionMeta {
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   white-space: nowrap;
 }
 
-.agents-panel__seats {
+.office-game .agents-panel__seats {
   list-style: none;
   margin: 0;
   padding: 0 0 var(--office-s1) var(--office-s3);
 }
 
-.agents-panel__seat {
+.office-game .agents-panel__seat {
   display: flex;
   gap: var(--office-s2);
   align-items: center;
@@ -543,22 +543,22 @@
   font-size: var(--office-fs-xs);
 }
 
-.agents-panel__emoji {
+.office-game .agents-panel__emoji {
   width: 1.2em;
   flex: 0 0 auto;
 }
 
-.agents-panel__name {
+.office-game .agents-panel__name {
   flex: 0 0 auto;
 }
 
-.agents-panel__meta {
+.office-game .agents-panel__meta {
   color: var(--office-muted);
   flex: 1 1 auto;
   overflow-wrap: anywhere;
 }
 
-.agents-panel__types {
+.office-game .agents-panel__types {
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   padding-top: var(--office-s2);
@@ -575,7 +575,7 @@
    `--body-x/y`) the panel sets from the theme payload; the 32px boxes are
    fixed here so swapping packs cannot shift the list. */
 
-.agents-panel__avatar {
+.office-game .agents-panel__avatar {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -587,7 +587,7 @@
   background: var(--office-plate);
 }
 
-.agents-panel__portrait {
+.office-game .agents-panel__portrait {
   display: block;
   flex: 0 0 auto;
   width: 32px;
@@ -599,7 +599,7 @@
   -ms-interpolation-mode: nearest-neighbor;
 }
 
-.agents-panel__initials {
+.office-game .agents-panel__initials {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
@@ -617,7 +617,7 @@
 
 /* The emoji is the LAST fallback (a seat with no letters in its name), so it
    owns the same fixed box the portrait/initials occupy. */
-.agents-panel__avatar > .agents-panel__emoji {
+.office-game .agents-panel__avatar > .agents-panel__emoji {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -632,7 +632,7 @@
    pack author's own dialogue-box pattern. Fixed height (64px body + padding)
    and a fixed grid so following the hovered row never reflows the roster. */
 
-.agents-panel__card {
+.office-game .agents-panel__card {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr) 32px;
   align-items: center;
@@ -647,12 +647,12 @@
   background: var(--office-ground);
 }
 
-.agents-panel__card:focus-visible {
+.office-game .agents-panel__card:focus-visible {
   outline: 2px solid var(--office-accent);
   outline-offset: 1px;
 }
 
-.agents-panel__cardPortrait {
+.office-game .agents-panel__cardPortrait {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -665,21 +665,21 @@
   background: var(--office-plate);
 }
 
-.agents-panel__cardTab {
+.office-game .agents-panel__cardTab {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.agents-panel__cardName {
+.office-game .agents-panel__cardName {
   overflow: hidden;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.agents-panel__cardMeta {
+.office-game .agents-panel__cardMeta {
   overflow: hidden;
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
@@ -687,7 +687,7 @@
   white-space: nowrap;
 }
 
-.agents-panel__body {
+.office-game .agents-panel__body {
   display: block;
   flex: 0 0 auto;
   width: 32px;
@@ -696,4 +696,60 @@
   background-size: auto;
   image-rendering: pixelated;
   -ms-interpolation-mode: nearest-neighbor;
+}
+
+
+/* --- host theme chrome (Task 7) ------------------------------------------
+   The tokens below come from the generated HOST stylesheet (theme.css, scoped
+   to :root[data-office-theme]) and apply ONLY to Qubit-owned elements in THIS
+   document: the two docks, the agent card, the close buttons and the fallback
+   menu buttons. The vendored app document is themed by the server and is never
+   touched here. Every fallback reproduces the classic palette, so an absent
+   theme is byte-for-byte the old look.
+
+   PAINT ONLY: no rule in this section changes layout, pointer-events or
+   stacking, so the iframe keeps its exact frame and the docks keep their
+   geometry. The optional 9-slice border-image is generated server-side (it
+   alone reserves its border width) and targets [data-office-slice] elements
+   only, which are opt-in per pack. */
+
+.office-game .office-theme-dock {
+  background: var(--ui-bg, var(--office-void));
+  color: var(--ui-text, var(--office-ink));
+  border-color: var(--ui-line, var(--office-line));
+}
+
+.office-game .office-theme-dock-head {
+  border-color: var(--ui-line, var(--office-line));
+}
+
+.office-game .office-theme-dock-title,
+.office-game .office-theme-dock-link {
+  color: var(--ui-muted, var(--office-muted));
+}
+
+.office-game .office-theme-dock-close,
+.office-game .office-theme-menu-btn {
+  color: var(--ui-text, var(--office-ink));
+  background: var(--ui-bg-solid, var(--office-plate));
+  border-color: var(--ui-line, var(--office-line));
+}
+
+.office-game .office-theme-dock-close:hover,
+.office-game .office-theme-menu-btn:hover {
+  background: var(--ui-bg-hover, var(--office-plate));
+  border-color: var(--ui-accent, var(--office-accent));
+}
+
+.office-game .office-theme-card {
+  background: var(--ui-bg-solid, var(--office-ground));
+  border-color: var(--ui-line-strong, var(--office-line-strong));
+}
+
+.office-game .office-theme-card .agents-panel__cardName {
+  color: var(--ui-text, var(--office-ink));
+}
+
+.office-game .office-theme-card .agents-panel__cardMeta {
+  color: var(--ui-muted, var(--office-muted));
 }

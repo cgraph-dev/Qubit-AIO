@@ -15,6 +15,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   applyHostTheme,
   loadOfficeTheme,
+  officeSliceName,
   officeThemeClass,
   themeCss,
   type OfficeTheme,
@@ -196,6 +197,25 @@ describe("host shell + menu hooks", () => {
     expect(officeThemeClass(activeTheme)).toBe("office-theme-demo");
     expect(officeThemeClass(classicTheme)).toBe("");
     expect(officeThemeClass(null)).toBe("");
+  });
+
+  it("maps a declared 9-slice role and ignores the rest", () => {
+    const sliced: OfficeTheme = {
+      ...activeTheme,
+      slices: {
+        dock: {
+          src: "ui/dock.png",
+          slice: [8, 8, 8, 8],
+          width: "8px",
+          repeat: "stretch",
+        },
+      },
+    };
+    expect(officeSliceName(sliced, "dock")).toBe("dock");
+    expect(officeSliceName(sliced, "card")).toBeUndefined();
+    expect(officeSliceName(sliced, "button")).toBeUndefined();
+    expect(officeSliceName(classicTheme, "dock")).toBeUndefined();
+    expect(officeSliceName(null, "dock")).toBeUndefined();
   });
 
   it("?theme= is appended to the iframe URL and classic is not", () => {

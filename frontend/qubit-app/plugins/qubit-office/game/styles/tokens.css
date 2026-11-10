@@ -31,8 +31,12 @@
 
   /* the frame */
   --office-radius: 6px;
-  --office-border: 1px solid rgba(255, 255, 255, 0.12);
-  --office-border-strong: 1px solid rgba(255, 255, 255, 0.24);
+  /* Border COLOURS are separate tokens so a host theme's `--ui-line*` can
+     replace them without touching the border width (paint, not layout). */
+  --office-line: rgba(255, 255, 255, 0.12);
+  --office-line-strong: rgba(255, 255, 255, 0.24);
+  --office-border: 1px solid var(--office-line);
+  --office-border-strong: 1px solid var(--office-line-strong);
   --office-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 
   /* spacing scale: 4px base. Every gap in the shell is one of these. */
@@ -72,6 +76,7 @@
 [data-office-contrast="high"] {
   --office-ink: #ffffff;
   --office-muted: #cfd6e4;
-  --office-border: 1px solid rgba(255, 255, 255, 0.4);
+  --office-line: rgba(255, 255, 255, 0.4);
+  --office-line-strong: rgba(255, 255, 255, 0.55);
   --office-plate: #222b3a;
 }

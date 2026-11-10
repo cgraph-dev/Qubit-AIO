@@ -67,21 +67,50 @@ PARTS RETURNED
 carry accessories, but they are not calibrated against the body frame, so a
 body accessory would be mis-aligned art. Add it once a body calibration has
 been measured and reviewed.
+
+PALETTE (Task 7)
+----------------
+``--tokens <sheet.png|zip>`` samples the Modern UI sheet's dominant colours,
+maps them onto the semantic tokens (surface/raised/hover/text/muted/border/
+accent) and prints the result as JSON. The map is validated with the real
+contract (``validate_tokens``: typed values + contrast); when the sampled
+palette fails, the current defaults are printed with the reason and
+``fallback: true``. ``python scripts/office_theme_build.py --ui-sheet <sheet>``
+uses the same validated map for a pack. The sheet is only read — never copied.
+
+CONTACT SHEET (Task 7)
+----------------------
+``--ui-contact-sheet <sheet.png|zip> --out DIR`` writes an enlarged, labelled
+coordinate grid so a human can author ``theme.recipe.json:slices`` by eye. The
+purchase is never written into the repository: an ``--out`` inside the checkout
+is a typed refusal. The derived sheet is authoring aid only and is not shipped.
 """
 from __future__ import annotations
 
+import argparse
 import io
+import json
 import re
+import sys
 import zipfile
 from pathlib import Path
 from typing import Dict, List, Mapping, Optional, Sequence, Tuple
 
-from PIL import Image
+from PIL import Image, ImageDraw
+
+# When run as ``python scripts/office_theme_extract.py`` the repo root is not
+# on sys.path (Python adds the script's directory instead). Make the package
+# importable without requiring PYTHONPATH.
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from voicebridge.office import theme as theme_contract  # noqa: E402
 
 try:  # imported as a top-level module (scripts/ is on sys.path)
-    from office_theme_build import ThemeBuildError
+    from office_theme_build import DEFAULT_TOKENS, ThemeBuildError
 except ImportError:  # imported as scripts.office_theme_extract
-    from scripts.office_theme_build import ThemeBuildError  # type: ignore
+    from scripts.office_theme_build import DEFAULT_TOKENS, ThemeBuildError  # type: ignore
 
 #: Canonical archive names, in search-preference order.
 CHARACTER_ZIP_NAMES: Tuple[str, ...] = ("Character Generator 2.0 Linux Build.zip",)
@@ -402,9 +431,353 @@ def extract_layers(source: str, *, size: int = 32) -> Dict[str, List[object]]:
     return layers
 
 
+# ---------------------------------------------------------------------------
+# Modern UI palette (Task 7)
+# ---------------------------------------------------------------------------
+#: The semantic tokens the palette sampler can derive, in their document order.
+SEMANTIC_TOKENS: Tuple[str, ...] = (
+    "color-surface",
+    "color-surface-raised",
+    "color-surface-hover",
+    "color-text-primary",
+    "color-text-muted",
+    "color-border",
+    "color-accent",
+)
+
+#: Sheet suffixes we will sample. The purchase is PNG; the others are here so a
+#: re-encoded pack still works without a code change.
+_SHEET_SUFFIXES = {".png", ".jpg", ".jpeg", ".webp"}
+
+#: Bucket size for the deterministic colour histogram. 4 bits per channel
+#: groups anti-aliased neighbours without merging distinct UI colours.
+_PALETTE_BITS = 4
+
+
+def load_ui_sheet(source: str, *, member: Optional[str] = None) -> Image.Image:
+    """Open one Modern UI sheet (an image or a zip member) in memory.
+
+    A zip is read straight from its member; the caller's purchase is never
+    extracted to disk. ``member`` names a member explicitly; otherwise the
+    lexicographically first image member is used, so the choice is
+    deterministic and documented.
+    """
+    path = Path(source)
+    if not path.is_file():
+        raise ThemeBuildError(f"{source}: no such sheet or archive")
+    suffix = path.suffix.lower()
+    if suffix == ".zip":
+        try:
+            with zipfile.ZipFile(path) as archive:
+                names = sorted(
+                    name for name in archive.namelist()
+                    if not name.endswith("/")
+                    and Path(name).suffix.lower() in _SHEET_SUFFIXES)
+                if member is not None:
+                    chosen = member if member in names else None
+                else:
+                    chosen = names[0] if names else None
+                if chosen is None:
+                    wanted = (f"member {member!r}" if member is not None
+                              else "an image member")
+                    raise ThemeBuildError(
+                        f"{path.name}: no {wanted} in the archive")
+                data = archive.read(chosen)
+        except (zipfile.BadZipFile, OSError) as exc:
+            raise ThemeBuildError(
+                f"{path.name}: not a valid zip archive ({exc})") from exc
+        try:
+            with Image.open(io.BytesIO(data)) as sheet:
+                return sheet.convert("RGBA")
+        except OSError as exc:
+            raise ThemeBuildError(
+                f"{path.name}:{chosen}: not a readable image ({exc})") from exc
+    if suffix not in _SHEET_SUFFIXES:
+        raise ThemeBuildError(
+            f"{path.name}: unsupported sheet type {suffix or '(none)'}")
+    try:
+        with Image.open(path) as sheet:
+            return sheet.convert("RGBA")
+    except OSError as exc:
+        raise ThemeBuildError(
+            f"{path.name}: not a readable image ({exc})") from exc
+
+
+def _luminance(rgb: Sequence[int]) -> float:
+    channels = []
+    for channel in rgb:
+        value = channel / 255.0
+        channels.append(value / 12.92 if value <= 0.03928
+                        else ((value + 0.055) / 1.055) ** 2.4)
+    r, g, b = channels
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def _hex(rgb: Sequence[int]) -> str:
+    r, g, b = (max(0, min(255, int(round(v)))) for v in rgb[:3])
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _contrast(first: Sequence[int], second: Sequence[int]) -> float:
+    a, b = _luminance(first), _luminance(second)
+    hi, lo = max(a, b), min(a, b)
+    return (hi + 0.05) / (lo + 0.05)
+
+
+def _away(rgb: Sequence[int], toward_text: int, amount: int) -> Tuple[int, int, int]:
+    """Move a colour AWAY from the text side (a raised panel keeps contrast)."""
+    step = amount if toward_text > 0 else -amount
+    return tuple(max(0, min(255, int(round(v - step)))) for v in rgb[:3])  # type: ignore[return-value]
+
+
+def _blend(first: Sequence[int], second: Sequence[int], t: float) -> Tuple[int, int, int]:
+    return tuple(
+        max(0, min(255, int(round(a + (b - a) * t))))
+        for a, b in zip(first[:3], second[:3]))  # type: ignore[return-value]
+
+
+def _colour_buckets(image: Image.Image) -> List[Tuple[int, int, int, int]]:
+    """Deterministic histogram: ``[(r, g, b, count)]``, largest first.
+
+    Channels are bucketed to ``_PALETTE_BITS`` and the bucket's true average is
+    reported, so a flat sheet's dominant colour comes back exactly while
+    anti-aliased edges do not invent new palette entries.
+    """
+    shift = 8 - _PALETTE_BITS
+    totals: Dict[Tuple[int, int, int], List[int]] = {}
+    # ``Image.getdata`` is deprecated (and a warning fails the strict suite);
+    # the RGBA byte buffer carries the same information without that API.
+    raw = image.convert("RGBA").tobytes()
+    for offset in range(0, len(raw), 4):
+        r, g, b, a = (raw[offset], raw[offset + 1],
+                       raw[offset + 2], raw[offset + 3])
+        if a < 16:
+            continue
+        key = (r >> shift, g >> shift, b >> shift)
+        entry = totals.get(key)
+        if entry is None:
+            totals[key] = [r, g, b, 1]
+        else:
+            entry[0] += r
+            entry[1] += g
+            entry[2] += b
+            entry[3] += 1
+    buckets = [
+        (round(r / count), round(g / count), round(b / count), count)
+        for r, g, b, count in totals.values()
+    ]
+    buckets.sort(key=lambda item: (-item[3], item[:3]))
+    return buckets
+
+
+def _tokens_from_image(image: Image.Image) -> Tuple[Dict[str, str], List[str]]:
+    """Map a sheet's dominant colours onto the semantic tokens.
+
+    Returns ``(tokens, reasons)``. ``reasons`` is empty when the sampled palette
+    passed the contract's typed-value + contrast validation; otherwise the
+    caller should use :data:`DEFAULT_TOKENS` (returned) instead.
+    """
+    buckets = _colour_buckets(image)
+    if not buckets:
+        return dict(DEFAULT_TOKENS), ["palette: the sheet has no opaque pixels"]
+
+    total = sum(bucket[3] for bucket in buckets)
+    surface = buckets[0][:3]
+
+    def contrast(colour: Sequence[int]) -> float:
+        return _contrast(colour, surface)
+
+    # Text: the sampled colour with the most contrast against the surface.
+    text = max(buckets, key=lambda item: (contrast(item[:3]), item[3]))[:3]
+    toward_text = 1 if _luminance(text) >= _luminance(surface) else -1
+
+    # A raised surface sits on the AWAY side of the text (so text contrast can
+    # only improve) and prefers a colour that actually occurs in the sheet.
+    raised_side = [
+        bucket[:3] for bucket in buckets
+        if (_luminance(bucket[:3]) - _luminance(surface)) * -toward_text > 0.03
+        and bucket[3] > 0
+    ]
+    raised = (max(raised_side, key=lambda colour: next(
+        b[3] for b in buckets if b[:3] == colour))
+        if raised_side else _away(surface, toward_text, 10))
+    hover = _away(raised, toward_text, 14)
+
+    # Muted text: the most common sampled colour that clears 3:1 but is not the
+    # primary text colour.
+    muted_candidates = [
+        bucket[:3] for bucket in buckets
+        if contrast(bucket[:3]) >= 3.0 and bucket[:3] != text
+    ]
+    muted = (max(muted_candidates, key=lambda colour: next(
+        b[3] for b in buckets if b[:3] == colour))
+        if muted_candidates else _blend(surface, text, 0.62))
+
+    # Border: a low-contrast sampled line, else a subtle blend from the surface.
+    border_candidates = [
+        bucket[:3] for bucket in buckets
+        if 1.25 <= contrast(bucket[:3]) < 3.0 and bucket[:3] != surface
+    ]
+    border = (max(border_candidates, key=lambda colour: next(
+        b[3] for b in buckets if b[:3] == colour))
+        if border_candidates else _blend(surface, text, 0.20))
+
+    # Accent: the most saturated sampled colour that is not the surface/text.
+    min_count = max(2, total // 4000)
+    accent_candidates = [
+        bucket for bucket in buckets
+        if bucket[3] >= min_count
+        and max(bucket[:3]) - min(bucket[:3]) > 24
+        and bucket[:3] not in (surface, text)
+        and contrast(bucket[:3]) >= 1.5
+    ]
+    accent = (max(
+        accent_candidates,
+        key=lambda item: (max(item[:3]) - min(item[:3]), item[3]))[:3]
+        if accent_candidates else None)
+
+    accent_hex = (_hex(accent) if accent is not None
+                  else DEFAULT_TOKENS["color-accent"])
+    tokens: Dict[str, str] = {
+        "color-surface": _hex(surface),
+        "color-surface-raised": _hex(raised),
+        "color-surface-hover": _hex(hover),
+        "color-text-primary": _hex(text),
+        "color-text-muted": _hex(muted),
+        "color-border": _hex(border),
+        "color-accent": accent_hex,
+        "radius-control": DEFAULT_TOKENS["radius-control"],
+    }
+    problems = theme_contract.validate_tokens(tokens)
+    if problems:
+        return dict(DEFAULT_TOKENS), problems
+    return tokens, []
+
+
+def derive_tokens(source: str, *, member: Optional[str] = None) -> Dict[str, object]:
+    """Derive the semantic tokens from a Modern UI sheet, or fall back.
+
+    The sheet is only read. When the sampled palette fails the contract's
+    contrast/typed-value validation the current defaults are returned with the
+    reason, so a sheet with too little range cannot silently produce unreadable
+    chrome.
+    """
+    image = load_ui_sheet(source, member=member)
+    tokens, reasons = _tokens_from_image(image)
+    return {
+        "tokens": tokens,
+        "fallback": bool(reasons),
+        "reasons": reasons,
+    }
+
+
+def _contact_sheet(image: Image.Image, *, scale: int = 2,
+                   grid: int = 16) -> Image.Image:
+    """Enlarge the sheet and draw a labelled coordinate grid over it."""
+    if scale < 1:
+        raise ThemeBuildError("contact sheet: scale must be >= 1")
+    if grid < 1:
+        raise ThemeBuildError("contact sheet: grid must be >= 1")
+    wide = image.width * scale
+    tall = image.height * scale
+    sheet = image.resize((wide, tall), Image.NEAREST)
+    draw = ImageDraw.Draw(sheet)
+    step = grid * scale
+    line = (16, 200, 255, 255)
+    for x in range(0, wide, step):
+        draw.line([(x, 0), (x, tall)], fill=line)
+        draw.text((x + 2, 2), str(x // scale), fill=(0, 0, 0, 255))
+    for y in range(0, tall, step):
+        draw.line([(0, y), (wide, y)], fill=line)
+        draw.text((2, y + 1), str(y // scale), fill=(0, 0, 0, 255))
+    return sheet
+
+
+def write_contact_sheet(image: Image.Image, out: str, *,
+                        scale: int = 2, grid: int = 16) -> Path:
+    """Write a labelled contact sheet OUTSIDE the repository.
+
+    The contact sheet is derived from the paid art. It exists to author the
+    ``slices`` coordinates by eye, and is deliberately never written into the
+    repo (ruling 14); a path inside the checkout is a typed error.
+    """
+    target = Path(out)
+    resolved = target.resolve()
+    if resolved == _REPO_ROOT or _REPO_ROOT in resolved.parents:
+        raise ThemeBuildError(
+            f"contact sheet: refusing to write inside the repository ({target}); "
+            "the purchased art must stay outside the tree")
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / "ui-contact-sheet.png"
+    sheet = _contact_sheet(image, scale=scale, grid=grid)
+    sheet.save(path, format="PNG")
+    return path
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    parser = argparse.ArgumentParser(
+        prog="office_theme_extract.py",
+        description=(
+            "Read the owner's purchased Modern UI sheets in memory: derive the "
+            "semantic palette, or write a labelled contact sheet for authoring "
+            "9-slice coordinates. Never writes the purchase into the repo."))
+    action = parser.add_mutually_exclusive_group(required=True)
+    action.add_argument(
+        "--tokens", metavar="SHEET",
+        help="sample the dominant Modern UI colours and print the validated "
+             "semantic tokens (png/jpg/webp or a zip member)")
+    action.add_argument(
+        "--ui-contact-sheet", metavar="SHEET",
+        help="write a labelled coordinate grid of the sheet (requires --out)")
+    parser.add_argument("--out", default=None,
+                        help="output directory for --ui-contact-sheet")
+    parser.add_argument("--member", default=None,
+                        help="zip member to read (default: first image member)")
+    parser.add_argument("--scale", type=int, default=2,
+                        help="contact-sheet enlargement (default 2)")
+    parser.add_argument("--ui-grid", type=int, default=16,
+                        help="contact-sheet grid step in source pixels (default 16)")
+    args = parser.parse_args(argv)
+    try:
+        if args.tokens:
+            result = derive_tokens(args.tokens, member=args.member)
+            print(json.dumps({
+                "ok": True,
+                "source": Path(args.tokens).name,
+                **result,
+            }, indent=2, sort_keys=True))
+            return 0
+        if not args.out:
+            parser.error("--ui-contact-sheet requires --out")
+        image = load_ui_sheet(args.ui_contact_sheet, member=args.member)
+        path = write_contact_sheet(image, args.out,
+                                   scale=args.scale, grid=args.ui_grid)
+        print(json.dumps({
+            "ok": True,
+            "contact_sheet": str(path),
+            "width": image.width,
+            "height": image.height,
+        }, indent=2, sort_keys=True))
+        return 0
+    except ThemeBuildError as exc:
+        for problem in exc.problems:
+            print(f"error: {problem}", file=sys.stderr)
+        return 2
+
+
 __all__ = [
     "CHARACTER_ZIP_NAMES",
+    "DEFAULT_TOKENS",
     "FALLBACK_ZIP_NAMES",
     "PORTRAIT_ZIP_NAMES",
+    "SEMANTIC_TOKENS",
+    "derive_tokens",
     "extract_layers",
+    "load_ui_sheet",
+    "main",
+    "write_contact_sheet",
 ]
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

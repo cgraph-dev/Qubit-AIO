@@ -300,6 +300,28 @@ export function officeThemeClass(
   return theme && theme.active && theme.id ? `office-theme-${theme.id}` : "";
 }
 
+/** The shell roles a pack may 9-slice. */
+export type OfficeSliceRole = "dock" | "card" | "button";
+
+/**
+ * The `data-office-slice` value for a shell element, or undefined.
+ *
+ * The pack declares which roles it has art for; the host stylesheet generated
+ * by `host_token_css` emits `[data-office-slice="<role>"]` rules only for
+ * those names. An element must therefore opt in by carrying the attribute
+ * ONLY when its role is declared — otherwise a theme switch would leave a
+ * stale slice on classic chrome.
+ */
+export function officeSliceName(
+  theme: OfficeTheme | null | undefined,
+  role: OfficeSliceRole,
+): string | undefined {
+  if (!theme || !theme.active) return undefined;
+  const slices = theme.slices;
+  if (!slices || typeof slices !== "object") return undefined;
+  return slices[role] ? role : undefined;
+}
+
 /**
  * The generated host stylesheet URL for an active theme, or "" for classic.
  *
