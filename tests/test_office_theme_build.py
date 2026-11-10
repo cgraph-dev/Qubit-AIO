@@ -121,6 +121,19 @@ def _layers(size: int = 32, variants: int = VARIANTS,
     }
 
 
+def _bare_sheet(part: str, variant: int, size: int = 32) -> Image.Image:
+    """One bare ``PIL.Image`` that is valid for both the portrait and body views."""
+    sheet = Image.new("RGBA", (size * 2, 15 * size * 2), (0, 0, 0, 0))
+    cell = Image.new("RGBA", (size * 2, size * 2), (0, 0, 0, 0))
+    _draw_box(cell, PORTRAIT_BOX[part], _color(part, variant))
+    sheet.paste(cell, (0, 0))
+    for row in (0, 3):
+        frame = Image.new("RGBA", (size, size * 2), (0, 0, 0, 0))
+        _draw_box(frame, BODY_BOX[part], _color(part, variant))
+        sheet.paste(frame, (0, row * size * 2))
+    return sheet
+
+
 def _png(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
@@ -258,6 +271,40 @@ def test_empty_outfit_rows_are_skipped(tmp_path):
     out, manifest = _build(tmp_path, layers=layers)
     assert T.validate_theme(out) == []
     assert manifest["bodies"]["frame"] == {"w": 32, "h": 64}
+
+
+def test_missing_body_view_is_refused_not_substituted(tmp_path):
+    layers = _layers()
+    # portrait-only eye mappings: using them as a body would be silent corruption
+    layers["eyes"] = [{"portrait": sheet["portrait"]} for sheet in layers["eyes"]]
+
+    with pytest.raises(B.ThemeBuildError) as info:
+        B.body_bytes("alpha", layers)
+    assert "missing the 'body' view" in str(info.value)
+
+    out = tmp_path / "demo"
+    with pytest.raises(B.ThemeBuildError):
+        B.build_theme(B.DEFAULT_SOURCE, out, personas=["alpha"], layers=layers)
+    assert not out.exists()
+
+
+def test_missing_portrait_view_is_refused_not_substituted():
+    layers = _layers()
+    # body-only hair mappings must not become a portrait
+    layers["hair"] = [{"body": sheet["body"]} for sheet in layers["hair"]]
+
+    with pytest.raises(B.ThemeBuildError) as info:
+        B.portrait_bytes("alpha", layers)
+    assert "missing the 'portrait' view" in str(info.value)
+
+
+def test_a_bare_image_is_the_explicit_both_views_form():
+    layers = _layers()
+    layers["eyes"] = [_bare_sheet("eyes", v) for v in range(VARIANTS)]
+    layers["hair"] = [_bare_sheet("hair", v) for v in range(VARIANTS)]
+
+    assert B.qa_portrait(B.portrait_bytes("alpha", layers)) == []
+    assert B.qa_body(B.body_bytes("alpha", layers), frame_h=64) == []
 
 
 def test_webp_is_only_used_when_smaller():

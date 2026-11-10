@@ -224,14 +224,21 @@ def _normalize_layers(layers: Any) -> Dict[str, List[Sheet]]:
 
 
 def _sheet_image(sheet: Sheet, view: str) -> Image.Image:
-    """Return the RGBA image for one view of a sheet."""
-    image: Any = sheet
+    """Return the RGBA image for one view of a sheet.
+
+    A bare ``PIL.Image`` is the explicit "same art for both views" form. A
+    mapping must carry the requested view (``portrait`` or ``body``); falling
+    back to the other view would silently compose a body frame out of a
+    portrait sheet (or vice versa) and still pass QA, so it is refused.
+    """
     if isinstance(sheet, Mapping):
         image = sheet.get(view)
         if image is None:
-            image = sheet.get("image")
-        if image is None:
-            image = sheet.get("body" if view == "portrait" else "portrait")
+            present = ", ".join(sorted(str(key) for key in sheet)) or "nothing"
+            raise ThemeBuildError(
+                f"layer sheet is missing the {view!r} view (has: {present})")
+    else:
+        image = sheet
     if not isinstance(image, Image.Image):
         raise ThemeBuildError(
             f"layer sheet for {view!r} is not a PIL image "
