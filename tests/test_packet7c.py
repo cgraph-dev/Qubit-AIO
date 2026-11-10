@@ -29,7 +29,15 @@ from voicebridge import distribution as D  # noqa: E402
 def test_manifest_versioned_and_platform_explicit():
     m = D.manifest()
     assert m["name"] == "qubit-voicebridge"
-    assert m["version"] == "1.0.0"
+    # The manifest must report the release version, and that version is the
+    # project's single source of truth (pyproject.toml) — a hard-coded literal
+    # here drifts on every release bump instead of catching a real mismatch.
+    assert m["version"] == D.PACKAGE_VERSION
+    pyproject = (REPO / "pyproject.toml").read_text(encoding="utf-8")
+    declared = next(ln.split("=", 1)[1].strip().strip('"')
+                    for ln in pyproject.splitlines()
+                    if ln.startswith("version = "))
+    assert m["version"] == declared, (m["version"], declared)
     assert m["target"]["os"] == "ubuntu"
     assert "x86_64" in m["target"]["arches"]
     assert "windows" not in m["target"].get("os", "").lower()
