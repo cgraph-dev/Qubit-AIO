@@ -59,18 +59,30 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("Content-Type", ""), e.read()
+        # Close the error's body: urlopen raised before the with-block, so the
+        # response fp is owned by the exception and would otherwise be reaped
+        # by the GC during an unrelated test (ResourceWarning under load).
+        with e:
+            return e.code, e.headers.get("Content-Type", ""), e.read()
 
 
 def _http_status_location(port, path):
     """Raw request that does NOT follow redirects."""
     import http.client
     conn = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
-    conn.request("GET", path)
-    resp = conn.getresponse()
-    loc = resp.getheader("Location")
-    resp.read()
-    return resp.status, loc
+    try:
+        conn.request("GET", path)
+        resp = conn.getresponse()
+        try:
+            loc = resp.getheader("Location")
+            resp.read()
+            return resp.status, loc
+        finally:
+            resp.close()
+    finally:
+        # The connection owns the socket; without this close it survives to the
+        # GC and is reported as an unclosed socket inside another test.
+        conn.close()
 
 
 def test_every_normal_route_serves_the_spa_shell(tmp_path):
