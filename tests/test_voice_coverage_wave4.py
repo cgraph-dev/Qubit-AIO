@@ -61,6 +61,11 @@ DASHBOARD_ONLY_PLUGIN_ROUTES = {
     # Live-update poll for the board tab (real task_events read); the spoken
     # kanban surface covers board/task/stats/config/projects.
     "h_plugin_kanban_events",
+    # Board workflow metadata: column order/labels/icons, drag targets and the
+    # archive marker the board UI renders itself. The spoken kanban surface
+    # (`kanban_fleet_*`) covers board/task/stats/config/projects; column
+    # geometry is a layout detail of the dashboard, not a spoken capability.
+    "h_plugin_kanban_workflow",
     # Obsidian note editor routes. The note body is arbitrary markdown and the
     # note name is a vault-relative path, so these are the dashboard plugin's
     # editor/refresh controls, not a spoken mutation; the structured-argument
