@@ -58,10 +58,11 @@ from voicebridge import config as C
 
 # The expected subcommand count for `qubit office`. Pinned so a verb silently
 # dropping off the parser turns this guard RED instead of quietly shrinking.
-# 83 = the original 81 surface plus `orphans` (the orphan report) and `reap`
+# 84 = the original 81 surface plus `orphans` (the orphan report) and `reap`
 # (the orphan reaper's write half, both added with the D15 reconciliation that
-# un-jams an org blocked by a crashed turn).
-EXPECTED_VERB_COUNT = 83
+# un-jams an org blocked by a crashed turn), plus `theme` (the recipe-only
+# office theme CLI added by the office UI theme upgrade).
+EXPECTED_VERB_COUNT = 84
 
 # The dialect of typed refusal that means "no dispatch branch reached this
 # verb" — i.e. the FOUR-SITE BUG (site 3 missing). It must NEVER appear for a
@@ -143,8 +144,8 @@ _READ_ONLY = {
     "org-facts", "orphans", "penalty", "pnl", "programme", "proposals",
     "receipts",
     "reconcile", "reports", "requests", "reviews", "roster", "runway",
-    "separation", "spot-audit", "task-trail", "tasks", "tick", "tower", "trace",
-    "tree", "turn-budgets", "unsettled",
+    "separation", "spot-audit", "task-trail", "tasks", "theme", "tick",
+    "tower", "trace", "tree", "turn-budgets", "unsettled",
 }
 
 # Read-only verbs that may return a TYPED 2 (not CONFIRM_REQUIRED, not

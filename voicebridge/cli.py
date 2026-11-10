@@ -1970,6 +1970,32 @@ def build_parser() -> argparse.ArgumentParser:
                        help="required: a rejection that says nothing teaches "
                             "the proposer nothing")
     of_pr.add_argument("--confirm", action="store_true")
+    # --- themes: recipes only; art is built locally from the purchase ------
+    of_theme = of_sub.add_parser(
+        "theme", parents=[common],
+        help="install/validate/list/share office themes (recipes only; the "
+             "paid atlases are built locally and never shared)")
+    of_theme_sub = of_theme.add_subparsers(dest="office_theme_command")
+    of_theme_sub.add_parser("list", parents=[common],
+                            help="installed/bundled themes, their kind, and "
+                                 "the active id")
+    of_theme_validate = of_theme_sub.add_parser(
+        "validate", parents=[common],
+        help="validate a recipe (dir/json/zip) or a full local pack")
+    of_theme_validate.add_argument("path")
+    of_theme_install = of_theme_sub.add_parser(
+        "install", parents=[common],
+        help="install a recipe or a locally built pack into "
+             "$QUBIT_HOME/office/themes/<id>")
+    of_theme_install.add_argument("path")
+    of_theme_install.add_argument(
+        "--force", action="store_true",
+        help="replace an installed theme (atomic; restored on failure)")
+    of_theme_export = of_theme_sub.add_parser(
+        "export", parents=[common],
+        help="export the recipe only (never art) as a re-installable zip")
+    of_theme_export.add_argument("id")
+    of_theme_export.add_argument("out")
     cu = add("computer-use", help="Desktop-control capability probes (control disabled)")
     cu_sub = cu.add_subparsers(dest="computer_use_command")
     cu_sub.add_parser("status", parents=[common],
@@ -7039,6 +7065,7 @@ def _cmd_office(cfg, args) -> int:
     from .office import work as W
     from .office import dispatch as DSP
     from .office import task_proposal as TP
+    from .office import theme_cli as THEMECLI
     from .office import room_layout as RL
     from .office.errors import CONFIRM_CODE as _CONFIRM_CODE
     from .office.errors import OfficeError
@@ -7607,6 +7634,10 @@ def _cmd_office(cfg, args) -> int:
                          "room_create. Seating agents into them is a separate "
                          "step (office seat-move)."),
             }
+        elif cmd == "theme":
+            # Recipe install/list/validate/export owns its own output and exit
+            # code (0 ok, 2 typed refusal); no office store is touched.
+            return THEMECLI.run(cfg, args)
         else:
             print(_json.dumps(
                 {"state": "REFUSED", "code": "OFFICE_UNSUPPORTED",
