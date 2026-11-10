@@ -12,6 +12,12 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# The upgrade manifest was purged in eafb54e26; read it read-only from
+# pre-purge history (AGENTS.md: a lost ledger is marked, never re-authored).
+ARCHIVE_DIR = "docs/archive/2026-09-21"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _purged_ledger import require_ledger  # noqa: E402
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -62,12 +68,17 @@ def test_family_static_proof():
 
 
 def test_manifest_dispositions_match_family():
-    rows = json.loads((REPO_ROOT / "docs" / "archive" / "2026-09-21"
-                       / "QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"
-                       ).read_text())["pinned_surface_disposition"]["methods"]
+    rows = json.loads(require_ledger(
+        f"{ARCHIVE_DIR}/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"))["pinned_surface_disposition"]["methods"]
+    # The ledger was frozen before the handler package was renamed
+    # ``openclaw_handlers`` -> ``qubit_handlers``, so its evidence field names the
+    # same module under the old directory. Accept either spelling: what this
+    # assertion proves is that the row points at THIS family's module, and the
+    # live generator (registry_sources) settles on the current name.
+    legacy = MODULE.replace("/qubit_handlers/", "/openclaw_handlers/")
     for m in IMPL:
         assert rows[m]["status"] == "IMPLEMENTED", rows[m]
-        assert rows[m]["evidence"] == MODULE, rows[m]
+        assert rows[m]["evidence"] in (MODULE, legacy), rows[m]
     for m, code in SAFE.items():
         assert rows[m]["status"] == "SAFE_EQUIVALENT", rows[m]
         assert rows[m]["code"] == code, rows[m]

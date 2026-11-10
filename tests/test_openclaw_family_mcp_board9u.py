@@ -13,6 +13,12 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+# The upgrade manifest was purged in eafb54e26; read it read-only from
+# pre-purge history (AGENTS.md: a lost ledger is marked, never re-authored).
+ARCHIVE_DIR = "docs/archive/2026-09-21"
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _purged_ledger import require_ledger  # noqa: E402
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
@@ -85,9 +91,8 @@ def test_board_family_static_proof():
 def test_manifest_dispositions_match_families():
     import json
 
-    rows = json.loads((REPO_ROOT / "docs" / "archive" / "2026-09-21"
-                       / "QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"
-                       ).read_text())["pinned_surface_disposition"]["methods"]
+    rows = json.loads(require_ledger(
+        f"{ARCHIVE_DIR}/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"))["pinned_surface_disposition"]["methods"]
     for m in MCP_IMPL + BOARD_IMPL:
         assert rows[m]["status"] == "IMPLEMENTED", rows[m]
     for m, c in {**MCP_SAFE, **BOARD_SAFE}.items():
