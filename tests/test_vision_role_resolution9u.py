@@ -1,11 +1,14 @@
 """The ``vision`` resolver role must resolve to a vision-capable model.
 
-Regression: ``resolver.resolve(cfg, role="vision")`` fell through to the shipped
-text-only chat default (``qubit-brain``) and reported
-``capabilities.vision == False``. The vision role now has its own resolution
-ladder (configured aux pin → registered vision profile → installed local VLM →
-shipped local VLM) and never reports a text-only model. Other roles are
-unchanged and resolution never raises.
+Regression: ``resolver.resolve(cfg, role="vision")`` fell through to a plain
+role default and reported ``capabilities.vision == False``. The vision role now
+has its own resolution ladder (configured aux pin → registered vision profile →
+installed local VLM → shipped local VLM) and never reports a text-only model.
+
+The shipped local model is now the single multimodal ``qubit-brain``
+(Qwen3.5-4B text+vision), so it IS the shipped VLM: the checks below pin that
+the vision role reports ``supports_vision=True`` and picks a VLM, not that it
+avoids the chat default id.
 """
 from __future__ import annotations
 
@@ -49,8 +52,10 @@ def test_vision_role_resolves_to_a_vision_capable_model():
     eff = R.resolve(None, role="vision")
     assert eff.capabilities["vision"] is True
     assert eff.kind == R.LOCAL
-    assert eff.model  # a real model id, not the text-only chat default
-    assert eff.model != R.DEFAULT_LOCAL_ID
+    assert eff.model  # a real model id
+    # The resolved model is one the ladder declares vision-capable, and it is the
+    # shipped local VLM when nothing else is configured or installed.
+    assert eff.model in R.VISION_LOCAL_CANDIDATES
     assert eff.provider == "ollama"
 
 
@@ -91,16 +96,19 @@ def test_registered_vision_profile_is_preferred(monkeypatch):
 
 
 def test_installed_local_vlm_is_selected(monkeypatch):
+    # A candidate the operator installed is preferred over the shipped fallback.
     monkeypatch.setattr(
-        R, "_vision_installed_local", lambda cfg: ("qwen3-vl:8b",))
+        R, "_vision_installed_local", lambda cfg: R.VISION_LOCAL_CANDIDATES)
     eff = R.resolve(None, role="vision")
-    assert eff.model == "qwen3-vl:8b"
+    assert eff.model == R.VISION_LOCAL_CANDIDATES[0]
     assert eff.capabilities["vision"] is True
 
 
 def test_other_roles_are_unchanged():
     chat = R.resolve(None, role="chat")
-    assert chat.capabilities["vision"] is False
+    # The chat role resolves through the plain ladder and does not gain the
+    # vision synthetic default (whatever the shipped model itself supports).
+    assert chat.profile_id != R.DEFAULT_VISION_ID
     embed = R.resolve(None, role="embedding")
     assert embed.profile_id == R.DEFAULT_EMBED_ID
     assert embed.model == R.DEFAULT_EMBED_MODEL
