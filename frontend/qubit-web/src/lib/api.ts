@@ -3074,6 +3074,11 @@ export interface McpServer {
   invocation_code?: string | null;
   /** Which store the row was read from (`qubit-registry`). */
   source?: string;
+  /** False when the row is inventory-only (an operator `config.yaml` server,
+   *  `source: "qubit-config"`). `set_enabled` only knows the registry store, so
+   *  a toggle on these rows is a control the API always refuses with
+   *  MCP_NOT_FOUND; the UI must not offer it. Absent/true = togglable. */
+  editable?: boolean;
   /** The mount policy attached to the row (Qubit never auto-mounts). */
   policy?: string;
 }

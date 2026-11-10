@@ -743,6 +743,12 @@ def _list_servers_uncached(cfg: Any) -> Dict[str, Any]:
             continue
         row = _public(rec, connected=name in discovered)
         row["source"] = "qubit-config"
+        # Operator-declared servers are INVENTORY-ONLY (see config_server_records:
+        # "PRB-01: read-only; never written, never a second authority"). set_enabled
+        # only knows the registry store, so a toggle rendered for these rows is a
+        # control that always 404s MCP_NOT_FOUND. Say so on the row instead of
+        # letting the UI offer a write the endpoint will refuse.
+        row["editable"] = False
         rows.append(row)
         seen.add(name)
     # Merge cached runtime state (parked/failed/connecting/lazy) without ever

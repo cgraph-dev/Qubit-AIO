@@ -1100,10 +1100,14 @@ export default function McpPage() {
                   <Button
                     ghost
                     size="sm"
-                    title={server.enabled ? "Disable" : "Enable"}
+                    title={
+                      server.editable === false
+                        ? `${server.name} is declared in config.yaml and is inventory-only here; change it with the CLI`
+                        : server.enabled ? "Disable" : "Enable"
+                    }
                     aria-label={server.enabled ? "Disable" : "Enable"}
                     onClick={() => handleToggleEnabled(server)}
-                    disabled={togglingName === server.name}
+                    disabled={togglingName === server.name || server.editable === false}
                     prefix={
                       togglingName === server.name ? <Spinner /> : <Power />
                     }
