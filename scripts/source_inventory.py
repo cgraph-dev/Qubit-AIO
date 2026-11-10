@@ -260,6 +260,12 @@ _FORK_BACKEND_BY_CATEGORY = {
     "hermes_skill": "qubit_runtime.skills",
     "hermes_plugin": "voicebridge.qubit_plugins.plugin_fleet_audit",
 }
+#: Upstream plugin name -> the name it is vendored under after the rebrand.
+#: Mirrors ``voicebridge.qubit_plugins._LEGACY_PLUGIN_ALIASES``; kept local so
+#: this generator never imports the live voicebridge package.
+_PLUGIN_RENAMES = {
+    "hermes-achievements": "qubit-achievements",
+}
 
 
 def _fork_tool_names(repo: Path) -> set[str]:
@@ -348,7 +354,10 @@ def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
         }
 
     # hermes_plugin
-    if name in fork_plugins:
+    # An upstream plugin renamed under the rebrand is vendored under its Qubit
+    # name (``hermes-achievements`` -> ``qubit-achievements``), so match the
+    # disposition against both the upstream name and its canonical local name.
+    if name in fork_plugins or _PLUGIN_RENAMES.get(name) in fork_plugins:
         return {
             "status": "IMPLEMENTED", "capability": capability,
             "backend": backend, "proving_test": _FORK_PLUGIN_TEST,
@@ -1013,6 +1022,113 @@ def extract_qubit_plugins(repo: Path) -> list[dict]:
 # upstream tools / skills / models / providers / workflows
 # ---------------------------------------------------------------------------
 
+def _table_loop_registered_names(tree: ast.AST) -> set[str]:
+    """Tool names registered through a loop over a module-level table.
+
+    Upstream declares tools in tables and registers them in a loop, so the
+    ``register`` call carries no string literal and a literal-only scan misses
+    them.  Three shapes are handled:
+
+    * ``for _name, ... in _BROWSER_TOOL_TABLE:`` ->
+      ``registry.register(name=_name, ...)`` — the name is the first row element;
+    * ``for _schema, _handler in (...):`` -> ``registry.register(name=_schema["name"])``
+      — the name is the ``"name"`` key of the row's schema dict;
+    * ``for name, schema, handler, emoji in _TOOLS:`` ->
+      ``ctx.register_tool(name=name, ...)`` in a bundled plugin module.
+
+    Every shape requires the registering call to actually exist in the loop
+    body, so an unrelated table that happens to be iterated cannot invent
+    tool names.
+    """
+    tables: dict[str, ast.AST] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                if isinstance(target, ast.Name):
+                    tables[target.id] = node.value
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if node.value is not None:
+                tables[node.target.id] = node.value
+
+    # Module-level tool schema dict literals, by variable name -> "name" value.
+    schemas: dict[str, str] = {}
+    for var, value in tables.items():
+        if not isinstance(value, ast.Dict):
+            continue
+        for key, val in zip(value.keys, value.values):
+            if key is None or _str_const(key) != "name":
+                continue
+            found = _str_const(val)
+            if found and re.fullmatch(r"[a-z][a-z0-9_]*", found):
+                schemas[var] = found
+
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.For):
+            continue
+        target, iterable = node.target, node.iter
+        if not isinstance(target, ast.Tuple) or not target.elts:
+            continue
+        loop_var = target.elts[0]
+        if not isinstance(loop_var, ast.Name):
+            continue
+        body = ast.Module(body=list(node.body), type_ignores=[])
+        if not _registered_by_keyword(body, loop_var.id):
+            continue
+        if isinstance(iterable, (ast.Tuple, ast.List)):
+            rows = iterable.elts
+        elif isinstance(iterable, ast.Name):
+            table = tables.get(iterable.id)
+            rows = table.elts if isinstance(table, (ast.Tuple, ast.List)) else []
+        else:
+            rows = []
+        for row in rows:
+            if isinstance(row, ast.Tuple) and row.elts:
+                first = _str_const(row.elts[0])
+                if first and re.fullmatch(r"[a-z][a-z0-9_]*", first):
+                    names.add(first)
+                else:
+                    # ``(SCHEMA_A, handler), (SCHEMA_B, handler)`` rows whose
+                    # schema is a module-level dict literal carrying "name".
+                    for elt in row.elts:
+                        if isinstance(elt, ast.Name) and elt.id in schemas:
+                            names.add(schemas[elt.id])
+            elif isinstance(row, ast.Dict):
+                for key, val in zip(row.keys, row.values):
+                    if key is None or _str_const(key) != "name":
+                        continue
+                    found = _str_const(val)
+                    if found and re.fullmatch(r"[a-z][a-z0-9_]*", found):
+                        names.add(found)
+    return names
+
+
+def _registered_by_keyword(body: ast.AST, var: str) -> bool:
+    """True when ``body`` calls ``*.register*(name=<var>)`` for the loop var.
+
+    The name may be the loop variable itself (``name=_name``) or a field of it
+    (``name=_schema["name"]``).
+    """
+    for node in ast.walk(body):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        if not (isinstance(func, ast.Attribute)
+                and func.attr in ("register", "register_tool")):
+            continue
+        for kw in node.keywords:
+            if kw.arg != "name":
+                continue
+            value = kw.value
+            if isinstance(value, ast.Name) and value.id == var:
+                return True
+            if isinstance(value, ast.Subscript) \
+                    and isinstance(value.value, ast.Name) \
+                    and value.value.id == var:
+                return True
+    return False
+
+
 def extract_qubit_tools(repo: Path) -> list[dict]:
     items: list[dict] = []
     seen: set[str] = set()
@@ -1031,11 +1147,18 @@ def extract_qubit_tools(repo: Path) -> list[dict]:
         except SyntaxError:
             pass
     reg_re = re.compile(r"registry\.register\(\s*(?:name\s*=\s*)?[\"']([a-z][a-z0-9_]+)[\"']")
-    for path in sorted(repo.glob("tools/*.py")):
-        for m in reg_re.finditer(_read_text(path)):
-            names.add(m.group(1))
-
     tdir = repo / "tools"
+    # Bundled plugin modules register their tools through ``ctx.register_tool``
+    # inside the plugin package, not in ``tools/*.py``.
+    sources = [(p, _read_text(p)) for p in sorted(repo.glob("tools/*.py"))]
+    sources += [(p, _read_text(p)) for p in sorted(repo.glob("plugins/*/__init__.py"))]
+    for path, src in sources:
+        for m in reg_re.finditer(src):
+            names.add(m.group(1))
+        try:
+            names |= _table_loop_registered_names(_parse(src))
+        except SyntaxError:
+            pass
     for name in sorted(names):
         item_id = f"tool:{name}"
         if item_id in seen:

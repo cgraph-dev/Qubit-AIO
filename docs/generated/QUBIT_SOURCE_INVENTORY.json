@@ -103957,12 +103957,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_plugin_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "plugin 'hermes-achievements' is not present in the vendored fork plugin fleet; no Qubit wrapper.",
-    "needs": "owner"
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "vendored under qubit_runtime/plugins/ and wrapped by voicebridge.qubit_plugins.VENDORED_PLUGIN_FLEET / plugin_fleet_audit; loadable in the fork plugin runtime.",
+    "needs": "none"
    }
   },
   {
@@ -105816,12 +105816,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_back' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_back'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -105862,12 +105862,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_click' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_click'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -105885,12 +105885,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_console' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_console'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -105954,12 +105954,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_get_images' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_get_images'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -105977,12 +105977,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_navigate' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_navigate'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106000,12 +106000,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_press' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_press'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106023,12 +106023,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_scroll' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_scroll'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106046,12 +106046,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_snapshot' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_snapshot'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106069,12 +106069,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_type' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_type'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106207,12 +106207,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'browser_vision' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'browser_vision'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106667,12 +106667,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'ha_call_service' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'ha_call_service'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106690,12 +106690,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'ha_get_state' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'ha_get_state'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106713,12 +106713,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'ha_list_entities' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'ha_list_entities'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -106736,12 +106736,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'ha_list_services' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'ha_list_services'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -107472,12 +107472,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'spotify_albums' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'spotify_albums'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -107495,12 +107495,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'spotify_devices' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'spotify_devices'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -107518,12 +107518,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'spotify_library' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'spotify_library'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -107541,12 +107541,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'spotify_playback' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'spotify_playback'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -107564,12 +107564,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'spotify_playlists' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'spotify_playlists'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -107587,12 +107587,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'spotify_queue' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'spotify_queue'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
@@ -107610,12 +107610,12 @@
    "parent_status": null,
    "parent_covered": false,
    "fork_disposition": {
-    "status": "GATED",
+    "status": "IMPLEMENTED",
     "capability": "fork_tool_runtime",
-    "backend": "",
-    "proving_test": "",
-    "reason": "tool 'spotify_search' is not declared by the vendored fork tool/toolset source; no Qubit caller.",
-    "needs": "owner"
+    "backend": "qubit_runtime.tools.registry:registry",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools",
+    "reason": "vendored fork tool/toolset registry exposes 'spotify_search'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.",
+    "needs": "none"
    }
   },
   {
