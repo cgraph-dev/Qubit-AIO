@@ -32,7 +32,6 @@ ROOT = Path(__file__).resolve().parents[2]
 WORKFLOWS = ROOT / ".github" / "workflows"
 
 LEGACY_WORKFLOWS = {
-    "qubit-ci.yml",
     "windows-ci.yml",
     "windows-install-update-e2e.yml",
 }
