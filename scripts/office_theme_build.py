@@ -320,7 +320,18 @@ def _compose_body(recipe: Mapping[str, int], layers: Mapping[str, List[Sheet]],
     frame_w, frame_h = size, size * 2
     canvas = Image.new("RGBA", (frame_w, frame_h), (0, 0, 0, 0))
 
-    base = _sheet_image(layers["body"][BODY_VARIANT], "body")
+    # The portrait's skin index selects the matching body tone. The bodies and
+    # skins are separate lists (Character Bodies vs Portrait Skins), so clamp
+    # into the body list; an absent/invalid skin index keeps the historical
+    # first-body fallback.
+    skin_index = recipe.get("skin")
+    body_list = layers["body"]
+    if isinstance(skin_index, int) and not isinstance(skin_index, bool) \
+            and skin_index >= 0:
+        body_index = min(skin_index, len(body_list) - 1)
+    else:
+        body_index = BODY_VARIANT
+    base = _sheet_image(body_list[body_index], "body")
     canvas.alpha_composite(_crop_frame(
         base, row=0, col=0, width=frame_w, height=frame_h,
         part="body", empty_ok=False))
@@ -837,9 +848,46 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     return manifest
 
 
+_IMAGE_SUFFIXES = frozenset({".png", ".webp", ".gif", ".jpg", ".jpeg"})
+
+
+def _same_payload(relative: str, left: bytes, right: bytes) -> bool:
+    """Compare a pack file semantically: decoded pixels, or sorted JSON.
+
+    Raw PNG/WebP bytes are not a reproducibility contract — a re-encode or a
+    different compression level changes them without changing the pack. JSON
+    object key order and indentation are likewise presentation. Everything
+    else still compares byte-for-byte.
+    """
+    if relative.endswith(".json"):
+        try:
+            return json.loads(left) == json.loads(right)
+        except (ValueError, TypeError):
+            return left == right
+    suffix = Path(relative).suffix.lower()
+    if suffix in _IMAGE_SUFFIXES:
+        decoded: List[Image.Image] = []
+        try:
+            for data in (left, right):
+                image = Image.open(io.BytesIO(data))
+                image.load()
+                decoded.append(image.convert("RGBA"))
+        except Exception:  # noqa: BLE001 - fall back to exact bytes
+            return left == right
+        return (decoded[0].size == decoded[1].size
+                and decoded[0].tobytes() == decoded[1].tobytes())
+    return left == right
+
+
 def compare_packs(reference: os.PathLike | str,
                   rebuilt: os.PathLike | str) -> List[str]:
-    """Every difference between two built packs (empty = identical)."""
+    """Every difference between two built packs (empty = identical).
+
+    Comparison is semantic: image files are decoded and compared by pixels
+    (not container bytes), and JSON files by parsed value (not key order or
+    indentation). This is what ``--check`` promises — a rebuild from the same
+    source reproduces the same *pack*, whatever encoder/formatting wrote it.
+    """
     reference = Path(reference)
     rebuilt = Path(rebuilt)
     problems: List[str] = []
@@ -859,7 +907,7 @@ def compare_packs(reference: os.PathLike | str,
     for relative in sorted(set(right) - set(left)):
         problems.append(f"extra: {relative}")
     for relative in sorted(set(left) & set(right)):
-        if left[relative] != right[relative]:
+        if not _same_payload(relative, left[relative], right[relative]):
             problems.append(f"changed: {relative}")
     return problems
 
@@ -868,11 +916,11 @@ def compare_packs(reference: os.PathLike | str,
 # CLI
 # ---------------------------------------------------------------------------
 def extract_layers(source: str, *, size: int = 32) -> Dict[str, List[Sheet]]:
-    """Task 3 seam: turn the purchased art at ``source`` into part sheets.
+    """Turn the purchased art at ``source`` into in-memory part sheets.
 
-    Task 2 ships the builder; the real extraction lives in
-    ``scripts/office_theme_extract.py`` (Task 3). Until it exists this raises a
-    typed error instead of inventing a fake extraction.
+    The extraction lives in ``scripts/office_theme_extract.py`` (Task 3) and
+    reads the owner's zips in memory. A missing extractor is still a typed
+    error rather than an invented extraction.
     """
     try:
         import office_theme_extract as extractor  # type: ignore

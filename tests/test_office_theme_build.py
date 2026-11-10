@@ -19,7 +19,8 @@ safe to build and reproducible:
   * the manifest declares sha256 + bytes for every file, and the real
     ``validate_theme``/``validate_recipe`` accept the built pack;
   * the ``agent_sheets.json`` calibration is recorded and validated;
-  * the CLI refuses without Task 3's extractor, and builds/checks with it.
+  * the CLI refuses a missing purchase source, and builds/checks with an
+    injected extraction.
 
 Hermetic: temporary directories only, no network, no live service. The
 synthetic layer sheets are generated in memory; no paid art is read or written.
@@ -457,12 +458,12 @@ def test_default_layout_is_twenty_columns_for_the_roster(tmp_path):
 
 
 # ------------------------------------------------------------------- CLI
-def test_cli_without_the_task3_extractor_is_a_typed_error(tmp_path, capsys):
+def test_cli_with_a_missing_source_is_a_typed_error(tmp_path, capsys):
     code = B.main(["--source", str(tmp_path / "purchase"),
                    "--out", str(tmp_path / "demo")])
     captured = capsys.readouterr()
     assert code == 2
-    assert "Task 3" in captured.err
+    assert "purchase" in captured.err
     assert not (tmp_path / "demo").exists()
 
 
