@@ -9446,13 +9446,20 @@ def _put_voice_edit_flag_via_service(cfg, key, visible,
     except _WaveformServiceRefused:
         raise
     except urllib.error.HTTPError as exc:
+        from .http_cleanup import close_http_error
+
         detail = ""
         try:
-            raw = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
+            with exc:
+                raw = exc.read().decode("utf-8", "replace") if hasattr(exc, "read") else ""
             parsed = json.loads(raw) if raw.strip() else {}
             detail = str(parsed.get("detail") or parsed.get("code") or "")[:160]
         except Exception:
             detail = ""
+        finally:
+            # The error owns its body; without this the handle survives to the
+            # GC and is reported on an unrelated test (ResourceWarning).
+            close_http_error(exc)
         raise _WaveformServiceRefused(int(getattr(exc, "code", 0) or 0), detail)
     except Exception:
         return "unreachable"
