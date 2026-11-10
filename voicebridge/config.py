@@ -419,6 +419,13 @@ DEFAULTS: Dict[str, Any] = {
             "auto_gain_control": True,
         },
     },
+    # Voice typing / selected-text editing via the authenticated desktop
+    # helper (docs: config/voice.example.yaml). Disabled by default; the
+    # registry counterpart is FeatureFlag("voice_edit") in feature_flags.py,
+    # which must agree with ``voice_edit.enabled`` below.
+    "voice_edit": {
+        "enabled": False,
+    },
     "audio": {
         "output_device": "",        # portaudio device index for TTS (pin to headphones); "" = system default
         "output_device_name": "",   # more robust: match by name substring (e.g. "ALC892 Analog")
