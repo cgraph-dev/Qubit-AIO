@@ -3984,71 +3984,81 @@ def _b_experiments(ctx, args):
     """Packet 8P experiment store (same store the CLI uses)."""
     from .experiments.store import experiments_store
 
-    store = experiments_store(ctx.cfg)
-    action = args.get("action", "status")
-    if action == "status":
-        out = store.journal_verify()
-        out["experiments"] = len(store.experiments())
-        return out
-    if action == "candidates":
-        return {"candidates": [c.to_dict() for c in store.candidates()]}
-    if action == "list":
-        return {"experiments": [e.to_dict() for e in store.experiments()]}
-    if action == "show":
-        exp = store.experiment(str(args.get("experiment_id", "")))
-        return {"experiment": exp.to_dict(),
-                "evaluate": store.evaluate(str(args.get("experiment_id", "")))}
-    if action == "evaluate":
-        return store.evaluate(str(args.get("experiment_id", "")))
-    if action == "evaluate":
-        return store.evaluate(str(args.get("experiment_id", "")))
-    if action == "register_candidate":
-        cand = store.register_candidate(role=str(args.get("role", "")),
-                                        label=str(args.get("label", "")),
-                                        model=str(args.get("model", "")),
-                                        description=str(args.get("description", "")))
-        return {"id": cand.id, "fingerprint": cand.fingerprint}
-    if action == "start":
-        exp = store.start_experiment(
-            champion_config_id=str(args.get("champion", "")),
-            challenger_config_id=str(args.get("challenger", "")))
-        return {"id": exp.id, "status": exp.status}
-    if action == "trial":
-        tri = store.start_trial(str(args.get("experiment_id", "")),
-                                variant=str(args.get("variant", "")))
-        return {"id": tri.id, "variant": tri.variant}
-    if action == "finish_trial":
-        tri = store.finish_trial(str(args.get("trial_id", "")),
-                                 outcome=str(args.get("outcome", "")),
-                                 note=str(args.get("note", "") or ""))
-        return {"id": tri.id, "outcome": tri.outcome}
-    if action == "signal":
-        import re as _re
-        raw = str(args.get("value", "") or "")
-        num = _re.search(r"[0-9]*\.?[0-9]+", raw)
-        if not num:
-            raise ValueError("signal value must be a number in [0,1]")
-        value = float(num.group(0))
-        sig = store.record_signal(str(args.get("trial_id", "")),
-                                  kind=str(args.get("kind", "")),
-                                  source="voice",
-                                  value=value)
-        return {"id": sig.id, "kind": sig.kind, "value": sig.value}
-    if action == "abort":
-        # Canonical human principal (voice audit carries the channel);
-        # the store refuses anything but "user".
-        return store.abort(str(args.get("experiment_id", "")),
-                           requested_by="user")
-    if action == "snapshot":
-        return store.snapshot()
-    if action == "promote":
-        # Canonical human principal; without a spoken gate note the store
-        # honestly returns hold (never auto-promote without a gate report).
-        return store.record_promotion(str(args.get("experiment_id", "")),
-                                      owner_approved=True,
-                                      gate_report=str(args.get("gate_note", "") or ""),
-                                      requested_by="user")
-    raise ValueError(f"unknown experiments action {action!r}")
+    store = None
+    try:
+        store = experiments_store(ctx.cfg)
+        action = args.get("action", "status")
+        if action == "status":
+            out = store.journal_verify()
+            out["experiments"] = len(store.experiments())
+            return out
+        if action == "candidates":
+            return {"candidates": [c.to_dict() for c in store.candidates()]}
+        if action == "list":
+            return {"experiments": [e.to_dict() for e in store.experiments()]}
+        if action == "show":
+            exp = store.experiment(str(args.get("experiment_id", "")))
+            return {"experiment": exp.to_dict(),
+                    "evaluate": store.evaluate(str(args.get("experiment_id", "")))}
+        if action == "evaluate":
+            return store.evaluate(str(args.get("experiment_id", "")))
+        if action == "evaluate":
+            return store.evaluate(str(args.get("experiment_id", "")))
+        if action == "register_candidate":
+            cand = store.register_candidate(role=str(args.get("role", "")),
+                                            label=str(args.get("label", "")),
+                                            model=str(args.get("model", "")),
+                                            description=str(args.get("description", "")))
+            return {"id": cand.id, "fingerprint": cand.fingerprint}
+        if action == "start":
+            exp = store.start_experiment(
+                champion_config_id=str(args.get("champion", "")),
+                challenger_config_id=str(args.get("challenger", "")))
+            return {"id": exp.id, "status": exp.status}
+        if action == "trial":
+            tri = store.start_trial(str(args.get("experiment_id", "")),
+                                    variant=str(args.get("variant", "")))
+            return {"id": tri.id, "variant": tri.variant}
+        if action == "finish_trial":
+            tri = store.finish_trial(str(args.get("trial_id", "")),
+                                     outcome=str(args.get("outcome", "")),
+                                     note=str(args.get("note", "") or ""))
+            return {"id": tri.id, "outcome": tri.outcome}
+        if action == "signal":
+            import re as _re
+            raw = str(args.get("value", "") or "")
+            num = _re.search(r"[0-9]*\.?[0-9]+", raw)
+            if not num:
+                raise ValueError("signal value must be a number in [0,1]")
+            value = float(num.group(0))
+            sig = store.record_signal(str(args.get("trial_id", "")),
+                                      kind=str(args.get("kind", "")),
+                                      source="voice",
+                                      value=value)
+            return {"id": sig.id, "kind": sig.kind, "value": sig.value}
+        if action == "abort":
+            # Canonical human principal (voice audit carries the channel);
+            # the store refuses anything but "user".
+            return store.abort(str(args.get("experiment_id", "")),
+                               requested_by="user")
+        if action == "snapshot":
+            return store.snapshot()
+        if action == "promote":
+            # Canonical human principal; without a spoken gate note the store
+            # honestly returns hold (never auto-promote without a gate report).
+            return store.record_promotion(str(args.get("experiment_id", "")),
+                                          owner_approved=True,
+                                          gate_report=str(args.get("gate_note", "") or ""),
+                                          requested_by="user")
+        raise ValueError(f"unknown experiments action {action!r}")
+    finally:
+        # The CLI closes its store; this dashboard/voice path opened one per
+        # call and leaked the sqlite connection until GC.
+        if store is not None:
+            try:
+                store.close()
+            except Exception:
+                pass
 
 
 def _b_product(ctx, args):
