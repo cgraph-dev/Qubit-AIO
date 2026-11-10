@@ -49,7 +49,13 @@ def test_goals_set_with_milestones_roundtrip(tmp_path, monkeypatch):
                             {"confirm": True, "title": "g-ms",
                              "milestones": ["m1", "m2"]})
     assert code == 200, out
-    assert out["goal"]["milestones"] == ["m1", "m2"], out
+    # goals-set ACCEPTS string[] but goals-list serves the pinned upstream
+    # ``Goal`` shape, where each milestone is an object (family_bot_harness.
+    # _normalize_goal upgrades the bare strings in place). The titles are what
+    # must survive the round trip.
+    ms = out["goal"]["milestones"]
+    assert [m["title"] for m in ms] == ["m1", "m2"], out
+    assert all(m["done"] is False and m["id"] for m in ms), out
     code, listed = HC.dispatch(cfg, "GET", "/api/qubit/bot/goals-list",
                                {}, None)
     assert code == 200, listed
