@@ -168,3 +168,11 @@ graphify-out.*/
 .bunshin/
 
 /.venv
+
+# Test-run byproducts that land in the repo root.
+# `owned/` is a runtime home a test created via a relative QUBIT_HOME (sessions/,
+# logs/, memories/, audio_cache/, SOUL.md) -- local state, never source.
+# `test_durations.json` is the parallel runner's timing cache (580 KB), rewritten
+# every run.
+/owned/
+/test_durations.json
