@@ -380,6 +380,17 @@ def test_generator_refuses_a_fabricated_ported_row(pl, monkeypatch):
     """The generator must exit non-zero rather than emit the fabricated row."""
     calls = {"n": 0}
 
+    # Every other path keeps real existence semantics; only the clone markers
+    # the generator gates on are answered present, so the run reaches the
+    # build_rows()/verification seam this test targets.
+    real_exists = pl.Path.exists
+    clone_markers = {str(pl.DEFAULT_SCRATCH / n / ".git") for n in CLONES.values()}
+
+    def _clones_present(self):
+        if str(self) in clone_markers:
+            return True
+        return real_exists(self)
+
     def fake_build(surface, clone, pin, inv, warnings):
         calls["n"] += 1
         return [pl.Row("backend/api/health.py", surface.name, "backend", "ported",
@@ -390,6 +401,10 @@ def test_generator_refuses_a_fabricated_ported_row(pl, monkeypatch):
     monkeypatch.setattr(pl, "repo_ls_tree", lambda clone, pin: ["backend/api/health.py"])
     monkeypatch.setattr(pl, "repo_ls_files_count", lambda clone: 1)
     monkeypatch.setattr(pl, "repo_pin", lambda clone: "0" * 40)
+    # The refusal is the unit under test: it fires on the rows/verification
+    # seam, not on a local upstream clone. The clone-existence gate would
+    # SystemExit before build_rows() is ever reached in a network-free host.
+    monkeypatch.setattr(pl.Path, "exists", _clones_present)
     rc = pl.main(["--scratch", str(pl.DEFAULT_SCRATCH), "--check"])
     assert rc == 1, "a fabricated 'ported' row must make the generator fail"
 
