@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "Scherp op elk formaat",
   "ui.staff": "Staf",
   "ui.the.caduceus": "De caduceus",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "Het logo van de extensie",
   "ui.replace.text.automatically": "Tekst automatisch vervangen",
   "ui.undo.is.always.one.click.away": "Ongedaan maken is altijd één klik verwijderd",

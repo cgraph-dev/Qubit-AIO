@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "Rõ nét ở mọi kích thước",
   "ui.staff": "Cây gậy",
   "ui.the.caduceus": "Gậy caduceus",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "Logo của tiện ích",
   "ui.replace.text.automatically": "Tự động thay thế văn bản",
   "ui.undo.is.always.one.click.away": "Luôn hoàn tác được chỉ với một cú nhấp",

@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "Wyraźna w każdym rozmiarze",
   "ui.staff": "Laska",
   "ui.the.caduceus": "Kaduceusz",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "Logo rozszerzenia",
   "ui.replace.text.automatically": "Automatycznie zastępuj tekst",
   "ui.undo.is.always.one.click.away": "Cofnięcie jest zawsze o jedno kliknięcie",

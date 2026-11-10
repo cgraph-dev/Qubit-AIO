@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "Nítida en cualquier tamaño",
   "ui.staff": "Bastón",
   "ui.the.caduceus": "El caduceo",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "El logotipo de la extensión",
   "ui.replace.text.automatically": "Reemplazar el texto automáticamente",
   "ui.undo.is.always.one.click.away": "Deshacer siempre está a un clic",

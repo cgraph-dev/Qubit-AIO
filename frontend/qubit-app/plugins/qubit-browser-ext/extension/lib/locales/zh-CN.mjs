@@ -957,7 +957,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "任何尺寸都清晰",
   "ui.staff": "权杖",
   "ui.the.caduceus": "双蛇杖",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "扩展程序标志",
   "ui.replace.text.automatically": "自动替换文本",
   "ui.undo.is.always.one.click.away": "随时一键撤销",

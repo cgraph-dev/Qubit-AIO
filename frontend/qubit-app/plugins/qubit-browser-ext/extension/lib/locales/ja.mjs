@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "どのサイズでもくっきり",
   "ui.staff": "杖",
   "ui.the.caduceus": "カドゥケウス",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "拡張機能のロゴ",
   "ui.replace.text.automatically": "テキストを自動で置き換える",
   "ui.undo.is.always.one.click.away": "いつでもワンクリックで元に戻せます",

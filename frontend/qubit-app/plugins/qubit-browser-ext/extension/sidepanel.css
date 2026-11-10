@@ -550,29 +550,28 @@ button { text-transform: uppercase; letter-spacing: 0.14em; }
   -webkit-mask: url("assets/img/qubit-wing-mark.svg") left center / contain no-repeat;
   mask: url("assets/img/qubit-wing-mark.svg") left center / contain no-repeat;
 }
-/* The Nous three-card mark (orb and hand, NOUS badge, Qubit wing) from
-   qubit-agent.nousresearch.com, white on transparent. Masked over the theme's
-   brand colour like the wing above, so it follows light and dark. Quiet,
-   centred, at the foot of a view. */
-.nous-strip {
+/* The Qubit app mark, white on transparent. Masked over the theme's brand
+   colour like the wing above, so it follows light and dark. Quiet, centred,
+   at the foot of a view. */
+.qubit-strip {
   display: block;
   height: 52px;
   aspect-ratio: 197 / 78;
   margin: 18px auto 6px;
   background: var(--qubit-brand-mark, var(--qubit-fg));
-  -webkit-mask: url("assets/img/nous-boxes.png") center / contain no-repeat;
-  mask: url("assets/img/nous-boxes.png") center / contain no-repeat;
+  -webkit-mask: url("assets/img/qubit-badge.webp") center / contain no-repeat;
+  mask: url("assets/img/qubit-badge.webp") center / contain no-repeat;
 }
 /* The middle card has two outlines: the dark-mode art suits dark surfaces and
    this one suits light surfaces. */
-html[data-qubit-mode="light"] .nous-strip {
-  -webkit-mask-image: url("assets/img/nous-boxes-light.png");
-  mask-image: url("assets/img/nous-boxes-light.png");
+html[data-qubit-mode="light"] .qubit-strip {
+  -webkit-mask-image: url("assets/img/qubit-badge.webp");
+  mask-image: url("assets/img/qubit-badge.webp");
 }
 /* About & Diagnostics is short, so its strip rides the foot of the screen
    rather than sitting under the last card. */
 #settingsPane-about { min-height: calc(100dvh - 140px); grid-template-rows: auto auto auto 1fr; padding-bottom: 16px; }
-.nous-strip-pane { align-self: end; margin: 18px auto 0; }
+.qubit-strip-pane { align-self: end; margin: 18px auto 0; }
 #currentSessionName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .app-scroll {

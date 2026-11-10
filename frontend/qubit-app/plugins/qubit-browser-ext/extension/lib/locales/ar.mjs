@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "واضحة بأي حجم",
   "ui.staff": "العصا",
   "ui.the.caduceus": "عصا الكادوسيوس",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "شعار الإضافة",
   "ui.replace.text.automatically": "استبدال النص تلقائيًا",
   "ui.undo.is.always.one.click.away": "التراجع دائمًا بنقرة واحدة",

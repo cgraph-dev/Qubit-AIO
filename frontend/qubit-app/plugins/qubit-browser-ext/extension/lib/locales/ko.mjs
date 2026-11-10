@@ -968,7 +968,7 @@ export default Object.freeze({
   "ui.clean.at.any.size": "어떤 크기에서도 선명함",
   "ui.staff": "지팡이",
   "ui.the.caduceus": "카두세우스",
-  "ui.nous.girl": "Nous girl",
+  "ui.nous.girl": "Qubit assistant",
   "ui.the.extension.logo": "확장 프로그램 로고",
   "ui.replace.text.automatically": "텍스트 자동으로 바꾸기",
   "ui.undo.is.always.one.click.away": "실행 취소는 언제나 한 번의 클릭",
