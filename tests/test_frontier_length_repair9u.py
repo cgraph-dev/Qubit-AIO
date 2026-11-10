@@ -172,19 +172,25 @@ def test_session_model_is_pinned_across_options_info_and_route(tmp_path,
     sid = AG.canonical_session_id(cfg)
     assert CT.store(cfg).ensure(sid, model="deepseek-v4.1-flash")["state"] == "OK"
 
+    # The session pin governs ROUTING (what a turn actually uses).
     routed = CT.resolve_route(cfg, None, session=sid)
     assert routed["ok"] is True, routed
     assert routed["model"] == "deepseek-v4.1-flash", routed
     assert routed["provider"] == "opencode-go"
 
+    # The model surfaces deliberately report the RESOLVED DEFAULT, not the
+    # session pin (60e41272e: letting a stored session model override them
+    # pinned every MODEL card to a dead default and switches never showed).
+    # The pin above is what a turn runs; these cards answer "what is my
+    # configured default, and what can it do".
     code, info = HC.h_model_info(cfg, {}, {}, {})
-    assert code == 200 and info["model"] == "deepseek-v4.1-flash", info
+    assert code == 200 and info["model"] == "deepseek-v4-flash", info
     assert info["provider"] == "opencode-go"
 
     code, options = HC.h_model_options(cfg, {"include_unconfigured": "true"},
                                        {}, {})
     assert code == 200, options
-    assert options["model"] == "deepseek-v4.1-flash", options.get("model")
+    assert options["model"] == "deepseek-v4-flash", options.get("model")
     assert options["provider"] == "opencode-go"
 
 

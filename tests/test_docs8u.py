@@ -54,7 +54,10 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("Content-Type", ""), e.read()
+        try:
+            return e.code, e.headers.get("Content-Type", ""), e.read()
+        finally:
+            e.close()
 
 
 def test_docs_page_served_with_shell(tmp_path):
@@ -64,11 +67,14 @@ def test_docs_page_served_with_shell(tmp_path):
         import http.client
         for route in ("/docs", "/docs.html"):
             conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-            conn.request("GET", route)
-            resp = conn.getresponse()
-            body = resp.read()
-            assert resp.status == 200, (route, resp.status)
-            assert b'id="root"' in body, route
+            try:
+                conn.request("GET", route)
+                resp = conn.getresponse()
+                body = resp.read()
+                assert resp.status == 200, (route, resp.status)
+                assert b'id="root"' in body, route
+            finally:
+                conn.close()
         # The labelled /classic/ fallback still serves the static docs page.
         status, ctype, body = _http(port, "GET", "/classic/docs")
         assert status == 200, status
@@ -90,6 +96,24 @@ def test_docs_api_index_and_fetch(tmp_path):
         assert index["docs"], index
         ids = [d["id"] for d in index["docs"]]
         assert ids == ["howto", "audio", "system", "migration"], ids
+        # The user-guide markdown lived under docs/archive/2026-09-21/ and was
+        # purged in eafb54e26; it is not restorable as a path (AGENTS.md). The
+        # API therefore reports the honest state instead of serving content it
+        # does not have: the index says UNAVAILABLE and each fetch is a typed
+        # 503, never a fabricated body.
+        import _purged_ledger as PL
+
+        shipped = all(
+            PL.was_purged(f"docs/archive/2026-09-21/{name}")
+            for name in ("HowTo.md", "AUDIO_SETUP.md",
+                         "VOICE_BRIDGE_SYSTEM.md", "QUBIT_MIGRATION.md"))
+        if shipped:
+            assert index["state"] == "UNAVAILABLE", index
+            for doc_id in ids:
+                status, _, body = _http(port, "GET", f"/api/docs/{doc_id}")
+                assert status == 503, (doc_id, status)
+                assert b"markdown" not in body, doc_id
+            return
         for doc_id in ids:
             status, ctype, body = _http(port, "GET", f"/api/docs/{doc_id}")
             assert status == 200, doc_id
@@ -126,8 +150,15 @@ def test_docs_api_requires_header_token(tmp_path):
 def test_user_docs_allowlist_matches_shipped_files():
     from voicebridge import webui as W
 
+    from _purged_ledger import require_ledger
+
     assert [d[0] for d in W.USER_DOCS] == ["howto", "audio", "system",
                                           "migration"]
     for _, _, filename in W.USER_DOCS:
-        assert (REPO_ROOT / "docs" / "archive" / "2026-09-21"
-                / filename).is_file(), filename
+        # The user-guide markdown lived under docs/archive/2026-09-21/ and was
+        # purged in eafb54e26 on purpose (AGENTS.md: never re-create it). The
+        # allowlist must still name real, historically retrievable documents —
+        # require_ledger reads them read-only from eafb54e26^ and fails loudly
+        # if one was never there, which is the property this test guards.
+        rel = f"docs/archive/2026-09-21/{filename}"
+        assert require_ledger(rel).strip(), filename

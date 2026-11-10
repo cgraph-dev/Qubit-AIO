@@ -34,7 +34,16 @@ sys.path.insert(0, str(REPO_ROOT))
 pytestmark = pytest.mark.unit
 
 NUM_PARAM_RE = re.compile(r"\(\?P<[^>]+>\[0-9\]\+\)")
-PARAM_RE = re.compile(r"\(\?P<[^>]+>[^)]+\)|\.\*|\[\^/\]\+")
+PARAM_RE = re.compile(
+    r"\(\?P<([A-Za-z_][A-Za-z0-9_]*)>[^)]+\)|\.\*|\[\^/\]+")
+# A param whose body is a closed set of literals (``(?P<family>bot|canvas)``)
+# and one naming the route's own family (``(?P<family>agent-workspace)``)
+# must be filled with a value the pattern actually accepts, not a generic
+# token. ``_LITERAL_PARAM_RE`` matches an alternation or a bare token as the
+# whole group body.
+_LITERAL_PARAM_RE = re.compile(
+    r"\(\?P<([A-Za-z_][A-Za-z0-9_]*)>([A-Za-z0-9_-]+(?:\|[A-Za-z0-9_-]+)+|"
+    r"[A-Za-z0-9_-]+)\)")
 
 
 def _cfg(tmp_path, monkeypatch):
@@ -61,9 +70,14 @@ def cfg(tmp_path, monkeypatch):
 def _fill(pattern: str) -> str:
     """Replace route params/wildcards with a concrete token.
 
-    Numeric params (``[0-9]+``) get a digit so the route still matches.
+    Numeric params (``[0-9]+``) get a digit so the route still matches, and a
+    param whose body is a closed literal set (the family routes register one
+    pattern per family, e.g. ``(?P<family>bot|canvas)``) gets one of its own
+    literals — ``probe`` is not a member and would never match.
     """
     pattern = NUM_PARAM_RE.sub("1", pattern)
+    pattern = _LITERAL_PARAM_RE.sub(
+        lambda m: m.group(2).split("|")[0], pattern)
     return PARAM_RE.sub("probe", pattern)
 
 

@@ -131,8 +131,13 @@ def test_daemon_home_never_resolves_to_the_reference_home(tmp_path, monkeypatch)
     monkeypatch.delenv("QUBIT_HOME", raising=False)
 
     resolved = GS._daemon_home()
-    assert resolved == (tmp_path / "xdg" / "qubit-voicebridge" / "runtime").resolve()
+    # A fresh home is a NEW-layout install: default_home() returns $QUBIT_HOME
+    # itself (~/.qubit), not the historical XDG runtime dir, which is kept only
+    # for an existing XDG install (qubit_runtime.default_home). The invariant
+    # this test guards is unchanged: never the operator's reference home.
+    assert resolved == (scratch_home / ".qubit").resolve()
     assert resolved != (scratch_home / ".hermes")
+    assert "hermes" not in str(resolved).lower()
 
 
 # ------------------------------------------------- one authority path / target

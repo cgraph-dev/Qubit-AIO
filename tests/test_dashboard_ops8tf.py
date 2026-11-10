@@ -466,7 +466,12 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("Content-Type", ""), e.read()
+        # HTTPError is itself a (temp-file-backed) response: close it so the
+        # body file is released, not merely garbage-collected at exit.
+        try:
+            return e.code, e.headers.get("Content-Type", ""), e.read()
+        finally:
+            e.close()
 
 
 def test_ops_http_end_to_end(tmp_path):
@@ -476,11 +481,14 @@ def test_ops_http_end_to_end(tmp_path):
         # (its operations console), never the retired static page.
         import http.client
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
-        conn.request("GET", "/ops")
-        resp = conn.getresponse()
-        resp.read()
-        assert resp.status == 302, resp.status
-        assert resp.getheader("Location") == "/operations"
+        try:
+            conn.request("GET", "/ops")
+            resp = conn.getresponse()
+            resp.read()
+            assert resp.status == 302, resp.status
+            assert resp.getheader("Location") == "/operations"
+        finally:
+            conn.close()
         # Catalog requires auth.
         status, _, _ = _http(port, "GET", "/api/ops", token=None)
         assert status == 401, status

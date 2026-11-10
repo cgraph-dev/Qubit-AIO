@@ -61,7 +61,12 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read())
+        # HTTPError wraps a temp-file-backed body: close it or the 409/401
+        # bodies surface as ResourceWarning/PytestUnraisableExceptionWarning.
+        try:
+            return e.code, json.loads(e.read())
+        finally:
+            e.close()
 
 
 def _stage_confirm(port, path, body):

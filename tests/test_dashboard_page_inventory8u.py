@@ -119,7 +119,7 @@ def test_served_dashboard_title_is_qubit(tmp_path):
     try:
         status, _ctype, body = _get(port, "/")
         assert status == 200
-        assert b"<title>Qubit Agent" in body, body[:200]
+        assert b"<title>Qubit AiO</title>" in body, body[:200]
     finally:
         ui.stop()
 
@@ -129,11 +129,20 @@ def test_served_fleet_and_plugin_bundles_are_qubit_branded(tmp_path):
     try:
         status, _ctype, body = _get(port, "/plugins/fleet.json")
         assert status == 200
-        fleet = {m["name"] for m in json.loads(body)}
-        assert fleet == {"qubit-achievements", "kanban"}
-        for name in sorted(fleet):
+        manifests = json.loads(body)
+        fleet = {m["name"] for m in manifests}
+        # The bundled fleet: the two upstream-derived tabs plus the Qubit
+        # office plugin (first-class tab, shipped in frontend/qubit-app).
+        assert fleet == {"qubit-achievements", "kanban", "qubit-office"}
+        for manifest in sorted(manifests, key=lambda m: m["name"]):
+            name = manifest["name"]
+            # Resolve the entry the way the SPA does (src/plugins/fleet.ts):
+            # assets load from the manifest's own assetBase, defaulting to the
+            # overlay root /dashboard-plugins/<name>. Only the dist plugins
+            # under /plugins/<name> declare an assetBase.
+            base = manifest.get("assetBase") or f"/dashboard-plugins/{name}"
             status, ctype, body = _get(
-                port, f"/plugins/{name}/dist/index.js")
+                port, f"{base}/{manifest['entry']}")
             assert status == 200 and "javascript" in ctype, (name, status)
             # product-facing copy is Qubit; lowercase plugin ids/comments and
             # the X-Qubit-Session-Token wire header are compatibility tokens.
