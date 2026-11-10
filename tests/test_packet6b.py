@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import threading
 import types
 import urllib.request
@@ -312,7 +313,25 @@ def test_offline_runner_never_touches_user_state(monkeypatch):
     monkeypatch.setattr(R, "MemoryStore", fake_mem)
     R.evaluate_cases(base_cases())
     assert touched, "runner must construct its own ledger/memory"
-    assert all("state" not in p for _, p in touched)
+    # The offline runner must keep its throwaway components inside the temp
+    # tree it owns — never the user's canonical state dir. A bare ``"state" not
+    # in path`` substring is wrong: the temp dir itself may legitimately live
+    # under ``.../runtime/cache/scratch`` of a state root. Compare real paths.
+    import os
+    from pathlib import Path as _P
+
+    from voicebridge.config import canonical_state_dir
+
+    state_root = _P(os.path.realpath(str(canonical_state_dir())))
+    temp_root = _P(os.path.realpath(tempfile.gettempdir()))
+    # The user's live state dir must never be the component root or an
+    # ancestor of it; every component lives under the runner's own temp tree.
+    for kind, raw in touched:
+        real = _P(os.path.realpath(raw))
+        assert real == temp_root or temp_root in real.parents, (kind, raw)
+        assert real != state_root, (kind, raw)
+        assert state_root not in real.parents or temp_root in real.parents, \
+            (kind, raw)
 
 
 # ========================================================================
