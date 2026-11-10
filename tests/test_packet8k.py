@@ -468,8 +468,10 @@ def test_synthetic_prior_artifact_upgrade_contract(tmp_path):
     assert prior["version"] != D.PACKAGE_VERSION
     joined = " ".join(str(x) for x in plan["does_not"]).lower()
     assert "delete state" in joined
-    # report the limitation honestly: real previous-release upgrade untested
-    assert D.PACKAGE_VERSION == "0.0.2"
+    # report the limitation honestly: real previous-release upgrade untested.
+    # Pin the MANIFEST to the released version (single source of truth), not a
+    # frozen literal that drifts on every release bump.
+    assert D.PACKAGE_VERSION == D.manifest()["version"]
 
 
 # ========================================================================
