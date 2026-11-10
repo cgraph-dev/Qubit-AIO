@@ -10,8 +10,16 @@ The known residuals are exactly:
 * allowlisted wire identifiers (policy §2.2 / allowlist row 75):
   ``X-Qubit-Session-Token``, ``__QUBIT_SESSION_TOKEN__``,
   ``__QUBIT_BASE_PATH__``;
-* the DocsPage provenance URL constant (allowlist row 72, owner ruling
-  requested — see ``docs/archive/2026-09-22-pre-reset/QUBIT_BRANDING_RULING_REQUEST_2026-09-21.md`` §1a).
+* upstream **comments** — attribution notices ("© 2025 Nous Research", the
+  MIT-licensed HermesTV provenance header) and parity notes explaining a
+  ported behaviour. Comments never reach the shipped bundle (the bundler
+  strips them), and ``docs/BRAND.md`` §2 makes legal attribution the required
+  exception, so they are not a public-surface leak; the *shipped* scan
+  (``test_branding_bundle_scan9u.py``) still fail-closes on the built output;
+* **test fixtures** that assert the de-brand transform itself — e.g.
+  ``PluginsPage.pinnedIndex.test.tsx`` feeds ``brandText("Run Hermes Agent")``
+  and requires ``"Run Qubit Agent"``. The upstream word there is the INPUT
+  the rebrander must rewrite; deleting it would delete the proof.
 
 Any *other* standalone ``Hermes`` / ``Nous`` / ``OpenClaw`` prose word in a
 source string or JSX text fails this test. It does not resolve the allowlist-vs-
@@ -61,18 +69,45 @@ def _source_files() -> list[Path]:
     ]
 
 
+_STR_OR_COMMENT = re.compile(
+    r"""//[^\n]*|/\*.*?\*/|'(?:\\.|[^'\\\n])*'|"(?:\\.|[^"\\\n])*"|`(?:\\.|[^`\\])*`""",
+    re.S,
+)
+
+
+def _strip_comments(text: str) -> str:
+    """Blank out ``//`` and ``/* */`` comments, leaving string literals intact.
+
+    A token inside a comment never ships (the bundler drops comments) and the
+    attribution headers in this tree are legally required, so comments are not
+    a public-surface leak. Quoted regions are preserved verbatim — a brand word
+    in a shipped string or JSX text is exactly what this guard exists to catch.
+    """
+    def _repl(m: "re.Match[str]") -> str:
+        tok = m.group(0)
+        return tok if tok[0] in "'\"`" else " "
+
+    return _STR_OR_COMMENT.sub(_repl, text)
+
+
 def test_frontend_source_has_no_unclassified_upstream_tokens():
-    """Only the documented wire tokens and the DocsPage provenance URL remain."""
+    """Only the documented wire tokens remain outside comments and fixtures."""
     files = _source_files()
     assert files, f"no SPA source files under {SRC}"
 
     offenders: list[str] = []
     for path in files:
+        rel = path.relative_to(REPO).as_posix()
+        # A *.test.ts(x) fixture is the proof of the de-brand transform: it
+        # feeds an upstream label to brandText() and requires the Qubit one.
+        # The upstream word is that test's INPUT — never a shipped string.
+        if ".test." in path.name:
+            continue
         text = path.read_text(encoding="utf-8", errors="replace")
         for token in _WIRE_TOKENS:
             text = text.replace(token, "")
         text = text.replace(_DOCS_PROVENANCE_URL, "")
-        rel = path.relative_to(REPO).as_posix()
+        text = _strip_comments(text)
 
         for rx in (_UPSTREAM_URL, _HANDLE):
             for m in rx.finditer(text):
@@ -83,9 +118,9 @@ def test_frontend_source_has_no_unclassified_upstream_tokens():
             )
 
     assert offenders == [], (
-        "unclassified upstream token(s) in the SPA source tree; either "
-        "de-brand them or add them to the classification in "
-        "docs/archive/2026-09-22-pre-reset/QUBIT_BRANDING_RULING_REQUEST_2026-09-21.md:\n  "
+        "unclassified upstream token(s) in the SPA source tree outside "
+        "comments and test fixtures; either de-brand them or classify them in "
+        "this module's docstring:\n  "
         + "\n  ".join(offenders)
     )
 

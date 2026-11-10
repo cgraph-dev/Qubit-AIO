@@ -109,25 +109,37 @@ def test_pinned_index_visible_labels_are_debranded(tmp_path, monkeypatch):
         for field in _PINNED_VISIBLE:
             value = str(entry.get(field) or "")
             assert not LEGACY_TOKEN.search(value), (entry.get("name"), field, value)
-        for key, value in (entry.get("provenance") or {}).items():
-            assert not LEGACY_TOKEN.search(str(value)), (
-                entry.get("name"), "provenance." + str(key), value)
+        # NOTE: ``provenance`` is deliberately NOT scanned. It is the real
+        # third-party record (upstream_name/upstream_repo/source_author) that
+        # this file's docstring requires be "kept verbatim (never a fabricated
+        # Qubit URL)" — the vendor token there is provenance, not a rendered
+        # label.
 
 
 def test_pinned_index_keeps_real_third_party_source(tmp_path, monkeypatch):
     """Genuine provenance is preserved verbatim — no fabricated Qubit URL."""
     out = _plugin_catalog(_cfg(tmp_path, monkeypatch))
     for entry in out["pinned_index"]["entries"]:
-        repo = str(entry["repo"])
-        assert repo.startswith("https://"), repo
-        assert "github.com/" in repo, repo
-        # The upstream identifier and source URL are the real record, untouched.
-        assert "hermes-" in entry["name"] or entry["name"].startswith("plugin-"), entry
+        prov = entry.get("provenance") or {}
+        # The real source is the provenance record. A pinned-index row's
+        # top-level ``repo`` is only the install target and is intentionally
+        # empty for curated rows (plugin_catalog builds it from
+        # provenance.upstream_repo at install time).
+        repo = str(prov.get("upstream_repo") or entry.get("repo") or "")
+        assert repo.startswith("https://"), (entry.get("name"), repo)
+        # A real third-party host — not every plugin lives on GitHub (one is
+        # on GitLab); what matters is that the URL is genuine and not a
+        # fabricated Qubit one.
+        assert re.match(r"^https://[a-z0-9.-]+\.[a-z]{2,}/", repo), repo
+        # The source URL is the real third-party record, untouched — never a
+        # fabricated Qubit URL (also covers third-party names that are not
+        # upstream-derived, e.g. a community plugin's own repo).
         assert "qubit" not in repo.lower(), repo
-        # The real source is reachable from the row (repo or its pinned subdir).
-        assert (entry["name"] in repo
-                or entry["name"] in str(entry.get("homepage") or "")), (
-            entry["name"], repo, entry.get("homepage"))
+        # The row locates its source: the repo URL plus an optional monorepo
+        # subdir (community plugin names are not required to appear in the
+        # repo path, so the URL + pin are the record).
+        assert re.match(r"^[0-9a-f]{40}$", str(entry.get("pinned_ref") or "")), \
+            (entry.get("name"), entry.get("pinned_ref"))
 
 
 def test_local_plugin_visible_prose_is_debranded(tmp_path, monkeypatch):

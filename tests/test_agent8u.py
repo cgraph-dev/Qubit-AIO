@@ -24,6 +24,21 @@ from voicebridge import agent as A  # noqa: E402
 from voicebridge import foundation as F  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _no_live_agent(monkeypatch):
+    """Keep the file hermetic: no vendored AIAgent, no live provider dial.
+
+    ``run_session`` prefers the tool-capable vendored ``AIAgent`` and only
+    falls back to the planner when it is unavailable. On a checkout where
+    ``run_agent`` IS importable (it is, in this repo) the real agent dials the
+    configured provider with the operator's key, so these hermetic tests hung
+    on a live network call instead of exercising what they pin. The
+    established shape in this tree is to stub the seam out and let the planner
+    path run (see tests/test_session_continuity9u.py).
+    """
+    monkeypatch.setattr(A, "_run_vendored_session", lambda *_a, **_kw: None)
+
+
 @pytest.fixture()
 def stub_model(monkeypatch):
     """Stub the model transport behind agent.turn (no live model)."""
@@ -33,7 +48,10 @@ def stub_model(monkeypatch):
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
-              reasoning=None):
+              reasoning=None, cancel=None):
+        # `cancel` is the turn's STOP hook (voicebridge.local_llm.chat_local
+        # gained it in c52e5cd46 so STOP aborts an in-flight model call); the
+        # stub must accept it or the turn degrades to MODEL_ERROR.
         calls.append({"text": text, "model": model})
         if _fake.mode == "empty":
             return ""
@@ -51,7 +69,7 @@ def stub_model(monkeypatch):
 def test_turn_receipt_native(stub_model):
     r = A.turn(None, "summarize inbox", session="voice")
     assert r["ok"] is True
-    assert "summarize inbox" not in r["reply"] or True
+    assert r["reply"].strip(), "a successful turn never contains an empty reply"
     receipt = r["receipt"]
     assert receipt["runtime"] == "qubit-native"
     assert receipt["path"] == "voicebridge.agent.turn"
@@ -201,7 +219,10 @@ def test_session_unknown_tool_reports_failure(stub_model, monkeypatch):
     res = A.run_session(None, "do the thing", session="sess-3",
                         execute_tool=_boom)
     assert res["state"] == "OK", res
-    assert "failed" in stub_model.calls[-1]["text"] or True
+    # The unknown-tool failure is folded into the summary prompt so the model
+    # reports it instead of a silent success (agent.run_session observation).
+    assert "failed" in stub_model.calls[-1]["text"]
+    assert "local.nonexistent_xyz" in stub_model.calls[-1]["text"]
 
 
 def test_session_cancel_before_summary(stub_model, monkeypatch):
@@ -283,12 +304,16 @@ def test_agent_receipt_carries_provenance(stub_model):
 
 
 def test_foundation_cli_runtime_check_reports_native_runtime():
+    # The CLI exits 0 only on an OK verdict and 1 on FAILED (foundation.py:
+    # `return 0 if result.get("verdict") == "OK" else 1`), so a hard-coded
+    # returncode==0 asserted "a live model is reachable". What this test pins
+    # is the NATIVE RUNTIME identity, which holds with or without a model.
     r = subprocess.run([sys.executable, "-m", "voicebridge.foundation",
                         "runtime-check"], capture_output=True, text=True,
                        timeout=180, cwd=str(REPO_ROOT))
-    assert r.returncode == 0, r.stderr[-1500:]
     result = json.loads(r.stdout)
     assert result["verdict"] in ("OK", "FAILED"), result
+    assert r.returncode == (0 if result["verdict"] == "OK" else 1), r.stderr[-1500:]
     assert result["identity"]["state"] == "VERIFIED"
     if result["verdict"] == "OK":
         assert result["turn"]["receipt"]["runtime"] == "qubit-native"

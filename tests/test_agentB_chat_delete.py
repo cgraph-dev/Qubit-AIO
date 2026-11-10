@@ -21,9 +21,12 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 _DIST = REPO_ROOT / "frontend" / "qubit-dist"
+# frontend/qubit-dist is a git-ignored build artifact (see
+# scripts/release_qualify.py) produced by `npm run build` in frontend/qubit-web,
+# so a source checkout legitimately has no dashboard bundle to serve.
 _needs_dist = pytest.mark.skipif(
     not (_DIST / "index.html").is_file(),
-    reason="hermes-dist not built (npm build step)")
+    reason="frontend/qubit-dist not built (npm run build in frontend/qubit-web)")
 
 
 def _start_webui(tmp_path):

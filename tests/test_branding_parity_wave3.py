@@ -94,6 +94,13 @@ ALLOWED_SURFACE_PHRASES = [
     "Hermes WebSocket dialect is not served",
     "Hermes tui_gateway WS dialect is not served",
     "in-process Hermes backend",
+    # Copyright holders of vendored upstream code — required notices
+    # (THIRD_PARTY_NOTICES.md), never product identity. The " (c) YEAR"
+    # form keeps these from matching a user-facing "Hermes" claim.
+    "Copyright (c) 2026 Hermes HUD Contributors",
+    "Copyright (c) 2025 Hermes Web UI Contributors",
+    # Diagnostic message naming the leaked string it detects in rendered DOM.
+    "rendered text still says Hermes",
     *LEGAL_ATTRIBUTION_PHRASES,
 ]
 
@@ -143,6 +150,51 @@ def _py_runtime_strings(path: Path):
     for node in ast.walk(tree):
         if (isinstance(node, ast.Constant) and isinstance(node.value, str)
                 and id(node) not in docstrings):
+            yield node.lineno, node.value
+
+
+#: Module-level tables whose string pairs ARE the de-brand mapping. The
+#: upstream name in these is the INPUT the rebrander searches for (and, in a
+#: REPAIRS row, the OUTPUT it restores after an over-reach), so it must stay
+#: verbatim or the transform silently stops working. Excluding the table is
+#: narrower and more honest than allowlisting a bare "Hermes", which would
+#: exempt every real product string in the runtime.
+_DEBRAND_TABLES = frozenset({
+    "THIRD_PARTY", "PROVENANCE_MODULES", "RULES", "REPAIRS",
+    "_SPEAK_BRAND_MAP",
+})
+
+
+def _py_runtime_strings_outside_debrand_maps(path: Path):
+    """Runtime literals, minus docstrings and the de-brand mapping tables."""
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    docstrings = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.FunctionDef, ast.AsyncFunctionDef,
+                             ast.ClassDef)):
+            if (node.body and isinstance(node.body[0], ast.Expr)
+                    and isinstance(node.body[0].value, ast.Constant)
+                    and isinstance(node.body[0].value.value, str)):
+                docstrings.add(id(node.body[0].value))
+    skip = set(docstrings)
+    for node in ast.walk(tree):
+        targets = []
+        if isinstance(node, ast.Assign):
+            targets = node.targets
+            value = node.value
+        elif isinstance(node, ast.AnnAssign) and node.value is not None:
+            targets = [node.target]
+            value = node.value
+        else:
+            continue
+        names = {t.id for t in targets if isinstance(t, ast.Name)}
+        if names & _DEBRAND_TABLES:
+            for sub in ast.walk(value):
+                if isinstance(sub, ast.Constant):
+                    skip.add(id(sub))
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Constant) and isinstance(node.value, str)
+                and id(node) not in skip):
             yield node.lineno, node.value
 
 
@@ -198,7 +250,7 @@ def test_voice_runtime_strings_have_no_unrebranded_product_names():
     for path in sorted((REPO_ROOT / "voicebridge").rglob("*.py")):
         if "__pycache__" in path.parts:
             continue
-        for lineno, text in _py_runtime_strings(path):
+        for lineno, text in _py_runtime_strings_outside_debrand_maps(path):
             residual = _residual(text)
             if residual:
                 rel = path.relative_to(REPO_ROOT).as_posix()
@@ -255,9 +307,19 @@ def test_minimal_frontend_pages_are_qubit_branded():
 
 
 def test_support_docs_are_qubit_branded():
-    for rel in ("README.md", "docs/archive/2026-09-21/AUDIO_SETUP.md",
-                "docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md", "docs/archive/2026-09-21/HowTo.md"):
-        text = (REPO_ROOT / rel).read_text(encoding="utf-8")
+    # AUDIO_SETUP / VOICE_BRIDGE_SYSTEM / HowTo were purged in eafb54e26 and
+    # must not be re-authored (AGENTS.md), so read them from history — the
+    # branding invariant is still checked on their real content.
+    from tests._purged_ledger import require_ledger
+
+    live = ("README.md",)
+    purged = ("docs/archive/2026-09-21/AUDIO_SETUP.md",
+              "docs/archive/2026-09-21/VOICE_BRIDGE_SYSTEM.md",
+              "docs/archive/2026-09-21/HowTo.md")
+    docs = {rel: (REPO_ROOT / rel).read_text(encoding="utf-8")
+            for rel in live}
+    docs.update({rel: require_ledger(rel) for rel in purged})
+    for rel, text in docs.items():
         residual = _residual(text)
         assert not residual, f"{rel}: support doc names upstream {residual}"
 
