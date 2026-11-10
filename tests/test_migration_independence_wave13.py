@@ -28,6 +28,11 @@ from voicebridge import qubit_runtime as QR
 from voicebridge import qubit_session_store as QSS
 
 
+#: The operator's real home, captured at module import — BEFORE tests run and
+#: before any fixture redirects ``HOME``.
+REAL_HOME: "Path | None" = Path(os.path.expanduser("~")).resolve()
+
+
 def _cfg(tmp_path, monkeypatch):
     from voicebridge import config as C
 
@@ -53,6 +58,7 @@ def _isolate_store(monkeypatch):
             pass
 
 
+
 @pytest.fixture(autouse=True)
 def _scratch_operator_home(tmp_path, monkeypatch):
     """Redirect the operator identity so ``~/.hermes`` is a scratch path.
@@ -65,6 +71,18 @@ def _scratch_operator_home(tmp_path, monkeypatch):
     ``~/.hermes`` is checked through ``Path.home()`` (monkeypatched), but
     ``default_home()`` reads ``XDG_STATE_HOME`` and, when truthiness checks fail,
     ``os.path.expanduser("~")`` — which reads ``$HOME``.
+
+    The REAL operator home is captured first. The vendored live-system guard
+    resolves its production roots through ``os.path.expanduser("~")``
+    (``qubit_runtime/qubit_state_guard.py``: "expanduser reads HOME/passwd, which
+    the conftest never rewrites"), so once ``HOME`` points at the scratch
+    identity the guard can no longer tell a scratch home from the operator's.
+    ``REAL_HOME`` is what the test hands back to the guard for its check.
+
+    Marked ``live_system_guard_bypass`` in spirit: this test's contract IS the
+    open of ``$HOME/.qubit/state.db`` from an unset ``QUBIT_HOME``, so the guard
+    reads a scratch ``~/.qubit`` exactly where it expects production and refuses
+    it. Nothing real is touched — the scratch home is under ``tmp_path``.
     """
     scratch = tmp_path / "operator"
     scratch.mkdir()
@@ -80,12 +98,29 @@ def _scratch_operator_home(tmp_path, monkeypatch):
 def test_session_store_resolves_qubit_home_not_hermes(tmp_path, monkeypatch):
     """The canonical store starts fully from the Qubit-owned home.
 
-    Marked ``live_system_guard_bypass`` on purpose: this test's contract IS that
-    the canonical store opens ``$HOME/.qubit/state.db`` from an unset
-    ``QUBIT_HOME``, so with the operator identity redirected to ``tmp_path`` the
-    guard sees a scratch ``~/.qubit`` and refuses exactly the open the test
-    asserts. Nothing real is touched — the scratch home is under ``tmp_path``.
+    The production roots the guard checks are pinned to the operator's REAL
+    home (``REAL_HOME``), not this test's scratch identity, so no live
+    ``~/.qubit`` / ``~/.hermes`` path is ever opened.
     """
+    # The guard's production roots are the REAL operator home's, not the scratch
+    # identity's: pin them to the home pytest was launched with so the guard
+    # keeps refusing the live ``~/.qubit``/``~/.hermes`` while this test opens
+    # its scratch store. ``qubit_state`` binds the root resolvers at import time
+    # (``from qubit_state_guard import ...``), so both spellings of the guard
+    # module are patched.
+    assert REAL_HOME is not None and REAL_HOME.is_absolute()
+    import qubit_runtime.qubit_state_guard as _guard
+    import qubit_state_guard as _guard_bare
+    import qubit_runtime.qubit_state as _state
+
+    for module in (_guard, _guard_bare, _state):
+        monkeypatch.setattr(
+            module, "_real_platform_state_root",
+            lambda: (REAL_HOME / ".qubit").resolve())
+        monkeypatch.setattr(
+            module, "_legacy_platform_state_root",
+            lambda: (REAL_HOME / ".hermes").resolve())
+
     cfg = _cfg(tmp_path, monkeypatch)
     external = QR._external_default_home()
     assert external == Path.home() / ".hermes"
