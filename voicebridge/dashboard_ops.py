@@ -236,6 +236,13 @@ def _dashboard_ctx(cfg: Any, actor: str, session: str) -> SimpleNamespace:
     return VC.make_ctx(cfg, actor=actor, session=session, source="dashboard")
 
 
+# The session id the canonical settle surfaces confirm under: POST
+# /api/ops/confirm, the approvals page (/api/approvals/respond), and the
+# approvals CLI. It is the one caller allowed to settle a record staged under
+# another (chat/voice) session — see _confirm_registry_across_sessions.
+CANONICAL_SETTLE_SESSION = "dashboard"
+
+
 def record_session(cfg: Any, confirmation_id: str) -> str:
     """The session a staged confirmation belongs to (for channel-agnostic
     settle paths like the approvals page and the approvals CLI)."""
@@ -341,6 +348,15 @@ def _confirm_registry_across_sessions(cfg: Any, confirmation_id: str, *,
         return None
     staged_session = record_session(cfg, confirmation_id)
     if staged_session == session:
+        return None
+    if session != CANONICAL_SETTLE_SESSION:
+        # Only the canonical settle path (``POST /api/ops/confirm``, the
+        # approvals page, the approvals CLI) may reach a record staged under
+        # another session. Any other caller naming its own session is a
+        # cross-session settle attempt and must stay isolated: it gets the
+        # typed NO_CONFIRMATION and must not consume the id, so the record's
+        # own session can still settle it (test_sessions_isolate_confirmations,
+        # test_skill_toolset_confirm_mutations).
         return None
     try:
         return VC.confirm_pending(
