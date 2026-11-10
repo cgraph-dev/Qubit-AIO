@@ -91,8 +91,11 @@ def test_header_token_is_checked_on_stream_and_agent_routes():
 
 def test_client_schema_adapter_is_based_on_actual_habblaud_requests():
     """Pin actual shipped request contracts and the expected server adapter surface."""
-    bundle = ROOT / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/app-U4Pwh2XA.js"
-    js = bundle.read_text(encoding="utf-8")
+    bundles = sorted(
+        (ROOT / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle").glob("app-*.js")
+    )
+    assert len(bundles) == 1, f"expected one shipped app chunk, found {bundles}"
+    js = bundles[0].read_text(encoding="utf-8")
     for route in ("/api/access", "/api/stream", "/api/agents/${encodeURIComponent(e)}",
                   "/api/sessions/recent", "/api/timeline/days", "/api/timeline/${e}"):
         assert route in js
