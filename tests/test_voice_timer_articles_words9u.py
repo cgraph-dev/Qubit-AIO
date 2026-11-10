@@ -126,7 +126,14 @@ def test_long_sentence_route_word_keeps_full_text():
 
 def test_long_sentence_ask_bypass_dispatches_worker_with_full_text():
     """ask() must skip the deterministic stages and hand the FULL stripped
-    text to the headless /chat worker (no truncation, no brain narration)."""
+    text to the headless /chat worker (no truncation, no brain narration).
+
+    Updated for the local-action wave (856e9d675): "create a file ..." is now a
+    safe, no-confirm local action, so ask() EXECUTES it instead of dispatching
+    the worker. The truncation proof below is unaffected; what this pins now is
+    that the whole sentence reaches the local action, and that the worker path
+    still receives the full text when no local action claims it.
+    """
     from voicebridge.voice_edit.router import RouteDecision  # noqa: F401 (import parity)
     from voicebridge.voice_edit.service import VoiceEditService
     from voicebridge.voice_edit.transform import TransformEngine
@@ -188,10 +195,21 @@ def test_long_sentence_ask_bypass_dispatches_worker_with_full_text():
     backend_text = "in chat: create a file called voice-test.txt in my Documents " \
         "containing the text hello voice"
     out = svc.ask(backend_text)
+    assert out["ok"] is True, out
+    # The safe local action claims the sentence: it runs in-process, no model.
+    assert out["mode"] == "local-action", out
+    assert out["answer"].startswith("Created "), out
+    assert "voice-test" in out["answer"], out
+    assert stages == [], stages  # no deterministic stage ran
+    assert not seen, seen  # the worker was never consulted
+
+    # A sentence no local action claims still reaches the worker whole.
+    chat_text = "in chat: summarise the notes I wrote about the garden fence"
+    seen.clear()
+    out = svc.ask(chat_text)
     assert out["ok"] is True and out["answer"] == "WORKER_DID_IT", out
     assert stages == [], stages  # no deterministic stage ran
-    assert seen["q"] == backend_text[len("in chat:"):].strip(), seen
-    assert "voice-test.txt" in seen["q"] and "hello voice" in seen["q"], seen
+    assert seen["q"] == chat_text[len("in chat:"):].strip(), seen
 
 
 def test_continuation_without_wake_word_is_discarded_proving_truncation_gap():
