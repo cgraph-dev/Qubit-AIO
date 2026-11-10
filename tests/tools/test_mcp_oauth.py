@@ -752,6 +752,11 @@ class TestIsInteractive:
             dt.join()
         finally:
             loop.call_soon_threadsafe(loop.stop)
+            loop_thread.join(timeout=5)
+            # ``loop.stop()`` only ends ``run_forever``; the loop object and its
+            # selector fd stay open until ``close()``. Left to the GC they raise
+            # "ResourceWarning: unclosed event loop" and fail a later test.
+            loop.close()
 
         assert result["cross_thread"] is True, "probe must run on the loop thread"
         # The whole point: suppression must hold on the loop thread.

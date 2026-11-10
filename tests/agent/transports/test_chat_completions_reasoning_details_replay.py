@@ -1,7 +1,7 @@
-"""``reasoning_details`` replay is route-scoped: OpenRouter reads it, every other
+import pytest
+"""``reasoning_details`` replay is route-scoped: OpenRouter/Nous read it, every other
 chat-completions route gets a wire copy without it (strict schemas 400/422 on the field,
-wedging the session after an in-session model switch — qubit#70233; the Nous Portal
-additionally 400s on a cumulative replayed-reasoning budget — qubit#118182)."""
+wedging the session after an in-session model switch — hermes-agent#70233)."""
 
 from openai import OpenAI
 
@@ -25,10 +25,21 @@ def test_auxiliary_wire_drops_reasoning_details_only_for_non_replaying_routes():
     assert any("reasoning_details" in m for m in kwargs["messages"])
 
 
-def test_openrouter_keeps_and_nous_strips_reasoning_details():
+def test_openrouter_and_nous_routes_keep_reasoning_details():
     transport = get_transport("chat_completions")
-    kwargs = transport.build_kwargs("m", _HISTORY, base_url="https://openrouter.ai/api/v1")
-    assert any("reasoning_details" in m for m in kwargs["messages"])
-    kwargs = transport.build_kwargs("m", _HISTORY, base_url="https://inference-api.nousresearch.com/v1")
-    assert all("reasoning_details" not in m for m in kwargs["messages"]), "Nous Portal strips (#118182)"
+    for base_url in ("https://openrouter.ai/api/v1", "https://inference-api.nousresearch.com/v1"):
+        kwargs = transport.build_kwargs("m", _HISTORY, base_url=base_url)
+        assert any("reasoning_details" in m for m in kwargs["messages"]), base_url
+
+
+def test_openrouter_format_gateways_keep_and_strict_hosts_strip_reasoning_details():
+    transport = get_transport("chat_completions")
+    for url in ("https://openrouter.ai/api/v1", "https://inference-api.nousresearch.com/v1",
+                "https://api.kilo.ai/api/gateway"):
+        kwargs = transport.build_kwargs("m", _HISTORY, base_url=url)
+        assert any("reasoning_details" in m for m in kwargs["messages"]), url
+    for url in ("https://api.groq.com/openai/v1", "https://api.fireworks.ai/inference/v1",
+                "https://api.mistral.ai/v1"):
+        kwargs = transport.build_kwargs("m", _HISTORY, base_url=url)
+        assert all("reasoning_details" not in m for m in kwargs["messages"]), url
     assert "reasoning_details" in _HISTORY[1]  # durable history is untouched

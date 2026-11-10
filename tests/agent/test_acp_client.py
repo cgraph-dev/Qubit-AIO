@@ -60,7 +60,6 @@ def _server(tmp_path: Path, body: str) -> list[str]:
     script.write_text(body, encoding="utf-8")
     return [sys.executable, str(script)]
 
-
 def test_subclass_launch_fallback_reads_its_env_vars_in_order(monkeypatch, tmp_path):
     for name in ("VENDOR_ACP_COMMAND", "VENDOR_CLI_PATH", "VENDOR_ACP_ARGS"):
         monkeypatch.delenv(name, raising=False)
@@ -81,31 +80,54 @@ def test_model_entry_disabled_hook_owns_vendor_filtering(tmp_path):
     command, *args = _server(tmp_path, _CATALOG_SERVER)
     generic = ACPClient(command=command, args=args, acp_cwd=str(tmp_path))
     vendor = _VendorClient(command=command, args=args, acp_cwd=str(tmp_path))
-    # The generic client applies no vendor _meta policy; the subclass hook does.
-    assert generic.list_models(timeout_seconds=30) == ["open-model", "policy-blocked", "copilot-gated"]
-    assert vendor.list_models(timeout_seconds=30) == ["open-model", "copilot-gated"]
-    completion = vendor.chat.completions.create(model="vendor-acp", messages=[{"role": "user", "content": "hi"}], timeout=30)
-    assert (completion.choices[0].message.content, completion.model) == ("hello", "vendor-acp")
+    try:
+        # The generic client applies no vendor _meta policy; the subclass hook does.
+        assert generic.list_models(timeout_seconds=30) == ["open-model", "policy-blocked", "copilot-gated"]
+        assert vendor.list_models(timeout_seconds=30) == ["open-model", "copilot-gated"]
+        completion = vendor.chat.completions.create(model="vendor-acp", messages=[{"role": "user", "content": "hi"}], timeout=30)
+        assert (completion.choices[0].message.content, completion.model) == ("hello", "vendor-acp")
+    finally:
+        # Each client owns a live ACP child and its three pipes; close() reaps the
+        # child and closes the pipes. Left to the GC they finalise later and raise
+        # ResourceWarning: unclosed file, which filterwarnings=error turns into a
+        # failure of an otherwise-passing test.
+        generic.close()
+        vendor.close()
 
 
 def test_errors_carry_the_subclass_label_and_early_exit_hook(tmp_path):
     missing = _VendorClient(command=str(tmp_path / "absent"), args=["--stdio"], acp_cwd=str(tmp_path))
-    with pytest.raises(RuntimeError, match=r"Could not start Vendor ACP command .*VENDOR_ACP_COMMAND/VENDOR_CLI_PATH"):
-        missing.chat.completions.create(messages=[{"role": "user", "content": "x"}], timeout=10)
+    try:
+        with pytest.raises(RuntimeError, match=r"Could not start Vendor ACP command .*VENDOR_ACP_COMMAND/VENDOR_CLI_PATH"):
+            missing.chat.completions.create(messages=[{"role": "user", "content": "x"}], timeout=10)
+    finally:
+        missing.close()
 
     command, *args = _server(tmp_path, "import sys; print('legacy build 1.0', file=sys.stderr); sys.exit(3)")
-    with pytest.raises(RuntimeError, match="vendor CLI too old: legacy build 1.0"):
-        _VendorClient(command=command, args=args, acp_cwd=str(tmp_path)).list_models(timeout_seconds=30)
-    with pytest.raises(RuntimeError, match="ACP process exited early: legacy build 1.0"):
-        ACPClient(command=command, args=args, acp_cwd=str(tmp_path)).list_models(timeout_seconds=30)
+    vendor = _VendorClient(command=command, args=args, acp_cwd=str(tmp_path))
+    try:
+        with pytest.raises(RuntimeError, match="vendor CLI too old: legacy build 1.0"):
+            vendor.list_models(timeout_seconds=30)
+    finally:
+        vendor.close()
+    generic = ACPClient(command=command, args=args, acp_cwd=str(tmp_path))
+    try:
+        with pytest.raises(RuntimeError, match="ACP process exited early: legacy build 1.0"):
+            generic.list_models(timeout_seconds=30)
+    finally:
+        generic.close()
 
 
 def test_malformed_vendor_model_options_fall_back_to_the_session_default(tmp_path):
     body = _CATALOG_SERVER.replace('result = {"sessionId": "s1", "configOptions": [', 'result = {"sessionId": "s1", "configOptions": 5, "x": [')
     command, *args = _server(tmp_path, body)
-    completion = _VendorClient(command=command, args=args, acp_cwd=str(tmp_path)).chat.completions.create(
-        model="open-model", messages=[{"role": "user", "content": "hi"}], timeout=30)
-    assert completion.choices[0].message.content == "hello"
+    client = _VendorClient(command=command, args=args, acp_cwd=str(tmp_path))
+    try:
+        completion = client.chat.completions.create(
+            model="open-model", messages=[{"role": "user", "content": "hi"}], timeout=30)
+        assert completion.choices[0].message.content == "hello"
+    finally:
+        client.close()
 
 
 _FROZEN_SUBCLASS_PLUGIN = '''
@@ -167,7 +189,6 @@ print(json.dumps({
 """
 
 
-@pytest.mark.skip(reason="agent/copilot_acp_client.py alias is ported by lane 6; this tree still ships the pre-refactor module")
 def test_deprecated_alias_keeps_a_frozen_out_of_tree_subclass_working(tmp_path):
     home = tmp_path / "hermes"
     plugin = home / "plugins" / "model-providers" / "frozen-acp"

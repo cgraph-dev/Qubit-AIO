@@ -354,6 +354,20 @@ class ACPClient:
         except Exception:
             with contextlib.suppress(Exception):
                 proc.kill()
+            with contextlib.suppress(Exception):
+                proc.wait(timeout=2)
+        finally:
+            # Close the three pipes we created: a reaped child's stdin/stdout/stderr
+            # stay open in this process until their wrapper objects are finalised,
+            # and the GC then raises "ResourceWarning: unclosed file" from
+            # ``_io.FileIO.__del__``. Reaping without closing is a real leak in
+            # production (one fd triple per completed session) and, under a suite
+            # that promotes ResourceWarning to an error, it fails the test that
+            # merely happened to trigger the collection.
+            for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                if pipe is not None:
+                    with contextlib.suppress(Exception):
+                        pipe.close()
 
     def _release_process(self, proc: subprocess.Popen[str]) -> None:
         """Reap one session's own child. ``is_closed`` flips only when the last live

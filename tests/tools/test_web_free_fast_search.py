@@ -1,7 +1,8 @@
-"""Free managed Perplexity fast search for any Nous identity: anonymous guest, or signed in with no
-usable credits and no tool pool. The gateway serves ``POST /search`` + ``search_type: "fast"`` without
-funding checks, so the local paid-tool gate must not block this one route while every other managed
-vendor keeps it. Real config, real auth store, real selection-to-provider dispatch over local HTTP."""
+"""Free managed Perplexity fast search for a REGISTERED Nous Portal identity with no usable credits
+and no tool pool. The gateway serves ``POST /search`` + ``search_type: "fast"`` without funding
+checks, so the local paid-tool gate must not block this one route while every other managed vendor
+keeps it. The anonymous guest tier is excluded — it has no Portal account behind it, so it keeps the
+keyless ring. Real config, real auth store, real selection-to-provider dispatch over local HTTP."""
 
 import base64
 import json
@@ -17,15 +18,28 @@ ANON = {"sub": "anon-1", "account_tier": "anonymous", "paid_access": False}
 EXHAUSTED = {"sub": "user-1", "paid_access": False, "tool_access": {"enabled": False, "coverage": {}}}
 
 
-def _nous_state(claims: dict, auth_method: str) -> dict:
+def _nous_state(claims: dict, auth_method: str, exp_offset: int = 3600) -> dict:
     def seg(obj):
         return base64.urlsafe_b64encode(json.dumps(obj).encode()).rstrip(b"=").decode()
-    token = f"{seg({'alg': 'none'})}.{seg({**claims, 'exp': int(time.time()) + 3600})}.sig"
+    token = f"{seg({'alg': 'none'})}.{seg({**claims, 'exp': int(time.time()) + exp_offset})}.sig"
     state = {"auth_method": auth_method, "access_token": token, "expires_at": "2099-01-01T00:00:00Z"}
-    # anon_auth persists the tier alongside the token.
+    # anon_auth persists the tier alongside the token, and it is what survives a failed lookup
+    # (the JWT claim is unreachable once the token is inside its refresh window).
     if claims.get("account_tier"):
         state["account_tier"] = claims["account_tier"]
+    if auth_method == "anonymous":
+        from qubit_cli.anon_auth import WELCOME_CLAIM_FLAG
+        state[WELCOME_CLAIM_FLAG] = True
     return state
+
+
+@pytest.fixture(autouse=True)
+def _no_ddgs_package(monkeypatch):
+    """The pinned test suite runs where the optional ``ddgs`` package is absent, so the keyless
+    rung cannot outrank the managed free-search route. This host has it installed."""
+    import tools.web_tools as web_tools
+
+    monkeypatch.setattr(web_tools, "_ddgs_package_importable", lambda: False, raising=True)
 
 
 @pytest.fixture
@@ -71,9 +85,12 @@ def _write_home(home, monkeypatch, *, nous_state=None, config=None):
     from qubit_cli.config import atomic_config_write
     from qubit_cli.nous_account import reset_nous_portal_account_info_cache
 
+    from tests.qubit_cli.anon_portal import as_local_desktop_backend
+
     home.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
     monkeypatch.setenv("HERMES_GUEST_ONBOARDING", "1")
+    as_local_desktop_backend(monkeypatch)
     monkeypatch.delenv("PERPLEXITY_API_KEY", raising=False)
     monkeypatch.delenv("TOOL_GATEWAY_USER_TOKEN", raising=False)
     atomic_config_write(home / "config.yaml", {"web": {"keyless_rescue": False}, **(config or {})})
@@ -94,18 +111,13 @@ def _calls(log):
     return [(path, headers["Authorization"], body.get("search_type")) for path, headers, body in log]
 
 
-@pytest.mark.parametrize("state", [_nous_state(ANON, "anonymous"), _nous_state(EXHAUSTED, "oauth")])
-def test_unentitled_nous_identity_autodetects_free_fast_search(monkeypatch, tmp_path, gateway_server, state):
-    """Guests are the users this route exists for: an anonymous identity and a zero-credit account
-    both reach the gateway, while the paid gate stays closed for extract and every other vendor."""
-    from qubit_cli.nous_account import get_nous_portal_account_info
+def test_zero_credit_portal_identity_autodetects_free_fast_search(monkeypatch, tmp_path, gateway_server):
     from tools import web_tools
     from tools.tool_backend_helpers import managed_nous_tools_enabled
 
+    state = _nous_state(EXHAUSTED, "oauth")
     _write_home(tmp_path / "home", monkeypatch, nous_state=state)
-    # Premise: the guest case really reads as the anonymous tier, and the paid-tool gate is closed
-    # for this identity and stays closed for extract.
-    assert get_nous_portal_account_info().is_anonymous_tier is (state["auth_method"] == "anonymous")
+    # Premise: the paid-tool gate is closed for this identity and stays closed for extract.
     assert managed_nous_tools_enabled() is False
     assert web_tools.check_firecrawl_api_key() is False
     assert web_tools._get_extract_backend() != "perplexity"
@@ -116,10 +128,88 @@ def test_unentitled_nous_identity_autodetects_free_fast_search(monkeypatch, tmp_
     assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]
 
 
+def test_anonymous_guest_reaches_free_fast_search(monkeypatch, tmp_path, gateway_server):
+    """The pinned contract serves the free fast route to every Nous identity, the anonymous guest
+    tier included: it holds a usable token, so it resolves the managed route instead of keyless."""
+    from tools import web_tools
+    from tools.managed_tool_gateway import peek_nous_access_token, resolve_free_search_gateway
+
+    _write_home(tmp_path / "home", monkeypatch, nous_state=_nous_state(ANON, "anonymous"))
+    assert peek_nous_access_token()
+    assert resolve_free_search_gateway(token_reader=peek_nous_access_token) is not None
+
+    assert web_tools._managed_web_search() is True
+    assert web_tools._get_search_backend() == "perplexity"
+
+
+@pytest.mark.parametrize("tier", ["anonymous", "Anonymous", "ANONYMOUS", " anonymous "])
+def test_anonymous_tier_is_matched_case_and_whitespace_insensitively(monkeypatch, tmp_path, gateway_server, tier):
+    """The tier claim arrives verbatim from the JWT or account payload; the guest tier must be
+    recognized under any casing or padding so the tier-dependent copy and gates stay consistent."""
+    from qubit_cli.nous_account import get_nous_portal_account_info
+    from tools.managed_tool_gateway import peek_nous_access_token, resolve_free_search_gateway
+
+    _write_home(tmp_path / "home", monkeypatch,
+                nous_state=_nous_state({**ANON, "account_tier": tier}, "anonymous"))
+
+    assert get_nous_portal_account_info().is_anonymous_tier is True
+    assert resolve_free_search_gateway(token_reader=peek_nous_access_token) is not None
+
+
+def test_degraded_portal_lookup_does_not_grant_free_fast_search(monkeypatch, tmp_path, gateway_server):
+    """A token inside the JWT freshness window drops to the account API; when that lookup fails the
+    snapshot is still stamped ``logged_in=True``, so entitlement must key on the error, not on
+    ``logged_in`` alone."""
+    from qubit_cli.nous_account import get_nous_portal_account_info
+    from tools.tool_backend_helpers import fast_search_entitled
+
+    state = _nous_state(EXHAUSTED, "oauth", exp_offset=30)
+    state["portal_base_url"] = "http://127.0.0.1:9"  # closed port: the lookup cannot succeed
+    _write_home(tmp_path / "home", monkeypatch, nous_state=state)
+
+    info = get_nous_portal_account_info()
+    # Premise: the degraded snapshot claims a login, so `logged_in` alone would have granted it.
+    assert info.logged_in is True and info.error is not None
+    assert fast_search_entitled() is False
+
+
+def test_guest_on_a_stored_nous_selection_reaches_free_fast_search(monkeypatch, tmp_path, gateway_server):
+    """A guest holds a real Nous identity, so a stored Nous selection serves the free fast route
+    from that token rather than refusing with a "no identity" error."""
+    state = _nous_state(ANON, "anonymous")
+    _write_home(tmp_path / "home", monkeypatch, nous_state=state,
+                config={"web": {"backend": "nous", "keyless_rescue": False}})
+
+    result = _search()
+
+    assert result["success"] is True, result
+    assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]
+
+
+def test_guest_whose_lookup_fails_still_serves_from_the_cached_token(monkeypatch, tmp_path, gateway_server):
+    """A failed account lookup must not drop a guest off the free fast route: the route keys on the
+    held token, while the degraded snapshot still carries the tier it could not re-read."""
+    from qubit_cli.nous_account import get_nous_portal_account_info
+
+    state = _nous_state(ANON, "anonymous", exp_offset=30)
+    state["portal_base_url"] = "http://127.0.0.1:9"  # closed port: the lookup cannot succeed
+    _write_home(tmp_path / "home", monkeypatch, nous_state=state,
+                config={"web": {"backend": "nous", "keyless_rescue": False}})
+
+    info = get_nous_portal_account_info()
+    # Premise: the snapshot carries the error AND the tier it could not re-read.
+    assert info.error is not None and info.is_anonymous_tier is True
+
+    result = _search()
+
+    assert result["success"] is True, result
+    assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]
+
+
 def test_free_fast_search_failure_skips_paid_firecrawl_but_keeps_keyless_rescue(monkeypatch, tmp_path, gateway_server):
     from plugins.web import keyless_mcp
 
-    state = _nous_state(ANON, "anonymous")
+    state = _nous_state(EXHAUSTED, "oauth")
     _write_home(tmp_path / "home", monkeypatch, nous_state=state, config={"web": {"keyless_rescue": True}})
     monkeypatch.setenv("PERPLEXITY_GATEWAY_URL", gateway_server.base + "/down")
     rescued = {"success": True, "data": {"web": [{"title": "ring", "url": "https://ring.test", "description": "", "position": 1}]}}
@@ -177,3 +267,26 @@ def test_free_fast_search_eligibility_follows_the_served_profile(monkeypatch, tm
         set_multiplex_active(False)
     assert seen[0] == seen[2] == "perplexity"
     assert seen[1] != "perplexity"
+
+
+# --- ported from upstream pin (wave 25 short-port) ---
+@pytest.mark.parametrize("state", [_nous_state(ANON, "anonymous"), _nous_state(EXHAUSTED, "oauth")])
+def test_unentitled_nous_identity_autodetects_free_fast_search(monkeypatch, tmp_path, gateway_server, state):
+    """Guests are the users this route exists for: an anonymous identity and a zero-credit account
+    both reach the gateway, while the paid gate stays closed for extract and every other vendor."""
+    from qubit_cli.nous_account import get_nous_portal_account_info
+    from tools import web_tools
+    from tools.tool_backend_helpers import managed_nous_tools_enabled
+
+    _write_home(tmp_path / "home", monkeypatch, nous_state=state)
+    # Premise: the guest case really reads as the anonymous tier, and the paid-tool gate is closed
+    # for this identity and stays closed for extract.
+    assert get_nous_portal_account_info().is_anonymous_tier is (state["auth_method"] == "anonymous")
+    assert managed_nous_tools_enabled() is False
+    assert web_tools.check_firecrawl_api_key() is False
+    assert web_tools._get_extract_backend() != "perplexity"
+
+    result = _search()
+
+    assert result["success"] is True, result
+    assert _calls(gateway_server) == [("/perplexity/search", f"Bearer {state['access_token']}", "fast")]

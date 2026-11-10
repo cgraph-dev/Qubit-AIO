@@ -180,6 +180,10 @@ def loopback_mcp():
     _Handler.seen.clear()
     yield srv.server_address[1]
     srv.shutdown()
+    # shutdown() ends serve_forever but leaves the listening socket bound and
+    # open; only server_close() releases it (else the GC raises
+    # "ResourceWarning: unclosed socket" and fails a later test).
+    srv.server_close()
 
 
 def test_endpoint_reads_server_json_every_call(tmp_path):
@@ -245,3 +249,4 @@ def test_network_probe_honors_one_absolute_deadline(tmp_path):
         assert pr.answering.state is CheckState.PRESENT
     finally:
         srv.shutdown()
+        srv.server_close()
