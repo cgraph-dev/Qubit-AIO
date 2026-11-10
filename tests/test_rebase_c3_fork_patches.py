@@ -162,7 +162,9 @@ def test_toolsets_core_bundle_and_client_surfaces(runtime_on_path):
     assert ts._QUBIT_CORE_TOOLS
     for tool in ("browser_vault_list", "browser_vault_unlock", "manage_connections"):
         assert tool in ts._QUBIT_CORE_TOOLS, f"D3: {tool!r} missing from core tools"
-    assert ts.CLIENT_SURFACE_TOOLSETS == frozenset({"project", "desktop_ui"})
+    # Client-added surfaces: ``catalog`` joined with 4e4ce965d (desktop catalog
+    # toolset); the fork patch must keep carrying ``desktop_ui`` and ``project``.
+    assert ts.CLIENT_SURFACE_TOOLSETS == frozenset({"project", "desktop_ui", "catalog"})
     names = ts.get_toolset_names()
     assert "setup" in names
     assert "desktop_ui" in names
