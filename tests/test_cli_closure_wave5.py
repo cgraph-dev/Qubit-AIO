@@ -31,10 +31,15 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
 
 from voicebridge import cli as CLI  # noqa: E402
 from voicebridge import cli_qubit_forward as HF  # noqa: E402
 from voicebridge import qubit_runtime  # noqa: E402
+
+HERMES_LEDGER = "docs/archive/2026-09-21/QUBIT_GAP_LEDGER.hermes.json"
 
 
 def _capture(monkeypatch):
@@ -252,8 +257,8 @@ SAFE_EQUIVALENT_ROUTES = (
 
 
 def test_safe_equivalent_routes_are_declared_in_the_qubit_ledger():
-    section = json.loads(
-        (REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.hermes.json").read_text())
+    # Purged in eafb54e26; read read-only from pre-purge history.
+    section = json.loads(require_ledger(HERMES_LEDGER))
     rows = {r["id"]: r for r in section["rows"]}
     for qargv in SAFE_EQUIVALENT_ROUTES:
         row = rows.get("cli:" + " ".join(qargv))
@@ -318,8 +323,8 @@ def test_wave5_confirm_targets_exist_in_fork_parser():
 
 
 def test_wave5_rows_are_in_the_qubit_ledger():
-    section = json.loads(
-        (REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.hermes.json").read_text())
+    # Purged in eafb54e26; read read-only from pre-purge history.
+    section = json.loads(require_ledger(HERMES_LEDGER))
     rows = {r["id"]: r for r in section["rows"]}
     for qargv in (
         ["approvals", "suggest"], ["approvals", "test"], ["auth", "add"],

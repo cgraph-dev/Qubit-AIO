@@ -21,10 +21,15 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
 
 PYPROJECT = REPO / "pyproject.toml"
-MIGRATIONS_DOC = REPO / "docs/archive/2026-09-21" / "MIGRATIONS.md"
-LIFECYCLE_DOC = REPO / "docs/archive/2026-09-21" / "LIFECYCLE_AUDIT_WAVE4.md"
+# Both docs were purged in eafb54e26; they are read read-only from pre-purge
+# history, so they are named as paths rather than opened from the worktree.
+MIGRATIONS_DOC = "docs/archive/2026-09-21/MIGRATIONS.md"
+LIFECYCLE_DOC = "docs/archive/2026-09-21/LIFECYCLE_AUDIT_WAVE4.md"
 REHEARSAL = REPO / "scripts" / "migration_rehearsal.sh"
 CLEAN_INSTALL = REPO / "scripts" / "clean_install_check.sh"
 VERIFY_DASHBOARD = REPO / "scripts" / "verify_installed_dashboard.sh"
@@ -50,11 +55,13 @@ def _is_tracked_clean_clone_source(source: str, tracked: set[str]) -> bool:
         return "docs/" + source[len(ARCHIVE_DOCS_PREFIX):] in tracked
     return False
 
+# Files scanned on disk for a developer-home literal.
 LIFECYCLE_SURFACES = [
     PYPROJECT, INSTALL_SH, UNIT_INSTALL_SH, RELEASE_QUALIFY, CLEAN_INSTALL,
-    VERIFY_DASHBOARD, BUILD_DASHBOARD, REHEARSAL, MIGRATIONS_DOC,
-    LIFECYCLE_DOC,
+    VERIFY_DASHBOARD, BUILD_DASHBOARD, REHEARSAL,
 ]
+# Purged docs scanned through their pre-purge text, same rule applied.
+LIFECYCLE_DOCS = [MIGRATIONS_DOC, LIFECYCLE_DOC]
 
 
 def _toml() -> dict:
@@ -127,6 +134,9 @@ def test_lifecycle_surfaces_have_no_developer_home_literal():
         text = path.read_text(encoding="utf-8", errors="replace")
         for user in HOME_LITERAL.findall(text):
             assert user in GENERIC_HOME_USERS, f"{path.name}: /home/{user} literal"
+    for rel in LIFECYCLE_DOCS:
+        for user in HOME_LITERAL.findall(require_ledger(rel)):
+            assert user in GENERIC_HOME_USERS, f"{rel}: /home/{user} literal"
 
 
 def test_rehearsal_script_carries_no_secret_assignment_shape():
@@ -288,7 +298,7 @@ def test_clean_install_and_dashboard_gates_declare_package_data_probe():
 # 7. Migration log documents the wave-4 lifecycle rehearsal
 # ===========================================================================
 def test_migrations_doc_records_the_wave4_lifecycle_entry():
-    text = MIGRATIONS_DOC.read_text(encoding="utf-8")
+    text = require_ledger(MIGRATIONS_DOC)
     assert "MIG-025" in text
     assert "migration_rehearsal.sh" in text
     assert "rollback" in text.lower() and "uninstall" in text.lower()

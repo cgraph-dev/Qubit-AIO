@@ -34,8 +34,14 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-INVENTORY_PATH = REPO_ROOT / "docs/archive/2026-09-21" / "QUBIT_SOURCE_INVENTORY.json"
+from _purged_ledger import require_ledger  # noqa: E402
+
+# The frozen v2026.9.4 source inventory was purged in eafb54e26; it is read
+# read-only from pre-purge history. (The post-purge docs/generated inventory is
+# a later regeneration against a different set and is not this contract.)
+INVENTORY_PATH = "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json"
 COVERED_CATEGORIES = frozenset({"hermes_tool", "hermes_skill", "hermes_plugin"})
 # Source-inventory ``fork_disposition`` statuses (unchanged by the owner's
 # terminal-status decision).
@@ -76,8 +82,7 @@ def _load_module(name: str, filename: str):
 
 @pytest.fixture(scope="module")
 def inventory() -> dict:
-    assert INVENTORY_PATH.is_file(), "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json missing"
-    return json.loads(INVENTORY_PATH.read_text(encoding="utf-8"))
+    return json.loads(require_ledger(INVENTORY_PATH))
 
 
 @pytest.fixture()

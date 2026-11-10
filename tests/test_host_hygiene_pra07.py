@@ -14,6 +14,9 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
 
 # Absolute paths that identify the stale external install. ``~/.hermes`` is a
 # legitimate *rejection* target in qubit_runtime, so only the hard-coded
@@ -68,8 +71,9 @@ def test_external_qubit_home_is_rejected_as_backend_home(tmp_path,
 
 
 def test_operator_hygiene_record_has_exact_commands():
-    doc = REPO / "docs/archive/2026-09-21" / "QUBIT_OPERATOR_HYGIENE_2026-09-19.md"
-    text = doc.read_text(encoding="utf-8")
+    # Purged in eafb54e26; read read-only from pre-purge history.
+    text = require_ledger(
+        "docs/archive/2026-09-21/QUBIT_OPERATOR_HYGIENE_2026-09-19.md")
     for needle in (
         "systemctl --user disable --now hermes-dashboard.service",
         "~/.config/systemd/user/qubit-voice-agent.service",

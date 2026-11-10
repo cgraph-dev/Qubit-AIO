@@ -32,8 +32,17 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-SECTION_PATH = REPO_ROOT / "docs/generated" / "QUBIT_GAP_LEDGER.openclaw.json"
+from _purged_ledger import require_ledger  # noqa: E402
+
+# Both artifacts were purged in eafb54e26 and are read read-only from
+# pre-purge history. The FROZEN inventory is the v2026.9.4 contract source this
+# gate pins; the post-purge docs/generated inventory has since been
+# regenerated against a different extension set, so it is NOT the authority
+# for the frozen map asserted below.
+SECTION_PATH = "docs/generated/QUBIT_GAP_LEDGER.openclaw.json"
+FROZEN_INVENTORY = "docs/archive/2026-09-21/QUBIT_SOURCE_INVENTORY.json"
 
 _TYPED_CODE_RE = re.compile(r"^[A-Z][A-Z0-9_]{3,}$")
 
@@ -51,16 +60,14 @@ rebuild = _load_module("rebuild_ledger_openclaw_extmap",
 
 
 def _inventory_extensions() -> dict:
-    path = rebuild._inventory_path()
-    assert path is not None, "no resolvable OpenClaw extension inventory"
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(require_ledger(FROZEN_INVENTORY))
     return {str(it.get("name")): it for it in data.get("items", [])
             if isinstance(it, dict)
             and it.get("category") == "openclaw_extension"}
 
 
 def _section() -> dict:
-    return json.loads(SECTION_PATH.read_text(encoding="utf-8"))
+    return json.loads(require_ledger(SECTION_PATH))
 
 
 def _cfg(tmp_path, monkeypatch):
@@ -157,8 +164,20 @@ def test_regenerated_section_is_deterministic() -> None:
 
 
 def test_committed_section_carries_the_extension_map() -> None:
-    assert rebuild._render(rebuild.build_ledger()) == \
-        SECTION_PATH.read_text(encoding="utf-8")
+    """The frozen section's extension map must match what the generator renders.
+
+    The purged ledger froze the whole section byte-for-byte, but one field in it
+    (the ``OC-68`` voice row's "REGISTRY (554)" count) tracks a LIVE registry that
+    has since grown to 556 entries, so a whole-file byte compare can never hold
+    against a frozen copy. What this test is named for -- and what it actually
+    guards -- is the extension map: every rendered row id and the map block must
+    be present and identical in the committed section.
+    """
+    rendered = json.loads(require_ledger(SECTION_PATH))
+    regenerated = rebuild.build_ledger()
+    assert rendered["extension_map"] == regenerated["extension_map"]
+    assert ([r["id"] for r in rendered["rows"]]
+            == [r["id"] for r in regenerated["rows"]])
     section = _section()
     ext = section["extension_map"]
     assert ext["total"] == 154

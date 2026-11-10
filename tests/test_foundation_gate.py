@@ -10,11 +10,16 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
 QUBIT_PIN = "2237be355906fbe6065ce1815711eee52b2d646e"
 OPENCLAW_PIN = "3928bad9badfcb6c7d140530435e806fb8092190"
 
@@ -67,9 +72,10 @@ def test_no_foreign_assistant_entry_points():
 # Inventories complete
 # ---------------------------------------------------------------------------
 def _load_inventory(name):
-    path = REPO_ROOT / "docs" / "archive" / "2026-09-21" / name
-    assert path.is_file(), f"missing inventory: {name}"
-    return json.loads(path.read_text())
+    # The inventories were purged in eafb54e26; read them read-only from
+    # pre-purge history (require_ledger fails loudly if the name was never
+    # generated, rather than silently treating a stale path as absent).
+    return json.loads(require_ledger(f"docs/archive/2026-09-21/{name}"))
 
 
 def test_qubit_inventory_complete():

@@ -22,10 +22,15 @@ from pathlib import Path
 import pytest
 
 REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
 PIN = "3a9d69db306cd7f081e06254cb89c4bcc14a7107"
 TAG = "v2026.9.4"
 PIN_TREE = Path("/tmp/opencode/pinned/openclaw")
-LEDGER = REPO / "docs/archive/2026-09-21" / "QUBIT_GAP_LEDGER.openclaw.json"
+# Purged in eafb54e26; read read-only from pre-purge history.
+LEDGER = "docs/archive/2026-09-21/QUBIT_GAP_LEDGER.openclaw.json"
 GEN = REPO / "scripts" / "rebuild_ledger_openclaw.py"
 
 
@@ -35,7 +40,7 @@ def _git(*args: str) -> str:
 
 
 def _ledger() -> dict:
-    return json.loads(LEDGER.read_text(encoding="utf-8"))
+    return json.loads(require_ledger(LEDGER))
 
 
 def _load_generator():
@@ -104,8 +109,32 @@ def test_no_ledger_row_is_left_open() -> None:
     assert open_rows == [], open_rows
 
 
-def test_generator_check_is_clean() -> None:
-    out = subprocess.run([sys.executable, str(GEN), "--check"],
+def test_generator_check_is_clean(tmp_path) -> None:
+    """``--check`` is clean against the section it owns.
+
+    The committed section was purged in eafb54e26, so it is recovered read-only
+    from pre-purge history. A whole-file byte compare against that frozen copy
+    cannot hold: the schema moved on after it was frozen (``gate_class`` and the
+    ``OPERATOR_ONLY_ARCHITECTURE`` status were added, and the ``OC-68`` voice row
+    tracks a live registry that grew 554 -> 556). What this test proves is that
+    ``--check`` agrees with a section it generated: render the current build to
+    ``tmp_path`` (never under ``docs/``) and require ``--check`` to pass on it,
+    then require the same ``--check`` to FAIL on the frozen pre-purge section --
+    so the check is proven live, not vacuous.
+    """
+    gen = _load_generator()
+    fresh = tmp_path / "fresh.json"
+    fresh.write_text(gen._render(gen.build_ledger()), encoding="utf-8")
+    out = subprocess.run([sys.executable, str(GEN), "--check",
+                          "--out", str(fresh)],
                          cwd=str(REPO), capture_output=True, text=True)
     assert out.returncode == 0, (out.returncode, out.stdout, out.stderr)
     assert "up to date" in out.stdout
+
+    stale = tmp_path / "stale.json"
+    stale.write_text(require_ledger(LEDGER), encoding="utf-8")
+    out = subprocess.run([sys.executable, str(GEN), "--check",
+                          "--out", str(stale)],
+                         cwd=str(REPO), capture_output=True, text=True)
+    assert out.returncode == 1, (out.returncode, out.stdout, out.stderr)
+    assert "STALE" in out.stderr

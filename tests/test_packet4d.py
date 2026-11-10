@@ -13,6 +13,12 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
+# Purged in eafb54e26; read read-only from pre-purge history.
+ALIGN_WINNER = "docs/archive/2026-09-21/ALIGN_4D_winner.json"
 
 from voicebridge.planner import (  # noqa: E402
     PLANNER_SCHEMA, PLANNER_TOOLS, TypedProposal, plan)
@@ -229,8 +235,7 @@ def test_create_candidate_uses_aligned_persona_not_inline_v2():
     assert body.count("persona = ") == 1, "duplicate persona assignment"
     assert "_aligned_persona()" in body
     # and the aligned refusal line must exist in the winner config
-    winner = json.loads(
-        (REPO_ROOT / "docs/archive/2026-09-21" / "ALIGN_4D_winner.json").read_text())
+    winner = json.loads(require_ledger(ALIGN_WINNER))
     assert "REFUSE IMMEDIATE ACTIONS FOR DESTRUCTION" in winner["persona"]
 
 
@@ -270,7 +275,6 @@ def test_created_modelfile_carries_aligned_system(tmp_path):
     assert m, f"no SYSTEM block:\n{mf[:400]}"
     assert m.group(1).strip(), f"EMPTY persona:\n{mf[:400]}"
     sys_text = m.group(1)
-    winner = json.loads(
-        (REPO_ROOT / "docs/archive/2026-09-21" / "ALIGN_4D_winner.json").read_text())
+    winner = json.loads(require_ledger(ALIGN_WINNER))
     assert "REFUSE IMMEDIATE ACTIONS FOR DESTRUCTION" in sys_text
     assert sys_text.strip().startswith(winner["persona"].strip()[:40])
