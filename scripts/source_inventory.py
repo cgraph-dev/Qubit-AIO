@@ -376,6 +376,151 @@ def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
     }
 
 
+def _live_cli_surface(repo: Path) -> set[str]:
+    """``{"chat", "cron create", ...}`` from the REAL Qubit argparse tree.
+
+    The ledger is the wrong place to look for CLI coverage: the rows that used
+    to carry ``cli:<command>`` ids were purged with the rest of the capability
+    ledger (``eafb54e26``), which left every ``qubit_cli_command`` inventory item
+    unmatched and therefore reported MISSING no matter how many of them ship.
+    The parser is the authority — if a command path exists there, the capability
+    exists.  Returns an empty set on any import/build failure so a broken
+    environment degrades to the old behaviour instead of crashing the generator.
+    """
+    roots = [repo / "qubit_runtime", repo]
+    for root in roots:
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+    try:
+        from qubit_cli import main as _main
+
+        built = _main._build_cli_parser()
+        parser = built[0] if isinstance(built, tuple) else built
+    except Exception:  # noqa: BLE001 - a missing CLI is not a generator failure
+        return set()
+
+    found: set[str] = set()
+
+    def _walk(sub_actions, prefix: str) -> None:
+        for action in sub_actions:
+            choices = getattr(action, "choices", None)
+            # ``choices`` is a dict for subparsers but a list for positional
+            # value constraints (``choices=["a", "b"]``); only the former is a
+            # command path.
+            if not isinstance(choices, dict):
+                continue
+            for name, sub in choices.items():
+                path = f"{prefix} {name}".strip()
+                found.add(path)
+                _walk(getattr(sub, "_actions", ()), path)
+
+    _walk(parser._actions, "")
+    return found
+
+
+def _live_route_surface(repo: Path) -> set[str]:
+    """``{"GET /api/status", ...}`` from the real route registry.
+
+    Same rationale as :func:`_live_cli_surface`: the ledger's ``api:*`` rows are
+    gone, but ``voicebridge/qubit_compat.py`` registers every route with a
+    literal ``_r("METHOD", r"pattern", "handler")`` call, which is a stronger
+    proof of existence than a ledger row ever was.
+    """
+    import re as _re
+
+    src_path = repo / "voicebridge" / "qubit_compat.py"
+    try:
+        src = src_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    found: set[str] = set()
+    for method, pattern in _re.findall(
+            r'^_r\(\s*"([A-Z]+)"\s*,\s*r?"([^"]+)"', src, _re.MULTILINE):
+        # Normalise a regex route to the concrete path shape an inventory id
+        # uses: ``(?P<id>[^/]+)`` -> ``{id}``, leftover groups dropped, anchors
+        # stripped. Without this the id never matches an upstream path.
+        pattern = _re.sub(r"\(\?P<([A-Za-z_][A-Za-z0-9_]*)>[^)]*\)", r"{\1}", pattern)
+        pattern = _re.sub(r"\([^)]*\)", "", pattern)
+        pattern = pattern.replace("$", "").lstrip("^")
+        found.add(f"{method} {pattern}")
+    return found
+
+
+def _live_dashboard_surface(repo: Path) -> set[str]:
+    """Page component basenames (``{"ChatPage", ...}``) that really ship."""
+    pages = repo / "frontend" / "qubit-web" / "src" / "pages"
+    try:
+        return {p.stem for p in pages.glob("*.tsx")
+                if not p.stem.endswith((".test", ".spec", ".stories"))}
+    except OSError:
+        return set()
+
+
+def _live_surface_disposition(repo: Path, item: dict,
+                              surfaces: dict | None = None) -> dict | None:
+    """Typed disposition for a CLI / route / dashboard item against LIVE code.
+
+    Returns ``None`` for categories this does not own, so their existing
+    classification is untouched.  ``surfaces`` is an optional pre-built cache
+    (``{"cli": set, "route": set, "page": set}``) so a 8196-item run builds the
+    three indexes once instead of per item.
+    """
+    cat = item.get("category")
+    if cat not in ("qubit_cli_command", "qubit_cli_subcommand",
+                   "qubit_backend_route", "hermes_dashboard_page"):
+        return None
+    if surfaces is None:
+        surfaces = {
+            "cli": _live_cli_surface(repo),
+            "route": _live_route_surface(repo),
+            "page": _live_dashboard_surface(repo),
+        }
+
+    if cat in ("qubit_cli_command", "qubit_cli_subcommand"):
+        name = str(item.get("name") or "").strip()
+        path = name[len("hermes "):] if name.startswith("hermes ") else name
+        path = path.replace("qubit ", "", 1) if path.startswith("qubit ") else path
+        if path in surfaces["cli"]:
+            return {
+                "status": "IMPLEMENTED", "capability": "qubit_cli_surface",
+                "backend": "qubit_cli.main:_build_cli_parser",
+                "proving_test": "tests/test_cli_*.py",
+                "reason": (f"`qubit {path}` is a live argparse command path in "
+                           "qubit_cli.main._build_cli_parser(); the bundle row "
+                           "it used to match was purged with the capability "
+                           "ledger, so coverage is read from the parser."),
+                "needs": "none",
+            }
+        return None
+
+    if cat == "qubit_backend_route":
+        method = str(item.get("method") or "").upper()
+        route = str(item.get("route") or "")
+        if f"{method} {route}" in surfaces["route"]:
+            return {
+                "status": "IMPLEMENTED", "capability": "qubit_backend_route",
+                "backend": "voicebridge.qubit_compat:_r",
+                "proving_test": "",
+                "reason": (f"{method} {route} is registered by a literal "
+                           "`_r(...)` call in voicebridge/qubit_compat.py."),
+                "needs": "none",
+            }
+        return None
+
+    # hermes_dashboard_page
+    name = str(item.get("name") or "")
+    if name in surfaces["page"]:
+        return {
+            "status": "IMPLEMENTED", "capability": "qubit_dashboard_page",
+            "backend": f"frontend/qubit-web/src/pages/{name}.tsx",
+            "proving_test": "",
+            "reason": (f"frontend/qubit-web/src/pages/{name}.tsx ships and is "
+                       "bundled into the served dashboard."),
+            "needs": "none",
+        }
+    return None
+
+
 def _openclaw_disposition(item: dict) -> dict | None:
     """Typed disposition for an upstream extension not matched to a ledger row.
 
@@ -2145,10 +2290,20 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
     # in-process, so its registry/skill tree/plugin fleet is the real surface.
     fork_tools = _fork_tool_names(repo)
     fork_plugins = _fork_plugin_names(repo)
+    # Build the live CLI/route/page indexes ONCE for the whole run: each helper
+    # imports the argparse tree or scans a 12k-line module, which is far too
+    # expensive to repeat per inventory item.
+    live_surfaces = {
+        "cli": _live_cli_surface(repo),
+        "route": _live_route_surface(repo),
+        "page": _live_dashboard_surface(repo),
+    }
     for it in all_items:
         disposition = _fork_disposition(repo, it, fork_tools, fork_plugins)
         if disposition is None:
             disposition = _openclaw_disposition(it)
+        if disposition is None:
+            disposition = _live_surface_disposition(repo, it, live_surfaces)
         if disposition is not None:
             it["fork_disposition"] = disposition
 
