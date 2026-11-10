@@ -338,6 +338,24 @@ describe("host theme + rerender stability", () => {
     h.cleanup();
   });
 
+  it("marks the root only while BOTH docks are open", () => {
+    // The dual-dock marker is what the stylesheet uses to split the row into
+    // two non-overlapping halves; a single dock must keep its original width.
+    const single = createStatefulHarness({ 3: true });
+    single.render({});
+    const singleRoot = single.tree.find(
+      (e) => e.props["data-testid"] === "office-app");
+    expect(singleRoot?.props["data-office-docks"]).toBeUndefined();
+    single.cleanup();
+
+    const both = createStatefulHarness({ 3: true, 4: true });
+    both.render({});
+    const bothRoot = both.tree.find(
+      (e) => e.props["data-testid"] === "office-app");
+    expect(bothRoot?.props["data-office-docks"]).toBe("both");
+    both.cleanup();
+  });
+
   it("opts the docks and buttons into a declared 9-slice", () => {
     const slicedTheme = {
       id: "demo",
