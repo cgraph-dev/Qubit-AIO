@@ -203,3 +203,58 @@ def test_cached_status_helper_uses_only_cached_state(tmp_path, monkeypatch):
     assert seen["configured"] == {"rea": {"transport": "stdio",
                                           "enabled": True}}
     assert seen["include_runtime"] is True
+
+
+def test_config_rows_advertise_editable_false(tmp_path, monkeypatch):
+    """A config.yaml row must be advertised non-editable (PRB-01).
+
+    ``set_enabled`` writes the canonical registry store only, so an enable /
+    disable against a config-declared server answers MCP_NOT_FOUND; and the
+    runtime MCP client (``tools/mcp_tool_config._load_mcp_config``) loads every
+    ``mcp_servers`` entry without consulting ``enabled``, so persisting a flag
+    would not switch anything. The served row therefore says ``editable: False``
+    and the dashboard offers no toggle. A registry row (the store's own record,
+    which ``set_enabled`` CAN act on) says ``editable: True``.
+    """
+    from voicebridge import mcp_servers as MS
+
+    cfg = _cfg(tmp_path, monkeypatch, runtime_yaml=RUNTIME_CONFIG)
+    rows = _rows(cfg)
+    # config.yaml-declared: read-only inventory
+    for name in ("rea", "memelord"):
+        assert rows[name]["source"] == "qubit-config", rows[name]
+        assert rows[name]["editable"] is False, rows[name]
+
+    # The same server upserted into the registry becomes editable.
+    MS.upsert(cfg, "rea", {"transport": "stdio", "command": "rea-local",
+                           "enabled": True})
+    row = _rows(cfg)["rea"]
+    assert row["source"] == "qubit-registry", row
+    assert row["editable"] is True, row
+    # set_enabled acts on it -- the exact call that 404'd for a config row.
+    assert MS.set_enabled(cfg, "rea", False)["server"]["enabled"] is False
+
+
+def test_served_wire_row_carries_editable(tmp_path, monkeypatch):
+    """``GET /api/mcp/servers`` must carry ``editable`` through its whitelist.
+
+    ``h_mcp_servers`` builds an explicit ``McpServer`` wire shape and silently
+    dropped any field not listed, so ``editable: False`` never reached the SPA
+    and the dashboard rendered a live toggle for a config.yaml row whose
+    endpoint answers MCP_NOT_FOUND. Pin the field on the served row.
+    """
+    from voicebridge import mcp_servers as MS
+    from voicebridge import qubit_compat as HC
+
+    cfg = _cfg(tmp_path, monkeypatch, runtime_yaml=RUNTIME_CONFIG)
+    status, body = HC.dispatch(cfg, "GET", "/api/mcp/servers")
+    assert status == 200, body
+    rows = {r["name"]: r for r in body["servers"]}
+    assert rows["rea"]["source"] == "qubit-config"
+    assert rows["rea"]["editable"] is False, rows["rea"]
+
+    MS.upsert(cfg, "rea", {"transport": "stdio", "command": "rea-local",
+                           "enabled": True})
+    status, body = HC.dispatch(cfg, "GET", "/api/mcp/servers")
+    rows = {r["name"]: r for r in body["servers"]}
+    assert rows["rea"]["editable"] is True, rows["rea"]

@@ -107,21 +107,58 @@ def test_every_ops_endpoint_in_plugin_source_is_a_real_operation(tmp_path,
     assert checked >= 12, checked
 
 
-def _served_through_office_front_door(path: str) -> bool:
-    """True when ``path`` reaches a real handler via the office rewrite.
+# The office family's catch-all is a deliberate TYPED REFUSAL
+# (``h_office_habblaud_refuse``, 403 OFFICE_CLIENT_UNSUPPORTED). Matching it is
+# not a capability, so the front-door probe below never counts it as "served" --
+# otherwise every fabricated path would pass and this audit would be vacuous.
+_OFFICE_REFUSAL_HANDLERS = {"h_office_habblaud_refuse"}
+
+
+def _served_through_office_front_door(path: str, method: str) -> bool:
+    """True when ``path``+``method`` reaches a real handler via the office rewrite.
 
     The vendored office client issues literal ``/api/<x>`` reads (``/api/stats``,
     ``/api/spawn``, ``/api/timeline/days`` ...). ``webui`` rewrites those onto
     ``/api/office/habblaud<suffix>`` and dispatches through ``HC.match``, so they
     are served without appearing as literal ``HC.ROUTES`` patterns. Anything the
-    office family does not bind answers a typed 501 OFFICE_CAPABILITY_UNBOUND —
-    never a bare 404 — which is the property this audit cares about.
+    office family does not bind answers a typed 501 OFFICE_CAPABILITY_UNBOUND or
+    the catch-all's 403 OFFICE_CLIENT_UNSUPPORTED — never a working endpoint.
+
+    The probe is method-aware: ``/api/spawn`` and ``/api/rooms/rename`` are
+    POST-only rows, so a GET probe would report them missing.
     """
     from voicebridge import qubit_compat as HC
 
     suffix = path[len("/api"):] if path.startswith("/api") else path
-    route, _params = HC.match("GET", "/api/office/habblaud" + suffix)
-    return route is not None
+    route, _params = HC.match(method, "/api/office/habblaud" + suffix)
+    if route is None:
+        return False
+    return route.get("handler") not in _OFFICE_REFUSAL_HANDLERS
+
+
+# The HTTP verb each plugin path is actually requested with. Anything unlisted
+# is a read (GET), which is what the vendored client uses for its literal reads.
+POST_ONLY_PATHS = {
+    "/api/spawn": "office-api.ts: POST queues a real office task",
+    "/api/rooms/rename": "office-api.ts: POST writes the office store",
+    "/api/type": "qubit-office3.js: POST /api/type (body {text})",
+}
+
+# Paths a plugin source names ONLY to explain that the host does not serve them
+# (never a request it issues). qubit-hud documents that ``/api/models`` is not a
+# route in this tree and redirects the tab to the real ``/api/model/options`` +
+# ``/api/model/info``; the constant is on screen so the substitution is visible.
+# Pinned with its reason: a plugin that STARTS calling one of these, or any new
+# unsupported path, still fails the audit below.
+DOCUMENTED_UNSERVED = {
+    "/api/models": "qubit-hud header: specified-against route, not served by this "
+                   "build; tab reads /api/model/options + /api/model/info",
+}
+
+# Paths served DIRECTLY by webui's do_GET/do_POST rather than through HC
+# dispatch (which returns JSON bodies, not streams): the office SSE feed
+# (webui.py:4095) and the voice-typing POST (webui.py:5622).
+_WEBUI_DIRECT_PATHS = {"/api/stream", "/api/snapshot", "/api/type"}
 
 
 def test_every_non_ops_endpoint_in_plugin_source_is_registered():
@@ -133,9 +170,14 @@ def test_every_non_ops_endpoint_in_plugin_source_is_registered():
         for path in paths:
             if path.startswith("/api/ops/"):
                 continue
+            if path in DOCUMENTED_UNSERVED:
+                continue
             if any(re.fullmatch(pattern, path) for pattern in known):
                 continue
-            if _served_through_office_front_door(path):
+            if path in _WEBUI_DIRECT_PATHS:
+                continue
+            method = "POST" if path in POST_ONLY_PATHS else "GET"
+            if _served_through_office_front_door(path, method):
                 continue
             missing.append((plugin, path))
     assert not missing, missing

@@ -464,6 +464,10 @@ def _public(rec: Dict[str, Any],
         "invocation_code": INVOKE_READY_CODE if ready else INVOKE_OPERATOR_CODE,
         "status": ("connected" if connected else "configured-not-connected"),
         "source": "qubit-registry",
+        # A registry row is the canonical store's own record: enable/disable
+        # (``set_enabled``) can act on it. Config-declared rows override this to
+        # False (PRB-01: they are read-only inventory).
+        "editable": True,
         "error": None,
     }
 
@@ -743,11 +747,14 @@ def _list_servers_uncached(cfg: Any) -> Dict[str, Any]:
             continue
         row = _public(rec, connected=name in discovered)
         row["source"] = "qubit-config"
-        # Operator-declared servers are INVENTORY-ONLY (see config_server_records:
-        # "PRB-01: read-only; never written, never a second authority"). set_enabled
-        # only knows the registry store, so a toggle rendered for these rows is a
-        # control that always 404s MCP_NOT_FOUND. Say so on the row instead of
-        # letting the UI offer a write the endpoint will refuse.
+        # PRB-01: a config.yaml-declared server is READ-ONLY inventory here.
+        # ``set_enabled`` writes the canonical registry store only, so an
+        # enable/disable on this row would raise MCP_NOT_FOUND; and the runtime
+        # MCP client (``tools/mcp_tool_config._load_mcp_config``) loads every
+        # ``mcp_servers`` entry without consulting ``enabled`` at all, so
+        # persisting a flag would not switch anything. Mark the row
+        # non-editable so the dashboard offers no toggle instead of a control
+        # that cannot act. The operator edits config.yaml.
         row["editable"] = False
         rows.append(row)
         seen.add(name)

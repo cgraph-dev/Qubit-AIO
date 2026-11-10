@@ -330,9 +330,12 @@ def test_vendored_dashboard_has_no_tiny_placeholder_page():
     real = [p for p in pages if not p.name.endswith(".test.tsx")]
     # The route inventory grew from the original 21 to 55 real pages as the
     # ported surfaces landed (computer, agent workspace, canvas, agents, …).
+    # 55 -> 54 in e4a9e6861, which deleted QubitBotWorkspacePage.tsx: it was
+    # never imported into App.tsx (the /qubit-workbench page was retired and
+    # /qubit-bot renders QubitBotPage), so the reachability audit flagged it.
     # The pinned count is a fence against a silent deletion, not a target: it
     # is asserted exactly so adding or dropping a page is a deliberate edit.
-    assert len(real) == 55, [p.name for p in real]
+    assert len(real) == 54, [p.name for p in real]
     for p in real:
         # A page may be a thin route shell that composes one component (e.g.
         # ComputerWorkspacePage -> components/om-computer-workspace.tsx), so

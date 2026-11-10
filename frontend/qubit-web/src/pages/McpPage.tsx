@@ -473,6 +473,11 @@ export default function McpPage() {
   };
 
   const handleToggleEnabled = async (server: McpServer) => {
+    // A config.yaml-declared row is read-only inventory (see `editable`): the
+    // endpoint writes the canonical registry store only and would answer
+    // MCP_NOT_FOUND, and the runtime client ignores `enabled` anyway. Refuse
+    // here so no path can offer a control that cannot act.
+    if (server.editable === false) return;
     const next = !server.enabled;
     setTogglingName(server.name);
     try {
@@ -1102,12 +1107,22 @@ export default function McpPage() {
                     size="sm"
                     title={
                       server.editable === false
-                        ? `${server.name} is declared in config.yaml and is inventory-only here; change it with the CLI`
-                        : server.enabled ? "Disable" : "Enable"
+                        ? "Declared in config.yaml — read-only here; edit config.yaml to change it"
+                        : server.enabled
+                          ? "Disable"
+                          : "Enable"
                     }
-                    aria-label={server.enabled ? "Disable" : "Enable"}
+                    aria-label={
+                      server.editable === false
+                        ? "Read-only: declared in config.yaml"
+                        : server.enabled
+                          ? "Disable"
+                          : "Enable"
+                    }
                     onClick={() => handleToggleEnabled(server)}
-                    disabled={togglingName === server.name || server.editable === false}
+                    disabled={
+                      togglingName === server.name || server.editable === false
+                    }
                     prefix={
                       togglingName === server.name ? <Spinner /> : <Power />
                     }

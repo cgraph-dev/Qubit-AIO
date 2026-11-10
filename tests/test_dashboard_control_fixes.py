@@ -94,8 +94,14 @@ def test_d8_d9_d10_duplicate_routes_have_distinct_identities():
     titles = _route_titles()
     assert titles["/qubit-boards"] == "Qubit Boards"
     assert titles["/qubit-runtime"] == "Runtime Inventory"
-    # the vendored counterparts keep their own (non-Qubit) titles
-    assert "/kanban" not in titles and "/devices" not in titles
+    # The vendored counterparts must not share a title with the Qubit surface;
+    # what makes them distinct is that no entry here claims the vendored path
+    # itself. `/kanban` is the vendored Boards tab and stays untitled here;
+    # `/devices` IS a Qubit family page (titled "Qubit Devices", like /nodes
+    # and /canvas) and is deliberately distinct from the vendored tab's own
+    # label -- so the invariant is distinctness, not absence.
+    assert "/kanban" not in titles
+    assert titles.get("/devices") != titles["/qubit-runtime"]
     app = APP.read_text(encoding="utf-8")
     # sidebar labels resolve through the same map, so nav and header agree
     assert "ROUTE_TITLES[manifest.tab.path]" in app
@@ -296,8 +302,8 @@ const authedFetch = () => Promise.resolve({
   text: () => Promise.resolve("{}"),
 });
 global.window = {
-  __HERMES_PLUGIN_SDK__: {React, hooks, fetchJSON, authedFetch},
-  __HERMES_PLUGINS__: {
+  __QUBIT_PLUGIN_SDK__: {React, hooks, fetchJSON, authedFetch},
+  __QUBIT_PLUGINS__: {
     register: (n, c) => { registered[n] = c; },
     registerSlot: () => {},
   },
