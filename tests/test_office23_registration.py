@@ -41,12 +41,39 @@ def test_app_tsx_has_a_route_map_entry_for_each_path():
             f"App.tsx route map has no PluginPage entry for {path}")
 
 
+# The sidebar entry for an office2/office3 path, if the shell carries one.
+_NAV_ENTRY_RE = r'\{{ path: "{{path}}", label(?:Key)?: "[^"]+", label: "[^"]+", icon: \w+[^}}]*\}}'
+
+
+_LABELS = {"/qubit-office2": "Agent Quest", "/qubit-office3": "Voice Chat"}
+
+
+def _app_tsx() -> str:
+    return (REPO / "frontend/qubit-web/src/App.tsx").read_text()
+
+
 def test_app_tsx_has_a_nav_tab_for_each_path():
-    app = (REPO / "frontend/qubit-web/src/App.tsx").read_text()
+    """A path is either a sidebar tab or a deliberate hidden-tab route.
+
+    Both are full registrations: a hidden-tab route is still mounted by the
+    client route map and the server allowlist (asserted above), and declaring
+    it hidden is how the shell says "reachable, not a sidebar row".  What must
+    never happen is a path with NEITHER a nav entry NOR an explicit hidden
+    declaration — that is the "renderable but undiscoverable" gap.
+    """
+    app = _app_tsx()
     for path in NEW_PATHS:
-        assert re.search(
-            rf'\{{ path: "{re.escape(path)}", label: "[^"]+", icon: \w+, exactEnd: true \}}',
-            app), f"App.tsx nav has no tab entry for {path}"
+        has_nav = re.search(
+            _NAV_ENTRY_RE.replace("{{path}}", re.escape(path)), app) is not None
+        # The shell records the drop as a comment beside the nav list.
+        dropped = f"`{path}` ({_LABELS[path]})" in app
+        dangling = f'"{path}": () => <PluginPage' in app
+        assert has_nav or dropped, (
+            f"App.tsx has no nav tab for {path} and no record of it being a "
+            "deliberately hidden tab")
+        if dropped:
+            assert dangling, (
+                f"{path} is declared hidden but has no mounted route entry")
 
 
 def test_chat_routes_lists_both_paths_as_full_height():

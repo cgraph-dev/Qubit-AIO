@@ -30,7 +30,8 @@ capability". This file pins the front door that fixes exactly that:
    real Qubit office store data, so the two paths can never disagree.
 3. **An unbound client path is a typed 501 JSON refusal**, never a bare 404.
 4. **The read gate is the tight loopback + same-origin + own-app triple** and
-   never a token bypass; query-token policy is unchanged; POST cannot ride it.
+   never a token bypass; query-token policy is unchanged; a supplied header
+   token keeps the real `/api/*` route; POST cannot ride it.
 
 Hermetic: tmp ``XDG_*`` only; no network, no live service.
 """
@@ -242,12 +243,16 @@ def test_forged_referer_without_a_live_nonce_is_refused():
     assert _Handler(cfg, referer=APP)._office_client_read_ok() is True
 
 
-def test_read_gate_refuses_a_query_token_but_accepts_a_header_token():
+def test_read_gate_refuses_a_query_token_and_a_supplied_header_token():
     cfg = type("C", (), {})()
     # The stream's query-token exception stays confined to /api/stream.
     assert not _Handler(cfg, query="token=configured") \
         ._office_client_read_ok()
-    assert _Handler(cfg, header="configured")._office_client_read_ok()
+    # A SUPPLIED header token never rides the office-client exemption, valid or
+    # not: a valid one is an authenticated caller that must keep the documented
+    # `/api/*` route (and its bridge contract), not be diverted into the office
+    # compat family. The office client itself has no token to attach.
+    assert not _Handler(cfg, header="configured")._office_client_read_ok()
     assert not _Handler(cfg, header="wrong")._office_client_read_ok()
 
 
