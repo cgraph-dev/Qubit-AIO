@@ -7,6 +7,7 @@ caller passes no milestones. Hermetic: temp XDG/QUBIT_HOME only.
 """
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -71,3 +72,25 @@ def test_goals_set_rejects_empty_title(tmp_path, monkeypatch):
                             {"confirm": True, "title": ""})
     assert code == 400, out
     assert out.get("code") == "BOT_GOAL_BAD_PARAMS", out
+
+
+def test_voice_bot_ops_reach_the_console_goals_path(tmp_path, monkeypatch):
+    """The ``bot_*`` ops dispatch through the same goals console path.
+
+    ``bot_goal_set`` / ``bot_goals_list`` (and the task/idea rows beside them)
+    declare the ``voicebridge.voice_commands._b_bot -> ``bot.<action>``
+    gateway backend, so they are only evidence-linked when a test reaches
+    that production dispatch — not merely when a test mentions the op id.
+    This is that production route: the shared registry dispatcher resolves
+    the row and its backend handler answers.
+    """
+    from voicebridge import dashboard_ops as DO
+
+    cfg = _cfg(tmp_path, monkeypatch)
+    first = DO.run_registry_op(cfg, "bot_goal_set", {"title": "inbox zero"})
+    assert first["state"] == "needs-confirm", first
+    out = DO.confirm_op(cfg, first["confirmation_id"])
+    assert out["state"] == "executed", out
+    listed = DO.run_registry_op(cfg, "bot_goals_list", {})
+    assert listed["state"] == "executed", listed
+    assert "inbox zero" in json.dumps(listed), listed
