@@ -34,6 +34,13 @@ function tokenPx(name: string): number {
 
 const GAP = tokenPx("--office-s3");
 
+// The live measurement at 1440x900: a 263px dashboard sidebar and 32px of page
+// padding leave the office host a 1145px content column, not the full viewport.
+const VIEWPORT_1440 = 1440;
+const SIDEBAR = 263;
+const PAGE_PADDING = 32;
+const CONTENT_1440 = VIEWPORT_1440 - SIDEBAR - PAGE_PADDING;
+
 /** The two absolutely-positioned sheets at a given host content width. */
 function dockRects(container: number) {
   // `.office-game[data-office-docks="both"] > .office-game__dock {
@@ -64,17 +71,15 @@ describe("dual-dock geometry", () => {
   });
 
   it("two single-width sheets do NOT fit the measured 1440px content column", () => {
-    // Why the dual rule is needed: measured content width at 1440x900 is
-    // 1440 - 263 (sidebar) - 32 (page padding) = 1145px.
-    const content = 1145;
-    const singleAt16 = Math.min(44 * 16, 0.92 * content); // 704px
-    expect(singleAt16 * 2).toBeGreaterThan(content);
+    // Why the dual rule is needed.
+    const singleAt16 = Math.min(44 * 16, 0.92 * CONTENT_1440); // 704px
+    expect(singleAt16 * 2).toBeGreaterThan(CONTENT_1440);
   });
 
   it("the rects never overlap at 1440x900 or at phone width", () => {
     // 1145px is the measured office host width at 1440x900. 390px is the
     // narrowest design target (mobile has no sidebar); the split still holds.
-    for (const container of [1145, 390]) {
+    for (const container of [CONTENT_1440, 390]) {
       const { agents, hud } = dockRects(container);
       expect(agents.right, `agents right @${container}`)
         .toBeLessThanOrEqual(hud.left);
@@ -86,8 +91,7 @@ describe("dual-dock geometry", () => {
   });
 
   it("the Agents Close button is inside its sheet, clear of the HUD sheet", () => {
-    const container = 1145;
-    const { agents, hud } = dockRects(container);
+    const { agents, hud } = dockRects(CONTENT_1440);
     // The Close button is the last child of the dock head; the head has
     // `padding: ... var(--office-s3)` and the Agents sheet adds a 1px
     // right border, so its right edge is at most `agents.right - gap - 1`.
