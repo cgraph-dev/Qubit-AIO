@@ -16,8 +16,19 @@ import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
-MANIFEST = REPO / "docs/archive/2026-09-21" / "QUBIT_WS_DIALECT_DISPOSITION.json"
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
+#: Purged in eafb54e26 with the rest of docs/archive/2026-09-21/. AGENTS.md
+#: forbids re-authoring it, so the manifest is read read-only from history and
+#: every assertion below still checks its CONTENT, not merely its existence.
+MANIFEST_REL = "docs/archive/2026-09-21/QUBIT_WS_DIALECT_DISPOSITION.json"
+
+
+def _manifest() -> dict:
+    return json.loads(require_ledger(MANIFEST_REL))
 
 
 def _gated():
@@ -34,7 +45,7 @@ def _gated():
 
 
 def test_manifest_registers_a_terminal_disposition_per_surface():
-    doc = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    doc = _manifest()
     allowed = {"SAFE_EQUIVALENT", "OPERATOR_ONLY", "IMPLEMENTED"}
     # PRA-09: an explicit, owner-approved typed safe equivalent is required —
     # the dialect may not be silently refused.
@@ -53,7 +64,7 @@ def test_manifest_registers_a_terminal_disposition_per_surface():
 
 
 def test_each_surface_matches_a_real_typed_gate():
-    doc = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    doc = _manifest()
     gates = _gated()
     for surface in doc["surfaces"]:
         if surface["disposition"] == "IMPLEMENTED":
