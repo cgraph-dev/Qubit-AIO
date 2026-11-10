@@ -192,10 +192,17 @@ class FakeModel:
 
 @pytest.fixture()
 def backend(tmp_path, monkeypatch):
+    from voicebridge import agent as AG
     from voicebridge.providers import gateway as GW
 
     model = FakeModel()
     monkeypatch.setattr(GW, "run_role", model)
+    # The chat turn prefers the vendored tool-capable agent (AG.run_agent_turn),
+    # which dials the configured provider directly and would bypass the stubbed
+    # gateway (hermetic gate: no LLM reachable). Return None so the turn takes
+    # the legacy gateway path this test stubs — the same shape the hermetic
+    # agent tests use for _run_vendored_session.
+    monkeypatch.setattr(AG, "run_agent_turn", lambda *_a, **_kw: None)
     be = E2EBackend(tmp_path / "e2e")
     be.start()
     try:
@@ -316,6 +323,14 @@ def _kill(proc) -> None:
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=10)
+    # The child was spawned with stdout=PIPE; close the pipe we own or the
+    # collector reports an unclosed file (PytestUnraisableExceptionWarning).
+    for stream in (getattr(proc, "stdout", None), getattr(proc, "stderr", None)):
+        try:
+            if stream is not None:
+                stream.close()
+        except Exception:  # noqa: BLE001 - best-effort teardown
+            pass
 
 
 def test_process_death_mid_turn_surfaces_interrupted_turn(tmp_path):
@@ -369,6 +384,9 @@ def test_process_death_mid_turn_surfaces_interrupted_turn(tmp_path):
         # ---- process death mid-turn ----
         proc1.kill()
         proc1.wait(timeout=10)
+        if getattr(proc1, "stdout", None) is not None:
+            assert proc1.stdout is not None
+            proc1.stdout.close()
 
     # The marker survives the process death.
     assert turn_marker.read_turn_marker(base / "runtime", session) is not None

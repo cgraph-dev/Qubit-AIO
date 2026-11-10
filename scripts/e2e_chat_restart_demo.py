@@ -88,6 +88,13 @@ def stub_model(park_forever: bool):
                               model="demo", identity="local/demo")
 
     GW.run_role = fake
+    # The chat turn prefers the vendored tool-capable agent, which dials the
+    # configured provider itself and would never reach ``fake`` (the model call
+    # is meant to be the ONLY stub here). Return None so the turn takes the
+    # legacy gateway path.
+    from voicebridge import agent as AG
+
+    AG.run_agent_turn = lambda *_a, **_kw: None
 
 
 def main() -> int:
