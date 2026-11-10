@@ -2775,6 +2775,10 @@ def probe_api_models(
         try:
             data = _get_json(url, timeout=timeout, headers=headers, **_open_kwargs)
         except Exception as exc:
+            # HTTPError is a response object holding the body fp: closing it here is
+            # what stops every failed probe from leaking a socket to the GC.
+            if isinstance(exc, urllib.error.HTTPError):
+                exc.close()
             # TLS, authentication and parsing failures must not hide corrected settings.
             cause = exc.reason if isinstance(exc, urllib.error.URLError) else exc
             all_timed_out = all_timed_out and isinstance(cause, TimeoutError)

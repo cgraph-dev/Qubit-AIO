@@ -598,7 +598,11 @@ def _dash_http(port, method, path, body=None, raw=None, token=_DASH_TOKEN):
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, r.read()
     except _err.HTTPError as e:
-        return e.code, e.read()
+        # HTTPError holds the response body fp; close it or it leaks.
+        try:
+            return e.code, e.read()
+        finally:
+            e.close()
 
 
 def _production_service_state():

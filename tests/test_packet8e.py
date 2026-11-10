@@ -1841,7 +1841,11 @@ def test_dashboard_auth_fail_closed_headers_and_pair_message(tmp_path):
                 urllib.request.urlopen(r)
                 raise AssertionError("expected 401")
             except urllib.error.HTTPError as exc:
-                assert exc.code == 401
+                # HTTPError holds the response body fp; close it or it leaks.
+                try:
+                    assert exc.code == 401
+                finally:
+                    exc.close()
 
         # missing header -> 401
         expect_401(req("/api/status"))
@@ -1880,7 +1884,11 @@ def test_dashboard_settings_is_real_backend_not_frontend_only(tmp_path):
             urllib.request.urlopen(req)
             raise AssertionError("expected 401")
         except urllib.error.HTTPError as exc:
-            assert exc.code == 401
+            # HTTPError holds the response body fp; close it or it leaks.
+            try:
+                assert exc.code == 401
+            finally:
+                exc.close()
         # the shared token helper is served to the dashboard
         with urllib.request.urlopen(  # noqa: S310
                 urllib.request.Request(base + "/static/vb.js")) as r:
@@ -2054,7 +2062,11 @@ def test_dashboard_full_lifecycle_real_backend(tmp_path):
             urllib.request.urlopen(base + "/api/websites")  # noqa: S310
             raise AssertionError("expected 401")
         except urllib.error.HTTPError as exc:
-            assert exc.code == 401
+            # HTTPError holds the response body fp; close it or it leaks.
+            try:
+                assert exc.code == 401
+            finally:
+                exc.close()
         # pending/disabled beginner status is pending/disabled (PENDING add)
         listing = get("/api/websites")
         assert listing["mode"] == MODE_RESTRICTED
@@ -2129,13 +2141,21 @@ def test_dashboard_websites_rejects_unauthenticated(tmp_path):
             urllib.request.urlopen(req())
             raise AssertionError("expected 401 without token")
         except urllib.error.HTTPError as exc:
-            assert exc.code == 401
+            # HTTPError holds the response body fp; close it or it leaks.
+            try:
+                assert exc.code == 401
+            finally:
+                exc.close()
         # query-string token is ALWAYS rejected
         try:
             urllib.request.urlopen(req(query="?token=secret-token"))
             raise AssertionError("expected 401 with query-string token")
         except urllib.error.HTTPError as exc:
-            assert exc.code == 401
+            # HTTPError holds the response body fp; close it or it leaks.
+            try:
+                assert exc.code == 401
+            finally:
+                exc.close()
         # correct header token works
         with urllib.request.urlopen(  # noqa: S310
                 req(headers={"X-Api-Token": "secret-token"})) as r:

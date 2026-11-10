@@ -361,11 +361,13 @@ def _fetch_models_dev_from_network(*, conditional: bool = False) -> tuple[dict[s
         started.set()
         try:
             # (connect, read) bounds each socket op, not the download: a trickling body never trips it.
-            response = requests.get(url, headers=headers, timeout=(5, 10))
-            if response.status_code == 304:
-                return 304, None, ""
-            response.raise_for_status()
-            return response.status_code, response.json(), response.headers.get("ETag", "")
+            # `with` releases the pool connection and its socket; without it the response is left
+            # to the GC, whose ResourceWarning lands in whichever test triggers collection.
+            with requests.get(url, headers=headers, timeout=(5, 10)) as response:
+                if response.status_code == 304:
+                    return 304, None, ""
+                response.raise_for_status()
+                return response.status_code, response.json(), response.headers.get("ETag", "")
         finally:
             _models_dev_download_slot.release()
 

@@ -92,7 +92,13 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("Content-Type", ""), e.read()
+        # HTTPError is a response object holding the body fp; closing it is
+        # required or the socket is left to the GC (ResourceWarning that fails
+        # an unrelated test under -n auto).
+        try:
+            return e.code, e.headers.get("Content-Type", ""), e.read()
+        finally:
+            e.close()
 
 
 def test_reports_api_requires_auth(tmp_path):

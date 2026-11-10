@@ -15,6 +15,7 @@ import threading
 import time
 import urllib.parse
 import urllib.request
+import urllib.error
 from pathlib import Path
 from typing import Optional
 
@@ -392,6 +393,10 @@ def _fetch_exchange_with_retry(req, timeout: float, fp: str) -> dict:
             _exchange_failure_cache.pop(fp, None)
             return data
         except Exception as exc:  # noqa: BLE001 — retry all, re-raise below
+            # HTTPError is a response object holding the body fp: closing it here is
+            # what stops every rejected exchange from leaking a socket to the GC.
+            if isinstance(exc, urllib.error.HTTPError):
+                exc.close()
             last_exc = exc
             status = getattr(exc, "code", None) or getattr(exc, "status", None)
             permanent_failure = status in _EXCHANGE_PERMANENT_HTTP_STATUSES

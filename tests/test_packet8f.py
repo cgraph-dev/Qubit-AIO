@@ -833,11 +833,15 @@ def _http(ui, method, path, body=None):
         with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode())
     except urllib.error.HTTPError as exc:
-        raw = exc.read().decode() or "{}"
+        # HTTPError holds the response body fp; close it or it leaks.
         try:
-            return json.loads(raw)
-        except Exception:
-            return {"state": "failed", "code": f"HTTP_{exc.code}"}
+            raw = exc.read().decode() or "{}"
+            try:
+                return json.loads(raw)
+            except Exception:
+                return {"state": "failed", "code": f"HTTP_{exc.code}"}
+        finally:
+            exc.close()
 
 
 def test_dashboard_actions_list_preview_execute(tmp_path):
@@ -1200,7 +1204,11 @@ def test_dashboard_unauthenticated_actions_rejected(tmp_path):
                 with urllib.request.urlopen(req, timeout=15) as resp:
                     assert False, f"expected 401 for {headers}"
             except urllib.error.HTTPError as exc:
-                assert exc.code == 401
+                # HTTPError holds the response body fp; close it or it leaks.
+                try:
+                    assert exc.code == 401
+                finally:
+                    exc.close()
         req = urllib.request.Request(url, headers={"X-Api-Token": "test-secret"})
         with urllib.request.urlopen(req, timeout=15) as resp:
             body = json.loads(resp.read().decode())
@@ -1214,7 +1222,11 @@ def test_dashboard_unauthenticated_actions_rejected(tmp_path):
             with urllib.request.urlopen(req, timeout=15) as resp:
                 assert False, "expected 401"
         except urllib.error.HTTPError as exc:
-            assert exc.code == 401
+            # HTTPError holds the response body fp; close it or it leaks.
+            try:
+                assert exc.code == 401
+            finally:
+                exc.close()
     finally:
         ui.stop()
 

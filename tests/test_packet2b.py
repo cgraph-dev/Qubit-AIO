@@ -309,7 +309,11 @@ def _get(url, headers=None):
         with urllib.request.urlopen(req, timeout=10) as resp:
             return resp.status, dict(resp.headers), resp.read()
     except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers), e.read()
+        # HTTPError holds the response body fp; close it or the socket leaks.
+        try:
+            return e.code, dict(e.headers), e.read()
+        finally:
+            e.close()
 
 
 def test_sse_stream_requires_header_token_and_serves_frames(sse_server, tmp_path):

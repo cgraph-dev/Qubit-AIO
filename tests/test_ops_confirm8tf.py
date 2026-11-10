@@ -62,7 +62,11 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
-        return e.code, json.loads(e.read())
+        # HTTPError holds the response body fp; close it or the socket leaks.
+        try:
+            return e.code, json.loads(e.read())
+        finally:
+            e.close()
 
 
 @needs_dist

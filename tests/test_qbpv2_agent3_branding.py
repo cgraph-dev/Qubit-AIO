@@ -100,7 +100,8 @@ def test_served_bundle_matches_tracked_source_bundle(tmp_path):
                 path = Path(root) / fname
                 rel = path.relative_to(DIST)
                 url = f"http://127.0.0.1:{port}/{rel.as_posix()}"
-                served = urllib.request.urlopen(url, timeout=15).read()
+                with urllib.request.urlopen(url, timeout=15) as _r:
+                    served = _r.read()
                 disk = path.read_bytes()
                 assert hashlib.sha256(served).hexdigest() == \
                     hashlib.sha256(disk).hexdigest(), f"served != disk: {rel}"
@@ -109,14 +110,17 @@ def test_served_bundle_matches_tracked_source_bundle(tmp_path):
         # Plugin bundles the SPA loads are the tracked public copies.
         for name in ("qubit-achievements", "kanban"):
             for sub in ("dist/index.js", "dist/style.css"):
-                served = urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/plugins/{name}/{sub}",
-                    timeout=15).read()
+                with urllib.request.urlopen(
+                        f"http://127.0.0.1:{port}/plugins/{name}/{sub}",
+                        timeout=15) as _r:
+                    served = _r.read()
                 tracked = (PUBLIC / "plugins" / name / sub).read_bytes()
                 assert hashlib.sha256(served).hexdigest() == \
                     hashlib.sha256(tracked).hexdigest(), (name, sub)
-        fleet = json.loads(urllib.request.urlopen(
-            f"http://127.0.0.1:{port}/plugins/fleet.json", timeout=15).read())
+        with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/plugins/fleet.json",
+                timeout=15) as _r:
+            fleet = json.loads(_r.read())
         assert {m["name"] for m in fleet} == {"qubit-achievements", "kanban"}
     finally:
         ui.stop()

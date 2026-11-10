@@ -109,11 +109,15 @@ def _mint(port, *, headers=None, body=None):
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as e:
-        raw = e.read()
+        # HTTPError holds the response body fp; close it or the socket leaks.
         try:
-            return e.code, json.loads(raw)
-        except ValueError:
-            return e.code, {"raw": raw.decode("utf-8", "replace")}
+            raw = e.read()
+            try:
+                return e.code, json.loads(raw)
+            except ValueError:
+                return e.code, {"raw": raw.decode("utf-8", "replace")}
+        finally:
+            e.close()
 
 
 def _ws_url(port, ticket, **extra):
