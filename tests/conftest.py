@@ -132,6 +132,31 @@ def pytest_runtest_setup(item):  # noqa: D103
 
 
 @pytest.fixture(autouse=True)
+def scratch_prune_spawns(monkeypatch):  # noqa: D103
+    """No test starts a real detached scratch prune.
+
+    ``qubit_constants_scratch_detach.spawn_prune`` deliberately *detaches* the
+    child: it discards the ``Popen`` handle so the prune outlives the command
+    that launched it. Under the test runner that handle is finalised by the GC
+    while the child is still running, and CPython raises ``ResourceWarning:
+    subprocess N is still running`` from ``Popen.__del__``. With
+    ``filterwarnings = error`` that fails the file at teardown — e.g.
+    tests/agent/test_compression_attempt_telemetry.py and
+    tests/agent/test_run_agent_codex_responses.py, which report every test
+    passing and still fail. The child would also outlive the test and outlive
+    the ``tmp_path`` cleanup.
+
+    Mirroring the vendored conftest: record the scratch dir instead of spawning.
+    A test that needs the real child runs a launcher in a subprocess.
+    """
+    import qubit_constants_scratch_detach
+
+    spawned: list = []
+    monkeypatch.setattr(qubit_constants_scratch_detach, "spawn_prune", spawned.append)
+    return spawned
+
+
+@pytest.fixture(autouse=True)
 def _isolate_qubit_runtime(tmp_path, monkeypatch):  # noqa: D103
     """PRB-03: no test may resolve the operator's real runtime store.
 
