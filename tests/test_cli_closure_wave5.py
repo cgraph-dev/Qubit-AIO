@@ -120,7 +120,6 @@ def test_wave5_confirm_routes_require_confirm_then_forward(monkeypatch):
         (["mcp", "install"], ["mcp", "install"]),
         (["mcp", "login"], ["mcp", "login"]),
         (["mcp", "reauth"], ["mcp", "reauth"]),
-        (["mcp", "rm"], ["mcp", "rm"]),
         (["mcp", "serve"], ["mcp", "serve"]),
         (["memory", "off"], ["memory", "off"]),
         (["memory", "reset"], ["memory", "reset"]),
@@ -181,6 +180,43 @@ def test_wave5_confirm_routes_require_confirm_then_forward(monkeypatch):
         assert rc == 0, (qargv, rc, buf.getvalue()[:200])
         assert calls == [fork_argv], (qargv, calls)
         assert "--confirm" not in calls[0]
+
+
+def test_wave5_mcp_mutate_is_native_with_its_own_confirm_gate(monkeypatch):
+    # ``qubit mcp remove|rm|delete|disable`` no longer forwards to the fork:
+    # _cmd_mcp_mutate reuses the dashboard mutation authority (mcp_delete /
+    # mcp_set_enabled) and stages its own CONFIRM_REQUIRED envelope. The fork
+    # runtime must never be dialed for it.
+    calls = _capture(monkeypatch)
+    for sub in ("remove", "rm", "delete", "disable"):
+        assert sub in _qubit_mcp_subcommands(), sub
+        # The forward layer declines the verb outright, so CLI.main falls
+        # through to the native handler below; the stale ``("mcp", "rm")``
+        # CONFIRM_TABLE row is therefore unreachable (route() returns None
+        # first) and is left in place as dead data, not scraped by this test.
+        assert HF.route(["mcp", sub, "someserver"]) is None, sub
+        calls.clear()
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = CLI.main(["mcp", sub, "someserver"])
+        out = json.loads(buf.getvalue())
+        assert rc == 1, (sub, rc, out)
+        assert calls == [], (sub, calls)
+        assert out["ok"] is False and out["code"] == "CONFIRM_REQUIRED", (sub, out)
+        assert out["state"] == "NEEDS_CONFIRMATION", (sub, out)
+
+
+def _qubit_mcp_subcommands() -> set:
+    families: dict = {}
+    for action in CLI.build_parser()._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            for fam, sp in action.choices.items():
+                subs = set()
+                for sub in sp._actions:
+                    if isinstance(sub, argparse._SubParsersAction):
+                        subs.update(sub.choices.keys())
+                families[fam] = subs
+    return families["mcp"]
 
 
 def test_wave5_confirm_pairs_are_in_confirm_table():
