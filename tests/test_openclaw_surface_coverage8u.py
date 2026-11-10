@@ -23,8 +23,13 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-MANIFEST = REPO_ROOT / "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"
+from _purged_ledger import require_ledger  # noqa: E402
+
+# The canonical manifest under docs/generated/ was purged in eafb54e26 along
+# with the archive; it is read read-only from pre-purge history.
+MANIFEST = "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"
 SCRIPT = REPO_ROOT / "scripts/qubit_upgrade_manifest.py"
 DESCRIPTOR = "src/gateway/methods/core-descriptors.ts"
 
@@ -96,7 +101,7 @@ def _true_names(blob):
 
 
 def _manifest():
-    return json.loads(MANIFEST.read_text())
+    return json.loads(require_ledger(MANIFEST))
 
 
 def test_true_surface_parses_to_the_contractual_and_observed_counts():
