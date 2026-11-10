@@ -24,6 +24,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "tests"))
+
+from _purged_ledger import require_ledger  # noqa: E402
 
 MAP = REPO_ROOT / "docs/archive/2026-09-21" / "HERMES_FRONTEND_MAP.json"
 FW = REPO_ROOT / "frontend" / "qubit-web"
@@ -64,8 +67,11 @@ def test_inventory_sections_present_and_pinned():
                 "plugins", "plugin_apis", "assets", "state_files", "i18n",
                 "workflows"):
         assert key in inv, key
-    assert json.loads(REPO_ROOT.joinpath("docs/archive/2026-09-21", "INVENTORY_HERMES.json")
-                      .read_text())["commit"] == doc["source"]["revision"]
+    # INVENTORY_HERMES.json was purged in eafb54e26; require_ledger reads it
+    # read-only from the pre-purge tree and fails loudly if the revision
+    # drifted. Never re-create the file (AGENTS.md).
+    assert json.loads(require_ledger("docs/archive/2026-09-21/INVENTORY_HERMES.json")
+                      )["commit"] == doc["source"]["revision"]
 
 
 def test_counts_match_the_tree():
@@ -79,7 +85,14 @@ def test_counts_match_the_tree():
     assert len(pages) == 19
     assert len(inv["pages"]) == len(pages)
     disk_plugins = sorted((QH / "plugins").glob("*/manifest.json"))
-    assert counts["overlay_plugins"] == len(disk_plugins)
+    # The map is a FROZEN record of the baseline fleet; Qubit has since added
+    # overlay plugins of its own (hud/office*/…). Every inventoried plugin must
+    # still exist on disk — a missing one is the regression this guards — while
+    # disk may hold additions the frozen record cannot know about. Never edit
+    # the archived map to catch up.
+    assert counts["overlay_plugins"] == len(inv["plugins"]["overlay"])
+    assert counts["overlay_plugins"] <= len(disk_plugins), (
+        counts["overlay_plugins"], len(disk_plugins))
     pinned = sorted(PINNED.rglob("dashboard/manifest.json"))
     assert counts["pinned_dashboard_plugins"] == len(pinned)
 
@@ -113,8 +126,14 @@ def test_overlay_route_and_nav_maps_keep_every_baseline_route():
     nav = set(re.findall(r'path:\s*"([^"]+)"', nav_block))
     core_nav = [n["path"] for n in _doc()["inventory"]["navigation"]
                 if not n["plugin_owned"] and n["path"] != "/chat"]
+    # `/docs` was deliberately dropped from the sidebar in 43b4f0acb (it served
+    # the OpenAPI dump; /guide replaced it) while staying routed. The invariant
+    # that matters is that a baseline nav surface is still REACHABLE, which the
+    # route check above already proves for every path.
     for path in core_nav:
-        assert path in nav, (path, sorted(nav))
+        if path in nav:
+            continue
+        assert path in routes, (path, sorted(nav))
     assert 'path: "/chat"' in app  # CHAT_NAV_ITEM
 
 
@@ -143,14 +162,32 @@ def test_pinned_and_overlay_plugin_inventory_matches_disk():
     overlay = {r["name"] for r in inv["plugins"]["overlay"]}
     disk_overlay = {p.parent.name for p in (QH / "plugins").glob(
         "*/manifest.json")}
-    assert overlay == disk_overlay, (overlay, disk_overlay)
+    # Superset, not equality: the archived map froze the baseline fleet, and
+    # Qubit has added overlay plugins since. Each extra name must still be a
+    # real plugin (manifest + js asserted below for every inventoried row).
+    assert overlay <= disk_overlay, (overlay, disk_overlay)
+    for extra in disk_overlay - overlay:
+        man = QH / "plugins" / extra / "manifest.json"
+        assert json.loads(man.read_text(encoding="utf-8"))["name"] == extra, extra
     for row in inv["plugins"]["overlay"]:
         assert (REPO_ROOT / row["js"]).is_file(), row["js"]
         assert (REPO_ROOT / row["manifest"]).is_file(), row["manifest"]
 
-    fleet = {e["name"] for e in json.loads(
-        (FW / "public" / "plugins" / "fleet.json").read_text())}
-    assert fleet == {"qubit-achievements", "kanban"}
+    fleet_rows = json.loads(
+        (FW / "public" / "plugins" / "fleet.json").read_text())
+    fleet = {e["name"] for e in fleet_rows}
+    # The two upstream plugins must still be in the served fleet; Qubit-added
+    # rows (qubit-office, hidden from the sidebar) are legitimate additions to
+    # a fleet manifest that is not a frozen record. Every row must resolve.
+    assert {"qubit-achievements", "kanban"} <= fleet, fleet
+    for entry in fleet_rows:
+        name = entry["name"]
+        # The runtime serves overlay plugins from frontend/qubit-app/plugins
+        # (webui.py); the bundled upstream two live under public/plugins.
+        base = (QH / "plugins" / name) if (QH / "plugins" / name).is_dir() \
+            else (FW / "public" / "plugins" / name)
+        assert base.is_dir(), name
+        assert (base / entry["entry"]).is_file(), (name, entry["entry"])
 
 
 def test_plugin_apis_are_real_routes():

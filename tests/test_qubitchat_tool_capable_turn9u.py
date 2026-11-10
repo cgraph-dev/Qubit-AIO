@@ -67,7 +67,8 @@ def test_blocking_general_turn_runs_tool_capable_agent(monkeypatch):
                     "task_text": "list every tool and skill you have access to"})
     seen = {}
 
-    def _agent(cfg, text, *, session, reasoning=None, estop_engaged=None):
+    def _agent(cfg, text, *, session, reasoning=None, estop_engaged=None,
+               progress_sink=None, stream_delta=None, **kw):
         seen["text"] = text
         seen["session"] = session
         return {"state": "OK", "reply": "I have 33 tools across skills/plugins/MCP.",
@@ -96,12 +97,15 @@ def test_streaming_general_turn_runs_tool_capable_agent(monkeypatch):
     CT = _hermetic(monkeypatch, fake,
                    {"action": "answer_local", "kind": "conversation",
                     "task_text": "list every tool and skill you have access to"})
-    monkeypatch.setattr(AG, "run_agent_turn",
-                        lambda cfg, text, *, session, reasoning=None,
-                        estop_engaged=None: {
-                            "state": "OK", "reply": "real toolset",
-                            "session_id": session,
-                            "receipt": {"tools": ["terminal"]}})
+    def _agent(cfg, text, *, session, reasoning=None, estop_engaged=None,
+               progress_sink=None, stream_delta=None, **kw):
+        if stream_delta is not None:
+            stream_delta("real toolset")
+        return {"state": "OK", "reply": "real toolset",
+                "session_id": session,
+                "receipt": {"tools": ["terminal"]}}
+
+    monkeypatch.setattr(AG, "run_agent_turn", _agent)
 
     events = list(CT.stream_turn(
         {}, "list every tool and skill you have access to",

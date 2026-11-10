@@ -757,7 +757,12 @@ def test_bot_console_sidecar_round_trips(tmp_path, monkeypatch):
     assert code == 200, out
     goal = out.get("result", out).get("goal", {})
     assert goal.get("title") == "Ship it", out
-    assert goal.get("milestones") == ["m1", "m2"], out
+    # goals-set accepts the upstream string[] form; goals-list (and this
+    # round-trip) serve the pinned ``Goal`` shape where each milestone is an
+    # object. The titles are what must survive (see test_bot_console_goals9u).
+    ms = goal.get("milestones") or []
+    assert [m.get("title") for m in ms] == ["m1", "m2"], out
+    assert all(m.get("done") is False and m.get("id") for m in ms), out
     code, out = HC.dispatch(cfg, "GET", "/api/qubit/bot/goals-list", {}, {})
     assert code == 200, out
     goals = out.get("result", out).get("goals", [])

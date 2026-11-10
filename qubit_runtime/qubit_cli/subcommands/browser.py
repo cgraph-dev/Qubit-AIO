@@ -32,6 +32,41 @@ def _cdp_port(cfg: dict, fallback: int = 9222) -> int:
     return int(fallback)
 
 
+def _spawn_detached(argv) -> None:
+    """Start ``argv`` fully detached, leaving no live ``Popen`` object behind.
+
+    The browser must outlive this CLI, so it has to be orphaned to init. A bare
+    ``subprocess.Popen`` cannot do that: CPython's ``Popen.__del__`` warns
+    ``"subprocess N is still running"`` whenever the handle is collected while
+    the child lives, and under ``-W error`` that turns any ``browser_cdp_open``
+    call into a failure. Double-fork on POSIX (the intermediate exits, so the
+    grandchild is reparented to init and no handle ever exists); a hidden
+    ``Popen`` remains the Windows path.
+    """
+    if os.name == "nt":  # detached-spawn: ok — no fork; Windows has no reaper
+        subprocess.Popen(argv, stdin=subprocess.DEVNULL,
+                         stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL,
+                         creationflags=0x08000000)
+        return
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.setsid()
+            mid = os.fork()
+            if mid == 0:
+                fd = os.open(os.devnull, os.O_RDWR)
+                for slot in (0, 1, 2):
+                    os.dup2(fd, slot)
+                if fd > 2:
+                    os.close(fd)
+                os.execv(argv[0], list(argv))
+            os._exit(0)
+        except BaseException:
+            os._exit(127)
+    os.waitpid(pid, 0)
+
+
 def launch_cdp_browser(browser: str, profile_dir: str, port: int,
                        url: str = "") -> tuple[bool, str]:
     """Launch one Chromium profile with CDP and wait for readiness.
@@ -56,10 +91,7 @@ def launch_cdp_browser(browser: str, profile_dir: str, port: int,
     if url:
         argv.append(str(url))
     try:
-        subprocess.Popen(argv, stdin=subprocess.DEVNULL,
-                         stdout=subprocess.DEVNULL,
-                         stderr=subprocess.DEVNULL,
-                         start_new_session=True)  # detached-spawn: ok — the child is owned and reaped by the parent process
+        _spawn_detached(argv)
     except Exception as exc:
         return False, f"Could not launch {exe}: {exc}"
     deadline = time.time() + 20.0
