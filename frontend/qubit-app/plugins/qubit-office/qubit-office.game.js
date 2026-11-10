@@ -192985,10 +192985,18 @@ create: function(game) {
 	* confused with the general API.
 	*/
 	var AGENTS_PANEL_PATH = "/api/office/habblaud/agents/panel";
-	/** The full URL, rebased onto the host's base path when the SPA is served one. */
-	function agentsPanelUrl(base) {
+	/** The full URL, rebased onto the host's base path when the SPA is served one.
+	*
+	* An active theme id is appended as ``?theme=<id>`` so the route resolves the
+	* panel's atlas cells for the SAME pack the host painted. ``classic`` (or no
+	* id) adds nothing, keeping the classic request byte-identical to before.
+	*/
+	function agentsPanelUrl(base, theme) {
 		const raw = base === void 0 ? hostBasePath() : base;
-		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${AGENTS_PANEL_PATH}`;
+		const url = `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${AGENTS_PANEL_PATH}`;
+		const id = String(theme ?? "").trim();
+		if (!id || id === "classic") return url;
+		return `${url}?theme=${encodeURIComponent(id)}`;
 	}
 	/** The dashboard's base path, from the host's injected global (may be absent). */
 	function hostBasePath() {
@@ -193051,7 +193059,7 @@ create: function(game) {
 	*/
 	async function fetchAgentPanel(opts = {}) {
 		const f = opts.fetchImpl ?? fetch;
-		const url = agentsPanelUrl(opts.base);
+		const url = agentsPanelUrl(opts.base, opts.theme);
 		const token = readToken(opts.win);
 		const headers = { Accept: "application/json" };
 		if (token) headers["X-Qubit-Session-Token"] = token;
@@ -193530,12 +193538,14 @@ create: function(game) {
 			const [activeSlug, setActiveSlug] = useState(null);
 			const [openDivisions, setOpenDivisions] = useState({});
 			const [pendingScroll, setPendingScroll] = useState(null);
+			const themeId = props.theme?.active && props.theme.id ? props.theme.id : void 0;
 			useEffect(() => {
 				let live = true;
 				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
 				fetchAgentPanel({
 					base: props.base,
 					fetchImpl: props.fetchImpl,
+					theme: themeId,
 					signal: ctl?.signal
 				}).then((next) => {
 					if (live) setState(next);
@@ -193544,7 +193554,7 @@ create: function(game) {
 					live = false;
 					ctl?.abort();
 				};
-			}, [props.base]);
+			}, [props.base, themeId]);
 			useEffect(() => {
 				const pending = preloadThemeAtlases(props.theme);
 				if (!pending) return;
