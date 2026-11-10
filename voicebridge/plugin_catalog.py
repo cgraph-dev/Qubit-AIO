@@ -351,6 +351,21 @@ def _matches(row: Dict[str, Any], query: str) -> bool:
     return any(q in str(item).lower() for item in hay)
 
 
+def _brand_text(value: Any) -> str:
+    """Render an upstream product name as Qubit in a SERVED catalog row.
+
+    The pinned index and the vendored catalog YAMLs are byte-faithful
+    provenance records, so their authored prose still names the upstream
+    product ("The official Hermes plugin catalog", an upstream feed host,
+    ``~/.hermes``). Those rows are product surface, so the visible prose is
+    de-branded at this boundary only; the real source URL and maintainer stay
+    in ``provenance`` (rendered behind Details) and are never rewritten.
+    """
+    from .qubit_plugins import _rebrand_product
+
+    return _rebrand_product(value)
+
+
 def _index_doc() -> Dict[str, Any]:
     """Read the curated pinned index document (read-only, never fetched)."""
     try:
@@ -395,8 +410,8 @@ def _valid_index_entry(raw: Any) -> Optional[Dict[str, Any]]:
     return {
         "id": name,
         "name": name,
-        "label": str(raw.get("label") or name),
-        "description": _bounded(raw.get("description", ""), 400),
+        "label": _brand_text(raw.get("label") or name),
+        "description": _brand_text(_bounded(raw.get("description", ""), 400)),
         "repo": repo,
         "subdir": str(raw.get("subdir") or ""),
         "pinned_ref": pin,
@@ -557,8 +572,9 @@ def _upstream_index_rows(known_bad: Optional[Dict[str, str]] = None
             broken_reason = bad.get(f"{entry.name}\0{sha}", "")
             out.append({
                 "id": entry.name, "name": entry.name,
-                "label": str(entry.title or entry.name),
-                "description": _bounded(entry.description or "", 400),
+                "label": _brand_text(entry.title or entry.name),
+                "description": _brand_text(_bounded(entry.description or "",
+                                                   400)),
                 "repo": "", "subdir": subdir,
                 "pinned_ref": sha, "pinned_ref_short": sha[:8],
                 "homepage": "", "maintainer": "",
