@@ -38,6 +38,12 @@ empty row 7/8/14 — the builder skips an empty outfit row rather than failing.
 The rows are frame indices, so the same calibration works at the 16 and 48
 tiers (the frame is ``size x 2*size``).
 
+To review the calibration against the real sheets, ``--calibrate`` writes one
+labelled frame-grid PNG per body-view sheet (body / hair / eyes / outfit) with
+row/column labels, separators and a green outline on every currently calibrated
+frame. It is read-only on the purchase zips and defaults to
+``<out>/calibrate`` (use ``--calibrate-out DIR`` to keep it elsewhere).
+
 NO DUPLICATED CONTRACT LOGIC
 ----------------------------
 The pack is accepted only when ``voicebridge.office.theme.validate_theme``
@@ -65,7 +71,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
-from PIL import Image  # noqa: E402  (build-time dependency only)
+from PIL import Image, ImageDraw, ImageFont  # noqa: E402  (build-time dependency only)
 
 from voicebridge.office import theme as theme_contract  # noqa: E402
 
@@ -913,6 +919,122 @@ def compare_packs(reference: os.PathLike | str,
 
 
 # ---------------------------------------------------------------------------
+# Calibration contact sheets (--calibrate)
+# ---------------------------------------------------------------------------
+#: Contact-sheet parts and the calibrated frames each one carries, in
+#: ``CALIBRATION`` keys. Portrait views are deliberately absent: the grid is
+#: the *body* frame (``size x 2*size``).
+CALIBRATE_PARTS: Tuple[str, ...] = ("body", "hair", "eyes", "outfit")
+_PART_FRAMES: Dict[str, Tuple[str, ...]] = {
+    "body": ("body",),
+    "eyes": ("eyes",),
+    "hair": ("hair",),
+    "outfit": ("outfit_bottom", "outfit_base_top", "outfit_top", "shoes"),
+}
+
+
+def _calibrated_frames(part: str) -> List[Dict[str, int]]:
+    return [dict(CALIBRATION[name]) for name in _PART_FRAMES[part]]
+
+
+def _labelled_grid(sheet: Image.Image, *, part: str, size: int,
+                   index: int) -> Image.Image:
+    """A contact sheet with row/column labels, separators and the live frames.
+
+    The returned image is exactly ``cols*frame_w x rows*frame_h`` so its
+    dimensions stay divisible by the frame size; labels and separators are
+    drawn *inside* the cells rather than in margins. Calibrated frames get a
+    green outline so a human can confirm or change them at a glance.
+    """
+    frame_w, frame_h = size, size * 2
+    grid = sheet.convert("RGBA").copy()
+    rows, cols = grid.height // frame_h, grid.width // frame_w
+    overlay = Image.new("RGBA", grid.size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    font = ImageFont.load_default()
+
+    for col in range(1, cols):
+        x = col * frame_w
+        draw.line([(x, 0), (x, grid.height - 1)],
+                  fill=(255, 0, 255, 150), width=1)
+    for row in range(1, rows):
+        y = row * frame_h
+        draw.line([(0, y), (grid.width - 1, y)],
+                  fill=(255, 0, 255, 150), width=1)
+
+    for row in range(rows):
+        for col in range(cols):
+            text = f"r{row}c{col}"
+            x = col * frame_w + 2
+            y = row * frame_h + 2
+            box = draw.textbbox((x, y), text, font=font)
+            draw.rectangle((box[0] - 1, box[1] - 1, box[2] + 1, box[3] + 1),
+                           fill=(0, 0, 0, 170))
+            draw.text((x, y), text, font=font, fill=(255, 255, 160, 255))
+
+    for frame in _calibrated_frames(part):
+        row, col = frame["row"], frame["col"]
+        if row >= rows or col >= cols:
+            continue
+        x0, y0 = col * frame_w + 1, row * frame_h + 1
+        draw.rectangle((x0, y0, x0 + frame_w - 2, y0 + frame_h - 2),
+                       outline=(60, 255, 120, 255), width=2)
+
+    return Image.alpha_composite(grid, overlay)
+
+
+def _calibrate(args: argparse.Namespace,
+               layers: Mapping[str, List[Sheet]]) -> int:
+    """Write one labelled frame-grid PNG per body-view sheet."""
+    size = args.size
+    frame_w, frame_h = size, size * 2
+    out = Path(args.calibrate_out) if args.calibrate_out \
+        else Path(args.out) / "calibrate"
+    out.mkdir(parents=True, exist_ok=True)
+
+    parts: Dict[str, List[Dict[str, Any]]] = {}
+    for part in CALIBRATE_PARTS:
+        entries: List[Dict[str, Any]] = []
+        for index, sheet in enumerate(layers[part], start=1):
+            image = _sheet_image(sheet, "body")
+            if image.width % frame_w or image.height % frame_h:
+                raise ThemeBuildError(
+                    f"calibrate: {part} sheet {index} is "
+                    f"{image.width}x{image.height}, not a multiple of the "
+                    f"{frame_w}x{frame_h} frame")
+            rows, cols = image.height // frame_h, image.width // frame_w
+            grid = _labelled_grid(image, part=part, size=size, index=index)
+            name = f"{part}_{index:02d}.png"
+            (out / name).write_bytes(_encode_png(grid))
+            entries.append({
+                "index": index,
+                "file": name,
+                "rows": rows,
+                "cols": cols,
+                "frame": {"w": frame_w, "h": frame_h},
+                "calibrated_frames": _calibrated_frames(part),
+            })
+        parts[part] = entries
+
+    document = {
+        "schema": 1,
+        "template_version": TEMPLATE_VERSION,
+        "size": size,
+        "frame": {"w": frame_w, "h": frame_h},
+        "calibration": {name: dict(frame)
+                        for name, frame in CALIBRATION.items()},
+        "parts": parts,
+    }
+    (out / "calibrate.json").write_bytes(_json_bytes(document))
+    print(json.dumps({
+        "ok": True,
+        "calibrate": str(out),
+        "files": sum(len(entries) for entries in parts.values()),
+    }, indent=2, sort_keys=True))
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 def extract_layers(source: str, *, size: int = 32) -> Dict[str, List[Sheet]]:
@@ -966,9 +1088,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--out", default=None,
         help="output theme directory "
              "(default: $QUBIT_HOME/office/themes/<id>, never committed)")
-    parser.add_argument(
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument(
         "--check", action="store_true",
         help="verify --out is a deterministic rebuild; write nothing")
+    mode.add_argument(
+        "--calibrate", action="store_true",
+        help="write labelled frame-grid contact sheets for the body-view "
+             "sheets instead of building a pack (read-only on the zips)")
+    parser.add_argument(
+        "--calibrate-out", default=None,
+        help="directory for --calibrate output (default: <out>/calibrate)")
     parser.add_argument("--size", type=int, default=32, choices=(16, 32, 48),
                         help="tile size (default 32)")
     args = parser.parse_args(argv)
@@ -978,6 +1108,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         layers = extract_layers(args.source, size=args.size)
         if args.check:
             return _check(args, layers)
+        if args.calibrate:
+            return _calibrate(args, layers)
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
                                layers=layers)
         recipes = json.loads(

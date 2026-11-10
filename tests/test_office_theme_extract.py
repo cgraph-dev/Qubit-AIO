@@ -439,6 +439,85 @@ def test_cli_missing_source_is_a_typed_error(tmp_path, monkeypatch):
     assert not (tmp_path / "pack" / "limezu").exists()
 
 
+# ------------------------------------------------------------- calibration
+def _zip_digest(root: Path) -> dict[str, str]:
+    import hashlib
+
+    return {
+        path.name: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(root.glob("*.zip"))
+    }
+
+
+def test_calibrate_writes_labelled_grids_for_every_body_sheet(tmp_path, monkeypatch):
+    root = _make_purchase(tmp_path)
+    before = _zip_digest(root)
+    calib = tmp_path / "calibrate"
+
+    monkeypatch.setattr(B, "_default_personas", lambda: list(PERSONAS))
+    code = B.main(["--source", str(root), "--calibrate",
+                   "--calibrate-out", str(calib), "--size", "32"])
+    assert code == 0
+    # Calibration reads the purchase and writes no pack.
+    assert not (tmp_path / "pack").exists()
+    assert _zip_digest(root) == before
+
+    manifest = json.loads(
+        (calib / "calibrate.json").read_text(encoding="utf-8"))
+    assert manifest["frame"] == {"w": 32, "h": 64}
+    assert set(manifest["parts"]) == {"body", "hair", "eyes", "outfit"}
+
+    for part in ("body", "hair", "eyes", "outfit"):
+        entries = manifest["parts"][part]
+        assert [entry["index"] for entry in entries] == [1, 2, 3]
+        for entry in entries:
+            path = calib / entry["file"]
+            assert path.is_file(), entry["file"]
+            with Image.open(path) as image:
+                image.load()
+                assert image.size[0] % 32 == 0
+                assert image.size[1] % 64 == 0
+                # The synthetic body sheets are one column, fifteen rows.
+                assert image.size == (entry["cols"] * 32,
+                                      entry["rows"] * 64) == (32, 960)
+                assert image.size == (32, 15 * 64)
+
+
+def test_calibrate_draws_frames_labels_and_calibration_outline(tmp_path):
+    root = _make_purchase(tmp_path, skins=1, eyes=1, hair=1, outfits=1, bodies=1)
+    calib = tmp_path / "calibrate"
+    assert B.main(["--source", str(root), "--calibrate",
+                   "--calibrate-out", str(calib)]) == 0
+
+    with Image.open(calib / "body_01.png") as image:
+        grid = image.convert("RGBA")
+        # The calibrated body frame (row 0, col 0) is outlined in green.
+        assert grid.getpixel((1, 1)) == (60, 255, 120, 255)
+        # Row 14 (shoes) is a different calibrated frame only for outfits.
+        assert grid.getpixel((1, 14 * 64 + 1)) != (60, 255, 120, 255)
+
+    with Image.open(calib / "outfit_01.png") as image:
+        grid = image.convert("RGBA")
+        for row in (0, 7, 8, 14):
+            assert grid.getpixel((1, row * 64 + 1)) == (60, 255, 120, 255)
+
+
+def test_calibrate_defaults_beside_the_theme_not_in_the_repo(
+        tmp_path, monkeypatch):
+    import voicebridge.paths as paths
+
+    home = tmp_path / "home"
+    monkeypatch.setattr(paths, "qubit_home", lambda: home)
+    root = _make_purchase(tmp_path / "src")
+    assert B.main(["--source", str(root), "--calibrate",
+                   "--size", "32"]) == 0
+    out = home / "office" / "themes" / "ui-office" / "calibrate"
+    assert (out / "body_01.png").is_file()
+    assert (out / "calibrate.json").is_file()
+    # No art or grid was written inside the checkout.
+    assert not (REPO / "calibrate").exists()
+
+
 # ------------------------------------------------------------- real purchase
 @pytest.mark.skipif(
     not os.environ.get("QUBIT_UI_OFFICE"),
