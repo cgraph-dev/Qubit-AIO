@@ -599,6 +599,11 @@
    selector only matches while both are open. */
 .office-game[data-office-docks="both"] > .office-game__dock {
   width: calc(50% - var(--office-s3));
+  /* The dock carries `.office-game__panel` padding and a border. State the
+     box model here so the half-width is the FULL sheet width even if a host
+     loses its global `border-box` reset; otherwise the padding would be added
+     back and the two sheets could overlap again. */
+  box-sizing: border-box;
 }
 
 .office-game[data-office-docks="both"] > .office-game__dock.office-game__agentsDock {

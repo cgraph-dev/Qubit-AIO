@@ -58,6 +58,9 @@ describe("dual-dock geometry", () => {
     expect(dual).not.toBeNull();
     expect(dual?.[1] ?? "").toMatch(
       /width:\s*calc\(50%\s*-\s*var\(--office-s3\)\)/);
+    // The width is the FULL sheet width: the panel padding and border must not
+    // be added back on top, or the two halves overlap again.
+    expect(dual?.[1] ?? "").toMatch(/box-sizing:\s*border-box/);
   });
 
   it("two single-width sheets do NOT fit the measured 1440px content column", () => {
