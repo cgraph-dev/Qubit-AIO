@@ -61,6 +61,29 @@ QUBIT_LOGO = """\
 """
 
 
+def _urlopen_json(req, timeout: float):
+    """``json.load(urlopen(req))`` that never leaks the response object.
+
+    On a 4xx/5xx response ``urlopen`` raises ``HTTPError`` *before* any ``with``
+    binds, and that error object owns the response stream/temp file — leaving it
+    to the GC emits a ``ResourceWarning`` at an arbitrary later point. Close the
+    error explicitly, then re-raise so callers keep their existing handling.
+    """
+    import urllib.error
+    import urllib.request
+
+    try:
+        resp = urllib.request.urlopen(req, timeout=timeout)
+    except urllib.error.HTTPError as exc:
+        try:
+            exc.close()
+        except Exception:
+            pass
+        raise
+    with resp:
+        return json.load(resp)
+
+
 def _qubit_banner(*, color: bool = False) -> str:
     """Render the interactive Qubit identity banner.
 
@@ -104,13 +127,13 @@ def _status_text(cfg) -> str:
     lines.append("worker: route=local (native Qubit worker session)")
     try:
         import urllib.request, json as _json
-        j = _json.load(urllib.request.urlopen("http://127.0.0.1:8890/api/status", timeout=3))
+        j = _urlopen_json("http://127.0.0.1:8890/api/status", timeout=3)
         lines.append(f"dashboard: bridge={j.get('bridge')} route={j.get('route')} busy={j.get('busy')} web_active={j.get('web_active')} uptime={j.get('uptime_s')}s")
     except Exception as e:
         lines.append(f"dashboard: offline ({e})")
     try:
         import urllib.request, json as _json
-        j = _json.load(urllib.request.urlopen("http://127.0.0.1:11434/api/ps", timeout=3))
+        j = _urlopen_json("http://127.0.0.1:11434/api/ps", timeout=3)
         for m in j.get("models", []):
             lines.append(f"ollama: {m.get('name')} keep_alive until {m.get('expires_at','?')}")
         if not j.get("models"):
@@ -131,7 +154,7 @@ def _health_text(cfg, since_s: float = 3600.0) -> str:
     lines = []
     try:
         import urllib.request, json as _json
-        j = _json.load(urllib.request.urlopen("http://127.0.0.1:8890/api/status", timeout=3))
+        j = _urlopen_json("http://127.0.0.1:8890/api/status", timeout=3)
         lines.append(f"dashboard: bridge={j.get('bridge')} route={j.get('route')} busy={j.get('busy')} "
                      f"web_active={j.get('web_active')} awaiting={j.get('awaiting_input')} "
                      f"uptime={j.get('uptime_s')}s tts={j.get('tts')}")
@@ -200,7 +223,7 @@ def _activity_items(cfg, limit: int = 20, query: str = ""):
     try:
         import urllib.request, json as _json
         url = f"http://127.0.0.1:8890/api/activity?limit={limit}"
-        j = _json.load(urllib.request.urlopen(url, timeout=3))
+        j = _urlopen_json(url, timeout=3)
         items = j.get("items", []) or []
         if query:
             q = query.lower()
@@ -296,7 +319,7 @@ def _do_interrupt(mode: str = "interrupt") -> str:
         import urllib.request, json as _json
         body = json.dumps({"mode": mode}).encode()
         req = urllib.request.Request("http://127.0.0.1:8890/api/interrupt", data=body, headers={"Content-Type": "application/json"})
-        j = _json.load(urllib.request.urlopen(req, timeout=5))
+        j = _urlopen_json(req, timeout=5)
         return json.dumps(j)
     except Exception as e:
         return f"interrupt failed: {e}"
@@ -320,10 +343,10 @@ def _do_talk(cfg, text: str, orch=None) -> str:
         import urllib.request, json as _json
         body = _json.dumps({"text": text}).encode()
         req = urllib.request.Request("http://127.0.0.1:8890/api/type", data=body, headers={"Content-Type": "application/json"})
-        rid = _json.load(urllib.request.urlopen(req, timeout=10))["request_id"]
+        rid = _urlopen_json(req, timeout=10)["request_id"]
         for _ in range(30):
             time.sleep(0.45)
-            pr = _json.load(urllib.request.urlopen(f"http://127.0.0.1:8890/api/result/{rid}", timeout=7))
+            pr = _urlopen_json(f"http://127.0.0.1:8890/api/result/{rid}", timeout=7)
             if pr.get("status") == "done":
                 summ = pr.get("summary") or ""
                 route = pr.get("route", "")
