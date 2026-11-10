@@ -123,7 +123,29 @@ def _upstream_clone() -> Path:
     )
 
 
-UP = _upstream_clone()
+_UPSTREAM_CLONE: "Path | None" = None
+
+
+def upstream_clone() -> Path:
+    """The upstream clone, resolved on FIRST USE.
+
+    Resolved lazily so importing this module (which pure offline checks do to
+    read ``BASELINE``/``route``) does not demand a clone that is absent in a
+    fresh worktree. The loud failure is preserved exactly where it matters: the
+    moment any audit actually needs the tree.
+    """
+    global _UPSTREAM_CLONE
+    if _UPSTREAM_CLONE is None:
+        _UPSTREAM_CLONE = _upstream_clone()
+    return _UPSTREAM_CLONE
+
+
+def __getattr__(name: str) -> object:
+    # ``UP`` stays a module-level name for callers/tests that read it, but is
+    # only resolved when accessed.
+    if name == "UP":
+        return upstream_clone()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 def _frozen_rev() -> str:
@@ -391,7 +413,7 @@ def blob(rev: str, path: str) -> str:
     Prime the cache with `git fetch --filter=blob:none origin main` for a full run.
     """
     env = dict(os.environ, GIT_NO_LAZY_FETCH="1")
-    return sh(["git", "-C", str(UP), "show", f"{rev}:{path}"], env=env, timeout=20)
+    return sh(["git", "-C", str(upstream_clone()), "show", f"{rev}:{path}"], env=env, timeout=20)
 
 
 _BASELINE_CACHE: dict[str, str] = {}
@@ -442,7 +464,7 @@ def blob_many(rev: str, paths: list[str]) -> dict[str, str]:
 
     env = dict(os.environ, GIT_NO_LAZY_FETCH="1")
     # path -> blob oid, in ONE tree walk.
-    ls = sh(["git", "-C", str(UP), "ls-tree", "-r", rev], env=env, timeout=120)
+    ls = sh(["git", "-C", str(upstream_clone()), "ls-tree", "-r", rev], env=env, timeout=120)
     oid_of: dict[str, str] = {}
     for line in ls.split("\n"):
         meta, _, path = line.partition("\t")      # "<mode> blob <oid>\t<path>"
@@ -455,7 +477,7 @@ def blob_many(rev: str, paths: list[str]) -> dict[str, str]:
         return {}
 
     proc = subprocess.Popen(
-        ["git", "-C", str(UP), "cat-file", "--batch"],
+        ["git", "-C", str(upstream_clone()), "cat-file", "--batch"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
         env=env,
     )
@@ -550,7 +572,7 @@ def main() -> int:
     args = ap.parse_args()
 
     # Every upstream .py file at the reference revision.
-    files = [p for p in sh(["git", "-C", str(UP), "ls-tree", "-r", "--name-only",
+    files = [p for p in sh(["git", "-C", str(upstream_clone()), "ls-tree", "-r", "--name-only",
                             args.rev]).split("\n") if p.endswith(".py")]
     print(f"# sync completeness audit -- upstream {args.rev} vs our tree")
     print(f"# upstream .py files: {len(files)}")
