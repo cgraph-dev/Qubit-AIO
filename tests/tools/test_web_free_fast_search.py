@@ -85,7 +85,7 @@ def _write_home(home, monkeypatch, *, nous_state=None, config=None):
     from qubit_cli.config import atomic_config_write
     from qubit_cli.nous_account import reset_nous_portal_account_info_cache
 
-    from tests.qubit_cli.anon_portal import as_local_desktop_backend
+    from qubit_runtime.tests.qubit_cli.anon_portal import as_local_desktop_backend
 
     home.mkdir(parents=True)
     monkeypatch.setenv("QUBIT_HOME", str(home))
