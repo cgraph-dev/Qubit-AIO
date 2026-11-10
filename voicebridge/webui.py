@@ -2648,6 +2648,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
         rest = rel[len(self._THEME_STATIC_PREFIX):]
         theme_id, _, asset_rel = rest.partition("/")
+        if asset_rel == "theme.css":
+            self._serve_theme_host_css(theme_id)
+            return
         path = OT.theme_asset_path(theme_id, asset_rel)
         if path is None:
             self._send(404, b"not found")
@@ -2655,6 +2658,35 @@ class WebUIHandler(BaseHTTPRequestHandler):
         ctype = self._THEME_CTYPES.get(
             path.suffix.lower(), "application/octet-stream")
         self._file(path, ctype, cache_control="public, max-age=3600")
+
+    def _serve_theme_host_css(self, theme_id: str) -> None:
+        """Serve the dashboard host's generated theme stylesheet.
+
+        This is a VIRTUAL file: it does not exist in the pack and no pack CSS
+        is ever served (packs may not contain ``.css`` at all). The CSS is
+        generated from the same validated tokens the office document receives,
+        scoped to the host element (``:root[data-office-theme="<id>"]``), so
+        Task 7's dock rules inherit the variables without a second token map in
+        TypeScript. The URL carries ``?v=<version>``, so an hour of caching is
+        safe. A classic/unknown/invalid pack is a 404, never a fallback.
+        """
+        from .office import theme as OT
+
+        theme_dir = OT.user_theme_root() / theme_id
+        if not (theme_dir / "theme.json").is_file():
+            self._send(404, b"not found")
+            return
+        try:
+            theme = OT.load_theme(theme_dir)
+            css = OT.host_token_css(theme.tokens, theme.id, theme.version)
+        except (OT.ThemeError, ValueError, OSError, RuntimeError):
+            self._send(404, b"not found")
+            return
+        if not css:
+            self._send(404, b"not found")
+            return
+        self._send(200, css.encode("utf-8"), "text/css; charset=utf-8",
+                   cache_control="public, max-age=3600")
 
     def _serve_office_stream(self) -> None:
         """GET /api/stream — the office client's live feed.
@@ -2873,8 +2905,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
         is re-checked against the plugin root so a symlink cannot escape either.
         """
         from . import resources as _resources
+        from urllib.parse import parse_qs
 
-        rel = sub.lstrip("/").split("?")[0]
+        raw_sub = sub.lstrip("/")
+        rel, _, raw_query = raw_sub.partition("?")
+        requested_theme = (parse_qs(raw_query).get("theme") or [""])[0]
         parts = [p for p in rel.split("/") if p not in ("", ".")]
         if not parts or ".." in parts:
             self._send(404, b"not found")
@@ -2951,7 +2986,9 @@ class WebUIHandler(BaseHTTPRequestHandler):
             # non-loopback callers are treated identically: the token is only in
             # the response body of a route the caller already fetched, and the
             # gate itself is unchanged.
-            self._serve_app_html(target)
+            self._serve_app_html(
+                target, office=(parts[0] == "qubit-office"),
+                requested_theme=requested_theme)
             return
         self._file(target, ctype)
 
@@ -3007,8 +3044,18 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 return False
         return True
 
-    def _serve_app_html(self, target: Path) -> None:
+    def _serve_app_html(self, target: Path, *, office: bool = False,
+                        requested_theme: Optional[str] = None) -> None:
         """Serve a plugin-app HTML document with the session token injected.
+
+        ``office`` marks the ONE plugin app the dashboard embeds as the Qubit
+        Office. Only that document receives the theme style; every other plugin
+        app is served byte-for-byte as its own HTML (the theme is a Qubit
+        contract, not an upstream one). The style is generated from the
+        validated theme payload by ``voicebridge.office.theme.theme_style_html``
+        and inserted after the app's own stylesheet link (immediately before
+        ``</head>``), so it overrides Habblaud's ``.ui-root`` variables without
+        a client-side race. ``classic``/invalid ids produce no style at all.
 
         THE TOKEN IS INJECTED FOR LOOPBACK CALLERS ONLY. The earlier revision
         injected for every caller, on the premise that "the token is ALSO
@@ -3061,6 +3108,22 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 html = html.replace("</head>", inject + "</head>", 1)
             else:
                 html = inject + html
+        if office:
+            # Only the Qubit Office document gets the theme. The style carries
+            # allowlisted variables only (no slices, so no ``url(``); a classic
+            # or invalid theme yields "" and nothing is injected.
+            try:
+                from .office import theme as _office_theme
+                cfg = getattr(getattr(self.app, "orch", None), "cfg", None)
+                style_html = _office_theme.theme_style_html(
+                    cfg, requested=requested_theme)
+            except Exception:  # noqa: BLE001 - a broken theme must not break the app
+                style_html = ""
+            if style_html:
+                if "</head>" in html:
+                    html = html.replace("</head>", style_html + "</head>", 1)
+                else:
+                    html = style_html + html
         # This document is the ONE same-origin iframe the dashboard embeds
         # (the Office plugin app). It gets SAMEORIGIN rather than DENY so the
         # intentional embedding keeps working; everything else refuses frames.

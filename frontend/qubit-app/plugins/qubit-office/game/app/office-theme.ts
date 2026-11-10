@@ -229,3 +229,151 @@ export function preloadThemeAtlases(
     image.src = src;
   }))).then((results) => results.every(Boolean));
 }
+
+/* ======================================================================
+ * THE HOST THEME (Task 6)
+ * ======================================================================
+ * The office app document gets its tokens from the server (one injected
+ * `<style>`), but the Qubit shell AROUND the iframe (the Agents/HUD docks, the
+ * seat model panel, the injected menu icons) is a different document. It has
+ * no server-injected style of its own, so the host loads the same validated
+ * payload and links the generated host stylesheet.
+ *
+ * WHY A LINK AND NOT INLINE CSS
+ * -----------------------------
+ * The semantic-token -> CSS-variable mapping lives once, in
+ * `voicebridge/office/theme.py`. `GET /plugins/qubit-office/themes/<id>/
+ * theme.css?v=<version>` is that same mapping rendered for the host scope
+ * (`:root[data-office-theme="<id>"]`), so the host and the iframe cannot drift.
+ * The URL carries the pack version, so the response is safely cacheable.
+ */
+
+/** The subset of `fetch` this module needs (a test seam, not a polyfill). */
+export type ThemeFetch = (
+  input: string,
+  init?: {
+    cache?: "no-store";
+    credentials?: "same-origin";
+    headers?: Record<string, string>;
+  },
+) => Promise<{
+  ok?: boolean;
+  status?: number;
+  json: () => Promise<unknown>;
+}>;
+
+/** The compat route the dashboard token gate already authorizes. */
+export const OFFICE_THEME_ROUTE = "/agent/api/office/theme";
+
+/** The class the shell root carries so Task 7 can scope its own chrome. */
+export function officeThemeClass(
+  theme: OfficeTheme | null | undefined,
+): string {
+  return theme && theme.active && theme.id ? `office-theme-${theme.id}` : "";
+}
+
+/**
+ * The generated host stylesheet URL for an active theme, or "" for classic.
+ *
+ * The CSS is generated server-side from the SAME validated payload: a classic
+ * theme has no stylesheet, and every URL carries `?v=<version>` so it can be
+ * cached for an hour (the version names the bytes).
+ */
+export function themeCss(theme: OfficeTheme | null | undefined): string {
+  if (!theme || !theme.active || !theme.id) return "";
+  const base = String(theme.assetBase || "").replace(/\/+$/, "");
+  if (!base) return "";
+  const version = encodeURIComponent(theme.version || "");
+  return `${base}/theme.css?v=${version}`;
+}
+
+/** Normalise a dashboard base path the same way `office-app.ts` does. */
+function themeBase(base?: string): string {
+  const raw = base ?? "";
+  return raw.endsWith("/") ? raw.slice(0, -1) : raw;
+}
+
+/**
+ * Load the active theme for the host, with ONE `no-store` request.
+ *
+ * Classic (no requested id, or the literal `classic`) resolves `null` WITHOUT
+ * a request: there is nothing to theme, and an idle page must not poll. A
+ * requested id asks the server, whose answer is authoritative — an unknown or
+ * invalid override falls back to `classic` (`active: false`) and so does a
+ * failed/garbage response, never a fabricated pack.
+ *
+ * The env kill switch (`QUBIT_OFFICE_THEME`) is applied by the SAME server
+ * handler, so the returned payload is what the iframe is actually themed with;
+ * `?theme=` is a request, not a client-side decision.
+ */
+export async function loadOfficeTheme(
+  fetchImpl: ThemeFetch | null | undefined,
+  base?: string,
+  requested?: string | null,
+): Promise<OfficeTheme | null> {
+  const want = String(requested ?? "").trim();
+  if (!want || want === "classic") return null;
+  if (typeof fetchImpl !== "function") return null;
+  const url = `${themeBase(base)}${OFFICE_THEME_ROUTE}?theme=${encodeURIComponent(want)}`;
+  try {
+    const response = await fetchImpl(url, {
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+    if (!response || response.ok === false) return null;
+    const payload = await response.json() as OfficeTheme | null;
+    if (!payload || payload.active !== true) return null;
+    if (typeof payload.id !== "string" || !payload.id) return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Apply an active theme to the HOST document, and return a disposer.
+ *
+ * Adds `data-office-theme="<id>"` to `<html>` (the host stylesheet's scope) and
+ * exactly ONE `<link rel="stylesheet" data-office-theme="<id>">`. Calling it
+ * again replaces the previous application, never stacking links; classic
+ * removes any prior application and adds nothing. The disposer removes only
+ * what this call installed (a later application owns its own link).
+ */
+export function applyHostTheme(
+  doc: Document | null | undefined,
+  theme: OfficeTheme | null | undefined,
+): () => void {
+  if (!doc || typeof doc.createElement !== "function") return () => {};
+  const root = doc.documentElement ?? null;
+  // Only OUR carriers. The `data-office-theme` attribute is also set on
+  // `<html>`, so a bare `[data-office-theme]` query would match the document
+  // element itself and remove it.
+  const previous = Array.from(
+    doc.querySelectorAll("link[data-office-theme], style[data-office-theme]"));
+  for (const node of previous) node.remove();
+  if (root) root.removeAttribute("data-office-theme");
+  if (!theme || !theme.active || !theme.id) return () => {};
+
+  const href = themeCss(theme);
+  if (!href) return () => {};
+  const id = theme.id;
+  if (root) root.setAttribute("data-office-theme", id);
+  const link = doc.createElement("link");
+  link.setAttribute("data-office-theme", id);
+  link.setAttribute("rel", "stylesheet");
+  link.setAttribute("href", href);
+  (doc.head ?? root ?? doc.body).appendChild(link);
+
+  let disposed = false;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    if (link.isConnected) link.remove();
+    // A newer application may own the attribute now; only clear our own id.
+    if (root && root.getAttribute("data-office-theme") === id
+        && !doc.querySelector("link[data-office-theme]")) {
+      root.removeAttribute("data-office-theme");
+    }
+  };
+}

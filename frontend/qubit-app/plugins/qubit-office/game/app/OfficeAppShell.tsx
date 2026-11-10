@@ -13,6 +13,10 @@ import { installOfficeMenuButtons, type OfficeMenuController } from "./office-me
 import { createSeatModelPanel } from "./SeatModelPanel";
 import { createAgentsPanel } from "./AgentsPanel";
 import {
+  applyHostTheme, loadOfficeTheme, officeThemeClass,
+  type OfficeTheme,
+} from "./office-theme";
+import {
   POLL_INTERVAL_MS, SNAPSHOT_ROUTE, STREAM_ROUTE,
   bindingSummary, bindingVerdict,
 } from "./office-api";
@@ -54,6 +58,20 @@ export interface OfficeAppProps {
   officeError?: string;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
+}
+
+/**
+ * The theme the host page asked for (`/qubit-office?theme=<id>`).
+ *
+ * Read from the host document, not from a prop: the plugin component receives
+ * no props in production. `classic` is the default and is not propagated (the
+ * iframe URL stays clean and the host loads nothing).
+ */
+function hostThemeRequest(): string {
+  if (typeof window === "undefined") return "";
+  const search = (window.location && window.location.search) || "";
+  const value = (new URLSearchParams(search).get("theme") || "").trim();
+  return value === "classic" ? "" : value;
 }
 
 function connectionText(props: OfficeAppProps): string {
@@ -147,12 +165,43 @@ export function createOfficeApp(
     // does. See app/AgentsPanel.tsx for why that is the only mechanism that
     // can cross the document boundary.
     const [agentsOpen, setAgentsOpen] = useState(false);
+    // The host's theme (the shell AROUND the iframe). The app document is
+    // themed by the server (`_serve_app_html`); this copy only styles OUR
+    // docks and the Agents panel, from the same validated payload.
+    const [officeTheme, setOfficeTheme] = useState<OfficeTheme | null>(null);
+    const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
     const menuRef = useRef<OfficeMenuController | null>(null);
+
+    // Load the host theme ONCE per request/base. Classic (no `?theme=`) makes
+    // no request at all; the server resolves the env kill switch, so an active
+    // response is what the iframe document is actually themed with.
+    useEffect(() => {
+      if (!requestedTheme) {
+        setOfficeTheme(null);
+        return;
+      }
+      let cancelled = false;
+      const fetchImpl = (typeof window !== "undefined"
+        && typeof window.fetch === "function")
+        ? window.fetch.bind(window) : null;
+      loadOfficeTheme(fetchImpl as never, props.base, requestedTheme)
+        .then((theme) => { if (!cancelled) setOfficeTheme(theme); })
+        .catch(() => { if (!cancelled) setOfficeTheme(null); });
+      return () => { cancelled = true; };
+    }, [props.base, requestedTheme]);
+
+    // Apply the host theme to THIS document (the shell around the iframe).
+    // `applyHostTheme` returns a disposer that removes only what it installed,
+    // so a classic/reload/teardown leaves no attribute or link behind.
+    useEffect(() => {
+      if (typeof document === "undefined") return;
+      return applyHostTheme(document, officeTheme);
+    }, [officeTheme]);
 
     useEffect(() => {
       const frame = frameRef.current;
@@ -192,7 +241,9 @@ export function createOfficeApp(
       frame.addEventListener("error", onError);
       setFailed(null);
       setLoaded(false);
-      frame.src = officeAppSrc({ base: props.base, mock: props.mock });
+      frame.src = officeAppSrc({
+        base: props.base, mock: props.mock, theme: requestedTheme,
+      });
       return () => {
         frame.removeEventListener("load", onLoad);
         frame.removeEventListener("error", onError);
@@ -200,7 +251,7 @@ export function createOfficeApp(
         menuRef.current = null;
         restoreBridge?.();
       };
-    }, [props.base, props.mock]);
+    }, [props.base, props.mock, requestedTheme]);
 
     // Mirror the dock state onto the injected buttons after every render: the
     // office paints its own active state from `aria-pressed`.
@@ -347,20 +398,23 @@ export function createOfficeApp(
       children.push(R.createElement("div", {
         key: "agents-dock",
         id: "office-game-agents-dock",
-        className: "office-game__dock office-game__agentsDock office-game__panel",
+        className: "office-game__dock office-game__agentsDock office-game__panel office-theme-dock office-theme-agents-dock",
         "data-testid": "office-game-agents-dock",
+        "data-office-dock": "agents",
         role: "region",
         "aria-label": "Office agents",
       }, [
-        R.createElement("div", { key: "head", className: "office-game__dockHead" }, [
-          R.createElement("span", { key: "t" }, "Agents"),
+        R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
+          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Agents"),
           R.createElement("button", {
-            key: "x", type: "button", className: "office-game__btn",
+            key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
             onClick: () => setAgentsOpen(false),
           }, "Close"),
         ]),
-        R.createElement(AgentsPanel as never, { key: "body", base: props.base }),
+        R.createElement(AgentsPanel as never, {
+          key: "body", base: props.base, theme: officeTheme,
+        }),
       ]));
     }
 
@@ -373,21 +427,22 @@ export function createOfficeApp(
       children.push(R.createElement("div", {
         key: "hud-dock",
         id: "office-game-hud-dock",
-        className: "office-game__dock office-game__panel",
+        className: "office-game__dock office-game__panel office-theme-dock office-theme-hud-dock",
         "data-testid": "office-game-hud-dock",
+        "data-office-dock": "hud",
         role: "region",
         "aria-label": "HUD",
       }, [
-        R.createElement("div", { key: "head", className: "office-game__dockHead" }, [
-          R.createElement("span", { key: "t" }, "HUD"),
+        R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
+          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "HUD"),
           R.createElement("a", {
             key: "open",
-            className: "office-game__hudLink",
+            className: "office-game__hudLink office-theme-dock-link",
             "data-testid": "office-game-hud-open-link",
             href: hudFrameSrc(props.base),
           }, "Open HUD"),
           R.createElement("button", {
-            key: "x", type: "button", className: "office-game__btn",
+            key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-hud-close", "aria-label": "Close HUD",
             onClick: () => setHudOpen(false),
           }, "Close"),
@@ -396,9 +451,12 @@ export function createOfficeApp(
       ]));
     }
 
+    const rootClass = ["office-game", officeThemeClass(officeTheme)]
+      .filter(Boolean).join(" ");
     return R.createElement("div", {
       "data-testid": "office-app",
-      className: "office-game",
+      "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
+      className: rootClass,
     }, children);
   };
 }

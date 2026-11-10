@@ -203,3 +203,119 @@ describe("Habblaud embedding", () => {
       (e) => e.props["data-testid"] === "office-app-connection")).toBeUndefined();
   });
 });
+
+describe("host theme + rerender stability", () => {
+  /**
+   * A stateful double: each `useState` keeps its own slot for the whole
+   * component instance, so a test can seed open docks and render twice the way
+   * React would after a parent update. (The original harness returns a fresh
+   * constant per call, which is enough for single renders.)
+   */
+  const createStatefulHarness = (seed: Record<number, unknown> = {}) => {
+    const frame = {
+      contentWindow: { fetch: vi.fn() },
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      src: "",
+    };
+    const tree: Array<{ type: unknown; props: Record<string, unknown> }> = [];
+    const refSlots: Array<{ current: unknown }> = [];
+    const state: unknown[] = [];
+    let stateIndex = 0;
+    let refIndex = 0;
+    const React = {
+      createElement(type: unknown, props: Record<string, unknown> | null, ...children: unknown[]) {
+        const element = { type, props: { ...(props ?? {}), children } };
+        tree.push(element);
+        if (type === "iframe") {
+          Object.assign(frame, element.props);
+          const ref = element.props.ref as { current: unknown } | undefined;
+          if (ref) ref.current = frame;
+        }
+        return element;
+      },
+    };
+    const effectCleanups: Array<() => void> = [];
+    const hooks = {
+      useState: (initial: unknown) => {
+        const index = stateIndex++;
+        if (!(index in state)) {
+          state[index] = index in seed ? seed[index] : initial;
+        }
+        const setter = (next: unknown) => {
+          state[index] = typeof next === "function"
+            ? (next as (value: unknown) => unknown)(state[index])
+            : next;
+        };
+        return [state[index], setter];
+      },
+      useRef: (initial: unknown) => {
+        // As in the single-render harness, the frame ref is committed before
+        // the effect runs; subsequent refs start at their initial value.
+        const seed = refIndex === 0 ? frame : initial;
+        const slot = refSlots[refIndex] ?? (refSlots[refIndex] = { current: seed });
+        refIndex += 1;
+        return slot;
+      },
+      useEffect: (fn: () => void | (() => void)) => {
+        const cleanup = fn();
+        if (typeof cleanup === "function") effectCleanups.push(cleanup);
+      },
+    };
+    let ready = false;
+    const App = createOfficeApp(React as never, hooks as never);
+    return {
+      frame,
+      tree,
+      render(props: Record<string, unknown> = {}) {
+        if (ready) tree.length = 0;
+        stateIndex = 0;
+        refIndex = 0;
+        ready = true;
+        return App(props);
+      },
+      cleanup: () => { for (const cleanup of effectCleanups.splice(0)) cleanup(); },
+    };
+  };
+
+  it("a parent rerender keeps the iframe src and the dock component identity", () => {
+    // Docks open so the HUD/Agents subtrees are actually mounted. State order:
+    // loaded, failed, panelOpen, hudOpen, agentsOpen, officeTheme.
+    const h = createStatefulHarness({ 3: true, 4: true });
+    h.render({});
+    const firstSrc = h.frame.src;
+    const firstHud = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-hud-dock");
+    const firstAgents = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-agents-dock");
+    expect(firstHud).toBeDefined();
+    expect(firstAgents).toBeDefined();
+
+    // A parent update: same props, same component instance.
+    h.render({});
+    expect(h.frame.src).toBe(firstSrc);
+    // Stable component identity = React reconciles instead of remounting
+    // (the original "HUD keeps refreshing" bug: a new type per render).
+    const secondHud = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-hud-dock");
+    const secondAgents = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-agents-dock");
+    expect(secondHud?.type).toBe(firstHud?.type);
+    expect(secondAgents?.type).toBe(firstAgents?.type);
+
+    // The docks carry Task 7's stable theme hooks; no Habblaud node is styled.
+    expect(String(firstHud?.props.className)).toContain("office-theme-hud-dock");
+    expect(String(firstAgents?.props.className)).toContain("office-theme-agents-dock");
+    expect(String(firstHud?.props.className)).toContain("office-theme-dock");
+    h.cleanup();
+  });
+
+  it("the shell root carries the host theme class only for an active theme", () => {
+    const h = createStatefulHarness();
+    h.render({});
+    const root = h.tree.find((e) => e.props["data-testid"] === "office-app");
+    expect(root?.props.className).toBe("office-game");
+    expect(root?.props["data-office-theme"]).toBeUndefined();
+    h.cleanup();
+  });
+});

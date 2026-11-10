@@ -77,6 +77,12 @@ export interface OfficeAppOptions {
   mock?: boolean;
   /** The dashboard's base path. Falls back to the host's injected global. */
   base?: string;
+  /**
+   * The theme the host page asked for (`?theme=`). Appended to the iframe URL
+   * so the app DOCUMENT is themed by the server (`_serve_app_html`), not by
+   * post-load CSS from here. `classic` is the default and adds no query.
+   */
+  theme?: string;
 }
 
 export function officeAppSrc(opts: OfficeAppOptions = {}): string {
@@ -86,6 +92,8 @@ export function officeAppSrc(opts: OfficeAppOptions = {}): string {
   const url = officeAppUrl(base);
   const query = new URLSearchParams();
   if (opts.mock) query.set("mock", "1");
+  const theme = String(opts.theme ?? "").trim();
+  if (theme && theme !== "classic") query.set("theme", theme);
   const suffix = query.toString();
   return suffix ? `${url}?${suffix}` : url;
 }

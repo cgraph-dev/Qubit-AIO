@@ -125,7 +125,10 @@ function buildButton(
 ): HTMLButtonElement {
   const button = doc.createElement("button");
   button.type = "button";
-  button.className = "ui-icon-btn";
+  // The app's own visual classes (so colour/hover/pressed match for free) plus
+  // Qubit's stable theme hooks: Task 7 scopes its token chrome to these, never
+  // to Habblaud's internal structure.
+  button.className = `ui-icon-btn office-theme-menu-btn office-theme-menu-${spec.id}`;
   button.setAttribute("aria-label", spec.label);
   button.setAttribute("title", spec.title);
   button.setAttribute("aria-pressed", "false");
