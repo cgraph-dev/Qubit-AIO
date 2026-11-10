@@ -30,14 +30,20 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-DOCS = REPO_ROOT / "docs" / "archive" / "2026-09-21"
-RUNBOOK = DOCS / "OPERATOR_QUALIFICATION.md"
-AMENDMENT = DOCS / "QUBIT_OWNER_AMENDMENT_2026-09-13_TERMINAL_STATUSES.md"
+from _purged_ledger import require_ledger  # noqa: E402
+
+# Every artifact this module asserts on was purged in eafb54e26. They are read
+# read-only from pre-purge history through ``_purged_ledger``; nothing is
+# re-authored and nothing is written under ``docs/``.
+DOCS = "docs/archive/2026-09-21"
+RUNBOOK = f"{DOCS}/OPERATOR_QUALIFICATION.md"
+AMENDMENT = f"{DOCS}/QUBIT_OWNER_AMENDMENT_2026-09-13_TERMINAL_STATUSES.md"
 LEDGERS = (
-    DOCS / "QUBIT_GAP_LEDGER.qubit.json",
-    DOCS / "QUBIT_GAP_LEDGER.openclaw.json",
-    DOCS / "QUBIT_GAP_LEDGER.hermes.json",
+    f"{DOCS}/QUBIT_GAP_LEDGER.qubit.json",
+    f"{DOCS}/QUBIT_GAP_LEDGER.openclaw.json",
+    f"{DOCS}/QUBIT_GAP_LEDGER.hermes.json",
 )
 
 LIVE_NEEDS = {"creds", "hardware", "owner"}
@@ -138,11 +144,11 @@ gap_ledger = _load_module("gap_ledger", "gap_ledger.py")
 
 def _operator_rows() -> list:
     rows = []
-    for path in LEDGERS:
-        data = json.loads(path.read_text(encoding="utf-8"))
+    for name in LEDGERS:
+        data = json.loads(require_ledger(name))
         for row in data["rows"]:
             if row.get("status") == "OPERATOR_ONLY":
-                rows.append((path.name.split(".")[-2], row))
+                rows.append((name.rsplit("/", 1)[-1].split(".")[-2], row))
     return rows
 
 
@@ -190,13 +196,11 @@ def _qualification_failures(row: dict, runbook: str, amendment: str,
 
 
 def _runbook_text() -> str:
-    assert RUNBOOK.is_file(), RUNBOOK
-    return RUNBOOK.read_text(encoding="utf-8")
+    return require_ledger(RUNBOOK)
 
 
 def _amendment_text() -> str:
-    assert AMENDMENT.is_file(), AMENDMENT
-    return AMENDMENT.read_text(encoding="utf-8")
+    return require_ledger(AMENDMENT)
 
 
 def test_operator_row_set_is_the_audited_eleven() -> None:
@@ -277,8 +281,15 @@ def test_amendment_records_terminal_status_decision() -> None:
         assert marker in amendment, marker
 
 
-def test_ledger_reports_code_ready_but_not_complete() -> None:
-    sections, missing, _ = gap_ledger.load_sections(DOCS)
+def test_ledger_reports_code_ready_but_not_complete(tmp_path) -> None:
+    # ``load_sections`` reads a directory, so materialise the purged sections
+    # from history into tmp_path -- never under docs/ -- and run the real loader
+    # and summary over that content.
+    for name in gap_ledger.SECTIONS:
+        (tmp_path / f"QUBIT_GAP_LEDGER.{name}.json").write_text(
+            require_ledger(f"{DOCS}/QUBIT_GAP_LEDGER.{name}.json"),
+            encoding="utf-8")
+    sections, missing, _ = gap_ledger.load_sections(tmp_path)
     summary = gap_ledger.build_summary(sections, missing)
     assert summary["sections_missing"] == [], summary["sections_missing"]
     assert summary["open_rows"] == 0
