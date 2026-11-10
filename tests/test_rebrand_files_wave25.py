@@ -74,9 +74,14 @@ def test_no_consumer_still_names_the_legacy_setup_scripts():
 
 def test_activation_invokes_the_renamed_scripts():
     sh = (REPO / "qubit_runtime" / "activate").read_text(encoding="utf-8")
+    helper = (REPO / "qubit_runtime" / "scripts" / "_activation.sh").read_text(
+        encoding="utf-8")
     ps1 = (REPO / "qubit_runtime" / "activate.ps1").read_text(encoding="utf-8")
-    assert "setup-qubit.sh" in sh
-    assert "$_HERMES_REPO/setup-qubit.sh" in sh
+    assert "setup-hermes" not in sh
+    # `activate` sources the shared helper, which is what runs setup; the
+    # literal setup invocation lives there since the a036b13 slice integration.
+    assert 'scripts/_activation.sh' in sh
+    assert 'bash "$repo/setup-qubit.sh"' in helper
     assert "setup-qubit.ps1" in ps1
     assert r"$repo\setup-qubit.ps1" in ps1
 

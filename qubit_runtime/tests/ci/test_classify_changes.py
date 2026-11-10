@@ -321,8 +321,8 @@ CASES = {
         ["scripts/install.sh"],
         _lanes(python=True, bootstrap=True, python_prod=True, e2e_upgrade=True, e2e_desktop_update=True),
     ),
-    "setup-hermes.sh → bootstrap lane": (
-        ["setup-hermes.sh"],
+    "setup-qubit.sh → bootstrap lane": (
+        ["setup-qubit.sh"],
         _lanes(python=True, bootstrap=True, python_prod=True, e2e_upgrade=True),
     ),
     "tauri installer source → bootstrap + rust": (
