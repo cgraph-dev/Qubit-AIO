@@ -1,0 +1,4 @@
+{
+  "channel": "chrome",
+  "note": "goldens are generated with the system Chrome channel; bundled Chromium is not a substitute"
+}

@@ -476,6 +476,11 @@ def _start_ui(tmp_root: Path, monkeypatch):
 
     def _patched_do_get(self):
         path = self.path.split("?")[0]
+        if path == "/favicon.ico":
+            # The shell has no favicon; answer it so the probe does not treat a
+            # known cosmetic 404 as an unexpected console/page error.
+            self._send(204, b"")
+            return
         if path.startswith("/probe/"):
             name = path[len("/probe/"):]
             if name in ("react.js", "react-dom.js"):
@@ -526,15 +531,23 @@ def _start_ui(tmp_root: Path, monkeypatch):
 # --------------------------------------------------------------------------
 # Browser capture
 # --------------------------------------------------------------------------
+#: The baseline renderer. The committed goldens were produced with the system
+#: Chrome channel; the bundled Playwright Chromium is deliberately refused so a
+#: machine without it skips instead of comparing two different rendering stacks.
+BASELINE_BROWSER = {
+    "channel": "chrome",
+    "note": ("goldens are generated with the system Chrome channel; "
+             "bundled Chromium is not a substitute"),
+}
+
+
 def _launch_browser(p):
-    errors = []
-    for kwargs in ({"channel": "chrome"}, {}):
-        try:
-            return p.chromium.launch(headless=True, **kwargs)
-        except Exception as exc:  # noqa: BLE001 - try the next real browser
-            errors.append(f"{kwargs or 'bundled'}: {exc}")
-    pytest.skip("no Chromium/Chrome available for Playwright: "
-                + " | ".join(errors))
+    try:
+        return p.chromium.launch(headless=True, channel="chrome")
+    except Exception as exc:  # noqa: BLE001 - a named skip, never a fake pass
+        pytest.skip(
+            "visual baselines require the system Chrome channel "
+            f"(channel='chrome'); bundled Chromium is not used: {exc}")
 
 
 def _colour_contrast(first: str, second: str) -> float:
@@ -580,22 +593,55 @@ def _capture(tmp_root: Path, monkeypatch) -> Dict[str, Path]:
                         " try { performance.now = () => 0; } catch (e) {}"
                         "})();")
                     page.emulate_media(reduced_motion="reduce")
-                    if os.environ.get("QUBIT_OFFICE_VISUAL_DEBUG"):
-                        page.on("console", lambda m: print(
-                            f"[console:{m.type}] {m.text[:300]}",
-                            file=sys.stderr))
-                        page.on("pageerror", lambda e: print(
-                            f"[pageerror] {e}", file=sys.stderr))
-                        page.on("requestfailed", lambda r: print(
-                            f"[failed] {r.url} {r.failure}", file=sys.stderr))
-                        page.on("response", lambda r: (
-                            print(f"[{r.status}] {r.url}", file=sys.stderr)
-                            if r.status >= 400 else None))
+                    console_errors: list[str] = []
+                    page_errors: list[str] = []
+                    bad_responses: list[str] = []
+                    failed_requests: list[str] = []
+
+                    def _on_console(message) -> None:
+                        if message.type != "error":
+                            return
+                        location = message.location or {}
+                        url = str(location.get("url") or "")
+                        if url.endswith("/favicon.ico"):
+                            return
+                        console_errors.append(message.text[:400])
+                        if os.environ.get("QUBIT_OFFICE_VISUAL_DEBUG"):
+                            print(f"[console:error] {message.text[:300]}",
+                                  file=sys.stderr)
+
+                    def _on_response(response) -> None:
+                        if response.status < 400:
+                            return
+                        if response.url.endswith("/favicon.ico"):
+                            return
+                        bad_responses.append(f"{response.status} {response.url}")
+                        if os.environ.get("QUBIT_OFFICE_VISUAL_DEBUG"):
+                            print(f"[{response.status}] {response.url}",
+                                  file=sys.stderr)
+
+                    page.on("console", _on_console)
+                    page.on("pageerror", lambda error: page_errors.append(
+                        str(error)[:400]))
+                    page.on("response", _on_response)
+                    page.on("requestfailed", lambda request: failed_requests.append(
+                        f"{request.url} {request.failure}"))
                     page.goto(base + "/qubit-office?theme=demo",
                               wait_until="load")
                     page.wait_for_selector("[data-testid=office-app]",
                                            timeout=30000)
                     _no_motion(page)
+                    # The host theme is applied asynchronously: wait for the
+                    # attribute AND a real computed token before any pixel is
+                    # captured, or the first screenshot races the classic paint.
+                    page.wait_for_function(
+                        "() => document.documentElement.getAttribute("
+                        "'data-office-theme') === 'demo'", timeout=20000)
+                    page.wait_for_function(
+                        "([expected]) => getComputedStyle(document."
+                        "documentElement).getPropertyValue('--ui-bg')"
+                        ".trim().toLowerCase() === expected",
+                        arg=[VISUAL_TOKENS["color-surface"]], timeout=20000)
                     frame = page.frame_locator(
                         "[data-testid=office-app-frame]")
                     frame.locator('.ui-btn-group[aria-label="Panels"]'
@@ -634,11 +680,27 @@ def _capture(tmp_root: Path, monkeypatch) -> Dict[str, Path]:
                         animations="disabled", caret="hide")
 
                     card = page.locator("#agents-panel-card")
-                    card.evaluate("el => el.focus({focusVisible: true})")
+                    # REAL keyboard focus: click the card (its tabIndex makes
+                    # it focusable), step out and back with Shift+Tab/Tab so the
+                    # browser's focus-visible heuristic engages, then verify the
+                    # ring is actually painted (width + style), not just coloured.
+                    card.click()
+                    page.keyboard.press("Shift+Tab")
+                    page.keyboard.press("Tab")
                     focused = card.evaluate(
                         "el => el === document.activeElement"
                         " && el.matches(':focus-visible')")
-                    assert focused, "the agent card did not enter focus-visible"
+                    assert focused, (
+                        "the agent card did not enter focus-visible through "
+                        "keyboard navigation")
+                    outline_width = card.evaluate(
+                        "el => parseFloat(getComputedStyle(el).outlineWidth)"
+                        " || 0")
+                    outline_style = card.evaluate(
+                        "el => getComputedStyle(el).outlineStyle")
+                    assert outline_width > 0, "focus ring has zero width"
+                    assert outline_style not in ("none", "hidden", ""), (
+                        f"focus ring style is {outline_style!r}")
                     outline = card.evaluate(
                         "el => getComputedStyle(el).outlineColor")
                     background = card.evaluate(
@@ -661,6 +723,17 @@ def _capture(tmp_root: Path, monkeypatch) -> Dict[str, Path]:
                             "width": box["width"] + 2 * pad,
                             "height": box["height"] + 2 * pad,
                         })
+                    assert not page_errors, (
+                        "unexpected page error(s): " + " | ".join(page_errors))
+                    assert not console_errors, (
+                        "unexpected console error(s): "
+                        + " | ".join(console_errors))
+                    assert not bad_responses, (
+                        "unexpected HTTP error response(s): "
+                        + " | ".join(bad_responses))
+                    assert not failed_requests, (
+                        "unexpected failed request(s): "
+                        + " | ".join(failed_requests))
                     context.close()
             finally:
                 browser.close()
@@ -701,6 +774,16 @@ def _compare(actual: Path, golden: Path) -> Tuple[int, int, float]:
 
 
 def test_office_visual_goldens(tmp_path, monkeypatch):
+    metadata_path = BASELINE_DIR / "browser.json"
+    if not metadata_path.is_file():
+        pytest.fail(
+            "visual baseline browser metadata missing: "
+            f"{metadata_path.relative_to(REPO_ROOT)}; regenerate baselines "
+            "with the explicit --write command and review them")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata.get("channel") == BASELINE_BROWSER["channel"], (
+        f"baselines were generated for {metadata.get('channel')!r}, this probe "
+        f"pins {BASELINE_BROWSER['channel']!r}")
     shots = _capture(tmp_path, monkeypatch)
     failures: list[str] = []
     for name, actual in sorted(shots.items()):
@@ -731,6 +814,10 @@ def _write_baselines(write: bool) -> int:
         target = BASELINE_DIR / f"{name}.png"
         target.write_bytes(source.read_bytes())
         print(f"wrote {target.relative_to(REPO_ROOT)}")
+    (BASELINE_DIR / "browser.json").write_text(
+        json.dumps(BASELINE_BROWSER, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8")
+    print(f"wrote {(BASELINE_DIR / 'browser.json').relative_to(REPO_ROOT)}")
     return 0
 
 

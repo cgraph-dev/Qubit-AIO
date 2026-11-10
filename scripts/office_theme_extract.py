@@ -603,24 +603,25 @@ def _tokens_from_image(image: Image.Image) -> Tuple[Dict[str, str], List[str]]:
         if raised_side else _away(surface, toward_text, 10))
     hover = _away(raised, toward_text, 14)
 
-    # Muted text: the most common sampled colour that clears 3:1 but is not the
-    # primary text colour.
+    # Muted text: the most common sampled colour that clears the 4.5:1 text
+    # floor but is not the primary text colour.
     muted_candidates = [
         bucket[:3] for bucket in buckets
-        if contrast(bucket[:3]) >= 3.0 and bucket[:3] != text
+        if contrast(bucket[:3]) >= 4.5 and bucket[:3] != text
     ]
     muted = (max(muted_candidates, key=lambda colour: next(
         b[3] for b in buckets if b[:3] == colour))
         if muted_candidates else _blend(surface, text, 0.62))
 
-    # Border: a low-contrast sampled line, else a subtle blend from the surface.
+    # Border: a sampled line that clears the 3:1 non-text floor against both
+    # surfaces, else a safe blend toward the text colour.
     border_candidates = [
         bucket[:3] for bucket in buckets
-        if 1.25 <= contrast(bucket[:3]) < 3.0 and bucket[:3] != surface
+        if contrast(bucket[:3]) >= 3.0 and bucket[:3] not in (surface, text)
     ]
     border = (max(border_candidates, key=lambda colour: next(
         b[3] for b in buckets if b[:3] == colour))
-        if border_candidates else _blend(surface, text, 0.20))
+        if border_candidates else _blend(surface, text, 0.62))
 
     # Accent: the most saturated sampled colour that is not the surface/text.
     min_count = max(2, total // 4000)
@@ -629,7 +630,7 @@ def _tokens_from_image(image: Image.Image) -> Tuple[Dict[str, str], List[str]]:
         if bucket[3] >= min_count
         and max(bucket[:3]) - min(bucket[:3]) > 24
         and bucket[:3] not in (surface, text)
-        and contrast(bucket[:3]) >= 1.5
+        and contrast(bucket[:3]) >= 3.0
     ]
     accent = (max(
         accent_candidates,

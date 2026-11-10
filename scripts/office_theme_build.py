@@ -154,15 +154,34 @@ _ALIASES: Dict[str, str] = {
 }
 _KNOWN_PARTS = {"skin", "eyes", "hair", "outfit", "accessory", "body"}
 
+#: The default warm palette. Every value clears the full contrast matrix on
+#: BOTH office surfaces (text/muted 4.5:1; accent, borders, status, level and
+#: disabled text 3:1), so a pack built without a sampled UI sheet still passes
+#: the same validation a shared recipe does.
 DEFAULT_TOKENS: Dict[str, str] = {
-    "color-surface": "#0d0d1a",
-    "color-surface-raised": "#161a23",
-    "color-surface-hover": "#1d2230",
-    "color-text-primary": "#e9edf7",
-    "color-text-muted": "#8a93a8",
-    "color-border": "#334155",
-    "color-accent": "#7cc8ff",
+    "color-surface": "#17110d",
+    "color-surface-soft": "#1f1711",
+    "color-surface-raised": "#241b15",
+    "color-surface-solid": "#241b15",
+    "color-surface-hover": "#2e221a",
+    "color-border": "#9a7b5a",
+    "color-border-strong": "#c9a676",
+    "color-text-primary": "#f6ecdd",
+    "color-text-muted": "#c9b69c",
+    "color-text-faint": "#a99276",
+    "color-accent": "#ffb066",
+    "color-accent-soft": "#ffc891",
+    "radius-panel": "8px",
     "radius-control": "4px",
+    "color-status-working": "#7fc8ff",
+    "color-status-waiting": "#ffd166",
+    "color-status-done": "#8bd17c",
+    "color-status-idle": "#c9b69c",
+    "color-status-offline": "#ff7a6b",
+    "color-status-shell": "#d3a4ff",
+    "color-level-ok": "#8bd17c",
+    "color-level-warn": "#ffc857",
+    "color-level-crit": "#ff6b5e",
 }
 
 
@@ -670,6 +689,78 @@ def shareable_recipe(manifest: Mapping[str, Any],
     }
 
 
+def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
+                 personas: Any = None, layers: Any = None,
+                 license: str = DEFAULT_LICENSE,
+                 credit: str = DEFAULT_CREDIT,
+                 tokens: Optional[Mapping[str, str]] = None,
+                 slices: Optional[Mapping[str, Mapping[str, Any]]] = None,
+                 label: Optional[str] = None) -> Dict[str, Any]:
+    """Write ONLY the shareable ``theme.recipe.json`` for a purchase.
+
+    The recipe is the repo-safe half of a theme: tokens, part counts, the 283
+    frozen persona recipes, credit/licence and a source description. It carries
+    no atlases, no files map, and no art. The pack itself is still built
+    locally by :func:`build_theme` on the owner's machine.
+
+    ``out`` is the recipe path (usually
+    ``.../themes/<id>/theme.recipe.json``); the theme id comes from its parent
+    directory name so a recipe cannot claim an id that disagrees with its path.
+    Nothing else is written.
+    """
+    problems: List[str] = []
+    _check_size(size)
+    if not isinstance(source, str) or not source.strip():
+        problems.append("source: must be a non-empty description")
+    elif _looks_like_path(source):
+        problems.append("source: must be a description, not a filesystem path")
+    if not isinstance(credit, str) or not credit.strip():
+        problems.append("credit: must be a non-empty string")
+    if not isinstance(license, str) or not license.strip():
+        problems.append("license: must be a non-empty string")
+
+    out_path = Path(out)
+    theme_id = out_path.parent.name
+    if not _theme_id_ok(theme_id):
+        problems.append(
+            "id: recipe parent directory must match ^[a-z0-9][a-z0-9-]{0,39}$ "
+            f"(got {theme_id!r})")
+    if problems:
+        raise ThemeBuildError(problems)
+
+    normalized = _normalize_layers(layers)
+    _require(normalized, ("skin", "eyes", "hair", "outfit", "body"))
+    slugs = _resolve_personas(personas)
+    recipes = {slug: _derive_recipe(slug, normalized) for slug in slugs}
+    parts = {
+        part: len(normalized[part])
+        for part in ("skin", "eyes", "hair", "outfit", "accessory")
+        if normalized.get(part)
+    }
+    manifest: Dict[str, Any] = {
+        "format": theme_contract.FORMAT,
+        "schema": theme_contract.SCHEMA,
+        "id": theme_id,
+        "label": label or theme_id.replace("-", " ").replace("_", " ").title(),
+        "version": VERSION,
+        "credit": credit,
+        "license": license,
+        "source": source,
+        "template_version": TEMPLATE_VERSION,
+        "tokens": dict(tokens or DEFAULT_TOKENS),
+        "slices": dict(slices or {}),
+        "parts": parts,
+    }
+    recipe = shareable_recipe(manifest, recipes)
+    recipe_problems = theme_contract.validate_recipe(recipe)
+    if recipe_problems:
+        raise ThemeBuildError(recipe_problems)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_bytes(_json_bytes(recipe))
+    return recipe
+
+
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
@@ -1113,6 +1204,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--calibrate", action="store_true",
         help="write labelled frame-grid contact sheets for the body-view "
              "sheets instead of building a pack (read-only on the zips)")
+    mode.add_argument(
+        "--recipe-out", default=None, metavar="PATH",
+        help="write ONLY the shareable theme.recipe.json (tokens, part counts, "
+             "persona recipes, credit/licence; no art) to PATH")
     parser.add_argument(
         "--calibrate-out", default=None,
         help="directory for --calibrate output "
@@ -1144,6 +1239,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             if sampled["fallback"]:
                 for reason in sampled["reasons"]:
                     print(f"warning: palette fallback: {reason}", file=sys.stderr)
+        if args.recipe_out:
+            recipe = build_recipe(DEFAULT_SOURCE, args.recipe_out,
+                                  size=args.size, layers=layers, tokens=tokens)
+            print(json.dumps({
+                "ok": True,
+                "recipe": str(Path(args.recipe_out)),
+                "agents": len(recipe["agents"]),
+                "files": 0,
+            }, indent=2, sort_keys=True))
+            return 0
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
                                layers=layers, tokens=tokens)
         recipes = json.loads(

@@ -402,6 +402,39 @@ def test_built_pack_passes_the_real_contract(tmp_path):
     assert T.validate_recipe(B.shareable_recipe(manifest, recipes)) == []
 
 
+def test_build_recipe_writes_only_a_valid_art_free_recipe(tmp_path):
+    recipe_path = tmp_path / "limezu" / "theme.recipe.json"
+    recipe = B.build_recipe(B.DEFAULT_SOURCE, recipe_path,
+                            personas=PERSONAS, layers=_layers())
+    assert recipe_path.is_file()
+    assert sorted(p.name for p in recipe_path.parent.iterdir()) == [
+        "theme.recipe.json"]
+    assert T.validate_recipe(recipe) == []
+    assert recipe["id"] == "limezu"
+    assert recipe["slices"] == {}
+    assert "files" not in recipe
+    assert "portraits" not in recipe and "bodies" not in recipe
+    assert set(recipe["agents"]) == set(PERSONAS)
+    assert recipe["parts"]["outfit"] == VARIANTS
+    # The default palette itself must clear the whole contrast matrix.
+    assert T.validate_tokens(recipe["tokens"]) == []
+
+
+def test_build_recipe_refuses_a_path_as_source(tmp_path):
+    with pytest.raises(B.ThemeBuildError) as info:
+        B.build_recipe(str(tmp_path / "purchase"),
+                       tmp_path / "limezu" / "theme.recipe.json",
+                       personas=PERSONAS, layers=_layers())
+    assert "description, not a filesystem path" in str(info.value)
+
+
+def test_build_recipe_uses_the_parent_directory_as_the_theme_id(tmp_path):
+    with pytest.raises(B.ThemeBuildError):
+        B.build_recipe(B.DEFAULT_SOURCE,
+                       tmp_path / "Bad Id" / "theme.recipe.json",
+                       personas=PERSONAS, layers=_layers())
+
+
 def test_built_pack_json_has_no_operator_paths(tmp_path):
     out, _ = _build(tmp_path)
     for path in out.rglob("*.json"):
@@ -489,6 +522,21 @@ def test_cli_defaults_out_under_the_qubit_home(tmp_path, monkeypatch):
     out = tmp_path / "home" / "office" / "themes" / "limezu"
     assert (out / "theme.json").is_file()
     assert T.validate_theme(out) == []
+
+
+def test_cli_recipe_out_writes_only_the_recipe(tmp_path, monkeypatch):
+    monkeypatch.setattr(B, "extract_layers", lambda source, size=32: _layers())
+    monkeypatch.setattr(B, "_default_personas", lambda: list(PERSONAS))
+    recipe_path = tmp_path / "limezu" / "theme.recipe.json"
+
+    assert B.main(["--source", str(tmp_path / "purchase"),
+                   "--recipe-out", str(recipe_path)]) == 0
+    assert recipe_path.is_file()
+    assert sorted(p.name for p in recipe_path.parent.iterdir()) == [
+        "theme.recipe.json"]
+    recipe = json.loads(recipe_path.read_text(encoding="utf-8"))
+    assert T.validate_recipe(recipe) == []
+    assert len(recipe["agents"]) == len(PERSONAS)
 
 
 def test_cli_builds_and_checks_with_injected_extraction(tmp_path, monkeypatch):

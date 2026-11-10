@@ -34,16 +34,25 @@ Therefore:
 * The art is sliced, positioned and composited by the local builder. It is not
   used to train models and it is not used to generate new art.
 
-LimeZu's art packs are CC-BY, not CC-BY-SA: attribution is required, and there
-is no source-sharing obligation. The CC-BY TASL form (Title, Author, Source,
-Licence) applies to any CC-BY pack, including Serene Village:
+The **purchased Modern Interiors / Modern User Interface packs** are governed
+by LimeZu's own paid-art commercial licence, not by a Creative Commons licence.
+That licence permits commercial use and requires credit, and it expressly
+forbids reselling or redistributing the assets. The recipe-only rule above is
+the practical consequence: each user builds from their own purchase.
 
-    Title:   Serene Village (and the other packs named in THIRD_PARTY_NOTICES.md)
+**Serene Village is the CC-BY exception.** Its separate CC-BY 4.0 terms require
+attribution and carry no source-sharing obligation (CC-BY, not CC-BY-SA):
+
+    Title:   Serene Village
     Author:  LimeZu
     Source:  https://limezu.itch.io
     Licence: CC-BY 4.0 — https://creativecommons.org/licenses/by/4.0/
     Changes: sliced into cells and positioned by the Qubit Office theme builder;
              no other modification.
+
+Do not describe the purchased packs as CC-BY: their licence forbids
+redistribution, which CC-BY would permit. The CC-BY statement above applies
+only to Serene Village (and only if that pack is used).
 
 Credit placement
 ----------------

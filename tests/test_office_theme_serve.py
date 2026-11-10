@@ -51,7 +51,7 @@ def _tokens():
         "color-surface-hover": "#1d2230",
         "color-text-primary": "#e9edf7",
         "color-text-muted": "#8a93a8",
-        "color-border": "#334155",
+        "color-border": "#64748b",
         "color-accent": "#7cc8ff",
         "radius-control": "4px",
     }

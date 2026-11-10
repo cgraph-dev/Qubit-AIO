@@ -34,7 +34,7 @@ import threading
 import unicodedata
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
 from voicebridge.paths import qubit_home
 from voicebridge.resources import resource_path
@@ -332,42 +332,59 @@ def _effective_token_map(tokens: Mapping[str, Any]) -> Dict[str, str]:
     return effective
 
 
+#: Token variables whose foreground must clear 4.5:1 against BOTH office
+#: surfaces. ``--ui-text-faint`` is the disabled text colour: WCAG allows 3:1
+#: for disabled controls, and we hold it to that floor deliberately.
+_TEXT_CONTRAST_VARS: Sequence[Tuple[str, float]] = (
+    ("--ui-text", 4.5),
+    ("--ui-muted", 4.5),
+    ("--ui-text-faint", 3.0),
+)
+
+#: Non-text colours the office actually paints (accents, borders, the status
+#: dots and the level pills). Each must clear 3:1 against both surfaces.
+_NON_TEXT_CONTRAST_VARS: Sequence[str] = (
+    "--ui-accent",
+    "--ui-accent-soft",
+    "--ui-line",
+    "--ui-line-strong",
+)
+
+
 def _contrast_problems(tokens: Mapping[str, Any]) -> List[str]:
+    """The full contrast matrix over the two office surfaces.
+
+    The office renders on ``--ui-bg`` (the main surface) and ``--ui-bg-solid``
+    (raised/plated surfaces). Text and muted text need 4.5:1; disabled text,
+    accents, borders, status colours and level colours need 3:1. Only tokens
+    the pack actually declares are measured (an absent token emits nothing).
+    """
     problems: List[str] = []
     effective = _effective_token_map(tokens)
-    surface = effective.get("--ui-bg")
-    raised = effective.get("--ui-bg-solid")
-    hover = effective.get("--ui-bg-hover")
-    text = effective.get("--ui-text")
-    muted = effective.get("--ui-muted")
+    surfaces = (
+        ("--ui-bg", effective.get("--ui-bg")),
+        ("--ui-bg-solid", effective.get("--ui-bg-solid")),
+    )
 
-    pairs = [
-        ("--ui-text", text, "--ui-bg", surface, 4.5),
-        ("--ui-muted", muted, "--ui-bg", surface, 3.0),
-        ("--ui-text", text, "--ui-bg-solid", raised, 4.5),
-        ("--ui-muted", muted, "--ui-bg-hover", hover, 3.0),
-    ]
-    for first_name, first, second_name, second, floor in pairs:
-        if first is None or second is None:
-            continue
-        if _hex_rgb(first) is None or _hex_rgb(second) is None:
-            continue
-        ratio = contrast_ratio(first, second)
-        if ratio + 1e-9 < floor:
-            problems.append(
-                f"token contrast: {first_name} vs {second_name} is "
-                f"{ratio:.2f}:1; needs >= {floor}:1")
-
-    if surface is not None and _hex_rgb(surface) is not None:
-        for variable in STATUS_TOKENS:
-            value = effective.get(variable)
-            if value is None or _hex_rgb(value) is None:
+    def check(variable: str, floor: float) -> None:
+        value = effective.get(variable)
+        if value is None or _hex_rgb(value) is None:
+            return
+        for surface_name, surface in surfaces:
+            if surface is None or _hex_rgb(surface) is None:
                 continue
             ratio = contrast_ratio(value, surface)
-            if ratio + 1e-9 < 3.0:
+            if ratio + 1e-9 < floor:
                 problems.append(
-                    f"token contrast: {variable} vs --ui-bg is "
-                    f"{ratio:.2f}:1; needs >= 3.0:1")
+                    f"token contrast: {variable} vs {surface_name} is "
+                    f"{ratio:.2f}:1; needs >= {floor}:1")
+
+    for variable, floor in _TEXT_CONTRAST_VARS:
+        check(variable, floor)
+    for variable in _NON_TEXT_CONTRAST_VARS:
+        check(variable, 3.0)
+    for variable in STATUS_TOKENS:
+        check(variable, 3.0)
     return problems
 
 

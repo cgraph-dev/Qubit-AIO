@@ -244,7 +244,13 @@ SERVED_PLUGIN_ARTIFACTS = (
     / "qubit-office.game.css",
 )
 THEME_ART_SUFFIXES = {".png", ".webp", ".jpg", ".jpeg", ".gif"}
-OPERATOR_PATH_NEEDLES = ("/home/", "Projects/Repos/", "C:\\Users")
+OPERATOR_PATH_NEEDLES = (
+    "/home/",
+    "~/",
+    "Projects/Repos/",
+    "C:\\Users",   # JSON-escaped Windows profile path
+    "C:\\\\Users",  # double-escaped form seen in generated JS/JSON
+)
 
 
 def _git_files() -> list[str]:
@@ -356,18 +362,48 @@ def test_no_theme_art_under_any_committed_themes_directory():
     assert not bad, f"committed theme art (recipes only): {bad}"
 
 
+def test_at_least_one_theme_recipe_is_committed():
+    """A vacuous recipe guard protects nothing: the repo must ship one recipe."""
+    recipes = [rel for rel in _git_files()
+               if Path(rel).name == "theme.recipe.json"]
+    assert recipes, (
+        "no committed theme.recipe.json; the recipe/contrast guards would be "
+        "vacuous. Generate one with `scripts/office_theme_build.py "
+        "--recipe-out ...` from the owner's purchase.")
+
+
 def test_every_committed_theme_recipe_validates():
     from voicebridge.office import theme as T
 
+    recipes: list[str] = []
     problems: dict[str, list[str]] = {}
     for rel in _git_files():
         if Path(rel).name != "theme.recipe.json":
             continue
+        recipes.append(rel)
         document = json.loads((REPO / rel).read_text(encoding="utf-8"))
         found = T.validate_recipe(document)
         if found:
             problems[rel] = found
+    assert recipes, "no committed theme.recipe.json to validate"
     assert not problems, f"invalid committed theme recipes: {problems}"
+
+
+def test_committed_theme_recipe_tokens_clear_the_contrast_matrix():
+    """The real recipe tokens must pass the production contrast gate."""
+    from voicebridge.office import theme as T
+
+    recipes = [rel for rel in _git_files()
+               if Path(rel).name == "theme.recipe.json"]
+    assert recipes, "no committed theme.recipe.json"
+    for rel in recipes:
+        document = json.loads((REPO / rel).read_text(encoding="utf-8"))
+        assert T.validate_tokens(document["tokens"]) == [], (
+            f"{rel}: tokens fail the contrast matrix")
+        # Verify the matrix is actually populated, not a text-only minimum.
+        for token in ("color-accent", "color-border", "color-text-faint",
+                      "color-status-working", "color-level-crit"):
+            assert token in document["tokens"], (rel, token)
 
 
 def test_committed_theme_json_has_no_operator_paths():
@@ -407,8 +443,10 @@ def test_vendor_habblaud_check_exits_zero():
 def test_served_plugin_artifacts_have_no_operator_or_build_paths():
     """The committed entry is portable: no builder home, no module comment."""
     bad: dict[str, list[str]] = {}
+    missing: list[str] = []
     for path in SERVED_PLUGIN_ARTIFACTS:
         if not path.is_file():
+            missing.append(path.relative_to(REPO).as_posix())
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         hits = [needle for needle in OPERATOR_PATH_NEEDLES if needle in text]
@@ -416,6 +454,7 @@ def test_served_plugin_artifacts_have_no_operator_or_build_paths():
             hits.append("leading ../.. module comment")
         if hits:
             bad[path.relative_to(REPO).as_posix()] = hits
+    assert not missing, f"served plugin artifact missing: {missing}"
     assert not bad, f"build/operator paths in served plugin artifacts: {bad}"
 
 
