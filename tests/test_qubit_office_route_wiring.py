@@ -10,7 +10,12 @@ REPO = Path(__file__).resolve().parents[1]
 
 def test_qubit_office_is_listed_and_full_height_without_being_a_plugin_route():
     app = (REPO / "frontend/qubit-web/src/App.tsx").read_text()
-    assert '{ path: "/qubit-office", label: "Qubit Office"' in app
+    # The nav row is a real object literal; it has since gained labelKey/icon/
+    # exactEnd fields (a11y + i18n), so match the path and label rather than one
+    # exact historical spelling of the line.
+    entry = re.search(r"\{[^{}]*path:\s*\"/qubit-office\"[^{}]*\}", app)
+    assert entry, "no nav entry for /qubit-office"
+    assert 'label: "Qubit Office"' in entry.group(0), entry.group(0)
     routes = (REPO / "frontend/qubit-web/src/lib/chat-routes.ts").read_text()
     match = re.search(r"FULL_HEIGHT_ROUTE_PATHS = \[([^\]]*)\]", routes, re.S)
     assert match and '"/qubit-office"' in match.group(1)
