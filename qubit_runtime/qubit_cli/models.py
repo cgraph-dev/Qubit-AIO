@@ -89,11 +89,18 @@ def _get_json(
     """GET ``url`` and parse the JSON body. ``opener`` defaults to the catalog opener (resolved at
     call time so monkeypatching ``_urlopen_model_catalog_request`` still applies). Raises on failure."""
     req = urllib.request.Request(url, headers=headers or {})
-    with (opener or _urlopen_model_catalog_request)(req, timeout=timeout, **open_kwargs) as resp:
-        body = resp.read()
-        if req.get_header("Accept-encoding") == "gzip" and resp.headers.get("Content-Encoding", "").lower() == "gzip":
-            body = gzip.decompress(body)
-        return json.loads(body.decode())
+    try:
+        with (opener or _urlopen_model_catalog_request)(req, timeout=timeout, **open_kwargs) as resp:
+            body = resp.read()
+            if req.get_header("Accept-encoding") == "gzip" and resp.headers.get("Content-Encoding", "").lower() == "gzip":
+                body = gzip.decompress(body)
+            return json.loads(body.decode())
+    except urllib.error.HTTPError as exc:
+        # HTTPError is itself a response holding the body fp: close it so every catalog probe
+        # that lands on an error status does not leak a socket to the GC. Callers that need the
+        # body have already read it into ``exc.__dict__`` by the time this unwinds.
+        exc.close()
+        raise
 
 
 

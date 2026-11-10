@@ -45,7 +45,7 @@ def test_kanban_submission_enters_single_query_approval_context(tmp_path, monkey
 
     monkeypatch.setattr('gateway.session_ingress.execute_admission', execute)
 
-    async def submit(actor, submission):
+    async def submit(actor, submission, **kwargs):
         await execute_finite_admission(authority, ref, {'admission_id': 'admission', 'payload': submission.payload})
         return AdmissionReceipt('admission', ref, 1, 'queued', None, 1, None)
 
@@ -160,10 +160,11 @@ def test_retry_of_pre_finite_kanban_admission_returns_original_receipt(kanban_ow
     authority = owner.authority
     real_submit = authority.submit
 
-    async def pre_finite_submit(actor, submission):
-        # The payload run_task committed before this change: no finite flag.
+    async def pre_finite_submit(actor, submission, **kwargs):
+        # The payload run_task committed before this change: no finite flag (and no card marker).
         payload = {k: v for k, v in submission.payload.items() if k != 'finite'}
-        return await real_submit(actor, type(submission)(submission.request_id, submission.ref, payload, submission.intent))
+        return await real_submit(actor, type(submission)(submission.request_id, submission.ref, payload, submission.intent),
+                                 **kwargs)
 
     def no_listing(*args, **kwargs):
         raise AssertionError('retry must use the exact-key admission lookup')

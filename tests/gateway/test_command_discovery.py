@@ -48,7 +48,7 @@ async def _legacy_ws_snapshot(root, home, env, requests):
             while process.poll() is None and time.monotonic() < deadline:
                 log.seek(0)
                 output = log.read()
-                if match := re.search(r'HERMES_BACKEND_READY port=(\d+)', output):
+                if match := re.search(r'QUBIT_BACKEND_READY port=(\d+)', output):
                     port = int(match.group(1))
                     break
                 await asyncio.sleep(.1)
@@ -101,7 +101,6 @@ def test_ordinary_daemon_discovery_matches_legacy_extensions(tmp_path):
     requests = [('commands.catalog', {}), *[('complete.slash', {'text': text})
         for text in ('/', '/probe', '/probe-quick', '/help', '/details c', 'plain')]]
     legacy_code = '''import json, sys
-pytestmark = pytest.mark.xfail(strict=False, reason="wave-20 lane B: ordinary-daemon discovery is flaky on this host (never reaches state=ready / auth scan timing)")
 from tui_gateway import server
 requests = json.loads(sys.argv[1])
 results = [server._methods[method](i, params)['result'] for i, (method, params) in enumerate(requests)]
