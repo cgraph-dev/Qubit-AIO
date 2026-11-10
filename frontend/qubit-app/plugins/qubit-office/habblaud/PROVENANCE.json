@@ -1,8 +1,12 @@
 {
   "source": "https://github.com/marmottajr/habblaud",
   "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
+  "local_commit": "3303cc16545a585f43bec1a78b94c86f6f9f91a3",
+  "local_changes": [
+    "theme floor surface provider (client/src/art/theme-assets.ts; floor.ts hook)"
+  ],
   "licence": "MIT",
-  "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to en by scripts/vendor_habblaud.py (English-only authoring ruling).",
+  "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to en by scripts/vendor_habblaud.py (English-only authoring ruling). This tree carries documented local changes on top of the upstream pin: `commit` names the upstream commit it was built from, `local_commit` names the source checkout HEAD that added them, and `local_changes` lists them.",
   "files": [
     {
       "path": "LICENSE",
@@ -215,18 +219,18 @@
       "bytes": 76799
     },
     {
+      "path": "bundle/app-0Gqa7aIn.js",
+      "sha256": "f6b63a3a95b0e4ba28a423a17351882ee152dd5c47b313314c000677ed39104d",
+      "bytes": 692282
+    },
+    {
       "path": "bundle/app-BW61bUik.css",
       "sha256": "2be3803177e97e74f62009495ad23c5f49d10ad3e544ed0987552fd90b2731f3",
       "bytes": 128520
     },
     {
-      "path": "bundle/app-U4Pwh2XA.js",
-      "sha256": "367365c9200c34898ceaa7e74c558031f9d92b6eb543094341ea71cfaeb27c9b",
-      "bytes": 698456
-    },
-    {
-      "path": "bundle/daystats-CUw1NUBG.js",
-      "sha256": "2c528ab63470a371474bdc47f683ab397ca903f1f05d0dbee6d6c45dd14cf941",
+      "path": "bundle/daystats-I5nXHlX6.js",
+      "sha256": "89fc6a24067ee7fbda4e729c60cbea49f671f467823b32839eb5b42245eb719f",
       "bytes": 36986
     },
     {
@@ -245,9 +249,9 @@
       "bytes": 203518
     },
     {
-      "path": "bundle/main-DND_b4_E.js",
-      "sha256": "e823327b4310ed7287dc0612f704fa085b094d4c0d31b0f30cdcdcfec5d0fba3",
-      "bytes": 3980
+      "path": "bundle/main-FPel1-E-.js",
+      "sha256": "2c161ca3d675bc010e93a9c5e9fa26116dd504d22a22a9772c14ac7e69835e66",
+      "bytes": 12103
     },
     {
       "path": "bundle/pixelify-sans-cyrillic-400-normal-Ckz2YJkH.woff2",
@@ -370,18 +374,18 @@
       "bytes": 5416
     },
     {
+      "path": "bundle/ptypane-BOKFnEaN.js",
+      "sha256": "008b07a31ea54ac0c522f40e7b4f5d8bea8ecc716bc6094fb5ddbf23da34bee3",
+      "bytes": 334656
+    },
+    {
       "path": "bundle/ptypane-BrP-ENHg.css",
       "sha256": "0e5386f16cb4be78a2fe911e014a810da76ea2db47d8c8b2a966516b2fd5270b",
       "bytes": 3939
     },
     {
-      "path": "bundle/ptypane-DxPqTDKo.js",
-      "sha256": "60fa0392fda300bf4c8e8426c5e78540547d4e55c5452ad35b5ddcb9e36e6054",
-      "bytes": 334656
-    },
-    {
       "path": "index.html",
-      "sha256": "f10757687bb60efd5415aaae333ad9277c73eb41ad8b6daede197597587f65df",
+      "sha256": "ce7e36de5894bd815de214f8610f332c00a0ddbb24e617388aa178226cea1cd7",
       "bytes": 2815
     },
     {
@@ -390,6 +394,6 @@
       "bytes": 818
     }
   ],
-  "total_bytes": 2147631,
+  "total_bytes": 2149580,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }
