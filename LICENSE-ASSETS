@@ -12,9 +12,11 @@ Code vs art
   game bundle, is original Qubit material under the root LICENSE (MIT).
 * The office art is not Qubit's to relicense. The art listed below remains the
   property of its author and is used under the terms stated for each pack.
+* The art is sliced, positioned and composited by the local builder. It is not
+  used to train models and it is not used to generate new art.
 
-LimeZu — Modern Interiors and the character/portrait art
---------------------------------------------------------
+LimeZu — Modern Interiors, Modern User Interface, and the character/portrait art
+-------------------------------------------------------------------------------
 The owner purchased the LimeZu packs used to build local office themes. Credit
 is required on every surface that ships the art:
 
@@ -24,6 +26,15 @@ The Modern Interiors licence permits editing and use in any commercial or
 non-commercial project and requires credit to the artist. It forbids reselling
 or redistributing the asset to others.
 
+The Modern User Interface licence says the same, and additionally excludes NFT
+minting:
+
+    YOU CAN: edit and use the asset in any commercial or non commercial
+    project, except NFT minting.
+    YOU CAN'T: resell or distribute the asset to others; edit and resell the
+    asset to others.
+    Credits required.
+
 Therefore:
 
 * The repository ships the theme RECIPE (semantic tokens, part indices and
@@ -31,17 +42,20 @@ Therefore:
   extracted parts, or a derived atlas. Each person builds locally from their own
   purchase.
 * No resale, redistribution, sublicensing or NFT minting of the art is allowed.
-* The art is sliced, positioned and composited by the local builder. It is not
-  used to train models and it is not used to generate new art.
+* The purchased Modern Interiors / Modern User Interface packs are governed by
+  LimeZu's own paid-art commercial licence, **not** by a Creative Commons
+  licence. That licence permits commercial use and requires credit, and it
+  expressly forbids reselling or redistributing the assets. The recipe-only
+  rule above is the practical consequence.
 
-The **purchased Modern Interiors / Modern User Interface packs** are governed
-by LimeZu's own paid-art commercial licence, not by a Creative Commons licence.
-That licence permits commercial use and requires credit, and it expressly
-forbids reselling or redistributing the assets. The recipe-only rule above is
-the practical consequence: each user builds from their own purchase.
+**CC-BY is not the licence of the purchased packs.** Describing them as CC-BY
+would be wrong, because CC-BY permits redistribution and these licences forbid
+it. CC-BY 4.0 applies only to Serene Village, below, and Serene Village is not
+used by the Qubit Office v1 theme.
 
-**Serene Village is the CC-BY exception.** Its separate CC-BY 4.0 terms require
-attribution and carry no source-sharing obligation (CC-BY, not CC-BY-SA):
+**Serene Village is the CC-BY exception (not used in v1).** Its separate CC-BY
+4.0 terms require attribution and carry no source-sharing obligation (CC-BY,
+not CC-BY-SA):
 
     Title:   Serene Village
     Author:  LimeZu
@@ -50,15 +64,29 @@ attribution and carry no source-sharing obligation (CC-BY, not CC-BY-SA):
     Changes: sliced into cells and positioned by the Qubit Office theme builder;
              no other modification.
 
-Do not describe the purchased packs as CC-BY: their licence forbids
-redistribution, which CC-BY would permit. The CC-BY statement above applies
-only to Serene Village (and only if that pack is used).
+If Serene Village is ever used, keep this TASL statement and the changes note;
+the purchased Modern Interiors / Modern User Interface packs still must not be
+described as CC-BY.
+
+Generators are tools, not shipped art
+-------------------------------------
+The two applications used as art sources are **tools only and are not shipped,
+modified, or redistributed** by Qubit:
+
+* Character Generator 2.0 — art: LimeZu's official character generator,
+  included with the complete pack; the tool is GPLv3 upstream.
+* Portrait Generator 1.5.0 — a Gray Matter Studios application; art: LimeZu;
+  no licence file is present in the archive.
+
+The build reads their archives in memory. A shared theme is the recipe only; it
+does not carry the tool or the art.
 
 Credit placement
 ----------------
-The office shows the active theme's credit; the persistent Credits/About entry
-required by the plan must also name LimeZu with the link above, so the credit
-does not depend on a theme being active.
+The office shell always shows a persistent Credits/About line
+(`Office art: LimeZu — https://limezu.itch.io`), independent of whether a theme
+is active. The active theme's own credit line is additional, never the only
+credit.
 
 Not used
 --------
