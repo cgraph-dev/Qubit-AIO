@@ -52,6 +52,11 @@ PAGES = ["/skills", "/plugins", "/mcp", "/models", "/profiles", "/config",
          "/pairing", "/system"]
 
 TEMP_PROFILE = "e2e-audit-prof"
+
+#: Profile/webhook controls create and delete real records.  They are off by
+#: default so an accidental run against the operator dashboard cannot stop the
+#: gateway or delete user data (2026-11-10 incident).
+ALLOW_LIVE_MUTATIONS = False
 TEMP_ENV_KEY = "E2E_AUDIT_TMP"
 TEMP_WEBHOOK = "e2e-audit-hook"
 TEMP_WEBHOOK_URL = "http://127.0.0.1:9/e2e-audit"
@@ -1134,6 +1139,13 @@ def audit_models(h: Harness) -> None:
 
 def audit_profiles(h: Harness) -> None:
     P = "/profiles"
+    if not ALLOW_LIVE_MUTATIONS:
+        h.run(P, "profiles_create_delete",
+              "create/delete a temp profile (refused: live mutations disabled)",
+              lambda: {"disposition": "E2E_SKIP",
+                       "detail": "live mutations disabled; rerun with "
+                                 "--allow-live-mutations on a scratch dashboard"})
+        return
     h.goto(P)
     # Pre-clean any temp profile left by a prior interrupted run (canonical
     # confirm-gated delete of our own e2e artifact only), outside any control
@@ -2276,6 +2288,13 @@ def audit_channels(h: Harness) -> None:
 
 def audit_webhooks(h: Harness) -> None:
     P = "/webhooks"
+    if not ALLOW_LIVE_MUTATIONS:
+        h.run(P, "webhooks_create_delete",
+              "create/delete a temp webhook (refused: live mutations disabled)",
+              lambda: {"disposition": "E2E_SKIP",
+                       "detail": "live mutations disabled; rerun with "
+                                 "--allow-live-mutations on a scratch dashboard"})
+        return
     h.goto(P)
 
     def purge_temp() -> bool:
@@ -2975,7 +2994,12 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--headed", action="store_true")
     ap.add_argument("--check", action="store_true",
                     help="re-run and compare classifications with the stored artifact")
+    ap.add_argument("--allow-live-mutations", action="store_true",
+                    help="allow profile/webhook create+delete controls "
+                         "(required; the audit mutates its target)")
     args = ap.parse_args(argv)
+    global ALLOW_LIVE_MUTATIONS
+    ALLOW_LIVE_MUTATIONS = bool(args.allow_live_mutations)
 
     doc = run_audit(args.base, headless=not args.headed)
     out = Path(args.out)
