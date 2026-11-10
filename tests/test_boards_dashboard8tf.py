@@ -21,9 +21,11 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
 
 DIST = REPO_ROOT / "frontend" / "qubit-dist"
+# Git-ignored build artifact (built by `npm run build` in frontend/qubit-web,
+# cf. scripts/release_qualify.py); a source checkout has no bundle to serve.
 needs_dist = pytest.mark.skipif(
     not (DIST / "index.html").is_file(),
-    reason="hermes-dist not built (npm build step)")
+    reason="frontend/qubit-dist not built (npm run build in frontend/qubit-web)")
 
 
 def _start(tmp_path):
