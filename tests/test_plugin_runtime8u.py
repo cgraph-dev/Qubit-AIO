@@ -67,7 +67,13 @@ def test_register_valid_manifest_redacted(tmp_path, monkeypatch):
     got = PR.get_plugin(cfg, "acme.tool")
     assert got["plugin"]["entrypoint"] == "acme.plugin:main"
     listed = PR.list_plugins(cfg)["plugins"]
-    assert {r["id"] for r in listed} == {"builtin.echo", "acme.tool"}
+    # The list is the registry (built-ins + registered) plus every bundled
+    # plugin that is really on disk; the registration is the delta here.
+    ids = {r["id"] for r in listed}
+    assert {"builtin.echo", "acme.tool"} <= ids
+    assert {r["id"] for r in PR._bundled_rows()} <= ids
+    assert [r for r in PR._load(cfg)["plugins"].values()
+            if r["id"] == "acme.tool"], ids
     # the manifest is metadata only; nothing was executed
     assert "no code was imported" in out["note"]
 
