@@ -97,6 +97,7 @@ def test_live_brain4_route_reaches_real_handler(tmp_path, monkeypatch):
 
 def test_model_failure_surfaces_real_cause(tmp_path, monkeypatch):
     from voicebridge import chat_transport as CT
+    from voicebridge import agent as _agent
     import voicebridge.local_llm as _llm
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -104,6 +105,10 @@ def test_model_failure_surfaces_real_cause(tmp_path, monkeypatch):
     def _boom(*a, **k):
         raise OSError("dial tcp 127.0.0.1:11434: connect: connection refused")
 
+    # A general turn prefers the tool-capable agent; with no vendored runtime
+    # it falls back to the model path. Return None so the stubbed provider --
+    # not a live dial -- is what the turn actually hits.
+    monkeypatch.setattr(_agent, "run_agent_turn", lambda *a, **k: None)
     monkeypatch.setattr(_llm, "chat_local", _boom)
     res = CT.turn(cfg, "hi", session="live-boom")
     assert res["ok"] is False and res["code"] == "MODEL_ERROR"
@@ -113,9 +118,11 @@ def test_model_failure_surfaces_real_cause(tmp_path, monkeypatch):
 
 def test_model_empty_is_unavailable_never_fabricated(tmp_path, monkeypatch):
     from voicebridge import chat_transport as CT
+    from voicebridge import agent as _agent
     import voicebridge.local_llm as _llm
 
     cfg = _cfg(tmp_path, monkeypatch)
+    monkeypatch.setattr(_agent, "run_agent_turn", lambda *a, **k: None)
     monkeypatch.setattr(_llm, "chat_local",
                         lambda *a, **k: "")
     res = CT.turn(cfg, "hi", session="live-empty")
