@@ -33,7 +33,14 @@ def _resample(audio: np.ndarray, from_sr: int, to_sr: int) -> np.ndarray:
     i0 = np.floor(idx).astype(int)
     i1 = np.minimum(i0 + 1, len(x) - 1)
     frac = (idx - i0).astype(np.float32)
-    y = x[i0] * (1 - frac[..., None]) + x[i1] * (frac[..., None])
+    # Widen frac to x's trailing shape. Using ``frac[..., None]`` unconditionally
+    # broadcasts a MONO signal (x[i0] has shape (n,)) against (n, 1), which NumPy
+    # resolves to an (n, n) intermediate — 44,100**2 floats for one second of
+    # audio, ~20 s of work instead of ~3 ms. Multiply along the trailing axis only
+    # when there IS one.
+    if x.ndim > 1:
+        frac = frac[..., None]
+    y = x[i0] * (1 - frac) + x[i1] * frac
     if is_int:
         y = np.clip(y, -1, 1) * 32767
         return y.astype(np.int16)
