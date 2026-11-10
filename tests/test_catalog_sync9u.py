@@ -262,7 +262,15 @@ def test_skill_state_import_without_yaml_is_typed_skip(tmp_path, monkeypatch):
     assert report["added"] == []
 
 
-def test_plugin_state_import_is_typed_unsupported(tmp_path, monkeypatch):
+def test_plugin_state_import_carries_disabled_state(tmp_path, monkeypatch):
+    """A plugin disabled at source arrives disabled, never silently enabled.
+
+    The typed-UNSUPPORTED refusal (``PLUGIN_STATE_NO_PUBLIC_API``) was replaced
+    by a real implementation: ``_import_plugin_state`` unions each source
+    plugin whose ``state.json`` says DISABLED into the destination
+    ``plugins.disabled`` deny-list (qubit_migration.py, "carries the semantic
+    enable/disable bit"). The invariants below are the ones that matter.
+    """
     from voicebridge import qubit_migration as HM
 
     cfg = _cfg(tmp_path, monkeypatch)
@@ -272,11 +280,14 @@ def test_plugin_state_import_is_typed_unsupported(tmp_path, monkeypatch):
         json.dumps({"enabled": False, "unlocks": {}}), encoding="utf-8")
 
     report = HM._import_plugin_state(cfg, home)
-    assert report["state"] == "UNSUPPORTED"
-    assert report["code"] == "PLUGIN_STATE_NO_PUBLIC_API"
-    assert report["recorded"] == []
+    # The source row is read as DISABLED, not unknown.
     assert {"name": "achievements", "state": "DISABLED"} in \
         report["source_plugins"]
+    assert "achievements" in report["source_disabled"]
+    # Either it was added on this run, or the destination already had it —
+    # both leave the plugin disabled. It is never reported as ENABLED.
+    assert "achievements" in (report["added"] + report["already_present"])
+    assert report["state"] in ("OK", "NOOP"), report
 
 
 def test_active_skill_is_reported_enabled(tmp_path, monkeypatch):
