@@ -35,7 +35,12 @@ async def probe():
     from websockets.asyncio.client import connect
 
     home = Path(os.environ['QUBIT_HOME'])
-    (home / 'config.yaml').write_text('gateway:\n  multiplex_profiles: false\nmodel:\n  provider: custom\n  default: no-inference\n  base_url: http://127.0.0.1:1/v1\nauxiliary:\n  title_generation:\n    enabled: false\n')
+    # ``plugins.disabled`` is a deny-list that wins over ``plugins.enabled``. The
+    # bundled ``jev-workflows`` plugin registers its ``jev`` toolset process-wide
+    # (it ignores a session's own toolsets), which would make the ``toolsets=[]``
+    # session below serve six tools and break the "zero tools" contract this
+    # fixture pins. Disable it so the fixture is hermetic on any host.
+    (home / 'config.yaml').write_text('gateway:\n  multiplex_profiles: false\nplugins:\n  disabled:\n    - jev-workflows\nmodel:\n  provider: custom\n  default: no-inference\n  base_url: http://127.0.0.1:1/v1\nauxiliary:\n  title_generation:\n    enabled: false\n')
     runner = GatewayRunner()
     authority = await initialize_session_authority(runner, profile_id=str(home), instance_id='desktop-verbs')
     api = await start_gateway_api(runner)
