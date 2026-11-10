@@ -303,8 +303,9 @@
  "classification_counts": {
   "EOL_NORMALIZED": 19,
   "INTENTIONALLY_OMITTED": 23,
-  "MISSING": 298,
+  "MISSING": 1,
   "OPENCLAW_OVERLAY": 0,
+  "OWNER_PURGED": 297,
   "QUBIT_ADDED": 4893,
   "QUBIT_PATCHED": 8641,
   "UNCHANGED": 7097,
@@ -273891,11 +273892,14 @@
  },
  "local_root": "qubit_runtime",
  "missing_from_local": [
+  "plugins/kanban/systemd/hermes-kanban-dispatcher.service"
+ ],
+ "mode_divergences": [],
+ "owner_purged": [
   "CONTRIBUTING.es.md",
   "README.es.md",
   "README.zh-CN.md",
   "SECURITY.es.md",
-  "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/developer-guide/acp-internals.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/developer-guide/adding-platform-adapters.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/developer-guide/adding-providers.md",
@@ -274190,7 +274194,6 @@
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-guide/windows-wsl-quickstart.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-stories.mdx"
  ],
- "mode_divergences": [],
  "patch_manifest": {
   ".dockerignore": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",

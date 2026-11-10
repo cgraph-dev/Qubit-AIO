@@ -171,6 +171,13 @@ def test_fork_tool_registry_exposes_inventory_tools(inventory, fork_path):
     import toolsets
 
     discover_builtin_tools()
+    # Built-in modules do not cover plugin-provided tools; the runtime registers
+    # those through the plugin loader (qubit_cli.plugins.discover_plugins), which
+    # is what a real session does. Without it, every plugin-backed toolset
+    # (spotify, google_meet, kanban, ...) reads as unexposed.
+    from qubit_cli.plugins import discover_plugins
+
+    discover_plugins()
     registered = set(registry.get_all_tool_names())
     exposed = set(registered)
     for name, spec in toolsets.TOOLSETS.items():

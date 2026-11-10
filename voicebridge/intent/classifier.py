@@ -327,6 +327,15 @@ class Classifier:
         if cc:
             return cc
 
+        # An EXPLICIT routing command ("route to the worker/agent ...") outranks
+        # the local-action whitelist: a task phrase inside it ("... and create a
+        # text document") must not hijack the turn into a local action and drop
+        # the rest of the instruction.
+        sticky = self._sticky_route(text)
+        if sticky:
+            return Intent("agent", confidence=0.9, task_text=text,
+                          backend="qubit", reason=f"explicit route -> {sticky}")
+
         # Direct PC action (whitelist) beats everything except system/confirm.
         # Packet 4D destructive screen: destruction text never takes the
         # immediate-action whitelist; it falls through to coding hints

@@ -27,6 +27,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -222,6 +224,11 @@ def test_generator_classifies_registered_catalog_route_as_ported():
     from scripts import parity_inventory as pi
     from voicebridge import qubit_compat as qc
 
+    if not pi.REF_AGENT.is_dir():
+        pytest.skip(
+            "upstream reference install absent at "
+            f"{pi.REF_AGENT}: build_routes() enumerates the reference route "
+            "decorators, so there is nothing to classify")
     rows = pi.build_routes(qc)
     catalog = next(r for r in rows
                    if r["id"] == "GET /api/dashboard/plugins/catalog")
