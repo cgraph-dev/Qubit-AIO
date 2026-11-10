@@ -128,7 +128,11 @@ def test_check_default_path_does_not_enumerate_tags():
     fake = _FakeGit(tags={"v1.3.0": T130})
     out = UM.check(_Cfg({}), git=fake)
     assert out["remote_revision"] == BRANCH
-    assert "ref_kind" not in out
+    # ``ref``/``ref_kind`` are part of the check() contract on every path: with
+    # no channel/tag the default tracks the configured branch and reports it as
+    # such (see test_update_channel_effective9u:
+    # test_check_default_uses_branch_head_unchanged).
+    assert out["ref"] == "main" and out["ref_kind"] == "branch", out
     assert not any(c[4:6] == ["--tags", "--refs"] for c in fake.calls), fake.calls
 
 

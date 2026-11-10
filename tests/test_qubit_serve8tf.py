@@ -67,7 +67,14 @@ def _http(port, method, path, body=None, token="test-token",
         with urllib.request.urlopen(req, timeout=10) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("Content-Type", ""), e.read()
+        # An HTTPError is itself a response object holding an open socket and,
+        # for a served body, a TemporaryFileCloser. Left to __del__ it raises a
+        # ResourceWarning at collection time, which pytest turns into an
+        # unraisable-exception failure attributed to an unrelated test.
+        try:
+            return e.code, e.headers.get("Content-Type", ""), e.read()
+        finally:
+            e.close()
 
 
 @needs_dist
@@ -132,16 +139,27 @@ def test_qubit_plugins_served(tmp_path):
         assert status == 200
         plugins = json.loads(body)
         names = [m["name"] for m in plugins]
-        assert names == ["qubit-approvals", "qubit-boards", "qubit-brand",
-                          "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
-                          "qubit-ops", "qubit-reports", "qubit-runtime"], names
+        # The Qubit overlay plugins under frontend/qubit-app/plugins, served by
+        # this route. Asserted as a subset plus a distinctness check rather than
+        # a frozen roster: the overlay set grows as Qubit ships tabs, and a
+        # hand-copied list turns every addition into a false failure.
+        assert {"qubit-approvals", "qubit-boards", "qubit-brand",
+                "qubit-devices", "qubit-gateway", "qubit-memory",
+                "qubit-models", "qubit-ops", "qubit-reports",
+                "qubit-runtime"} <= set(names), names
+        assert len(set(names)) == len(names), names
         for name in names:
             mf = [m for m in plugins if m["name"] == name][0]
             status, ctype, js = _http(
                 port, "GET", f"/dashboard-plugins/{name}/{mf['entry']}")
             assert status == 200, (name, status)
             assert "application/javascript" in ctype
-            assert b"__HERMES_PLUGINS__" in js, name
+            # Qubit overlay bundles register through the canonical
+            # window.__QUBIT_PLUGINS__ handle (frontend/qubit-web/src/plugins/
+            # registry.ts). The legacy __HERMES_PLUGINS__ handle is still
+            # aliased there for third-party bundles, but no Qubit-owned overlay
+            # bundle references it any more.
+            assert b"__QUBIT_PLUGINS__" in js, name
     finally:
         ui.stop()
 

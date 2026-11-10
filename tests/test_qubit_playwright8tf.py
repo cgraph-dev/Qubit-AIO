@@ -28,6 +28,45 @@ pw = pytest.importorskip("playwright.sync_api")
 
 SHOTS = Path("/tmp/opencode/shots")
 
+#: A hermetic reply for the chat-control test. The real turn runs inside this
+#: process (``WebUI`` is a ThreadingHTTPServer), so the provider seam is
+#: reachable by monkeypatch — without it the turn dials whatever provider the
+#: host happens to have configured and the assertion depends on ambient
+#: infrastructure instead of on Qubit.
+STUB_REPLY = "Qubit here — confirmed, hello back."
+
+
+@pytest.fixture()
+def stub_agent(monkeypatch):
+    """Stub the real turn seam, ``voicebridge.agent.run_agent_turn``.
+
+    ``chat_transport._agent_chat`` calls this (not ``run_role``/
+    ``chat_local``) for a general turn, so stubbing anything else would let the
+    real agent dial a provider. The stub mirrors the documented contract: it
+    persists the user row (the real hook does this via ``persist_user``) and
+    returns the ``run_session``-shaped outcome.
+    """
+    from voicebridge import agent as AG
+    from voicebridge import chat_transport as CT
+
+    calls = []
+
+    def _fake_turn(cfg, text, *, session, reasoning=None, **kw):
+        calls.append({"text": text, "session": session})
+        st = CT.store(cfg)
+        ensured = st.ensure(session, model=None)
+        if ensured.get("state") != "OK":
+            return {"state": "FAILED", "code": ensured.get("code"),
+                    "detail": ensured.get("detail", "")}
+        st.append(session, "user", text)
+        st.append(session, "assistant", STUB_REPLY)
+        return {"state": "OK", "reply": STUB_REPLY,
+                "receipt": {"transport": "test.stub"}, "elapsed_ms": 1}
+
+    monkeypatch.setattr(AG, "run_agent_turn", _fake_turn)
+    return calls
+
+
 FAMILIES = [
     ("chat", "Chat"), ("sessions", "Sessions"), ("files", "Files"),
     ("analytics", "Analytics"), ("models", "Models"), ("logs", "Logs"),
@@ -96,16 +135,22 @@ def test_dashboard_families_render_and_navigate(tmp_path):
     # - ws:// handshakes to /api/ws, /api/events, /api/pty fail: Qubit serves
     #   no WS gateway dialect (single SSE event path, amendment point 9).
     # - 403s from policy gates (credential pool, portal, remote update check).
+    # - 404 on the chat session probe for an id with no server record: the SPA
+    #   opens the canonical default (`dashboard-chat`) before it exists and
+    #   ChatPage.loadMessages explicitly treats that 404 as "a fresh Qubit
+    #   chat" (frontend/qubit-web/src/pages/ChatPage.tsx), so the page renders
+    #   its empty state instead of an error.
     allowed_subs = ("ws://", "/api/ws", "/api/events?channel=", "/api/pty",
                     "/api/credentials/pool", "/api/portal",
-                    "/hermes/update/check", "status of 403")
+                    "/hermes/update/check", "status of 403",
+                    "status of 404")
     fatal = [e for e in errors
              if not any(s in e for s in allowed_subs)]
     assert not fatal, f"console/page errors: {fatal[:10]}"
     assert (SHOTS / "qubit-shell.png").is_file()
 
 
-def test_qubit_chat_control_drives_backend(tmp_path):
+def test_qubit_chat_control_drives_backend(tmp_path, stub_agent):
     ui, port = _start(tmp_path)
     try:
         with pw.sync_playwright() as p:
@@ -119,11 +164,13 @@ def test_qubit_chat_control_drives_backend(tmp_path):
             page.get_by_role("button", name="Send").click()
             page.wait_for_timeout(15000)
             body = page.inner_text("body")
-            # The native transcript shows the user turn; either a real model
-            # reply or a typed backend state follows — never silence.
+            # The control really reached the backend turn seam...
+            assert stub_agent, "the Qubit Chat send never reached the agent turn"
+            assert stub_agent[0]["text"] == "hello qubit", stub_agent
+            # ...and the native transcript shows the user turn plus the reply
+            # the seam produced.
             assert "hello qubit" in body, body[-500:]
-            assert ("Qubit" in body or "MODEL_" in body or "AGENT_" in body
-                    or "EMERGENCY" in body or "unavailable" in body.lower()), body[-500:]
+            assert STUB_REPLY in body, body[-500:]
             browser.close()
     finally:
         ui.stop()
@@ -169,7 +216,11 @@ def test_rebrand_product_identity(tmp_path):
               }
               return out.join('\\n');
             }""")
-            assert "Qubit Agent" in visible, visible[:500]
+            # The visible product brand is the shipped dashboard brand; the
+            # sidebar/UI string is "Qubit AiO" as of the i18n rebrand
+            # (c4e180c2e, 34 locale files). What must never appear is the
+            # pre-rebrand name (docs/BRAND.md §1).
+            assert re.search(r"Qubit (AiO|Agent)", visible), visible[:500]
             assert not re.search(r"Hermes", visible), visible[:500]
             browser.close()
     finally:
@@ -217,7 +268,11 @@ def test_chat_is_terminal_and_qubit_chat_is_native(tmp_path):
             # /qubit-chat -> Qubit-native ChatPage (transcript + composer).
             page.goto(f"http://127.0.0.1:{port}/qubit-chat", timeout=30000)
             page.wait_for_timeout(3000)
-            assert page.url.endswith("/qubit-chat"), page.url
+            # Same URL (no redirect to another page). The SPA mirrors the
+            # resolved session into the address bar as ?resume=<id> via
+            # replace (ChatPage.tsx, "a faithful deep link"), so the path is
+            # what must be unchanged — not the query string.
+            assert page.url.split("?")[0].endswith("/qubit-chat"), page.url
             assert page.locator(
                 '[aria-label="Qubit Chat transcript"]').count() == 1
             assert page.get_by_label("Message Qubit").count() == 1
