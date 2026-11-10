@@ -107,9 +107,9 @@ def _log(entry: Dict[str, Any]) -> None:
 
 
 def _hermes_config() -> Dict[str, Any]:
-    """This profile's config.yaml as Hermes parsed it. Empty outside Hermes or when it cannot be read."""
+    """This profile's config.yaml as Qubit parsed it. Empty when it cannot be read."""
     try:
-        from hermes_cli.config import load_config_readonly  # type: ignore
+        from qubit_cli.config import load_config_readonly  # type: ignore
 
         config = load_config_readonly()
         return config if isinstance(config, dict) else {}
@@ -135,12 +135,12 @@ def _disabled_skills() -> Any:
 
 
 def _hermes_skill_roots() -> List[Path]:
-    """Hermes's own answer for the session in flight, or [] when it cannot be asked.
+    """Qubit's own answer for the session in flight, or [] when it cannot be asked.
 
     The plugin used to derive the roots from ``HERMES_HOME`` alone. Under a named profile
     that home can still be the default one, so Jev ranked the DEFAULT profile's catalog and
     suggested skills the running profile cannot open at all (three of them in two sessions:
-    ``skill_view`` answered "not found" every time). Hermes already knows the answer per
+    ``skill_view`` answered "not found" every time). Qubit already knows the answer per
     session, profile and ``skills.external_dirs`` included, so ask it instead of guessing.
     """
     try:
@@ -152,7 +152,7 @@ def _hermes_skill_roots() -> List[Path]:
 
 
 def _skill_roots() -> List[Path]:
-    """Every folder Hermes loads skills from, or the one this profile owns when that cannot be known.
+    """Every folder Qubit loads skills from, or the one this profile owns when that cannot be known.
 
     Hermes scans more than `<home>/skills`, so ranking only that folder suggests from a
     catalog the agent cannot fully see and misses the rest. The jevkit copy bundled with an
@@ -990,7 +990,7 @@ _CARD_RE = re.compile(r"\bt_[0-9a-f]{8}\b")
 
 
 def _kanban_rows(task_id: str, board: Optional[str]) -> Tuple[Any, List[Any]]:
-    from hermes_cli import kanban_db as kb  # the host's own API; only SELECTs run here
+    from qubit_cli import kanban_db as kb  # Qubit's own kanban store; only SELECTs run here
     with kb.connect_closing(board=board) as conn:
         return kb.get_task(conn, task_id), kb.list_runs(conn, task_id)
 
