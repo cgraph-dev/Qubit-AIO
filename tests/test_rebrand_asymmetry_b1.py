@@ -157,29 +157,43 @@ def test_startup_watchdog_default_home_is_qubit_owned(monkeypatch):
 
 
 def test_node_fallback_uses_qubit_home(monkeypatch, tmp_path):
+    """The managed toolchain PATH is rooted in the Qubit home, never ``~/.hermes``.
+
+    ``tools.mcp_tool_config._node_fallback`` was replaced by the PM-managed
+    launcher path: ``_managed_launcher`` asks ``qubit_constants.with_qubit_node_path``
+    for a PATH composed from the Qubit home and the PM store. That composition
+    is empty when nothing is installed, so the invariant is asserted over every
+    entry it does emit rather than on a fabricated install.
+    """
     import os
 
-    from tools.mcp_tool_config import _node_fallback
+    import qubit_constants
+
+    home = tmp_path / ".qubit"
+    monkeypatch.setenv("QUBIT_HOME", str(home))
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    path = qubit_constants.with_qubit_node_path({"PATH": ""})["PATH"]
+    for entry in (p for p in path.split(os.pathsep) if p):
+        assert ".hermes" not in entry, (entry, path)
+        assert str(home) in entry or "pm" in entry, (entry, path)
+    # The legacy home must never be what a bare launcher resolves against.
+    assert qubit_constants.get_process_qubit_home().name == ".qubit"
+
+
+def test_env_loader_default_home_is_qubit_owned(monkeypatch):
+    """A cold process with no home env resolves ``~/.qubit``, never ``~/.hermes``.
+
+    Asserts the behavior, not where the literal lives: the default home is
+    resolved by ``qubit_constants.get_process_qubit_home()`` (which falls back
+    to ``Path.home() / ".qubit"`` in ``env_loader._process_qubit_home``).
+    """
+    import qubit_constants
 
     monkeypatch.delenv("QUBIT_HOME", raising=False)
-    real_expanduser = os.path.expanduser
-    monkeypatch.setattr(
-        os.path, "expanduser",
-        lambda p: str(tmp_path) if p == "~" else real_expanduser(p))
-    target = tmp_path / ".qubit" / "node" / "bin" / "npx"
-    target.parent.mkdir(parents=True)
-    target.write_text("#!/bin/sh\n")
-    target.chmod(0o755)
-    assert _node_fallback("npx") == str(target)
-
-
-def test_env_loader_default_home_is_qubit_owned():
-    import inspect
-
-    from qubit_cli import env_loader
-
-    assert 'Path.home() / ".qubit"' in inspect.getsource(env_loader.load_qubit_dotenv)
-    assert 'Path.home() / ".hermes"' not in inspect.getsource(env_loader.load_qubit_dotenv)
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    home = qubit_constants.get_process_qubit_home()
+    assert home.name == ".qubit", home
+    assert home != qubit_constants._legacy_platform_default_qubit_home()
 
 
 def test_providers_scan_reads_qubit_entry_point_group():
