@@ -510,7 +510,7 @@
 .agents-panel__seat {
   display: flex;
   gap: var(--office-s2);
-  align-items: baseline;
+  align-items: center;
   padding: 2px 0;
   font-size: var(--office-fs-xs);
 }
@@ -534,4 +534,138 @@
   color: var(--office-muted);
   font-size: var(--office-fs-xs);
   padding-top: var(--office-s2);
+}
+
+/* --- portraits: one atlas request per sheet, CSS-positioned cells ---------
+   The panel paints a seat's portrait as a BACKGROUND SPRITE, never an <img>.
+   One 32px portrait atlas (plus one body atlas for the dialogue card) covers
+   every seat, so opening a 283-row roster costs two image requests instead of
+   283. `image-rendering: pixelated` keeps the generated pixel art crisp when a
+   HiDPI display would otherwise smooth it into mush.
+
+   The cell offset comes from the inline custom properties (`--cell-x/y`,
+   `--body-x/y`) the panel sets from the theme payload; the 32px boxes are
+   fixed here so swapping packs cannot shift the list. */
+
+.agents-panel__avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  overflow: hidden;
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+}
+
+.agents-panel__portrait {
+  display: block;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  /* `auto` = the atlas' own pixel size; scaling it would blur the cells. */
+  background-repeat: no-repeat;
+  background-size: auto;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+.agents-panel__initials {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* The emoji is the LAST fallback (a seat with no letters in its name), so it
+   owns the same fixed box the portrait/initials occupy. */
+.agents-panel__avatar > .agents-panel__emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  font-size: calc(16px * var(--office-scale));
+  background: transparent;
+}
+
+/* --- the dialogue-style agent card ---------------------------------------
+   Portrait in a frame, the name on the tab, the 32x64 body beside it — the
+   pack author's own dialogue-box pattern. Fixed height (64px body + padding)
+   and a fixed grid so following the hovered row never reflows the roster. */
+
+.agents-panel__card {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: var(--office-s2);
+  box-sizing: border-box;
+  height: 72px;
+  padding: var(--office-s1) var(--office-s2);
+  margin: 0 0 var(--office-s2);
+  overflow: hidden;
+  border: var(--office-border-strong);
+  border-radius: var(--office-radius);
+  background: var(--office-ground);
+}
+
+.agents-panel__card:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 1px;
+}
+
+.agents-panel__cardPortrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+}
+
+.agents-panel__cardTab {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.agents-panel__cardName {
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-panel__cardMeta {
+  overflow: hidden;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-panel__body {
+  display: block;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 64px;
+  background-repeat: no-repeat;
+  background-size: auto;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
 }

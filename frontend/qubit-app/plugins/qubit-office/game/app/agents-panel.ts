@@ -72,7 +72,14 @@ export function readToken(win?: Window | null): string {
   }
 }
 
-/** One seat as the route serves it. Every field is copied, never defaulted. */
+/**
+ * One seat as the route serves it. Every field is copied, never defaulted.
+ *
+ * ``portrait`` and ``body`` are the active theme's atlas cells for this seat
+ * (Task 4): ``[col, row]`` or ``null`` when no theme/index lists the persona.
+ * They are data, not a claim — the panel only paints them once the atlases have
+ * actually decoded, and falls back to initials/emoji otherwise.
+ */
 export interface AgentSeat {
   slug: string;
   name: string;
@@ -82,6 +89,8 @@ export interface AgentSeat {
   room: string;
   emoji: string;
   color: string;
+  portrait: [number, number] | null;
+  body: [number, number] | null;
 }
 
 /** One division bucket. The boardroom tier has `slug === ""`. */
