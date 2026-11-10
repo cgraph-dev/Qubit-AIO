@@ -128,9 +128,13 @@ def test_plugins_voice_executes_on_shared_backend(tmp_path, monkeypatch):
         assert spoken.receipt["entry"] == eid
 
     # The registry is real: the unregister removed the manifest; the built-in
-    # remains. An entrypoint-only plugin resolves to the typed gate.
-    assert {r["id"] for r in PR.list_plugins(cfg)["plugins"]} == \
-        {"builtin.echo"}
+    # remains. (``list_plugins`` also carries the read-only vendored bundled
+    # rows — the fork's plugin tree, 1:1 with the reference — so the assertion
+    # is on the REGISTRY, keyed by each row's source, not on the whole list.)
+    registry = {r["id"] for r in PR.list_plugins(cfg)["plugins"]
+                if r.get("builtin") or not r.get("source_kind")}
+    assert registry == {"builtin.echo"}
+    assert "acme.tool" not in {r["id"] for r in PR.list_plugins(cfg)["plugins"]}
     PR.register(cfg, manifest=_manifest("acme.tool"), confirmed=True)
     gate = _speak_confirm(ctx, "qubit, invoke plugin acme.tool")
     assert gate.receipt["result"]["code"] == PR.UNAVAILABLE_CODE
