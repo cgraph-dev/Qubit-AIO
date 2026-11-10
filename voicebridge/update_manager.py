@@ -404,10 +404,11 @@ def _effective_ref(exec_: Runner, repo: Path, remote: str, branch: str,
     from . import update_channel as UC
 
     ch = (str(channel or "").strip().lower() or UC.DEFAULT_CHANNEL)
-    try:
-        support = UC.release_tag_support(ch)
-    except Exception:  # noqa: BLE001 — unknown channel falls back to branch
-        return branch, "branch", None
+    # ``release_tag_support`` raises ValueError for an unknown channel (fail
+    # closed). That is a caller error, not a resolution failure: let it
+    # propagate so apply()/check() can return the typed refusal instead of
+    # silently updating the branch the user did not ask for.
+    support = UC.release_tag_support(ch)
     if support.get("follow") != "tag":
         return branch, "branch", None
     rc, out, _err = exec_(
@@ -610,12 +611,22 @@ def check(cfg: Any, *, runner: Optional[Runner] = None,
     # channel picks its newest matching tag). The default path keeps tracking
     # the configured branch so existing behavior is unchanged.
     ref, ref_kind = branch, "branch"
+    # ``ref``/``ref_kind`` are part of the check() contract on every path: the
+    # default path tracks the configured branch, so it reports that branch.
+    out["ref"] = ref
+    out["ref_kind"] = ref_kind
     if channel is not None or tag is not None:
         from . import update_channel as UC
 
         eff_ch = str(channel or "").strip().lower() or UC.resolve_channel(cfg)
-        ref, ref_kind, sel_tag = _effective_ref(
-            exec_, repo, remote, branch, eff_ch, tag)
+        try:
+            ref, ref_kind, sel_tag = _effective_ref(
+                exec_, repo, remote, branch, eff_ch, tag)
+        except ValueError as exc:
+            out["state"] = "FAILED"
+            out["code"] = UC.INVALID_CHANNEL_CODE
+            out["detail"] = str(exc)[:300]
+            return out
         out["channel"] = eff_ch
         out["ref"] = ref
         out["ref_kind"] = ref_kind
@@ -743,8 +754,15 @@ def apply(cfg: Any, *, confirm: bool = False,
         from . import update_channel as UC
 
         eff_ch = str(channel or "").strip().lower() or UC.resolve_channel(cfg)
-        ref, ref_kind, _sel_tag = _effective_ref(
-            exec_, repo, remote, branch, eff_ch, tag)
+        try:
+            ref, ref_kind, _sel_tag = _effective_ref(
+                exec_, repo, remote, branch, eff_ch, tag)
+        except ValueError as exc:
+            _audit("refused", actor=actor, reason="channel_invalid")
+            return {"ok": False, "state": "FAILED",
+                    "code": UC.INVALID_CHANNEL_CODE,
+                    "detail": str(exc)[:300],
+                    "rollback_plan": "nothing changed; nothing to roll back"}
     command = f"git pull --ff-only {safe_remote} {ref}"
 
     rc, pulled_out, pulled_err = exec_(
