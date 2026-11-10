@@ -972,6 +972,10 @@ QUBIT_READ_AUTHORITY: tuple = (
     # The office tower is the Qubit office store authority; never read the
     # upstream Habblaud backend's unrelated organization.
     "/api/office/tower",
+    # The office theme payload is Qubit's local, data-only theme contract
+    # (voicebridge.office.theme). Proxying it would serve the fork's unrelated
+    # theme/overlay store; the compat handler is the authority.
+    "/api/office/theme",
     # Public liveness for port/health checks and the reference dashboard's
     # ``GET /api/health`` contract. The compat handler is the authority.
     "/api/health",
@@ -2562,8 +2566,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
         finally:
             self._allow_same_origin_frame = False
 
+    # Office theme packs live outside the built dashboard. URLs carry ``?v=``,
+    # so an hour of caching is safe and matches other stable-name assets.
+    _THEME_STATIC_PREFIX = "plugins/qubit-office/themes/"
+    _THEME_CTYPES = {
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".json": "application/json",
+        ".txt": "text/plain; charset=utf-8",
+    }
+
     def _serve_qubit_static(self, sub: str) -> None:
-        dist = self._qubit_dist()
         from urllib.parse import unquote
 
         # The route suffix is request-controlled. Decode once, normalise the
@@ -2574,6 +2589,14 @@ class WebUIHandler(BaseHTTPRequestHandler):
         if not rel or ".." in rel.split("/"):
             self._send(404, b"not found")
             return
+        # Office theme packs are NOT part of the built dashboard: the full pack
+        # lives only under ``$QUBIT_HOME/office/themes/<id>`` and is served from
+        # there. This branch runs before the dist resolution so an unknown or
+        # classic id 404s instead of falling back to a dist copy.
+        if rel.startswith(self._THEME_STATIC_PREFIX):
+            self._serve_theme_static(rel)
+            return
+        dist = self._qubit_dist()
         try:
             base = Path(dist).resolve()
             fp = (base / rel).resolve()
@@ -2612,6 +2635,26 @@ class WebUIHandler(BaseHTTPRequestHandler):
         else:
             cache_control = "public, max-age=3600"
         self._file(fp, ctype, cache_control=cache_control)
+
+    def _serve_theme_static(self, rel: str) -> None:
+        """Serve one file from a local office theme pack, or answer 404.
+
+        ``voicebridge.office.theme.theme_asset_path`` owns every rule (id must
+        resolve through ``find_theme``; the path is relative, suffix-allowlisted,
+        symlink-free and confined to the pack root). Nothing is ever read from
+        the build tree, so a classic/unknown id is a 404 rather than a fallback.
+        """
+        from .office import theme as OT
+
+        rest = rel[len(self._THEME_STATIC_PREFIX):]
+        theme_id, _, asset_rel = rest.partition("/")
+        path = OT.theme_asset_path(theme_id, asset_rel)
+        if path is None:
+            self._send(404, b"not found")
+            return
+        ctype = self._THEME_CTYPES.get(
+            path.suffix.lower(), "application/octet-stream")
+        self._file(path, ctype, cache_control="public, max-age=3600")
 
     def _serve_office_stream(self) -> None:
         """GET /api/stream — the office client's live feed.

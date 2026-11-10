@@ -146,6 +146,9 @@ _DANGEROUS_TOKEN_VECTORS = (
 )
 
 _CACHE: Dict[tuple, "Theme"] = {}
+#: Parsed index ``cells`` per (index path, mtime_ns, size), so the 283-seat
+#: panel does not re-read the same JSON once per seat.
+_INDEX_CACHE: Dict[tuple, Dict[str, List[int]]] = {}
 _CACHE_LOCK = threading.Lock()
 _CACHE_MAX = 64
 
@@ -971,6 +974,108 @@ def theme_payload(cfg: Any, requested: Optional[str] = None) -> Dict[str, Any]:
     except ThemeError as exc:
         return _classic_payload("theme invalid: " + "; ".join(exc.problems))
     return _active_payload(theme)
+
+
+# --------------------------------------------------------------------------
+# Atlas cells and file serving
+# --------------------------------------------------------------------------
+def _index_cells(theme: "Theme", kind: str) -> Dict[str, List[int]]:
+    """The ``cells`` map from a pack's portraits/bodies index (cached)."""
+    section = theme.portraits if kind == "portraits" else theme.bodies
+    relative = section.get("index") if isinstance(section, Mapping) else None
+    if not isinstance(relative, str) or not relative:
+        return {}
+    path = _inside_root(theme.root, relative)
+    if path is None or not path.is_file():
+        return {}
+    try:
+        stat = path.stat()
+    except OSError:
+        return {}
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    with _CACHE_LOCK:
+        cached = _INDEX_CACHE.get(key)
+    if cached is not None:
+        return cached
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
+    raw_cells = data.get("cells") if isinstance(data, dict) else None
+    cells: Dict[str, List[int]] = {}
+    if isinstance(raw_cells, dict):
+        for slug, cell in raw_cells.items():
+            if (not isinstance(slug, str) or not slug
+                    or not isinstance(cell, (list, tuple)) or len(cell) != 2
+                    or any(not isinstance(v, int) or isinstance(v, bool)
+                           for v in cell)):
+                continue
+            cells[slug] = [int(cell[0]), int(cell[1])]
+    with _CACHE_LOCK:
+        if len(_INDEX_CACHE) >= _CACHE_MAX:
+            _INDEX_CACHE.pop(next(iter(_INDEX_CACHE)))
+        _INDEX_CACHE[key] = cells
+    return cells
+
+
+def cell_for(cfg: Any, slug: str, kind: str = "portraits",
+             requested: Optional[str] = None) -> Optional[List[int]]:
+    """The ``[col, row]`` atlas cell for ``slug`` in the active theme.
+
+    Returns ``None`` for classic, an unknown/invalid theme, an unknown slug, an
+    unsafe slug, or a ``kind`` other than ``portraits``/``bodies``. The parsed
+    index is cached per file stamp, so this is cheap enough to call once per
+    seat row.
+    """
+    if kind not in ("portraits", "bodies"):
+        return None
+    if not isinstance(slug, str) or not _SLUG_RE.fullmatch(slug):
+        return None
+    theme_id = active_theme_id(cfg, requested)
+    if theme_id == CLASSIC:
+        return None
+    theme_dir = find_theme(theme_id)
+    if theme_dir is None:
+        return None
+    try:
+        theme = load_theme(theme_dir)
+    except ThemeError:
+        return None
+    cell = _index_cells(theme, kind).get(slug)
+    return list(cell) if cell is not None else None
+
+
+def theme_asset_path(theme_id: str, relative: str) -> Optional[Path]:
+    """Resolve one theme-relative asset to a safe real file, or ``None``.
+
+    The only reader used by the ``/plugins/qubit-office/themes/<id>/<rel>``
+    route. ``None`` means "answer 404": the id is not a local pack, the path is
+    empty/absolute/``.``/``..``-bearing, has a symlinked component, resolves
+    outside the pack root, carries a suffix outside :data:`ALLOWED_SUFFIXES`, or
+    is not a regular file. The pack is resolved through :func:`find_theme`, so
+    only packs under :func:`theme_roots` (the operator home first) are served —
+    nothing is ever copied into the built dashboard.
+    """
+    theme_dir = find_theme(theme_id)
+    if theme_dir is None:
+        return None
+    if not isinstance(relative, str) or not relative:
+        return None
+    relative = relative.replace("\\", "/")
+    if "\x00" in relative or relative.startswith("/"):
+        return None
+    segments = relative.split("/")
+    if any(segment in ("", ".", "..") for segment in segments):
+        return None
+    suffix = os.path.splitext(segments[-1])[1].lower()
+    if suffix not in ALLOWED_SUFFIXES:
+        return None
+    if _symlink_component(theme_dir, relative) is not None:
+        return None
+    candidate = _inside_root(theme_dir, relative)
+    if candidate is None or not candidate.is_file():
+        return None
+    return candidate
 
 
 # --------------------------------------------------------------------------
