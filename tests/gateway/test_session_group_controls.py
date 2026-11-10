@@ -68,6 +68,12 @@ def test_group_management_on_ordinary_authenticated_socket(tmp_path):
 def test_profile_discovery_and_group_controls_enforce_actor_scope(tmp_path, monkeypatch):
     home = tmp_path / 'state'
     home.mkdir()
+    # QUBIT_HOME is the canonical spelling get_default_qubit_root() reads first; the root
+    # conftest's fail-closed QUBIT_HOME would otherwise outrank HERMES_HOME and roster a
+    # second, unrelated profile home.
+    import qubit_constants
+    monkeypatch.setattr(qubit_constants, '_default_qubit_root_memo', None)
+    monkeypatch.setenv('QUBIT_HOME', str(home))
     monkeypatch.setenv('HERMES_HOME', str(home))
     monkeypatch.setenv('HOME', str(tmp_path / 'user'))
     (home / 'config.yaml').write_text('model:\n  default: fixture-model\n  provider: custom\n')
@@ -134,7 +140,7 @@ def test_groups_list_pages_the_actor_visible_rooms(tmp_path):
         actor = SimpleNamespace(subject='me')
         pages, params = [], {'limit': 2}
         while True:
-            page = _group(authority, actor, tmp_path, 'groups.list', params)
+            page = _group(authority, actor, 'groups.list', params)
             pages.append([room['room_id'] for room in page['rooms']])
             if page['next_offset'] is None:
                 break
