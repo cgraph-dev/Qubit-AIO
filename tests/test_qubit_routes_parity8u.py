@@ -379,24 +379,28 @@ def test_local_models_status_read_equals_backend(tmp_path, monkeypatch):
 
 
 def test_schedules_runs_read_equals_backend(tmp_path, monkeypatch):
+    """The runs read equals its own backend.
+
+    8f9df75ae moved ``/api/cron/jobs/{id}/runs`` onto ``cron_bridge`` -> the
+    vendored ``cron.executions`` ledger. The read must equal THAT backend
+    (``CB.runs``), which is the store the live scheduler writes.
+    """
+    from voicebridge import cron_bridge as CB
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as S
 
     cfg = _cfg(tmp_path, monkeypatch)
-    created = S.create(cfg, "reads-equal", "summarize notes",
-                       "once in 10 minutes", requested_by="t", confirmed=True)
-    job_id = int(created["job"]["id"])
-    fired = S.run_due(
-        cfg, requested_by="t",
-        executor=lambda *_a, **_k: {"state": "OK", "code": "OK",
-                                    "detail": "done"},
-        now=time.time() + 3600, estop_engaged=lambda: False)
-    assert fired["ran"] == 1, fired
-    direct = S.history(cfg, job_id, 20)
+    created = CB.create(cfg, name="reads-equal", prompt="summarize notes",
+                        schedule="every 10 minutes")
+    job_id = str(created["id"])
+    E = CB._executions(cfg)
+    execution = E.create_execution(job_id, source="manual")
+    assert E.finish_execution(execution["id"], success=True) is not None
+    direct = CB.runs(cfg, job_id, 20)
 
     code, out = HC.dispatch(cfg, "GET", f"/api/cron/jobs/{job_id}/runs", {}, {})
     assert code == 200 and out["ok"] is True, (code, out)
-    assert out["count"] == len(direct.get("runs", [])), (out, direct)
+    assert out["count"] == len(direct), (out, direct)
+    assert out["runs"] == direct, (out, direct)
 
 
 # ------------------------------------------------- gates: no fs / no network

@@ -913,28 +913,44 @@ def test_git_local_writes_are_real_brokered_grants(tmp_path, monkeypatch):
 
 
 def test_blueprint_instantiate_is_real_confirm_gated(tmp_path, monkeypatch):
+    """The handler fills a REAL catalog blueprint's slots server-side.
+
+    The key and slot names are validated against ``cron.blueprint_catalog``:
+    an unknown key is a typed 404 and an unknown slot a typed 400, so the
+    payload below names a shipped blueprint and only its declared slots. The
+    schedule is created in the cron store the dashboard reads (``cron_bridge``).
+    """
+    from voicebridge import cron_bridge as CB
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as S
 
     cfg = _cfg(tmp_path, monkeypatch)
-    payload = {"blueprint": "standup",
-               "values": {"prompt": "summarize notes",
-                          "when": "once in 10 minutes"}}
+    payload = {"blueprint": "custom-reminder",
+               "values": {"what": "summarize notes", "time": "09:30"}}
 
     code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
                             {}, payload)
     assert code == 409 and out["code"] == "CONFIRM_REQUIRED", (code, out)
-    assert S.list_jobs(cfg)["jobs"] == [], "unconfirmed must not create"
+    assert CB.list_jobs(cfg) == [], "unconfirmed must not create"
 
     code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
                             {}, {**payload, "confirm": True})
     assert code == 200, (code, out)
-    assert out["name"] == "standup", out
-    assert len(S.list_jobs(cfg)["jobs"]) == 1, S.list_jobs(cfg)
+    # The blueprint supplies the job's display name from its title.
+    assert out["name"] == "Custom reminder", out
+    assert "summarize notes" in str(out.get("prompt") or ""), out
+    jobs = CB.list_jobs(cfg)
+    assert len(jobs) == 1, jobs
 
-    # A blueprint with no schedule expression is a typed 400.
+    # An unknown blueprint key is a typed 404, never a fabricated job.
     code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
                             {}, {"blueprint": "x", "confirm": True})
+    assert (code, out["code"]) == (404, "BLUEPRINT_NOT_FOUND"), (code, out)
+    assert len(CB.list_jobs(cfg)) == 1, CB.list_jobs(cfg)
+
+    # An unknown SLOT on a real blueprint is a typed 400.
+    code, out = HC.dispatch(cfg, "POST", "/api/cron/blueprints/instantiate",
+                            {}, {"blueprint": "custom-reminder",
+                                 "values": {"nonsense": "x"}, "confirm": True})
     assert (code, out["code"]) == (400, "BLUEPRINT_BAD_FILL"), (code, out)
 
 
@@ -1266,10 +1282,20 @@ def test_config_and_env_writes_are_real_confirm_gated(tmp_path, monkeypatch):
                             {"name": "OPENAI_KEY", "value": "vault:openai",
                              "confirm": True})
     assert code == 200 and out["ok"] is True, (code, out)
+    # A pasted RAW secret is stored in the canonical runtime .env (1:1 with the
+    # reference Keys page: pasting a provider key must store it), never echoed
+    # back and never entered in the reference registry.
     code, out = HC.dispatch(cfg, "PUT", "/api/env", {},
-                            {"name": "RAW", "value": "sk-live-123",
+                            {"name": "RAW_SECRET_NAME", "value": "sk-live-123",
                              "confirm": True})
-    assert (code, out["code"]) == (403, "SECRET_WRITE_REFUSED"), (code, out)
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert "sk-live-123" not in str(out), out
+    from voicebridge import env_store as ES
+    env_file = ES._runtime_env_path(cfg)
+    assert "sk-live-123" in env_file.read_text(), env_file
+    assert env_file.stat().st_mode & 0o777 == 0o600, oct(env_file.stat().st_mode)
+    # It is a secret, not a vault reference: the reference registry stays empty.
+    assert "RAW_SECRET_NAME" not in ES.load(cfg), ES.load(cfg)
 
     # The SPA's exact delete payload is `{key, confirm}` on DELETE (B-08D);
     # the verb is the authority, not a PUT-shaped `delete` flag.

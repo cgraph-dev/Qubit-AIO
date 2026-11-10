@@ -6,7 +6,8 @@ the upstream wire keys -- never a 404/500. Also spot-checks that adding the
 routes did not shadow pre-existing ones.
 
 * ``GET /api/health``                    -> ``h_health`` (lifecycle health + status)
-* ``GET /api/cron/jobs/{id}/runs``       -> ``h_cron_job_runs`` (schedules.history)
+* ``GET /api/cron/jobs/{id}/runs``       -> ``h_cron_job_runs`` (cron_bridge -> the
+  vendored ``cron.executions`` ledger the live scheduler writes)
 * ``GET /api/model/recommended-default`` -> ``h_model_recommended_default``
 * ``GET /api/egress/status``             -> ``h_egress_status`` (proxy + frontier policy)
 * ``GET /api/ssh/ownership``             -> typed gate (no SSH ownership module)
@@ -100,21 +101,22 @@ def test_health_degrades_instead_of_failing(tmp_path, monkeypatch):
 
 
 def test_cron_runs_route_shape_and_real_history(tmp_path, monkeypatch):
-    """GET /api/cron/jobs/{id}/runs reflects the real schedules run log."""
+    """GET /api/cron/jobs/{id}/runs reflects the ledger the scheduler writes.
+
+    8f9df75ae moved this route off the legacy ``voicebridge.schedules``
+    SQLite store onto ``cron_bridge`` -> the vendored ``cron.executions``
+    ledger, so /cron and the live scheduler read ONE store. Seed that one.
+    """
+    from voicebridge import cron_bridge as CB
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as S
 
     cfg = _cfg(tmp_path, monkeypatch)
-    created = S.create(cfg, "audit-read", "summarize notes",
-                       "once in 10 minutes", requested_by="test",
-                       confirmed=True)
-    job_id = int(created["job"]["id"])
-    fired = S.run_due(
-        cfg, requested_by="test",
-        executor=lambda *_a, **_k: {"state": "OK", "code": "OK",
-                                    "detail": "done"},
-        now=time.time() + 3600, estop_engaged=lambda: False)
-    assert fired["ran"] == 1, fired
+    created = CB.create(cfg, name="audit-read", prompt="summarize notes",
+                        schedule="every 10 minutes")
+    job_id = str(created["id"])
+    E = CB._executions(cfg)
+    execution = E.create_execution(job_id, source="manual")
+    assert E.finish_execution(execution["id"], success=True) is not None
 
     code, out = HC.dispatch(cfg, "GET", f"/api/cron/jobs/{job_id}/runs",
                             {}, {})
@@ -127,7 +129,8 @@ def test_cron_runs_route_shape_and_real_history(tmp_path, monkeypatch):
                 "state", "code", "detail", "is_active", "archived"):
         assert key in run, (key, run)
     assert run["job_id"] == job_id
-    assert run["state"] == "OK" and run["code"] == "OK"
+    assert run["state"] == "completed" and run["code"] == "OK"
+    assert run["is_active"] is False
 
 
 def test_cron_runs_non_numeric_id_is_not_500(tmp_path, monkeypatch):

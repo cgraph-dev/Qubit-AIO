@@ -5,6 +5,13 @@ minute." routed chat/intent:conversation -> ask() -> brain answered
 "Set a 1-minute timer. Confirm?" (no task.proposed, no re-arm) -> the
 owner's "Yes." arrived unarmed -> wake.discarded. The core yes-dies shape.
 
+Superseded in part by edf34af46 ("voice: run safe local actions
+immediately"): the timer is a safe, reversible local action, so route()/ask()
+now EXECUTE it on the answer lane instead of staging "say yes". The net still
+owns the contract that matters here — tool-shaped text never reaches the
+brain, the timer is really set, and the data-losing local actions
+(window_close, empty_trash, send_message, repo_edit, compound) still stage.
+
 Fix contract (service.py + desktop_helper.py only):
 * route()/ask() consult deterministic propose_tool for answer/chat text;
   a local.* hit stages via the task shape (helper stages + speaks + re-arms
@@ -89,23 +96,23 @@ def _begin(svc, rid="r1"):
 
 # -- route() net ------------------------------------------------------------
 
-def test_route_timer_stages_task_not_chat(monkeypatch):
+def test_route_timer_takes_the_local_lane_not_chat(monkeypatch):
+    """The timer is a safe local action: it runs, it is not chatted about."""
     svc, audits = _svc(monkeypatch)
     rid = _begin(svc)
     out = svc.route(rid, "Set the timer for one minute.")
-    assert out.get("mode") == "task", out
-    assert out.get("requires_confirmation") is True
-    assert "timer" in (out.get("task_text") or "").lower()
-    assert any(op == "voice_edit.task.proposed" for op, _ in audits)
+    assert out.get("mode") == "answer", out
+    assert not out.get("requires_confirmation"), out
+    assert (out.get("decision") or {}).get("intent") == "local", out
 
 
-def test_route_timer_with_the_article_stages(monkeypatch):
-    """The exact journal shape ("Set THE timer ...") must stage."""
+def test_route_timer_with_the_article_takes_the_local_lane(monkeypatch):
+    """The exact journal shape ("Set THE timer ...") must not fall to chat."""
     svc, audits = _svc(monkeypatch)
     rid = _begin(svc)
     out = svc.route(rid, "Set THE timer for one minute.")
-    assert out.get("mode") == "task", out
-    assert out.get("requires_confirmation") is True
+    assert out.get("mode") == "answer", out
+    assert not out.get("requires_confirmation"), out
 
 
 def test_route_briefing_not_stolen_by_net(monkeypatch):
@@ -122,6 +129,17 @@ def test_route_reply_shaped_text_not_stolen_by_net(monkeypatch):
     assert out.get("mode") != "task", out
 
 
+def test_data_losing_local_actions_still_stage(monkeypatch):
+    """Immediate execution is for safe actions only: the ones that can lose
+    data or cannot be undone still ask for "say yes" first."""
+    for phrase in ("close this window", "empty the trash"):
+        svc, _ = _svc(monkeypatch)
+        rid = _begin(svc)
+        out = svc.route(rid, phrase)
+        assert out.get("mode") == "task", (phrase, out)
+        assert out.get("requires_confirmation") is True, (phrase, out)
+
+
 # -- ask() net (direct /ask callers; brain must never see tool text) --------
 
 def _boom_brain(monkeypatch):
@@ -133,16 +151,16 @@ def _boom_brain(monkeypatch):
     monkeypatch.setattr(GW, "run_role", _boom)
 
 
-def test_ask_timer_stages_without_brain(monkeypatch):
+def test_ask_timer_runs_without_brain(monkeypatch):
+    """A local action needs no model: the brain explodes if consulted."""
     _boom_brain(monkeypatch)
     svc, audits = _svc(monkeypatch)
     rid = _begin(svc)
     out = svc.ask("Set the timer for one minute.", request_id=rid)
-    assert out.get("ok") is True
-    assert out.get("mode") == "task", out
-    assert out.get("requires_confirmation") is True
-    assert "timer" in (out.get("task_text") or "").lower()
-    assert any(op == "voice_edit.task.proposed" for op, _ in audits)
+    assert out.get("ok") is True, out
+    assert out.get("mode") == "local-action", out
+    assert "timer" in (out.get("answer") or "").lower(), out
+    assert any(op == "voice_edit.local.immediate" for op, _ in audits), audits
 
 
 def test_ask_web_shaped_text_never_stages(monkeypatch):
@@ -229,8 +247,8 @@ def test_tool_stage_works_while_sleeping(monkeypatch):
     svc.ask("I'm going to sleep.", request_id=rid)
     assert svc.sleeping() is True
     out = svc.ask("Set the timer for one minute.", request_id=rid)
-    assert out.get("mode") == "task", out
-    assert out.get("requires_confirmation") is True
+    assert out.get("mode") == "local-action", out
+    assert "timer" in (out.get("answer") or "").lower(), out
 
 
 # -- helper settles task-shaped ask results -----------------------------------

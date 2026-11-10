@@ -346,6 +346,15 @@ def resolve_orb_state(status: Any, events: Any, now: float,
         now_f = float(now)
     except (TypeError, ValueError):
         now_f = None
+    # `now_mono` is the same instant on the monotonic clock the helper stamps
+    # `spec_tts_ts` with. Resolve it BEFORE the talk-event branch: that branch's
+    # idle fall-through re-runs the inference and needs it, and reading it first
+    # is what keeps the re-run from raising on the unbound name.
+    try:
+        now_mono_f = (float(now_mono) if now_mono is not None
+                      else time.monotonic())
+    except (TypeError, ValueError):
+        now_mono_f = time.monotonic()
     if talk_events is not None:
         try:
             from . import talk_state as _talk_state
@@ -365,11 +374,6 @@ def resolve_orb_state(status: Any, events: Any, now: float,
     if now_f is None:
         return "idle"
     now_f = float(now_f)
-    try:
-        now_mono_f = (float(now_mono) if now_mono is not None
-                      else time.monotonic())
-    except (TypeError, ValueError):
-        now_mono_f = time.monotonic()
     hb = heartbeat if isinstance(heartbeat, dict) else {}
     try:
         hb_state = str(hb.get("state") or "").strip().lower()

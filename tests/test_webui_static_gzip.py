@@ -55,6 +55,8 @@ def _handler(base: Path, accept_encoding: str | None = None):
     handler = object.__new__(ui.WebUIHandler)
     handler.server = _FakeServer()
     handler._head_only = False
+    # The request path: `_serve_qubit_index` reads it for the HUD frame grant.
+    handler.path = "/"
     handler.headers = (
         {"Accept-Encoding": accept_encoding} if accept_encoding else {}
     )

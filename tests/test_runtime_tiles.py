@@ -8,6 +8,7 @@ scheduler/listener, no upstream pip imports, no hidden UI success).
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -89,14 +90,20 @@ def test_runtime_route_reports_real_state(tmp_path):
     try:
         st, body = _http(ui, "GET", "/api/runtime")
         assert st == 200, body
-        assert body["product"]["name"] == "Qubit Agent"
+        # The public product identity is Qubit AiO (voicebridge.foundation), the
+        # single identity source the CLI/installer/docs mirror.
+        assert body["product"]["name"] == "Qubit AiO"
         assert body["agent"]["runtime"] == "qubit-native"
         assert body["agent"]["entry"] == "voicebridge.agent.turn"
         assert "agent" in body and "voice" in body and "broker" in body
         assert "approvals" in body and "adapters" in body
-        blob = json.dumps(body).lower()
-        for secret in ("sk-", "token:", "cookie", "Bearer "):
-            assert secret not in blob, secret
+        blob = json.dumps(body)
+        # No credentials in the payload. Check credential SHAPES, not bare
+        # substrings: a plugin id like "disk-cleanup" contains "sk-" and is not a
+        # secret, so a substring scan reports the inventory's own data as a leak.
+        for pattern in (r"sk-[A-Za-z0-9]{16,}", r"(?i)\btoken\s*[:=]\s*\S",
+                        r"(?i)\bcookie\s*[:=]\s*\S", r"(?i)bearer\s+[A-Za-z0-9._-]{8,}"):
+            assert not re.search(pattern, blob), pattern
     finally:
         ui.stop()
 

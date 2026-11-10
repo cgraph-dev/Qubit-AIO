@@ -37,10 +37,16 @@ def _serve(base: Path) -> tuple[int, str]:
     """Invoke the real ``_serve_qubit_index`` against ``base`` (no socket)."""
     handler = object.__new__(ui.WebUIHandler)
     handler.server = _FakeServer()
+    # The handler attributes `_serve_qubit_index` reads on this path: the peer/Host
+    # pair `_token_bootstrap_allowed` checks, and the request path for the HUD grant.
+    handler.client_address = ("127.0.0.1", 0)
+    handler.headers = {"Host": "127.0.0.1"}
+    handler.path = "/"
+    handler._head_only = False
     handler._qubit_dist = lambda: base  # type: ignore[method-assign]
     captured: dict[str, object] = {}
 
-    def _send(code, body, ctype="text/plain"):
+    def _send(code, body, ctype="text/plain", extra_headers=None):
         captured["code"] = code
         captured["body"] = body
         captured["ctype"] = ctype
@@ -87,14 +93,17 @@ def test_served_head_replaces_stale_theme_style_id(tmp_path):
 
 
 def test_served_head_title_is_qubit_and_wire_globs_preserved(tmp_path):
+    # The served shell no longer rewrites <title>: the built dashboard owns it, and a
+    # per-request regex silently reverted a rebuilt title to a stale string
+    # (d0da95749). What must hold is that the built title survives intact.
     base = _write_index(
         tmp_path / "dist",
-        "<!doctype html><html><head><title>Whatever</title>"
+        "<!doctype html><html><head><title>Qubit AiO</title>"
         "<script>window.__QUBIT_SESSION_TOKEN__=\"t\";"
         "window.__QUBIT_BASE_PATH__=\"\";</script></head><body></body></html>",
     )
     _, html = _serve(base)
-    assert "<title>Qubit Agent - Command Center</title>" in html
+    assert "<title>Qubit AiO</title>" in html
     assert "window.__QUBIT_SESSION_TOKEN__" in html
     assert "window.__QUBIT_BASE_PATH__" in html
 

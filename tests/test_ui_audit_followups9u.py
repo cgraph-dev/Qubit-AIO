@@ -10,6 +10,8 @@ D2 — the pending-approvals banner settled a staged ``cron.create`` on the
      ``BACKEND_REFUSED`` although the job WAS created (a false failure).
 D3 — ``/model/info`` mixed the configured provider with a terminal session's
      stored model id from a different profile (``iv-endpoint`` + ``qubit-brain``).
+     Superseded by 60e41272e: the stored model on the stale canonical session wins
+     on neither field, so the card follows the resolved default.
 D4 — deleting a custom endpoint left its registered model profile + active
      pointer, so ``/model/info`` still targeted the deleted endpoint.
 """
@@ -89,9 +91,15 @@ def test_d3_model_info_session_profile_supplies_provider(tmp_path, monkeypatch):
     CT.store(cfg).ensure(AG.canonical_session_id(cfg), model="qubit-brain")
     code, info = HC.h_model_info(cfg, {}, {}, {})
     assert code == 200, info
-    assert info["model"] == "qubit-brain"
+    # 60e41272e removed the D3 override: the stale canonical session's stored
+    # model no longer wins, so MODEL cards follow a switch. `/model/info` reports
+    # the resolved default for the active profile.
+    assert info["model"] == "deepseek-v4-flash", info
     # The provider must match the model's own profile, never the endpoint's.
-    assert info["provider"] == "ollama", info
+    assert info["provider"] == "opencode-go", info
+    # An explicit `?model=` still reports that specific model's capabilities.
+    code, asked = HC.h_model_info(cfg, {"model": "qubit-brain"}, {}, {})
+    assert code == 200 and asked["model"] == "qubit-brain", asked
 
 
 def test_d4_delete_endpoint_clears_profile_and_active(tmp_path, monkeypatch):

@@ -63,6 +63,23 @@ def shape_job(job: Dict[str, Any]) -> Dict[str, Any]:
                       "completed": int(repeat.get("completed") or 0)}
     expr = str(schedule.get("expr") or "")
     run_at = schedule.get("run_at")
+    # Retry ladder state. The dashboard's retry columns read these three wire
+    # keys; the vendored store keeps the ladder under ``unreachable_retry``
+    # (``state`` + ``next_run_at``, which plan_retry pulls to the ladder
+    # instant), so derive them here rather than reporting the fields absent and
+    # leaving the columns blank.
+    ladder = job.get("unreachable_retry")
+    ladder = ladder if isinstance(ladder, dict) else {}
+    try:
+        retry_attempt = int(ladder.get("attempt") or 0)
+    except (TypeError, ValueError):
+        retry_attempt = 0
+    retry_at = str(ladder.get("at") or "") or None if retry_attempt else None
+    try:
+        from cron.unreachable_retry import retry_enabled as _retry_enabled
+        retry_on = bool(_retry_enabled())
+    except Exception:  # noqa: BLE001 - config unreadable keeps the reliability default
+        retry_on = True
     return {
         "id": str(job.get("id", "")),
         "profile": None, "profile_name": None,
@@ -71,6 +88,7 @@ def shape_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "prompt": job.get("prompt"),
         "script": job.get("script"),
         "skills": job.get("skills") or [],
+        "timezone": str(job.get("timezone") or ""),
         "schedule": {
             "kind": schedule.get("kind"),
             "expr": expr,
@@ -92,6 +110,9 @@ def shape_job(job: Dict[str, Any]) -> Dict[str, Any]:
         "workdir": job.get("workdir"),
         "last_run_at": job.get("last_run_at"),
         "next_run_at": job.get("next_run_at"),
+        "retry_enabled": retry_on,
+        "retry_attempt": retry_attempt,
+        "retry_at": retry_at,
         "last_status": job.get("last_status"),
         "last_error": job.get("last_error"),
         "last_delivery_error": job.get("last_delivery_error"),

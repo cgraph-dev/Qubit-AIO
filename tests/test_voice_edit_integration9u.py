@@ -574,9 +574,16 @@ def test_ask_answers_time_directly_without_brain(monkeypatch):
     assert out["model"] == "live-facts"
 
 
-def test_ask_weather_failure_falls_through_to_brain(monkeypatch):
-    svc, _audits = _service()
+def test_ask_weather_failure_is_honest_and_never_calls_the_brain(monkeypatch):
+    """ff4859267: a failed weather read must NOT fall through to the model.
+
+    A cold brain made the fall-through a 30 s timeout plus retry, and the model
+    then invented weather. Fail fast and say so instead.
+    """
+    svc, audits = _service()
     monkeypatch.setattr(svc, "_live_weather", lambda q: "")
+
+    called = []
 
     class FakeRes:
         ok = True
@@ -587,9 +594,13 @@ def test_ask_weather_failure_falls_through_to_brain(monkeypatch):
         message = ""
 
     import voicebridge.providers.gateway as GW
-    monkeypatch.setattr(GW, "run_role", lambda prompt, cfg, **kw: FakeRes())
+    monkeypatch.setattr(GW, "run_role",
+                        lambda prompt, cfg, **kw: called.append(prompt) or FakeRes())
     out = svc.ask("weather in Bucharest?", request_id="w-2", mode="answer")
-    assert out["ok"] and out["answer"] == "brain fallback"
+    assert out["ok"] is True, out
+    assert "couldn't reach the weather service" in out["answer"], out
+    assert called == [], called
+    assert any(op == "voice_edit.weather.unavailable" for op, _ in audits), audits
 
 
 # ---------------------------------------------------------------------------
