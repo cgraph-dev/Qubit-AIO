@@ -12,8 +12,29 @@ import json
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO_ROOT))
+
+#: ``docs/generated/`` is gitignored; this artifact comes from
+#: ``scripts/qubit_upgrade_manifest.py``, which reads a pristine upstream clone
+#: (``--clone``) that is not part of the repo. Regenerate it, or skip with the
+#: generator named rather than asserting against a hand-written ledger.
+UPGRADE_MANIFEST = REPO_ROOT / "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json"
+
+requires_upgrade_manifest = pytest.mark.skipif(
+    not UPGRADE_MANIFEST.is_file(),
+    reason=(
+        "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json is a generated "
+        "artifact (gitignored) and is absent; regenerate with "
+        "`python scripts/qubit_upgrade_manifest.py --clone <upstream clone>`"
+    ),
+)
+
+
+def _manifest() -> dict:
+    return json.loads(UPGRADE_MANIFEST.read_text())
 
 
 def test_routes_are_registered_on_the_existing_listener():
@@ -149,6 +170,7 @@ def test_talk_voice_complete_requires_text():
     assert res["error"]["code"] == "GATEWAY_BAD_PARAMS"
 
 
+@requires_upgrade_manifest
 def test_manifest_overlay_is_fully_disposed():
     """No delta method is left OPEN; each is a terminal behavior disposition.
 
@@ -157,8 +179,7 @@ def test_manifest_overlay_is_fully_disposed():
     terminal disposition is IMPLEMENTED, SAFE_EQUIVALENT, or OPERATOR_ONLY. A
     bare registered-method name is not a disposition.
     """
-    manifest = json.loads(
-        (REPO_ROOT / "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json").read_text())
+    manifest = _manifest()
     overlay = manifest["disposition_overlay"]
     counts = overlay["counts"]
     assert counts.get("OPEN", 0) == 0
@@ -170,10 +191,10 @@ def test_manifest_overlay_is_fully_disposed():
     assert set(overlay["methods"]) == union
 
 
+@requires_upgrade_manifest
 def test_manifest_refusal_rows_declare_a_typed_code():
     """SAFE_EQUIVALENT / OPERATOR_ONLY rows must carry a typed code + proof."""
-    manifest = json.loads(
-        (REPO_ROOT / "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json").read_text())
+    manifest = _manifest()
     for method, row in manifest["disposition_overlay"]["methods"].items():
         if row["status"] in ("SAFE_EQUIVALENT", "OPERATOR_ONLY"):
             assert row.get("code"), method
@@ -182,10 +203,10 @@ def test_manifest_refusal_rows_declare_a_typed_code():
             assert row.get("evidence"), method
 
 
+@requires_upgrade_manifest
 def test_manifest_overlay_matches_registry_actual():
     """Every method the manifest stamps IMPLEMENTED must be in the registry."""
-    manifest = json.loads(
-        (REPO_ROOT / "docs/generated/QUBIT_OPENCLAW_UPGRADE_MANIFEST.json").read_text())
+    manifest = _manifest()
     from voicebridge.gateway.rpc import default_registry
 
     registered = set(default_registry().names())
