@@ -48,8 +48,32 @@ def _start(tmp_path):
     return ui, ui._server.server_address[1]
 
 
-def test_native_chat_page_uses_native_turn_and_no_pty(tmp_path):
+def test_native_chat_page_uses_native_turn_and_no_pty(tmp_path, monkeypatch):
     """/qubit-chat is the native Qubit chat: native agent turn, no PTY."""
+    # Stub the provider boundary, not the transport: the page's `POST
+    # /api/qubit/chat` runs a real turn through `voicebridge.agent.run_agent_turn`
+    # in this process (threading HTTP server), so without this the test dials a
+    # live provider (ollama `qubit-brain`) and never answers. Dispatch, routing,
+    # receipt shaping, streaming and the page's rendering all stay real.
+    from voicebridge import agent as AG
+
+    def _agent_turn(cfg, text, *, session, reasoning=None, estop_engaged=None,
+                    event_sink=None, progress_sink=None, stream_delta=None,
+                    model=None, provider=None):
+        reply = f"NATIVE_TURN_OK: {text}"
+        if stream_delta is not None:
+            try:
+                stream_delta(reply)
+            except Exception:  # noqa: BLE001 - streaming is best-effort
+                pass
+        return {"state": "OK", "reply": reply, "text": reply,
+                "session": session, "session_id": session, "route": "agent",
+                "receipt": {"runtime": "qubit-native",
+                            "path": "voicebridge.agent.turn",
+                            "model": "qubit-native-test",
+                            "provider": "local"}}
+
+    monkeypatch.setattr(AG, "run_agent_turn", _agent_turn)
     ui, port = _start(tmp_path)
     pty_requests: list[str] = []
     try:
