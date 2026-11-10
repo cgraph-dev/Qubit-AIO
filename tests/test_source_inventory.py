@@ -17,6 +17,10 @@ from pathlib import Path
 
 import pytest
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = REPO_ROOT / "scripts" / "source_inventory.py"
 # Canonical regenerated artifacts (Owner resolution 0.6): the frozen
@@ -387,9 +391,11 @@ def test_achievements_plugin_represented_and_closed_in_ledger(inventory,
     # carries a real plugin:qubit-achievements row (the Qubit-owned identity
     # for the upstream hermes-achievements plugin) with a backend and an
     # on-disk proving test, and the inventory surfaces reconcile to it.
+    # docs/generated/ is gitignored and was emptied in eafb54e26, so the live
+    # path is absent in a fresh checkout; read the ledger read-only from
+    # history rather than re-authoring it.
     qubit_rows = json.loads(
-        (GENERATED / "QUBIT_GAP_LEDGER.hermes.json").read_text(
-            encoding="utf-8"))["rows"]
+        require_ledger("docs/generated/QUBIT_GAP_LEDGER.hermes.json"))["rows"]
     row = next((r for r in qubit_rows
                 if r["id"] == "plugin:qubit-achievements"), None)
     assert row is not None, "achievements plugin has no live ledger row"

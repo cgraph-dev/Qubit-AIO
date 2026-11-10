@@ -36,6 +36,7 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
+from .http_cleanup import close_http_error
 from .logging_setup import log_event
 from .chat_transport import parse_route_word
 from .voice_edit import debug as _dbg
@@ -571,10 +572,15 @@ class HelperClient:
                 return json.loads(body) if body.strip() else {}
         except urllib.error.HTTPError as exc:
             try:
-                body = exc.read().decode("utf-8", "replace")
+                with exc:
+                    body = exc.read().decode("utf-8", "replace")
                 parsed = json.loads(body) if body.strip() else {}
             except Exception:
                 parsed = {}
+            finally:
+                # The error owns its body (an io.BytesIO here, a tempfile on
+                # real urllib paths); dropping it leaked the handle to the GC.
+                close_http_error(exc)
             code = str(parsed.get("code") or f"HTTP_{exc.code}")
             raise HelperError(code, str(parsed.get("detail", "") or "")[:200])
         except HelperError:

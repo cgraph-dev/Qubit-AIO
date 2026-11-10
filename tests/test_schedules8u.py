@@ -312,7 +312,25 @@ def test_run_due_concurrent_claims_run_once(tmp_path, monkeypatch):
 
 
 def test_run_due_default_executor_degrades_honestly(tmp_path, monkeypatch):
+    """The DEFAULT executor must report OK/UNAVAILABLE, never fake OK.
+
+    ``run_op`` is stubbed at the broker seam (the same seam
+    tests/test_final_integrity_fixes.py uses): letting the real
+    ``schedule_dispatch`` op run performs a live model call, which blocks for
+    the full model timeout here and leaves the dispatch's socket and
+    subprocess to the GC. The behaviour under test — how run_due maps an
+    executor's result to a typed state — needs no model.
+    """
+    from voicebridge import dashboard_ops as OPS
     from voicebridge import schedules as SC
+
+    monkeypatch.setattr(
+        OPS, "run_op",
+        lambda cfg, op_id, args, **kw: {
+            "state": "executed", "code": "OK",
+            "receipt": {"result": {"state": "UNAVAILABLE",
+                                   "code": "MODEL_UNAVAILABLE",
+                                   "detail": "no local model"}}})
 
     cfg = _cfg(tmp_path, monkeypatch)
     SC.create(cfg, "live", "do it live", "every 5 minutes", confirmed=True)

@@ -34,7 +34,10 @@ def _http_get(url: str, headers: dict | None = None):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, dict(r.headers), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, dict(e.headers), e.read()
+        # The error owns the response fp (urlopen raised before the with-block);
+        # close it so the GC does not reap it inside another test.
+        with e:
+            return e.code, dict(e.headers), e.read()
 
 
 def _http_post_json(url: str, obj: dict):
@@ -44,11 +47,12 @@ def _http_post_json(url: str, obj: dict):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        body = e.read()
-        try:
-            return e.code, json.loads(body.decode())
-        except Exception:
-            return e.code, {"raw": body.decode(errors="replace")}
+        with e:
+            body = e.read()
+            try:
+                return e.code, json.loads(body.decode())
+            except Exception:
+                return e.code, {"raw": body.decode(errors="replace")}
 
 
 class _StubCfg:

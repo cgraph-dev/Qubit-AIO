@@ -281,7 +281,11 @@ class CommunicationsStore:
             except OSError:
                 pass
         self._lock = threading.RLock()
+        # Set BEFORE the handle exists so __del__ on a partially-built object
+        # (sqlite3.connect raising) is a no-op instead of an AttributeError.
+        self._conn_closed = True
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
+        self._conn_closed = False
         self._conn.row_factory = sqlite3.Row
         with self._lock:
             self._conn.execute("PRAGMA journal_mode=WAL")
@@ -922,5 +926,28 @@ class CommunicationsStore:
             return [str(r["platform"]) for r in rows]
 
     def close(self) -> None:
+        """Close the sqlite connection. Idempotent: safe to call twice."""
         with self._lock:
+            if getattr(self, "_conn_closed", False):
+                return
+            self._conn_closed = True
             self._conn.close()
+
+    def __enter__(self) -> "CommunicationsStore":
+        return self
+
+    def __exit__(self, *exc_info: Any) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        """Release the sqlite connection if the caller never closed it.
+
+        The store owns an open ``sqlite3.Connection``. Callers that build one
+        and forget ``close()`` used to leave it to the GC, which then reported
+        "ResourceWarning: unclosed database" while some OTHER code was running.
+        Closing here keeps the connection's lifetime tied to the object's.
+        """
+        try:
+            self.close()
+        except Exception:  # noqa: BLE001 - never raise from a finaliser
+            pass

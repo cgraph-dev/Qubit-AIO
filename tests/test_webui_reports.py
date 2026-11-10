@@ -92,7 +92,11 @@ def _http(port, method, path, body=None, token="test-token"):
         with urllib.request.urlopen(req, timeout=5) as r:
             return r.status, r.headers.get("Content-Type", ""), r.read()
     except urllib.error.HTTPError as e:
-        return e.code, e.headers.get("Content-Type", ""), e.read()
+        # urlopen raised before the with-block, so the error owns the response
+        # fp; close it rather than leave it for the GC (ResourceWarning lands
+        # on whichever test happens to run when the collector fires).
+        with e:
+            return e.code, e.headers.get("Content-Type", ""), e.read()
 
 
 def test_reports_api_requires_auth(tmp_path):

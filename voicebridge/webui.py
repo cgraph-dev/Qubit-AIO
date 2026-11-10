@@ -2280,7 +2280,15 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # be silently upgraded to the loopback exemption.
         if self.headers.get("X-Qubit-Session-Token", "") or \
                 self.headers.get("X-Api-Token", ""):
-            return self._qubit_token_ok() or self._api_token_ok()
+            # A VALID normal token means this is NOT the office client: that
+            # client has no bridge token to attach (see the docstring above).
+            # Returning True here routed authenticated callers into the office
+            # status document and dropped the classic bridge-status contract
+            # (measured: /api/status answered 'qubit-office-habblaud-status/1'
+            # with no "bridge" key, failing test_api_remains_header_token_
+            # authenticated). This gate only ever AUTHORISES the office client;
+            # a real caller keeps the documented route below.
+            return False
         peer = self.client_address[0] if self.client_address else ""
         if peer not in ("127.0.0.1", "::1", "localhost"):
             return False

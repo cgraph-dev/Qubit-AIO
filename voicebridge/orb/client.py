@@ -43,6 +43,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
+from ..http_cleanup import close_http_error
+
 DEFAULT_BASE = "http://127.0.0.1:8890"
 TOKEN_FILE = Path("~/.config/qubit-voicebridge/webui-token.txt").expanduser()
 
@@ -297,6 +299,10 @@ class OrbClient:
                 parsed = json.loads(body) if body.strip() else {}
                 return parsed if isinstance(parsed, dict) else {}
         except urllib.error.HTTPError as exc:
+            # The error owns the response body (a tempfile-backed file object
+            # on some paths); closing it here keeps the refusal from leaking a
+            # handle that the GC would later report on an unrelated test.
+            close_http_error(exc)
             raise OrbError(f"HTTP_{exc.code}", "service refused the request")
         except (urllib.error.URLError, OSError, ValueError):
             raise OrbError("ORB_SERVICE_UNREACHABLE", "local service not reachable")

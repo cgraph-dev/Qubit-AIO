@@ -11,9 +11,17 @@ import importlib.util
 import json
 import pathlib
 import re
+import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-MANIFEST = REPO / "docs" / "archive" / "2026-09-21" / "QUBIT_REBRAND_MANIFEST.json"
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+
+from _purged_ledger import require_ledger  # noqa: E402
+
+#: Purged in eafb54e26 with the rest of docs/archive/2026-09-21/. AGENTS.md
+#: forbids re-authoring it, so the frozen manifest is read read-only from
+#: history; the row assertions below are unchanged.
+MANIFEST_REL = "docs/archive/2026-09-21/QUBIT_REBRAND_MANIFEST.json"
 
 
 def _engine():
@@ -31,7 +39,7 @@ def _manifest_basename_rows():
     segments are used; parenthetical notes and ``->`` symlink descriptions are
     stripped.  No-ops (``shared`` -> ``shared``) are dropped.
     """
-    data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+    data = json.loads(require_ledger(MANIFEST_REL))
     rows = {}
     for row in data.get("path_renames", []):
         old_parts = _clean(row["old"]).split(" / ")

@@ -333,8 +333,9 @@ def test_ws_ticket_mint_surfaces_the_context_error(tmp_path, monkeypatch):
             urllib.request.urlopen(req, timeout=8)
             raise AssertionError("expected 409 context-floor refusal")
         except urllib.error.HTTPError as exc:
-            assert exc.code == 409, exc.code
-            body = json.loads(exc.read())
+            with exc:
+                assert exc.code == 409, exc.code
+                body = json.loads(exc.read())
             assert body["ok"] is False
             assert body["code"] == "TERMINAL_CONTEXT_BELOW_MINIMUM"
             assert body["owner"] == "qubit-policy"
@@ -419,7 +420,8 @@ def _mint(port, body=None):
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as exc:
-        return exc.code, json.loads(exc.read())
+        with exc:
+            return exc.code, json.loads(exc.read())
 
 
 def test_session_open_audit_names_model_and_profile(tmp_path, monkeypatch):

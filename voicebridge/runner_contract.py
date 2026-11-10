@@ -18,6 +18,7 @@ import urllib.request
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from .http_cleanup import close_http_error
 from .logging_setup import log_event
 
 DEFAULT_ALIAS = "qubit-brain"
@@ -62,8 +63,8 @@ def _fetch_digest(url: str, alias: str, timeout_s: float = 1.0) -> Optional[str]
             d = resp.headers.get("X-Ollama-Digest")
             if d:
                 return d or None
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 - best-effort, typed None below
+        close_http_error(exc)
     try:
         with urllib.request.urlopen(f"{base}/api/tags", timeout=timeout_s) as resp:
             tags = json.loads(resp.read().decode())
@@ -72,8 +73,8 @@ def _fetch_digest(url: str, alias: str, timeout_s: float = 1.0) -> Optional[str]
             want = alias.split(":")[0]
             if name.split(":")[0] == want:
                 return m.get("digest") or None
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 - best-effort, typed None below
+        close_http_error(exc)
     return None
 
 
