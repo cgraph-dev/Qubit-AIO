@@ -484,6 +484,28 @@ def test_high_contrast_swaps_tokens_rather_than_filtering():
         "scene's own state colours survive")
 
 
+def test_high_contrast_redeclares_the_border_shorthands():
+    """A nested `var()` resolves where the property is DECLARED.
+
+    `--office-border` is a :root shorthand over `var(--office-line)`, so a
+    high-contrast block that only overrides `--office-line` would leave the
+    actual border colour on the classic value. The block must restate the
+    shorthands on the same attribute-scoped element.
+    """
+    tokens = (STYLES / "tokens.css").read_text()
+    match = re.search(r'\[data-office-contrast="high"\]\s*\{([^}]*)\}', tokens)
+    assert match, "the high-contrast token block is missing"
+    body = match.group(1)
+    assert "--office-line:" in body
+    assert "--office-line-strong:" in body
+    assert "--office-border:" in body, (
+        "high contrast does not redeclare --office-border, so classic borders "
+        "keep the :root value (nested var resolves at the declaring element)")
+    assert "--office-border-strong:" in body
+    assert "var(--office-line)" in body
+    assert "var(--office-line-strong)" in body
+
+
 def test_focus_is_never_removed():
     game = (STYLES / "game.css").read_text()
     assert ":focus-visible" in game, (

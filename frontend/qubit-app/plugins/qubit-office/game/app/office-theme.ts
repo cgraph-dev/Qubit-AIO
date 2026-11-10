@@ -300,8 +300,14 @@ export function officeThemeClass(
   return theme && theme.active && theme.id ? `office-theme-${theme.id}` : "";
 }
 
-/** The shell roles a pack may 9-slice. */
-export type OfficeSliceRole = "dock" | "card" | "button";
+/** The shell roles/states a pack may 9-slice. */
+export type OfficeSliceRole =
+  | "dock"
+  | "card"
+  | "tab"
+  | "button"
+  | "button-hover"
+  | "button-pressed";
 
 /**
  * The `data-office-slice` value for a shell element, or undefined.
@@ -311,6 +317,11 @@ export type OfficeSliceRole = "dock" | "card" | "button";
  * those names. An element must therefore opt in by carrying the attribute
  * ONLY when its role is declared — otherwise a theme switch would leave a
  * stale slice on classic chrome.
+ *
+ * `button-hover` / `button-pressed` are STATES of the `button` role: the
+ * server attaches them to `[data-office-slice="button"]:hover` / `:active`
+ * (and `[aria-pressed="true"]`), so an element only ever carries
+ * `data-office-slice="button"`.
  */
 export function officeSliceName(
   theme: OfficeTheme | null | undefined,

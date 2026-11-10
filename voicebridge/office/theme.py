@@ -136,6 +136,17 @@ _VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 _SLICE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
 _SLICE_WIDTH_RE = re.compile(r"^[1-9][0-9]{0,3}px$")
 _SLICE_REPEAT = {"stretch", "round", "repeat"}
+
+#: Slice names whose rule is derived from the BUTTON's own slice: a pack names
+#: the state, the emitter attaches it to the button's state selector. The other
+#: names (``dock``, ``card``, ``tab``, ``button``) target the element directly.
+_SLICE_STATE_SELECTORS = {
+    "button-hover": ('[data-office-slice="button"]:hover',),
+    "button-pressed": (
+        '[data-office-slice="button"]:active',
+        '[data-office-slice="button"][aria-pressed="true"]',
+    ),
+}
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _PATH_CHARS_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
@@ -1167,7 +1178,12 @@ def token_css(tokens: Any, slices: Any, asset_base: str, version: str,
         cell = descriptor["slice"]
         repeat = descriptor["repeat"]
         src = f"{base}/{descriptor['src']}{suffix}"
-        lines.append(f'{selector} [data-office-slice="{name}"] {{')
+        parts = _SLICE_STATE_SELECTORS.get(name)
+        if parts is None:
+            targets = [f'{selector} [data-office-slice="{name}"]']
+        else:
+            targets = [f"{selector} {part}" for part in parts]
+        lines.append(",\n".join(targets) + " {")
         lines.append(
             f'  border-image: url("{src}") '
             f"{cell[0]} {cell[1]} {cell[2]} {cell[3]} {repeat};")

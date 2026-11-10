@@ -213,9 +213,29 @@ describe("host shell + menu hooks", () => {
     };
     expect(officeSliceName(sliced, "dock")).toBe("dock");
     expect(officeSliceName(sliced, "card")).toBeUndefined();
+    expect(officeSliceName(sliced, "tab")).toBeUndefined();
     expect(officeSliceName(sliced, "button")).toBeUndefined();
+    expect(officeSliceName(sliced, "button-hover")).toBeUndefined();
+    expect(officeSliceName(sliced, "button-pressed")).toBeUndefined();
     expect(officeSliceName(classicTheme, "dock")).toBeUndefined();
     expect(officeSliceName(null, "dock")).toBeUndefined();
+
+    const states: OfficeTheme = {
+      ...activeTheme,
+      slices: {
+        button: { src: "ui/btn.png", slice: [6, 6, 6, 6],
+                  width: "6px", repeat: "stretch" },
+        "button-hover": { src: "ui/btn-hover.png", slice: [6, 6, 6, 6],
+                          width: "6px", repeat: "stretch" },
+        "button-pressed": { src: "ui/btn-pressed.png", slice: [6, 6, 6, 6],
+                            width: "6px", repeat: "stretch" },
+        tab: { src: "ui/tab.png", slice: [4, 4, 4, 4],
+               width: "4px", repeat: "stretch" },
+      },
+    };
+    expect(officeSliceName(states, "tab")).toBe("tab");
+    expect(officeSliceName(states, "button-hover")).toBe("button-hover");
+    expect(officeSliceName(states, "button-pressed")).toBe("button-pressed");
   });
 
   it("?theme= is appended to the iframe URL and classic is not", () => {

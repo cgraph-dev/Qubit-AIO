@@ -229,6 +229,7 @@ function agentCard(
     }, [seatAvatar(R, seat, theme, ready, "p")]),
     R.createElement("div", {
       key: "t", className: "agents-panel__cardTab",
+      "data-office-slice": officeSliceName(theme, "tab"),
     }, [
       R.createElement("span", {
         key: "n", className: "agents-panel__cardName",

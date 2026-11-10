@@ -631,7 +631,7 @@ def test_cli_tokens_reads_a_sheet_and_writes_nothing(tmp_path, capsys):
     before = sorted(p.name for p in tmp_path.iterdir())
     assert E.main(["--tokens", str(sheet)]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["ok"] is True and payload["fallback"] is False
+    assert payload["result"] == "sampled" and payload["fallback"] is False
     assert T.validate_tokens(payload["tokens"]) == []
     assert sorted(p.name for p in tmp_path.iterdir()) == before
 
@@ -644,7 +644,7 @@ def test_cli_tokens_reads_a_zip_member(tmp_path, capsys):
     assert E.main(["--tokens", str(archive),
                    "--member", "16x16/Modern_UI_Style_1/sheet.png"]) == 0
     payload = json.loads(capsys.readouterr().out)
-    assert payload["ok"] is True and payload["fallback"] is False
+    assert payload["result"] == "sampled" and payload["fallback"] is False
 
 
 def test_contact_sheet_is_written_outside_the_repo(tmp_path, capsys):

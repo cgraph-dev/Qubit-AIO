@@ -705,6 +705,21 @@ describe("atlas portraits in the agents panel", () => {
     h.cleanup();
   });
 
+  it("opts the card tab into a declared tab 9-slice", async () => {
+    const themed = activeTheme({
+      slices: { tab: { src: "ui/tab.png", slice: [4, 4, 4, 4],
+                       width: "4px", repeat: "stretch" } },
+    });
+    const h = await mountPanel(
+      themed,
+      oneDivision([seat({ slug: "solo", name: "Solo Agent" })]),
+    );
+    const tab = h.tree.find(
+      (element) => element.props.className === "agents-panel__cardTab");
+    expect(tab?.props["data-office-slice"]).toBe("tab");
+    h.cleanup();
+  });
+
   it("leaves the agent card slice-free when the pack declares none", async () => {
     const h = await mountPanel(
       activeTheme(),

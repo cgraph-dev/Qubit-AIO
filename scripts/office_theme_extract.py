@@ -742,7 +742,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.tokens:
             result = derive_tokens(args.tokens, member=args.member)
             print(json.dumps({
-                "ok": True,
+                # ``result`` is unambiguous: a fallback is a successful, named
+                # outcome — not an "ok" that contradicts itself.
+                "result": "fallback" if result["fallback"] else "sampled",
                 "source": Path(args.tokens).name,
                 **result,
             }, indent=2, sort_keys=True))

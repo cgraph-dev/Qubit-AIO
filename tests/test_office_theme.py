@@ -26,6 +26,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 
 import pytest
 
@@ -550,10 +551,12 @@ def test_host_token_css_scopes_tokens_and_slices_to_the_host():
     css = T.host_token_css(
         _tokens(), "demo", "1.0.0",
         {"dock": {"src": "ui/dock.png", "slice": [8, 8, 8, 8],
-                  "width": "8px", "repeat": "stretch"}})
+                  "width": "8px", "repeat": "stretch"}},
+        asset_base="/plugins/qubit-office/themes/demo")
     assert ':root[data-office-theme="demo"] {' in css
     assert ':root[data-office-theme="demo"] [data-office-slice="dock"] {' in css
-    assert 'border-image: url("/plugins/qubit-office/themes/ui/dock.png?v=1.0.0")' in css
+    assert ('border-image: url('
+            '"/plugins/qubit-office/themes/demo/ui/dock.png?v=1.0.0")') in css
     # The painted slice and the reserved CSS border are the SAME width.
     assert "border-width: 8px" in css
     assert "border-image-width: 8px" in css
@@ -566,6 +569,44 @@ def test_host_token_css_without_slices_emits_no_border_image():
     assert "--ui-bg:" in css
     assert "border-image" not in css
     assert "[data-office-slice" not in css
+
+
+def test_host_token_css_maps_slice_roles_and_button_states():
+    slices = {
+        "tab": {"src": "ui/tab.png", "slice": [4, 4, 4, 4],
+                "width": "4px", "repeat": "stretch"},
+        "button": {"src": "ui/btn.png", "slice": [6, 6, 6, 6],
+                   "width": "6px", "repeat": "stretch"},
+        "button-hover": {"src": "ui/btn-hover.png", "slice": [6, 6, 6, 6],
+                         "width": "6px", "repeat": "stretch"},
+        "button-pressed": {"src": "ui/btn-pressed.png", "slice": [6, 6, 6, 6],
+                           "width": "6px", "repeat": "stretch"},
+    }
+    css = T.host_token_css(_tokens(), "demo", "1.0.0", slices,
+                           asset_base="/plugins/qubit-office/themes/demo")
+    scope = ':root[data-office-theme="demo"]'
+    assert f'{scope} [data-office-slice="tab"] {{' in css
+    assert f'{scope} [data-office-slice="button"] {{' in css
+    assert f'{scope} [data-office-slice="button"]:hover {{' in css
+    assert f'{scope} [data-office-slice="button"]:active,' in css
+    assert f'{scope} [data-office-slice="button"][aria-pressed="true"] {{' in css
+    assert '/themes/demo/ui/btn-hover.png' in css
+    assert '/themes/demo/ui/btn-pressed.png' in css
+    # The slice rules may reserve their border box, but they never move,
+    # restack, or capture input.
+    for prop in ("position", "pointer-events", "z-index", "display",
+                 "margin", "padding", "inset", "top", "left", "right",
+                 "bottom"):
+        assert not re.search(rf"(^|[\s;]){prop}\s*:", css), prop
+
+
+def test_host_token_css_uses_the_caller_asset_base():
+    css = T.host_token_css(
+        _tokens(), "demo", "1.0.0",
+        {"dock": {"src": "ui/dock.png", "slice": [8, 8, 8, 8],
+                  "width": "8px", "repeat": "stretch"}},
+        asset_base="/plugins/qubit-office/themes/demo")
+    assert 'url("/plugins/qubit-office/themes/demo/ui/dock.png?v=1.0.0")' in css
 
 
 def test_host_token_css_refuses_an_invalid_slice():

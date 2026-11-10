@@ -1,5 +1,5 @@
 (function() {
-	// node_modules/phaser/dist/phaser.esm.js
+	// ../../../../Projects/Repos/Qubit/frontend/qubit-web/node_modules/phaser/dist/phaser.esm.js
 	var __webpack_modules__ = {
 		50792(module) {
 			var has = Object.prototype.hasOwnProperty, prefix = "~";
@@ -192490,6 +192490,8 @@ create: function(game) {
 		const url = officeAppUrl(opts.base ?? hostBasePath$1());
 		const query = new URLSearchParams();
 		if (opts.mock) query.set("mock", "1");
+		const theme = String(opts.theme ?? "").trim();
+		if (theme && theme !== "classic") query.set("theme", theme);
 		const suffix = query.toString();
 		return suffix ? `${url}?${suffix}` : url;
 	}
@@ -192623,11 +192625,21 @@ create: function(game) {
 	* nothing (the Agents plus lost its crossbar at 22 px).
 	*/
 	var MAX_ICON_PX = 28;
+	/** The traced icon's native geometry (shared by injected and fallback buttons). */
+	function menuIconGeometry(spec) {
+		const scale = Math.min(1, MAX_ICON_PX / spec.icon.cols);
+		return {
+			width: Math.max(1, Math.round(spec.icon.cols * scale)),
+			height: Math.max(1, Math.round(spec.icon.rows * scale)),
+			viewBox: `0 0 ${spec.icon.cols} ${spec.icon.rows}`,
+			d: spec.icon.d
+		};
+	}
 	/** Build one button with the app's own classes and icon convention. */
 	function buildButton(doc, spec, onActivate) {
 		const button = doc.createElement("button");
 		button.type = "button";
-		button.className = "ui-icon-btn";
+		button.className = `ui-icon-btn office-theme-menu-btn office-theme-menu-${spec.id}`;
 		button.setAttribute("aria-label", spec.label);
 		button.setAttribute("title", spec.title);
 		button.setAttribute("aria-pressed", "false");
@@ -192636,19 +192648,17 @@ create: function(game) {
 		button.addEventListener("click", onActivate);
 		const ns = "http://www.w3.org/2000/svg";
 		const svg = doc.createElementNS(ns, "svg");
-		const scale = Math.min(1, MAX_ICON_PX / spec.icon.cols);
-		const width = Math.max(1, Math.round(spec.icon.cols * scale));
-		const height = Math.max(1, Math.round(spec.icon.rows * scale));
+		const geometry = menuIconGeometry(spec);
 		svg.setAttribute("class", "ui-px-icon");
-		svg.setAttribute("width", String(width));
-		svg.setAttribute("height", String(height));
-		svg.setAttribute("viewBox", `0 0 ${spec.icon.cols} ${spec.icon.rows}`);
+		svg.setAttribute("width", String(geometry.width));
+		svg.setAttribute("height", String(geometry.height));
+		svg.setAttribute("viewBox", geometry.viewBox);
 		svg.setAttribute("shape-rendering", "crispEdges");
 		svg.setAttribute("aria-hidden", "true");
 		svg.setAttribute("focusable", "false");
 		const path = doc.createElementNS(ns, "path");
 		path.setAttribute("fill", "currentColor");
-		path.setAttribute("d", spec.icon.d);
+		path.setAttribute("d", geometry.d);
 		svg.appendChild(path);
 		button.appendChild(svg);
 		return button;
@@ -192671,7 +192681,15 @@ create: function(game) {
 			agents: false,
 			hud: false
 		};
+		let fallbackShown = false;
+		let attachedOnce = false;
 		const findGroup = () => doc.querySelector(PANELS_GROUP_SELECTOR);
+		const isAttached = () => Boolean(byId.agents && byId.agents.isConnected && byId.hud && byId.hud.isConnected);
+		const setFallback = (show) => {
+			if (fallbackShown === show) return;
+			fallbackShown = show;
+			opts.onFallback?.(show);
+		};
 		const insert = (group, button) => {
 			const settings = Array.from(group.querySelectorAll("button")).find((b) => (b.getAttribute("title") || "") === "Settings");
 			if (settings) group.insertBefore(button, settings);
@@ -192689,8 +192707,17 @@ create: function(game) {
 				byId[spec.id] = button;
 				insert(group, button);
 			}
-			return true;
+			if (!attachedOnce && isAttached()) {
+				attachedOnce = true;
+				clearTimeout(fallbackTimer);
+				setFallback(false);
+				opts.onAttach?.();
+			}
+			return isAttached();
 		};
+		const fallbackTimer = setTimeout(() => {
+			if (!isAttached()) setFallback(true);
+		}, Math.max(0, opts.fallbackAfterMs ?? 1500));
 		attach();
 		let scheduled = false;
 		const observer = new MutationObserver(() => {
@@ -192716,8 +192743,13 @@ create: function(game) {
 					if (button) button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
 				}
 			},
+			attached() {
+				return isAttached();
+			},
 			dispose() {
 				observer.disconnect();
+				clearTimeout(fallbackTimer);
+				setFallback(false);
 				for (const spec of MENU_BUTTONS) {
 					const button = byId[spec.id];
 					if (button && button.isConnected) button.remove();
@@ -193063,24 +193095,334 @@ create: function(game) {
 			};
 		}
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/office-theme.ts
+	function themeAtlasUrls(theme) {
+		return {
+			portrait: theme && theme.atlas || null,
+			body: theme && theme.bodies && theme.bodies.atlas || null
+		};
+	}
+	/** A whole, positive cell size; the payload's own values are validated. */
+	function cellPx(value, fallback) {
+		return typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : fallback;
+	}
+	/**
+	* Position a portrait cell. ``size`` is the atlas cell edge in CSS pixels; the
+	* fixed 32px face of the panel passes 32, and the helper keeps it explicit so a
+	* 16/48 pack would not silently misalign.
+	*/
+	function portraitCellStyle(cell, size) {
+		if (!cell) return void 0;
+		const [col, row] = cell;
+		const px = cellPx(size, 32);
+		return {
+			"--cell-x": col,
+			"--cell-y": row,
+			backgroundPosition: `calc(-1 * var(--cell-x) * ${px}px) calc(-1 * var(--cell-y) * ${px}px)`
+		};
+	}
+	/**
+	* Position a body frame. The body atlas packs 32x64 (by default) frames, so the
+	* horizontal step is the frame width and the vertical step the frame height —
+	* not one square cell size.
+	*/
+	function bodyCellStyle(cell, frame) {
+		if (!cell || !frame) return void 0;
+		const [col, row] = cell;
+		return {
+			"--body-x": col,
+			"--body-y": row,
+			backgroundPosition: `calc(-1 * var(--body-x) * ${cellPx(frame.w, 32)}px) calc(-1 * var(--body-y) * ${cellPx(frame.h, 64)}px)`
+		};
+	}
+	/**
+	* A readable initials chip for an avatar fallback: first and last word, so
+	* "Chief of Staff" reads "CS" and "One" reads "O". Returns "" when the name
+	* carries no letters or digits, which lets the panel fall through to the emoji
+	* instead of rendering an empty chip.
+	*/
+	function initialsFor(name) {
+		const words = String(name || "").trim().split(/[\s._-]+/).filter(Boolean);
+		const letters = [];
+		for (const word of words) {
+			const found = Array.from(word).find((ch) => /[\p{L}\p{N}]/u.test(ch));
+			if (found) letters.push(found);
+		}
+		if (letters.length === 0) return "";
+		return (letters.length === 1 ? [letters[0]] : [letters[0], letters[letters.length - 1]]).join("").toUpperCase();
+	}
+	/**
+	* Preload every atlas the theme names, ONCE, and resolve true only when all of
+	* them decoded.
+	*
+	* WHY PRELOAD AT ALL
+	* ------------------
+	* The panel renders a CSS sprite per seat, not an ``<img>`` per seat: done the
+	* other way, 283 seats are 283 image requests and long scrolls flood the
+	* browser's connection pool (the documented sprite-atlas decision). But a CSS
+	* background paints nothing until the image is back, so the initials would
+	* vanish into empty boxes for that first frame. Preloading the two sheets lets
+	* the panel keep initials visible until both are actually decodable, then
+	* commit ``office-portraits-ready`` once.
+	*
+	* Returns ``null`` when there is nothing to preload (classic, or no platform
+	* ``Image``), which callers treat as "not ready" — never as a failure to retry.
+	*/
+	function preloadThemeAtlases(theme, ImageImpl) {
+		const urls = themeAtlasUrls(theme);
+		const wanted = Array.from(new Set([urls.portrait, urls.body].filter((url) => Boolean(url))));
+		if (wanted.length === 0) return null;
+		const Img = ImageImpl ?? globalThis.Image;
+		if (!Img) return null;
+		return Promise.all(wanted.map((src) => new Promise((resolve) => {
+			const image = new Img();
+			image.onload = () => resolve(true);
+			image.onerror = () => resolve(false);
+			image.src = src;
+		}))).then((results) => results.every(Boolean));
+	}
+	/** The compat route the dashboard token gate already authorizes. */
+	var OFFICE_THEME_ROUTE = "/agent/api/office/theme";
+	/** The server-injected global that carries the resolved host payload. */
+	var OFFICE_THEME_GLOBAL = "__QUBIT_OFFICE_THEME__";
+	/** The window this module should read the global/token from. */
+	function themeWindow(win) {
+		if (win !== void 0) return win;
+		if (typeof window === "undefined") return null;
+		return window;
+	}
+	/** Prefix a root-relative URL with the dashboard base (subpath deployments). */
+	function withHostBase(url) {
+		const base = hostBasePath$1();
+		if (!url || !base || !url.startsWith("/")) return url;
+		if (url === base || url.startsWith(`${base}/`)) return url;
+		return `${base}${url}`;
+	}
+	/** The class the shell root carries so Task 7 can scope its own chrome. */
+	function officeThemeClass(theme) {
+		return theme && theme.active && theme.id ? `office-theme-${theme.id}` : "";
+	}
+	/**
+	* The `data-office-slice` value for a shell element, or undefined.
+	*
+	* The pack declares which roles it has art for; the host stylesheet generated
+	* by `host_token_css` emits `[data-office-slice="<role>"]` rules only for
+	* those names. An element must therefore opt in by carrying the attribute
+	* ONLY when its role is declared — otherwise a theme switch would leave a
+	* stale slice on classic chrome.
+	*
+	* `button-hover` / `button-pressed` are STATES of the `button` role: the
+	* server attaches them to `[data-office-slice="button"]:hover` / `:active`
+	* (and `[aria-pressed="true"]`), so an element only ever carries
+	* `data-office-slice="button"`.
+	*/
+	function officeSliceName(theme, role) {
+		if (!theme || !theme.active) return void 0;
+		const slices = theme.slices;
+		if (!slices || typeof slices !== "object") return void 0;
+		return slices[role] ? role : void 0;
+	}
+	/**
+	* The generated host stylesheet URL for an active theme, or "" for classic.
+	*
+	* The CSS is generated server-side from the SAME validated payload: a classic
+	* theme has no stylesheet, and every URL carries `?v=<version>` so it can be
+	* cached for an hour (the version names the bytes). ``assetBase`` is a route
+	* URL from the server; when it is absent (a hand-built/legacy payload) the
+	* known namespace is used, and the dashboard's own base path is prefixed so a
+	* subpath deployment resolves it (same rule as ``agentsPanelUrl``).
+	*/
+	function themeCss(theme) {
+		if (!theme || !theme.active || !theme.id) return "";
+		const base = String(theme.assetBase || `/plugins/qubit-office/themes/${theme.id}`).replace(/\/+$/, "");
+		if (!base) return "";
+		return withHostBase(`${base}/theme.css?v=${encodeURIComponent(theme.version || "")}`);
+	}
+	/** Normalise a dashboard base path the same way `office-app.ts` does. */
+	function themeBase(base) {
+		const raw = base === void 0 ? hostBasePath$1() : base;
+		return raw.endsWith("/") ? raw.slice(0, -1) : raw;
+	}
+	/** Read the document's injected session token (or the parent's, in an app). */
+	function sessionToken(win) {
+		const w = themeWindow(win);
+		if (!w) return "";
+		if (typeof w.__QUBIT_SESSION_TOKEN__ === "string" && w.__QUBIT_SESSION_TOKEN__) return w.__QUBIT_SESSION_TOKEN__;
+		try {
+			const parent = w.parent;
+			return parent && parent.__QUBIT_SESSION_TOKEN__ || "";
+		} catch {
+			return "";
+		}
+	}
+	/**
+	* The server-injected host payload, when the shell is served by Qubit.
+	*
+	* The global is the PRIMARY source: it is generated on the server from the
+	* same resolved payload as the iframe (so config/env themes work with no
+	* `?theme=` and no first-paint fetch/auth gap). It is validated here rather
+	* than trusted: an object with a non-empty string ``id`` and a boolean
+	* ``active``. An absent/invalid global falls through to the authenticated
+	* fetch below.
+	*/
+	function readOfficeThemeGlobal(win) {
+		const raw = themeWindow(win)?.[OFFICE_THEME_GLOBAL];
+		if (!raw || typeof raw !== "object") return null;
+		const candidate = raw;
+		if (typeof candidate.id !== "string" || !candidate.id) return null;
+		if (typeof candidate.active !== "boolean") return null;
+		if (candidate.active) {
+			if (typeof candidate.tokens !== "object" || candidate.tokens === null) return null;
+		}
+		return candidate;
+	}
+	/**
+	* Load the resolved office theme for the host.
+	*
+	* ORDER MATTERS. The server-injected global wins: it already contains the
+	* config/env/`?theme=` resolution (the env kill switch still applies on the
+	* server), so the host paints the same theme as the iframe with no request.
+	* Only when the global is absent (an older server, or the shell embedded
+	* outside Qubit) does this make ONE authenticated `no-store` request.
+	*
+	* Classic is a valid answer from both paths and results in no class/link; an
+	* unknown/invalid override or a failed response is also `null`, never a
+	* fabricated pack.
+	*/
+	async function loadOfficeTheme(fetchImpl, base, requested, win) {
+		const injected = readOfficeThemeGlobal(win);
+		if (injected) return injected;
+		if (typeof fetchImpl !== "function") return null;
+		const want = String(requested ?? "").trim();
+		const query = want ? `?theme=${encodeURIComponent(want)}` : "";
+		const url = `${themeBase(base)}${OFFICE_THEME_ROUTE}${query}`;
+		const token = sessionToken(win);
+		const headers = { Accept: "application/json" };
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		try {
+			const response = await fetchImpl(url, {
+				cache: "no-store",
+				credentials: "same-origin",
+				headers
+			});
+			if (!response || response.ok === false) return null;
+			const payload = await response.json();
+			if (!payload || typeof payload.active !== "boolean") return null;
+			if (typeof payload.id !== "string" || !payload.id) return null;
+			return payload;
+		} catch {
+			return null;
+		}
+	}
+	/**
+	* Apply an active theme to the HOST document, and return a disposer.
+	*
+	* Adds `data-office-theme="<id>"` to `<html>` (the host stylesheet's scope) and
+	* exactly ONE `<link rel="stylesheet" data-office-theme="<id>">`. Calling it
+	* again replaces the previous application, never stacking links; classic
+	* removes any prior application and adds nothing. The disposer removes only
+	* what this call installed (a later application owns its own link).
+	*/
+	function applyHostTheme(doc, theme) {
+		if (!doc || typeof doc.createElement !== "function") return () => {};
+		const root = doc.documentElement ?? null;
+		const previous = Array.from(doc.querySelectorAll("link[data-office-theme], style[data-office-theme]"));
+		for (const node of previous) node.remove();
+		if (root) root.removeAttribute("data-office-theme");
+		if (!theme || !theme.active || !theme.id) return () => {};
+		const href = themeCss(theme);
+		if (!href) return () => {};
+		const id = theme.id;
+		if (root) root.setAttribute("data-office-theme", id);
+		const link = doc.createElement("link");
+		link.setAttribute("data-office-theme", id);
+		link.setAttribute("rel", "stylesheet");
+		link.setAttribute("href", href);
+		(doc.head ?? root ?? doc.body).appendChild(link);
+		let disposed = false;
+		return () => {
+			if (disposed) return;
+			disposed = true;
+			if (link.isConnected) link.remove();
+			if (root && root.getAttribute("data-office-theme") === id && !doc.querySelector("link[data-office-theme]")) root.removeAttribute("data-office-theme");
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/AgentsPanel.tsx
-	/** One seat row: emoji, persona name, type, room, supervisor. */
-	function seatRow(R, seat, index) {
+	/** The panel portrait box. The payload's portrait tier is 32px (see Task 4). */
+	var PORTRAIT_PX = 32;
+	function seatMeta(seat) {
 		const meta = [seatTypeLabel(seat.seat_type)];
 		if (seat.room) meta.push(seat.room === "boardroom" ? "Boardroom" : seat.room);
 		if (seat.supervisor) meta.push(`reports to ${seat.supervisor}`);
+		return meta;
+	}
+	/**
+	* One avatar, with the owner-directed fallback chain:
+	*   generated atlas portrait -> initials chip -> emoji.
+	*
+	* The portrait is a CSS SPRITE, not an `<img>`: one atlas request feeds all 283
+	* seats (two for portrait+body), so a fast scroll cannot flood the connection
+	* pool. It only appears once the sheets have actually decoded (``ready``); until
+	* then the initials/emoji carry the row and remain announced. A failed preload
+	* therefore degrades to the same truthful fallback instead of an empty box.
+	*/
+	function seatAvatar(R, seat, theme, ready, key) {
+		const urls = themeAtlasUrls(theme);
+		const initials = initialsFor(seat.name);
+		const style = seat.portrait ? portraitCellStyle(seat.portrait, PORTRAIT_PX) : void 0;
+		const showSprite = Boolean(ready && urls.portrait && style);
+		const common = {
+			"data-testid": "agents-panel-avatar",
+			"data-seat-slug": seat.slug
+		};
+		if (showSprite && style && urls.portrait) return R.createElement("span", {
+			...common,
+			key,
+			className: "agents-panel__portrait",
+			role: "img",
+			"aria-label": `${seat.name} portrait`,
+			"data-sprite": "portrait",
+			style: {
+				...style,
+				backgroundImage: `url("${urls.portrait}")`
+			}
+		});
+		if (initials) return R.createElement("span", {
+			...common,
+			key,
+			className: "agents-panel__initials",
+			role: "img",
+			"aria-label": `${seat.name} initials`,
+			"data-sprite": "initials"
+		}, initials);
+		return R.createElement("span", {
+			...common,
+			key,
+			className: "agents-panel__emoji",
+			role: "img",
+			"aria-label": seat.name ? `${seat.name} portrait` : "Agent portrait",
+			"data-sprite": "emoji"
+		}, (seat.emoji || "").trim() || "•");
+	}
+	/** One seat row: portrait, persona name, type, room, supervisor. */
+	function seatRow(R, seat, index, theme, ready, interaction) {
+		const meta = seatMeta(seat);
+		const active = interaction.activeSlug === seat.slug;
 		return R.createElement("li", {
 			key: `${seat.slug}:${index}`,
+			id: interaction.rowId(seat.slug),
 			className: "agents-panel__seat",
 			"data-testid": "agents-panel-seat",
 			"data-seat-slug": seat.slug,
-			"data-seat-type": seat.seat_type
+			"data-seat-type": seat.seat_type,
+			"aria-current": active ? "true" : void 0,
+			onMouseEnter: () => interaction.onActivate(seat.slug),
+			onClick: () => interaction.onActivate(seat.slug)
 		}, [
 			R.createElement("span", {
-				key: "e",
-				className: "agents-panel__emoji",
-				"aria-hidden": "true"
-			}, seat.emoji || "•"),
+				key: "a",
+				className: "agents-panel__avatar"
+			}, [seatAvatar(R, seat, theme, ready, "p")]),
 			R.createElement("span", {
 				key: "n",
 				className: "agents-panel__name"
@@ -193091,8 +193433,65 @@ create: function(game) {
 			}, meta.join(" · "))
 		]);
 	}
+	/**
+	* The dialogue-style agent card the pack author demonstrates: a framed portrait,
+	* the agent name on the tab, and the 32x64 body sprite beside it. It is the
+	* roster's single keyboard owner: hover/click select a row, and Arrow/Home/End
+	* on the card walk every seat (default: the first), so the card is a preview of
+	* the roster, never a fabricated extra agent.
+	*
+	* Fixed 72px tall (64px body + padding) and a fixed three-column grid, so
+	* moving the pointer down 283 rows cannot reflow the list under it.
+	*/
+	function agentCard(R, seat, theme, ready, onKeyDown) {
+		const urls = themeAtlasUrls(theme);
+		const frame = theme?.bodies?.frame ?? null;
+		const bodyStyle = seat.body ? bodyCellStyle(seat.body, frame) : void 0;
+		const showBody = Boolean(ready && urls.body && bodyStyle);
+		return R.createElement("div", {
+			key: "card",
+			className: "agents-panel__card office-theme-card",
+			id: "agents-panel-card",
+			"data-testid": "agents-panel-card",
+			"data-seat-slug": seat.slug,
+			"data-office-slice": officeSliceName(theme, "card"),
+			role: "group",
+			"aria-label": "Active agent",
+			"aria-live": "polite",
+			"aria-atomic": "true",
+			tabIndex: 0,
+			onKeyDown
+		}, [
+			R.createElement("div", {
+				key: "p",
+				className: "agents-panel__cardPortrait"
+			}, [seatAvatar(R, seat, theme, ready, "p")]),
+			R.createElement("div", {
+				key: "t",
+				className: "agents-panel__cardTab",
+				"data-office-slice": officeSliceName(theme, "tab")
+			}, [R.createElement("span", {
+				key: "n",
+				className: "agents-panel__cardName"
+			}, seat.name), R.createElement("span", {
+				key: "m",
+				className: "agents-panel__cardMeta"
+			}, seatMeta(seat).join(" · "))]),
+			showBody && bodyStyle && urls.body ? R.createElement("span", {
+				key: "b",
+				className: "agents-panel__body",
+				role: "img",
+				"aria-label": `${seat.name} body`,
+				"data-sprite": "body",
+				style: {
+					...bodyStyle,
+					backgroundImage: `url("${urls.body}")`
+				}
+			}) : null
+		]);
+	}
 	/** One division: a heading with its REAL headcount, then its seats. */
-	function divisionGroup(R, division, open) {
+	function divisionGroup(R, division, open, theme, ready, interaction, onToggle) {
 		const boardroom = division.slug === "";
 		const heading = `${division.label} \u2014 ${division.headcount} ` + (division.headcount === 1 ? "seat" : "seats");
 		return R.createElement("details", {
@@ -193102,7 +193501,8 @@ create: function(game) {
 			id: `agents-panel-division-${division.slug || "boardroom"}`,
 			"data-division": division.slug,
 			"data-headcount": String(division.headcount),
-			open
+			open,
+			onToggle: (event) => onToggle(event.currentTarget.open)
 		}, [R.createElement("summary", {
 			key: "s",
 			className: "agents-panel__divisionHead"
@@ -193118,12 +193518,19 @@ create: function(game) {
 		}, boardroom ? "Above every division" : division.kind)]), R.createElement("ul", {
 			key: "u",
 			className: "agents-panel__seats"
-		}, division.seats.map((seat, i) => seatRow(R, seat, i)))]);
+		}, division.seats.map((seat, i) => seatRow(R, seat, i, theme, ready, interaction)))]);
 	}
 	function createAgentsPanel(R, hooks) {
 		const { useState, useEffect } = hooks;
 		return function AgentsPanel(props) {
 			const [state, setState] = useState({ kind: "loading" });
+			const atlasKey = `${props.theme?.atlas ?? ""}\u0000${props.theme?.bodies?.atlas ?? ""}`;
+			const hasAtlas = Boolean(props.theme?.atlas || props.theme?.bodies?.atlas);
+			const [readyAtlasKey, setReadyAtlasKey] = useState(null);
+			const portraitsReady = hasAtlas && readyAtlasKey === atlasKey;
+			const [activeSlug, setActiveSlug] = useState(null);
+			const [openDivisions, setOpenDivisions] = useState({});
+			const [pendingScroll, setPendingScroll] = useState(null);
 			useEffect(() => {
 				let live = true;
 				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
@@ -193139,6 +193546,22 @@ create: function(game) {
 					ctl?.abort();
 				};
 			}, [props.base]);
+			useEffect(() => {
+				const pending = preloadThemeAtlases(props.theme);
+				if (!pending) return;
+				let live = true;
+				pending.then((ok) => {
+					if (live && ok) setReadyAtlasKey(atlasKey);
+				});
+				return () => {
+					live = false;
+				};
+			}, [atlasKey]);
+			useEffect(() => {
+				if (!pendingScroll) return;
+				if (typeof document !== "undefined") document.getElementById(`agents-panel-seat-${pendingScroll}`)?.scrollIntoView?.({ block: "nearest" });
+				setPendingScroll(null);
+			}, [pendingScroll]);
 			if (state.kind === "loading") return R.createElement("div", {
 				className: "agents-panel",
 				"data-testid": "agents-panel",
@@ -193157,20 +193580,61 @@ create: function(game) {
 			const groups = data.divisions ?? [];
 			const boardroom = groups.find((g) => g.slug === "");
 			const divisions = groups.filter((g) => g.slug !== "");
+			const orderedSeats = [...boardroom ? boardroom.seats : [], ...divisions.flatMap((division) => division.seats)];
+			const activeSeat = (activeSlug ? orderedSeats.find((seat) => seat.slug === activeSlug) : void 0) ?? orderedSeats[0] ?? null;
+			const divisionBySeat = /* @__PURE__ */ new Map();
+			for (const group of groups) for (const seat of group.seats) divisionBySeat.set(seat.slug, group.slug);
+			const rowId = (slug) => `agents-panel-seat-${slug}`;
+			const toggleDivision = (slug, open) => {
+				setOpenDivisions((previous) => previous[slug] === open ? previous : {
+					...previous,
+					[slug]: open
+				});
+			};
+			const navigate = (slug, key) => {
+				const current = orderedSeats.findIndex((seat) => seat.slug === slug);
+				if (current < 0) return false;
+				let next = current;
+				if (key === "ArrowDown") next = Math.min(orderedSeats.length - 1, current + 1);
+				else if (key === "ArrowUp") next = Math.max(0, current - 1);
+				else if (key === "Home") next = 0;
+				else if (key === "End") next = orderedSeats.length - 1;
+				else return false;
+				const target = orderedSeats[next];
+				setActiveSlug(target.slug);
+				const division = divisionBySeat.get(target.slug);
+				if (division !== void 0) setOpenDivisions((previous) => previous[division] ? previous : {
+					...previous,
+					[division]: true
+				});
+				setPendingScroll(target.slug);
+				return true;
+			};
+			const onCardKeyDown = (event) => {
+				if (!activeSeat) return;
+				if (navigate(activeSeat.slug, event.key)) event.preventDefault();
+			};
+			const interaction = {
+				activeSlug: activeSeat ? activeSeat.slug : null,
+				onActivate: (slug) => setActiveSlug(slug),
+				rowId
+			};
 			return R.createElement("div", {
-				className: "agents-panel",
+				className: "agents-panel" + (portraitsReady ? " office-portraits-ready" : ""),
 				"data-testid": "agents-panel",
 				"data-state": "ready",
 				"data-seats": String(counts?.headcount ?? 0),
-				"data-divisions": String(counts?.divisions ?? divisions.length)
+				"data-divisions": String(counts?.divisions ?? divisions.length),
+				"data-portraits": portraitsReady ? "ready" : "fallback"
 			}, [
+				activeSeat ? agentCard(R, activeSeat, props.theme, portraitsReady, onCardKeyDown) : null,
 				R.createElement("div", {
 					key: "summary",
 					className: "agents-panel__summary",
 					"data-testid": "agents-panel-summary"
 				}, summaryLine(counts)),
-				boardroom ? divisionGroup(R, boardroom, false) : null,
-				...divisions.map((d) => divisionGroup(R, d, false)),
+				boardroom ? divisionGroup(R, boardroom, Boolean(openDivisions[boardroom.slug]), props.theme, portraitsReady, interaction, (open) => toggleDivision(boardroom.slug, open)) : null,
+				...divisions.map((d) => divisionGroup(R, d, Boolean(openDivisions[d.slug]), props.theme, portraitsReady, interaction, (open) => toggleDivision(d.slug, open))),
 				counts ? R.createElement("div", {
 					key: "types",
 					className: "agents-panel__types",
@@ -193298,6 +193762,19 @@ create: function(game) {
 		return `${v.bound.length} bound · ${v.missing.length} unavailable · ${v.gated.length} confirmation-gated`;
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
+	/**
+	* The theme the host page asked for (`/qubit-office?theme=<id>`).
+	*
+	* Read from the host document, not from a prop: the plugin component receives
+	* no props in production. `classic` is the default and is not propagated (the
+	* iframe URL stays clean and the host loads nothing).
+	*/
+	function hostThemeRequest() {
+		if (typeof window === "undefined") return "";
+		const search = window.location && window.location.search || "";
+		const value = (new URLSearchParams(search).get("theme") || "").trim();
+		return value === "classic" ? "" : value;
+	}
 	function connectionText(props) {
 		const state = props.officeState ?? "connecting";
 		const rooms = props.officeRooms ?? 0;
@@ -193360,9 +193837,28 @@ create: function(game) {
 			const [panelOpen, setPanelOpen] = useState(false);
 			const [hudOpen, setHudOpen] = useState(false);
 			const [agentsOpen, setAgentsOpen] = useState(false);
+			const [officeTheme, setOfficeTheme] = useState(null);
+			const [menuFallback, setMenuFallback] = useState(false);
+			const requestedTheme = hostThemeRequest();
 			const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
+			useEffect(() => {
+				let cancelled = false;
+				const hostWindow = typeof window === "undefined" ? null : window;
+				loadOfficeTheme(hostWindow && typeof hostWindow.fetch === "function" ? hostWindow.fetch.bind(hostWindow) : null, props.base, requestedTheme, hostWindow).then((theme) => {
+					if (!cancelled) setOfficeTheme(theme);
+				}).catch(() => {
+					if (!cancelled) setOfficeTheme(null);
+				});
+				return () => {
+					cancelled = true;
+				};
+			}, [props.base, requestedTheme]);
+			useEffect(() => {
+				if (typeof document === "undefined") return;
+				return applyHostTheme(document, officeTheme);
+			}, [officeTheme]);
 			useEffect(() => {
 				const frame = frameRef.current;
 				if (!frame) return;
@@ -193382,9 +193878,12 @@ create: function(game) {
 					setLoaded(true);
 					setFailed(null);
 					menuRef.current?.dispose();
+					setMenuFallback(false);
 					menuRef.current = installOfficeMenuButtons(win, {
 						onToggleAgents: () => setAgentsOpen((v) => !v),
-						onToggleHud: () => setHudOpen((v) => !v)
+						onToggleHud: () => setHudOpen((v) => !v),
+						onFallback: (show) => setMenuFallback(show),
+						onAttach: () => setMenuFallback(false)
 					});
 					menuRef.current?.update({
 						agents: agentsOpen,
@@ -193399,7 +193898,8 @@ create: function(game) {
 				setLoaded(false);
 				frame.src = officeAppSrc({
 					base: props.base,
-					mock: props.mock
+					mock: props.mock,
+					theme: requestedTheme
 				});
 				return () => {
 					frame.removeEventListener("load", onLoad);
@@ -193408,13 +193908,19 @@ create: function(game) {
 					menuRef.current = null;
 					restoreBridge?.();
 				};
-			}, [props.base, props.mock]);
+			}, [
+				props.base,
+				props.mock,
+				requestedTheme
+			]);
 			useEffect(() => {
 				menuRef.current?.update({
 					agents: agentsOpen,
 					hud: hudOpen
 				});
 			});
+			const dockSlice = officeSliceName(officeTheme, "dock");
+			const buttonSlice = officeSliceName(officeTheme, "button");
 			const children = [R.createElement("iframe", {
 				key: "frame",
 				ref: frameRef,
@@ -193515,54 +194021,102 @@ create: function(game) {
 			if (agentsOpen) children.push(R.createElement("div", {
 				key: "agents-dock",
 				id: "office-game-agents-dock",
-				className: "office-game__dock office-game__agentsDock office-game__panel",
+				className: "office-game__dock office-game__agentsDock office-game__panel office-theme-dock office-theme-agents-dock",
 				"data-testid": "office-game-agents-dock",
+				"data-office-dock": "agents",
+				"data-office-slice": dockSlice,
 				role: "region",
 				"aria-label": "Office agents"
 			}, [R.createElement("div", {
 				key: "head",
-				className: "office-game__dockHead"
-			}, [R.createElement("span", { key: "t" }, "Agents"), R.createElement("button", {
+				className: "office-game__dockHead office-theme-dock-head"
+			}, [R.createElement("span", {
+				key: "t",
+				className: "office-theme-dock-title"
+			}, "Agents"), R.createElement("button", {
 				key: "x",
 				type: "button",
-				className: "office-game__btn",
+				className: "office-game__btn office-theme-dock-close",
 				"data-testid": "office-game-agents-close",
 				"aria-label": "Close agents",
+				"data-office-slice": buttonSlice,
 				onClick: () => setAgentsOpen(false)
 			}, "Close")]), R.createElement(AgentsPanel, {
 				key: "body",
-				base: props.base
+				base: props.base,
+				theme: officeTheme
 			})]));
 			if (hudOpen) children.push(R.createElement("div", {
 				key: "hud-dock",
 				id: "office-game-hud-dock",
-				className: "office-game__dock office-game__panel",
+				className: "office-game__dock office-game__panel office-theme-dock office-theme-hud-dock",
 				"data-testid": "office-game-hud-dock",
+				"data-office-dock": "hud",
+				"data-office-slice": dockSlice,
 				role: "region",
 				"aria-label": "HUD"
 			}, [R.createElement("div", {
 				key: "head",
-				className: "office-game__dockHead"
+				className: "office-game__dockHead office-theme-dock-head"
 			}, [
-				R.createElement("span", { key: "t" }, "HUD"),
+				R.createElement("span", {
+					key: "t",
+					className: "office-theme-dock-title"
+				}, "HUD"),
 				R.createElement("a", {
 					key: "open",
-					className: "office-game__hudLink",
+					className: "office-game__hudLink office-theme-dock-link",
 					"data-testid": "office-game-hud-open-link",
 					href: hudFrameSrc(props.base)
 				}, "Open HUD"),
 				R.createElement("button", {
 					key: "x",
 					type: "button",
-					className: "office-game__btn",
+					className: "office-game__btn office-theme-dock-close",
 					"data-testid": "office-game-hud-close",
 					"aria-label": "Close HUD",
+					"data-office-slice": buttonSlice,
 					onClick: () => setHudOpen(false)
 				}, "Close")
 			]), R.createElement(HudDock, { key: "body" })]));
+			if (menuFallback) children.push(R.createElement("div", {
+				key: "menu-fallback",
+				className: "office-game__menuFallback office-theme-menu-fallback",
+				"data-testid": "office-menu-fallback",
+				role: "group",
+				"aria-label": "Office panels"
+			}, MENU_BUTTONS.map((spec) => {
+				const geometry = menuIconGeometry(spec);
+				const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
+				const onActivate = spec.id === "agents" ? () => setAgentsOpen((v) => !v) : () => setHudOpen((v) => !v);
+				return R.createElement("button", {
+					key: spec.id,
+					type: "button",
+					className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
+					"data-testid": `${spec.testId}-fallback`,
+					"aria-label": spec.label,
+					title: spec.title,
+					"aria-pressed": pressed ? "true" : "false",
+					"data-office-slice": buttonSlice,
+					onClick: onActivate
+				}, R.createElement("svg", {
+					className: "ui-px-icon",
+					width: geometry.width,
+					height: geometry.height,
+					viewBox: geometry.viewBox,
+					shapeRendering: "crispEdges",
+					"aria-hidden": "true",
+					focusable: "false"
+				}, R.createElement("path", {
+					fill: "currentColor",
+					d: geometry.d
+				})));
+			})));
+			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
 			return R.createElement("div", {
 				"data-testid": "office-app",
-				className: "office-game"
+				"data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : void 0,
+				className: rootClass
 			}, children);
 		};
 	}

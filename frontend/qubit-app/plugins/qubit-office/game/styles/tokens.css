@@ -78,5 +78,13 @@
   --office-muted: #cfd6e4;
   --office-line: rgba(255, 255, 255, 0.4);
   --office-line-strong: rgba(255, 255, 255, 0.55);
+  /* Restate the shorthands here too: `--office-border` is declared on :root
+     with a nested `var(--office-line)`, and a custom property resolves its
+     vars at the element that DECLARES it. Overriding only `--office-line` on
+     this attribute-scoped element would leave classic borders at the old
+     colour. Setting the shorthands re-resolves them against the high-contrast
+     line tokens. */
+  --office-border: 1px solid var(--office-line);
+  --office-border-strong: 1px solid var(--office-line-strong);
   --office-plate: #222b3a;
 }
