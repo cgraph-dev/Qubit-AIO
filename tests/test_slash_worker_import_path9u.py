@@ -67,8 +67,11 @@ def test_slash_worker_imports_from_the_spawn_env(tmp_path):
 
     broken = {k: v for k, v in env.items() if k not in (
         "PYTHONPATH", "HERMES_PYTHON_SRC_ROOT", "QUBIT_PYTHON_SRC_ROOT")}
+    # ``-S`` skips site-packages, which on a dev box carries an editable install
+    # of this same project whose finder maps ``tui_gateway`` absolutely.  Without
+    # it the negative control would pass for the wrong reason on any such box.
     bad = subprocess.run(
-        [sys.executable, "-c", "import tui_gateway.slash_worker"],
+        [sys.executable, "-S", "-c", "import tui_gateway.slash_worker"],
         cwd=tmp_path, env=broken, capture_output=True, text=True, timeout=300,
     )
     assert bad.returncode != 0, "without the seed the worker must fail to import"
