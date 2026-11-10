@@ -283,10 +283,28 @@ class TestFindAllSkills:
 # ---------------------------------------------------------------------------
 
 
+from contextlib import contextmanager
+
+
+@contextmanager
+def _no_plugin_skills():
+    """An empty plugin-skill registry.
+
+    ``skills_list`` merges SKILLS_DIR with ``PluginManager.list_plugin_skill_metadata``
+    (skills_tool.py:301-304), so patching SKILLS_DIR alone still returns every SKILL
+    shipped by an installed plugin — the ported jev-workflows bundle contributes 13.
+    These two tests assert what the DIRECTORY scan produces, so the plugin source is
+    stubbed out; the assertions themselves are unchanged.
+    """
+    with patch("qubit_cli.plugins.get_plugin_manager") as manager:
+        manager.return_value.list_plugin_skill_metadata.return_value = []
+        yield
+
+
 class TestSkillsList:
     def test_empty_creates_directory(self, tmp_path):
         skills_dir = tmp_path / "skills"
-        with patch("tools.skills_tool.SKILLS_DIR", skills_dir):
+        with patch("tools.skills_tool.SKILLS_DIR", skills_dir), _no_plugin_skills():
             raw = skills_list()
         result = json.loads(raw)
         assert result["success"] is True
@@ -294,7 +312,7 @@ class TestSkillsList:
         assert skills_dir.exists()
 
     def test_category_filter(self, tmp_path):
-        with patch("tools.skills_tool.SKILLS_DIR", tmp_path):
+        with patch("tools.skills_tool.SKILLS_DIR", tmp_path), _no_plugin_skills():
             _make_skill(tmp_path, "skill-a", category="devops")
             _make_skill(tmp_path, "skill-b", category="mlops")
             all_result = json.loads(skills_list())
