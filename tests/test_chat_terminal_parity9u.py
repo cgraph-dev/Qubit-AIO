@@ -102,7 +102,10 @@ def _mint(port, body=None):
         with urllib.request.urlopen(req, timeout=8) as r:
             return r.status, json.loads(r.read())
     except urllib.error.HTTPError as exc:
-        return exc.code, json.loads(exc.read())
+        try:
+            return exc.code, json.loads(exc.read())
+        finally:
+            exc.close()  # HTTPError owns an unclosed fp; unclosed it warns at GC.
 
 
 # ---------------------------------------------------------------------------
@@ -354,12 +357,23 @@ def test_session_open_audit_records_verified_window(tmp_path, monkeypatch):
 # Task 2 inventory: upstream raw WS dialects stay typed-refused (426)
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("path", [
-    "/api/console", "/api/ws", "/api/events", "/api/pub",
+    "/api/console", "/api/ws", "/api/pub",
     "/api/audio/speak-stream", "/api/plugins/kanban/events",
-    "/agent/api/console", "/agent/api/ws", "/agent/api/events",
+    "/agent/api/console", "/agent/api/ws",
 ])
 def test_upstream_raw_ws_paths_are_typed_refused(tmp_path, monkeypatch, path):
     _assert_ws_upgrade(tmp_path, monkeypatch, path, want=426)
+
+
+@pytest.mark.parametrize("path", ["/api/events", "/agent/api/events"])
+def test_events_ws_requires_the_dashboard_token(tmp_path, monkeypatch, path):
+    # ``/api/events`` is NOT a 426 refusal: 2557df64d removed it from
+    # QUBIT_WS_GATE_CODES and serves it as a real WebSocket
+    # (``_maybe_events_upgrade``) because the dashboard sidebar dials it with
+    # unmodified upstream client code. An upgrade that carries the header but
+    # no ticket/loopback ``?token=`` is a typed 401 TOKEN_REQUIRED.
+    _assert_ws_upgrade(tmp_path, monkeypatch, path, want=401,
+                       want_code="TOKEN_REQUIRED")
 
 
 @pytest.mark.parametrize("path", ["/api/pty", "/agent/api/pty"])
@@ -370,7 +384,7 @@ def test_pty_socket_requires_a_ticket(tmp_path, monkeypatch, path):
     _assert_ws_upgrade(tmp_path, monkeypatch, path, want=401)
 
 
-def _assert_ws_upgrade(tmp_path, monkeypatch, path, *, want):
+def _assert_ws_upgrade(tmp_path, monkeypatch, path, *, want, want_code=None):
     import socket
 
     cfg = _cfg(tmp_path, monkeypatch, "webui:\n  token: test-token\n")
@@ -412,6 +426,8 @@ def _assert_ws_upgrade(tmp_path, monkeypatch, path, *, want):
         assert payload["ok"] is False
         assert payload["code"]
         assert payload["owner"] == "qubit-policy"
+        if want_code is not None:
+            assert payload["code"] == want_code, payload
     finally:
         ui.stop()
 
