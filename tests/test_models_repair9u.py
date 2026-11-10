@@ -66,10 +66,19 @@ def test_build_endpoint_profile_local_and_external():
     assert keyless.kind == R.PLUGIN and keyless.locality == "external"
 
 
+#: A staged window at or above the ``/chat`` usability floor. The resolver
+#: refuses to return an ACTIVE profile that declares less than
+#: ``terminal_min_context_tokens`` for the chat role (upstream D3), so an
+#: endpoint defaulted to the 4096 creation window can be REGISTERED and marked
+#: active without ever becoming the effective model — that is the guard working,
+#: not a broken activation.
+_CTX_FLOOR = R.TERMINAL_MIN_CONTEXT_TOKENS
+
+
 def test_activate_endpoint_applies_real_runtime_model(tmp_path):
     cfg = _cfg(tmp_path)
     record = {"base_url": "https://api.example.com/v1", "model": "gpt-x",
-              "key_ref": "env:EX_API_KEY"}
+              "key_ref": "env:EX_API_KEY", "context_length": _CTX_FLOOR}
 
     before = R.resolve_model(cfg)
     assert before["provider"] != "example"
@@ -91,9 +100,15 @@ def test_activate_endpoint_applies_real_runtime_model(tmp_path):
     ids = [rec["id"] for rec in registry.get("model_profiles", [])]
     assert "example-ep" in ids
 
-    # The runtime config.yaml model slot is mirrored (reference parity).
-    runtime_cfg = (tmp_path / "state" / "runtime" / "config.yaml")
-    assert runtime_cfg.is_file()
+    # The runtime config.yaml model slot is mirrored (reference parity). The
+    # slot lives in the config's RUNTIME home — ``<logging.jsonl_path>/runtime``
+    # for a custom state dir, the canonical Qubit home otherwise — so it is
+    # located through the same resolver production writes through rather than
+    # assumed under ``tmp_path``.
+    from voicebridge import qubit_runtime as QR
+
+    runtime_cfg = Path(QR.runtime_home_for_cfg(cfg)) / "config.yaml"
+    assert runtime_cfg.is_file(), runtime_cfg
     assert "gpt-x" in runtime_cfg.read_text()
 
 
@@ -323,7 +338,8 @@ def test_patched_endpoint_activate_applies_real_model(patched_qc, tmp_path):
     cfg = _patched_cfg(tmp_path)
     patched_qc.h_custom_endpoints_write(
         cfg, {}, {"id": "ep2", "base_url": "https://api.example.com/v1",
-                  "model": "gpt-z", "confirm": True}, {})
+                  "model": "gpt-z", "context_length": _CTX_FLOOR,
+                  "confirm": True}, {})
     code, out = patched_qc.h_custom_endpoints_activate(
         cfg, {}, {"id": "ep2", "confirm": True}, {})
     assert code == 200 and out["ok"] is True, (code, out)
