@@ -96,7 +96,12 @@ def _request(ui, method, path, body=None, raw=None, content_type=None,
         with urllib.request.urlopen(req, timeout=8) as resp:
             return resp.status, json.loads(resp.read().decode() or "{}")
     except urllib.error.HTTPError as exc:
-        payload = exc.read()
+        # The HTTPError IS a response object: it owns an open connection and a
+        # temp file for the body. Close it (it is also a context manager) or the
+        # GC finalises it inside whatever test runs next and pytest escalates
+        # that PytestUnraisableExceptionWarning to a failure.
+        with exc:
+            payload = exc.read()
         try:
             parsed = json.loads(payload.decode() or "{}")
         except ValueError:
