@@ -85,9 +85,9 @@ def _isolate(monkeypatch, tmp_path):
     return home
 
 
-def _write_pack(home, portrait_cells=None, body_cells=None, *, suffix="png"):
-    """Write a complete, valid local pack at ``home/office/themes/demo``."""
-    root = home / "office" / "themes" / THEME_ID
+def _write_pack_at(themes_root, portrait_cells=None, body_cells=None):
+    """Write a complete, valid local pack under an arbitrary themes root."""
+    root = themes_root / THEME_ID
     root.mkdir(parents=True, exist_ok=True)
     portrait_cells = {} if portrait_cells is None else portrait_cells
     body_cells = {} if body_cells is None else body_cells
@@ -132,6 +132,13 @@ def _write_pack(home, portrait_cells=None, body_cells=None, *, suffix="png"):
     }
     (root / "theme.json").write_text(json.dumps(manifest), encoding="utf-8")
     return root
+
+
+def _write_pack(home, portrait_cells=None, body_cells=None):
+    """Write a valid pack into the operator's user theme root."""
+    return _write_pack_at(home / "office" / "themes",
+                          portrait_cells=portrait_cells,
+                          body_cells=body_cells)
 
 
 class _FakeApp:
@@ -334,19 +341,20 @@ def test_unlisted_suffix_is_refused(monkeypatch, tmp_path):
     assert T.theme_asset_path(THEME_ID, "evil.css") is None
 
 
-def test_symlinked_file_is_refused(monkeypatch, tmp_path):
+def test_symlinked_declared_file_is_refused(monkeypatch, tmp_path):
     home = _isolate(monkeypatch, tmp_path)
     root = _write_pack(home)
     outside = tmp_path / "outside.png"
-    outside.write_bytes(_png_bytes())
-    link = root / "portraits" / "link.png"
+    outside.write_bytes(_png_bytes(color=(1, 2, 3, 255)))
+    atlas = root / "portraits" / "atlas32.png"
+    atlas.unlink()
     try:
-        link.symlink_to(outside)
+        atlas.symlink_to(outside)
     except (OSError, NotImplementedError):
         pytest.skip("this filesystem cannot create symlinks")
-    assert T.theme_asset_path(THEME_ID, "portraits/link.png") is None
+    assert T.theme_asset_path(THEME_ID, "portraits/atlas32.png") is None
     handler, captured = _handler()
-    handler._serve_qubit_static(ASSET_PREFIX + "portraits/link.png")
+    handler._serve_qubit_static(ASSET_PREFIX + "portraits/atlas32.png")
     assert captured["code"] == 404
 
 
@@ -369,10 +377,39 @@ def test_classic_has_no_files(monkeypatch, tmp_path):
     assert T.theme_asset_path("classic", "portraits/atlas32.png") is None
 
 
-def test_files_are_only_read_from_the_pack_root(monkeypatch, tmp_path):
-    """A same-named file in the build tree is NOT reachable through this route."""
+# ----------------------------------------------------------------------
+# 3a - the static route serves ONLY from the user theme root
+# ----------------------------------------------------------------------
+def test_pack_only_in_a_bundled_root_is_not_served(monkeypatch, tmp_path):
+    """A pack the loader can see in a bundled root must never be served.
+
+    ``find_theme`` still searches the bundled/source roots (the payload may
+    report such a pack), but the static allowlist is the operator's
+    ``$QUBIT_HOME/office/themes``. This registers a fake bundled root with a
+    real, valid pack in it and proves the route answers 404.
+    """
     home = _isolate(monkeypatch, tmp_path)
-    _write_pack(home)
+    bundled = tmp_path / "bundled" / "themes"
+    bundled_pack = _write_pack_at(bundled)
+    monkeypatch.setattr(T, "theme_roots", lambda: [bundled])
+
+    # The loader-level lookup DOES see it...
+    assert T.find_theme(THEME_ID) == bundled_pack
+    # ...but the user root has no pack, so nothing is served.
+    assert not (home / "office" / "themes" / THEME_ID).exists()
+    assert T.theme_asset_path(THEME_ID, "portraits/atlas32.png") is None
+    handler, captured = _handler()
+    handler._serve_qubit_static(ASSET_PREFIX + "portraits/atlas32.png")
+    assert captured["code"] == 404
+
+
+def test_declared_atlas_is_served_from_the_user_root(monkeypatch, tmp_path):
+    """The bytes served are the user-root pack's, even if dist has a decoy."""
+    home = _isolate(monkeypatch, tmp_path)
+    user_pack = _write_pack(home)
+    resolved = T.theme_asset_path(THEME_ID, "portraits/atlas32.png")
+    assert resolved == (user_pack / "portraits" / "atlas32.png").resolve()
+
     dist = tmp_path / "dist" / "plugins" / "qubit-office" / "themes"
     (dist / THEME_ID / "portraits").mkdir(parents=True)
     (dist / THEME_ID / "portraits" / "atlas32.png").write_bytes(
@@ -381,5 +418,40 @@ def test_files_are_only_read_from_the_pack_root(monkeypatch, tmp_path):
     handler._qubit_dist = lambda: tmp_path / "dist"  # type: ignore[assignment]
     handler._serve_qubit_static(ASSET_PREFIX + "portraits/atlas32.png")
     assert captured["code"] == 200
-    # Served bytes are the pack's, not the dist copy's.
     assert handler.wfile.getvalue() == _png_bytes()
+
+
+# ----------------------------------------------------------------------
+# 3b - only declared files of a valid pack are served
+# ----------------------------------------------------------------------
+def test_theme_json_is_not_an_asset(monkeypatch, tmp_path):
+    home = _isolate(monkeypatch, tmp_path)
+    root = _write_pack(home)
+    assert (root / "theme.json").is_file()
+    assert T.theme_asset_path(THEME_ID, "theme.json") is None
+    handler, captured = _handler()
+    handler._serve_qubit_static(ASSET_PREFIX + "theme.json")
+    assert captured["code"] == 404
+
+
+def test_undeclared_file_is_not_served(monkeypatch, tmp_path):
+    home = _isolate(monkeypatch, tmp_path)
+    root = _write_pack(home)
+    (root / "portraits" / "extra.png").write_bytes(_png_bytes())
+    assert T.theme_asset_path(THEME_ID, "portraits/extra.png") is None
+    handler, captured = _handler()
+    handler._serve_qubit_static(ASSET_PREFIX + "portraits/extra.png")
+    assert captured["code"] == 404
+
+
+def test_invalid_pack_exposes_nothing(monkeypatch, tmp_path):
+    home = _isolate(monkeypatch, tmp_path)
+    root = _write_pack(home)
+    (root / "portraits" / "atlas32.png").unlink()  # declared file now missing
+    assert T.theme_asset_path(THEME_ID, "portraits/atlas32.png") is None
+    handler, captured = _handler()
+    handler._serve_qubit_static(ASSET_PREFIX + "portraits/atlas32.png")
+    assert captured["code"] == 404
+    # Even the index (still on disk and declared) is not served from an
+    # invalid pack.
+    assert T.theme_asset_path(THEME_ID, "portraits/index.json") is None

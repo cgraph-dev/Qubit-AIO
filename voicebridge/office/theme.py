@@ -182,10 +182,22 @@ class Theme:
 # --------------------------------------------------------------------------
 # Roots and config access
 # --------------------------------------------------------------------------
+def user_theme_root() -> Path:
+    """The operator's local theme directory.
+
+    This is the **only** root the static asset route serves from
+    (:func:`theme_asset_path`). The bundled/source roots below remain valid for
+    the loader/payload, but a pack that exists only there is never exposed over
+    HTTP: serving it would make the built dashboard a theme delivery path and
+    defeat the "local pack in the user home" contract.
+    """
+    return qubit_home() / "office" / "themes"
+
+
 def theme_roots() -> List[Path]:
-    """Where a theme may live, most specific first."""
+    """Where a theme may live, most specific first (loader/payload only)."""
     candidates = [
-        qubit_home() / "office" / "themes",
+        user_theme_root(),
         resource_path("frontend/qubit-web/public/plugins/qubit-office") / "themes",
         resource_path("frontend/qubit-dist/plugins/qubit-office") / "themes",
     ]
@@ -1049,15 +1061,22 @@ def theme_asset_path(theme_id: str, relative: str) -> Optional[Path]:
     """Resolve one theme-relative asset to a safe real file, or ``None``.
 
     The only reader used by the ``/plugins/qubit-office/themes/<id>/<rel>``
-    route. ``None`` means "answer 404": the id is not a local pack, the path is
-    empty/absolute/``.``/``..``-bearing, has a symlinked component, resolves
-    outside the pack root, carries a suffix outside :data:`ALLOWED_SUFFIXES`, or
-    is not a regular file. The pack is resolved through :func:`find_theme`, so
-    only packs under :func:`theme_roots` (the operator home first) are served —
-    nothing is ever copied into the built dashboard.
+    route. It is deliberately narrower than :func:`find_theme`:
+
+    * the pack must live under :func:`user_theme_root`
+      (``$QUBIT_HOME/office/themes/<id>``) — a bundled/source-root pack is
+      **never** served, even though the loader may still see it;
+    * the pack must validate (:func:`load_theme`), so an invalid pack exposes
+      nothing;
+    * only a file declared in the manifest's ``files`` map is served, so
+      ``theme.json`` itself and undeclared files are 404;
+    * the path must be relative, suffix-allowlisted, symlink-free, confined to
+      the pack root, and a regular file.
+
+    ``None`` means "answer 404". Nothing is ever copied into the built
+    dashboard.
     """
-    theme_dir = find_theme(theme_id)
-    if theme_dir is None:
+    if not isinstance(theme_id, str) or not _ID_RE.fullmatch(theme_id):
         return None
     if not isinstance(relative, str) or not relative:
         return None
@@ -1067,8 +1086,19 @@ def theme_asset_path(theme_id: str, relative: str) -> Optional[Path]:
     segments = relative.split("/")
     if any(segment in ("", ".", "..") for segment in segments):
         return None
+    if relative == "theme.json":
+        return None
     suffix = os.path.splitext(segments[-1])[1].lower()
     if suffix not in ALLOWED_SUFFIXES:
+        return None
+    theme_dir = user_theme_root() / theme_id
+    if not (theme_dir / "theme.json").is_file():
+        return None
+    try:
+        theme = load_theme(theme_dir)
+    except (ThemeError, OSError, RuntimeError):
+        return None
+    if relative not in theme.files:
         return None
     if _symlink_component(theme_dir, relative) is not None:
         return None
