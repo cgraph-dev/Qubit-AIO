@@ -40,7 +40,8 @@ PUBLIC_PLUGINS = REPO_ROOT / "frontend" / "qubit-web" / "public" / "plugins"
 
 EXPECTED_PLUGINS = [
     "qubit-approvals", "qubit-boards", "qubit-brand",
-    "qubit-devices", "qubit-gateway", "qubit-memory", "qubit-models",
+    "qubit-devices", "qubit-gateway", "qubit-hud", "qubit-memory",
+    "qubit-models", "qubit-office", "qubit-office2", "qubit-office3",
     "qubit-ops", "qubit-reports", "qubit-runtime",
 ]
 
@@ -58,7 +59,27 @@ KNOWN_ENDPOINTS = {
     "/api/curator",
 }
 
+# Served by voicebridge.webui directly rather than through the compat route
+# table (the office client's own feed, typed-input and result reads), so
+# ``HC.ROUTES`` cannot vouch for them.
+WEBUI_ENDPOINTS = {
+    "/api/access", "/api/stream", "/api/snapshot", "/api/type",
+}
+# The office client speaks the upstream path set and installs a fetch bridge
+# that rewrites each of these onto its real Qubit route
+# (``${apiPrefix}/api/office/habblaud/<...>``, agent/api/office/habblaud/*).
+OFFICE_BRIDGE_PREFIX = "/api/office/habblaud/"
+OFFICE_BRIDGE_PATHS = {
+    "/api/access", "/api/stream", "/api/stats", "/api/stats/days",
+    "/api/timeline", "/api/timeline/days", "/api/agents",
+    "/api/sessions/recent", "/api/messages", "/api/rooms/rename",
+    "/api/spawn",
+}
 _ENDPOINT_RE = re.compile(r"""["'](/api/[A-Za-z0-9_./-]+)["']""")
+# A constant whose whole purpose is to name a specified-but-unserved path.
+# Its value is displayed, never fetched, so it is not an endpoint literal.
+_SPECIFIED_ROUTE_RE = re.compile(
+    r"""(?:var|let|const)\s+\w*_SPECIFIED_ROUTE\s*=\s*["'][^"']*["'];?""")
 _PRODUCT_NAME = re.compile(r"\bHermes\b|\bOpenClaw\b")
 _PLACEHOLDERS = re.compile(
     r"coming soon|under construction|lorem ipsum|not yet implemented|"
@@ -120,7 +141,7 @@ def test_theme_carries_responsive_and_accessibility_contract():
 # ---------------------------------------------------------------------------
 # Overlay plugin inventory + real routes
 # ---------------------------------------------------------------------------
-def test_all_ten_overlay_plugins_still_register_and_are_qubit_labelled():
+def test_every_overlay_plugin_still_registers_and_is_qubit_labelled():
     manifests = sorted(PLUGDIR.glob("*/manifest.json"))
     assert sorted(p.parent.name for p in manifests) == EXPECTED_PLUGINS
     for mf in manifests:
@@ -132,15 +153,44 @@ def test_all_ten_overlay_plugins_still_register_and_are_qubit_labelled():
 
 
 def test_every_overlay_backend_literal_is_real_or_known():
-    """Each /api literal is either a known Qubit route or resolves in compat."""
+    """Each /api literal is either a known Qubit route or resolves in compat.
+
+    Two exclusions, both for text that is not a call:
+
+    - comment lines, where a plugin documents a route it deliberately does NOT
+      use (qubit-hud's header names ``/api/models`` and explains the tab reads
+      ``/api/model/options`` instead);
+    - the value of a ``*_SPECIFIED_ROUTE`` constant, which exists precisely to
+      name a specified-but-unserved path so the substitution is stated on
+      screen (qubit-hud line ~159; it is never fetched, only interpolated into
+      the "this build serves no GET route at that path" copy).
+
+    Every other literal in code is a real endpoint and must resolve.
+    """
     from voicebridge import qubit_compat as HC
 
     known_patterns = [r["pattern"] for r in HC.ROUTES]
     seen = set()
     for name in EXPECTED_PLUGINS:
-        for lit in _ENDPOINT_RE.findall(_plugin_text(name)):
+        text = _plugin_text(name)
+        code = "\n".join(line for line in text.splitlines()
+                         if not line.lstrip().startswith(("*", "//", "/*")))
+        code = _SPECIFIED_ROUTE_RE.sub("", code)
+        for lit in _ENDPOINT_RE.findall(code):
             lit = lit.rstrip("/")
-            if lit in KNOWN_ENDPOINTS:
+            if lit in KNOWN_ENDPOINTS or lit in WEBUI_ENDPOINTS:
+                seen.add(lit)
+                continue
+            if lit in OFFICE_BRIDGE_PATHS:
+                # Verify the route the bridge actually calls, not the name.
+                bridged = OFFICE_BRIDGE_PREFIX + lit[len("/api/"):]
+                assert any(re.fullmatch(p, bridged) for p in known_patterns), \
+                    f"{name}: office bridge target unmapped {bridged}"
+                seen.add(lit)
+                continue
+            # ``/api/result/`` is the office3 result read, a webui prefix route
+            # (``path.startswith("/api/result/")``), not a compat pattern.
+            if lit == "/api/result":
                 seen.add(lit)
                 continue
             assert any(re.fullmatch(p, lit) for p in known_patterns), \
@@ -201,7 +251,12 @@ def test_achievements_tab_is_qubit_branded_and_calls_real_backend():
     assert "/api/plugins/qubit-achievements" in text
     assert "Qubit Achievements" in text
     assert "tx(" in text, "achievements must resolve host translations"
-    clean = text.replace("X-Qubit-Session-Token", "")
+    # The only permitted upstream token is the legacy session-header NAME in a
+    # code comment (X-Hermes-Session-Token compat, line ~84 of the bundle);
+    # both the Qubit header and that compat mention are stripped, and every
+    # other upstream mention — any product-facing copy — still fails.
+    clean = text.replace("X-Qubit-Session-Token", "").replace(
+        "X-Hermes-Session-Token", "")
     assert not _PRODUCT_NAME.search(clean), "achievements exposes upstream name"
 
 
@@ -273,12 +328,22 @@ def test_vendored_dashboard_has_no_tiny_placeholder_page():
     """
     pages = sorted((WEB_SRC / "pages").glob("*.tsx"))
     real = [p for p in pages if not p.name.endswith(".test.tsx")]
-    # 21 pages: the 19 preserved dashboard pages plus the Qubit-added
-    # TerminalChatPage (`/chat` real terminal; ChatPage owns `/qubit-chat`)
-    # and AgentsPage (`/agents` canonical roster).
-    assert len(real) == 21, [p.name for p in real]
+    # The route inventory grew from the original 21 to 55 real pages as the
+    # ported surfaces landed (computer, agent workspace, canvas, agents, …).
+    # The pinned count is a fence against a silent deletion, not a target: it
+    # is asserted exactly so adding or dropping a page is a deliberate edit.
+    assert len(real) == 55, [p.name for p in real]
     for p in real:
-        assert len(p.read_text(encoding="utf-8").splitlines()) >= 100, p.name
+        # A page may be a thin route shell that composes one component (e.g.
+        # ComputerWorkspacePage -> components/om-computer-workspace.tsx), so
+        # measure the code it actually renders, not only its own file.
+        body = p.read_text(encoding="utf-8")
+        size = len(body.splitlines())
+        for rel in re.findall(r'from "@/([^"]+)"', body):
+            comp = WEB_SRC / f"{rel}.tsx"
+            if comp.is_file():
+                size += len(comp.read_text(encoding="utf-8").splitlines())
+        assert size >= 100, (p.name, size)
     docs = (WEB_SRC / "pages" / "DocsPage.tsx").read_text(encoding="utf-8")
     # a real OAS reference, not a wrapper: canonical doc fetch + parser
     for needle in (
