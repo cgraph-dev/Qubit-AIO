@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from tests.gateway import test_session_bot_target_lifecycle as lifecycle
+from qubit_runtime.tests.gateway import test_session_bot_target_lifecycle as lifecycle
 
 bot = lifecycle.bot  # the shared Bot Chat owner fixture
 
