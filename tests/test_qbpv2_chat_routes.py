@@ -30,6 +30,21 @@ def _cfg(tmp_path, monkeypatch):
 
 
 def _stub(monkeypatch, reply="route reply"):
+    """Stub the seam a general turn really takes, and keep the legacy one too.
+
+    Since DECISIONS #26 a general ``/qubit-chat`` turn runs the tool-capable
+    agent (``voicebridge.agent.run_agent_turn``); only a session with no
+    tool-capable runtime falls back to the model path. Stubbing just
+    ``local_llm.chat_local`` left the real agent running — the route test then
+    reached a live provider instead of the stub.
+
+    The stub must honour the seam's PERSISTENCE contract too: the real
+    ``_run_vendored_session`` writes the user row (via ``persist_user``) and the
+    reply through ``voicebridge.agent._persist_session_turn`` on the caller's
+    canonical store, which is exactly what the reload assertions here read
+    back. A stub that only returns a dict leaves the transcript empty.
+    """
+    import voicebridge.agent as _agent
     import voicebridge.local_llm as _llm
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
@@ -37,7 +52,23 @@ def _stub(monkeypatch, reply="route reply"):
               reasoning=None):
         return reply
 
+    def _agent_turn(cfg, text, *, session, reasoning=None, estop_engaged=None,
+                    event_sink=None, progress_sink=None, stream_delta=None,
+                    model=None, provider=None):
+        store = _agent._canonical_session_store(cfg)
+        if store is not None:
+            _agent._persist_session_turn(store, session, "user", text,
+                                         model=model or "qubit-brain")
+            _agent._persist_session_turn(store, session, "assistant", reply,
+                                         model=model or "qubit-brain")
+        return {"state": "OK", "reply": reply, "text": reply,
+                "session": session, "session_id": session, "route": "agent",
+                "receipt": {"runtime": "qubit-vendored-agent",
+                            "path": "voicebridge.agent.run_session",
+                            "model": "qubit-brain", "tools": []}}
+
     monkeypatch.setattr(_llm, "chat_local", _fake)
+    monkeypatch.setattr(_agent, "run_agent_turn", _agent_turn)
     monkeypatch.setattr(
         _llm, "chat_local_stream",
         lambda text, conversation_prompt="", model="qubit-brain", timeout_s=4.0,
