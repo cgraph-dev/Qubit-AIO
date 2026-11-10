@@ -3197,6 +3197,31 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     html = html.replace("</head>", script_html + "</head>", 1)
                 else:
                     html = script_html + html
+            # The host shell's stylesheet is scoped to
+            # `:root[data-office-theme="<id>"]`, but the iframe is a SEPARATE
+            # document: the host's attribute does not cross that boundary. The
+            # vendored client and the visual contract read the marker from the
+            # app document itself, so the server sets it on `documentElement`
+            # here. Classic (or an invalid/unknown override) sets nothing, so
+            # the attribute stays absent exactly as before.
+            marker_html = ""
+            if _office_theme is not None:
+                try:
+                    _payload = _office_theme.theme_payload(
+                        cfg, requested=requested_theme)
+                    _theme_id = str(_payload.get("id") or "")
+                    if _payload.get("active") and _theme_id:
+                        marker_html = (
+                            "<script>document.documentElement.dataset."
+                            "officeTheme=%s;</script>"
+                            % json.dumps(_theme_id))
+                except Exception as exc:  # noqa: BLE001 - never break the app
+                    log.warning("office theme marker skipped: %s", exc)
+            if marker_html:
+                if "</head>" in html:
+                    html = html.replace("</head>", marker_html + "</head>", 1)
+                else:
+                    html = marker_html + html
             if style_html:
                 if "</head>" in html:
                     html = html.replace("</head>", style_html + "</head>", 1)

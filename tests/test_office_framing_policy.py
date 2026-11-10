@@ -305,6 +305,23 @@ def test_office_app_document_injects_the_theme_global(plugin_root, themed_home):
     assert body.index("__QUBIT_OFFICE_THEME__") < body.index("</head>")
 
 
+def test_office_app_document_sets_document_element_marker(plugin_root,
+                                                          themed_home):
+    # The iframe is a SEPARATE document, so the host shell's
+    # `documentElement.dataset.officeTheme` does not reach it. The server must
+    # set the marker on the app document too, alongside the global and style.
+    h = _make_handler(sub="qubit-office/habblaud/?theme=demo")
+    h._serve_plugin_app("qubit-office/habblaud/?theme=demo")
+    body = _body(h)
+
+    assert "__QUBIT_OFFICE_THEME__" in body
+    assert len(_style_blocks(body)) == 1
+    assert (
+        'document.documentElement.dataset.officeTheme="demo"'
+        in body
+    ), body
+
+
 def test_classic_office_app_still_gets_the_classic_global(plugin_root,
                                                          themed_home):
     h = _make_handler(sub="qubit-office/habblaud/")
@@ -315,6 +332,8 @@ def test_classic_office_app_still_gets_the_classic_global(plugin_root,
     assert payload["surfaces"] is None
     # The classic style is still absent; only the global distinguishes it.
     assert "data-office-theme" not in body
+    # And no documentElement marker is injected under classic.
+    assert "document.documentElement.dataset.officeTheme" not in body
 
 
 def test_other_plugin_app_gets_no_office_theme_global(plugin_root, themed_home):

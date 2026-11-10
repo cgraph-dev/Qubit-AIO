@@ -499,6 +499,39 @@
   box-shadow: var(--office-shadow);
 }
 
+/* BOTH DOCKS OPEN — split the row into two non-overlapping halves.
+   The office host is only the dashboard's content column (~1145px at a
+   1440px viewport: 263px sidebar + 32px padding). Two `min(44rem, 92%)`
+   sheets are wider than that together, so the right-hand HUD covered the
+   Agents sheet's right edge and intercepted its Close button even though the
+   sheets are anchored to opposite edges. `calc(50% - gap)` leaves exactly
+   `2 * gap` between them, and the single-dock width is untouched because this
+   selector only matches while both are open. */
+.office-game[data-office-docks="both"] > .office-game__dock {
+  width: calc(50% - var(--office-s3));
+}
+
+.office-game[data-office-docks="both"] > .office-game__dock.office-game__agentsDock {
+  right: auto;
+  left: 0;
+}
+
+.office-game[data-office-docks="both"] > .office-game__dock[data-office-dock="hud"] {
+  right: 0;
+  left: auto;
+}
+
+/* At phone width the split halves are narrow, so let the dock heads wrap
+   their title/link/Close onto a second line instead of overflowing the sheet.
+   This only applies while both are open; the 390px single-dock layout is
+   unchanged. */
+@media (max-width: 520px) {
+  .office-game[data-office-docks="both"] > .office-game__dock
+    > .office-game__dockHead {
+    flex-wrap: wrap;
+  }
+}
+
 .office-game .agents-panel {
   flex: 1 1 auto;
   min-height: 0;

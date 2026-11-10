@@ -533,9 +533,18 @@ export function createOfficeApp(
 
     const rootClass = ["office-game", officeThemeClass(officeTheme)]
       .filter(Boolean).join(" ");
+    // The two side sheets are anchored to opposite edges, but the office host
+    // is only ~1145px wide at a 1440px viewport (dashboard sidebar + padding).
+    // Two `min(44rem, 92%)` sheets are wider than that together, so the right
+    // HUD sheet covered the Agents sheet's close button. The marker lets the
+    // stylesheet split the row into two non-overlapping halves with a gap;
+    // a single sheet keeps its original width because the selector only
+    // matches while both are open.
+    const dualDocks = agentsOpen && hudOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
+      "data-office-docks": dualDocks ? "both" : undefined,
       className: rootClass,
     }, children);
   };
