@@ -227,13 +227,30 @@ def test_client_cancel_closes_bridge(tmp_path):
         ws = ws_connect(_ws_url(port, out["ticket"]), open_timeout=8)
         ws.send(b"x")
         ws.recv(timeout=8)
+        # A short idle window is what makes the terminal reapable; the
+        # session is still live here (active, not yet detached).
+        ui.pty_ws._idle = 0.2
         bridge = next(iter(ui.pty_ws._active.values())).bridge
         ws.close()
+        # A client close DETACHES (a browser refresh must not kill an in-flight
+        # turn): the session leaves the active set and stays live, detached.
+        deadline = time.time() + 5
+        while time.time() < deadline and ui.pty_ws.active_count != 0:
+            time.sleep(0.05)
+        assert ui.pty_ws.active_count == 0, "session not released after client close"
+        assert bridge.closed is False, "a client close must not kill the terminal"
+        # The idle reaper is what retires a detached terminal -- and it must
+        # actually close the bridge (a live TUI child and its session lease).
+        # The pump stamps ``last_activity`` as it exits, so wait out the window
+        # after the detach is observed (observing it costs up to 5 s).
+        time.sleep(0.3)
+        ui.pty_ws._sweep_idle_detached()
         deadline = time.time() + 5
         while time.time() < deadline and not bridge.closed:
             time.sleep(0.05)
-        assert bridge.closed, "bridge not cleaned up after client close"
-        assert ui.pty_ws.active_count == 0
+        assert bridge.closed, "the idle reaper did not retire the detached bridge"
+        assert ui.pty_ws._detached == {}, "reaped session still in the detached set"
+        assert ui.pty_ws._detached_keyless == [], "reaped key-less session leaked"
     finally:
         ui.stop()
 
@@ -270,13 +287,21 @@ def test_listener_stop_cleans_up_sessions(tmp_path):
     ws = ws_connect(_ws_url(port, out["ticket"]), open_timeout=8)
     ws.send(b"x")
     ws.recv(timeout=8)
+    # Real teardown requires an idle window; check FIRST that the reaper alone
+    # does not kill a session (or nothing is revealed), then make the terminal
+    # reapable and stop the listener.
+    ui.pty_ws._sweep_idle_detached()
+    ui.pty_ws._idle = 0.2
     bridge = next(iter(ui.pty_ws._active.values())).bridge
     ui.stop()
+    # The listener's cleanup contract: no session and no PTY child outlives it.
     deadline = time.time() + 5
-    while time.time() < deadline and not bridge.closed:
+    while time.time() < deadline and bridge.is_alive():
         time.sleep(0.05)
-    assert bridge.closed
+    assert not bridge.is_alive(), "PTY child outlived the listener"
     assert ui.pty_ws.active_count == 0
+    assert not ui.pty_ws._detached, "detached sessions leaked past shutdown"
+    assert not ui.pty_ws._detached_keyless, "key-less sessions leaked past shutdown"
 
 
 def test_default_spawn_is_the_vendored_pty_bridge():

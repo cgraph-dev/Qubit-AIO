@@ -694,6 +694,14 @@ class PtyWsServer:
         self._idle = float(idle_timeout_s)
         self._lock = threading.Lock()
         self._active: Dict[int, _Session] = {}
+        # Detached sessions that carry no re-attach key. ``_detached`` is keyed
+        # by the conversation key, so a key-less session stored there was
+        # unreachable by every reaper/eviction path (an orphan TUI and its
+        # session lease for the life of the process) and, worse, collided on
+        # the empty key: a second key-less detach overwrote the first, whose
+        # session then leaked while the set looked bounded. They are retired by
+        # the idle sweep instead.
+        self._detached_keyless: list[_Session] = []
         # Detached PTYs: a browser refresh closes the websocket, but the
         # terminal must keep running so an in-flight turn is not killed. We
         # keep the bridge alive under its conversation key and re-attach on the
@@ -945,6 +953,13 @@ class PtyWsServer:
                         or "TERMINAL_CONTEXT_BELOW_MINIMUM"),
                     _redact(str(guard.get("detail") or ""))[:220])
             return
+        # Bind a conversation key up front. ``?attach=`` is the browser's own
+        # token; a caller that sends none (a script, a regression probe) would
+        # otherwise detach KEY-LESS and never be reaped. The ticket's session,
+        # then the terminal's conversation id, give a stable key. Computed
+        # before the reattach below because that path may rewrite
+        # ``session_id`` to the value this key was derived from.
+        key = str(attach or ticket.session or "").strip()
         # Retire detached terminals whose browser is long gone. The in-pump idle
         # check cannot see them (no client), so without this sweep an orphan
         # keeps its vendored session lease until the process exits — the cause
@@ -983,7 +998,7 @@ class PtyWsServer:
         #     it). ``resume`` still selects the target when NO live terminal
         #     exists for this key. A session whose terminal has exited falls
         #     through to a fresh spawn below (``_reattach`` retires it).
-        key = str(attach or ticket.session or "")
+        #     ``key`` was bound above from ``?attach=`` / the ticket session.
         if key and not fresh:
             prior = self._reattach(key)
             # A browser CLOSE clears sessionStorage, so the reopened tab presents a
@@ -1076,6 +1091,12 @@ class PtyWsServer:
 
         session = _Session(bridge=bridge, ticket=ticket, key=key,
                            session_id=str(meta.get("session_id") or ""))
+        # A terminal with no conversation id and no attach token still needs a
+        # re-attachable key: the bridge-derived socket id keeps it reaped and
+        # lets a reload re-adopt it instead of leaking a key-less orphan.
+        if not session.key:
+            session.key = str(meta.get("session_id") or "") or (
+                f"pty:{_safe_pid(bridge)}")
         with self._lock:
             self._active[id(session)] = session
         resolved = guard if isinstance(guard, dict) else {}
@@ -1212,8 +1233,14 @@ class PtyWsServer:
         with self._lock:
             stale = [s for s in self._detached.values()
                      if now - s.last_activity > self._idle]
+            stale += [s for s in self._detached_keyless
+                      if now - s.last_activity > self._idle]
         for session in stale:
             try:
+                # RETIRE, do not merely unlink: a detached terminal that has
+                # been idle past its window must have its bridge closed, or the
+                # reaper leaks the very TUI child and session lease it exists
+                # to reclaim.
                 self._teardown(session)
                 log_event("webui.pty.session_idle_reap", pid=_safe_pid(session.bridge))
             except Exception:
@@ -1257,6 +1284,10 @@ class PtyWsServer:
             self._active.pop(id(session), None)
             if session.key:
                 self._detached.pop(session.key, None)
+            try:
+                self._detached_keyless.remove(session)
+            except ValueError:
+                pass
         try:
             session.bridge.close()
         except Exception:
@@ -1293,6 +1324,15 @@ class PtyWsServer:
                     old = self._detached.pop(old_key, None)
                     if old is not None:
                         evicted.append(old)
+            else:
+                # No conversation key: nothing can ever re-attach it, so it is
+                # retired by its idle window rather than silently dropped.
+                self._detached_keyless.append(session)
+                while (len(self._active) + len(self._detached)
+                       + len(self._detached_keyless)) > self._max:
+                    if not self._detached_keyless:
+                        break
+                    evicted.append(self._detached_keyless.pop(0))
         for old in evicted:
             self._teardown(old)
         log_event("webui.pty.session_detach", session=session.ticket.session,
@@ -1309,8 +1349,12 @@ class PtyWsServer:
         """
         evicted: list[_Session] = []
         with self._lock:
-            while (len(self._active) + len(self._detached) >= self._max
-                   and self._detached):
+            while (len(self._active) + len(self._detached)
+                   + len(self._detached_keyless) >= self._max
+                   and (self._detached or self._detached_keyless)):
+                if self._detached_keyless:
+                    evicted.append(self._detached_keyless.pop(0))
+                    continue
                 old_key = next(iter(self._detached))
                 old = self._detached.pop(old_key, None)
                 if old is not None:
