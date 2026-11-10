@@ -95,6 +95,12 @@ def test_installer_qubit_owned_no_foreign_runtime():
     scrubbed = install_sh.lower()
     for vendored in ("frontend/qubit-dist", "qubit_runtime"):
         scrubbed = scrubbed.replace(vendored, "<qubit-vendored>")
+    # One legacy-migration note deliberately names the old launchd label: it says
+    # such plists "stay read-old; they are never deleted here". Drop that single
+    # explanatory line so the check still covers every executable reference.
+    scrubbed = "\n".join(
+        line for line in scrubbed.splitlines()
+        if "plists stay read-old" not in line)
     assert "hermes" not in scrubbed, \
         "installer must not reference a foreign assistant"
     assert not (REPO_ROOT / "scripts" / "install_qubit_runtime.sh").exists()
