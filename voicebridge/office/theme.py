@@ -128,6 +128,11 @@ WINDOWS_RESERVED: Set[str] = {
 
 ASSET_BASE = "/plugins/qubit-office/themes"
 
+#: A pack that omits ``limits`` still gets a bounded validation: the declared
+#: archive bytes are compared against this cap before any file is opened, so an
+#: unbounded manifest cannot make the loader hash an arbitrarily large tree.
+DEFAULT_MAX_TOTAL_BYTES = 25 * 1024 * 1024
+
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
 _TOKEN_KEY_RE = re.compile(r"^[a-z][a-z0-9-]{1,40}$")
 _COLOR_RE = re.compile(r"^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$")
@@ -351,6 +356,12 @@ _NON_TEXT_CONTRAST_VARS: Sequence[str] = (
     "--ui-line-strong",
 )
 
+#: Muted text also renders on the hover/selected row surface (``--ui-bg-hover``),
+#: not only the two base surfaces. The office plan holds it to 3:1 there.
+_HOVER_CONTRAST_VARS: Sequence[Tuple[str, float]] = (
+    ("--ui-muted", 3.0),
+)
+
 
 def _contrast_problems(tokens: Mapping[str, Any]) -> List[str]:
     """The full contrast matrix over the two office surfaces.
@@ -386,6 +397,19 @@ def _contrast_problems(tokens: Mapping[str, Any]) -> List[str]:
         check(variable, 3.0)
     for variable in STATUS_TOKENS:
         check(variable, 3.0)
+    # Muted text also paints on the hover/selected row surface, which the two
+    # base surfaces above do not cover.
+    hover = effective.get("--ui-bg-hover")
+    if hover is not None and _hex_rgb(hover) is not None:
+        for variable, floor in _HOVER_CONTRAST_VARS:
+            value = effective.get(variable)
+            if value is None or _hex_rgb(value) is None:
+                continue
+            ratio = contrast_ratio(value, hover)
+            if ratio + 1e-9 < floor:
+                problems.append(
+                    f"token contrast: {variable} vs --ui-bg-hover is "
+                    f"{ratio:.2f}:1; needs >= {floor}:1")
     return problems
 
 
@@ -534,12 +558,47 @@ def _symlink_component(root: Path, relative: str) -> Optional[str]:
     return None
 
 
+def _file_limits(files: Any, limits: Any) -> Tuple[List[str], Optional[int]]:
+    """Validate the declared limits and return the effective total-byte cap.
+
+    A manifest that omits ``limits`` (or omits ``max_total_bytes``) still gets
+    :data:`DEFAULT_MAX_TOTAL_BYTES`, so validation is bounded even when the pack
+    author forgot to declare one.
+    """
+    problems: List[str] = []
+    if limits is not None and not isinstance(limits, dict):
+        problems.append("limits: must be an object")
+        limits = {}
+    declared = limits if isinstance(limits, dict) else {}
+    for key in ("max_files", "max_total_bytes"):
+        if key not in declared:
+            continue
+        value = declared[key]
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            problems.append(f"limits.{key}: must be a positive integer")
+    max_files = declared.get("max_files")
+    if isinstance(max_files, int) and not isinstance(max_files, bool):
+        if len(files) > max_files:
+            problems.append(
+                f"files: {len(files)} entries exceed max_files={max_files}")
+    max_total = declared.get("max_total_bytes")
+    if not isinstance(max_total, int) or isinstance(max_total, bool) or max_total <= 0:
+        max_total = DEFAULT_MAX_TOTAL_BYTES
+    return problems, max_total
+
+
 def _validate_files(files: Any, root: Optional[Path],
                     limits: Any) -> List[str]:
     if not isinstance(files, dict) or not files:
         return ["files: must be a non-empty object"]
     problems: List[str] = _duplicate_problems(files.keys())
+    limit_problems, max_total = _file_limits(files, limits)
+    problems.extend(limit_problems)
     total_bytes = 0
+    # First pass is structural only: the declared total is checked against the
+    # cap BEFORE any file is opened, so an over-budget pack is refused without
+    # reading (and hashing) its tree.
+    entries: List[Tuple[str, Any, List[str], Any, Any]] = []
     for relative, entry in files.items():
         path_problems = _path_problems(relative)
         problems.extend(path_problems)
@@ -552,9 +611,20 @@ def _validate_files(files: Any, root: Optional[Path],
         size = entry.get("bytes")
         if not isinstance(size, int) or isinstance(size, bool) or size < 0:
             problems.append(f"file {relative}: bytes must be a non-negative integer")
+            size = None
         else:
             total_bytes += size
-        if root is None or path_problems:
+        entries.append((relative, entry, path_problems, size, sha))
+
+    over_budget = total_bytes > max_total
+    if over_budget:
+        problems.append(
+            f"files: {total_bytes} bytes exceed max_total_bytes={max_total}")
+    if root is None or over_budget:
+        return problems
+
+    for relative, _entry, path_problems, size, sha in entries:
+        if path_problems:
             continue
         link = _symlink_component(root, relative)
         if link is not None:
@@ -573,31 +643,18 @@ def _validate_files(files: Any, root: Optional[Path],
             if isinstance(size, int) and not isinstance(size, bool) and actual_size != size:
                 problems.append(
                     f"file {relative}: bytes {actual_size} != declared {size}")
+            # Do not read a file that is already over the total cap even if its
+            # declared bytes lied.
+            if actual_size > max_total:
+                problems.append(
+                    f"file {relative}: {actual_size} bytes exceed "
+                    f"max_total_bytes={max_total}")
+                continue
             actual_sha = hashlib.sha256(candidate.read_bytes()).hexdigest()
             if isinstance(sha, str) and _SHA256_RE.fullmatch(sha) and actual_sha.lower() != sha.lower():
                 problems.append(f"file {relative}: sha256 mismatch")
         except OSError as exc:
             problems.append(f"file {relative}: unreadable ({exc})")
-
-    if limits is not None and not isinstance(limits, dict):
-        problems.append("limits: must be an object")
-    if isinstance(limits, dict):
-        for key in ("max_files", "max_total_bytes"):
-            if key not in limits:
-                continue
-            value = limits[key]
-            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
-                problems.append(f"limits.{key}: must be a positive integer")
-        max_files = limits.get("max_files")
-        if isinstance(max_files, int) and not isinstance(max_files, bool):
-            if len(files) > max_files:
-                problems.append(
-                    f"files: {len(files)} entries exceed max_files={max_files}")
-        max_total = limits.get("max_total_bytes")
-        if isinstance(max_total, int) and not isinstance(max_total, bool):
-            if total_bytes > max_total:
-                problems.append(
-                    f"files: {total_bytes} bytes exceed max_total_bytes={max_total}")
     return problems
 
 
@@ -1145,6 +1202,13 @@ def _safe_asset_base(asset_base: str) -> str:
         raise ValueError("asset_base: must be a non-empty string")
     if any(ch in asset_base for ch in "\"'()\\;{}@ \t\r\n"):
         raise ValueError("asset_base: unsafe characters")
+    # The base is a same-origin *path* (``/plugins/...``). A protocol-relative
+    # ``//host/...`` or a scheme'd absolute URL would turn every slice src into
+    # a remote fetch, so both are refused outright.
+    if asset_base.startswith("//"):
+        raise ValueError("asset_base: must be a path, not a network-path reference")
+    if re.match(r"^[A-Za-z][A-Za-z0-9+.\-]*:", asset_base):
+        raise ValueError("asset_base: must be a path, not an absolute URL")
     return asset_base.rstrip("/")
 
 

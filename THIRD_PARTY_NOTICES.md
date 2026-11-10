@@ -1055,18 +1055,21 @@ YOU CAN'T EDIT THE SPRITES AND USE THEM IN COMMERCIAL PROJECTS
 YOU CAN'T EDIT AND RESELL THE SPRITES
 ```
 
-Licence clarification recorded from the publisher's page and comment history: LimeZu
-licenses these packs under **CC-BY 4.0, not CC-BY-SA** — the itch.io information tab
-once showed CC-BY-SA by mistake and the artist corrected it. Using the art does not
-impose ShareAlike on Qubit's source code. Credit is required even for the paid
-version, and the artist asks for it **somewhere persistent** ("maybe in the Credits
-menu or at the end of your game"), not a tooltip. The free pack is non-commercial-only
-and is not used. Credit line: `LimeZu — https://limezu.itch.io`.
+Licence clarification recorded from the publisher's page and comment history: the
+paid packs (Modern Interiors, Modern User Interface, and the character/portrait
+generators) are governed by LimeZu's **own paid-art licence, not a Creative
+Commons licence**. That licence permits commercial and non-commercial use and
+requires credit to the artist, and it expressly forbids reselling or
+redistributing the assets. Credit is required even for the paid version, and the
+artist asks for it **somewhere persistent** ("maybe in the Credits menu or at
+the end of your game"), not a tooltip. The free pack is non-commercial-only and
+is not used. Credit line: `LimeZu — https://limezu.itch.io`.
 
-Serene Village carries **no licence file in the archive**; the publisher page
-states `Asset license: Creative Commons Attribution v4.0 International`.
-Any redistributed Serene Village material requires attribution, a link to the
-licence, and an indication of changes.
+Serene Village is the only CC-BY pack: it carries **no licence file in the
+archive**, and the publisher page states `Asset license: Creative Commons
+Attribution v4.0 International` (CC-BY 4.0, not CC-BY-SA). Serene Village is
+**not used** by the Office v1 theme. Any redistributed Serene Village material
+requires attribution, a link to the licence, and an indication of changes.
 
 Local divergence: none yet — no pack file has been added to the tree.
 

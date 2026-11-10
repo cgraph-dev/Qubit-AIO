@@ -66,6 +66,20 @@ describe("the panel's route", () => {
     expect(agentsPanelUrl("/qubit/")).toBe(
       "/qubit/agent/api/office/habblaud/agents/panel");
   });
+
+  it("carries the active theme id so the route can resolve its cells", () => {
+    expect(agentsPanelUrl("", "demo")).toBe(
+      "/agent/api/office/habblaud/agents/panel?theme=demo");
+    expect(agentsPanelUrl("/qubit/", "demo")).toBe(
+      "/qubit/agent/api/office/habblaud/agents/panel?theme=demo");
+  });
+
+  it("keeps the classic request byte-identical", () => {
+    expect(agentsPanelUrl("", "classic")).toBe(
+      "/agent/api/office/habblaud/agents/panel");
+    expect(agentsPanelUrl("", "")).toBe(
+      "/agent/api/office/habblaud/agents/panel");
+  });
 });
 
 describe("the session token", () => {
@@ -132,6 +146,16 @@ describe("fetching the panel", () => {
     if (state.kind === "ready") {
       expect(state.data.counts?.headcount).toBe(3);
     }
+  });
+
+  it("passes the requested theme id to the panel request", async () => {
+    const fetchImpl = vi.fn(async () => respond(200, payload()));
+    await fetchAgentPanel({
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      win: null, base: "", theme: "demo",
+    });
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(url).toBe("/agent/api/office/habblaud/agents/panel?theme=demo");
   });
 
   it("names a 401 as a token problem instead of an empty roster", async () => {
@@ -507,6 +531,24 @@ describe("atlas portraits in the agents panel", () => {
     await harness.settle();
     expect(avatarFor(harness, "ada", "portrait")).toBeDefined();
     expect(avatarFor(harness, "ada", "initials")).toBeUndefined();
+    harness.cleanup();
+  });
+
+  it("sends the host's active theme id with the panel fetch", async () => {
+    const harness = createPanelHarness();
+    const Panel = createAgentsPanel(
+      harness.React as never, harness.hooks as never);
+    const seen: string[] = [];
+    const fetchImpl = (async (url: string) => {
+      seen.push(String(url));
+      return respond(200, oneDivision([seat({ slug: "ada", name: "Ada" })]));
+    }) as unknown as typeof fetch;
+    harness.mount(Panel as never, {
+      base: "", fetchImpl, theme: activeTheme(),
+    });
+    await harness.settle();
+    expect(seen).toContain(
+      "/agent/api/office/habblaud/agents/panel?theme=demo");
     harness.cleanup();
   });
 

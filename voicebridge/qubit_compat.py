@@ -6182,9 +6182,16 @@ def h_office_habblaud_agents_panel(cfg: Any, q: Dict[str, str],
     from .office import agent_panel as PANEL
     from .office import theme as OT
 
+    # An explicit ``?theme=`` request themes the panel's cells too, exactly as
+    # it themes the iframe document and the host payload. Without this the
+    # cells would silently follow config/env only, so a `?theme=demo` office
+    # would show the demo chrome but classic (blank) avatars.
+    requested = (q or {}).get("theme")
     out = PANEL.panel(
-        portrait=lambda slug: OT.cell_for(cfg, slug, "portraits"),
-        body=lambda slug: OT.cell_for(cfg, slug, "bodies"),
+        portrait=lambda slug: OT.cell_for(cfg, slug, "portraits",
+                                          requested=requested),
+        body=lambda slug: OT.cell_for(cfg, slug, "bodies",
+                                     requested=requested),
     )
     if not out.get("ok"):
         return 503, out

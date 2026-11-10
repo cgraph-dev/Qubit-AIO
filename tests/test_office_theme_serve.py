@@ -292,6 +292,27 @@ def test_panel_route_passes_theme_cells(monkeypatch, tmp_path):
     assert by_persona[listed]["body"] is None
 
 
+def test_panel_route_honours_the_theme_query(monkeypatch, tmp_path):
+    """Config/env are classic; only ``?theme=demo`` activates the cells."""
+    home = _isolate(monkeypatch, tmp_path)
+    rows = PANEL.panel()["seats"]
+    listed = rows[0]["persona_slug"]
+    _write_pack(home, portrait_cells={listed: [2, 1]},
+                body_cells={listed: [3, 0]})
+    # _isolate cleared QUBIT_OFFICE_THEME and dispatch gets cfg=None (classic).
+    code, out = HC.dispatch(None, "GET", "/api/office/habblaud/agents/panel",
+                            query={"theme": THEME_ID})
+    assert code == 200 and out["ok"] is True
+    assert out["counts"]["headcount"] == 283
+    by_persona = {r["persona_slug"]: r for r in out["seats"]}
+    assert by_persona[listed]["portrait"] == [2, 1]
+    assert by_persona[listed]["body"] == [3, 0]
+    # Every other seat still carries null cells for the fixture pack.
+    other = next(r for r in out["seats"]
+                 if r["persona_slug"] != listed)
+    assert other["portrait"] is None and other["body"] is None
+
+
 # ======================================================================
 # 3 - static serving from the local pack root
 # ======================================================================

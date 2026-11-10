@@ -27,12 +27,15 @@ import hashlib
 import json
 import os
 import re
+from pathlib import Path
 
 import pytest
 
 from voicebridge.office import theme as T
 
 pytestmark = pytest.mark.unit
+
+REPO = Path(__file__).resolve().parents[1]
 
 
 # ----------------------------------------------------------------- helpers
@@ -274,6 +277,19 @@ def test_totals_must_fit_limits(tmp_path):
     assert any("max_files" in p or "max_total_bytes" in p for p in problems), problems
 
 
+def test_a_manifest_without_limits_gets_a_default_size_cap(tmp_path):
+    """An unbounded manifest must not let validation read an arbitrary tree."""
+    pack = _pack(tmp_path)
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest.pop("limits")
+    manifest["files"]["portraits/atlas32.png"]["bytes"] = (
+        T.DEFAULT_MAX_TOTAL_BYTES + 1)
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    problems = T.validate_theme(pack)
+    assert any("max_total_bytes" in p for p in problems), problems
+    assert T.DEFAULT_MAX_TOTAL_BYTES == 25 * 1024 * 1024
+
+
 # ------------------------------------------------------------------ tokens
 @pytest.mark.parametrize("value", [
     "url(https://evil.test/x)", "image-set('x')", "var(--ui-text)",
@@ -294,6 +310,29 @@ def test_untyped_token_values_are_refused(value):
 def test_non_string_token_value_is_refused_without_crashing():
     problems = T.validate_tokens({"color-surface": 123})
     assert any("token" in p for p in problems), problems
+
+
+def test_muted_text_must_clear_the_hover_surface():
+    """Muted text also paints on the hover row surface the office uses."""
+    tokens = {
+        "color-surface": "#000000",
+        "color-surface-raised": "#000000",
+        "color-surface-hover": "#202020",
+        "color-text-muted": "#252525",
+    }
+    problems = T.validate_tokens(tokens)
+    assert any("--ui-bg-hover" in p and "contrast" in p for p in problems), problems
+
+
+def test_the_committed_recipe_clears_the_hover_contrast_floor():
+    """The shipped recipe must keep passing the hover-surface check."""
+    recipe = json.loads(
+        (REPO / "frontend/qubit-web/public/plugins/qubit-office/themes/"
+                "limezu/theme.recipe.json").read_text(encoding="utf-8"))
+    assert T.validate_tokens(recipe["tokens"]) == []
+    assert T.contrast_ratio(
+        recipe["tokens"]["color-text-muted"],
+        recipe["tokens"]["color-surface-hover"]) >= 3.0
 
 
 def test_low_contrast_is_reported():
@@ -406,6 +445,18 @@ def test_token_css_requires_slice_src_to_be_declared_when_files_are_given():
 def test_token_css_refuses_invalid_tokens():
     with pytest.raises(ValueError):
         T.token_css({"color-accent": "url(https://evil.test/x)"}, {}, "/plugins/x", "1.0.0")
+
+
+@pytest.mark.parametrize("base", [
+    "//evil.test/theme",
+    "https://evil.test/theme",
+    "http://evil.test/theme",
+    "javascript:alert(1)",
+])
+def test_token_css_refuses_a_remote_asset_base(base):
+    """A slice ``url()`` must never become a remote fetch."""
+    with pytest.raises(ValueError):
+        T.token_css({"color-surface": "#000000"}, {}, base, "1.0.0")
 
 
 def test_token_css_can_emit_every_allowlisted_variable():

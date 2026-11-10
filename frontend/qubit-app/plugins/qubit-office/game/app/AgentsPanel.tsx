@@ -329,6 +329,11 @@ export function createAgentsPanel(
     const [openDivisions, setOpenDivisions] = useState<Record<string, boolean>>({});
     // A row to reveal after the render that opens its division.
     const [pendingScroll, setPendingScroll] = useState<string | null>(null);
+    // The theme the host resolved. Cells must come from the SAME pack, so the
+    // id is part of the panel request (and of its effect deps: the theme may
+    // finish loading after the panel opened).
+    const themeId = props.theme?.active && props.theme.id
+      ? props.theme.id : undefined;
 
     useEffect(() => {
       let live = true;
@@ -337,6 +342,7 @@ export function createAgentsPanel(
       fetchAgentPanel({
         base: props.base,
         fetchImpl: props.fetchImpl,
+        theme: themeId,
         signal: ctl?.signal,
       }).then((next) => {
         if (live) setState(next);
@@ -345,7 +351,7 @@ export function createAgentsPanel(
         live = false;
         ctl?.abort();
       };
-    }, [props.base]);
+    }, [props.base, themeId]);
 
     useEffect(() => {
       const pending = preloadThemeAtlases(props.theme);
