@@ -18,6 +18,8 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "scripts"))
 
+from _purged_ledger import require_ledger, was_purged  # noqa: E402
+
 from voicebridge.config import Config  # noqa: E402
 from voicebridge import profiles as P  # noqa: E402
 
@@ -273,6 +275,17 @@ def _staged_repo(tmp_path: Path) -> Path:
                 shutil.copy2(p, out)
             except OSError:
                 continue
+    # AGENT_PROMPT_PACK.md was purged in eafb54e26 (frozen evidence, never
+    # re-authored), so it is absent from the live docs/ tree. It is still the
+    # allowlisted HISTORICAL reference the brander must tolerate, so stage it
+    # read-only from the pre-purge commit rather than silently dropping it —
+    # otherwise the copy below has nothing to copy and the historical-reference
+    # coverage disappears.
+    rel_hist = "docs/archive/2026-09-21/AGENT_PROMPT_PACK.md"
+    if not (dest / rel_hist).exists():
+        text = require_ledger(rel_hist)
+        (dest / rel_hist).parent.mkdir(parents=True, exist_ok=True)
+        (dest / rel_hist).write_text(text, encoding="utf-8")
     # normalize to the pre-branding identity so the transition is observable
     # (Packet 8S canonical is qubit-voicebridge; the 7D intermediate
     # qubit-voice-agent is also normalized back to the original name)
@@ -327,10 +340,13 @@ def test_branding_verify_reports_partial_and_planned(tmp_path):
     v = P.branding_verify(cfg, repo=repo)
     assert v["state"] in ("PLANNED", "PARTIAL")
     assert v["files_remaining"]
-    # migrate only pyproject -> PARTIAL
-    (repo / "pyproject.toml").write_text(
-        (repo / "pyproject.toml").read_text().replace(
-            'name = "openclaw-voice-bridge"', 'name = "qubit-voicebridge"'))
+    # migrate only pyproject -> PARTIAL. Every old-name occurrence must go, not
+    # just the ``name =`` line: pyproject also spells the distribution in the
+    # ``[project.optional-dependencies]`` example, and a half-migrated file is
+    # exactly the PARTIAL the verifier is meant to report.
+    pp = repo / "pyproject.toml"
+    pp.write_text(pp.read_text().replace(
+        "openclaw-voice-bridge", "qubit-voicebridge"))
     v2 = P.branding_verify(cfg, repo=repo)
     assert v2["state"] == "PARTIAL"
     assert "pyproject.toml" not in v2["files_remaining"]
@@ -383,7 +399,21 @@ def test_branding_cli_verify_succeeds_on_current_repository(tmp_path, capsys):
     out = json.loads(capsys.readouterr().out)
     assert rc == 0, out
     assert out["state"] == "VERIFIED", out
-    assert out["historical_references"]   # reported, not hidden
+    # The allowlisted historical file was purged in eafb54e26, so the LIVE tree
+    # carries no old-name reference to report. The invariant that matters here
+    # is that a reportable historical reference is never HIDDEN when it exists:
+    # if any allowlisted historical file is present it must appear in the
+    # report. (The staged-repo test proves reporting end to end.)
+    hist_present = [rel for rel in P.BRANDING_HISTORICAL_REFERENCE_FILES
+                    if (REPO / rel).exists()]
+    if hist_present:
+        assert out["historical_references"], (
+            "historical files present but not reported", hist_present)
+    else:
+        assert out["historical_references"] == {}, out
+        assert all(was_purged(rel) for rel in
+                   P.BRANDING_HISTORICAL_REFERENCE_FILES), (
+            "historical file neither in the tree nor purged:", hist_present)
 
 
 def test_branding_staged_apply_verify_rollback_cycle(tmp_path):
@@ -834,8 +864,11 @@ def test_api_profiles_upgrade_performs_real_upgrade(tmp_path, monkeypatch):
             id="amy-2", kind="voice", source="test", revision="r1",
             license="MIT", checksum="", hardware="cpu", languages=["en"],
             vram_mib=0, ram_mib=0, latency_ms=250.0,
-            quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
-            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7A.md",
+            # Live evidence docs. The pre-reset archive paths these used to
+            # name were purged in eafb54e26, so the evidence gate (correctly)
+            # FAILED them — the fixture cited files that no longer exist.
+            quality_evidence="docs/VOICE-BRIDGE-AUDIT.md",
+            safety_evidence="docs/DECISIONS.md",
             rollback_to="en_US-amy-medium",
             config_path=("tts", "voice"), config_value="amy-2")
         P.install_manifest(cfg, man)
@@ -857,8 +890,11 @@ def test_api_profiles_remove_non_default_real(tmp_path, monkeypatch):
             id="amy-2", kind="voice", source="test", revision="r1",
             license="MIT", checksum="", hardware="cpu", languages=["en"],
             vram_mib=0, ram_mib=0, latency_ms=250.0,
-            quality_evidence="docs/archive/2026-09-21/AUDIO_SETUP.md",
-            safety_evidence="docs/archive/2026-09-21/OPERATIONS_7A.md",
+            # Live evidence docs. The pre-reset archive paths these used to
+            # name were purged in eafb54e26, so the evidence gate (correctly)
+            # FAILED them — the fixture cited files that no longer exist.
+            quality_evidence="docs/VOICE-BRIDGE-AUDIT.md",
+            safety_evidence="docs/DECISIONS.md",
             rollback_to="en_US-amy-medium",
             config_path=("tts", "voice"), config_value="amy-2")
         P.install_manifest(cfg, man)
