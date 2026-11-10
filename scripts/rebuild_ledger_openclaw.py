@@ -412,6 +412,176 @@ WAVE5_FORMS: Dict[str, Dict[str, str]] = {
 }
 
 
+# ---------------------------------------------------------------------------
+# Wave 6: explicit disposition for every CURRENT-PIN extension
+# ---------------------------------------------------------------------------
+# ``EXTENSION_MAP`` is frozen to the audited v2026.9.4 set (154 extensions) and
+# ``WAVE5_FORMS`` only covers its 30 wave-5 names, so the current pin's
+# extensions reach ``_openclaw_disposition`` with no form and stay MISSING even
+# where Qubit really ships the capability.  This table is the audited answer
+# for that population, decided one extension at a time against real code:
+#
+#   * ``implemented`` -- Qubit has the capability. ``form`` is a real
+#     ``file.py symbol(s)`` (asserted to exist by
+#     ``tests/test_openclaw_extensions_wave6.py``) and ``proving`` is an on-disk
+#     test that exercises it.
+#   * ``gated`` -- a typed refusal with a real reason; ``gate`` names the typed
+#     code and ``needs`` says what is missing (creds/hardware/owner).
+#
+# An extension absent from this table has no Qubit equivalent and stays
+# MISSING.  That is deliberate: an unexplained open row is honest, a fabricated
+# implementation is not.
+WAVE6_AUDIT: Dict[str, Dict[str, str]] = {
+    # ---- provider/transport plugins riding an implemented capability ------
+    "active-memory": {
+        "status": "implemented", "parent": "OC-D04",
+        "form": ("voicebridge/active_memory.py recall/resolve/status "
+                 "(bounded session policy over voicebridge/memory/store.py)"),
+        "proving": "tests/test_active_memory8u.py",
+        "why": ("active-recall layer over the existing MemoryStore: bounded "
+                "policy, scored recall, prompt-injection resolve, typed "
+                "escalation; Qubit reaches it from CLI and dashboard."),
+    },
+    "diagnostics-otel": {
+        "status": "implemented", "parent": "OC-D32",
+        "form": "voicebridge/evaluation/telemetry.py span/metric/export",
+        "proving": "tests/test_oc_reports_agent10_telemetry.py",
+        "why": ("local OTLP-shaped traces/spans/metrics with W3C traceparent "
+                "correlation; export is opt-in gated and never implicit."),
+    },
+    "memory-wiki": {
+        "status": "implemented", "parent": "OC-48",
+        "form": "voicebridge/qubit_compat.py h_memwiki_overview/h_memwiki_subjects",
+        "proving": "tests/test_memwiki_handlers9u.py",
+        "why": ("the memory-wiki READ surface (overview/subjects/subject/days/"
+                "day) is served by five real compat handlers over a read-only "
+                "state.db."),
+    },
+    "document-extract": {
+        "status": "implemented", "parent": "OC-D20",
+        "form": "voicebridge/doc_extract.py kind_for_path/pdf_backend (bounded extract)",
+        "proving": "tests/test_doc_extract8u.py",
+        "why": ("bounded PDF/transcript extraction over files.py with typed "
+                "unsupported/unavailable refusals and size caps."),
+    },
+    "diffs": {
+        "status": "implemented", "parent": "OC-62",
+        "form": "voicebridge/file_patch.py apply_patch",
+        "proving": "tests/test_openclaw_extensions_wave5.py",
+        "why": ("unified-diff apply path is the real form of the diffs "
+                "extension; the syntax packs are a viewer refinement of it."),
+    },
+    "diffs-language-pack": {
+        "status": "implemented", "parent": "OC-62",
+        "form": "voicebridge/file_patch.py apply_patch",
+        "proving": "tests/test_openclaw_extensions_wave5.py",
+        "why": ("syntax-highlight packs are a diff-viewer refinement of the "
+                "already-implemented patch path, not a separate capability."),
+    },
+    "file-transfer": {
+        "status": "implemented", "parent": "OC-D03",
+        "form": ("voicebridge/file_transfer.py list_directory/fetch/stream_plan/"
+                 "resume/verify_transfer (confined, resumable)"),
+        "proving": "tests/test_file_transfer8u.py",
+        "why": ("approved-root confinement, offset/length bounded fetch with "
+                "SHA-256, resumable stream plans with per-chunk digests."),
+    },
+    "image-generation-core": {
+        "status": "implemented", "parent": "OC-64",
+        "form": "voicebridge/media_gen.py shape_media_request/generate",
+        "proving": "tests/test_openclaw_closure_wave2_webmedia.py",
+        "why": ("the media adapter registry + request-shaping/gating contract "
+                "is real; per-provider generation stays credential-gated."),
+    },
+    "web-readability": {
+        "status": "implemented", "parent": "OC-63",
+        "form": "voicebridge/web_tool.py readable_text",
+        "proving": "tests/test_openclaw_extensions_wave5.py",
+        "why": "Qubit-owned readable-text extraction from fetched HTML.",
+    },
+    # ---- ACP harness clients: catalog is real, execution needs a binary ---
+    "codex": {
+        "status": "gated", "parent": "OC-58",
+        "gate": "ACP_HARNESS_UNAVAILABLE", "needs": "hardware",
+        "form": "voicebridge/acp_client.py HARNESS_CAPS/catalog/handshake",
+        "why": ("codex is a declared ACP harness: Qubit shapes the real "
+                "handshake but never executes it, and the catalog reports "
+                "ACP_HARNESS_UNAVAILABLE until the `codex` binary and a "
+                "credential reference exist."),
+    },
+    "acpx": {
+        "status": "gated", "parent": "OC-58",
+        "gate": "ACP_HARNESS_UNAVAILABLE", "needs": "hardware",
+        "form": "voicebridge/acp_client.py HARNESS_CAPS/adapters",
+        "why": ("the ACP harness *client* contract is real; the acpx harness "
+                "runtime is not shipped, so execution has no transport."),
+    },
+    "copilot": {
+        "status": "gated", "parent": "OC-58",
+        "gate": "ACP_HARNESS_UNAVAILABLE", "needs": "hardware",
+        "form": "voicebridge/acp_client.py HARNESS_CAPS/send",
+        "why": ("same ACP boundary: send always resolves to the typed "
+                "ACP_REFUSED gate, so no live harness runs in Qubit."),
+    },
+    # ---- channels ---------------------------------------------------------
+    "imessage": {
+        "status": "gated", "parent": "OC-D15",
+        "gate": "CHANNEL_NO_CREDENTIAL", "needs": "creds",
+        "form": "voicebridge/channels_inbound.py CHANNELS/normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py",
+        "why": ("the inbound channel adapter + normalizer is real and "
+                "registered, but its transport is a macOS bridge billboard, so "
+                "it reports UNAVAILABLE without a credential/transport."),
+    },
+    "feishu": {
+        "status": "gated", "parent": "OC-D16",
+        "gate": "CHANNEL_NO_CREDENTIAL", "needs": "creds",
+        "form": "voicebridge/channels_inbound.py CHANNELS/normalize_event",
+        "proving": "tests/test_openclaw_extensions_wave5.py",
+        "why": ("feishu send/receive adapter is live; the hosted app side "
+                "stays a typed credential gate."),
+    },
+    # ---- media/voice providers with no shipped adapter --------------------
+    "comfy": {
+        "status": "gated", "parent": "OC-64",
+        "gate": "MEDIA_GEN_UNAVAILABLE", "needs": "creds",
+        "form": "voicebridge/media_gen.py shape_media_request/generate",
+        "proving": "tests/test_media_gen8u.py",
+        "why": ("no comfy provider adapter is registered, so generation is the "
+                "typed MEDIA_GEN_UNAVAILABLE refusal until one is configured."),
+    },
+    "alibaba": {
+        "status": "gated", "parent": "OC-64",
+        "gate": "MEDIA_GEN_UNAVAILABLE", "needs": "creds",
+        "form": "voicebridge/media_gen.py shape_media_request/generate",
+        "proving": "tests/test_media_gen8u.py",
+        "why": "media provider gated on an operator credential + adapter.",
+    },
+    "tts-local-cli": {
+        "status": "gated", "parent": "OC-67",
+        "gate": "VISION_MEDIA_UNAVAILABLE", "needs": "creds",
+        "form": "voicebridge/media_gen.py shape_media_request/generate",
+        "proving": "tests/test_media_gen8u.py",
+        "why": ("speech synthesis rides the media adapter registry, which "
+                "reports a typed UNAVAILABLE with no configured CLI backend."),
+    },
+    "voice-call": {
+        "status": "gated", "parent": "OC-67",
+        "gate": "VISION_MEDIA_UNAVAILABLE", "needs": "creds",
+        "form": "voicebridge/media_gen.py shape_media_request/generate",
+        "proving": "tests/test_media_gen8u.py",
+        "why": ("realtime call adapters ride the same typed provider gate; no "
+                "telephony credential or adapter ships."),
+    },
+}
+
+
+def wave6_records() -> List[Dict[str, str]]:
+    """The audited wave-6 disposition table, in stable order."""
+    return [{"name": name, **dict(WAVE6_AUDIT[name])}
+            for name in sorted(WAVE6_AUDIT)]
+
+
 def wave5_records() -> List[Dict[str, str]]:
     """Merge the wave-5 forms with the authoritative wave-4 dispositions."""
     records: List[Dict[str, str]] = []

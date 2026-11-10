@@ -16,7 +16,7 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **5**
 - Parented surfaces covered by an IMPLEMENTED parent: **1024**
 - Distinct capabilities total: **911**; parented surfaces total: **1029**
-- Fork-runtime dispositions (tools/skills/plugins): **1094** (IMPLEMENTED 1078, GATED 16)
+- Fork-runtime dispositions (tools/skills/plugins): **1110** (IMPLEMENTED 1086, GATED 24)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
 - Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=21122 identical=7075 missing=321 extra=5365 changed=8682
 
@@ -248,7 +248,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `schedules_list`: 32 surface(s) — coverage `workflow-surface`
 - `webui_status`: 48 surface(s) — coverage `dashboard-surface`
 
-## Fork-runtime dispositions for tools / skills / plugins (1094)
+## Fork-runtime dispositions for tools / skills / plugins (1110)
 
 Qubit executes the complete pinned Hermes fork in-process, so these are not separate Qubit modules: the fork tool/toolset registry, skill tree, and plugin fleet are the real backing surface. Every item carries an explicit typed disposition (no silent drop).
 
@@ -419,25 +419,73 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `tool:yb_send_dm` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'yb_send_dm'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 - `tool:yb_send_sticker` — **IMPLEMENTED**; backend `qubit_runtime.tools.registry:registry`; vendored fork tool/toolset registry exposes 'yb_send_sticker'; dispatchable through the in-process fork agent runtime under Qubit policy/broker.; proof `tests/test_tool_skill_plugin_coverage_wave5.py::test_fork_tool_registry_exposes_inventory_tools`
 
+### `openclaw extension acpx` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:acpx` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/adapters`; OpenClaw extension 'acpx' -> wave-6 audit: the ACP harness *client* contract is real; the acpx harness runtime is not shipped, so execution has no transport. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).
+
+### `openclaw extension active-memory` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:active-memory` — **IMPLEMENTED**; backend `voicebridge/active_memory.py recall/resolve/status (bounded session policy over voicebridge/memory/store.py)`; OpenClaw extension 'active-memory' -> wave-6 audit: active-recall layer over the existing MemoryStore: bounded policy, scored recall, prompt-injection resolve, typed escalation; Qubit reaches it from CLI and dashboard. (parent=OC-D04, gate=none).; proof `tests/test_active_memory8u.py`
+
+### `openclaw extension alibaba` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:alibaba` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'alibaba' -> wave-6 audit: media provider gated on an operator credential + adapter. (parent=OC-64, gate=MEDIA_GEN_UNAVAILABLE).; proof `tests/test_media_gen8u.py`
+
 ### `openclaw extension clickclack` (1; IMPLEMENTED 0, GATED 1)
 
 - `openclaw-ext:clickclack` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'clickclack' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension codex` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:codex` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/catalog/handshake`; OpenClaw extension 'codex' -> wave-6 audit: codex is a declared ACP harness: Qubit shapes the real handshake but never executes it, and the catalog reports ACP_HARNESS_UNAVAILABLE until the `codex` binary and a credential reference exist. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).
+
+### `openclaw extension comfy` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:comfy` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'comfy' -> wave-6 audit: no comfy provider adapter is registered, so generation is the typed MEDIA_GEN_UNAVAILABLE refusal until one is configured. (parent=OC-64, gate=MEDIA_GEN_UNAVAILABLE).; proof `tests/test_media_gen8u.py`
+
+### `openclaw extension copilot` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:copilot` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/send`; OpenClaw extension 'copilot' -> wave-6 audit: same ACP boundary: send always resolves to the typed ACP_REFUSED gate, so no live harness runs in Qubit. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).
 
 ### `openclaw extension device-pair` (1; IMPLEMENTED 1, GATED 0)
 
 - `openclaw-ext:device-pair` — **IMPLEMENTED**; backend `voicebridge/device.py token_issue/token_approve/token_rotate/token_revoke/token_verify`; OpenClaw extension 'device-pair' -> parent (parent=OC-05, gate=none) via voicebridge/device.py token_issue/token_approve/token_rotate/token_revoke/token_verify.; proof `tests/test_openclaw_parity_wave1.py`
 
+### `openclaw extension diagnostics-otel` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:diagnostics-otel` — **IMPLEMENTED**; backend `voicebridge/evaluation/telemetry.py span/metric/export`; OpenClaw extension 'diagnostics-otel' -> wave-6 audit: local OTLP-shaped traces/spans/metrics with W3C traceparent correlation; export is opt-in gated and never implicit. (parent=OC-D32, gate=none).; proof `tests/test_oc_reports_agent10_telemetry.py`
+
 ### `openclaw extension diffs` (1; IMPLEMENTED 1, GATED 0)
 
-- `openclaw-ext:diffs` — **IMPLEMENTED**; backend `voicebridge/file_patch.py apply_patch`; OpenClaw extension 'diffs' -> parent (parent=OC-62, gate=none) via voicebridge/file_patch.py apply_patch.; proof `tests/test_openclaw_extensions_wave5.py`
+- `openclaw-ext:diffs` — **IMPLEMENTED**; backend `voicebridge/file_patch.py apply_patch`; OpenClaw extension 'diffs' -> wave-6 audit: unified-diff apply path is the real form of the diffs extension; the syntax packs are a viewer refinement of it. (parent=OC-62, gate=none).; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension diffs-language-pack` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:diffs-language-pack` — **IMPLEMENTED**; backend `voicebridge/file_patch.py apply_patch`; OpenClaw extension 'diffs-language-pack' -> wave-6 audit: syntax-highlight packs are a diff-viewer refinement of the already-implemented patch path, not a separate capability. (parent=OC-62, gate=none).; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension document-extract` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:document-extract` — **IMPLEMENTED**; backend `voicebridge/doc_extract.py kind_for_path/pdf_backend (bounded extract)`; OpenClaw extension 'document-extract' -> wave-6 audit: bounded PDF/transcript extraction over files.py with typed unsupported/unavailable refusals and size caps. (parent=OC-D20, gate=none).; proof `tests/test_doc_extract8u.py`
+
+### `openclaw extension feishu` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:feishu` — **GATED**; backend `voicebridge/channels_inbound.py CHANNELS/normalize_event`; OpenClaw extension 'feishu' -> wave-6 audit: feishu send/receive adapter is live; the hosted app side stays a typed credential gate. (parent=OC-D16, gate=CHANNEL_NO_CREDENTIAL).; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension file-transfer` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:file-transfer` — **IMPLEMENTED**; backend `voicebridge/file_transfer.py list_directory/fetch/stream_plan/resume/verify_transfer (confined, resumable)`; OpenClaw extension 'file-transfer' -> wave-6 audit: approved-root confinement, offset/length bounded fetch with SHA-256, resumable stream plans with per-chunk digests. (parent=OC-D03, gate=none).; proof `tests/test_file_transfer8u.py`
 
 ### `openclaw extension googlechat` (1; IMPLEMENTED 0, GATED 1)
 
 - `openclaw-ext:googlechat` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'googlechat' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
-### `openclaw extension image-generation-core` (1; IMPLEMENTED 0, GATED 1)
+### `openclaw extension image-generation-core` (1; IMPLEMENTED 1, GATED 0)
 
-- `openclaw-ext:image-generation-core` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'image-generation-core' -> gate (parent=OC-64, gate=MEDIA_GEN_UNAVAILABLE) via voicebridge/media_gen.py shape_media_request/generate.; proof `tests/test_openclaw_closure_wave2_webmedia.py`
+- `openclaw-ext:image-generation-core` — **IMPLEMENTED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'image-generation-core' -> wave-6 audit: the media adapter registry + request-shaping/gating contract is real; per-provider generation stays credential-gated. (parent=OC-64, gate=none).; proof `tests/test_openclaw_closure_wave2_webmedia.py`
+
+### `openclaw extension imessage` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:imessage` — **GATED**; backend `voicebridge/channels_inbound.py CHANNELS/normalize_event`; OpenClaw extension 'imessage' -> wave-6 audit: the inbound channel adapter + normalizer is real and registered, but its transport is a macOS bridge billboard, so it reports UNAVAILABLE without a credential/transport. (parent=OC-D15, gate=CHANNEL_NO_CREDENTIAL).; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension irc` (1; IMPLEMENTED 0, GATED 1)
 
@@ -458,6 +506,10 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 ### `openclaw extension mattermost` (1; IMPLEMENTED 0, GATED 1)
 
 - `openclaw-ext:mattermost` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'mattermost' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension memory-wiki` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:memory-wiki` — **IMPLEMENTED**; backend `voicebridge/qubit_compat.py h_memwiki_overview/h_memwiki_subjects`; OpenClaw extension 'memory-wiki' -> wave-6 audit: the memory-wiki READ surface (overview/subjects/subject/days/day) is served by five real compat handlers over a read-only state.db. (parent=OC-48, gate=none).; proof `tests/test_memwiki_handlers9u.py`
 
 ### `openclaw extension msteams` (1; IMPLEMENTED 0, GATED 1)
 
@@ -495,9 +547,21 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 - `openclaw-ext:tlon` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'tlon' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
+### `openclaw extension tts-local-cli` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:tts-local-cli` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'tts-local-cli' -> wave-6 audit: speech synthesis rides the media adapter registry, which reports a typed UNAVAILABLE with no configured CLI backend. (parent=OC-67, gate=VISION_MEDIA_UNAVAILABLE).; proof `tests/test_media_gen8u.py`
+
 ### `openclaw extension twitch` (1; IMPLEMENTED 0, GATED 1)
 
 - `openclaw-ext:twitch` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'twitch' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
+
+### `openclaw extension voice-call` (1; IMPLEMENTED 0, GATED 1)
+
+- `openclaw-ext:voice-call` — **GATED**; backend `voicebridge/media_gen.py shape_media_request/generate`; OpenClaw extension 'voice-call' -> wave-6 audit: realtime call adapters ride the same typed provider gate; no telephony credential or adapter ships. (parent=OC-67, gate=VISION_MEDIA_UNAVAILABLE).; proof `tests/test_media_gen8u.py`
+
+### `openclaw extension web-readability` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:web-readability` — **IMPLEMENTED**; backend `voicebridge/web_tool.py readable_text`; OpenClaw extension 'web-readability' -> wave-6 audit: Qubit-owned readable-text extraction from fetched HTML. (parent=OC-63, gate=none).; proof `tests/test_openclaw_extensions_wave5.py`
 
 ### `openclaw extension zalo` (1; IMPLEMENTED 0, GATED 1)
 
