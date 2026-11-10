@@ -70,7 +70,7 @@ switch (NTPResourceCache::GetWindowType(profile)) {
 So the line fires **only** when `chrome://newtab/` is requested against a
 `NORMAL` profile — i.e. the ordinary user profile, which is exactly the
 `Default` profile named `Work` in
-`/home/trick/snap/chromium/common/chromium/Local State`
+`$HOME/snap/chromium/common/chromium/Local State`
 (`info_cache.Default.name == "Work"`, `last_used == "Default"`). It is a *tab
 creation* event, not a page-load failure of an existing tab.
 
@@ -93,7 +93,7 @@ and the HTTP handler default:
 ```
 $ xdg-settings get default-web-browser
 chromium_daemon.desktop
-$ grep -n "chromium" /home/trick/.config/mimeapps.list
+$ grep -n "chromium" $HOME/.config/mimeapps.list
 x-scheme-handler/http=chromium_daemon.desktop
 x-scheme-handler/https=chromium_daemon.desktop
 x-scheme-handler/about=chromium_chromium.desktop
@@ -183,11 +183,11 @@ The `Daily watch video` job fires at 18:00 and the burst was ~18:04, which looks
 like a match. It is not.
 
 * The job is `no_agent: true` with `script: watch_video_of_day.py`. That script
-  (`/home/trick/.local/state/qubit-voicebridge/runtime/scripts/watch_video_of_day.py`)
+  (`$HOME/.local/state/qubit-voicebridge/runtime/scripts/watch_video_of_day.py`)
   is 177 lines of `print()`/`json.dumps` — it imports `argparse, json, sys,
   datetime, zoneinfo` and **never touches a browser**.
 * Its actual run log for that evening is a failure, and it returned in ~3 s:
-  `/home/trick/.local/state/qubit-voicebridge/runtime/cron/output/721c3d035c22/2026-11-10_18-00-52.md`
+  `$HOME/.local/state/qubit-voicebridge/runtime/cron/output/721c3d035c22/2026-11-10_18-00-52.md`
   → `Status: script failed / dependency environment interpreter is missing:
   .../qubit_runtime/venv/bin/python`.
 * `executions.db` confirms it started `18:00:52` and was done by `18:00:53.635`.
@@ -244,8 +244,8 @@ scope). Ranked:
    sudo ausearch -k tablaunch -i | tail -40     # ppid + parent comm
    ```
 3. **The out-of-repo venv copy — checked and cleared.** The running
-   gateway is `/home/trick/venvs/qubit-0.0.13/bin/python` with cwd
-   `/home/trick/.local/share/qubit-live-013`, i.e. the *installed* build, not
+   gateway is `$HOME/venvs/qubit-0.0.13/bin/python` with cwd
+   `$HOME/.local/share/qubit-live-013`, i.e. the *installed* build, not
    this worktree. I inspected it: its `webbrowser.open` call sites are the same
    flag-gated set as the tree's, and its one tab-creating module
    (`voicebridge/browser_tabs.py`) is byte-identical to the tree's and
