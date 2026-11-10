@@ -37,8 +37,8 @@ def stub_model(monkeypatch):
 
     def _fake(text, conversation_prompt="", model="qubit-brain",
               timeout_s=4.0, max_tokens=100, context="", num_ctx=None,
-              reasoning=None):
-        calls.append({"text": text, "model": model})
+              reasoning=None, cancel=None):
+        calls.append({"text": text, "model": model, "cancel": cancel})
         mode = _fake.mode
         if mode == "sleep":
             import time as _t
