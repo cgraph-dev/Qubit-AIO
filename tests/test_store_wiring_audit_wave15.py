@@ -6,7 +6,9 @@ dashboard/voice ROUTES now expose them truthfully:
 
 * ``GET /api/cron/jobs[/{id}]`` carries the configured timezone, the pending
   retry instant/attempt, whether the retry ladder is armed, and the real
-  ``last_error`` — plus the store's own ``next_run_at`` projection.
+  ``last_error`` — plus the store's own ``next_run_at`` projection. Backed by
+  ``cron_bridge`` over the vendored cron store the scheduler actually fires
+  (8f9df75ae), not the legacy ``voicebridge.schedules`` SQLite store.
 * ``GET /api/recall`` accepts ``limit``/``offset`` (active-memory pagination).
 * ``POST /api/recall/update`` is a real, confirmation-gated in-place memory
   update (holographic ``update_fact`` / Mem0 ``update`` semantics).
@@ -75,15 +77,29 @@ def _project(cfg, folder):
 # ============================================================ cron: tz/retry
 def test_cron_routes_surface_timezone_retry_and_last_error(tmp_path,
                                                            monkeypatch):
+    """The cron reads carry tz, the retry ladder, and the real last_error.
+
+    Backed by ``cron_bridge`` (8f9df75ae moved /cron onto the vendored store the
+    scheduler fires from), so the job is created and failed through THAT store.
+    """
+    from voicebridge import cron_bridge as CB
     from voicebridge import qubit_compat as HC
-    from voicebridge import schedules as SC
 
     cfg = _cfg(tmp_path, monkeypatch)
-    monkeypatch.setenv("QUBIT_TIMEZONE", "Asia/Tokyo")
-    job_id = SC.create(cfg, "net job", "do it", "every 2 hours",
-                       confirmed=True)["job"]["id"]
-    out = SC.run_due(cfg, executor=_transient, now=time.time() + 121 * 60)
-    assert out["ran"] == 1 and out["results"][0]["retry"]["scheduled"] is True
+    job_id = str(CB.create(cfg, name="net job", prompt="do it",
+                           schedule="every 2 hours")["id"])
+    CB._store(cfg).update_job(job_id, {"timezone": "Asia/Tokyo"})
+
+    # Fail the job the way the scheduler records a transient failure, then let
+    # the vendored retry ladder pull next_run_at to the retry instant.
+    J = CB._store(cfg)
+    J.update_job(job_id, {"last_error": "nodename nor servname provided",
+                          "last_status": "FAILED"})
+    from cron import unreachable_retry as UR
+    job = J.get_job(job_id)
+    assert UR.plan_retry(job) is True, job
+    J.update_job(job_id, {"unreachable_retry": job.get("unreachable_retry"),
+                          "next_run_at": job.get("next_run_at")})
 
     code, jobs = HC.dispatch(cfg, "GET", "/api/cron/jobs", {}, {})
     assert code == 200 and isinstance(jobs, list)
