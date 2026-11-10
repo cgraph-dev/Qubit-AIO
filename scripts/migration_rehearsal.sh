@@ -41,7 +41,13 @@ export XDG_CONFIG_HOME="$HOME_DIR/.config"
 export XDG_DATA_HOME="$HOME_DIR/.local/share"
 export XDG_STATE_HOME="$HOME_DIR/.local/state"
 export XDG_CACHE_HOME="$HOME_DIR/.cache"
+# The canonical product tree lives under $QUBIT_HOME (default ~/.qubit for an
+# uninitialized machine), NOT under XDG. Without this override the migration
+# renames the legacy tree into the OPERATOR's real runtime home and the state
+# check then reads a different tree than the one it moved.
+export QUBIT_HOME="$HOME_DIR/.qubit"
 unset PYTHONPATH || true
+unset QUBIT_VOICE_DIR VOICE_BRIDGE_DIR || true
 mkdir -p "$HOME_DIR"
 
 fail() { echo "FAIL: $*" >&2; exit 2; }
@@ -84,9 +90,17 @@ CFG_BASE = Path(os.environ["XDG_CONFIG_HOME"])
 STATE_BASE = Path(os.environ["XDG_STATE_HOME"])
 DATA_BASE = Path(os.environ["XDG_DATA_HOME"])
 LEGACY = "openclaw-voice-bridge"
-CANON = "qubit-voicebridge"
+#: The canonical tree is the Qubit-owned $QUBIT_HOME/voice layout, not an XDG
+#: directory named after the product: `voicebridge.paths.voice_layout()`
+#: resolves config/data/state/cache/models under $QUBIT_HOME/voice for every
+#: install that is not read-old.
+QUBIT_HOME = Path(os.environ["QUBIT_HOME"])
+CANON_DIRS = {"config": QUBIT_HOME / "voice" / "config",
+              "state": QUBIT_HOME / "voice" / "state",
+              "data": QUBIT_HOME / "voice" / "data"}
 
 CATEGORIES = {"config": CFG_BASE, "state": STATE_BASE, "data": DATA_BASE}
+CANON_DEST = {cat: CANON_DIRS[cat] for cat in CATEGORIES}
 
 BACKUP = WORK / "migration-backup"
 
@@ -139,8 +153,28 @@ def snapshot(category, dirname):
     return out
 
 
+def snapshot_dir(base):
+    """Hash every file under an absolute directory (legacy or canonical)."""
+    out = {}
+    if not base.exists() or base.is_symlink():
+        return out
+    for p in sorted(base.rglob("*")):
+        rel = str(p.relative_to(base))
+        if p.is_symlink():
+            out[rel] = "symlink:" + os.readlink(p)
+        elif p.is_file():
+            out[rel] = _hash_file(p)
+    return out
+
+
 def logical_tree(dirname):
+    """The legacy trees: one XDG dir per category, all named ``dirname``."""
     return {cat: snapshot(cat, dirname) for cat in CATEGORIES}
+
+
+def canonical_tree():
+    """The canonical trees: config/state/data under ``$QUBIT_HOME/voice``."""
+    return {cat: snapshot_dir(CANON_DEST[cat]) for cat in CATEGORIES}
 
 
 def assert_preserved(expected, actual, stage):
@@ -197,12 +231,12 @@ mig = run_json(cli("product", "migrate", "--apply",
 if mig.get("state") != "OK":
     fail(f"migrate --apply expected OK, got {mig.get('state')}: {mig}")
 
-after_migrate = logical_tree(CANON)
+after_migrate = canonical_tree()
 assert_preserved(before, after_migrate, "migration")
 
 for cat in CATEGORIES:
     legacy = CATEGORIES[cat] / LEGACY
-    canonical = CATEGORIES[cat] / CANON
+    canonical = CANON_DEST[cat]
     if not canonical.is_dir() or canonical.is_symlink():
         fail(f"migration: canonical {cat} tree missing at {canonical}")
     if not legacy.is_symlink() or os.path.realpath(legacy) != str(canonical):
@@ -230,7 +264,7 @@ for key in ("user state", "memory/reports/cursors", "user config"):
 pkg_up = run_json(cli("package", "upgrade"))
 if pkg_up.get("action") != "upgrade":
     fail(f"package upgrade plan unexpected: {pkg_up}")
-assert_preserved(before, logical_tree(CANON), "upgrade")
+assert_preserved(before, canonical_tree(), "upgrade")
 print(f"   upgrade preserves: {', '.join(up.get('preserves', []))}")
 
 # ---------------------------------------------------------------- 3. rollback
@@ -244,7 +278,7 @@ if rb.get("state") != "OK":
 after_rollback = logical_tree(LEGACY)
 assert_preserved(before, after_rollback, "rollback")
 for cat in CATEGORIES:
-    canonical = CATEGORIES[cat] / CANON
+    canonical = CANON_DEST[cat]
     if canonical.exists() or canonical.is_symlink():
         fail(f"rollback: canonical {cat} tree still present at {canonical}")
 print("   canonical trees removed; legacy trees restored whole")
