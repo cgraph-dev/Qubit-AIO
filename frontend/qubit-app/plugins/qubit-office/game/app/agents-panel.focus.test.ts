@@ -3,11 +3,13 @@
  *
  * WHY THIS FILE EXISTS
  * --------------------
- * The fake-React recorder can prove a handler is wired, but not that a user can
- * reach it: invoking `props.onFocus()` directly passes even for an <li> that a
- * browser will never focus. This test mounts the panel with React 19 + jsdom,
- * calls the DOM's own `.focus()` on a seat row, and reads the card the user
- * would see — so "hover/focus updates the card" is proven, not asserted.
+ * The card is the single keyboard owner of the roster: it is always visible,
+ * always tabbable, and drives the active seat across every division — including
+ * divisions whose rows are collapsed and therefore cannot take focus. This test
+ * mounts the panel with React 19 + jsdom while ALL divisions are collapsed,
+ * focuses the card, sends real `keydown` events, and proves the reachable path:
+ * ArrowDown opens the target division and updates the card, Home/End jump, and
+ * no row is ever mistaken for a tab stop.
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
@@ -26,6 +28,7 @@ const React = webRequire("react") as {
   createElement: (...args: unknown[]) => unknown;
   useState: (value: unknown) => [unknown, (next: unknown) => void];
   useEffect: (fn: () => void | (() => void), deps?: unknown[]) => void;
+  useRef: (value: unknown) => { current: unknown };
   act: (cb: () => void | Promise<void>) => Promise<void>;
 };
 const { createRoot } = webRequire("react-dom/client") as {
@@ -46,19 +49,28 @@ function seat(over: Partial<AgentSeat> & { slug: string; name: string }): AgentS
   };
 }
 
-function payload(seats: AgentSeat[]): AgentPanelData {
+/** Two divisions, one seat each: the minimal cross-division keyboard case. */
+function twoDivisionPayload(): AgentPanelData {
+  const alpha = [seat({
+    slug: "alpha-one", name: "Alpha One", division: "alpha",
+  })];
+  const beta = [seat({
+    slug: "beta-one", name: "Beta One", division: "beta", room: "beta-desk-a",
+  })];
   return {
     ok: true,
     counts: {
-      headcount: seats.length, divisions: 1, roster_divisions: 1,
-      boardroom_seats: 0, rooms: 1, floors: 1,
-      seat_types: { worker: seats.length }, per_division: { alpha: seats.length },
+      headcount: 2, divisions: 2, roster_divisions: 2,
+      boardroom_seats: 0, rooms: 2, floors: 2,
+      seat_types: { worker: 2 }, per_division: { alpha: 1, beta: 1 },
     },
-    divisions: [{
-      slug: "alpha", label: "Alpha", kind: "product", floor: 1,
-      headcount: seats.length, seats,
-    }],
-    seats,
+    divisions: [
+      { slug: "alpha", label: "Alpha", kind: "product", floor: 1,
+        headcount: 1, seats: alpha },
+      { slug: "beta", label: "Beta", kind: "product", floor: 2,
+        headcount: 1, seats: beta },
+    ],
+    seats: [...alpha, ...beta],
   };
 }
 
@@ -82,18 +94,24 @@ afterEach(async () => {
   document.body.innerHTML = "";
 });
 
+const press = async (target: HTMLElement, key: string) => {
+  await act(async () => {
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  });
+};
+
 describe("the agents panel's real keyboard path", () => {
-  it("keeps one tabbable row and moves focus/card with arrows, Home and End", async () => {
-    const seats = [
-      seat({ slug: "first", name: "First Agent" }),
-      seat({ slug: "second", name: "Second Agent" }),
-      seat({ slug: "third", name: "Third Agent" }),
-    ];
+  it("makes the always-visible card the reachable keyboard owner", async () => {
     const Panel = createAgentsPanel(
       React as never,
-      { useState: React.useState, useEffect: React.useEffect, useRef: React.useRef } as never,
+      {
+        useState: React.useState,
+        useEffect: React.useEffect,
+        useRef: React.useRef,
+      } as never,
     );
-    const fetchImpl = (async () => respond(payload(seats))) as unknown as typeof fetch;
+    const fetchImpl = (async () =>
+      respond(twoDivisionPayload())) as unknown as typeof fetch;
 
     await act(async () => {
       root.render(React.createElement(Panel as never, {
@@ -107,59 +125,59 @@ describe("the agents panel's real keyboard path", () => {
       });
     }
 
-    const rows = Array.from(host.querySelectorAll<HTMLElement>(
-      "[data-testid=agents-panel-seat]"));
-    expect(rows).toHaveLength(3);
     const card = () => host.querySelector<HTMLElement>(
-      "[data-testid=agents-panel-card]");
+      "[data-testid=agents-panel-card]")!;
+    const cardName = () => host.querySelector(
+      "[data-testid=agents-panel-card] .agents-panel__cardName")?.textContent;
+    const rows = () => Array.from(host.querySelectorAll<HTMLElement>(
+      "[data-testid=agents-panel-seat]"));
+    const division = (slug: string) => host.querySelector<HTMLDetailsElement>(
+      `[data-division="${slug}"]`)!;
 
-    // Exactly ONE row is in the tab order, and it is the active one.
-    expect(rows.filter((row) => row.tabIndex === 0)).toHaveLength(1);
-    expect(rows[0].tabIndex).toBe(0);
-    expect(rows[1].tabIndex).toBe(-1);
-    expect(rows[2].tabIndex).toBe(-1);
-    expect(rows[0].getAttribute("aria-current")).toBe("true");
-    expect(card()?.dataset.seatSlug).toBe("first");
+    // Everything starts collapsed; the card is still the one reachable stop.
+    expect(division("alpha").open).toBe(false);
+    expect(division("beta").open).toBe(false);
+    expect(card().tabIndex).toBe(0);
+    expect(card().getAttribute("role")).toBe("group");
+    expect(card().getAttribute("aria-live")).toBe("polite");
+    expect(card().getAttribute("aria-atomic")).toBe("true");
+    // The card is the ONLY keyboard entry into the roster.
+    const tabStops = host.querySelectorAll<HTMLElement>('[tabindex="0"]');
+    expect(tabStops).toHaveLength(1);
+    expect(tabStops[0]).toBe(card());
+    await act(async () => { card().focus(); });
+    expect(document.activeElement).toBe(card());
 
-    // Open the group the way a reader does, then put DOM focus on the row.
-    const details = host.querySelector("details") as HTMLDetailsElement;
-    details.open = true;
-    await act(async () => { rows[0].focus(); });
-    expect(document.activeElement).toBe(rows[0]);
+    // No row is a tab stop, collapsed or not.
+    expect(rows().length).toBe(2);
+    expect(rows().every((row) => row.tabIndex === -1)).toBe(true);
+    expect(rows().some((row) => row.tabIndex === 0)).toBe(false);
+    expect(cardName()).toBe("Alpha One");
 
-    // ArrowDown: real keydown -> focus AND the live card move together.
-    await act(async () => {
-      rows[0].dispatchEvent(new KeyboardEvent("keydown", {
-        key: "ArrowDown", bubbles: true,
-      }));
-    });
-    expect(document.activeElement).toBe(rows[1]);
-    expect(card()?.dataset.seatSlug).toBe("second");
-    expect(rows[1].tabIndex).toBe(0);
-    expect(rows[0].tabIndex).toBe(-1);
+    // ArrowDown moves the active seat to the OTHER division's collapsed row…
+    await press(card(), "ArrowDown");
+    expect(document.activeElement).toBe(card());
+    expect(cardName()).toBe("Beta One");
+    // …and opens that division, without handing focus to the row.
+    expect(division("beta").open).toBe(true);
+    expect(division("alpha").open).toBe(false);
+    // The card is the live readout; the row id is a stable anchor, not a focus
+    // target or an out-of-scope aria-activedescendant.
+    expect(rows().every((row) => row.tabIndex === -1)).toBe(true);
 
-    // End: jump to the last seat.
-    await act(async () => {
-      (document.activeElement as HTMLElement).dispatchEvent(
-        new KeyboardEvent("keydown", { key: "End", bubbles: true }));
-    });
-    expect(document.activeElement).toBe(rows[2]);
-    expect(card()?.dataset.seatSlug).toBe("third");
+    // End -> last, Home -> first (opening the first division on the way).
+    await press(card(), "End");
+    expect(cardName()).toBe("Beta One");
+    await press(card(), "Home");
+    expect(cardName()).toBe("Alpha One");
+    expect(division("alpha").open).toBe(true);
 
-    // Home: jump to the first seat.
-    await act(async () => {
-      (document.activeElement as HTMLElement).dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Home", bubbles: true }));
-    });
-    expect(document.activeElement).toBe(rows[0]);
-    expect(card()?.dataset.seatSlug).toBe("first");
-
-    // Clamp (documented): ArrowUp at the top stays on the first seat.
-    await act(async () => {
-      (document.activeElement as HTMLElement).dispatchEvent(
-        new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
-    });
-    expect(document.activeElement).toBe(rows[0]);
-    expect(card()?.dataset.seatSlug).toBe("first");
+    // Clamp both ends (documented): no wrap.
+    await press(card(), "ArrowUp");
+    expect(cardName()).toBe("Alpha One");
+    await press(card(), "End");
+    await press(card(), "ArrowDown");
+    expect(cardName()).toBe("Beta One");
+    expect(document.activeElement).toBe(card());
   });
 });

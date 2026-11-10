@@ -57,23 +57,21 @@ export interface AgentsPanelProps {
 /** The panel portrait box. The payload's portrait tier is 32px (see Task 4). */
 const PORTRAIT_PX = 32;
 
-/** The bit of a React keyboard event the roving row needs. */
+/** The bit of a React keyboard event the card's navigation needs. */
 interface SeatKeyEvent {
   key: string;
   preventDefault: () => void;
 }
 
 /**
- * The roving-focus wiring shared by every rendered row. One row is tabbable
- * (`tabIndex: 0`); the rest are `-1` and are reached with the arrow keys, which
- * also move the active seat the card reads. `registerRow` lets the component
- * focus the target row after the (possibly closed) division has opened.
+ * Row wiring. The CARD is the single keyboard owner: rows are not tab stops,
+ * they only select on hover/click. `rowId` gives each row a stable DOM anchor
+ * (and a stable test hook) independent of its division's open state.
  */
 interface SeatInteraction {
   activeSlug: string | null;
   onActivate: (slug: string) => void;
-  onKeyNavigate: (slug: string, key: string) => boolean;
-  registerRow: (slug: string, node: HTMLElement | null) => void;
+  rowId: (slug: string) => string;
 }
 
 function seatMeta(seat: AgentSeat): string[] {
@@ -155,23 +153,18 @@ function seatRow(
   const active = interaction.activeSlug === seat.slug;
   return R.createElement("li", {
     key: `${seat.slug}:${index}`,
+    id: interaction.rowId(seat.slug),
     className: "agents-panel__seat",
     "data-testid": "agents-panel-seat",
     "data-seat-slug": seat.slug,
     "data-seat-type": seat.seat_type,
-    // ROVING TABINDEX: exactly one row is in the tab order. Arrow/Home/End
-    // move both focus and this active seat; the card is the live readout.
-    tabIndex: active ? 0 : -1,
-    // Native `<ul>/<li>` semantics are kept (the listbox pattern does not fit
-    // several division lists sharing one selection); `aria-current` marks the
-    // row feeding the card without overriding the list-item role.
+    // Rows are NOT tab stops: the card owns the keyboard so a row inside a
+    // collapsed division can never trap the roster. Hover/click still selects.
+    // Native list semantics stay intact; ``aria-current`` marks the row feeding
+    // the card without inventing a listbox selection model for many lists.
     "aria-current": active ? "true" : undefined,
-    ref: (node: HTMLElement | null) => interaction.registerRow(seat.slug, node),
     onMouseEnter: () => interaction.onActivate(seat.slug),
-    onFocus: () => interaction.onActivate(seat.slug),
-    onKeyDown: (event: SeatKeyEvent) => {
-      if (interaction.onKeyNavigate(seat.slug, event.key)) event.preventDefault();
-    },
+    onClick: () => interaction.onActivate(seat.slug),
   }, [
     R.createElement("span", {
       key: "a", className: "agents-panel__avatar",
@@ -187,9 +180,10 @@ function seatRow(
 
 /**
  * The dialogue-style agent card the pack author demonstrates: a framed portrait,
- * the agent name on the tab, and the 32x64 body sprite beside it. It follows the
- * row the reader hovers or focuses (default: the first seat), so the card is a
- * preview of the roster, never a fabricated extra agent.
+ * the agent name on the tab, and the 32x64 body sprite beside it. It is the
+ * roster's single keyboard owner: hover/click select a row, and Arrow/Home/End
+ * on the card walk every seat (default: the first), so the card is a preview of
+ * the roster, never a fabricated extra agent.
  *
  * Fixed 72px tall (64px body + padding) and a fixed three-column grid, so
  * moving the pointer down 283 rows cannot reflow the list under it.
@@ -199,6 +193,7 @@ function agentCard(
   seat: AgentSeat,
   theme: OfficeTheme | null | undefined,
   ready: boolean,
+  onKeyDown: (event: SeatKeyEvent) => void,
 ) {
   const urls = themeAtlasUrls(theme);
   // Optional chaining here is deliberate: the payload type requires `bodies`,
@@ -210,10 +205,21 @@ function agentCard(
   return R.createElement("div", {
     key: "card",
     className: "agents-panel__card",
+    id: "agents-panel-card",
     "data-testid": "agents-panel-card",
     "data-seat-slug": seat.slug,
+    role: "group",
+    "aria-label": "Active agent",
+    // The live region is the announcement path. `aria-activedescendant` was
+    // deliberately NOT used: the active row lives outside the card, so pointing
+    // at it would require `aria-owns` and would reparent the row out of its
+    // division list in the accessibility tree. The card's own name/meta/portrait
+    // update inside this live region instead.
     "aria-live": "polite",
+    // Atomic: announce the whole active agent, not just the diffed text node.
+    "aria-atomic": "true",
     tabIndex: 0,
+    onKeyDown,
   }, [
     R.createElement("div", {
       key: "p", className: "agents-panel__cardPortrait",
@@ -294,7 +300,7 @@ export function createAgentsPanel(
   R: OfficeGameShellProps["React"],
   hooks: OfficeGameShellProps["hooks"],
 ) {
-  const { useState, useEffect, useRef } = hooks;
+  const { useState, useEffect } = hooks;
 
   return function AgentsPanel(props: AgentsPanelProps) {
     const [state, setState] = useState<AgentPanelState>({ kind: "loading" });
@@ -314,14 +320,11 @@ export function createAgentsPanel(
     // Which seat the dialogue card previews. null means "the first seat", so
     // the initial render is deterministic before any pointer event.
     const [activeSlug, setActiveSlug] = useState<string | null>(null);
-    // Which divisions the reader opened. Managed here so keyboard navigation
-    // can open the target's division before focusing its row (a row inside a
-    // closed <details> cannot take focus).
+    // Which divisions the reader opened. Managed here so card navigation can
+    // open the target's division before revealing/scroll-ing its row.
     const [openDivisions, setOpenDivisions] = useState<Record<string, boolean>>({});
-    // A row to focus after the render that opens its division. Cleared once the
-    // effect has moved focus.
-    const [pendingFocus, setPendingFocus] = useState<string | null>(null);
-    const rowRefs = useRef<Map<string, HTMLElement>>(new Map());
+    // A row to reveal after the render that opens its division.
+    const [pendingScroll, setPendingScroll] = useState<string | null>(null);
 
     useEffect(() => {
       let live = true;
@@ -354,13 +357,18 @@ export function createAgentsPanel(
       // same URLs must not re-download them.
     }, [atlasKey]);
 
-    // Focus the roving target AFTER the render that opened its division.
+    // Reveal the card's new active row AFTER the render that opened its
+    // division. Focus deliberately STAYS on the card: the card owns the
+    // keyboard, so opening a division can never move focus into a possibly
+    // collapsing tree.
     useEffect(() => {
-      if (!pendingFocus) return;
-      const node = rowRefs.current.get(pendingFocus);
-      if (node) node.focus();
-      setPendingFocus(null);
-    }, [pendingFocus]);
+      if (!pendingScroll) return;
+      if (typeof document !== "undefined") {
+        const node = document.getElementById(`agents-panel-seat-${pendingScroll}`);
+        node?.scrollIntoView?.({ block: "nearest" });
+      }
+      setPendingScroll(null);
+    }, [pendingScroll]);
 
     if (state.kind === "loading") {
       return R.createElement("div", {
@@ -399,11 +407,8 @@ export function createAgentsPanel(
     for (const group of groups) {
       for (const seat of group.seats) divisionBySeat.set(seat.slug, group.slug);
     }
+    const rowId = (slug: string) => `agents-panel-seat-${slug}`;
 
-    const registerRow = (slug: string, node: HTMLElement | null) => {
-      if (node) rowRefs.current.set(slug, node);
-      else rowRefs.current.delete(slug);
-    };
     const toggleDivision = (slug: string, open: boolean) => {
       setOpenDivisions((previous) =>
         previous[slug] === open ? previous : { ...previous, [slug]: open });
@@ -425,14 +430,17 @@ export function createAgentsPanel(
         setOpenDivisions((previous) =>
           previous[division] ? previous : { ...previous, [division]: true });
       }
-      setPendingFocus(target.slug);
+      setPendingScroll(target.slug);
       return true;
+    };
+    const onCardKeyDown = (event: SeatKeyEvent) => {
+      if (!activeSeat) return;
+      if (navigate(activeSeat.slug, event.key)) event.preventDefault();
     };
     const interaction: SeatInteraction = {
       activeSlug: activeSeat ? activeSeat.slug : null,
       onActivate: (slug: string) => setActiveSlug(slug),
-      onKeyNavigate: navigate,
-      registerRow,
+      rowId,
     };
 
     return R.createElement("div", {
@@ -443,7 +451,9 @@ export function createAgentsPanel(
       "data-divisions": String(counts?.divisions ?? divisions.length),
       "data-portraits": portraitsReady ? "ready" : "fallback",
     }, [
-      activeSeat ? agentCard(R, activeSeat, props.theme, portraitsReady) : null,
+      activeSeat
+        ? agentCard(R, activeSeat, props.theme, portraitsReady, onCardKeyDown)
+        : null,
       R.createElement("div", {
         key: "summary",
         className: "agents-panel__summary",

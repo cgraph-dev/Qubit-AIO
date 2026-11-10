@@ -630,7 +630,7 @@ describe("atlas portraits in the agents panel", () => {
     h.cleanup();
   });
 
-  it("keeps exactly one row tabbable and follows hover/focus", async () => {
+  it("makes the card the only keyboard owner and follows hover/click", async () => {
     const h = await mountPanel(
       activeTheme(),
       oneDivision([
@@ -642,6 +642,8 @@ describe("atlas portraits in the agents panel", () => {
     const card = () => byTestId(h, "agents-panel-card")[0];
     expect(card()?.props["data-seat-slug"]).toBe("first");
     expect(card()?.props["aria-live"]).toBe("polite");
+    expect(card()?.props.role).toBe("group");
+    expect(card()?.props["aria-label"]).toBe("Active agent");
     expect(card()?.props.tabIndex).toBe(0);
 
     let body = withClass(h, "agents-panel__body")[0];
@@ -656,28 +658,35 @@ describe("atlas portraits in the agents panel", () => {
 
     const row = (slug: string) => byTestId(h, "agents-panel-seat")
       .find((element) => element.props["data-seat-slug"] === slug);
-    // ROVING TABINDEX: exactly one row is in the tab order, and it is the one
-    // the card currently reads.
-    expect(row("first")?.props.tabIndex).toBe(0);
-    expect(row("second")?.props.tabIndex).toBe(-1);
+    // Rows are NOT tab stops: the card is the only keyboard owner, so a row in
+    // a collapsed division cannot trap or hide the roster.
+    expect(row("first")?.props.tabIndex).toBeUndefined();
+    expect(row("second")?.props.tabIndex).toBeUndefined();
+    expect(row("first")?.props.id).toBe("agents-panel-seat-first");
     expect(row("first")?.props["aria-current"]).toBe("true");
+
     (row("second")?.props.onMouseEnter as () => void)();
     h.flush();
-
     expect(card()?.props["data-seat-slug"]).toBe("second");
-    expect(row("first")?.props.tabIndex).toBe(-1);
-    expect(row("second")?.props.tabIndex).toBe(0);
     expect(row("second")?.props["aria-current"]).toBe("true");
+    expect(row("first")?.props["aria-current"]).toBeUndefined();
     body = withClass(h, "agents-panel__body")[0];
     expect(body?.props["aria-label"]).toBe("Second Agent body");
     bodyStyle = body?.props.style as Record<string, unknown>;
     expect(bodyStyle["--body-x"]).toBe(1);
 
-    (row("first")?.props.onFocus as () => void)();
+    (row("first")?.props.onClick as () => void)();
     h.flush();
     expect(card()?.props["data-seat-slug"]).toBe("first");
-    expect(row("first")?.props.tabIndex).toBe(0);
-    expect(row("second")?.props.tabIndex).toBe(-1);
+
+    // The card's own key handler drives the active seat too.
+    const prevented = vi.fn();
+    (card()?.props.onKeyDown as (event: unknown) => void)({
+      key: "ArrowDown", preventDefault: prevented,
+    });
+    h.flush();
+    expect(prevented).toHaveBeenCalledTimes(1);
+    expect(card()?.props["data-seat-slug"]).toBe("second");
     h.cleanup();
   });
 
