@@ -657,6 +657,18 @@ def search(cfg: Any, query: str, *, limit: int = DEFAULT_SEARCH_LIMIT,
                 "provider": provider, "query": redact_text(text),
                 "results": [], "count": 0,
                 "detail": "search provider timed out"}
+    except HTTPError as exc:
+        # An HTTPError owns a file-like body; leaving it unclosed leaks the
+        # temp file and surfaces as a ResourceWarning in unrelated tests.
+        code = int(getattr(exc, "code", 0) or 0)
+        try:
+            exc.close()
+        except Exception:
+            pass
+        return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
+                "provider": provider, "query": redact_text(text),
+                "results": [], "count": 0,
+                "detail": f"search provider returned HTTP {code}"}
     except Exception as exc:
         return {"state": "FAILED", "code": SEARCH_PROVIDER_CODE,
                 "provider": provider, "query": redact_text(text),
