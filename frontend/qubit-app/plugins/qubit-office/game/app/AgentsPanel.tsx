@@ -139,6 +139,11 @@ function seatRow(
     "data-testid": "agents-panel-seat",
     "data-seat-slug": seat.slug,
     "data-seat-type": seat.seat_type,
+    // A REAL focus target. `onFocus` without a focusable element was a dead
+    // handler: keyboard/AT users could never leave the first-seat default.
+    // Rows are the navigation surface (the card is the readout), so each seat
+    // participates in the normal tab order in the roster's reading order.
+    tabIndex: 0,
     onMouseEnter: () => onActivate(seat.slug),
     onFocus: () => onActivate(seat.slug),
   }, [
@@ -170,7 +175,10 @@ function agentCard(
   ready: boolean,
 ) {
   const urls = themeAtlasUrls(theme);
-  const frame = theme ? theme.bodies.frame : null;
+  // Optional chaining here is deliberate: the payload type requires `bodies`,
+  // but a malformed/older theme object must degrade to "no body" rather than
+  // throw inside the panel's render.
+  const frame = theme?.bodies?.frame ?? null;
   const bodyStyle = seat.body ? bodyCellStyle(seat.body, frame) : undefined;
   const showBody = Boolean(ready && urls.body && bodyStyle);
   return R.createElement("div", {
@@ -265,7 +273,15 @@ export function createAgentsPanel(
     // per-seat requests). Portraits only paint after both decoded; on failure
     // these stay false and the initials/emoji remain the visible, announced
     // fallback.
-    const [portraitsReady, setPortraitsReady] = useState(false);
+    //
+    // `readyAtlasKey` records WHICH pack decoded. Repainting readiness on a
+    // theme/atlas change is derived (`readyAtlasKey === atlasKey`), so a new
+    // atlas can never be painted with the previous pack's ready state.
+    const atlasKey = `${props.theme?.atlas ?? ""}\u0000`
+      + `${props.theme?.bodies?.atlas ?? ""}`;
+    const hasAtlas = Boolean(props.theme?.atlas || props.theme?.bodies?.atlas);
+    const [readyAtlasKey, setReadyAtlasKey] = useState<string | null>(null);
+    const portraitsReady = hasAtlas && readyAtlasKey === atlasKey;
     // Which seat the dialogue card previews. null means "the first seat", so
     // the initial render is deterministic before any pointer event.
     const [activeSlug, setActiveSlug] = useState<string | null>(null);
@@ -289,20 +305,17 @@ export function createAgentsPanel(
 
     useEffect(() => {
       const pending = preloadThemeAtlases(props.theme);
-      if (!pending) {
-        setPortraitsReady(false);
-        return;
-      }
+      if (!pending) return;
       let live = true;
       pending.then((ok) => {
-        if (live) setPortraitsReady(ok);
+        if (live && ok) setReadyAtlasKey(atlasKey);
       });
       return () => {
         live = false;
       };
       // The atlas URLs are the identity of a pack; a new theme object with the
       // same URLs must not re-download them.
-    }, [props.theme?.atlas, props.theme?.bodies?.atlas]);
+    }, [atlasKey]);
 
     if (state.kind === "loading") {
       return R.createElement("div", {

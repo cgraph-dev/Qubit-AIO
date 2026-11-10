@@ -347,6 +347,11 @@ function createPanelHarness() {
       dirty = false;
       render();
     },
+    rerender(nextProps: Record<string, unknown>) {
+      props = nextProps;
+      dirty = true;
+      this.flush();
+    },
     flush(max = 30) {
       let rounds = 0;
       while (dirty && rounds++ < max) {
@@ -358,6 +363,14 @@ function createPanelHarness() {
       for (let i = 0; i < 15; i += 1) {
         await Promise.resolve();
         await new Promise((resolve) => setTimeout(resolve, 0));
+        this.flush();
+      }
+    },
+    // Flush promises only: enough for the real fetch to land, but NOT enough
+    // for the fake Image's macrotask to fire — the "before decode" window.
+    async microtasks() {
+      for (let i = 0; i < 20; i += 1) {
+        await Promise.resolve();
         this.flush();
       }
     },
@@ -437,6 +450,9 @@ describe("theme helpers", () => {
     expect(initialsFor("  grace   brewster hopper ")).toBe("GH");
     expect(initialsFor("")).toBe("");
     expect(initialsFor("🎛")).toBe("");
+    // Scan past an emoji/punctuation prefix instead of dropping the word.
+    expect(initialsFor("🤖Bot")).toBe("B");
+    expect(initialsFor("«Ada» Lovelace")).toBe("AL");
   });
 
   it("preloads each atlas exactly once and resolves true only if all decode", async () => {
@@ -459,6 +475,70 @@ describe("theme helpers", () => {
 });
 
 describe("atlas portraits in the agents panel", () => {
+  it("keeps initials on screen BEFORE the success preload decodes", async () => {
+    // The promise-only flush lands the fetch but NOT the fake Image's macrotask:
+    // this is exactly the frame where a CSS sprite would be an empty box.
+    const harness = createPanelHarness();
+    const Panel = createAgentsPanel(
+      harness.React as never, harness.hooks as never);
+    const fetchImpl = (async () => respond(
+      200,
+      oneDivision([seat({ slug: "ada", name: "Ada Lovelace", portrait: [2, 1] })]),
+    )) as unknown as typeof fetch;
+    harness.mount(Panel as never, {
+      base: "", fetchImpl, theme: activeTheme(),
+    });
+    await harness.microtasks();
+
+    const root = harness.tree.find(
+      (e) => e.props["data-testid"] === "agents-panel");
+    expect(root?.props["data-state"]).toBe("ready");
+    expect(root?.props["data-portraits"]).toBe("fallback");
+    expect(avatarFor(harness, "ada", "initials")).toBeDefined();
+    expect(avatarFor(harness, "ada", "portrait")).toBeUndefined();
+
+    await harness.settle();
+    expect(avatarFor(harness, "ada", "portrait")).toBeDefined();
+    expect(avatarFor(harness, "ada", "initials")).toBeUndefined();
+    harness.cleanup();
+  });
+
+  it("never paints a new atlas with the previous pack's ready state", async () => {
+    const firstTheme = activeTheme();
+    const nextTheme = activeTheme({
+      atlas: "/plugins/qubit-office/themes/demo2/portraits/atlas32.png?v=2.0.0",
+      bodies: {
+        atlas: "/plugins/qubit-office/themes/demo2/bodies/atlas32.png?v=2.0.0",
+        index: "/plugins/qubit-office/themes/demo2/bodies/index.json?v=2.0.0",
+        size: 32,
+        frame: { w: 32, h: 64 },
+      },
+    });
+    const seats = oneDivision([
+      seat({ slug: "ada", name: "Ada Lovelace", portrait: [2, 1] }),
+    ]);
+    const fetchImpl = (async () => respond(200, seats)) as unknown as typeof fetch;
+    const h = await mountPanel(firstTheme, seats);
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "agents-panel")?.props["data-portraits"])
+      .toBe("ready");
+
+    // A theme change must drop readiness IMMEDIATELY (before demo2 decodes).
+    h.rerender({ base: "", fetchImpl, theme: nextTheme });
+    const afterSwap = h.tree.find(
+      (e) => e.props["data-testid"] === "agents-panel");
+    expect(afterSwap?.props["data-portraits"]).toBe("fallback");
+    expect(avatarFor(h, "ada", "initials")).toBeDefined();
+    expect(avatarFor(h, "ada", "portrait")).toBeUndefined();
+
+    await h.settle();
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "agents-panel")?.props["data-portraits"])
+      .toBe("ready");
+    expect(avatarFor(h, "ada", "portrait")).toBeDefined();
+    h.cleanup();
+  });
+
   it("paints a seat's cell as a 32x32 sprite span once the sheets decode", async () => {
     const h = await mountPanel(
       activeTheme(),
@@ -543,7 +623,7 @@ describe("atlas portraits in the agents panel", () => {
     h.cleanup();
   });
 
-  it("renders the active-seat dialogue card and follows row hover/focus", async () => {
+  it("renders the active-seat dialogue card and wires focusable row handlers", async () => {
     const h = await mountPanel(
       activeTheme(),
       oneDivision([
@@ -569,6 +649,9 @@ describe("atlas portraits in the agents panel", () => {
 
     const row = (slug: string) => byTestId(h, "agents-panel-seat")
       .find((element) => element.props["data-seat-slug"] === slug);
+    // A dead onFocus was the finding: the row must be a real tab stop.
+    expect(row("first")?.props.tabIndex).toBe(0);
+    expect(row("second")?.props.tabIndex).toBe(0);
     (row("second")?.props.onMouseEnter as () => void)();
     h.flush();
 

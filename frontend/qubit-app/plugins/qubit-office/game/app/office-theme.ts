@@ -166,9 +166,15 @@ export function initialsFor(name: string): string {
     .trim()
     .split(/[\s._-]+/)
     .filter(Boolean);
-  const letters = words
-    .map((word) => Array.from(word)[0])
-    .filter((ch): ch is string => Boolean(ch) && /[\p{L}\p{N}]/u.test(ch));
+  // Scan INTO each word rather than only its first codepoint: an emoji or
+  // punctuation prefix must not drop the word ("🤖Bot" is still "B"). Words
+  // with no letter/digit at all contribute nothing (the emoji fallback wins).
+  const letters: string[] = [];
+  for (const word of words) {
+    const found = Array.from(word)
+      .find((ch) => /[\p{L}\p{N}]/u.test(ch));
+    if (found) letters.push(found);
+  }
   if (letters.length === 0) return "";
   const picked = letters.length === 1
     ? [letters[0]]
