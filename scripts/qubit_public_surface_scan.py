@@ -656,6 +656,17 @@ TS_PROSE_WORD_RE = re.compile(
     r"(?<![A-Za-z0-9_\-./@:\\#])(?:Hermes|OpenClaw|NousResearch|NousPortal|Nous)"
     r"(?![A-Za-z0-9_\-./@:\\#])", re.IGNORECASE)
 
+#: A legacy-token alternation used as a manifest GUARD, e.g. the bundled
+#: plugin-name filter ``RegExp(`(^|[/_.-])(hermes|nous|openclaw)([/_.-]|$)`,`i`)``.
+#: The source assembles it from ``String.fromCharCode`` pieces so no contiguous
+#: legacy literal is emitted, but a minifier folds the codes back into a plain
+#: literal — so in the bundle the token appears as an alternation branch bounded
+#: by the guard's own separator class, which is what this matches. A real public
+#: route/asset path never looks like that.
+CHAR_CODE_GUARD_RE = re.compile(
+    r"RegExp\(\s*[`'\"](?:\(\^\|\[[/_.\-]\]\)\([^)]*\)\(\[[/_.\-]\]\|\$\))[`'\"]"
+    r"\s*,\s*[`'\"]i[`'\"]")
+
 
 def scan_bundles() -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
     findings: List[Dict[str, Any]] = []
@@ -707,9 +718,20 @@ def scan_bundles() -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
                     r"hermes-achievements|/plugins/hermes|/api/plugins/hermes"
                     r"|/api/hermes|openclaw", line, re.IGNORECASE)
                 if m_path:
-                    findings.append(_leak(
-                        "bundles", m_path.group(0), file=rel_s, line=i,
-                        text=line, classification="plugin_path"))
+                    # A pre-rename MANIFEST GUARD is not a public path: the
+                    # bundled plugin-name filter builds its token alternation
+                    # from ``String.fromCharCode(...)`` literals, which the
+                    # minifier leaves as bare words, so ``openclaw`` appears in
+                    # the bundle with no contiguous source literal and no
+                    # product route. Recognise the guard by its construction
+                    # rather than allowlisting the word everywhere.
+                    if CHAR_CODE_GUARD_RE.search(line):
+                        _allow(allow, "bundles", "guard",
+                               m_path.group(0))
+                    else:
+                        findings.append(_leak(
+                            "bundles", m_path.group(0), file=rel_s, line=i,
+                            text=line, classification="plugin_path"))
                 elif UPSTREAM_URL_RE.search(line) or UPSTREAM_DOMAIN_RE.search(line) \
                         or HANDLE_RE.search(line) or PROSE_RE.search(line):
                     toks = sorted(set(
@@ -862,8 +884,10 @@ def _scan_py_source(rel: str, line_ranges: Optional[List[Tuple[int, int]]] = Non
                 _allow(allow, "source_strings", "third_party_attribution", token)
             continue
         # A guard may span lines (e.g. ``_LEGACY_BRAND_RE = re.compile(`` on the
-        # previous line), so match the pattern against a small backward window.
-        window = "\n".join(lines[max(0, i - 4):i])
+        # previous line) and its alternation runs several lines further, so
+        # match the pattern against a backward window wide enough to reach the
+        # guard's opening line from its last fragment.
+        window = "\n".join(lines[max(0, i - 12):i])
         if any(re.search(pat, window) for pat in guards):
             for token in _hits(line):
                 _allow(allow, "source_strings", "guard", token)
@@ -973,17 +997,18 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
 
         for m in TS_TOKEN_RE.finditer(view):
             token = m.group(0)
-            if _covered(m.span(), spans):
-                # A join blanks the ``+`` into a space between two quotes, so
-                # the identifier regexes run THROUGH the join
-                # ("QUBIT_CONTAINERHermes_CONTAINER"): classify the joined name
-                # inside such a run, judged on its own — the quote beside it
-                # would bar the prose pattern.
-                assembled = [name for name in _assembled_hits(line)
-                             if name in token]
-                if not assembled:
-                    continue
+            # A join blanks the ``+`` into a space between two quotes, so the
+            # identifier regexes run THROUGH the join
+            # ("QUBIT_CONTAINERHermes_CONTAINER"): classify the joined name
+            # inside such a run, judged on its own — the quote beside it would
+            # bar the prose pattern. The joined run has no URL/domain span, so
+            # this check must not be gated on ``_covered``.
+            assembled = [name for name in _assembled_hits(line)
+                         if name in token]
+            if assembled:
                 token = assembled[0]
+            elif _covered(m.span(), spans):
+                continue
             bare = next(TS_TOKEN_RE.finditer(token)).group(0)
             if TS_GUARD_RE.search(line):
                 _allow(allow, "source_strings", "guard", token)

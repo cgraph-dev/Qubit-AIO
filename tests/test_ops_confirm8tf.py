@@ -220,7 +220,10 @@ def test_approvals_require_auth(tmp_path):
             with _up.urlopen(req, timeout=10) as r:
                 status = r.status
         except urllib.error.HTTPError as e:
-            status = e.code
+            # HTTPError is itself an open response: close it explicitly so it
+            # does not fall to the GC as an implicitly-cleaned tempfile.
+            with e:
+                status = e.code
         assert status == 401, status
     finally:
         ui.stop()
