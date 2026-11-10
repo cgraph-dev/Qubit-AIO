@@ -46,7 +46,7 @@ def stamp_failure(result: dict[str, Any], reason: str, retryable: bool) -> dict[
 
 
 # ---- failed-turn transcript boundary ----------------------------------------------------------
-# The Hermes-authored assistant row that closes a durable turn which ended without one. A
+# The Qubit-authored assistant row that closes a durable turn which ended without one. A
 # transcript boundary, NOT the model's answer: no provider/model error or refusal detail is
 # ever interpolated (that rides ``final_response``). Owned here so the core closer
 # (``agent/conversation_loop.py::run_conversation``) and the gateway's own writer
@@ -70,7 +70,7 @@ AUTOMATION_INTERRUPTED_NOTICE = (
 # call that ran before the failure. An ``assistant`` tail is already closed (a reply or a boundary).
 OPEN_TURN_TAIL_ROLES = frozenset({"user", "tool"})
 # ``messages.display_kind`` of that row: display-only (stripped before every provider request),
-# so renderers show a Hermes notice and room pollers never read it as the model's reply.
+# so renderers show a Qubit notice and room pollers never read it as the model's reply.
 FAILED_TURN_DISPLAY_KIND = "failed_turn"
 
 
@@ -95,7 +95,7 @@ def failed_turn_notice(turn_messages: Any) -> str:
 
 
 def provider_label_for(provider: Any) -> str:
-    """Human-friendly provider name for chat copy (``"OpenRouter"``, ``"Nous Portal"``…)."""
+    """Human-friendly provider name for chat copy (``"OpenRouter"``, ``"Anthropic"``…)."""
     from qubit_cli.models import provider_label
 
     return provider_label(str(provider or ""))
@@ -224,7 +224,7 @@ _NONRETRYABLE_COPY: dict[str, str] = {
         "conversation's shape. Start a clean session with /new or switch models with /model."
     ),
     FailoverReason.ssl_cert_verification.value: (
-        "Hermes couldn't verify {label}'s security certificate, so the connection was refused. "
+        "Qubit couldn't verify {label}'s security certificate, so the connection was refused. "
         "This is usually a corporate proxy or an outdated certificate store on this computer — "
         "see the terminal or `{home}/logs/agent.log` for the exact fix, or try another provider "
         "with /model."
@@ -306,13 +306,13 @@ def failure_cause_gloss(reason: Any, *, subject: str = "it", possessive: str = "
 # (``empty_response`` is worded by agent/turn_explainers.py, ``session_busy`` by the lease).
 _FAILURE_CODE_COPY: dict[str, str] = {
     "context_overflow": (
-        "This conversation has grown too long for {model} to read, and Hermes couldn't shrink "
+        "This conversation has grown too long for {model} to read, and Qubit couldn't shrink "
         "it enough automatically. Start a new session with /new (your history is kept), or try "
         "/compress once more. Switching to a model with a bigger context window also works."
     ),
     "truncated": (
         "The model's reply was cut off before it finished (it hit its output length limit), so "
-        "Hermes didn't run the incomplete action. Nothing was changed. Send `continue`, ask for "
+        "Qubit didn't run the incomplete action. Nothing was changed. Send `continue`, ask for "
         "the work in smaller steps, or raise max_tokens for this model."
     ),
     "invalid_response": (
@@ -320,11 +320,11 @@ _FAILURE_CODE_COPY: dict[str, str] = {
         "or rate-limiting you. " + _NEXT_STEPS_RETRY + "\n\nDetails: {detail}"
     ),
     "loop_error": (
-        "Hermes hit repeated errors and stopped this turn so it wouldn't keep retrying. "
+        "Qubit hit repeated errors and stopped this turn so it wouldn't keep retrying. "
         + _NEXT_STEPS_LOOP + "\n\nDetails: {detail}"
     ),
     "interpreter_shutdown": (
-        "Hermes was shutting down and stopped this turn. Your conversation is saved — reopen "
+        "Qubit was shutting down and stopped this turn. Your conversation is saved — reopen "
         "it{resume} and send your message again."
     ),
 }
@@ -334,7 +334,7 @@ _FAILURE_CODE_COPY: dict[str, str] = {
 _ONE_OFF_COPY: dict[str, str] = {
     "payload_too_large": (
         "This conversation (including attachments) has grown too large to send to {model}, and "
-        "Hermes couldn't shrink it enough automatically. Start a new session with /new (your "
+        "Qubit couldn't shrink it enough automatically. Start a new session with /new (your "
         "history is kept), or try /compress once more."
     ),
     "compression_disabled": (
@@ -347,16 +347,16 @@ _ONE_OFF_COPY: dict[str, str] = {
     # message must stay in the transcript and the session must not be auto-reset.
     "server_context_rejection": (
         "The model server rejected this request as too large, but this conversation is only "
-        "about {tokens:,} tokens — well under the {window:,}-token window Hermes knows for "
+        "about {tokens:,} tokens — well under the {window:,}-token window Qubit knows for "
         "{model} — so shrinking it would not help. Another request on the same server (for "
         "example a background memory review from an earlier session) was probably holding its "
-        "capacity, or the server runs {model} with a smaller window than Hermes assumes. Wait a "
+        "capacity, or the server runs {model} with a smaller window than Qubit assumes. Wait a "
         "moment and send /retry; if it keeps happening, check the server's context setting."
     ),
     # Rides failure_reason="truncated": args were cut mid-JSON but the model never reported
     # an output-length stop, so don't claim it hit one (#91717).
     "truncated_unreported": (
-        "The model's action arrived cut off partway through, so Hermes didn't run it. Nothing was changed. The model didn't report hitting its output "
+        "The model's action arrived cut off partway through, so Qubit didn't run it. Nothing was changed. The model didn't report hitting its output "
         "limit, so this was most likely a dropped connection or a provider/router cutting the "
         "reply short. Send /retry; if it keeps happening, ask for the work in smaller steps."
     ),
@@ -374,7 +374,7 @@ _ONE_OFF_COPY: dict[str, str] = {
     ),
     # Rides failure_reason="loop_error" (advisory; the turn is incomplete, not failed).
     "local_processing_error": (
-        "Hermes hit an internal error while handling the model's reply and stopped this turn. "
+        "Qubit hit an internal error while handling the model's reply and stopped this turn. "
         + _NEXT_STEPS_LOOP + "\n\nDetails: {detail}"
     ),
     "max_iterations_no_summary": (

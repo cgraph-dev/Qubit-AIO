@@ -20,7 +20,6 @@ WORKFLOWS = ROOT / ".github" / "workflows"
 POLICY = ROOT / ".github" / "scripts" / "check_workflow_security.py"
 
 EXPECTED_LEGACY = {
-    "qubit-ci.yml",
     "windows-ci.yml",
     "windows-install-update-e2e.yml",
 }

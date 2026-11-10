@@ -67,11 +67,34 @@ class _FakeHTTP:
         return step
 
 
+_LEAKED_ERRORS: list = []
+
+
 def _redirect_exc(location, code=302):
+    """A redirect as urllib raises it.
+
+    ``HTTPError`` is an ``addinfourl``: with ``fp=None`` urllib allocates a
+    ``BytesIO`` body, and an unclosed one is collected later as a
+    ``ResourceWarning: Implicitly cleaning up <HTTPError 302>`` that lands in a
+    *different* test. Hold the reference and close it at session end.
+    """
     from urllib.error import HTTPError
 
-    return HTTPError("http://93.184.216.34/", code, "Found",
-                     {"Location": location}, None)
+    exc = HTTPError("http://93.184.216.34/", code, "Found",
+                    {"Location": location}, None)
+    _LEAKED_ERRORS.append(exc)
+    return exc
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _close_redirect_errors():
+    yield
+    while _LEAKED_ERRORS:
+        exc = _LEAKED_ERRORS.pop()
+        try:
+            exc.close()
+        except Exception:
+            pass
 
 
 def _boom(req, timeout):

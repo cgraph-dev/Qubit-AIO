@@ -28,7 +28,11 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MEMORY_PLUGINS_DIR = Path(__file__).parent
+QUBIT_ENTRY_POINTS_GROUP = "qubit_agent.memory_providers"
 ENTRY_POINTS_GROUP = "hermes_agent.memory_providers"
+#: Qubit's own group first, then the upstream group — a provider installed under
+#: either spelling must be found (same pairing as ``qubit_cli.plugins_discovery``).
+MEMORY_ENTRY_POINT_GROUPS = (QUBIT_ENTRY_POINTS_GROUP, ENTRY_POINTS_GROUP)
 # Per Qubit home (plugin managers are per home too): pruning under one multiplexed profile must
 # only retract that profile's provider skills, never a sibling profile's.
 _REGISTERED_MEMORY_PROVIDER_SKILLS: dict[str, dict[str, Path]] = {}
@@ -49,14 +53,22 @@ _get_user_plugins_dir = _loader.user_plugins_dir
 
 
 def _get_project_plugins_dir() -> Optional[Path]:
-    """``./.hermes/plugins/`` or None. Gated on HERMES_ENABLE_PROJECT_PLUGINS like the
-    PluginManager scan: a repo you merely ``cd`` into must not offer a memory backend."""
+    """``./.qubit/plugins/`` or None. Gated on ``QUBIT_ENABLE_PROJECT_PLUGINS``
+    (``HERMES_`` read-old) like the PluginManager scan: a repo you merely ``cd``
+    into must not offer a memory backend.
+
+    The Qubit-owned ``./.qubit/plugins/`` wins; ``./.hermes/plugins/`` is the
+    read-old fallback for repos laid out before the rebrand, matching
+    ``qubit_cli.plugins_discovery.discover_plugin_manifests``.
+    """
     try:
         from qubit_cli.plugins import _env_enabled
 
         if not _env_enabled("HERMES_ENABLE_PROJECT_PLUGINS"):
             return None
-        d = Path.cwd() / ".hermes" / "plugins"
+        d = Path.cwd() / ".qubit" / "plugins"
+        if not d.is_dir():
+            d = Path.cwd() / ".hermes" / "plugins"
         return d if d.is_dir() else None
     except Exception:
         return None
@@ -133,12 +145,22 @@ def _iter_provider_dirs() -> list[tuple[str, Path]]:
 
 
 def _iter_entry_points():
-    """Yield pip-installed memory provider entry points."""
+    """Yield pip-installed memory provider entry points.
+
+    Reads both the Qubit-owned and the upstream group, so a provider installed
+    under either spelling is found.
+    """
     try:
         eps = importlib.metadata.entry_points()
-        if hasattr(eps, "select"):
-            return list(eps.select(group=ENTRY_POINTS_GROUP))
-        return list(eps.get(ENTRY_POINTS_GROUP, [])) if isinstance(eps, dict) else [ep for ep in eps if ep.group == ENTRY_POINTS_GROUP]
+        selected = []
+        for group in MEMORY_ENTRY_POINT_GROUPS:
+            if hasattr(eps, "select"):
+                selected.extend(eps.select(group=group))
+            elif isinstance(eps, dict):
+                selected.extend(eps.get(group, []))
+            else:
+                selected.extend(ep for ep in eps if ep.group == group)
+        return selected
     except Exception as exc:
         logger.debug("Memory provider entry-point scan failed: %s", exc)
         return []
