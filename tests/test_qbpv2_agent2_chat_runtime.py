@@ -533,6 +533,11 @@ def test_qubit_runtime_home_is_qubit_owned(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
     monkeypatch.delenv("QUBIT_HOME", raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
+    # An EXISTING XDG install: the read-old state dir is present, so the
+    # layout keeps the historical ``<state>/qubit-voicebridge/runtime`` home
+    # (a fresh machine is a *new* install and owns ``$QUBIT_HOME`` instead —
+    # see tests/test_voice_paths_new_install9v.py).
+    (tmp_path / "state" / "qubit-voicebridge" / "state").mkdir(parents=True)
 
     home = HR.default_home()
     assert home == tmp_path / "state" / "qubit-voicebridge" / "runtime"
@@ -573,6 +578,8 @@ def test_fork_get_qubit_home_is_the_qubit_home(tmp_path, monkeypatch):
     )
     home = tmp_path / "home"
     home.mkdir()
+    # Existing XDG install (read-old) — see test_qubit_runtime_home_is_qubit_owned.
+    (home / "state" / "qubit-voicebridge" / "state").mkdir(parents=True)
     env = dict(os.environ)
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / "state")
@@ -598,11 +605,12 @@ def test_external_qubit_home_is_not_consulted(tmp_path):
     sentinel.write_text("model:\n  default: EXTERNAL_SENTINEL_MODEL\n")
     before = sentinel.read_bytes()
 
+    # A fresh machine is a NEW install: the layout owns ``$QUBIT_HOME`` — the
+    # canonical runtime home is created in the Qubit home, not in the read-old
+    # XDG tree (see tests/test_voice_paths_new_install9v.py).
     env = dict(os.environ)
     env["HOME"] = str(home)
     env["XDG_STATE_HOME"] = str(home / "state")
-    env["XDG_CONFIG_HOME"] = str(home / ".config")
-    env["XDG_DATA_HOME"] = str(home / ".local" / "share")
     env.pop("QUBIT_HOME", None)
     env.pop("PYTHONPATH", None)
     proc = subprocess.run(
@@ -615,5 +623,5 @@ def test_external_qubit_home_is_not_consulted(tmp_path):
     # External ~/.hermes was neither read nor written.
     assert sentinel.read_bytes() == before
     # The Qubit-owned home was the one initialized.
-    assert (home / "state" / "qubit-voicebridge" / "runtime").is_dir()
+    assert (home / ".qubit").is_dir()
 
