@@ -633,7 +633,7 @@ DROP VIEW IF EXISTS office_v_agent_pnl;
 DROP VIEW IF EXISTS office_v_department_pnl;
 DROP VIEW IF EXISTS office_v_org_pnl;
 
-CREATE VIEW office_v_agent_pnl AS
+CREATE VIEW IF NOT EXISTS office_v_agent_pnl AS
 SELECT a.id AS agent_id, a.slug AS agent_slug, a.seat_type,
        COALESCE(SUM(CASE WHEN l.unmetered=0 AND l.kind='revenue'
                          THEN l.amount_cents END),0) AS revenue_cents,
@@ -670,7 +670,7 @@ SELECT a.id AS agent_id, a.slug AS agent_slug, a.seat_type,
 FROM office_agent a LEFT JOIN office_ledger l ON l.agent_id = a.id
 GROUP BY a.id;
 
-CREATE VIEW office_v_business_pnl AS
+CREATE VIEW IF NOT EXISTS office_v_business_pnl AS
 SELECT b.id AS business_id, b.slug AS business_slug, b.status,
        b.department_id,
        COALESCE(SUM(CASE WHEN l.unmetered=0 AND l.kind='revenue'
@@ -709,7 +709,7 @@ SELECT b.id AS business_id, b.slug AS business_slug, b.status,
   LEFT JOIN office_ledger l ON l.business_id = b.id
  GROUP BY b.id;
 
-CREATE VIEW office_v_department_pnl AS
+CREATE VIEW IF NOT EXISTS office_v_department_pnl AS
 SELECT d.id AS department_id, d.slug AS department_slug, d.division_kind,
        d.status,
        COALESCE(SUM(CASE WHEN l.unmetered=0 AND l.kind='revenue'
@@ -739,7 +739,7 @@ FROM office_department d LEFT JOIN office_ledger l
   ON l.department_id = d.id
 GROUP BY d.id;
 
-CREATE VIEW office_v_org_pnl AS
+CREATE VIEW IF NOT EXISTS office_v_org_pnl AS
 SELECT COALESCE(SUM(CASE WHEN unmetered=0 AND kind='revenue'
                          THEN amount_cents END),0) AS revenue_cents,
        COALESCE(SUM(CASE WHEN unmetered=0
@@ -786,59 +786,100 @@ def _stored_schema(conn: sqlite3.Connection) -> str:
         return ""
 
 
+def _exec_script(conn: sqlite3.Connection, script: str) -> None:
+    """Run a multi-statement script inside the caller's open transaction.
+
+    ``executescript`` commits any pending transaction before it starts. That
+    let two concurrent office readers both observe a stale schema, both drop
+    and rebuild the reporting views, and the loser answer ``view ... already
+    exists`` (surfaced as a transient ``OFFICE_TOWER_UNAVAILABLE`` 503).
+    Feeding complete statements one at a time keeps ``BEGIN IMMEDIATE`` held
+    across the whole migration, so the second reader waits, then sees the new
+    schema row and only installs missing views.
+    """
+    buf = ""
+    for line in script.splitlines(True):
+        buf += line
+        if sqlite3.complete_statement(buf):
+            conn.execute(buf)
+            buf = ""
+    if buf.strip() and not all(
+            line.strip().startswith("--")
+            for line in buf.splitlines() if line.strip()):
+        conn.execute(buf)
+
+
 def migrate(conn: sqlite3.Connection) -> None:
     """Create the schema if missing. Idempotent, additive-only.
 
     The views are version-gated on purpose. Rebuilding them on every call would
     quietly repair a view that had drifted from the ledger, and a silently
     repaired number is the one thing reconciliation cannot survive.
+
+    The whole upgrade runs under ``BEGIN IMMEDIATE`` when the caller is not
+    already in a transaction. Office reads open short-lived connections and
+    migrate per operation; without the write lock the version check and view
+    rebuild race across threads and the tower endpoint intermittently fails.
     """
-    conn.executescript(_SCHEMA_SQL)
-    # Additive-only upgrades for a store created by an earlier schema. A
-    # CREATE TABLE IF NOT EXISTS cannot add a column to a table that already
-    # exists, so every column added after the first release lands here.
-    _ensure_column(conn, "office_ledger", "offsets_id", "INTEGER")
-    _ensure_column(conn, "office_ledger", "unmetered",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(conn, "office_ledger", "attested",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(conn, "office_ledger", "attested_as", "TEXT")
-    _ensure_column(conn, "office_ledger", "tokens_in",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(conn, "office_ledger", "tokens_out",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(conn, "office_ledger", "source", "TEXT")
-    _ensure_column(conn, "office_ledger", "provider_cost_micros",
-                   "INTEGER NOT NULL DEFAULT 0")
-    _ensure_column(conn, "office_ledger", "external_ref", "TEXT")
-    _ensure_column(conn, "office_ledger", "business_id", "INTEGER")
-    _ensure_column(conn, "office_agent", "auditor_of", "TEXT")
-    # Per-seat model routing. Additive with an empty default, so a seat created
-    # before this column existed keeps inheriting the profile default rather
-    # than being silently pinned to a model nobody chose.
-    _ensure_column(conn, "office_agent", "model", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "office_agent", "provider", "TEXT NOT NULL DEFAULT ''")
-    _ensure_column(conn, "office_run_receipts", "status",
-                   "TEXT NOT NULL DEFAULT 'open'")
-    _ensure_column(conn, "office_run_receipts", "cap_cents", "INTEGER")
-    _ensure_column(conn, "office_run_receipts", "attested_as", "TEXT")
-    _ensure_column(conn, "office_run_receipts", "end_reason", "TEXT")
+    started = not conn.in_transaction
+    if started:
+        conn.execute("BEGIN IMMEDIATE")
     try:
-        conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_idempotency"
-            " ON office_ledger(source, external_ref)"
-            " WHERE source IS NOT NULL AND external_ref IS NOT NULL")
-    except sqlite3.Error:
-        pass
-    # Views: rebuild on a version bump, otherwise install-if-absent only.
-    stored = _stored_schema(conn)
-    if stored != SCHEMA:
-        conn.executescript(_REBUILD_VIEWS_SQL)
-    else:
-        conn.executescript(_VIEWS_SQL)
-    conn.execute("INSERT INTO office_meta(key, value) VALUES('schema', ?)"
-                 " ON CONFLICT(key) DO UPDATE SET value=excluded.value",
-                 (SCHEMA,))
+        _exec_script(conn, _SCHEMA_SQL)
+        # Additive-only upgrades for a store created by an earlier schema. A
+        # CREATE TABLE IF NOT EXISTS cannot add a column to a table that already
+        # exists, so every column added after the first release lands here.
+        _ensure_column(conn, "office_ledger", "offsets_id", "INTEGER")
+        _ensure_column(conn, "office_ledger", "unmetered",
+                       "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "office_ledger", "attested",
+                       "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "office_ledger", "attested_as", "TEXT")
+        _ensure_column(conn, "office_ledger", "tokens_in",
+                       "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "office_ledger", "tokens_out",
+                       "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "office_ledger", "source", "TEXT")
+        _ensure_column(conn, "office_ledger", "provider_cost_micros",
+                       "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(conn, "office_ledger", "external_ref", "TEXT")
+        _ensure_column(conn, "office_ledger", "business_id", "INTEGER")
+        _ensure_column(conn, "office_agent", "auditor_of", "TEXT")
+        # Per-seat model routing. Additive with an empty default, so a seat created
+        # before this column existed keeps inheriting the profile default rather
+        # than being silently pinned to a model nobody chose.
+        _ensure_column(conn, "office_agent", "model", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(conn, "office_agent", "provider", "TEXT NOT NULL DEFAULT ''")
+        _ensure_column(conn, "office_run_receipts", "status",
+                       "TEXT NOT NULL DEFAULT 'open'")
+        _ensure_column(conn, "office_run_receipts", "cap_cents", "INTEGER")
+        _ensure_column(conn, "office_run_receipts", "attested_as", "TEXT")
+        _ensure_column(conn, "office_run_receipts", "end_reason", "TEXT")
+        try:
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_ledger_idempotency"
+                " ON office_ledger(source, external_ref)"
+                " WHERE source IS NOT NULL AND external_ref IS NOT NULL")
+        except sqlite3.Error:
+            pass
+        # Views: rebuild on a version bump, otherwise install-if-absent only.
+        stored = _stored_schema(conn)
+        if stored != SCHEMA:
+            _exec_script(conn, _REBUILD_VIEWS_SQL)
+        else:
+            _exec_script(conn, _VIEWS_SQL)
+        conn.execute("INSERT INTO office_meta(key, value) VALUES('schema', ?)"
+                     " ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                     (SCHEMA,))
+        if started:
+            conn.execute("COMMIT")
+    except BaseException:
+        if started:
+            try:
+                conn.execute("ROLLBACK")
+            except sqlite3.Error:
+                pass
+        raise
 
 
 def now() -> float:
