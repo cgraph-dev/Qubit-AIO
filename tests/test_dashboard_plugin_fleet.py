@@ -167,6 +167,13 @@ def test_every_registered_plugin_backend_route_is_live(tmp_path, monkeypatch):
             # without being timing-fragile.
             time.sleep(0.05)
             status, body = HC.dispatch(cfg, "GET", pattern, {}, {})
+        if isinstance(body, dict) and body.get("code") == "PLUGIN_NOT_FOUND":
+            # memory-wiki is an OPTIONAL user-installed plugin: its five read
+            # routes stay registered, and the handler answers a typed
+            # PLUGIN_NOT_FOUND (never a dispatcher 404) when the plugin is not
+            # installed. That is the route being live, not missing.
+            assert status == 404, (pattern, status, body)
+            continue
         assert status != 404, (pattern, body)
         assert isinstance(body, (dict, list)), pattern
 
