@@ -740,7 +740,16 @@ def upgrade_profile(cfg: Any, kind: str, profile_id: str, *,
         return {"state": MISSING, "detail": f"unknown {profile_id!r}"}
     gates = profile_check(cfg, kind, profile_id)
     if gates["state"] in (FAILED,):
-        return {"state": gates["state"], "detail": gates["detail"],
+        # ``profile_check`` returns ``detail`` only on its early typed refusals;
+        # a gate failure reports the failing gate names in ``gates`` instead.
+        # Reading ``detail`` unconditionally raised KeyError and killed the
+        # request (a 500) instead of returning the typed refusal.
+        failed = sorted(k for k, v in (gates.get("gates") or {}).items()
+                        if v == FAILED)
+        detail = gates.get("detail") or (
+            f"profile {profile_id!r} failed gates: {', '.join(failed)}"
+            if failed else f"profile {profile_id!r} failed its gates")
+        return {"state": gates["state"], "detail": detail,
                 "kept": _current_value(cfg, kind),
                 "gates": gates.get("gates", {})}
     # Real upgrade: refresh the registered manifest metadata from the live
