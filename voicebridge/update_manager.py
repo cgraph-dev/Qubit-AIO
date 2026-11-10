@@ -1198,8 +1198,12 @@ def detect_install_method(cfg: Any) -> Dict[str, Any]:
         method, reason = "immutable", "the code tree is not writable in place"
     elif str(os.environ.get("QUBIT_CONTAINER", "") or "").strip():
         method, reason = "container", "QUBIT_CONTAINER is set"
-    elif str(os.environ.get("HERMES_CONTAINER", "") or "").strip():
-        method, reason = "container", "HERMES_CONTAINER is set"
+    elif (str(os.environ.get("QUBIT_CONTAINER", "") or "").strip()
+            or str(os.environ.get("HERMES_CONTAINER", "") or "").strip()):
+        # The reason is user-facing (it lands in the update receipt), so it
+        # names the documented Qubit variable even when the legacy spelling is
+        # what actually triggered the detection.
+        method, reason = "container", "QUBIT_CONTAINER is set"
     elif is_checkout:
         method, reason = "git-checkout", "a git checkout is present"
     elif immutable:

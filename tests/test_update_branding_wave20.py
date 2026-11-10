@@ -57,6 +57,11 @@ EXACT_LINE_WHITELIST = {
 GUARD_PATTERNS = {
     "voicebridge/update_manager.py": (
         r"hermes-dashboard\.service",       # foreign unit restart refusal
+        # Legacy container-env read: the Docker images export HERMES_CONTAINER
+        # while every doc names QUBIT_CONTAINER, so update-method detection must
+        # accept both or it disagrees with qubit_constants' chmod policy. An
+        # internal read only — the receipt reason names the Qubit spelling.
+        r"os\.environ\.get\(\s*['\"]HERMES_CONTAINER['\"]",
     ),
     "voicebridge/update_channel.py": (
         r"LEGACY_URL_TOKENS\s*=",           # legacy source-URL token guard
