@@ -45,6 +45,24 @@ class RunnerContract:
                 "parallelism": self.parallelism, "digest": self.digest}
 
 
+def _close_http_error(exc: BaseException) -> None:
+    """Close the response body an ``HTTPError`` carries.
+
+    ``urllib`` raises ``HTTPError`` *before* the ``with`` statement is
+    entered, and the error object owns the response's file object (a
+    ``tempfile``-backed one on some code paths). Swallowing it with
+    ``except Exception: pass`` therefore leaks that handle until the GC
+    finalises it — which surfaces as a ``ResourceWarning`` at an arbitrary
+    later point, often attached to an unrelated test. Closing here keeps
+    the failure best-effort without the leak."""
+    closer = getattr(exc, "close", None)
+    if callable(closer):
+        try:
+            closer()
+        except Exception:  # noqa: BLE001 - already on an error path
+            pass
+
+
 def _fetch_digest(url: str, alias: str, timeout_s: float = 1.0) -> Optional[str]:
     """Best-effort digest lookup; never blocks startup (typed None).
 
@@ -62,8 +80,8 @@ def _fetch_digest(url: str, alias: str, timeout_s: float = 1.0) -> Optional[str]
             d = resp.headers.get("X-Ollama-Digest")
             if d:
                 return d or None
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 - best-effort, typed None below
+        _close_http_error(exc)
     try:
         with urllib.request.urlopen(f"{base}/api/tags", timeout=timeout_s) as resp:
             tags = json.loads(resp.read().decode())
@@ -72,8 +90,8 @@ def _fetch_digest(url: str, alias: str, timeout_s: float = 1.0) -> Optional[str]
             want = alias.split(":")[0]
             if name.split(":")[0] == want:
                 return m.get("digest") or None
-    except Exception:
-        pass
+    except Exception as exc:  # noqa: BLE001 - best-effort, typed None below
+        _close_http_error(exc)
     return None
 
 
