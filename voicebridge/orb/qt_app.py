@@ -1407,6 +1407,49 @@ def _tint_cached(image: Any, ghost_atlas: Any, index: int,
     return cached
 
 
+_BODY_CENTRE: dict[str, "tuple[float, float] | None"] = {}
+
+
+def _ghost_body_centre(atlas: Any) -> tuple[float, float]:
+    """Centre of the ghost's opaque BODY, unioned across the whole loop.
+
+    The frame is padded to fit the halo, and it is padded UNEVENLY: measured on
+    the 72-frame atlas the body spans x 88..127, y 102..152, so its centre is
+    (107.5, 127.0) while the canvas centre is (108.0, 110.0). Aligning the canvas
+    centre to the orb centre therefore lifts the sprite ~17 art px, which at the
+    current scale is about 40 screen px — enough to shear the hem off the bottom.
+    Aligning the BODY centre instead keeps the ghost whole.
+
+    Falls back to the canvas centre when the atlas cannot be probed.
+    """
+    try:
+        cached = _BODY_CENTRE.get("body")
+        if cached is not None:
+            return cached
+        min_x, min_y, max_x, max_y = 10 ** 6, 10 ** 6, -1, -1
+        for index in range(atlas.frames):
+            data = atlas.rgba(index)
+            for y in range(atlas.h):
+                row = y * atlas.w
+                for x in range(atlas.w):
+                    if data[(row + x) * 4 + 3] > 40:
+                        if x < min_x:
+                            min_x = x
+                        if x > max_x:
+                            max_x = x
+                        if y < min_y:
+                            min_y = y
+                        if y > max_y:
+                            max_y = y
+        if max_x < 0:
+            raise ValueError("no opaque pixels")
+        centre = ((min_x + max_x) / 2.0, (min_y + max_y) / 2.0)
+    except Exception:  # noqa: BLE001 - a probe failure declines to the canvas
+        centre = (atlas.w / 2.0, atlas.h / 2.0)
+    _BODY_CENTRE["body"] = centre
+    return centre
+
+
 def _luma_range(image: Any) -> tuple[float, float]:
     """(min, max) luma of the frame's visible pixels, cached by frame index."""
     key = id(image)
@@ -1563,8 +1606,16 @@ def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
         src_h = float(max_y - min_y + 1)
         draw_w = src_w * scale
         draw_h = src_h * scale
-        left = cx - draw_w * 0.5
-        top_y = cy - draw_h * 0.5
+        # Centre on the GHOST, not on the canvas. It is not centred in its own
+        # frame: the exporter pads unevenly above for the halo, so the body's
+        # centre sits at y=127 in a canvas whose centre is y=110 -- 17px low,
+        # which at this scale is ~40px on screen. Centring the canvas therefore
+        # pushed the sprite UP and sheared its hem off at the bottom edge.
+        # Placing the body's own centre on the orb centre keeps the whole ghost,
+        # hem and ground-glow included, inside the widget.
+        body_cx, body_cy = _ghost_body_centre(atlas)
+        left = cx - (body_cx - float(min_x)) * scale
+        top_y = cy - (body_cy - float(min_y)) * scale
         bright = max(0.0, min(1.0, float(brightness)))
 
         def _blit(frame_image: Any, alpha: float) -> None:
