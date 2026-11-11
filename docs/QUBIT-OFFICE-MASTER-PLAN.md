@@ -1067,3 +1067,13 @@ graphs, OpenViking scopes, interaction/action engine, mature-content policy, bui
 FX/map/Godot guidance and the corrected implementation order are persisted in
 `docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md`. That file is the reference for this
 work; this section only points at it.
+
+
+---
+
+## 44. Coverage additions
+
+The Character Studio merge (Habblaud + LimeZu Character/Portrait Generators), outside-world
+campus map, full panel inventory, capability catalog, asset ledger and the coverage-status
+table are persisted in `docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` §15–§20. That file
+is the reference; this is a pointer, not a second authority.
