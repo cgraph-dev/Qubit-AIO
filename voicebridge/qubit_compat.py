@@ -42,6 +42,7 @@ from . import resources as _resources  # noqa: E402
 from . import qubit_plugins as _qubit_plugins  # noqa: E402
 from . import qubit_desktop_plugins as _qubit_desktop_plugins  # noqa: E402
 from . import read_cache as _rc  # noqa: E402
+from .business import bridge as _business_bridge  # noqa: E402
 OVERLAY_DIR = _resources.resource_path("frontend/qubit-app")
 
 Handler = Callable[..., Tuple[int, Dict[str, Any]]]
@@ -11994,6 +11995,48 @@ _r("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "h_oauth_disconnect")
 _r("GET", r"/api/curator", "h_curator")
 # M4: the tower. Read-only; the plugin renders it and nothing else.
 _r("GET", r"/api/office/tower", "h_office_tower")
+# --- Business OS (War Room / roles / agent controls) -----------------------
+# The owner-only Business UI bridge. Reads project the durable Business OS
+# rows; mutations require the explicit owner intent and never publish, spend,
+# contact or call an external platform. The same routes are reachable from the
+# Office shell through its `/agent/api` prefix. Registered before any catch-all
+# office route so a business path is never read as an office seat id.
+_r("GET", r"/api/office/business/overview", "h_business_overview")
+_r("GET", r"/api/office/business/directory", "h_business_directory")
+_r("GET", r"/api/office/business/roles", "h_business_roles")
+_r("GET", r"/api/office/business/org/floors", "h_business_floors")
+_r("GET", r"/api/office/business/warroom/sessions", "h_business_warroom_list")
+_r("POST", r"/api/office/business/warroom/sessions", "h_business_warroom_create")
+_r("GET", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)",
+   "h_business_warroom_get")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/sources",
+   "h_business_warroom_source_add")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/evidence",
+   "h_business_warroom_evidence_add")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/arguments",
+   "h_business_warroom_argument_add")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/decisions",
+   "h_business_warroom_decide")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/tasks",
+   "h_business_warroom_tasks_create")
+_r("GET", r"/api/office/business/agents", "h_business_agents_list")
+_r("GET", r"/api/office/business/agents/(?P<id>[^/]+)/audit",
+   "h_business_agent_audit")
+_r("GET", r"/api/office/business/agents/(?P<id>[^/]+)", "h_business_agent_get")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/update",
+   "h_business_agent_update")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/pause",
+   "h_business_agent_pause")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/resume",
+   "h_business_agent_resume")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/stop",
+   "h_business_agent_stop")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/takeover",
+   "h_business_agent_takeover")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/revoke",
+   "h_business_agent_revoke")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/archive",
+   "h_business_agent_archive")
 # The office theme payload (tokens, slice descriptors, local asset base). A
 # read: it never serves the atlas bytes (those come from the pack root through
 # the static handler) and never writes.
@@ -21591,6 +21634,21 @@ def h_qubit_family_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/qubit/<family>/<action> -> direct gateway write (prefs)."""
     return _qubit_family_dispatch(cfg, q, b, p, "PUT")
+
+
+# Business OS bridge handlers (registered by name from the route table).
+for _name in (
+    "h_business_overview", "h_business_directory", "h_business_roles",
+    "h_business_floors", "h_business_warroom_list", "h_business_warroom_create",
+    "h_business_warroom_get", "h_business_warroom_source_add",
+    "h_business_warroom_evidence_add", "h_business_warroom_argument_add",
+    "h_business_warroom_decide", "h_business_warroom_tasks_create",
+    "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
+    "h_business_agent_update", "h_business_agent_pause", "h_business_agent_resume",
+    "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
+    "h_business_agent_archive",
+):
+    HANDLERS[_name] = getattr(_business_bridge, _name)
 
 
 HANDLERS["h_qubit_family_get"] = h_qubit_family_get

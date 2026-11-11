@@ -976,6 +976,10 @@ QUBIT_READ_AUTHORITY: tuple = (
     # (voicebridge.office.theme). Proxying it would serve the fork's unrelated
     # theme/overlay store; the compat handler is the authority.
     "/api/office/theme",
+    # Business OS (War Room / roles / agent controls): the durable local
+    # business.db is the authority. Proxying these reads would serve the
+    # vendored runtime's unrelated business/memory configuration.
+    "/api/office/business",
     # Public liveness for port/health checks and the reference dashboard's
     # ``GET /api/health`` contract. The compat handler is the authority.
     "/api/health",
