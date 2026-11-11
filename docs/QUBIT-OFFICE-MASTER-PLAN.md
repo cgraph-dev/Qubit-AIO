@@ -839,3 +839,113 @@ The panel must write through the Business OS/agent authority, not just localStor
 - Later Estonia/HK/US entities get separate books, accounts, approvals and credentials.
 - Never mix personal and company money/data; migration/clone path must be explicit.
 - Local PC now; export/backup makes moving to a VPS/entity later possible.
+
+
+---
+
+## 32. Full-service corporation capability map
+
+**Rule:** no artificial cap on rooms, floors/wings, departments, roles or agents. Capacity is bounded only by hardware, platform terms, budgets, permissions and human approval.
+
+### Departments / divisions
+
+- **Executive:** CEO (human), Chief of Staff, Strategy, Operations, Board/Council.
+- **Revenue:** Sales/SDR, Lead Generation, CRM, Partnerships, Account Management, Customer Success, Pricing.
+- **Marketing:** Brand, Content, Social Media, Community, SEO/GEO, Paid Ads, Email/Lifecycle, Influencer, Creative/Video, Analytics.
+- **Product & Engineering:** Product, UX/UI, Web, Apps, E-commerce, QA, DevOps, Data, Security.
+- **Delivery:** Project/Program, Onboarding, Services, Fulfillment, Training, Support.
+- **Finance:** Bookkeeping, Invoicing, Payments, Reconciliation, Tax, Procurement, Reporting.
+- **Legal & Compliance:** Contracts, Privacy, IP, Vendor, Risk, Platform Policy.
+- **People:** Recruiting, Onboarding, Performance, Training (agents/humans).
+- **Research / War Room:** Market, Competitor, Customer, Trend, Innovation, Validation.
+- **Maintenance:** Cost, API/schema drift, security, backups, incidents, QA, monitors.
+
+### Service lines (A–Z)
+
+Websites/landing pages, web apps, e-commerce, SEO/GEO, content, social media, community, email, ads, CRM, support, automation, branding/design, video/creative, data/analytics, onboarding, retainers, training, AI transformation, maintenance.
+
+### Role template fields
+
+Every role has: department, mission, responsibilities, skills, tools, data scopes, permissions, budgets/limits, autonomy level, approvals, schedules, KPIs, escalation, model/provider defaults, memory/SOPs, human owner.
+
+### 100-storey / 1000-agent scale
+
+- Floors/wings = organizational groups, not business truth.
+- No hard cap on floors/rooms/desks/agents; the static world can be large.
+- Only active businesses/rooms materialize agents; dormant rooms stay furnished/persistent.
+- Active set: camera, interaction, deadlines, approvals, incidents, priority, fairness.
+- Directory/elevator/minimap/floor stack for navigation; no fake floors or agents.
+- Static caches, chunking, LOD, hierarchical pathfinding, simulation tiers; load-test at 100/500/1,000 agents.
+- Room clusters: 16×12 cells; 9/12/18/24+ desks; never stretch a cell.
+
+> Note: this supersedes the earlier “no more floors” preference where the owner now wants a 100-storey corporation. Floors are allowed; they remain presentation/grouping, and only active areas simulate.
+
+---
+
+## 33. Platform-safe social, leads, clients and delivery
+
+### Social media — official APIs, human approval, no fake engagement
+
+- Use **official APIs/OAuth** only. Never browser-automate or scrape logged-in platforms.
+- X: automated posts allowed via API; **no automated likes/follows/bulk engagement**; label automated accounts; replies/DMs only with opt-in and per-interaction limits; pay-per-use caps.
+- Meta (Facebook/Instagram/Threads): app review/business verification; frequency/spam rules; Page/professional accounts; official publish APIs; respect per-24h caps.
+- LinkedIn: only documented OAuth/Posts API routes; **no crawlers/bots/browser automation**, no bulk messaging/inauthentic engagement; many read/message features are partner-only.
+- TikTok: Content Posting API; audit required or posts are private; low per-token limits; no fake likes/followers.
+- YouTube: Data API quota; uploads via official API with privacy/publish-at controls; 100 uploads/day bucket.
+- Pinterest/Reddit/others: official API/approval only; no scraping/automation where prohibited.
+- **Human approval** for first publish, claims/pricing/guarantees, sensitive replies, crisis/complaints, DMs to high-intent buyers, and anything irreversible.
+- **No fake reviews, testimonials, engagement, followers, or unoriginal content.**
+
+### Lead generation and clients
+
+- ICP, consent, suppression lists, opt-outs, data minimisation, GDPR/CCPA/CAN-SPAM.
+- CRM is system of record; avoid duplicates; source/attribution/consent stored.
+- AI may research/score/draft; human approves targeting changes, campaigns, high-value replies, pricing/claims/commitments.
+- Multi-channel coordination prevents duplicate/contradictory messages.
+- Daily/weekly review; deliverability, reply quality, meetings, revenue—not just sends.
+
+### Websites, apps, services
+
+- GitHub/Git worktrees per project; isolated sandbox for code; CI/tests; human code review before deploy.
+- Client workspaces isolate data, credentials, assets, brand.
+- Staging → approval → production; rollback and backups.
+- SEO/GEO/content/ads/reporting follow the same approval and evidence rules.
+
+### Etsy pilot
+
+Digital downloads first; shop setup/listing/pricing/publish/refunds/messages/ads require human approval initially; official Etsy routes only; IP/licence check; no fake reviews/claims; personal seller now, entity later.
+
+---
+
+## 34. War Room for full-service ideas
+
+Inputs: YouTube links/transcripts, web pages, posts, comments, competitor shops/sites, images, notes, customer conversations.
+
+Debate roles expand to: Moderator, Researcher, Skeptic, Marketer, Social/Community, Sales/Lead Gen, Product/Engineering, Web/App, Delivery, Finance, Legal/Platform Policy, Customer, Builder.
+
+Outputs: idea brief, niche/service choice, customer/ICP, offer, channels, content/social plan, lead-gen plan, website/app scope, pricing, budget, risks, experiments, 30/60/90-day plan, tasks.
+
+Evidence labels: FACT / INFERENCE / ASSUMPTION / UNKNOWN; source artifacts; dissent preserved; no fabricated research; owner approves.
+
+---
+
+## 35. Phase order v4 (full-service)
+
+0. **Decisions/platform/legal:** pilot (Etsy digital), personal seller, tools, approval limits, budgets, local hosting, platform accounts/app reviews, entity-later plan.
+1. **Office shell + full static world:** rebrand, loading/weather, 100-floor/wing-capable campus, rooms/styles, active/dormant, controls. *(Wave 1 done as foundation.)*
+2. **War Room + role registry + agent controls:** 100+ role templates, idea lab, per-agent model/permissions/budget/autonomy.
+3. **Business OS + Etsy pilot:** durable workflows, CRM/payments/support/accounting adapters, Etsy dry-run, approvals, ledger.
+4. **Full-service agency:** social/lead-gen/content/ads/SEO/web/app/service playbooks; official APIs; human approvals; client workspaces.
+5. **100-storey scale + Business Factory:** many floors/rooms/agents active-only; create/clone businesses; multi-entity later.
+6. **World/self-host + hardening:** local/invite-only World; security, DR, load; full matrix once.
+
+---
+
+## 36. Wave-2 agent contract (4 lanes)
+
+- **A. War Room/full-service idea lab** — finish partial work; intake/debate/evidence/score/decision/tasks; no auto-publish/spend; tests.
+- **B. Role/capability registry** — 100+ role templates across departments, tools/permissions, org/floor templates, scaling; tests.
+- **C. Agent control panel** — model/provider, permissions, budgets, autonomy, schedule, stop/revoke; backend + UI; tests.
+- **D. Platform integration + Etsy pilot** — official API/dry-run adapters for Etsy/social/CRM/email, platform-policy gates, approval/rate-limit handling, Etsy playbook; no credentials/network/live actions.
+
+Each lane owns its worktree; no main/live/paid art/fake success; focused tests; commit; report blockers.
