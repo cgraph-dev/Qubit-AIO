@@ -104,6 +104,52 @@ def test_dashboard_build_artifact_declared_in_both_targets():
     assert _frontend_tree_packaged(wheel)
 
 
+def test_frontend_staging_never_prunes_the_office_client_or_theme_recipe():
+    """The filtered ``frontend/`` staging keeps runtime assets.
+
+    ``scripts/hatch_build_qubit.py`` prunes only dev/build output from the
+    per-file frontend mapping. The served office client
+    (``qubit-app/plugins/qubit-office/**``) and the committed theme recipe
+    (``qubit-web/public/plugins/qubit-office/themes/**``) are runtime assets:
+    if a future ``_PRUNED_PREFIXES`` entry covered them the wheel would install
+    a dashboard/office whose client or recipe is missing.
+    """
+    import ast
+
+    source = (REPO / "scripts" / "hatch_build_qubit.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    prefixes: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Assign) and any(
+            isinstance(t, ast.Name) and t.id == "_PRUNED_PREFIXES"
+            for t in node.targets
+        ):
+            prefixes.update(
+                elt.value for elt in getattr(node.value, "elts", [])
+                if isinstance(elt, ast.Constant) and isinstance(elt.value, str)
+            )
+    assert prefixes, "could not read _PRUNED_PREFIXES from the build hook"
+
+    represented = [
+        "qubit-app/plugins/qubit-office/habblaud/bundle/app-x.js",
+        "qubit-app/plugins/qubit-office/habblaud/PROVENANCE.json",
+        "qubit-app/plugins/qubit-office/qubit-office.game.js",
+        "qubit-web/public/plugins/qubit-office/themes/limezu/theme.recipe.json",
+    ]
+    for rel in represented:
+        assert not any(
+            rel == p or rel.startswith(p + "/") for p in prefixes
+        ), f"frontend staging would prune runtime asset {rel}"
+
+    for rel in (
+        "frontend/qubit-app/plugins/qubit-office/habblaud/bundle",
+        "frontend/qubit-app/plugins/qubit-office/habblaud/PROVENANCE.json",
+        "frontend/qubit-app/plugins/qubit-office/qubit-office.game.js",
+        "frontend/qubit-web/public/plugins/qubit-office/themes/limezu/theme.recipe.json",
+    ):
+        assert (REPO / rel).exists(), rel
+
+
 def test_every_runtime_resource_is_reachable_from_package_data():
     """Each resource the installed package resolves must be produced by a
     wheel force-include (a directory mapping or an exact file)."""

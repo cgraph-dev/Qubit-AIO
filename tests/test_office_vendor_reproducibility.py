@@ -51,6 +51,21 @@ def _record() -> dict:
     return json.loads(PROVENANCE.read_text(encoding="utf-8"))
 
 
+def _app_chunk_rel() -> str:
+    """The chunk the vendored build actually ships (the filename is hashed).
+
+    A re-vendor renames ``bundle/app-<hash>.js``, so a hardcoded hash goes
+    stale and the falsifiability tests would silently test a missing file.
+    Read the single ``bundle/app-*.js`` from PROVENANCE instead.
+    """
+    apps = sorted(
+        f["path"] for f in _record()["files"]
+        if f["path"].startswith("bundle/app-") and f["path"].endswith(".js")
+    )
+    assert len(apps) == 1, f"expected one vendored bundle/app-*.js, saw {apps}"
+    return apps[0]
+
+
 def _diff_record_against_tree(root: Path, record: dict) -> dict:
     """The exact comparison the rebuild verifier performs, pointed at `root`.
 
@@ -95,13 +110,14 @@ def _copy_tree(tmp_path: Path) -> Path:
 def test_perturbed_byte_is_detected(tmp_path: Path) -> None:
     """Flip one byte in a vendored chunk; the comparison must notice."""
     root = _copy_tree(tmp_path)
-    target = root / "bundle" / "app-U4Pwh2XA.js"
+    rel = _app_chunk_rel()
+    target = root / rel
     assert target.is_file(), "expected the vendored app chunk"
     blob = target.read_bytes()
     target.write_bytes(blob[:-1] + bytes([blob[-1] ^ 0x01]))
 
     diff = _diff_record_against_tree(root, _record())
-    assert "bundle/app-U4Pwh2XA.js" in diff["differing"], (
+    assert rel in diff["differing"], (
         "a single flipped byte in the app chunk was NOT detected — the check is "
         "not falsifiable"
     )
@@ -109,9 +125,10 @@ def test_perturbed_byte_is_detected(tmp_path: Path) -> None:
 
 def test_deleted_file_is_detected(tmp_path: Path) -> None:
     root = _copy_tree(tmp_path)
-    (root / "bundle" / "app-U4Pwh2XA.js").unlink()
+    rel = _app_chunk_rel()
+    (root / rel).unlink()
     diff = _diff_record_against_tree(root, _record())
-    assert "bundle/app-U4Pwh2XA.js" in diff["missing"], (
+    assert rel in diff["missing"], (
         "deleting a vendored chunk was NOT detected"
     )
 
@@ -128,16 +145,18 @@ def test_undeclared_file_is_detected(tmp_path: Path) -> None:
 def test_wrong_revision_substitution_is_detected(tmp_path: Path) -> None:
     """The real-world failure: a chunk from a DIFFERENT upstream revision.
 
-    `86c0379` (the shared checkout's HEAD) builds `app-DrspyBzY.js`; the pin
-    builds `app-U4Pwh2XA.js`. Swapping the file for the wrong-revision build
-    must fail the check — this is exactly the confusion that produced the
-    original "not reproducible" verdict.
+    The owner revendored the client once already, and the hash-named chunks
+    changed; a hardcoded revision builds a different ``app-<hash>.js``.
+    Swapping the shipped chunk for a wrong-revision build must fail the
+    check — this is exactly the confusion that produced the original
+    "not reproducible" verdict.
     """
     root = _copy_tree(tmp_path)
-    app = root / "bundle" / "app-U4Pwh2XA.js"
+    rel = _app_chunk_rel()
+    app = root / rel
     app.write_bytes(b"// a bundle built from a different commit\n")
     diff = _diff_record_against_tree(root, _record())
-    assert "bundle/app-U4Pwh2XA.js" in diff["differing"]
+    assert rel in diff["differing"]
 
 
 # --- the record must name a full pinned commit -------------------------------

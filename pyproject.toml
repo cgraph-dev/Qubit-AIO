@@ -635,6 +635,11 @@ exclude = [
   "docs/STARNET_VOICE_STUDY.md",
   "docs/TEST-HONESTY-AUDIT.md",
   "docs/TEST_PORT_RECOVERY_2026-10-19.md",
+  # Internal superpowers work plans are not product docs and record the
+  # developer's worktree paths. The Office Habblaud/theme plan carries that
+  # home path, so keep it out of the release sdist (Packet 8K sdist privacy;
+  # pinned by tests/test_packaging_wave3.py).
+  "docs/superpowers/plans/2026-11-09-office-habblaud-surfaces.md",
   # docs/VOICE-BRIDGE-AUDIT.md is NOT excluded: it is force-included into the
   # wheel as the installed AUDIO_SETUP guide, so the sdist must carry it or a
   # wheel rebuilt from the sdist dies with "Forced include not found".
