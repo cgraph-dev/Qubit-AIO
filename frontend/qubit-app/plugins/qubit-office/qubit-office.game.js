@@ -197678,10 +197678,10 @@ create: function(game) {
 				};
 			}, []);
 			useEffect(() => {
-				if (!config.tips.length) return;
+				if (!config.tips.length || hidden) return;
 				const id = setInterval(() => setTipIndex((i) => (i + 1) % config.tips.length), TIP_MS);
 				return () => clearInterval(id);
-			}, [config.tips.length]);
+			}, [config.tips.length, hidden]);
 			useEffect(() => {
 				const previous = surfaces.current.splice(0);
 				for (const surface of previous) surface.dispose();

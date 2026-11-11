@@ -184,10 +184,10 @@ export function createOfficeLoadingScreen(
     // Tips rotate while the screen is up; the timer is cleared on unmount and
     // never used for anything that could re-render the world.
     useEffect(() => {
-      if (!config.tips.length) return;
+      if (!config.tips.length || hidden) return;
       const id = setInterval(() => setTipIndex((i: number) => (i + 1) % config.tips.length), TIP_MS);
       return () => clearInterval(id);
-    }, [config.tips.length]);
+    }, [config.tips.length, hidden]);
 
     // One surface per layer. `effect: none` disposes them; unmount disposes
     // them. Reduced motion/low power draw a single still frame.
