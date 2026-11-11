@@ -264,3 +264,153 @@ Licences and attribution apply; do not copy paid art or non-redistributable asse
 
 **First measurable milestone:** one department floor where agents work, chat, remember, use
 tools, take breaks/interact, recover from restart, and leave artifacts — then clone it.
+
+---
+
+## 15. Character Studio — merge Habblaud editor + LimeZu generators
+
+There must be **one** Character Studio, not three disconnected editors.
+
+### Sources
+
+- **Habblaud character editor/state:** existing character layers, animation states and preview
+  surface in the vendored client. Character save is currently refused by the Qubit boundary;
+  the canonical profile replaces that gate.
+- **LimeZu Character Generator 2.0:** body, eyes, hair, outfit and skin parts; the measured
+  catalog is body 9 / eyes 7 / hair 29 / outfit 33 / skin 9. Local-only paid art.
+- **LimeZu Portrait Generator 1.5:** portrait parts/atlas for agent cards, controls and
+  close-ups.
+
+### Canonical profile
+
+```
+CharacterProfile
+  profile_id, agent_id
+  body_id, skin_id, eyes_id, hair_id, outfit_id, accessory_ids
+  colors, layers, palette
+  portrait_cell, portrait_size (32/48)
+  animation_set, idle/working/talking presets
+  seed, style_version
+  source_assets (local paths/hashes, never shipped)
+```
+
+### Studio surfaces
+
+- Live preview at world scale and portrait scale
+- Part pickers with category counts and search
+- Randomize / lock parts / undo / presets
+- Layer ordering, colors, shadow policy
+- Animation preview: idle, walk, type, talk, think, break, celebrate
+- Save to the Business OS agent record; sync Habblaud character state and LimeZu
+  portrait/atlas references
+- Per-agent override, department defaults, role defaults
+- Import/export JSON; versioned revisions
+- Paid-art guard: no generated/paid asset is committed to the public tree; build locally
+
+### Merge rule
+
+Habblaud supplies the character **state/editor/animation contract**. LimeZu supplies the
+**parts and portrait atlas**. The Qubit Character Studio is the only save authority. Do not
+keep a second editor with a second save path.
+
+## 16. Outside world / campus exterior
+
+The outside world is a **data-driven campus map**, not a decorative backdrop.
+
+- Ground, roads, sidewalks, parking, paths, trees, gardens, fences, props
+- Building exterior/facade, roof, entrance, windows, signage
+- Lobby/security entrance connecting exterior → department floors
+- Weather, day/night, seasonal variants
+- Visitors/vehicles/ambient life as presentation only
+- Campus map, department entrances, elevator/stairs
+- Chunks/tiles so the map can grow without loading everything
+- Active/dormant exterior zones; only active areas animate
+- Asset licensing recorded per pack; paid LimeZu/other art stays local
+
+### Renderer
+
+Web/Phaser can render the first exterior map. Godot is optional for a larger 2.5D/3D campus;
+it reads the same map/state API and owns no business truth. Do not switch before the map schema
+and one department floor work.
+
+## 17. Full panel inventory
+
+Panels must be reconciled against Habblaud, Agent Quest, StarNet, agent-monitor and the office
+shell. At minimum:
+
+**Agents/work**
+- Agents roster, Agent Controls, Agent Chat, Agent Session, Agent Terminal
+- Deliveries, Timeline/Timelapse, Tasks, Jobs, Artifacts
+
+**World**
+- Campus map, Department map, Room map, Floor directory
+- Room Builder, Department Builder, Character Studio, Wardrobe
+- Weather/time, Visitors, Exterior
+
+**Business**
+- War Room/Idea Lab, Memory Room, Approvals, Ops cockpit
+- Ledger, CRM/leads, customers, marketing/social, Etsy, reports, KPIs
+
+**System**
+- Models/providers, tools/toolsets, MCP, plugins, skills, budgets, audit, security
+- Notifications/inbox, search, settings, activity
+
+Every panel needs: data authority, permissions, empty/error states, real actions, and a
+capability mapping. No panel may invent state.
+
+## 18. Capability catalog
+
+Agents get the **full Qubit capability catalog**, not a hardcoded research provider.
+
+- Qubit tools and toolsets
+- MCP servers and tools
+- Plugins and skills
+- Terminal/command execution
+- Browser/CDP and web search
+- Files/read/write/search
+- Messaging/channels/email
+- Connectors and platform integrations (Etsy/social/CRM/payments)
+- Memory: Obsidian and OpenViking
+- Agent-to-agent/owner messaging
+- Model/provider selection with fallback
+
+Each capability has: id, category, risk, required scopes, approval policy, budget/rate limits,
+provider/availability, audit behaviour. Per-agent grants are explicit; no wildcard defaults.
+War Room, research, council and business workflows call this catalog; they do not call a
+specific provider.
+
+## 19. Asset ledger
+
+Every asset gets a record before use:
+
+- pack/file, sha256, dimensions, license, local-only/paid flag
+- intended department/room/style/prop/character slot
+- extracted/sliced status, atlas/frame coordinates
+- used-by rooms/agents/panels
+- provenance/attribution
+
+Assets remain outside the public tree when the license forbids redistribution.
+
+## 20. Coverage status
+
+| Area | Design coverage | Implementation |
+|---|---|---|
+| Department floors, rooms, facilities | Covered | Partial: 4 live rooms, 100-floor room directory |
+| Department/floor builder | Covered | Not built |
+| Room styles/LimeZu variation | Covered | Partial: one theme, six floor surfaces |
+| Agent sessions/workspaces | Covered | Not built |
+| Owner↔agent / agent↔agent chat | Covered | Not built |
+| Obsidian department + office graph | Covered | Not built |
+| OpenViking scopes | Covered | Not built |
+| Interaction/action engine | Covered | Not built beyond coffee/RPS |
+| Mature-content policy | Covered | Not built |
+| FX/animation mapping | Covered | Loading weather only |
+| Maps/campus/exterior | Covered | Not built |
+| Godot option | Covered | Not built |
+| Character Studio merge | Covered here | Not built |
+| Full panel inventory | Covered here | Partial: Agents/War Room/Approvals/Etsy |
+| Capability catalog | Covered here | Partial: permission data, no gateway |
+| Asset ledger | Covered here | Not built |
+| Business/room/agent implementation | Covered | 1 business, 283 records, no operations |
+
+**Nothing above is `VERIFIED`; the table is a scope map, not a completion claim.**
