@@ -462,6 +462,17 @@ def _live_cli_surface(repo: Path) -> set[str]:
     return found
 
 
+def _normalise_route(route: str) -> str:
+    """A route with its placeholder NAMES erased: ``{job_id}`` -> ``{}``.
+
+    The two trees spell path parameters differently (upstream ``{job_id}``,
+    compat ``(?P<id>...)``) while the shape a request actually travels is
+    identical. Comparing normalised forms distinguishes "not served" from
+    "served under another parameter name", which is the honest question.
+    """
+    return re.sub(r"\{[^}]*\}", "{}", route)
+
+
 def _live_route_surface(repo: Path) -> set[str]:
     """``{"GET /api/status", ...}`` from the real route registry.
 
@@ -541,9 +552,11 @@ def _live_surface_disposition(repo: Path, item: dict,
                    "hermes_dashboard_page", "hermes_dashboard_route"):
         return None
     if surfaces is None:
+        _routes = _live_route_surface(repo)
         surfaces = {
             "cli": _live_cli_surface(repo),
-            "route": _live_route_surface(repo),
+            "route": _routes,
+            "route_norm": {_normalise_route(r) for r in _routes},
             "page": _live_dashboard_surface(repo),
             "spa": _live_spa_routes(repo),
         }
@@ -595,6 +608,23 @@ def _live_surface_disposition(repo: Path, item: dict,
                 "proving_test": "tests/test_backend_routes_integration8u.py",
                 "reason": (f"{method} {route} is registered by a literal "
                            "`_r(...)` call in voicebridge/qubit_compat.py."),
+                "needs": "none",
+            }
+        # Same route, different placeholder NAME. The compat layer registers
+        # `/api/cron/jobs/(?P<id>...)` while the upstream route is
+        # `/api/cron/jobs/{job_id}`: the path shape is identical and the handler
+        # reads the parameter positionally, so the route IS served. Matching the
+        # literal string reported these as MISSING purely because the two trees
+        # spell the wildcard differently.
+        normalised = _normalise_route(f"{method} {route}")
+        if normalised in surfaces.get("route_norm", set()):
+            return {
+                "status": "IMPLEMENTED", "capability": "qubit_backend_route",
+                "backend": "voicebridge.qubit_compat:_r",
+                "proving_test": "tests/test_backend_routes_integration8u.py",
+                "reason": (f"{method} {route} is served by a `_r(...)` route with "
+                           "the same path shape and a differently-named path "
+                           "parameter in voicebridge/qubit_compat.py."),
                 "needs": "none",
             }
         return None
@@ -2425,9 +2455,11 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
     # Build the live CLI/route/page indexes ONCE for the whole run: each helper
     # imports the argparse tree or scans a 12k-line module, which is far too
     # expensive to repeat per inventory item.
+    _routes = _live_route_surface(repo)
     live_surfaces = {
         "cli": _live_cli_surface(repo),
-        "route": _live_route_surface(repo),
+        "route": _routes,
+        "route_norm": {_normalise_route(r) for r in _routes},
         "page": _live_dashboard_surface(repo),
         "spa": _live_spa_routes(repo),
     }
