@@ -31,6 +31,7 @@ import sqlite3
 from typing import Any, Dict, Mapping, Tuple
 
 from . import agents as AGENTS
+from . import office_seats as OFFICE_SEATS
 from . import warroom as WARROOM
 from .errors import BusinessError
 from .roles import RoleRegistry, RoleRegistryError
@@ -357,6 +358,50 @@ def h_business_floors(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 
 # ---------------------------------------------------------------------------
+# Office-seat link/bootstrap
+# ---------------------------------------------------------------------------
+def h_business_bootstrap(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/business/bootstrap -> local Personal scope + 283 seats.
+
+    Creates the durable ``Personal`` tenant/business when absent and imports
+    every seat of the office's own plan as a Business OS agent that does not
+    already have a control record. It is idempotent (a repeat creates zero
+    records), owner-gated like every other Business OS write, and it never runs
+    a model, spends, contacts anyone, or calls an external platform.
+    """
+    if not _owner_ok(b):
+        return _owner_refusal("bootstrapping the office seat roster")
+    try:
+        store, service = _service(cfg)
+        scope = OFFICE_SEATS.ensure_personal_scope(store)
+        plan, seats = OFFICE_SEATS.plan_building_seats()
+        if not seats:
+            verdict = plan.get("check") or {}
+            raise BusinessError(
+                "BUSINESS_NOT_FOUND",
+                "the office roster is empty: "
+                + str(verdict.get("reason") or "no ported personas on disk"),
+            )
+        result = OFFICE_SEATS.sync_office_seats(
+            store, service, scope.tenant_id, scope.business_id, seats)
+        return _ok(
+            schema="qubit-office-business-bootstrap/1",
+            tenant_id=scope.tenant_id,
+            business_id=scope.business_id,
+            created_tenant=scope.created_tenant,
+            created_business=scope.created_business,
+            plan_ok=bool(plan.get("ok")),
+            total=result.total,
+            created=result.created,
+            existing=result.existing,
+            created_slugs=list(result.created_slugs),
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
+# ---------------------------------------------------------------------------
 # War Room
 # ---------------------------------------------------------------------------
 def h_business_warroom_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
@@ -669,6 +714,7 @@ __all__ = [
     "h_business_agent_takeover",
     "h_business_agent_update",
     "h_business_agents_list",
+    "h_business_bootstrap",
     "h_business_directory",
     "h_business_floors",
     "h_business_overview",

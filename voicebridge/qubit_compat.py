@@ -12002,6 +12002,10 @@ _r("GET", r"/api/office/tower", "h_office_tower")
 # Office shell through its `/agent/api` prefix. Registered before any catch-all
 # office route so a business path is never read as an office seat id.
 _r("GET", r"/api/office/business/overview", "h_business_overview")
+# Owner-gated, idempotent: creates the local Personal scope and imports the
+# office seat roster as Business OS control records on first use. The Office
+# Agent Controls drawer calls this when a clicked seat has no linked agent.
+_r("POST", r"/api/office/business/bootstrap", "h_business_bootstrap")
 _r("GET", r"/api/office/business/directory", "h_business_directory")
 _r("GET", r"/api/office/business/roles", "h_business_roles")
 _r("GET", r"/api/office/business/org/floors", "h_business_floors")
@@ -21638,7 +21642,8 @@ def h_qubit_family_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
 # Business OS bridge handlers (registered by name from the route table).
 for _name in (
-    "h_business_overview", "h_business_directory", "h_business_roles",
+    "h_business_overview", "h_business_bootstrap", "h_business_directory",
+    "h_business_roles",
     "h_business_floors", "h_business_warroom_list", "h_business_warroom_create",
     "h_business_warroom_get", "h_business_warroom_source_add",
     "h_business_warroom_evidence_add", "h_business_warroom_argument_add",

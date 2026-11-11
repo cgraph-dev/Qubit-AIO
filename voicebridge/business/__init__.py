@@ -20,7 +20,7 @@ adapters, UI, voice commands, real payouts. See
 """
 from __future__ import annotations
 
-from . import agents, approvals, jobs, ledger, role_catalog, roles, tools, warroom
+from . import agents, approvals, jobs, ledger, office_seats, role_catalog, roles, tools, warroom
 from .agents import (
     Agent,
     AgentControlService,
@@ -56,6 +56,13 @@ from .roles import (
     RoleRegistryError,
     RoleTemplate,
     RoomTemplate,
+)
+from .office_seats import (
+    PersonalScope,
+    SeatSyncResult,
+    ensure_personal_scope,
+    plan_building_seats,
+    sync_office_seats,
 )
 from .etsy_workflow import (
     EtsyDigitalListingWorkflow,
@@ -99,12 +106,14 @@ __all__ = [
     "LedgerEntry",
     "ListingWorkflowState",
     "Permissions",
+    "PersonalScope",
     "Policy",
     "RoleRegistry",
     "RoleRegistryError",
     "RoleTemplate",
     "RoomTemplate",
     "Safety",
+    "SeatSyncResult",
     "Task",
     "Tenant",
     "ToolGateway",
@@ -120,6 +129,10 @@ __all__ = [
     "WORKFLOW_STAGES",
     "agents",
     "approvals",
+    "ensure_personal_scope",
+    "office_seats",
+    "plan_building_seats",
+    "sync_office_seats",
     "integration_tools",
     "jobs",
     "ledger",
