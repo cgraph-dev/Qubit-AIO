@@ -458,7 +458,13 @@ def _cli_disposition(item):
         import source_inventory as si
     finally:
         sys.path.pop(0)
-    surfaces = {"cli": si._live_cli_surface(REPO_ROOT)}
+    # Build the same index shape production builds. Every key must be present:
+    # the disposition reads `cli` for commands/options and `cli_positionals` for
+    # positionals, so a partial dict raises rather than silently mis-classifying.
+    surfaces = {
+        "cli": si._live_cli_surface(REPO_ROOT),
+        "cli_positionals": si._live_cli_positional_surface(REPO_ROOT),
+    }
     disp = si._live_surface_disposition(REPO_ROOT, item, surfaces)
     return bool(disp and disp["status"] == "IMPLEMENTED")
 
