@@ -6011,6 +6011,31 @@ def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return result
 
 
+def h_office_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/world/tower -> deterministic 100-floor projection.
+
+    Read-only: it builds the projection from the shipped in-memory role/floor
+    templates. No store is opened, nothing is written, no model or network call
+    is made. ``?floor=`` returns one floor in full (rooms, 16x12 cells, desks);
+    ``?wing=`` returns that wing's floors with room summaries; the default is a
+    bounded floor summary. Every form carries the full-projection digest.
+    """
+    from .office.world import tower_plan as TP
+
+    floor = (q or {}).get("floor") or None
+    wing = (q or {}).get("wing") or None
+    try:
+        plan = TP.build_tower_plan()
+        return 200, TP.tower_payload(plan, floor=floor, wing=wing)
+    except TP.TowerPlanError as exc:
+        return exc.status, {"ok": False, "code": exc.code, "detail": exc.detail}
+    except Exception as exc:  # noqa: BLE001 - a read surface must not 500
+        return 503, {"ok": False, "code": "OFFICE_WORLD_UNAVAILABLE",
+                     "detail": "the office world projection could not be built: "
+                               f"{str(exc)[:200]}"}
+
+
 # ===========================================================================
 # Habblaud office-client compat surface
 # ===========================================================================
@@ -11995,6 +12020,10 @@ _r("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "h_oauth_disconnect")
 _r("GET", r"/api/curator", "h_curator")
 # M4: the tower. Read-only; the plugin renders it and nothing else.
 _r("GET", r"/api/office/tower", "h_office_tower")
+# The deterministic 100-floor/5-wing static world projection. Read-only; it
+# reads the shipped templates, opens no store and writes nothing. Registered
+# before any office catch-all so `/world/tower` is never read as a seat id.
+_r("GET", r"/api/office/world/tower", "h_office_world_tower")
 # --- Business OS (War Room / roles / agent controls) -----------------------
 # The owner-only Business UI bridge. Reads project the durable Business OS
 # rows; mutations require the explicit owner intent and never publish, spend,
@@ -20581,6 +20610,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_oauth_disconnect": h_oauth_disconnect,
     "h_curator": h_curator, "h_curator_paused": h_curator_paused,
     "h_office_tower": h_office_tower,
+    "h_office_world_tower": h_office_world_tower,
     "h_office_theme": h_office_theme,
     "h_office_habblaud_access": h_office_habblaud_access,
     "h_office_habblaud_status": h_office_habblaud_status,
