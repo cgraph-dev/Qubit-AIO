@@ -15,7 +15,7 @@
  *   POST /api/qubit/nodes/dispatch      (nodes.dispatch, confirm-gated)
  *   POST /api/qubit/nodes/rename        (nodes.rename, confirm-gated)
  *
- * Built on the shipped openclaw render-helper contract
+ * Built on the shared console-ui render-helper contract
  * (`@/components/console-ui`): a `SettingsPage` root holding a
  * `SettingsPageHeader`, a summary tile strip, and `SettingsSection` groups
  * (enroll / roster / detail). `.settings-row__control` is emitted by the helper

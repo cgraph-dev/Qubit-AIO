@@ -4,7 +4,7 @@
  *
  * The page used to render the `dashboard.show_token_analytics` gate as a wall
  * of four bare paragraphs (one 201-char unbroken block) with no settings
- * chrome. These tests pin the ported openclaw settings structure:
+ * chrome. These tests pin the ported settings structure:
  *
  *   - hidden gate  -> one `.settings-section` whose notice is `.settings-empty`
  *                     carrying the honest reason, plus a Config row. No

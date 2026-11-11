@@ -13,7 +13,7 @@
  * `{ files: [], root, live_reload, authority }`; a missing file is a typed
  * `CANVAS_NOT_FOUND`, never a fake page.
  *
- * Built on the shipped openclaw render-helper contract
+ * Built on the shared console-ui render-helper contract
  * (`@/components/console-ui`): a `SettingsPage` root holding a
  * `SettingsPageHeader`, a summary tile strip, and `SettingsSection` groups.
  * `.settings-row__control` is emitted by the helper ONLY when a control is
