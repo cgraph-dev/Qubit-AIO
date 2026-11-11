@@ -30,6 +30,7 @@ import secrets
 import sqlite3
 from typing import Any, Dict, Mapping, Tuple
 
+from ..office.world import model as WORLD
 from . import agents as AGENTS
 from . import office_seats as OFFICE_SEATS
 from . import warroom as WARROOM
@@ -39,6 +40,7 @@ from .store import BusinessStore
 from .util import redact
 
 SCHEMA = "qubit-office-business/1"
+WORLD_SCHEMA = "qubit-office-world-tower/1"
 OWNER_ONLY = "BUSINESS_OWNER_ONLY"
 TENANT_REQUIRED = "BUSINESS_TENANT_REQUIRED"
 INTERNAL = "BUSINESS_BRIDGE_ERROR"
@@ -352,6 +354,146 @@ def h_business_floors(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 for item in floors
             ],
             counts={"floors": len(floors), "wings": len({f.wing for f in registry.floors})},
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
+def _world_room(room: Any, *, active: bool) -> Dict[str, Any]:
+    """Project one room template into the world scene shape.
+
+    Cells come from :mod:`voicebridge.office.world.model`, which owns the fixed
+    16x12 primitive and the six desk slots per cell. Nothing here binds an
+    agent: every seat's ``occupied_by`` is left as the model produced it, which
+    is ``None`` for a template, so an empty desk stays honestly empty.
+    """
+    cells = WORLD.plan_cell_cluster(
+        room.room_id, room.desks, kind=room.kind)
+    cell_payload = []
+    for cell in cells:
+        cell_payload.append({
+            "cell_id": cell.cell_id,
+            "index": int(cell.index),
+            "cols": int(cell.cols),
+            "rows": int(cell.rows),
+            "origin": cell.origin.to_dict(),
+            "desk_slots": [
+                {
+                    "desk_id": desk.desk_id,
+                    "seat_id": desk.seat.seat_id,
+                    "tile": desk.tile.to_dict(),
+                    "footprint": {
+                        "w": int(desk.width),
+                        "h": int(desk.height),
+                    },
+                    "occupied_by": desk.seat.occupied_by,
+                }
+                for desk in cell.desks
+            ],
+        })
+    return {
+        "room_id": room.room_id,
+        "name": room.name,
+        "kind": room.kind,
+        "archetype": room.kind or "work",
+        "role_ids": list(room.role_ids),
+        "active": bool(active),
+        "state": "template",
+        "template": True,
+        "capacity": int(room.desks),
+        "cell_count": len(cell_payload),
+        "cells": cell_payload,
+    }
+
+
+def h_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/world/tower -> the 100-floor tower as room scenes.
+
+    A pure projection over the shipped floor/room templates. It is explicitly
+    unstaffed: rooms are template scenes with empty desk slots, not agents.
+    The endpoint is read-only and never creates a floor, a room, a seat or a
+    Business OS record.
+    """
+    try:
+        registry = _registry()
+        floors: Dict[str, Any] = []
+        wing_order: list[str] = []
+        wing_counts: Dict[str, Dict[str, int]] = {}
+        room_total = cell_total = desk_total = active_room_total = 0
+        for floor in registry.floors:
+            if floor.wing not in wing_order:
+                wing_order.append(floor.wing)
+            rooms = [_world_room(room, active=floor.active_by_default)
+                     for room in floor.rooms]
+            floor_cells = sum(room["cell_count"] for room in rooms)
+            floor_desks = sum(room["capacity"] for room in rooms)
+            active_rooms = sum(1 for room in rooms if room["active"])
+            room_total += len(rooms)
+            cell_total += floor_cells
+            desk_total += floor_desks
+            active_room_total += active_rooms
+            bucket = wing_counts.setdefault(floor.wing, {
+                "floors": 0,
+                "active_floors": 0,
+                "dormant_floors": 0,
+                "rooms": 0,
+            })
+            bucket["floors"] += 1
+            bucket["active_floors" if floor.active_by_default
+                   else "dormant_floors"] += 1
+            bucket["rooms"] += len(rooms)
+            floors.append({
+                "floor_id": floor.floor_id,
+                "index": int(floor.index),
+                "wing": floor.wing,
+                "wing_name": f"{floor.wing.title()} Wing",
+                "name": floor.name,
+                "active_by_default": bool(floor.active_by_default),
+                "active": bool(floor.active_by_default),
+                "department_ids": list(floor.department_ids),
+                "role_ids": list(floor.role_ids),
+                "room_count": len(rooms),
+                "desk_capacity": floor_desks,
+                "cells": floor_cells,
+                "capacity": {
+                    "rooms": len(rooms),
+                    "cells": floor_cells,
+                    "desks": floor_desks,
+                },
+                "rooms": rooms,
+            })
+        active_floors = sum(1 for floor in floors if floor["active"])
+        wings = [
+            {
+                "wing": wing,
+                "name": f"{wing.title()} Wing",
+                "floor_count": wing_counts[wing]["floors"],
+                "active_floors": wing_counts[wing]["active_floors"],
+                "dormant_floors": wing_counts[wing]["dormant_floors"],
+                "rooms": wing_counts[wing]["rooms"],
+            }
+            for wing in wing_order
+        ]
+        return _ok(
+            WORLD_SCHEMA,
+            source="templates",
+            staffed=False,
+            campus={"campus_id": "campus:office", "name": "Qubit Office"},
+            counts={
+                "floors": len(floors),
+                "wings": len(wings),
+                "active_floors": active_floors,
+                "dormant_floors": len(floors) - active_floors,
+                "rooms": room_total,
+                "cells": cell_total,
+                "desks": desk_total,
+                "active_rooms": active_room_total,
+                "dormant_rooms": room_total - active_room_total,
+                "agents": 0,
+            },
+            wings=wings,
+            floors=floors,
         )
     except Exception as exc:  # noqa: BLE001
         return _error(exc)
@@ -727,4 +869,5 @@ __all__ = [
     "h_business_warroom_list",
     "h_business_warroom_source_add",
     "h_business_warroom_tasks_create",
+    "h_world_tower",
 ]

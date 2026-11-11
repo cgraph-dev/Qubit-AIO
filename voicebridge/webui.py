@@ -980,6 +980,9 @@ QUBIT_READ_AUTHORITY: tuple = (
     # business.db is the authority. Proxying these reads would serve the
     # vendored runtime's unrelated business/memory configuration.
     "/api/office/business",
+    # The 100-floor tower room scenes come from Qubit's own world model, not
+    # the vendored Habblaud backend's unrelated organization.
+    "/api/office/world",
     # Public liveness for port/health checks and the reference dashboard's
     # ``GET /api/health`` contract. The compat handler is the authority.
     "/api/health",

@@ -86,6 +86,7 @@ def test_routes_are_registered_under_the_office_family():
         ("GET", "/api/office/business/directory"),
         ("GET", "/api/office/business/roles"),
         ("GET", "/api/office/business/org/floors"),
+        ("GET", "/api/office/world/tower"),
         ("GET", "/api/office/business/warroom/sessions"),
         ("POST", "/api/office/business/warroom/sessions"),
         ("GET", "/api/office/business/agents"),
@@ -98,6 +99,7 @@ def test_routes_are_registered_under_the_office_family():
 def test_business_reads_are_a_qubit_read_authority():
     assert W.qubit_read_authority("/api/office/business/overview")
     assert W.qubit_read_authority("/api/office/business/warroom/sessions")
+    assert W.qubit_read_authority("/api/office/world/tower")
 
 
 def test_a_tokenless_non_loopback_request_fails_the_dashboard_gate():
@@ -141,6 +143,44 @@ def test_directory_reports_the_real_template_catalog(env):
     assert len(out["roles"]) == 132
     assert all("autonomy" in role and "budget" in role for role in out["roles"])
     assert all("wing" in floor for floor in out["floors"])
+
+
+def test_world_tower_is_a_100_floor_unstaffed_room_scene(env):
+    cfg, _store = env
+    code, out = _call(cfg, "GET", "/api/office/world/tower")
+    assert code == 200
+    assert out["ok"] is True
+    assert out["schema"] == "qubit-office-world-tower/1"
+    assert out["source"] == "templates"
+    assert out["staffed"] is False
+    counts = out["counts"]
+    assert counts["floors"] == 100
+    assert counts["wings"] == 5
+    assert counts["active_floors"] + counts["dormant_floors"] == 100
+    assert len(out["wings"]) == 5
+    assert len(out["floors"]) == 100
+    # No fake agents: every rendered seat is empty and no agent is counted.
+    assert counts["agents"] == 0
+    assert counts["desks"] == sum(floor["capacity"]["desks"]
+                                 for floor in out["floors"])
+    for floor in out["floors"]:
+        assert floor["active"] is floor["active_by_default"]
+        assert floor["capacity"]["rooms"] == len(floor["rooms"])
+        for room in floor["rooms"]:
+            assert room["template"] is True
+            assert room["state"] == "template"
+            assert room["active"] is floor["active_by_default"]
+            assert room["cell_count"] == len(room["cells"])
+            desks = 0
+            for cell in room["cells"]:
+                assert (cell["cols"], cell["rows"]) == (16, 12)
+                assert len(cell["desk_slots"]) <= 6
+                for slot in cell["desk_slots"]:
+                    assert slot["occupied_by"] is None
+                    assert 0 <= slot["tile"]["x"] < 16
+                    assert 0 <= slot["tile"]["y"] < 12
+                    desks += 1
+            assert desks == room["capacity"]
 
 
 def test_roles_and_floors_can_be_filtered(env):

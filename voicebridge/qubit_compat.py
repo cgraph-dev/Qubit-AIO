@@ -12009,6 +12009,11 @@ _r("POST", r"/api/office/business/bootstrap", "h_business_bootstrap")
 _r("GET", r"/api/office/business/directory", "h_business_directory")
 _r("GET", r"/api/office/business/roles", "h_business_roles")
 _r("GET", r"/api/office/business/org/floors", "h_business_floors")
+# The 100-floor tower as room scenes: a read-only projection over the shipped
+# floor/room templates (fixed 16x12 cells, six desk slots per cell). It is
+# explicitly unstaffed, so the Office scene can render empty desks rather than
+# inventing agents.
+_r("GET", r"/api/office/world/tower", "h_world_tower")
 _r("GET", r"/api/office/business/warroom/sessions", "h_business_warroom_list")
 _r("POST", r"/api/office/business/warroom/sessions", "h_business_warroom_create")
 _r("GET", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)",
@@ -21651,7 +21656,7 @@ for _name in (
     "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
     "h_business_agent_update", "h_business_agent_pause", "h_business_agent_resume",
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
-    "h_business_agent_archive",
+    "h_business_agent_archive", "h_world_tower",
 ):
     HANDLERS[_name] = getattr(_business_bridge, _name)
 
