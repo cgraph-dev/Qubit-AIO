@@ -691,6 +691,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const loadReqRef = useRef(0);
+  // Count of transcript rows appended LOCALLY (optimistic user sends, streamed
+  // replies, image turns). A transcript read compares this against the value
+  // it captured when it was issued, so a read that settles late can never
+  // overwrite a row the operator added in the meantime.
+  const localAppendRef = useRef(0);
   // Sessions already auto-resumed in this page load, so a surviving crash marker
   // can re-issue a turn exactly once (a crash loop must not spin here).
   const resumedRef = useRef<Set<string>>(new Set());
@@ -741,8 +746,18 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
   // strand the transcript — the reported "reload shows a blank chat until I
   // click a session in the right rail" defect, which was the transcript load
   // being gated behind the list fetch.
+  //
+  // A read issued here may REPLACE the transcript, but it may never discard a
+  // row the operator added after it was issued: `localAppendRef` counts the
+  // local appends since this effect last started, and the 404 branch below
+  // uses it to keep an optimistically-appended user turn. A 404 that settles
+  // after a send is a stale observation about the server, not evidence that
+  // the operator's message did not happen.
   useEffect(() => {
     const myReq = ++loadReqRef.current;
+    // Rows appended locally from here on belong to the operator's own actions
+    // and outrank this (older) read.
+    const appendsAtStart = localAppendRef.current;
     // Instant paint from the cache; the server load below replaces it.
     setMessages(loadTranscript(session));
     setTranscriptSession(session);
@@ -809,7 +824,15 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
         if (/\b404\b/.test(message)) {
           setForeignSession(session === DEFAULT_SESSION ? null : session);
           setReasoning(null);
-          setMessages([]);
+          // Keep any row this page appended AFTER the probe was issued. The
+          // server answered "no such session" for a read that predates the
+          // operator's own turn, so clearing the transcript here deleted the
+          // message they just sent — the "my message vanished" defect. A
+          // failed read is not evidence the message did not happen: the local
+          // rows are ours and a later read (or the turn's `done`) reconciles
+          // them with the store. Only a probe with no local appends still
+          // clears, which is the fresh/empty default chat it was written for.
+          if (localAppendRef.current === appendsAtStart) setMessages([]);
           setTranscriptState("ready");
           voiceSyncedRef.current = 0;
           transcriptReadyRef.current = true;
@@ -1083,6 +1106,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       setStreamingText("");
       setTaskProgress(null);
       taskTurnRef.current = false;
+      // This row is the operator's own message and outranks any transcript read
+      // issued before it (see `localAppendRef` / the load effect's 404 branch).
+      localAppendRef.current += 1;
       setMessages((prev) => prev.concat([{ role: "user", text }]));
       // A locally-driven turn in a followed voice session appends rows the
       // server will persist too; advance the merge counter so the next poll
@@ -1168,6 +1194,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   : { key: taskKey, status: "done", detail: "worker finished" },
               );
             }
+            // The assistant row is a local append too: a transcript read
+            // issued before this turn must not clear it.
+            localAppendRef.current += 1;
             setMessages((prev) =>
               prev.concat([
                 {
@@ -1664,6 +1693,7 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
               setRetryText(userText);
               return;
             }
+            localAppendRef.current += 1;
             setMessages((prev) =>
               prev.concat([
                 {

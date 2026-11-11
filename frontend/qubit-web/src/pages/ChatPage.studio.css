@@ -737,15 +737,18 @@
 }
 .qchat__message--progress::after,
 .qchat__message--streaming::after { background: var(--qchat-cyan) !important; }
-/* Speaker label: the loudest small text on the page. */
+/* Speaker label: the loudest small text on the page. The label is CONTENT
+   ("You" / "Qubit"), so it is never case-transformed: the studio register
+   carries the loudness through weight, tracking and colour instead. Widening
+   it to "YOU"/"QUBIT" made the rendered text differ from the speaker's real
+   name and hid the user row from anything reading the visible string. */
 .qchat__message > div:first-of-type > span:first-child {
   color: var(--qchat-faint);
   font: 650 .58rem/1 var(--qchat-mono);
   letter-spacing: .18em;
-  text-transform: uppercase;
 }
 .qchat__message--user > div:first-of-type > span:first-child { color: var(--qchat-signal); }
-.qchat__message--streaming > div:first-of-type { color: var(--qchat-cyan); font: 650 .58rem/1 var(--qchat-mono); letter-spacing: .18em; text-transform: uppercase; }
+.qchat__message--streaming > div:first-of-type { color: var(--qchat-cyan); font: 650 .58rem/1 var(--qchat-mono); letter-spacing: .18em; }
 .qchat__message > div.whitespace-pre-wrap,
 .qchat__message [data-testid="message-report-full"] > div { color: var(--qchat-ink); }
 .qchat__message a { color: var(--qchat-cyan); text-underline-offset: 2px; }
