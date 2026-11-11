@@ -107,6 +107,8 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `PORT-PLAN.md` | PORT PLAN — closing the upstream gap in finishable chunks |
 | `POST_RESTART_VERIFICATION_2026-10-10.md` | Post-Restart Verification + Health Baseline — 2026-10-10 |
 | `QUBIT-BUSINESS-OS-FOUNDATION.md` | Qubit Business OS foundation — control-plane boundary, schema, state machines, next steps |
+| `QUBIT-ETSY-PILOT-PLAYBOOK.md` | Etsy digital-download pilot — niche, listing/SEO, pricing, policies, approvals, launch |
+| `QUBIT-PLATFORM-POLICY.md` | Platform policy — official APIs, publish/engagement rules, approvals, safe fallbacks |
 | `REBRAND-FILENAMES-PLAN.md` | Filename rebrand — scope and ordering (measured 2026-10-17) |
 | `REBRAND-SWEEP-PLAN.md` | Rebrand Sweep Plan — env/attr symbols HERMES_* → QUBIT_* |
 | `REBRAND-SWEEP-STATUS.md` | Rebrand sweep status — CORRECTED 2026-10-17 |
