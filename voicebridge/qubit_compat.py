@@ -12094,6 +12094,14 @@ _r("POST", r"/api/office/business/warroom/sessions", "h_business_warroom_create"
 # spends. Registered before the parameterized session routes.
 _r("POST", r"/api/office/business/warroom/etsy-pilot",
    "h_business_warroom_etsy_pilot")
+# Etsy OAuth connection (connection only; never a listing, publish or spend).
+# The status read is safe and non-mutating; authorize/complete/disconnect are
+# owner-gated in the handler and never echo a code, verifier or token.
+_r("GET", r"/api/office/business/etsy/status", "h_business_etsy_status")
+_r("POST", r"/api/office/business/etsy/authorize", "h_business_etsy_authorize")
+_r("POST", r"/api/office/business/etsy/complete", "h_business_etsy_complete")
+_r("POST", r"/api/office/business/etsy/disconnect",
+   "h_business_etsy_disconnect")
 _r("GET", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)",
    "h_business_warroom_get")
 _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/sources",
@@ -21733,6 +21741,8 @@ for _name in (
     "h_business_warroom_evidence_add", "h_business_warroom_argument_add",
     "h_business_warroom_decide", "h_business_warroom_tasks_create",
     "h_business_warroom_etsy_pilot",
+    "h_business_etsy_status", "h_business_etsy_authorize",
+    "h_business_etsy_complete", "h_business_etsy_disconnect",
     "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
     "h_business_agent_update", "h_business_agent_pause", "h_business_agent_resume",
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",

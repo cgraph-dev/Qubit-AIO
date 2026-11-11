@@ -28,6 +28,16 @@ from .base import (
 from .crm import CrmAdapter
 from .email import EmailAdapter
 from .etsy import EtsyAdapter
+from .etsy_auth import (
+    EtsyAuthError,
+    EtsyOAuth,
+    EtsyOAuthConfig,
+    EtsyTokenStore,
+    OAuthTransport,
+    default_token_path,
+    pkce_challenge,
+)
+from .etsy_auth_transport import EtsyOAuthHttpTransport
 from .etsy_playbook import playbook, validate_playbook
 from .platform_policy import (
     BASELINE_APPROVALS,
@@ -69,14 +79,22 @@ __all__ = [
     "CrmAdapter",
     "EmailAdapter",
     "EtsyAdapter",
+    "EtsyAuthError",
+    "EtsyOAuth",
+    "EtsyOAuthConfig",
+    "EtsyOAuthHttpTransport",
+    "EtsyTokenStore",
+    "OAuthTransport",
     "PlatformPolicy",
     "PolicyDecision",
     "PolicyError",
     "RateLimiter",
     "SocialAdapter",
     "Transport",
+    "default_token_path",
     "evaluate_action",
     "get_policy",
+    "pkce_challenge",
     "playbook",
     "policy_matrix",
     "require_action",
