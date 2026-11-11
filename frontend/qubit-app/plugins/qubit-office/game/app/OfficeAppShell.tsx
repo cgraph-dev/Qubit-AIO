@@ -24,6 +24,8 @@ import {
   POLL_INTERVAL_MS, SNAPSHOT_ROUTE, STREAM_ROUTE,
   bindingSummary, bindingVerdict,
 } from "./office-api";
+import { createOfficeLoadingScreen } from "../loading/OfficeLoadingScreen";
+import type { OfficeLoadingConfigInput } from "../loading/config";
 
 /** Always-present art credit; it must not depend on a theme being active. */
 export const OFFICE_ART_CREDIT = OFFICE_BRAND.credit;
@@ -66,6 +68,12 @@ export interface OfficeAppProps {
   officeError?: string;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
+  /**
+   * Owner loading-screen config. Normally supplied by a host global
+   * (`window.__QUBIT_OFFICE_LOADING__` / `office.loading`); this prop is the
+   * explicit/test path. See `../loading/config.ts`.
+   */
+  loading?: OfficeLoadingConfigInput;
 }
 
 /**
@@ -106,6 +114,7 @@ type ShellComponents = {
   HudDock: ReturnType<typeof createHudDock>;
   AgentsPanel: ReturnType<typeof createAgentsPanel>;
   SeatModelPanel: ReturnType<typeof createSeatModelPanel>;
+  LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
 
 /**
@@ -141,6 +150,7 @@ function shellComponents(
     HudDock: createHudDock({ React: R, hooks, base }),
     AgentsPanel: createAgentsPanel(R, hooks),
     SeatModelPanel: createSeatModelPanel(R, hooks),
+    LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
   byBase.set(cacheKey, built);
   SHELL_COMPONENT_CACHE.set(key, byBase);
@@ -182,9 +192,13 @@ export function createOfficeApp(
     // traced-icon buttons after a bounded wait. Injection suppresses them the
     // moment it attaches, so the two are never visible at once.
     const [menuFallback, setMenuFallback] = useState(false);
+    // A retry must actually re-navigate the iframe; the token is appended to
+    // the src so assigning the same URL still reloads the document. Declared
+    // LAST so existing state slots/tests keep their indices.
+    const [retryToken, setRetryToken] = useState(0);
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
-    const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
+    const { HudDock, AgentsPanel, SeatModelPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
@@ -255,9 +269,12 @@ export function createOfficeApp(
       frame.addEventListener("error", onError);
       setFailed(null);
       setLoaded(false);
-      frame.src = officeAppSrc({
+      const baseSrc = officeAppSrc({
         base: props.base, mock: props.mock, theme: requestedTheme,
       });
+      frame.src = retryToken
+        ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}`
+        : baseSrc;
       return () => {
         frame.removeEventListener("load", onLoad);
         frame.removeEventListener("error", onError);
@@ -265,7 +282,7 @@ export function createOfficeApp(
         menuRef.current = null;
         restoreBridge?.();
       };
-    }, [props.base, props.mock, requestedTheme]);
+    }, [props.base, props.mock, requestedTheme, retryToken]);
 
     // Mirror the dock state onto the injected buttons after every render: the
     // office paints its own active state from `aria-pressed`.
@@ -325,31 +342,6 @@ export function createOfficeApp(
         title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`,
       }, OFFICE_BRAND.legalLabel)),
     ];
-
-    if (!loaded && !failed) {
-      children.push(R.createElement("div", {
-        key: "loading",
-        className: "office-game__panel office-game__loading",
-        "data-testid": "office-app-loading",
-        role: "status",
-        "aria-live": "polite",
-      }, "Loading the office\u2026"));
-    }
-
-    if (failed) {
-      children.push(R.createElement("div", {
-        key: "failed",
-        className: "office-game__refusal office-game__error",
-        "data-testid": "office-app-failed",
-        role: "alert",
-      }, [
-        R.createElement("div", { key: "m" }, `${failed} Check Qubit's office connection; do not start a separate upstream server.`),
-        // The one thing a reader needs when it fails: WHERE it was looking.
-        R.createElement("div", {
-          key: "p", style: { fontSize: "var(--office-fs-xs)" },
-        }, OFFICE_APP_PATH),
-      ]));
-    }
 
     // The host's tower read is the only connection state this page can prove.
     // Show it, so "Connecting…" is never a permanent lie and a failure is named
@@ -537,6 +529,25 @@ export function createOfficeApp(
         })));
       })));
     }
+
+    // THE LOADING SCREEN. One import, one render seam: it overlays the iframe,
+    // owns the weather/pixelfx layer, and fades itself out on `ready`. It is
+    // ALWAYS mounted so a failed frame can show the same screen with a retry;
+    // when it has faded it returns null and disposes its surfaces.
+    children.push(R.createElement(LoadingScreen as never, {
+      key: "loading-screen",
+      phase: failed ? "error" : "loading",
+      ready: loaded,
+      error: failed
+        ? `${failed} Check Qubit's office connection; do not start a separate upstream server. (${OFFICE_APP_PATH})`
+        : null,
+      config: props.loading,
+      onRetry: () => {
+        setFailed(null);
+        setLoaded(false);
+        setRetryToken((n: number) => n + 1);
+      },
+    }));
 
     const rootClass = ["office-game", officeThemeClass(officeTheme)]
       .filter(Boolean).join(" ");

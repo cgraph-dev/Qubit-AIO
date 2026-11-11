@@ -17,6 +17,8 @@ import path from "node:path";
 const HERE = path.dirname(new URL(import.meta.url).pathname);
 const APP_DIR = path.resolve(
   HERE, "../qubit-app/plugins/qubit-office/game/app");
+const LOADING_DIR = path.resolve(
+  HERE, "../qubit-app/plugins/qubit-office/game/loading");
 
 export default defineConfig({
   // The tests live OUTSIDE this package (../qubit-app/...). Under the default
@@ -27,9 +29,23 @@ export default defineConfig({
   server: {
     fs: { allow: [path.resolve(HERE, "../../..")] },
   },
+  // The tests live outside this package, so Vite's bare-specifier resolution
+  // would walk up from the test file and miss this package's node_modules.
+  // Point React at the package's own copy (one React, never a second runtime).
+  resolve: {
+    alias: {
+      react: path.resolve(HERE, "node_modules/react"),
+      "react-dom": path.resolve(HERE, "node_modules/react-dom"),
+    },
+  },
   test: {
     environment: "node",
-    include: [path.join(APP_DIR, "**/*.test.ts")],
+    // `app/**` is the office shell; `loading/**` is the Phase-1 loading screen
+    // and its weather/pixelfx subset. Both live outside this package.
+    include: [
+      path.join(APP_DIR, "**/*.test.ts"),
+      path.join(LOADING_DIR, "**/*.test.ts"),
+    ],
     testTimeout: 20000,
   },
 });

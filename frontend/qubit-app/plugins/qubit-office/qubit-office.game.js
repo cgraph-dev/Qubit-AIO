@@ -1,4 +1,15 @@
 (function() {
+	// \0rolldown/runtime.js
+	var __defProp = Object.defineProperty;
+	var __exportAll = (all, no_symbols) => {
+		let target = {};
+		for (var name in all) __defProp(target, name, {
+			get: all[name],
+			enumerable: true
+		});
+		if (!no_symbols) __defProp(target, Symbol.toStringTag, { value: "Module" });
+		return target;
+	};
 	var __webpack_modules__ = {
 		50792(module) {
 			var has = Object.prototype.hasOwnProperty, prefix = "~";
@@ -190057,7 +190068,7 @@ create: function(game) {
 			255
 		];
 	}
-	function toHex(r, g, b) {
+	function toHex$1(r, g, b) {
 		const h = (n) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, "0");
 		return `#${h(r)}${h(g)}${h(b)}`;
 	}
@@ -190157,17 +190168,17 @@ create: function(game) {
 		}
 		l = clamp01(l + k);
 		const [nr, ng, nb] = hslToRgb(h, s, l);
-		return alphaHex(toHex(nr, ng, nb), a);
+		return alphaHex(toHex$1(nr, ng, nb), a);
 	}
 	/** Linear blend: t = 0 → a, t = 1 → b. */
-	function mix(a, b, t) {
+	function mix$1(a, b, t) {
 		const ca = parse(a);
 		const cb = parse(b);
 		const u = clamp01(t);
-		return toHex(ca[0] + (cb[0] - ca[0]) * u, ca[1] + (cb[1] - ca[1]) * u, ca[2] + (cb[2] - ca[2]) * u);
+		return toHex$1(ca[0] + (cb[0] - ca[0]) * u, ca[1] + (cb[1] - ca[1]) * u, ca[2] + (cb[2] - ca[2]) * u);
 	}
 	var rampCache = /* @__PURE__ */ new Map();
-	function ramp(base, step = .08) {
+	function ramp$1(base, step = .08) {
 		const key = `${base}|${step}`;
 		let r = rampCache.get(key);
 		if (!r) {
@@ -190192,7 +190203,7 @@ create: function(game) {
 	*/
 	var OUTLINE_SLATE = "#272b3b";
 	function outlineFor(colour) {
-		return mix(shade(colour, -.45), OUTLINE_SLATE, .7);
+		return mix$1(shade(colour, -.45), OUTLINE_SLATE, .7);
 	}
 	/** A deterministic 0–1 generator. Same seed, same art, every run. */
 	function seeded(seed) {
@@ -190301,7 +190312,7 @@ create: function(game) {
 			for (let sx = x + 4; sx < x + w; sx += 8) ctx.fillRect(sx, faceY, 1, faceH);
 		} else if (pattern === "panelled") {
 			const top = faceY + Math.floor(faceH * .42);
-			ctx.fillStyle = mix("#b98a5e", base, .2);
+			ctx.fillStyle = mix$1("#b98a5e", base, .2);
 			ctx.fillRect(x, top, w, faceY + faceH - top);
 			for (let sx = x; sx < x + w; sx += 7) {
 				ctx.fillStyle = r.dd;
@@ -190318,7 +190329,7 @@ create: function(game) {
 		}
 		ctx.fillStyle = shade(base, -.075);
 		ctx.fillRect(x, faceY, w, 1);
-		const cap = mix("#3d4356", base, .12);
+		const cap = mix$1("#3d4356", base, .12);
 		ctx.fillStyle = cap;
 		ctx.fillRect(x, y, w, capH);
 		ctx.fillStyle = shade(cap, .09);
@@ -190410,7 +190421,7 @@ create: function(game) {
 	}
 	/** Local alias so the import list stays short at the call sites. */
 	function climb(base) {
-		return ramp(base);
+		return ramp$1(base);
 	}
 	/** Grid -> screen. Origin (0,0,0) maps to (0,0); callers translate. */
 	function toScreen(p) {
@@ -190707,13 +190718,13 @@ create: function(game) {
 		const { ctx, cam } = p;
 		for (const b of blocks) {
 			const faces = wallFaces(b.gx, b.gy, 2);
-			const r = ramp(b.theme.wall, .08);
+			const r = ramp$1(b.theme.wall, .08);
 			ctx.save();
 			ctx.translate(cam.ox, cam.oy);
 			ctx.scale(cam.zoom, cam.zoom);
 			fillPoly(p, faces.west, shade(r.base, -.06));
 			fillPoly(p, faces.east, shade(r.dk, -.17));
-			fillPoly(p, faces.top, mix(r.hi, "#ffffff", .1));
+			fillPoly(p, faces.top, mix$1(r.hi, "#ffffff", .1));
 			const wf = faces.west;
 			const t = 3 / cam.zoom;
 			fillPoly(p, [
@@ -190734,7 +190745,7 @@ create: function(game) {
 	/** A desk: an isometric box with a lit top and a drawn shadow. */
 	function paintDesk(p, gx, gy, colour = "#a07f5c") {
 		const { ctx, cam } = p;
-		const r = ramp(colour, .09);
+		const r = ramp$1(colour, .09);
 		const faces = wallFaces(gx, gy, .55);
 		ctx.save();
 		ctx.translate(cam.ox, cam.oy);
@@ -190742,7 +190753,7 @@ create: function(game) {
 		fillPoly(p, faces.west, r.dk);
 		fillPoly(p, faces.east, r.dd);
 		fillPoly(p, faces.top, r.lt);
-		const mon = ramp("#39445a", .1);
+		const mon = ramp$1("#39445a", .1);
 		const mp = wallFaces(gx, gy, 1.15);
 		fillPoly(p, [
 			mp.west[2],
@@ -190750,7 +190761,7 @@ create: function(game) {
 			mp.west[2],
 			mp.west[2]
 		], mon.base);
-		const screen = ramp("#5fd0c0", .1);
+		const screen = ramp$1("#5fd0c0", .1);
 		fillPoly(p, [
 			{
 				x: mp.top[0].x,
@@ -190781,7 +190792,7 @@ create: function(game) {
 			gx,
 			gy
 		});
-		const pot = ramp("#8a6a4e", .1);
+		const pot = ramp$1("#8a6a4e", .1);
 		fillPoly(p, [
 			{
 				x: centre.x - 5,
@@ -190800,7 +190811,7 @@ create: function(game) {
 				y: centre.y + 1
 			}
 		], pot.base);
-		const leaf = ramp("#4cae6a", .1);
+		const leaf = ramp$1("#4cae6a", .1);
 		for (let i = 0; i < 5; i++) {
 			ctx.fillStyle = i % 2 ? leaf.base : leaf.dk;
 			const a = i / 5 * Math.PI * 2;
@@ -190823,7 +190834,7 @@ create: function(game) {
 			gx,
 			gy
 		});
-		const r = ramp(colour, .1);
+		const r = ramp$1(colour, .1);
 		ctx.save();
 		ctx.translate(cam.ox, cam.oy);
 		ctx.scale(cam.zoom, cam.zoom);
@@ -190982,19 +190993,19 @@ create: function(game) {
 		f.ctx.restore();
 	}
 	/** A box standing on the floor: height in tiles, footprint one tile. */
-	function box(f, gx, gy, height, base, opts = {}) {
-		const r = ramp(base, .09);
+	function box$1(f, gx, gy, height, base, opts = {}) {
+		const r = ramp$1(base, .09);
 		const faces = wallFaces(gx, gy, height);
 		const ctx = f.ctx;
 		if (opts.alpha !== void 0) ctx.globalAlpha = opts.alpha;
 		fill(f, faces.west, r.base);
 		fill(f, faces.east, shade(r.base, -.14));
-		fill(f, faces.top, opts.topColour ?? mix(r.hi, "#ffffff", .05));
+		fill(f, faces.top, opts.topColour ?? mix$1(r.hi, "#ffffff", .05));
 		if (opts.alpha !== void 0) ctx.globalAlpha = 1;
 	}
 	/** A wide bench (desk, counter): a box spanning several tiles on X. */
 	function bench(f, gx, gy, tilesX, height, base) {
-		for (let i = 0; i < tilesX; i++) box(f, gx + i, gy, height, base);
+		for (let i = 0; i < tilesX; i++) box$1(f, gx + i, gy, height, base);
 	}
 	/**
 	* The reception counter: a bench with a lip, a monitor and a chair.
@@ -191011,14 +191022,14 @@ create: function(game) {
 			});
 			drawContactShadow(f.ctx, c.x, c.y + 8, 34, 12, .32);
 			bench(f, gx, gy, 3, .75, base);
-			bench(f, gx, gy, 3, .9, mix(base, "#ffffff", .12));
+			bench(f, gx, gy, 3, .9, mix$1(base, "#ffffff", .12));
 			const mon = toScreen({
 				gx: gx + 1,
 				gy
 			});
 			f.ctx.fillStyle = "#2f3b52";
 			f.ctx.fillRect(mon.x - 9, mon.y - 40, 18, 14);
-			f.ctx.fillStyle = mix("#5fd0c0", "#ffffff", .18);
+			f.ctx.fillStyle = mix$1("#5fd0c0", "#ffffff", .18);
 			f.ctx.fillRect(mon.x - 7, mon.y - 38, 14, 10);
 			f.ctx.fillStyle = "#20222c";
 			f.ctx.fillRect(mon.x - 3, mon.y - 26, 6, 3);
@@ -191034,8 +191045,8 @@ create: function(game) {
 	function elevator(f, gx, gy, height = 2.4) {
 		const ctx = f.ctx;
 		withCam(f, () => {
-			const r = ramp("#6a7284", .09);
-			box(f, gx, gy, height, shade(r.base, -.28));
+			const r = ramp$1("#6a7284", .09);
+			box$1(f, gx, gy, height, shade(r.base, -.28));
 			const wf = wallFaces(gx, gy, height).west;
 			const left = wf[0], right = wf[1];
 			const halfN = 3;
@@ -191090,14 +191101,14 @@ create: function(game) {
 	function stairs(f, gx, gy, steps = 6) {
 		const base = "#5f5a72";
 		withCam(f, () => {
-			for (let i = 0; i < steps; i++) box(f, gx, gy - i, .35 + i * .32, shade(base, -i * .012));
+			for (let i = 0; i < steps; i++) box$1(f, gx, gy - i, .35 + i * .32, shade(base, -i * .012));
 		});
 	}
 	/** A chair: a low box with a back. */
 	function chair(f, gx, gy, base = "#4a6ea8") {
 		withCam(f, () => {
-			box(f, gx, gy, .42, base);
-			box(f, gx, gy - .001 + 0, .72, shade(base, -.1));
+			box$1(f, gx, gy, .42, base);
+			box$1(f, gx, gy - .001 + 0, .72, shade(base, -.1));
 		});
 	}
 	/** A plant in a pot: two boxes and a few leaves. */
@@ -191109,8 +191120,8 @@ create: function(game) {
 				gy
 			});
 			drawContactShadow(ctx, c.x, c.y + 3, 8, 4, .34);
-			box(f, gx, gy, .4, "#8a6a4e");
-			const leaf = ramp("#4cae6a", .11);
+			box$1(f, gx, gy, .4, "#8a6a4e");
+			const leaf = ramp$1("#4cae6a", .11);
 			for (let i = 0; i < 6; i++) {
 				const a = i / 6 * Math.PI * 2;
 				ctx.fillStyle = i % 2 ? leaf.base : leaf.dk;
@@ -191128,9 +191139,9 @@ create: function(game) {
 	function rug(f, gx, gy, tiles, base) {
 		f.ctx;
 		withCam(f, () => {
-			const r = ramp(base, .1);
+			const r = ramp$1(base, .1);
 			for (let i = 0; i < tiles; i++) for (let j = 0; j < tiles; j++) fill(f, tileDiamond(gx + i, gy + j), i === 0 || j === 0 || i === tiles - 1 || j === tiles - 1 ? r.dk : (i + j) % 3 === 0 ? r.lt : r.base);
-			for (let i = 0; i < tiles; i++) fill(f, tileDiamond(gx + i, gy + Math.floor(tiles / 2)), mix(r.hi, "#ffffff", .1));
+			for (let i = 0; i < tiles; i++) fill(f, tileDiamond(gx + i, gy + Math.floor(tiles / 2)), mix$1(r.hi, "#ffffff", .1));
 		});
 	}
 	// ../qubit-app/plugins/qubit-office/game/scenes.ts
@@ -191174,7 +191185,7 @@ create: function(game) {
 	function figure(ctx, c, x, y, scale, selected) {
 		const w = 12 * scale, h = 17 * scale;
 		const top = y - h;
-		const r = ramp(ANIM_COLOUR[c.animation] ?? PALETTE.muted, .09);
+		const r = ramp$1(ANIM_COLOUR[c.animation] ?? PALETTE.muted, .09);
 		drawContactShadow(ctx, x, y + 1, w * .62, w * .24, .34);
 		ctx.save();
 		if (selected) {
@@ -191225,7 +191236,7 @@ create: function(game) {
 		sky.addColorStop(1, "#241f38");
 		ctx.fillStyle = sky;
 		ctx.fillRect(0, 0, width, height * .62);
-		const rnd = ramp("#1d1930", .06);
+		const rnd = ramp$1("#1d1930", .06);
 		for (let i = 0; i < 9; i++) {
 			const bw = 40 + i % 3 * 24;
 			const bh = 30 + i * 37 % 70;
@@ -191233,7 +191244,7 @@ create: function(game) {
 			ctx.fillStyle = i % 2 ? rnd.dk : rnd.base;
 			ctx.fillRect(bx, height * .62 - bh, bw, bh);
 		}
-		const ground = ramp("#2b2740", .07);
+		const ground = ramp$1("#2b2740", .07);
 		ctx.fillStyle = ground.base;
 		ctx.fillRect(0, height * .62, width, height * .38);
 		for (let i = 0; i < 6; i++) {
@@ -191245,12 +191256,12 @@ create: function(game) {
 		const bx = width / 2 - bw / 2;
 		const by = height * .62 - bh;
 		const floors = Math.max(1, world.building.floors.length);
-		const wallR = ramp(HQ.wall, .07);
+		const wallR = ramp$1(HQ.wall, .07);
 		for (let i = 0; i < bh; i++) {
 			ctx.fillStyle = shade(HQ.wall, .05 - i / bh * .12);
 			ctx.fillRect(bx, by + i, bw, 1);
 		}
-		ctx.fillStyle = mix(wallR.lt, "#ffffff", .12);
+		ctx.fillStyle = mix$1(wallR.lt, "#ffffff", .12);
 		ctx.fillRect(bx, by, 2, bh);
 		ctx.fillStyle = wallR.dd;
 		ctx.fillRect(bx + bw - 2, by, 2, bh);
@@ -191271,7 +191282,7 @@ create: function(game) {
 				ctx.fillRect(wx - 1, wy - 1, ww + 2, wh + 2);
 				const lit = i === 0 ? "#ffd98a" : "#cbb894";
 				const pane = ctx.createLinearGradient(wx, wy, wx, wy + wh);
-				pane.addColorStop(0, mix(lit, "#ffffff", .15));
+				pane.addColorStop(0, mix$1(lit, "#ffffff", .15));
 				pane.addColorStop(1, shade(lit, -.12));
 				ctx.fillStyle = pane;
 				ctx.fillRect(wx, wy, ww, wh);
@@ -191286,7 +191297,7 @@ create: function(game) {
 		const dy = height * .62 - dh;
 		ctx.fillStyle = shade(HQ.wall, -.24);
 		ctx.fillRect(dx - 5, dy - 5, 62, 59);
-		const doorR = ramp(PALETTE.doorway, .1);
+		const doorR = ramp$1(PALETTE.doorway, .1);
 		const dg = ctx.createLinearGradient(dx, dy, dx, dy + dh);
 		dg.addColorStop(0, doorR.hi);
 		dg.addColorStop(1, doorR.dk);
@@ -191319,9 +191330,9 @@ create: function(game) {
 		const dw = 62, dh = 104;
 		const dx = width * .5 - dw / 2;
 		const dy = fy + fh * .52 - dh;
-		const doorR = ramp(PALETTE.doorway, .1);
+		const doorR = ramp$1(PALETTE.doorway, .1);
 		const dg = ctx.createLinearGradient(dx, dy, dx, dy + dh);
-		dg.addColorStop(0, mix(doorR.hi, "#ffffff", .2));
+		dg.addColorStop(0, mix$1(doorR.hi, "#ffffff", .2));
 		dg.addColorStop(1, doorR.base);
 		ctx.fillStyle = dg;
 		ctx.fillRect(dx, dy, dw, dh);
@@ -191335,13 +191346,13 @@ create: function(game) {
 		ctx.fillStyle = pool;
 		ctx.fillRect(width * .5 - 220, fy + fh * .52 - 20, 440, fh * .48 + 20);
 		for (const px of [width * .1, width * .9]) {
-			const potR = ramp("#7a5a44", .08);
+			const potR = ramp$1("#7a5a44", .08);
 			drawContactShadow(ctx, px, fy + fh * .52 + 4, 12, 5, .35);
 			ctx.fillStyle = potR.base;
 			ctx.fillRect(px - 9, fy + fh * .52 - 18, 18, 18);
 			ctx.fillStyle = potR.lt;
 			ctx.fillRect(px - 9, fy + fh * .52 - 18, 18, 2);
-			const leafR = ramp("#4cae6a", .09);
+			const leafR = ramp$1("#4cae6a", .09);
 			for (let i = 0; i < 5; i++) {
 				ctx.fillStyle = i % 2 ? leafR.base : leafR.dk;
 				ctx.beginPath();
@@ -191440,7 +191451,7 @@ create: function(game) {
 			const col = i % cols, row = Math.floor(i / cols);
 			const dx = width * .14 + col * 158;
 			const dy = floorY + 44 + row * 104;
-			const deskR = ramp("#8a6f52", .08);
+			const deskR = ramp$1("#8a6f52", .08);
 			const dwid = 96, dhei = 30;
 			drawContactShadow(ctx, dx + dwid / 2, dy + dhei + 16, dwid * .5, 8, .3);
 			ctx.fillStyle = deskR.dk;
@@ -191450,11 +191461,11 @@ create: function(game) {
 			ctx.fillStyle = deskR.hi;
 			ctx.fillRect(dx, dy, dwid, 3);
 			outlineRect(ctx, dx, dy, dwid, dhei, deskR.base);
-			const monR = ramp("#2f3b52", .09);
+			const monR = ramp$1("#2f3b52", .09);
 			ctx.fillStyle = monR.base;
 			ctx.fillRect(dx + dwid / 2 - 16, dy - 24, 32, 24);
 			const anim = ANIM_COLOUR[c.animation] ?? PALETTE.muted;
-			ctx.fillStyle = mix(anim, "#ffffff", .15);
+			ctx.fillStyle = mix$1(anim, "#ffffff", .15);
 			ctx.fillRect(dx + dwid / 2 - 14, dy - 22, 28, 18);
 			if (worldChar) figure(ctx, worldChar, dx + dwid / 2, dy + 24, 1.7, false);
 			text(ctx, c.slug, dx + dwid / 2, dy + dhei + 34, 11, PALETTE.ink, "center", "600");
@@ -193785,6 +193796,4104 @@ create: function(game) {
 		const v = bindingVerdict();
 		return `${v.bound.length} bound · ${v.missing.length} unavailable · ${v.gated.length} confirmation-gated`;
 	}
+	var CONDITION_SET = /* @__PURE__ */ new Set([
+		"clear-day",
+		"clear-night",
+		"partly-cloudy",
+		"cloudy",
+		"rain",
+		"storm",
+		"snow",
+		"fog",
+		"fallback"
+	]);
+	var EFFECT_FOR_CONDITION = Object.freeze({
+		"clear-day": "god-rays",
+		"clear-night": "none",
+		"partly-cloudy": "clouds",
+		"cloudy": "clouds",
+		rain: "rain",
+		storm: "storm",
+		snow: "snow",
+		fog: "fog",
+		fallback: "none"
+	});
+	var EFFECT_SET = /* @__PURE__ */ new Set([
+		"none",
+		"god-rays",
+		"clouds",
+		"rain",
+		"storm",
+		"snow",
+		"fog"
+	]);
+	function isCondition(value) {
+		return typeof value === "string" && CONDITION_SET.has(value);
+	}
+	/** WMO weather interpretation code → normalized condition. */
+	function conditionFromCode(code, isDay = true) {
+		const n = typeof code === "number" ? code : Number(code);
+		if (!Number.isFinite(n)) return "fallback";
+		const day = isDay !== false && isDay !== 0 && isDay !== "0";
+		if (n === 0) return day ? "clear-day" : "clear-night";
+		if (n === 1 || n === 2) return "partly-cloudy";
+		if (n === 3) return "cloudy";
+		if (n === 45 || n === 48) return "fog";
+		if (n >= 50 && n <= 67 || n >= 80 && n <= 82) return "rain";
+		if (n >= 70 && n <= 77 || n === 85 || n === 86) return "snow";
+		if (n === 95 || n === 96 || n === 99) return "storm";
+		return "fallback";
+	}
+	function effectForCondition(condition) {
+		return EFFECT_FOR_CONDITION[condition] ?? "none";
+	}
+	function fallbackWeather(reason, at = Date.now()) {
+		return {
+			condition: "fallback",
+			temperatureC: null,
+			windKph: null,
+			precipitationMm: null,
+			isDay: null,
+			source: "fallback",
+			reason,
+			fetchedAt: at
+		};
+	}
+	function numOrNull(value) {
+		const n = typeof value === "number" ? value : Number(value);
+		return Number.isFinite(n) ? n : null;
+	}
+	function boolOrNull$1(value) {
+		if (typeof value === "boolean") return value;
+		if (value === 1 || value === "1") return true;
+		if (value === 0 || value === "0") return false;
+		return null;
+	}
+	function sourceOr(value, fallback) {
+		return value === "injected" || value === "open-meteo" || value === "cache" || value === "fallback" ? value : fallback;
+	}
+	/**
+	* Normalize any accepted snapshot shape: a condition string, a
+	* `NormalizedWeather`-like object, or an Open-Meteo response. Returns `null`
+	* for something unrecognizable so the caller can keep its neutral fallback.
+	*/
+	function normalizeSnapshot(raw, at = Date.now()) {
+		if (typeof raw === "string") return isCondition(raw) ? {
+			condition: raw,
+			temperatureC: null,
+			windKph: null,
+			precipitationMm: null,
+			isDay: null,
+			source: "injected",
+			reason: null,
+			fetchedAt: at
+		} : null;
+		if (!raw || typeof raw !== "object") return null;
+		const obj = raw;
+		if (isCondition(obj.condition)) return {
+			condition: obj.condition,
+			temperatureC: numOrNull(obj.temperatureC),
+			windKph: numOrNull(obj.windKph),
+			precipitationMm: numOrNull(obj.precipitationMm),
+			isDay: boolOrNull$1(obj.isDay),
+			source: sourceOr(obj.source, "injected"),
+			reason: typeof obj.reason === "string" ? obj.reason : null,
+			fetchedAt: Number.isFinite(Number(obj.fetchedAt)) ? Number(obj.fetchedAt) : at
+		};
+		return normalizeOpenMeteo(obj, at);
+	}
+	/** Normalize an Open-Meteo `/v1/forecast?current=…` response. */
+	function normalizeOpenMeteo(json, at = Date.now()) {
+		if (!json || typeof json !== "object") return null;
+		const root = json;
+		const current = root.current ?? root.current_weather;
+		if (!current || typeof current !== "object") return null;
+		const code = current.weather_code ?? current.weathercode;
+		if (code === void 0 || code === null) return null;
+		const isDay = boolOrNull$1(current.is_day ?? current.isday);
+		return {
+			condition: conditionFromCode(code, isDay ?? true),
+			temperatureC: numOrNull(current.temperature_2m ?? current.temperature),
+			windKph: numOrNull(current.wind_speed_10m ?? current.windspeed_10m ?? current.windspeed),
+			precipitationMm: numOrNull(current.precipitation),
+			isDay,
+			source: "open-meteo",
+			reason: null,
+			fetchedAt: at
+		};
+	}
+	var CACHE_PREFIX = "qubit.office.loading.weather.v1:";
+	function weatherCacheKey(location) {
+		return `${CACHE_PREFIX}${location.latitude.toFixed(3)},${location.longitude.toFixed(3)}`;
+	}
+	function defaultStorage() {
+		try {
+			return typeof sessionStorage === "undefined" ? null : sessionStorage;
+		} catch {
+			return null;
+		}
+	}
+	function readWeatherCache(location, ttlMs, at = Date.now(), storage) {
+		const store = storage === void 0 ? defaultStorage() : storage;
+		if (!store) return null;
+		try {
+			const text = store.getItem(weatherCacheKey(location));
+			if (!text) return null;
+			const parsed = JSON.parse(text);
+			const savedAt = Number(parsed.savedAt);
+			if (!Number.isFinite(savedAt) || at - savedAt > ttlMs || at < savedAt) return null;
+			const weather = normalizeSnapshot(parsed.weather, savedAt);
+			if (!weather || weather.condition === "fallback") return null;
+			return {
+				...weather,
+				source: "cache"
+			};
+		} catch {
+			return null;
+		}
+	}
+	function writeWeatherCache(location, weather, at = Date.now(), storage) {
+		const store = storage === void 0 ? defaultStorage() : storage;
+		if (!store) return;
+		try {
+			store.setItem(weatherCacheKey(location), JSON.stringify({
+				savedAt: at,
+				weather
+			}));
+		} catch {}
+	}
+	function weatherUrl(config) {
+		const location = config.location;
+		const url = new URL(config.weatherEndpoint);
+		if (location) {
+			url.searchParams.set("latitude", String(location.latitude));
+			url.searchParams.set("longitude", String(location.longitude));
+		}
+		url.searchParams.set("current", "weather_code,is_day,temperature_2m,wind_speed_10m,precipitation");
+		url.searchParams.set("timezone", "auto");
+		return url.toString();
+	}
+	/**
+	* Resolve the weather without ever blocking or throwing.
+	*
+	* Order: injected snapshot → valid cache → network (if a location is set) →
+	* neutral fallback with a typed reason. The loading screen renders before this
+	* settles; it calls this from an effect and paints the fallback immediately.
+	*/
+	async function loadWeather(config, opts = {}) {
+		const now = opts.now ?? Date.now;
+		if (config.weather) return config.weather;
+		const location = config.location;
+		if (!location) return fallbackWeather("no-location", now());
+		const cached = readWeatherCache(location, config.weatherCacheTtlMs, now(), opts.storage);
+		if (cached) return cached;
+		if (typeof navigator !== "undefined" && navigator.onLine === false) return fallbackWeather("offline", now());
+		const fetchImpl = opts.fetchImpl === void 0 ? typeof fetch === "function" ? fetch : null : opts.fetchImpl;
+		if (!fetchImpl) return fallbackWeather("unknown", now());
+		const controller = new AbortController();
+		const onExternalAbort = () => controller.abort();
+		if (opts.signal) {
+			if (opts.signal.aborted) return fallbackWeather("aborted", now());
+			opts.signal.addEventListener("abort", onExternalAbort, { once: true });
+		}
+		const timer = setTimeout(() => controller.abort(), config.weatherTimeoutMs);
+		try {
+			const response = await fetchImpl(weatherUrl(config), {
+				method: "GET",
+				signal: controller.signal,
+				credentials: "omit",
+				cache: "no-store",
+				headers: { Accept: "application/json" }
+			});
+			if (!response.ok) return fallbackWeather("http", now());
+			const weather = normalizeOpenMeteo(await response.json(), now());
+			if (!weather) return fallbackWeather("parse", now());
+			writeWeatherCache(location, weather, now(), opts.storage);
+			return weather;
+		} catch {
+			if (opts.signal?.aborted) return fallbackWeather("aborted", now());
+			return fallbackWeather(controller.signal.aborted ? "timeout" : "unknown", now());
+		} finally {
+			clearTimeout(timer);
+			opts.signal?.removeEventListener("abort", onExternalAbort);
+		}
+	}
+	/**
+	* A candidate must persist `hysteresisMs` before replacing the current effect.
+	* The rain↔storm pair uses twice that hold, because those are the two states
+	* weather APIs oscillate between. A storm is a single effect: the player never
+	* draws rain under it.
+	*/
+	function createEffectSelector(opts = {}) {
+		const baseHold = Math.max(0, Number(opts.hysteresisMs) || 0);
+		let current = "none";
+		let initialized = false;
+		let hasKnownWeather = false;
+		let pending = null;
+		let pendingSince = 0;
+		const holdFor = (from, to) => {
+			return from === "rain" && to === "storm" || from === "storm" && to === "rain" ? baseHold * 2 : baseHold;
+		};
+		const selectEffect = (candidate, at = Date.now(), known = true) => {
+			if (!EFFECT_SET.has(candidate)) return current;
+			if (!initialized) {
+				initialized = true;
+				current = candidate;
+				if (known) hasKnownWeather = true;
+				return current;
+			}
+			if (candidate === current) {
+				pending = null;
+				if (known) hasKnownWeather = true;
+				return current;
+			}
+			if (!hasKnownWeather && known) {
+				current = candidate;
+				pending = null;
+				hasKnownWeather = true;
+				return current;
+			}
+			if (pending !== candidate) {
+				pending = candidate;
+				pendingSince = at;
+			}
+			if (at - pendingSince >= holdFor(current, candidate)) {
+				current = candidate;
+				pending = null;
+				if (known) hasKnownWeather = true;
+			}
+			return current;
+		};
+		return {
+			current: () => current,
+			reset() {
+				current = "none";
+				initialized = false;
+				hasKnownWeather = false;
+				pending = null;
+				pendingSince = 0;
+			},
+			select(weather, at = Date.now()) {
+				return selectEffect(effectForCondition(weather.condition), at, weather.condition !== "fallback");
+			},
+			selectEffect
+		};
+	}
+	var DEFAULT_LOADING_CONFIG = Object.freeze({
+		background: "",
+		backgroundPosition: "center",
+		backgroundDim: .55,
+		brand: "Qubit Office",
+		tagline: "Nobody knows what it will become.",
+		tips: [...[
+			"Tip: press the Panels icons to open the HUD or the agents list.",
+			"Tip: the office animates from real office events, not a scripted loop.",
+			"Tip: every room is a real place; click a floor to travel.",
+			"Tip: unsupported write actions answer with a typed refusal, never a lie.",
+			"Tip: the same office backend powers the dashboard and the building."
+		]],
+		weather: null,
+		location: null,
+		weatherEndpoint: "https://api.open-meteo.com/v1/forecast",
+		weatherTimeoutMs: 1500,
+		weatherCacheTtlMs: 9e5,
+		hysteresisMs: 6e4,
+		reducedMotion: null,
+		lowPower: null,
+		effects: true
+	});
+	function clampNumber(value, fallback, min, max) {
+		const n = typeof value === "number" ? value : Number(value);
+		if (!Number.isFinite(n)) return fallback;
+		return Math.min(max, Math.max(min, n));
+	}
+	function readWindow(win) {
+		if (win) return win;
+		return typeof window === "undefined" ? null : window;
+	}
+	function record(value) {
+		if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+		return value;
+	}
+	/** The two documented injection shapes, merged shallowly (the first wins). */
+	function readInjectedLoadingConfig(win) {
+		const w = readWindow(win);
+		if (!w) return null;
+		const direct = record(w.__QUBIT_OFFICE_LOADING__);
+		const nested = record(record(w.__QUBIT_OFFICE_CONFIG__?.office)?.loading);
+		if (!direct && !nested) return null;
+		return {
+			...nested ?? {},
+			...direct ?? {}
+		};
+	}
+	/**
+	* A background value that is safe to put in CSS `url(...)`.
+	*
+	* Accepts absolute HTTP(S), protocol-relative, root/relative paths and
+	* `data:image/…`; rejects schemes that can execute (`javascript:`,
+	* `vbscript:`, `file:`), control/whitespace characters, quotes, backslashes
+	* and parentheses (which would break out of the CSS value). Empty string means
+	* "use the placeholder".
+	*/
+	function safeBackground(value) {
+		if (typeof value !== "string") return "";
+		const trimmed = value.trim();
+		if (!trimmed || trimmed.length > 2048) return "";
+		if (/[\u0000-\u0020"'\\()<>]/.test(trimmed)) return "";
+		const lower = trimmed.toLowerCase();
+		if (lower.startsWith("javascript:") || lower.startsWith("vbscript:") || lower.startsWith("file:")) return "";
+		if (/^(https?:)?\/\//.test(trimmed) || lower.startsWith("data:image/") || /^(\/|\.\/|\.\.\/)/.test(trimmed)) return trimmed;
+		if (!trimmed.includes(":") && /^[A-Za-z0-9._~%+,-]+(?:\/[A-Za-z0-9._~%+,-]+)*(?:[?#][A-Za-z0-9._~%+=&,-]*)?$/.test(trimmed)) return trimmed;
+		return "";
+	}
+	function safeLocation(value) {
+		const r = record(value);
+		if (!r) return null;
+		const latitude = Number(r.latitude);
+		const longitude = Number(r.longitude);
+		if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90) return null;
+		if (!Number.isFinite(longitude) || longitude < -180 || longitude > 180) return null;
+		const name = typeof r.name === "string" ? r.name.slice(0, 120) : void 0;
+		return {
+			latitude,
+			longitude,
+			...name ? { name } : {}
+		};
+	}
+	function safeTips(value, fallback) {
+		if (!Array.isArray(value)) return fallback;
+		const tips = value.filter((tip) => typeof tip === "string").map((tip) => tip.trim()).filter(Boolean).slice(0, 8);
+		return tips.length ? tips : fallback;
+	}
+	function boolOrNull(value) {
+		return typeof value === "boolean" ? value : null;
+	}
+	/**
+	* Resolve defaults ← host globals ← explicit props. Pure; no DOM read unless
+	* `win` is omitted (then the current window is inspected).
+	*/
+	function resolveLoadingConfig(input, win) {
+		const base = DEFAULT_LOADING_CONFIG;
+		const merged = {
+			...readInjectedLoadingConfig(win) ?? {},
+			...input ?? {}
+		};
+		const background = safeBackground(merged.background);
+		const dim = merged.backgroundDim;
+		return {
+			background,
+			backgroundPosition: typeof merged.backgroundPosition === "string" ? merged.backgroundPosition.slice(0, 80) : base.backgroundPosition,
+			backgroundDim: clampNumber(dim, base.backgroundDim, 0, .95),
+			brand: typeof merged.brand === "string" && merged.brand.trim() ? merged.brand.trim().slice(0, 60) : base.brand,
+			tagline: typeof merged.tagline === "string" ? merged.tagline.trim().slice(0, 160) : base.tagline,
+			tips: safeTips(merged.tips, base.tips),
+			weather: normalizeSnapshot(merged.weather) ?? base.weather,
+			location: safeLocation(merged.location),
+			weatherEndpoint: typeof merged.weatherEndpoint === "string" && /^https?:\/\//i.test(merged.weatherEndpoint) ? merged.weatherEndpoint.slice(0, 300) : base.weatherEndpoint,
+			weatherTimeoutMs: clampNumber(merged.weatherTimeoutMs, base.weatherTimeoutMs, 500, 2e3),
+			weatherCacheTtlMs: clampNumber(merged.weatherCacheTtlMs, base.weatherCacheTtlMs, 6e5, 18e5),
+			hysteresisMs: clampNumber(merged.hysteresisMs, base.hysteresisMs, 0, 3e5),
+			reducedMotion: boolOrNull(merged.reducedMotion),
+			lowPower: boolOrNull(merged.lowPower),
+			effects: typeof merged.effects === "boolean" ? merged.effects : base.effects
+		};
+	}
+	/** CSS for the owner's background art, or `null` for the placeholder. */
+	function backgroundImageStyle(config) {
+		if (!config.background) return null;
+		return { backgroundImage: `url("${config.background}")` };
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/core/math.js
+	var TAU = Math.PI * 2;
+	var clamp = (x, a = 0, b = 1) => x < a ? a : x > b ? b : x;
+	var wrap = (x, m) => (x % m + m) % m;
+	/** Progress 0..1 of t through the window [t0, t1]: 0 before it, 1 after it. */
+	var seg = (t, t0, t1) => clamp((t - t0) / (t1 - t0));
+	/** Hermite smoothstep of x between e0 and e1. */
+	var smooth = (e0, e1, x) => {
+		const t = seg(x, e0, e1);
+		return t * t * (3 - 2 * t);
+	};
+	/** 32-bit integer hash of any number of integers. */
+	function hash(...ns) {
+		let h = 2654435769;
+		for (const n of ns) {
+			h = Math.imul(h ^ (n | 0), 2246822507);
+			h ^= h >>> 13;
+			h = Math.imul(h, 3266489909);
+			h ^= h >>> 16;
+		}
+		return h >>> 0;
+	}
+	/** Deterministic random number in [0, 1) from integers (seed, particle index, which value...). */
+	var rand = (...ns) => hash(...ns) / 4294967296;
+	/** Seeded random generator (mulberry32). */
+	var Rng = class {
+		constructor(seed = 1) {
+			this.s = seed >>> 0 || 1;
+		}
+		next() {
+			let t = this.s = this.s + 1831565813 >>> 0;
+			t = Math.imul(t ^ t >>> 15, t | 1);
+			t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+			return ((t ^ t >>> 14) >>> 0) / 4294967296;
+		}
+		range(a, b) {
+			return a + (b - a) * this.next();
+		}
+		int(a, b) {
+			return Math.floor(this.range(a, b + 1));
+		}
+		chance(p) {
+			return this.next() < p;
+		}
+		sign() {
+			return this.next() < .5 ? -1 : 1;
+		}
+		pick(list) {
+			return list[Math.floor(this.next() * list.length)];
+		}
+		/** Roughly normal, mean 0, sd 1. */
+		gauss() {
+			return (this.next() + this.next() + this.next() + this.next() - 2) * 1.732;
+		}
+	};
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/core/color.js
+	var rgb = (r, g, b) => 255 << 24 | (b & 255) << 16 | (g & 255) << 8 | r & 255;
+	var red = (c) => c & 255;
+	var green = (c) => c >>> 8 & 255;
+	var blue = (c) => c >>> 16 & 255;
+	/** "#rgb" or "#rrggbb" (or a color number, passed through) to a color number. */
+	function hex(h) {
+		if (typeof h === "number") return h;
+		let s = h.replace("#", "");
+		if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
+		const v = parseInt(s.slice(0, 6), 16);
+		return rgb(v >> 16 & 255, v >> 8 & 255, v & 255);
+	}
+	var toHex = (c) => "#" + [
+		red(c),
+		green(c),
+		blue(c)
+	].map((v) => v.toString(16).padStart(2, "0")).join("");
+	/** Linear mix of two colors. */
+	function mix(a, b, t) {
+		t = clamp(t);
+		return rgb(red(a) + (red(b) - red(a)) * t, green(a) + (green(b) - green(a)) * t, blue(a) + (blue(b) - blue(a)) * t);
+	}
+	/** Multiply a color's brightness by k. */
+	var scale = (c, k) => rgb(Math.min(255, red(c) * k), Math.min(255, green(c) * k), Math.min(255, blue(c) * k));
+	/** A list of hex strings (dark to bright) to color numbers. */
+	var ramp = (list) => list.map(hex);
+	/**
+	* Resample a ramp to exactly n steps, keeping its ends (the darkest and brightest stay put). Lets an effect
+	* index steps by number (C[5]) whatever length of palette a caller passes.
+	*/
+	function fit(r, n) {
+		r = r.map(hex);
+		if (r.length === n) return r;
+		return Array.from({ length: n }, (_, i) => r[Math.round(i * (r.length - 1) / Math.max(1, n - 1))]);
+	}
+	Object.fromEntries(Object.entries({
+		fire: [
+			"#1f0b10",
+			"#4a1118",
+			"#8c1d1c",
+			"#cc3a1a",
+			"#f2701f",
+			"#ffae35",
+			"#ffe27a",
+			"#fff8d6"
+		],
+		ember: [
+			"#1a0a0e",
+			"#3d1012",
+			"#701a14",
+			"#a8301a",
+			"#e0561e",
+			"#ff8a2a",
+			"#ffc46a"
+		],
+		lava: [
+			"#14060a",
+			"#380a10",
+			"#6e1210",
+			"#ac2410",
+			"#e8501a",
+			"#ff8c2a",
+			"#ffd25a"
+		],
+		smoke: [
+			"#0e0c12",
+			"#1d1a22",
+			"#2e2a35",
+			"#433e4b",
+			"#5c5664",
+			"#7b7484",
+			"#a39cab"
+		],
+		dust: [
+			"#1c1610",
+			"#33281c",
+			"#4f3f2c",
+			"#6e5a40",
+			"#927a58",
+			"#b89f78",
+			"#dcc8a2"
+		],
+		ice: [
+			"#0c1430",
+			"#162c5c",
+			"#1f4f94",
+			"#2f7fcc",
+			"#58b4ec",
+			"#9bdcff",
+			"#d8f4ff",
+			"#ffffff"
+		],
+		water: [
+			"#081830",
+			"#0e2e5a",
+			"#14508c",
+			"#1c76bc",
+			"#36a2e0",
+			"#78ccf4",
+			"#c4ecff",
+			"#ffffff"
+		],
+		electric: [
+			"#0a0f2e",
+			"#172a78",
+			"#2550d0",
+			"#3f8cff",
+			"#7cc8ff",
+			"#c8f0ff",
+			"#ffffff"
+		],
+		volt: [
+			"#24160a",
+			"#5e3a0c",
+			"#a8680f",
+			"#e8a218",
+			"#ffd23c",
+			"#fff08a",
+			"#ffffff"
+		],
+		poison: [
+			"#0d1a0c",
+			"#173a14",
+			"#265e18",
+			"#3f8a1e",
+			"#6cb82a",
+			"#a8e04a",
+			"#e0ff8a"
+		],
+		holy: [
+			"#2a1c08",
+			"#5a3e10",
+			"#9a6c18",
+			"#d8a428",
+			"#ffd84a",
+			"#fff09a",
+			"#fffbe6",
+			"#ffffff"
+		],
+		heal: [
+			"#08201a",
+			"#0f3f2c",
+			"#17663e",
+			"#24924e",
+			"#3ec466",
+			"#7ee88a",
+			"#c8ffc4",
+			"#ffffff"
+		],
+		arcane: [
+			"#140a26",
+			"#2b1252",
+			"#481c88",
+			"#6b2cc0",
+			"#9a48ec",
+			"#c684ff",
+			"#ecc8ff",
+			"#ffffff"
+		],
+		shadow: [
+			"#050308",
+			"#0f0a18",
+			"#1c1230",
+			"#2c1a4a",
+			"#432468",
+			"#5e3290",
+			"#8048b8",
+			"#a970e0"
+		],
+		blood: [
+			"#14040a",
+			"#3a0a14",
+			"#6a101c",
+			"#a01824",
+			"#d42a30",
+			"#ff5a50",
+			"#ff9a8a"
+		],
+		earth: [
+			"#140e0a",
+			"#2a1e14",
+			"#47321e",
+			"#69492a",
+			"#8e6638",
+			"#b88a52",
+			"#dcb47c"
+		],
+		stone: [
+			"#0e0e12",
+			"#1c1c24",
+			"#2c2c38",
+			"#42424f",
+			"#5c5c6b",
+			"#7d7d8c",
+			"#a4a4b2",
+			"#d0d0da"
+		],
+		gold: [
+			"#1e1206",
+			"#4a2c08",
+			"#86520c",
+			"#c48412",
+			"#f0b424",
+			"#ffe066",
+			"#fff6c4",
+			"#ffffff"
+		],
+		leaf: [
+			"#0c1a0e",
+			"#163418",
+			"#225224",
+			"#357530",
+			"#4f9a3a",
+			"#7cc048",
+			"#b4e070",
+			"#e4ffb0"
+		],
+		wood: [
+			"#160c06",
+			"#2e1a0c",
+			"#4a2c14",
+			"#6a421e",
+			"#8e5c2c",
+			"#b47c40",
+			"#d8a464"
+		],
+		metal: [
+			"#0c0e14",
+			"#1c2230",
+			"#2e3648",
+			"#4a5468",
+			"#6e7a90",
+			"#9aa6ba",
+			"#d0d8e6",
+			"#ffffff"
+		],
+		bone: [
+			"#1a1814",
+			"#3a352c",
+			"#5e5648",
+			"#8a806c",
+			"#b8ad96",
+			"#e4dcc8",
+			"#fffaf0"
+		],
+		neon: [
+			"#1a0516",
+			"#3d0a33",
+			"#701560",
+			"#b0228f",
+			"#f53cd1",
+			"#ff86e6",
+			"#ffd2f6",
+			"#ffffff"
+		],
+		cyber: [
+			"#041418",
+			"#08303a",
+			"#0c5260",
+			"#108088",
+			"#18b4b0",
+			"#4ce8d8",
+			"#b4fff0",
+			"#ffffff"
+		],
+		matrix: [
+			"#020a04",
+			"#05200c",
+			"#0a3c16",
+			"#106624",
+			"#1a9a34",
+			"#3cd650",
+			"#a4ffa8",
+			"#e8ffe8"
+		],
+		candy: [
+			"#ff4a5a",
+			"#ff9a2a",
+			"#ffe03c",
+			"#5ad84a",
+			"#3cc8ff",
+			"#7a6cff",
+			"#f53cd1"
+		],
+		night: [
+			"#07060d",
+			"#0c0a18",
+			"#131026",
+			"#1b1734",
+			"#241f44",
+			"#2f2956"
+		]
+	}).map(([k, v]) => [k, ramp(v)]));
+	var WHITE = hex("#ffffff");
+	hex("#000000");
+	hex("#0b0a10");
+	hex("#f53cd1");
+	var CROSS = [
+		[1, 0],
+		[-1, 0],
+		[0, 1],
+		[0, -1]
+	];
+	var DIAG$1 = [
+		[1, 1],
+		[1, -1],
+		[-1, 1],
+		[-1, -1]
+	];
+	var HOT = [
+		"#fff3a6",
+		"#ffe26b",
+		"#ff8a2a",
+		"#f2561d"
+	].map(hex);
+	/** Fire from white-hot to smouldering, and smoke from fresh to thin: the ramps FIRE puffs and SMOKE walk down. */
+	var FIRE_RAMP = [
+		"#ffffff",
+		"#fff3a6",
+		"#ffe26b",
+		"#ffc23d",
+		"#ff8a2a",
+		"#f2561d",
+		"#c9281f",
+		"#8a1f17",
+		"#4a1712"
+	].map(hex);
+	var SMOKE_RAMP = [
+		"#7b6f72",
+		"#5d5660",
+		"#433d48",
+		"#2b2630",
+		"#1a171e"
+	].map(hex);
+	var rampAt = (r, t) => r[Math.min(r.length - 1, Math.max(0, Math.floor(t * r.length)))];
+	/** Particle kinds. */
+	var P = {
+		SPARK: 0,
+		MOTE: 1,
+		STREAK: 2,
+		FLAKE: 3,
+		VAPOUR: 4,
+		DUST: 5,
+		STAR: 6,
+		EMBER: 7,
+		SMOKE: 8,
+		FIRE: 9,
+		BRAND: 10,
+		GRIT: 11
+	};
+	/** Particle flags: SMOKES (a FIRE puff leaves smoke when it dies), BIG (bigger, slower smoke), BACK (draw behind). */
+	var PF = {
+		SMOKES: 1,
+		BIG: 2,
+		BACK: 4
+	};
+	var SOFT = /* @__PURE__ */ new Set([
+		P.VAPOUR,
+		P.DUST,
+		P.SMOKE
+	]);
+	/**
+	* A particle system. opts: { seed, ground: (x) => floor y (local px; sparks bounce on it), sparks: [head..tail]
+	* colors for SPARK, haze: color vapour glows with }.
+	* spawn(kind, x, y, vx, vy, life, color, size); update(dt); draw(p, layer): "back" draws the soft kinds
+	* (vapour, dust, smoke), "front" the rest, nothing for both.
+	*/
+	var Particles = class {
+		constructor(opts = {}) {
+			this.R = opts.rng ?? new Rng(opts.seed ?? 1);
+			this.list = [];
+			this.t = 0;
+			this.ground = opts.ground ?? (() => Infinity);
+			this.sparks = (opts.sparks ?? HOT).map(hex);
+			this.haze = opts.haze === void 0 ? null : hex(opts.haze);
+			this.onLand = opts.onLand ?? null;
+		}
+		/** delay: seconds before it appears; flag: PF bits. col 0 lets FIRE and SMOKE use their own ramps. */
+		spawn(k, x, y, vx, vy, life, col = WHITE, size = 1, delay = 0, flag = 0) {
+			this.list.push({
+				k,
+				x,
+				y,
+				vx,
+				vy,
+				life,
+				max: life,
+				col: col ? hex(col) : 0,
+				size,
+				seed: this.R.next() * 100,
+				delay,
+				flag
+			});
+		}
+		get count() {
+			return this.list.length;
+		}
+		update(dt) {
+			this.t += dt;
+			const R = this.R, t = this.t;
+			for (let i = this.list.length - 1; i >= 0; i--) {
+				const p = this.list[i];
+				if (p.delay > 0) {
+					p.delay -= dt;
+					continue;
+				}
+				if ((p.life -= dt) <= 0) {
+					if (p.k === P.FIRE && p.flag & PF.SMOKES) {
+						const big = p.flag & PF.BIG;
+						this.spawn(P.SMOKE, p.x, p.y, p.vx * .6, p.vy * .6 - 6, big ? R.range(1.3, 2.3) : R.range(.8, 1.4), 0, p.size * (big ? .85 : .7), 0, big ? PF.BIG : 0);
+					}
+					this.list.splice(i, 1);
+					continue;
+				}
+				switch (p.k) {
+					case P.FIRE:
+						p.vy -= 95 * dt;
+						p.vx += Math.sin(t * 17 + p.seed) * 30 * dt;
+						p.vx -= p.vx * 5 * dt;
+						p.vy -= p.vy * 3.2 * dt;
+						break;
+					case P.GRIT: {
+						p.vy += 950 * dt;
+						p.vx -= p.vx * .8 * dt;
+						const g = this.ground(p.x), ny = p.y + p.vy * dt;
+						p.x += p.vx * dt;
+						if (p.vy > 0 && p.y <= g && ny >= g) {
+							p.y = g - .25;
+							if (p.vy > 130 && R.chance(.4)) p.vy = -p.vy * .25, p.vx = p.vx * .5 + R.range(-10, 10);
+							else p.vx = p.vy = 0, p.life = Math.min(p.life, .5);
+						} else p.y = ny;
+						continue;
+					}
+					case P.BRAND: {
+						p.vy += 760 * dt;
+						p.vx -= p.vx * .9 * dt;
+						if (R.chance(.9 * Math.min(1, dt * 60))) this.spawn(P.FIRE, p.x, p.y, p.vx * .1 + R.range(-7, 7), p.vy * .1 - 10, R.range(.16, .32), 0, R.range(.9, 1.7) * (.5 + p.life / p.max * .6), 0, R.chance(.4) ? PF.SMOKES : 0);
+						const g = this.ground(p.x), ny = p.y + p.vy * dt;
+						p.x += p.vx * dt;
+						if (p.vy > 0 && p.y <= g && ny >= g) {
+							this.onLand?.(p.x, g);
+							this.list.splice(i, 1);
+						} else p.y = ny;
+						continue;
+					}
+					case P.SPARK: {
+						p.vy += 427.5 * dt;
+						p.vx -= p.vx * 2.2 * dt;
+						p.vy -= p.vy * 2.2 * dt;
+						const g = this.ground(p.x), ny = p.y + p.vy * dt;
+						p.x += p.vx * dt;
+						if (p.vy > 0 && p.y <= g && ny >= g) p.vy = -p.vy * .45, p.vx *= .7, p.y = g - .25;
+						else p.y = ny;
+						continue;
+					}
+					case P.STREAK:
+						p.vx += p.vx * 3 * dt, p.vy += p.vy * 3 * dt;
+						break;
+					case P.FLAKE:
+						p.vx -= p.vx * 2.2 * dt;
+						p.vy -= p.vy * 2.2 * dt - 35 * dt;
+						p.x += Math.sin(this.t * 2.5 + p.seed) * 7 * dt;
+						break;
+					case P.EMBER:
+						p.vy += (-30 + Math.sin(t * 3 + p.seed) * 20) * dt;
+						p.vx += Math.cos(t * 2.3 + p.seed) * 45 * dt;
+						p.vx -= p.vx * 1.6 * dt;
+						p.vy -= p.vy * 1.6 * dt;
+						break;
+					case P.SMOKE: {
+						const big = p.flag & PF.BIG;
+						p.vy -= (big ? 23 : 16) * dt;
+						p.vx += Math.sin(t * 1.3 + p.seed) * 8 * dt;
+						p.vx -= p.vx * 1.6 * dt;
+						p.vy -= p.vy * 1.2 * dt;
+						break;
+					}
+					case P.MOTE:
+						p.vx -= p.vx * .6 * dt;
+						p.vy -= p.vy * .6 * dt;
+						break;
+					default: {
+						const drag = SOFT.has(p.k) ? 4 : 1.6;
+						p.vx -= p.vx * drag * dt;
+						p.vy -= p.vy * drag * dt + 5 * dt;
+					}
+				}
+				p.x += p.vx * dt;
+				p.y += p.vy * dt;
+			}
+		}
+		draw(p, layer) {
+			for (const q of this.list) {
+				if (q.delay > 0) continue;
+				if (layer && (SOFT.has(q.k) || q.flag & PF.BACK ? "back" : "front") !== layer) continue;
+				const k = q.life / q.max, x = q.x, y = q.y, sp = Math.hypot(q.vx, q.vy) || 1, ux = q.vx / sp, uy = q.vy / sp;
+				switch (q.k) {
+					case P.SPARK: {
+						const S = this.sparks, head = k > .6 ? S[0] : k > .3 ? S[1] : S[2], len = Math.min(9, 1 + sp * .022);
+						p.line(x - ux * len, y - uy * len, x - ux * len * .4, y - uy * len * .4, k > .5 ? head : S[S.length - 1]);
+						p.line(x - ux * len * .45, y - uy * len * .45, x, y, head);
+						p.glow(x, y, 3, head, .45 * k);
+						break;
+					}
+					case P.MOTE: {
+						const len = Math.min(16, .5 + sp * .026) * q.size, a = k < .35 ? k / .35 : 1;
+						p.line(x - ux * len, y - uy * len, x - ux * len * .35, y - uy * len * .35, scale(q.col, .55), a);
+						p.line(x - ux * len * .4, y - uy * len * .4, x, y, q.col, a);
+						p.glow(x, y, 2.5 + q.size, q.col, .4 * k);
+						break;
+					}
+					case P.STREAK: {
+						const L = clamp(sp / 30, 1, 7);
+						for (let d = L; d >= 0; d -= .5) p.dot(x - ux * d, y - uy * d, d < 1 ? WHITE : d < L * .5 ? q.col : scale(q.col, .6), d < L * .5 ? 1 : 1.2 - d / L);
+						p.glow(x, y, 4, q.col, .4);
+						break;
+					}
+					case P.FLAKE: {
+						const a = Math.min(1, k * 3);
+						p.dot(x, y, q.col, a);
+						if (q.size > 1.3) for (const [dx, dy] of CROSS) p.dot(x + dx, y + dy, scale(q.col, .8), a * .8);
+						break;
+					}
+					case P.VAPOUR: {
+						const r = q.size * (.6 + (1 - k) * .9);
+						p.disc(x, y, r, q.col, Math.pow(k, 1.3) * .45);
+						if (this.haze) p.glow(x, y, r * 1.8, this.haze, .16 * k);
+						break;
+					}
+					case P.DUST:
+						p.disc(x, y, q.size * (.6 + (1 - k) * .9), q.col, Math.pow(k, 1.3) * .7);
+						break;
+					case P.SMOKE: {
+						const age = 1 - k, big = q.flag & PF.BIG;
+						const r = q.size * (.65 + Math.min(1, age * 2.5) * .45 + age * (big ? .5 : .4));
+						const a = Math.min(1, age * 12) * Math.min(1, k * 2.4) * (big ? .7 : .58);
+						const c = q.col ? mix(q.col, rampAt(SMOKE_RAMP, age), age) : rampAt(SMOKE_RAMP, age * 1.05);
+						p.disc(x, y, r, c, a * .45);
+						p.disc(x + r * .05, y + r * .06, r * .74, c, a * .62);
+						if (age < .5) p.disc(x - r * .22, y - r * .3, r * .5, mix(c, WHITE, .12), a * .4 * (1 - age * 2));
+						break;
+					}
+					case P.FIRE: {
+						const age = 1 - k, heat = Math.min(.999, Math.pow(age, .62) + q.seed % 1 * .1), F = FIRE_RAMP, n = F.length;
+						const idx = Math.min(n - 2, Math.floor(heat * (n - 1)));
+						const r = q.size * (.55 + .45 * Math.min(1, age * 7)) * (1 - age * .55), c = F[idx];
+						if (idx >= n - 2) p.disc(x, y, r, c, Math.min(1, k * 3) * .85);
+						else {
+							p.circle(x, y, r, F[Math.min(n - 1, idx + 2)]);
+							p.circle(x - r * .16, y - r * .22, r * .78, c);
+							if (r > 1.6) p.circle(x, y - r * .9, r * .42, c);
+							if (idx <= 3 && r > 1.8) p.circle(x - r * .28, y - r * .34, r * .36, F[Math.max(0, idx - 1)]);
+							if (idx < 6) p.glow(x, y, r * 2.4 + 2, c, .18 * k);
+						}
+						break;
+					}
+					case P.BRAND:
+						p.circle(x, y, 1.6, HOT[3]);
+						p.px(x, y, Math.sin(this.t * 40 + q.seed) > 0 ? HOT[0] : HOT[1]);
+						p.px(x + 1, y, HOT[1]);
+						p.glow(x, y, 7, HOT[2], .45);
+						break;
+					case P.GRIT:
+						if (k > .25 || k * 4 > .5) {
+							p.px(x, y, q.col);
+							if (q.size >= 2) p.px(x + 1, y, q.col), p.px(x, y + 1, scale(q.col, .8)), p.px(x + 1, y + 1, scale(q.col, .7));
+						}
+						break;
+					case P.EMBER: {
+						const c = k > .6 ? this.sparks[0] : k > .3 ? this.sparks[1] : this.sparks[2];
+						if (k < .25 && Math.sin(this.t * 40 + q.seed) < 0) break;
+						p.px(x, y, c);
+						if (q.size > 1.5) p.px(x, y + 1, this.sparks[this.sparks.length - 1]);
+						p.glow(x, y, 3 + q.size, c, .35 * k);
+						break;
+					}
+					default: {
+						const tw = .6 + .4 * Math.sin(this.t * (8 + q.seed % 5) + q.seed);
+						if (q.size < 1) {
+							if (tw * k > .25) p.px(x, y, tw > .8 ? WHITE : q.col);
+							p.glow(x, y, 3, q.col, .4 * k * tw);
+							break;
+						}
+						sparkle(p, x, y, q.size * tw * Math.min(1, k * 3), q.col, scale(q.col, .75), .5 * k * tw);
+					}
+				}
+			}
+		}
+	};
+	/** A star glint: arms of length arm in color c with tips in tip, a white heart, light. */
+	function sparkle(p, x, y, arm, c, tip = c, k = .6) {
+		const n = Math.round(arm);
+		if (n < 1) return;
+		const X = Math.floor(x), Y = Math.floor(y);
+		for (let d = 1; d <= n; d++) {
+			const cc = d > n * .6 ? tip : c;
+			for (const [dx, dy] of CROSS) p.px(X + dx * d, Y + dy * d, cc);
+		}
+		if (n >= 3) for (const [dx, dy] of DIAG$1) p.px(X + dx, Y + dy, c);
+		if (n >= 6) for (const [dx, dy] of DIAG$1) p.px(X + dx * 2, Y + dy * 2, tip);
+		p.px(X, Y, WHITE);
+		p.glow(x, y, 4 + n * 2, c, k);
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/core/font.js
+	var MINI = {
+		A: ".#.|#.#|###|#.#|#.#",
+		B: "##.|#.#|##.|#.#|##.",
+		C: ".##|#..|#..|#..|.##",
+		D: "##.|#.#|#.#|#.#|##.",
+		E: "###|#..|##.|#..|###",
+		F: "###|#..|##.|#..|#..",
+		G: ".##|#..|#.#|#.#|.##",
+		H: "#.#|#.#|###|#.#|#.#",
+		I: "###|.#.|.#.|.#.|###",
+		J: "..#|..#|..#|#.#|.#.",
+		K: "#.#|#.#|##.|#.#|#.#",
+		L: "#..|#..|#..|#..|###",
+		M: "#.#|###|###|#.#|#.#",
+		N: "##.|#.#|#.#|#.#|#.#",
+		O: ".#.|#.#|#.#|#.#|.#.",
+		P: "##.|#.#|##.|#..|#..",
+		Q: ".#.|#.#|#.#|##.|.##",
+		R: "##.|#.#|##.|#.#|#.#",
+		S: ".##|#..|.#.|..#|##.",
+		T: "###|.#.|.#.|.#.|.#.",
+		U: "#.#|#.#|#.#|#.#|###",
+		V: "#.#|#.#|#.#|#.#|.#.",
+		W: "#.#|#.#|###|###|#.#",
+		X: "#.#|#.#|.#.|#.#|#.#",
+		Y: "#.#|#.#|.#.|.#.|.#.",
+		Z: "###|..#|.#.|#..|###",
+		0: "###|#.#|#.#|#.#|###",
+		1: ".#.|##.|.#.|.#.|###",
+		2: "##.|..#|.#.|#..|###",
+		3: "##.|..#|.#.|..#|##.",
+		4: "#.#|#.#|###|..#|..#",
+		5: "###|#..|##.|..#|##.",
+		6: ".##|#..|###|#.#|###",
+		7: "###|..#|.#.|.#.|.#.",
+		8: "###|#.#|###|#.#|###",
+		9: "###|#.#|###|..#|##.",
+		"+": "...|.#.|###|.#.|...",
+		"-": "...|...|###|...|...",
+		"!": "#|#|#|.|#",
+		"?": "##.|..#|.#.|...|.#.",
+		".": ".|.|.|.|#",
+		",": "..|..|..|.#|#.",
+		":": ".|#|.|#|.",
+		"/": "..#|..#|.#.|#..|#..",
+		"%": "#.#|..#|.#.|#..|#.#",
+		x: "...|#.#|.#.|#.#|...",
+		"*": "#.#|.#.|#.#|...|...",
+		"'": "#|#|.|.|.",
+		"(": ".#|#.|#.|#.|.#",
+		")": "#.|.#|.#|.#|#.",
+		"<": "..#|.#.|#..|.#.|..#",
+		">": "#..|.#.|..#|.#.|#..",
+		"=": "...|###|...|###|...",
+		_: "...|...|...|...|###",
+		"#": "#.#|###|#.#|###|#.#"
+	};
+	var BIG = {
+		A: ".###.|#...#|#...#|#####|#...#|#...#|#...#",
+		B: "####.|#...#|#...#|####.|#...#|#...#|####.",
+		C: ".###.|#...#|#....|#....|#....|#...#|.###.",
+		D: "####.|#...#|#...#|#...#|#...#|#...#|####.",
+		E: "#####|#....|#....|####.|#....|#....|#####",
+		F: "#####|#....|#....|####.|#....|#....|#....",
+		G: ".###.|#...#|#....|#.###|#...#|#...#|.####",
+		H: "#...#|#...#|#...#|#####|#...#|#...#|#...#",
+		I: "###|.#.|.#.|.#.|.#.|.#.|###",
+		J: "..###|...#.|...#.|...#.|...#.|#..#.|.##..",
+		K: "#...#|#..#.|#.#..|##...|#.#..|#..#.|#...#",
+		L: "#....|#....|#....|#....|#....|#....|#####",
+		M: "#...#|##.##|#.#.#|#.#.#|#...#|#...#|#...#",
+		N: "#...#|#...#|##..#|#.#.#|#..##|#...#|#...#",
+		O: ".###.|#...#|#...#|#...#|#...#|#...#|.###.",
+		P: "####.|#...#|#...#|####.|#....|#....|#....",
+		Q: ".###.|#...#|#...#|#...#|#.#.#|#..#.|.##.#",
+		R: "####.|#...#|#...#|####.|#.#..|#..#.|#...#",
+		S: ".####|#....|#....|.###.|....#|....#|####.",
+		T: "#####|..#..|..#..|..#..|..#..|..#..|..#..",
+		U: "#...#|#...#|#...#|#...#|#...#|#...#|.###.",
+		V: "#...#|#...#|#...#|#...#|#...#|.#.#.|..#..",
+		W: "#...#|#...#|#...#|#.#.#|#.#.#|#.#.#|.#.#.",
+		X: "#...#|#...#|.#.#.|..#..|.#.#.|#...#|#...#",
+		Y: "#...#|#...#|.#.#.|..#..|..#..|..#..|..#..",
+		Z: "#####|....#|...#.|..#..|.#...|#....|#####",
+		0: ".###.|#...#|#..##|#.#.#|##..#|#...#|.###.",
+		1: ".#.|##.|.#.|.#.|.#.|.#.|###",
+		2: ".###.|#...#|....#|...#.|..#..|.#...|#####",
+		3: "#####|...#.|..#..|...#.|....#|#...#|.###.",
+		4: "...#.|..##.|.#.#.|#..#.|#####|...#.|...#.",
+		5: "#####|#....|####.|....#|....#|#...#|.###.",
+		6: "..##.|.#...|#....|####.|#...#|#...#|.###.",
+		7: "#####|....#|...#.|..#..|.#...|.#...|.#...",
+		8: ".###.|#...#|#...#|.###.|#...#|#...#|.###.",
+		9: ".###.|#...#|#...#|.####|....#|...#.|.##..",
+		"!": "#|#|#|#|#|.|#",
+		"?": ".###.|#...#|....#|...#.|..#..|.....|..#..",
+		"+": ".....|..#..|..#..|#####|..#..|..#..|.....",
+		"-": "....|....|....|####|....|....|....",
+		".": ".|.|.|.|.|.|#",
+		",": "..|..|..|..|..|.#|#.",
+		":": ".|.|#|.|.|#|.",
+		"/": "....#|....#|...#.|..#..|.#...|#....|#....",
+		"%": "##...|##..#|...#.|..#..|.#...|#..##|...##",
+		x: ".....|.....|#...#|.#.#.|..#..|.#.#.|#...#",
+		"*": ".....|..#..|#.#.#|.###.|#.#.#|..#..|.....",
+		"'": "#|#|.|.|.|.|.",
+		"<": "...#|..#.|.#..|#...|.#..|..#.|...#",
+		">": "#...|.#..|..#.|...#|..#.|.#..|#...",
+		"=": "....|....|####|....|####|....|....",
+		"(": "..#|.#.|#..|#..|#..|.#.|..#",
+		")": "#..|.#.|..#|..#|..#|.#.|#..",
+		"#": ".#.#.|.#.#.|#####|.#.#.|#####|.#.#.|.#.#."
+	};
+	function build(table, h) {
+		const out = {};
+		for (const [ch, src] of Object.entries(table)) {
+			const rows = src.split("|");
+			out[ch] = {
+				w: rows[0].length,
+				rows: rows.map((r) => [...r].map((c) => c === "#"))
+			};
+			if (rows.length !== h) throw new Error(`glyph ${ch} has ${rows.length} rows, expected ${h}`);
+		}
+		return out;
+	}
+	var FONTS = {
+		mini: {
+			h: 5,
+			space: 2,
+			gap: 1,
+			glyphs: build(MINI, 5)
+		},
+		big: {
+			h: 7,
+			space: 3,
+			gap: 1,
+			glyphs: build(BIG, 7)
+		}
+	};
+	/** Width in font pixels of a string (before scaling). */
+	function textWidth(str, font = "mini") {
+		const F = FONTS[font];
+		let w = 0;
+		for (const ch of String(str)) {
+			const g = F.glyphs[ch] ?? F.glyphs[ch.toUpperCase()];
+			w += (g ? g.w : F.space) + F.gap;
+		}
+		return Math.max(0, w - F.gap);
+	}
+	/** Calls plot(x, y) for every inked font pixel of str, with the top-left of the text at (0, 0). */
+	function rasterText(str, font, plot) {
+		const F = FONTS[font];
+		let x = 0;
+		for (const ch of String(str)) {
+			const g = F.glyphs[ch] ?? F.glyphs[ch.toUpperCase()];
+			if (!g) {
+				x += F.space + F.gap;
+				continue;
+			}
+			for (let r = 0; r < F.h; r++) for (let c = 0; c < g.w; c++) if (g.rows[r][c]) plot(x + c, r);
+			x += g.w + F.gap;
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/core/painter.js
+	var BAYER$1 = [
+		0,
+		8,
+		2,
+		10,
+		12,
+		4,
+		14,
+		6,
+		3,
+		11,
+		1,
+		9,
+		15,
+		7,
+		13,
+		5
+	].map((v) => (v + .5) / 16);
+	var OUT$1 = {
+		c: 0,
+		a: 1,
+		l: 0,
+		k: 0
+	};
+	var sprites = /* @__PURE__ */ new WeakMap();
+	var call = (v, ...args) => typeof v === "function" ? v(...args) : v;
+	var Painter = class {
+		constructor(frame) {
+			this.frame = frame;
+			this.reset();
+		}
+		/** Re-read the frame and clear placement, fade and light strength. */
+		reset() {
+			const f = this.frame;
+			this.w = f.w;
+			this.h = f.h;
+			this.ox = f.ox | 0;
+			this.oy = f.oy | 0;
+			this.C = f.color;
+			this.L = f.light;
+			this.tx = 0;
+			this.ty = 0;
+			this.fx = 1;
+			this.cs = 1;
+			this.sn = 0;
+			this.fade = 1;
+			this.lightK = 1;
+			this.layer = "front";
+			return this;
+		}
+		/** Put the effect's origin at (x, y) in frame space, mirrored if flip, rotated by angle (radians). */
+		place(x, y, flip = false, angle = 0) {
+			this.tx = x;
+			this.ty = y;
+			this.fx = flip ? -1 : 1;
+			this.cs = Math.cos(angle);
+			this.sn = Math.sin(angle);
+			return this;
+		}
+		toX(x, y) {
+			return this.tx + x * this.fx * this.cs - y * this.sn;
+		}
+		toY(x, y) {
+			return this.ty + x * this.fx * this.sn + y * this.cs;
+		}
+		fromX(sx, sy) {
+			const dx = sx - this.tx, dy = sy - this.ty;
+			return (dx * this.cs + dy * this.sn) * this.fx;
+		}
+		fromY(sx, sy) {
+			const dx = sx - this.tx, dy = sy - this.ty;
+			return -dx * this.sn + dy * this.cs;
+		}
+		cellX(x, y) {
+			return Math.floor(this.toX(Math.floor(x) + .5, Math.floor(y) + .5));
+		}
+		cellY(x, y) {
+			return Math.floor(this.toY(Math.floor(x) + .5, Math.floor(y) + .5));
+		}
+		put(sx, sy, c, a = 1) {
+			if (!c) return;
+			a *= this.fade;
+			if (a < 1 && a <= BAYER$1[(sy & 3) << 2 | sx & 3]) return;
+			const x = sx - this.ox, y = sy - this.oy;
+			if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+			this.C[y * this.w + x] = c;
+		}
+		add(sx, sy, c, k = 1) {
+			k *= this.fade * this.lightK;
+			if (k <= .004) return;
+			const x = sx - this.ox, y = sy - this.oy;
+			if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+			const i = y * this.w + x, d = this.L[i];
+			const r = Math.min(255, (d & 255) + (c & 255) * k) | 0;
+			const g = Math.min(255, (d >>> 8 & 255) + (c >>> 8 & 255) * k) | 0;
+			const b = Math.min(255, (d >>> 16 & 255) + (c >>> 16 & 255) * k) | 0;
+			this.L[i] = 255 << 24 | b << 16 | g << 8 | r;
+		}
+		/**
+		* Blend a color over what's there at alpha a (0..1), keeping the result's own alpha: soft smoke, vapour and
+		* mist. Use dithered dot() for hard pixel fades and blend() for translucent volumes.
+		*/
+		blendPx(sx, sy, c, a) {
+			a *= this.fade;
+			if (!c || a <= .004) return;
+			const x = sx - this.ox, y = sy - this.oy;
+			if (x < 0 || y < 0 || x >= this.w || y >= this.h) return;
+			const i = y * this.w + x, d = this.C[i], da = (d >>> 24) / 255, oa = a + da * (1 - a), k = a / oa;
+			const ch = (s) => (c >>> s & 255) * k + (d >>> s & 255) * (1 - k) & 255;
+			this.C[i] = (oa * 255 & 255) << 24 | ch(16) << 16 | ch(8) << 8 | ch(0);
+		}
+		/** Translucent pixel at a local point. */
+		blend(x, y, c, a) {
+			this.blendPx(this.cellX(x, y), this.cellY(x, y), c, a);
+		}
+		/** A translucent disc: puffs of smoke, vapour, dust. c and a may be functions of (d: 0 center..1 rim, angle). */
+		disc(cx, cy, r, c, a) {
+			if (r < .5) return this.blend(cx, cy, call(c, 0, 0), call(a, 0, 0));
+			this.each(cx - r, cy - r, cx + r, cy + r, (x, y, sx, sy) => {
+				const dx = x - cx, dy = y - cy, d2 = dx * dx + dy * dy;
+				if (d2 > r * r) return;
+				const d = Math.sqrt(d2) / r, ang = Math.atan2(dy, dx);
+				this.blendPx(sx, sy, call(c, d, ang), call(a, d, ang));
+			});
+		}
+		/** Read back the color under a local point (0 if empty). */
+		get(x, y) {
+			const sx = this.cellX(x, y) - this.ox, sy = this.cellY(x, y) - this.oy;
+			return sx < 0 || sy < 0 || sx >= this.w || sy >= this.h ? 0 : this.C[sy * this.w + sx];
+		}
+		/** One opaque pixel. */
+		px(x, y, c) {
+			this.put(this.cellX(x, y), this.cellY(x, y), c, 1);
+		}
+		/** One pixel at alpha a (0..1), faded by ordered dither. */
+		dot(x, y, c, a = 1) {
+			if (a > 0) this.put(this.cellX(x, y), this.cellY(x, y), c, a);
+		}
+		/** Add light to one pixel. */
+		light(x, y, c, k = 1) {
+			this.add(this.cellX(x, y), this.cellY(x, y), c, k);
+		}
+		/**
+		* Visit every screen pixel whose center falls in the local box [x0, x1] x [y0, y1], with that center in
+		* local space: fn(lx, ly, sx, sy). The basis of every filled shape, so shapes mirror and rotate exactly.
+		*/
+		each(x0, y0, x1, y1, fn) {
+			let ax = Infinity, bx = -Infinity, ay = Infinity, by = -Infinity;
+			for (let k = 0; k < 4; k++) {
+				const x = k & 1 ? x1 : x0, y = k & 2 ? y1 : y0, sx = this.toX(x, y), sy = this.toY(x, y);
+				if (sx < ax) ax = sx;
+				if (sx > bx) bx = sx;
+				if (sy < ay) ay = sy;
+				if (sy > by) by = sy;
+			}
+			const sx0 = Math.max(Math.floor(ax), this.ox), sx1 = Math.min(Math.ceil(bx), this.ox + this.w - 1);
+			const sy0 = Math.max(Math.floor(ay), this.oy), sy1 = Math.min(Math.ceil(by), this.oy + this.h - 1);
+			for (let sy = sy0; sy <= sy1; sy++) for (let sx = sx0; sx <= sx1; sx++) {
+				const cx = sx + .5, cy = sy + .5;
+				fn(this.fromX(cx, cy), this.fromY(cx, cy), sx, sy);
+			}
+		}
+		/**
+		* A pixel shader over a local box. fn(x, y, out) returns a color, or sets out.c (color), out.a (alpha),
+		* out.l (light color, defaults to out.c) and out.k (light amount). Return nothing to leave the pixel alone.
+		*/
+		shade(x0, y0, x1, y1, fn) {
+			const o = OUT$1;
+			this.each(x0, y0, x1, y1, (lx, ly, sx, sy) => {
+				o.c = 0;
+				o.a = 1;
+				o.l = 0;
+				o.k = 0;
+				const c = fn(lx, ly, o) || o.c;
+				if (c) this.put(sx, sy, c, o.a);
+				if (o.k > 0) this.add(sx, sy, o.l || c, o.k);
+			});
+		}
+		/** 1 px line. c and a may be functions of u (0 at the start, 1 at the end). */
+		line(x0, y0, x1, y1, c, a = 1) {
+			let sx = this.cellX(x0, y0), sy = this.cellY(x0, y0);
+			const ex = this.cellX(x1, y1), ey = this.cellY(x1, y1);
+			const dx = Math.abs(ex - sx), dy = -Math.abs(ey - sy), stepx = sx < ex ? 1 : -1, stepy = sy < ey ? 1 : -1;
+			const n = Math.max(dx, -dy) || 1, fc = typeof c === "function", fa = typeof a === "function";
+			let err = dx + dy, i = 0;
+			for (;;) {
+				const u = i++ / n;
+				this.put(sx, sy, fc ? c(u) : c, fa ? a(u) : a);
+				if (sx === ex && sy === ey) break;
+				const e2 = 2 * err;
+				if (e2 >= dy) {
+					err += dy;
+					sx += stepx;
+				}
+				if (e2 <= dx) {
+					err += dx;
+					sy += stepy;
+				}
+			}
+		}
+		/** Lines through a list of points [[x, y], ...]. */
+		polyline(pts, c, a = 1) {
+			for (let i = 1; i < pts.length; i++) this.line(pts[i - 1][0], pts[i - 1][1], pts[i][0], pts[i][1], c, a);
+		}
+		/** Thick segment with round ends. c and a may be functions of (u along, v across: 0 center, 1 edge). */
+		beam(x0, y0, x1, y1, width, c, a = 1) {
+			const r = width / 2, dx = x1 - x0, dy = y1 - y0, L2 = dx * dx + dy * dy || 1e-9;
+			this.shade(Math.min(x0, x1) - r, Math.min(y0, y1) - r, Math.max(x0, x1) + r, Math.max(y0, y1) + r, (x, y, o) => {
+				const u = clamp(((x - x0) * dx + (y - y0) * dy) / L2), px = x0 + dx * u - x, py = y0 + dy * u - y;
+				const d2 = px * px + py * py;
+				if (d2 > r * r) return;
+				const v = Math.sqrt(d2) / r;
+				o.c = call(c, u, v);
+				o.a = call(a, u, v);
+			});
+		}
+		/** Filled disc. c and a may be functions of (d: 0 center to 1 rim, angle). */
+		circle(cx, cy, r, c, a = 1) {
+			if (r < .6) return this.dot(cx, cy, call(c, 0, 0), call(a, 0, 0));
+			this.shade(cx - r, cy - r, cx + r, cy + r, (x, y, o) => {
+				const dx = x - cx, dy = y - cy, d2 = dx * dx + dy * dy;
+				if (d2 > r * r) return;
+				const d = Math.sqrt(d2) / r, ang = Math.atan2(dy, dx);
+				o.c = call(c, d, ang);
+				o.a = call(a, d, ang);
+			});
+		}
+		/** Ellipse. c and a may be functions of (d: 0 center to 1 rim, angle). */
+		ellipse(cx, cy, rx, ry, c, a = 1) {
+			if (rx <= 0 || ry <= 0) return;
+			this.shade(cx - rx, cy - ry, cx + rx, cy + ry, (x, y, o) => {
+				const dx = (x - cx) / rx, dy = (y - cy) / ry, d2 = dx * dx + dy * dy;
+				if (d2 > 1) return;
+				const d = Math.sqrt(d2), ang = Math.atan2(dy, dx);
+				o.c = call(c, d, ang);
+				o.a = call(a, d, ang);
+			});
+		}
+		/** Ring from radius r - w to r. c and a may be functions of (v: 0 inner to 1 outer, angle). */
+		ring(cx, cy, r, w, c, a = 1) {
+			const r0 = Math.max(0, r - w);
+			this.shade(cx - r, cy - r, cx + r, cy + r, (x, y, o) => {
+				const dx = x - cx, dy = y - cy, d2 = dx * dx + dy * dy;
+				if (d2 > r * r || d2 < r0 * r0) return;
+				const v = w > 0 ? (Math.sqrt(d2) - r0) / (r - r0 || 1) : 1, ang = Math.atan2(dy, dx);
+				o.c = call(c, v, ang);
+				o.a = call(a, v, ang);
+			});
+		}
+		/**
+		* Band of a ring from angle a0 to a1 (radians, a1 > a0), radius r - w to r: the slash and smear shape.
+		* c and a may be functions of (u: 0 at a0 to 1 at a1, v: 0 inner to 1 outer). w can be a function of u
+		* for a crescent that tapers at both ends.
+		*/
+		arc(cx, cy, r, w, a0, a1, c, a = 1) {
+			const span = a1 - a0, wf = typeof w === "function";
+			this.shade(cx - r, cy - r, cx + r, cy + r, (x, y, o) => {
+				const dx = x - cx, dy = y - cy, d = Math.sqrt(dx * dx + dy * dy);
+				if (d > r) return;
+				let ang = Math.atan2(dy, dx) - a0;
+				ang -= Math.floor(ang / (Math.PI * 2)) * Math.PI * 2;
+				if (ang > span) return;
+				const u = ang / span, ww = wf ? w(u) : w;
+				if (ww <= 0 || d < r - ww) return;
+				const v = (d - (r - ww)) / ww;
+				o.c = call(c, u, v);
+				o.a = call(a, u, v);
+			});
+		}
+		/** Filled rectangle. */
+		rect(x, y, w, h, c, a = 1) {
+			if (this.sn === 0) {
+				const X0 = Math.round(x), Y0 = Math.round(y), X1 = Math.round(x + w), Y1 = Math.round(y + h);
+				for (let yy = Y0; yy < Y1; yy++) for (let xx = X0; xx < X1; xx++) this.put(this.cellX(xx, yy), this.cellY(xx, yy), c, a);
+				return;
+			}
+			this.shade(x, y, x + w, y + h, (lx, ly, o) => {
+				if (lx < x || ly < y || lx >= x + w || ly >= y + h) return;
+				o.c = c;
+				o.a = a;
+			});
+		}
+		/** Filled polygon from points [[x, y], ...] (even-odd rule). */
+		poly(pts, c, a = 1) {
+			let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+			for (const [x, y] of pts) {
+				if (x < x0) x0 = x;
+				if (x > x1) x1 = x;
+				if (y < y0) y0 = y;
+				if (y > y1) y1 = y;
+			}
+			const n = pts.length;
+			this.shade(x0, y0, x1, y1, (x, y, o) => {
+				let inside = false;
+				for (let i = 0, j = n - 1; i < n; j = i++) {
+					const [xi, yi] = pts[i], [xj, yj] = pts[j];
+					if (yi > y !== yj > y && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+				}
+				if (!inside) return;
+				o.c = call(c, x, y);
+				o.a = call(a, x, y);
+			});
+		}
+		tri(x0, y0, x1, y1, x2, y2, c, a = 1) {
+			this.poly([
+				[x0, y0],
+				[x1, y1],
+				[x2, y2]
+			], c, a);
+		}
+		/** Radial glow into the light buffer: k at the center, falling to 0 at radius r. */
+		glow(x, y, r, c, k = .5) {
+			if (r < 1 || k <= .004) return;
+			const cx = this.toX(x, y), cy = this.toY(x, y);
+			const x0 = Math.floor(cx - r), x1 = Math.ceil(cx + r), y0 = Math.floor(cy - r), y1 = Math.ceil(cy + r);
+			for (let sy = y0; sy <= y1; sy++) {
+				const dy = (sy + .5 - cy) / r;
+				for (let sx = x0; sx <= x1; sx++) {
+					const dx = (sx + .5 - cx) / r, d = dx * dx + dy * dy;
+					if (d >= 1) continue;
+					const f = 1 - Math.sqrt(d);
+					this.add(sx, sy, c, f * f * k);
+				}
+			}
+		}
+		/** Glow around a segment (a soft beam of light). */
+		glowLine(x0, y0, x1, y1, r, c, k = .5) {
+			if (r < 1 || k <= .004) return;
+			const ax = this.toX(x0, y0), ay = this.toY(x0, y0), bx = this.toX(x1, y1), by = this.toY(x1, y1);
+			const dx = bx - ax, dy = by - ay, L2 = dx * dx + dy * dy || 1e-9;
+			const X0 = Math.floor(Math.min(ax, bx) - r), X1 = Math.ceil(Math.max(ax, bx) + r);
+			const Y0 = Math.floor(Math.min(ay, by) - r), Y1 = Math.ceil(Math.max(ay, by) + r);
+			for (let sy = Y0; sy <= Y1; sy++) for (let sx = X0; sx <= X1; sx++) {
+				const px = sx + .5, py = sy + .5, u = clamp(((px - ax) * dx + (py - ay) * dy) / L2);
+				const ex = ax + dx * u - px, ey = ay + dy * u - py, d = Math.sqrt(ex * ex + ey * ey) / r;
+				if (d >= 1) continue;
+				const f = 1 - d;
+				this.add(sx, sy, c, f * f * k);
+			}
+		}
+		/** Glow hugging a circle of radius R (a shockwave's light), falling off over width r. */
+		glowRing(x, y, R, r, c, k = .5) {
+			if (r < 1 || k <= .004) return;
+			const cx = this.toX(x, y), cy = this.toY(x, y), E = R + r;
+			for (let sy = Math.floor(cy - E); sy <= Math.ceil(cy + E); sy++) for (let sx = Math.floor(cx - E); sx <= Math.ceil(cx + E); sx++) {
+				const d = Math.abs(Math.hypot(sx + .5 - cx, sy + .5 - cy) - R) / r;
+				if (d >= 1) continue;
+				const f = 1 - d;
+				this.add(sx, sy, c, f * f * k);
+			}
+		}
+		/**
+		* A little sprite from strings: rows like ["..##..", ".#oo#."], pal maps characters to colors
+		* ({ "#": "#222034", o: 0xff... }); "." and " " are empty. Top-left at (x, y).
+		* opts: { scale, a, flip (mirror left-right), flipY (upside down), tint (draw every pixel in one color) }.
+		*/
+		sprite(rows, pal, x, y, opts = {}) {
+			let s = sprites.get(rows);
+			if (!s) sprites.set(rows, s = rows.map((r) => [...r]));
+			const k = opts.scale ?? 1, a = opts.a ?? 1, W = s[0]?.length ?? 0, cache = {};
+			for (let r = 0; r < s.length; r++) for (let q = 0; q < s[r].length; q++) {
+				const ch = s[r][q];
+				if (ch === "." || ch === " ") continue;
+				let c = opts.tint;
+				if (c === void 0) {
+					c = cache[ch];
+					if (c === void 0) c = cache[ch] = pal[ch] === void 0 ? 0 : hex(pal[ch]);
+				}
+				if (!c) continue;
+				const col = opts.flip ? W - 1 - q : q, row = opts.flipY ? s.length - 1 - r : r;
+				if (k === 1) this.dot(x + col, y + row, c, a);
+				else this.rect(x + col * k, y + row * k, k, k, c, a);
+			}
+		}
+		/**
+		* Pixel text. opts: { font: "mini" (3x5) | "big" (5x7), scale, align: "left" | "center" | "right",
+		* outline: color, shadow: color, a }. (x, y) is the top of the text, at the left, center or right.
+		*/
+		text(str, x, y, c, opts = {}) {
+			const font = opts.font ?? "mini", k = opts.scale ?? 1, a = opts.a ?? 1, w = textWidth(str, font) * k;
+			const left = Math.round(opts.align === "center" ? x - w / 2 : opts.align === "right" ? x - w : x), top = Math.round(y);
+			const ol = opts.outline, sh = opts.shadow;
+			if (ol !== void 0) rasterText(str, font, (gx, gy) => this.rect(left + gx * k - 1, top + gy * k - 1, k + 2, k + 2, ol, a));
+			if (sh !== void 0) rasterText(str, font, (gx, gy) => this.rect(left + gx * k + 1, top + gy * k + 1, k, k, sh, a));
+			rasterText(str, font, (gx, gy) => this.rect(left + gx * k, top + gy * k, k, k, call(c, gx, gy), a));
+		}
+		/** Size of text in pixels: [w, h]. */
+		measure(str, opts = {}) {
+			const k = opts.scale ?? 1;
+			return [textWidth(str, opts.font ?? "mini") * k, FONTS[opts.font ?? "mini"].h * k];
+		}
+		/** Fill a mask ({ w, h, data }) with its top-left at (x, y). c may be a function of (mx, my). */
+		mask(m, x, y, c, a = 1) {
+			for (let my = 0; my < m.h; my++) for (let mx = 0; mx < m.w; mx++) if (m.data[my * m.w + mx]) this.dot(x + mx, y + my, call(c, mx, my), call(a, mx, my));
+		}
+		/** The 1 px outline just outside a mask. */
+		outline(m, x, y, c, a = 1) {
+			const at = (mx, my) => mx >= 0 && my >= 0 && mx < m.w && my < m.h && m.data[my * m.w + mx];
+			for (let my = -1; my <= m.h; my++) for (let mx = -1; mx <= m.w; mx++) if (!at(mx, my) && (at(mx - 1, my) || at(mx + 1, my) || at(mx, my - 1) || at(mx, my + 1))) this.dot(x + mx, y + my, call(c, mx, my), call(a, mx, my));
+		}
+	};
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/core/actor.js
+	var HERO = [
+		"....kkkkk...",
+		"..kkhhhhhk..",
+		".khhhhhhhhk.",
+		".khhhhhhhhhk",
+		".khhssssshhk",
+		".khsessesshk",
+		".khsessesshk",
+		"..ksssssssk.",
+		"...kkSSSkk..",
+		"..kttttttk..",
+		".kttTttTttk.",
+		".ksttTTttsk.",
+		".kstttttttk.",
+		"..kbbbbbbk..",
+		"..kppkkppk..",
+		"..kppk.kppk.",
+		"..kppk.kppk.",
+		"..koook.kook",
+		"..kkkkk.kkkk"
+	];
+	var HERO_PAL = {
+		k: "#17121f",
+		h: "#7a4128",
+		s: "#f3c49d",
+		S: "#c98b6c",
+		e: "#17121f",
+		t: "#5f6f94",
+		T: "#46536f",
+		b: "#8a5a32",
+		p: "#38334a",
+		o: "#6a4030",
+		H: "#a35d34",
+		w: "#ffffff",
+		m: "#a3564a",
+		g: "#e8c060",
+		L: "#7f90b6",
+		O: "#8f5a3f",
+		P: "#4b4560",
+		c: "#f53cd1",
+		C: "#ff8fe6",
+		D: "#a31f8a"
+	};
+	var DUMMY_PAL = {
+		k: "#0e0c14",
+		A: "#e4e6ec",
+		B: "#b6b9c3",
+		C: "#868995",
+		D: "#5c5e6a",
+		E: "#6e707c",
+		F: "#4b4d58",
+		G: "#34353f",
+		J: "#2a2b33",
+		m: "#f53cd1"
+	};
+	var HERO2 = [
+		"...........kkk..........",
+		"..........kAABk.........",
+		".........kAAABJk........",
+		".........kABBJJk........",
+		".........kBBBJCDk.......",
+		".........kBCJDDDk.......",
+		".........kkJJJDk........",
+		".......kkkkABBJCkk......",
+		"......kAABCJBCCCkDk.....",
+		"......kABBCJCCCmDkDk....",
+		"......kBBCDDJCDDDkDk....",
+		"......kABCDJDDDDDkk.....",
+		".....kAABDkDDDDJkk......",
+		".....kABCDkDDJJGkk......",
+		".....kABCkJJJGGGkk......",
+		"....kJJCDkFFFGGGk.......",
+		"....kAJJDkJJJGGGk.......",
+		"....kJCJJkABBJGGk.......",
+		".....kJCCkBBCDJJJk......",
+		".....kCCCJBBCDJJDk......",
+		".....kCCCDJCCDkJDDk.....",
+		"......kCDDJBCDkDDDk.....",
+		".......kDJJJCDkDDDkk....",
+		".......kJBCJCDkDDDkk....",
+		".......kBDJBCDkCDDkk....",
+		"........kJJBCDkCDDk.....",
+		"........kBBBCDkCCDDk....",
+		"........kBBBCDkCCDDk....",
+		".........kBBCDkJDDDk....",
+		"........kBJJJJkCJJJk....",
+		"........kBBCCDkCCDDk....",
+		"........kBBCDDkCDDk.....",
+		"........kBBCDkCCDDk.....",
+		"........kBCCDkCCDDk.....",
+		"........kBCDDkCDDDk.....",
+		".......kJBCJkkkDJkkkk...",
+		".......kAJJAAAAkCCCCCk..",
+		"........kkkkkkkkkkkkk..."
+	];
+	function maskOf(rows, k = 1) {
+		const h = rows.length * k, w = rows[0].length * k, data = new Uint8Array(w * h);
+		rows.forEach((r, y) => [...r].forEach((ch, x) => {
+			if (ch === ".") return;
+			for (let j = 0; j < k * k; j++) data[(y * k + (j / k | 0)) * w + x * k + j % k] = 1;
+		}));
+		return {
+			w,
+			h,
+			data
+		};
+	}
+	var MASKS = {
+		1: maskOf(HERO, 1),
+		2: maskOf(HERO2, 1)
+	};
+	function pixelsOf(rows, pal) {
+		const w = rows[0].length, data = new Uint32Array(w * rows.length);
+		rows.forEach((r, y) => [...r].forEach((ch, x) => data[y * w + x] = ch === "." ? 0 : hex(pal[ch])));
+		return data;
+	}
+	var PIXELS = {
+		1: pixelsOf(HERO, HERO_PAL),
+		2: pixelsOf(HERO2, DUMMY_PAL)
+	};
+	/**
+	* The stock actor at scale k (1: 12 x 19 px, 2: 24 x 38 px), in local space with its feet at (0, 0):
+	* { mask, x, y (top-left of the mask), w, h, k, head: [x, y] (top of the head), chest: [x, y] }.
+	*/
+	function stockActor(k = 1) {
+		k = k === 2 ? 2 : 1;
+		const m = MASKS[k], x = -Math.floor(m.w / 2), y = -m.h;
+		return {
+			mask: m,
+			pixels: PIXELS[k],
+			x,
+			y,
+			w: m.w,
+			h: m.h,
+			k,
+			head: [0, y],
+			chest: [0, k === 2 ? -26 : y + 11],
+			...k === 2 ? { eyes: [[13, 3], [15, 3]] } : {}
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/core/fx.js
+	/**
+	* A frame: w x h pixels whose top-left sits at (ox, oy) in world space. `color` holds opaque pixels,
+	* `light` additive glow; composite() puts them together. Same shape as Sprite Fusion's VFX frames.
+	*/
+	function createFrame(w, h, ox = 0, oy = 0) {
+		return {
+			w,
+			h,
+			ox,
+			oy,
+			color: new Uint32Array(w * h),
+			light: new Uint32Array(w * h)
+		};
+	}
+	function clearFrame(f) {
+		f.color.fill(0);
+		f.light.fill(0);
+		return f;
+	}
+	var painters = /* @__PURE__ */ new WeakMap();
+	/** The painter for a frame (one per frame, reused). */
+	function painterFor(frame) {
+		let p = painters.get(frame);
+		if (!p) painters.set(frame, p = new Painter(frame));
+		return p.reset();
+	}
+	var FADE = .3;
+	var isRamp = (v) => Array.isArray(v) && v.length > 0 && v.every((c) => typeof c === "number" || /^#[0-9a-f]{3,8}$/i.test(c));
+	/**
+	* An effect's options: its defaults with the caller's on top. Any color ramp (palette, or another ramp option
+	* like dust or smoke) of a different length than its default is resampled to the default's length, so effects
+	* can index steps by number whatever a caller passes.
+	*/
+	function resolveOptions(meta, o = {}) {
+		const opts = {
+			...meta.options ?? {},
+			...o
+		};
+		for (const [k, def] of Object.entries(meta.options ?? {})) if (isRamp(def) && isRamp(o[k]) && o[k].length !== def.length) opts[k] = fit(o[k], def.length).map(toHex);
+		if (meta.actor && !opts.actor) opts.actor = stockActor(meta.actor === 2 ? 2 : 1);
+		return opts;
+	}
+	/**
+	* A live instance of an effect module: { update(dt), draw(frame, layer), stop(), done() }.
+	* o: { x, y, flip, angle, seed, palette, light (glow strength), actor, ...the effect's own options }.
+	* draw(frame, "back") draws what goes behind a character, "front" what goes in front, nothing both.
+	*/
+	function createFx(mod, o = {}) {
+		const meta = mod.meta ?? {};
+		const opts = resolveOptions(meta, o);
+		const impl = mod.create ? mod.create(opts) : mod;
+		const D = meta.duration ?? 1;
+		let t = 0, stopAt = Infinity;
+		return {
+			meta,
+			options: opts,
+			get t() {
+				return t;
+			},
+			update(dt) {
+				t += dt;
+				if (!impl.update) return;
+				const n = Math.max(1, Math.ceil(dt * 120 - 1e-9));
+				for (let i = 0; i < n; i++) impl.update(dt / n, opts);
+			},
+			draw(frame, layer) {
+				const p = painterFor(frame);
+				p.place(opts.x ?? 0, opts.y ?? 0, !!opts.flip, opts.angle ?? 0);
+				p.fade = stopAt === Infinity ? 1 : clamp(1 - (t - stopAt) / FADE);
+				p.lightK = opts.light ?? 1;
+				const tt = meta.loop ? t % D : Math.min(t, D);
+				if (layer !== "front" && impl.drawBack) {
+					p.layer = "back";
+					impl.drawBack(p, tt, opts);
+				}
+				if (layer !== "back") {
+					p.layer = "front";
+					impl.draw(p, tt, opts);
+				}
+			},
+			/** Let it end: loops fade out, one-shots cut short. */
+			stop() {
+				if (stopAt === Infinity) stopAt = t;
+			},
+			done() {
+				return t - stopAt >= FADE || !meta.loop && t >= D;
+			}
+		};
+	}
+	/**
+	* Color over a background, plus light, into RGBA bytes (a Uint8ClampedArray or Buffer, w * h * 4).
+	* bg: null for transparent, a color number, or a Uint32Array of the frame's size. Over transparency, light
+	* becomes color with alpha (its brightest channel), which reads as additive over dark backgrounds.
+	*/
+	function composite(f, out, bg = null, lightK = 1) {
+		const n = f.w * f.h, C = f.color, L = f.light, flat = typeof bg === "number";
+		for (let i = 0; i < n; i++) {
+			const c = C[i], l = L[i] & 16777215;
+			let r, g, b, a;
+			const ca = c >>> 24;
+			if (ca === 255) {
+				r = c & 255;
+				g = c >>> 8 & 255;
+				b = c >>> 16 & 255;
+				a = 255;
+			} else if (bg === null) {
+				r = c & 255;
+				g = c >>> 8 & 255;
+				b = c >>> 16 & 255;
+				a = ca;
+			} else {
+				const k = flat ? bg : bg[i], f = ca / 255;
+				r = (c & 255) * f + (k & 255) * (1 - f);
+				g = (c >>> 8 & 255) * f + (k >>> 8 & 255) * (1 - f);
+				b = (c >>> 16 & 255) * f + (k >>> 16 & 255) * (1 - f);
+				a = 255;
+			}
+			if (l) {
+				const lr = (l & 255) * lightK, lg = (l >>> 8 & 255) * lightK, lb = (l >>> 16 & 255) * lightK;
+				if (a < 255) {
+					const pa = a / 255, pr = r * pa + lr, pg = g * pa + lg, pb = b * pa + lb;
+					const na = Math.min(1, Math.max(pa, Math.max(lr, lg, lb) / 255));
+					if (na > 0) {
+						r = Math.min(255, pr / na);
+						g = Math.min(255, pg / na);
+						b = Math.min(255, pb / na);
+						a = na * 255;
+					}
+				} else {
+					r = Math.min(255, r + lr);
+					g = Math.min(255, g + lg);
+					b = Math.min(255, b + lb);
+				}
+			}
+			const j = i * 4;
+			out[j] = r;
+			out[j + 1] = g;
+			out[j + 2] = b;
+			out[j + 3] = a;
+		}
+		return out;
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/fx/weather/_lib.js
+	var BAYER = [
+		0,
+		8,
+		2,
+		10,
+		12,
+		4,
+		14,
+		6,
+		3,
+		11,
+		1,
+		9,
+		15,
+		7,
+		13,
+		5
+	].map((v) => (v + .5) / 16);
+	/** The canvas in local coordinates: x0 <= x < x1, y0 <= y < y1. */
+	function box(meta) {
+		const [W, H] = meta.size, [OX, OY] = meta.origin;
+		return {
+			x0: -OX,
+			y0: -OY,
+			x1: W - OX,
+			y1: H - OY,
+			w: W,
+			h: H
+		};
+	}
+	/**
+	* A painter that draws only inside the effect's canvas: the same API, with color, blends and light outside it
+	* dropped. Exact under the painter's flip and rotation.
+	*/
+	function clip(p, meta) {
+		const B = box(meta), q = Object.create(p);
+		let ok;
+		if (p.sn === 0) {
+			const a = p.toX(B.x0, 0), b = p.toX(B.x1, 0), sx0 = Math.round(Math.min(a, b)), sx1 = Math.round(Math.max(a, b));
+			const sy0 = Math.round(p.toY(0, B.y0)), sy1 = Math.round(p.toY(0, B.y1));
+			ok = (sx, sy) => sx >= sx0 && sx < sx1 && sy >= sy0 && sy < sy1;
+		} else ok = (sx, sy) => {
+			const lx = p.fromX(sx + .5, sy + .5), ly = p.fromY(sx + .5, sy + .5);
+			return lx >= B.x0 && lx < B.x1 && ly >= B.y0 && ly < B.y1;
+		};
+		q.put = (sx, sy, c, a) => ok(sx, sy) && p.put(sx, sy, c, a);
+		q.add = (sx, sy, c, k) => ok(sx, sy) && p.add(sx, sy, c, k);
+		q.blendPx = (sx, sy, c, a) => ok(sx, sy) && p.blendPx(sx, sy, c, a);
+		q.glow = (x, y, r, c, k) => glow(q, B, x, y, r, c, k);
+		return q;
+	}
+	function glow(q, B, x, y, r, c, k) {
+		if (r < 1 || k <= .004) return;
+		const x0 = Math.max(B.x0, Math.floor(x - r)), x1 = Math.min(B.x1 - 1, Math.ceil(x + r));
+		const y0 = Math.max(B.y0, Math.floor(y - r)), y1 = Math.min(B.y1 - 1, Math.ceil(y + r));
+		for (let py = y0; py <= y1; py++) {
+			const dy = (py + .5 - y) / r;
+			for (let px = x0; px <= x1; px++) {
+				const dx = (px + .5 - x) / r, d = dx * dx + dy * dy;
+				if (d >= 1) continue;
+				const f = 1 - Math.sqrt(d);
+				q.light(px, py, c, f * f * k);
+			}
+		}
+	}
+	var OUT = {
+		c: 0,
+		a: 1,
+		b: 0,
+		l: 0,
+		k: 0
+	};
+	/**
+	* A per-pixel shader over the canvas rows y0..y1 (local, clipped to the canvas), much faster than p.shade for
+	* whole-sky passes. fn(x, y, out) sets out.c (color) with out.a (alpha: dithered, or truly blended when out.b
+	* is 1), and out.l / out.k (light color and amount). x, y are pixel centers. Falls back to p.shade when rotated.
+	*/
+	function pass(p, meta, y0, y1, fn) {
+		const B = box(meta), o = OUT;
+		y0 = Math.max(B.y0, Math.floor(y0));
+		y1 = Math.min(B.y1 - 1, Math.ceil(y1));
+		if (y0 > y1) return;
+		if (p.sn !== 0) {
+			const q = clip(p, meta);
+			for (let y = y0; y <= y1; y++) for (let x = B.x0; x < B.x1; x++) {
+				o.c = 0;
+				o.a = 1;
+				o.b = 0;
+				o.l = 0;
+				o.k = 0;
+				fn(x + .5, y + .5, o);
+				if (o.c) o.b ? q.blend(x, y, o.c, o.a) : q.dot(x, y, o.c, o.a);
+				if (o.k > 0) q.light(x, y, o.l || o.c, o.k);
+			}
+			return;
+		}
+		const C = p.C, L = p.L, W = p.w, fade = p.fade, lk = p.lightK * fade, fx = p.fx, tx = p.tx;
+		for (let y = y0; y <= y1; y++) {
+			const sy = Math.floor(p.ty + y + .5), ry = sy - p.oy;
+			if (ry < 0 || ry >= p.h) continue;
+			const row = ry * W, by = (sy & 3) << 2;
+			let sxf = tx + (B.x0 + .5) * fx;
+			for (let x = B.x0; x < B.x1; x++, sxf += fx) {
+				const sx = Math.floor(sxf), rx = sx - p.ox;
+				if (rx < 0 || rx >= W) continue;
+				o.c = 0;
+				o.a = 1;
+				o.b = 0;
+				o.l = 0;
+				o.k = 0;
+				fn(x + .5, y + .5, o);
+				const i = row + rx;
+				if (o.c) {
+					const a = o.a * fade;
+					if (o.b) {
+						if (a > .004) {
+							const d = C[i], oa = a + (d >>> 24) / 255 * (1 - a), k = a / oa, j = 1 - k, c = o.c;
+							const r = (c & 255) * k + (d & 255) * j & 255, g = (c >>> 8 & 255) * k + (d >>> 8 & 255) * j & 255;
+							const b = (c >>> 16 & 255) * k + (d >>> 16 & 255) * j & 255;
+							C[i] = (oa * 255 & 255) << 24 | b << 16 | g << 8 | r;
+						}
+					} else if (a >= 1 || a > BAYER[by | sx & 3]) C[i] = o.c;
+				}
+				if (o.k > 0) {
+					const k = o.k * lk;
+					if (k > .004) {
+						const c = o.l || o.c, d = L[i];
+						const r = Math.min(255, (d & 255) + (c & 255) * k) | 0, g = Math.min(255, (d >>> 8 & 255) + (c >>> 8 & 255) * k) | 0;
+						L[i] = 255 << 24 | (Math.min(255, (d >>> 16 & 255) + (c >>> 16 & 255) * k) | 0) << 16 | g << 8 | r;
+					}
+				}
+			}
+		}
+	}
+	var ROW = {
+		w: 0,
+		c: null,
+		a: null,
+		b: null,
+		l: null,
+		k: null
+	};
+	/**
+	* The fastest whole-sky shader: fn(y, R) fills one canvas row at a time (y the row's pixel center), writing
+	* R.c[i] (color, 0 for none), R.a[i] (alpha, default 1), R.b[i] (1: blend, 0: dither), R.l[i] / R.k[i] (light
+	* color and amount) for column i = x - box.x0. One call a row, so the effect's inner loop stays tight.
+	*/
+	function rows(p, meta, y0, y1, fn) {
+		const B = box(meta), w = B.w, R = ROW;
+		if (R.w !== w) Object.assign(R, {
+			w,
+			c: new Uint32Array(w),
+			a: new Float32Array(w),
+			b: new Uint8Array(w),
+			l: new Uint32Array(w),
+			k: new Float32Array(w)
+		});
+		y0 = Math.max(B.y0, Math.floor(y0));
+		y1 = Math.min(B.y1 - 1, Math.ceil(y1));
+		const rot = p.sn !== 0, q = rot ? clip(p, meta) : null;
+		const C = p.C, L = p.L, W = p.w, fade = p.fade, lk = p.lightK * fade, fx = p.fx;
+		for (let y = y0; y <= y1; y++) {
+			R.c.fill(0);
+			R.k.fill(0);
+			R.a.fill(1);
+			R.b.fill(0);
+			fn(y + .5, R);
+			if (rot) {
+				for (let i = 0; i < w; i++) {
+					if (R.c[i]) R.b[i] ? q.blend(B.x0 + i, y, R.c[i], R.a[i]) : q.dot(B.x0 + i, y, R.c[i], R.a[i]);
+					if (R.k[i] > 0) q.light(B.x0 + i, y, R.l[i] || R.c[i], R.k[i]);
+				}
+				continue;
+			}
+			const sy = Math.floor(p.ty + y + .5), ry = sy - p.oy;
+			if (ry < 0 || ry >= p.h) continue;
+			const row = ry * W, by = (sy & 3) << 2;
+			let sxf = p.tx + (B.x0 + .5) * fx;
+			for (let i = 0; i < w; i++, sxf += fx) {
+				const c = R.c[i], kk = R.k[i];
+				if (!c && !(kk > 0)) continue;
+				const sx = Math.floor(sxf), rx = sx - p.ox;
+				if (rx < 0 || rx >= W) continue;
+				const j = row + rx;
+				if (c) {
+					const a = R.a[i] * fade;
+					if (R.b[i]) {
+						if (a > .004) {
+							const d = C[j], oa = a + (d >>> 24) / 255 * (1 - a), k = a / oa, m = 1 - k;
+							const r = (c & 255) * k + (d & 255) * m & 255, g = (c >>> 8 & 255) * k + (d >>> 8 & 255) * m & 255;
+							const b = (c >>> 16 & 255) * k + (d >>> 16 & 255) * m & 255;
+							C[j] = (oa * 255 & 255) << 24 | b << 16 | g << 8 | r;
+						}
+					} else if (a >= 1 || a > BAYER[by | sx & 3]) C[j] = c;
+				}
+				if (kk > 0) {
+					const k = kk * lk;
+					if (k > .004) {
+						const lc = R.l[i] || c, d = L[j];
+						const r = Math.min(255, (d & 255) + (lc & 255) * k) | 0, g = Math.min(255, (d >>> 8 & 255) + (lc >>> 8 & 255) * k) | 0;
+						L[j] = 255 << 24 | (Math.min(255, (d >>> 16 & 255) + (lc >>> 16 & 255) * k) | 0) << 16 | g << 8 | r;
+					}
+				}
+			}
+		}
+	}
+	/** Ordered-dither threshold of a local pixel (0..1): `a > bayer(x, y)` draws it. */
+	var bayer = (x, y) => BAYER[(Math.floor(y) & 3) << 2 | Math.floor(x) & 3];
+	var FIELDS = /* @__PURE__ */ new Map();
+	/**
+	* A baked fractal noise that tiles: w x h cells (powers of two), octaves of `cells` lattice squares across.
+	* Values 0..1, mostly near 0.5. Scroll it a whole number of tiles a loop and the loop has no seam.
+	*/
+	function field(seed, w = 256, h = 128, cells = [
+		4,
+		8,
+		16,
+		32
+	]) {
+		const key = `${seed}|${w}|${h}|${cells}`;
+		let F = FIELDS.get(key);
+		if (F) return F;
+		const d = new Float32Array(w * h);
+		let amp = .5, total = 0;
+		for (const n of cells) {
+			const cs = w / n, rows = Math.max(1, Math.round(h / cs));
+			const at = (a, b) => rand(wrap(a, n), wrap(b, rows), seed, n);
+			for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+				const gx = x / cs, gy = y / h * rows, ix = Math.floor(gx), iy = Math.floor(gy), u = gx - ix, v = gy - iy;
+				const su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+				const top = at(ix, iy) + (at(ix + 1, iy) - at(ix, iy)) * su, bot = at(ix, iy + 1) + (at(ix + 1, iy + 1) - at(ix, iy + 1)) * su;
+				d[y * w + x] += (top + (bot - top) * sv) * amp;
+			}
+			total += amp;
+			amp *= .5;
+		}
+		for (let i = 0; i < d.length; i++) d[i] /= total;
+		FIELDS.set(key, F = {
+			w,
+			h,
+			d
+		});
+		return F;
+	}
+	/** A field at (u, v) in its own cells, wrapping, smooth between cells. */
+	function sample(F, u, v) {
+		const x = Math.floor(u), y = Math.floor(v), fx = u - x, fy = v - y, m = F.w - 1, n = F.h - 1, D = F.d;
+		const x0 = x & m, x1 = x + 1 & m, y0 = (y & n) * F.w, y1 = (y + 1 & n) * F.w;
+		const a = D[y0 + x0], b = D[y0 + x1], c = D[y1 + x0], e = D[y1 + x1];
+		return a + (b - a) * fx + (c - a + (a - b - c + e) * fx) * fy;
+	}
+	/**
+	* Falling particles for a loop of D seconds: n slots, each falling m times a loop (m whole, from m0 to m1), each
+	* fall somewhere new. fn(u, k, m, i): u 0..1 through the current fall, k its number (wrap(k, m) names it: use
+	* rand(seed, i, wrap(k, m), ...) for its own randoms, the same every loop), m, the slot i. A fall lasts D / m s.
+	*/
+	function trips(t, D, n, seed, m0, m1, fn) {
+		for (let i = 0; i < n; i++) {
+			const m = m0 + Math.floor(rand(seed, i, 72) * (m1 - m0 + 1)), s = t / D * m + rand(seed, i, 71), k = Math.floor(s);
+			fn(s - k, k, m, i);
+		}
+	}
+	/**
+	* A branching lightning path from (x0, y0) to (x1, y1): midpoint displacement down to ~3 px segments, with
+	* forks (and forks of forks) peeling off. Returns [{ pts: [[x, y], ...], w }], the trunk first with w = 1,
+	* forks thinner (w < 1). R is an Rng.
+	*/
+	function tree(R, x0, y0, x1, y1, jag = .3, forks = .4, w = 1, depth = 0) {
+		const out = [], L = Math.hypot(x1 - x0, y1 - y0);
+		let pts = [[x0, y0], [x1, y1]], off = L * jag;
+		while (pts.length < 2 + L / 3) {
+			const nxt = [pts[0]];
+			for (let i = 0; i < pts.length - 1; i++) {
+				const [ax, ay] = pts[i], [bx, by] = pts[i + 1], l = Math.hypot(bx - ax, by - ay) || 1, o = R.range(-off, off);
+				nxt.push([(ax + bx) / 2 + -(by - ay) / l * o, (ay + by) / 2 + (bx - ax) / l * o], [bx, by]);
+			}
+			pts = nxt;
+			off *= .52;
+		}
+		out.push({
+			pts,
+			w,
+			depth
+		});
+		if (depth < 2) {
+			for (let i = 2; i < pts.length - 3; i++) if (R.chance(forks / (1 + depth) / Math.max(4, pts.length / 6))) {
+				const [ax, ay] = pts[i], [bx, by] = pts[Math.min(pts.length - 1, i + 3)];
+				const a = Math.atan2(by - ay, bx - ax) + R.sign() * R.range(.35, .95), l = (L - i / pts.length * L) * R.range(.25, .55);
+				out.push(...tree(R, ax, ay, ax + Math.cos(a) * l, ay + Math.sin(a) * l, jag * 1.1, forks, w * .55, depth + 1));
+			}
+		}
+		return out;
+	}
+	/**
+	* A raindrop's splash on the floor, age seconds after it lands at (x, z): a white crown for a frame or two, a
+	* flat ring spreading (its near arc brighter), and droplets thrown up that fall back. size 0..1 (far to near),
+	* c = { hot, cool } colors, h a number unique to this drop. Adapted from Sprite Fusion's rain.
+	*/
+	function splash(q, x, z, age, size, c, h) {
+		const u = age / (.3 + .12 * size);
+		if (u >= 1) return;
+		if (age < .07) {
+			q.px(x, z - 1, c.hot);
+			if (size > .3) q.px(x - 1, z - 1 - (age > .035 ? 1 : 0), c.hot), q.px(x + 1, z - 1 - (age > .035 ? 1 : 0), c.hot);
+			if (size > .65 && age > .03) q.px(x - 2, z - 2, c.cool), q.px(x + 2, z - 2, c.cool);
+		}
+		const rx = 1 + (1.2 + 3.6 * size) * Math.sqrt(u), ry = Math.max(.5, rx * .26), n = Math.ceil(rx * 6.5);
+		for (let j = 0; j < n; j++) {
+			const a = j / n * TAU, s = Math.sin(a);
+			if (s < -.25) continue;
+			q.dot(x + Math.cos(a) * rx, z + s * ry, u < .3 && s > 0 ? c.hot : c.cool, u < .45 ? s > .2 ? 1 : .7 : (1 - u) * 1.6 * (s > .2 ? 1 : .6));
+		}
+		const nd = size > .55 ? 3 : 2, H = Math.floor(h * 1e6);
+		for (let d = 0; d < nd; d++) {
+			const vx = (rand(H, d, 1) - .5) * 2 * (25 + 35 * size), vy = -(55 + rand(H, d, 2) * 70 * (.5 + size)), y = z - 1 + vy * age + 475 * age * age;
+			if (y > z - .5 || age > .34) continue;
+			const xx = x + vx * age;
+			q.px(xx, y, age < .12 ? c.hot : c.cool);
+			if (vy + 950 * age < -40) q.dot(xx - vx * .012, y + 1, c.cool, .7);
+		}
+	}
+	/**
+	* A crisp splash on a floor line, age seconds after a drop lands at (x, z): a crown for a few frames (a white
+	* point, two arms rising), then a flat dash that spreads and breaks into two end dashes, and a droplet or two
+	* arcing up and back. Solid pixels only (no dither), so a line of them stays clean. size 0..1, c = { hot, cool,
+	* white }, h a number unique to the drop. Returns false once it's over.
+	*/
+	function crown(q, x, z, age, size, c, h) {
+		const u = age / (.22 + .14 * size), X = Math.round(x), Z = Math.round(z);
+		if (u >= 1) return false;
+		if (age < .1) {
+			const up = age < .033 ? 1 : age < .067 ? 2 : 2 + (size > .5 ? 1 : 0);
+			q.px(X, Z - 1, age < .05 ? c.white : c.hot);
+			for (let d = 1; d <= Math.min(up, size > .5 ? 3 : 1); d++) q.px(X - d, Z - 1 - (d > 1 ? d - 1 : 0), d === 1 ? c.hot : c.cool), q.px(X + d, Z - 1 - (d > 1 ? d - 1 : 0), d === 1 ? c.hot : c.cool);
+		}
+		if (u > .15) {
+			const w = Math.round(1 + (1.5 + 3.5 * size) * Math.sqrt(u)), gap = u > .55 ? Math.max(0, w - 2) : -1;
+			for (let d = -w; d <= w; d++) if (Math.abs(d) > gap) q.px(X + d, Z, Math.abs(d) >= w - 1 && u < .6 ? c.hot : c.cool);
+		}
+		const nd = size > .5 ? 2 : 1, H = Math.floor(h * 1e6);
+		for (let d = 0; d < nd; d++) {
+			const vx = (rand(H, d, 1) - .5) * 2 * (20 + 30 * size), vy = -(50 + rand(H, d, 2) * 60 * (.4 + size)), y = Z - 1 + vy * age + 475 * age * age;
+			if (y < Z - .5 && age < .3) q.px(x + vx * age, y, age < .1 ? c.white : c.hot);
+		}
+		return true;
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/fx/weather/god-rays.js
+	var god_rays_exports = /* @__PURE__ */ __exportAll({
+		draw: () => draw$5,
+		drawBack: () => drawBack$4,
+		meta: () => meta$5
+	});
+	var meta$5 = {
+		name: "God rays",
+		desc: "Shafts of light slant down from high on the left, breathing and swaying, pooling on the floor, as drifting dust motes light up whenever they cross a beam.",
+		tags: [
+			"weather",
+			"god rays",
+			"light",
+			"sunbeam",
+			"dust",
+			"ambient",
+			"loop"
+		],
+		size: [320, 180],
+		origin: [160, 170],
+		duration: 10,
+		loop: true,
+		fps: 30,
+		bg: "sky",
+		options: {
+			palette: [
+				"#1a1208",
+				"#3a2810",
+				"#7a5a24",
+				"#c89a44",
+				"#f2d27a",
+				"#fff2c4",
+				"#ffffff"
+			],
+			seed: 3
+		}
+	};
+	var D$5 = 10;
+	var W$1 = 320;
+	var SX = -230;
+	var SY = -300;
+	var AX = Math.cos(.94);
+	var AY = Math.sin(.94);
+	var NX = -AY;
+	var NY = AX;
+	var SHAFTS = [
+		{
+			c: -.27,
+			h: .03,
+			k: .65,
+			b: 1,
+			sw: .006
+		},
+		{
+			c: -.17,
+			h: .022,
+			k: .55,
+			b: 2,
+			sw: .005
+		},
+		{
+			c: -.07,
+			h: .05,
+			k: 1,
+			b: 1,
+			sw: .008
+		},
+		{
+			c: .03,
+			h: .018,
+			k: .6,
+			b: 3,
+			sw: .004
+		},
+		{
+			c: .12,
+			h: .042,
+			k: .85,
+			b: 2,
+			sw: .007
+		},
+		{
+			c: .23,
+			h: .026,
+			k: .6,
+			b: 1,
+			sw: .005
+		}
+	];
+	var STR = /* @__PURE__ */ new Float32Array(512);
+	function lightAt(x, y, sh) {
+		const dx = x - SX, dy = y - SY, r = dx * AX + dy * AY, ang = (dx * NX + dy * NY) / r;
+		let e = 0;
+		for (const s of sh) {
+			const q = Math.abs(ang - s.c) / s.h;
+			if (q < 1) e += s.k * (1 - q * q) ** 1.5;
+		}
+		if (e <= 0) return 0;
+		const strand = STR[clamp(Math.floor((ang + .36) * 700), 0, 511)], fall = clamp(1.25 - (r - 230) / 420);
+		return e * fall * (.7 + .45 * strand);
+	}
+	function drawBack$4(p, t, o) {
+		const q = clip(p, meta$5), S = o.seed, C = fit(o.palette, 7);
+		const sh = shafts(t, S);
+		const L = C.map((c) => mix(C[0], c, .75));
+		const n = sh.length, SC = new Float32Array(n), SI = new Float32Array(n), SK = new Float32Array(n);
+		sh.forEach((s, j) => (SC[j] = s.c, SI[j] = 1 / s.h, SK[j] = s.k));
+		rows(p, meta$5, -170, 9, (y, R) => {
+			const floor = y > 0, dy = y - SY, air = floor ? .8 : .66, boost = floor ? 1.6 : 1;
+			let r = 70.5 * AX + dy * AY, nn = 70.5 * NX + dy * NY;
+			R.a.fill(air);
+			R.b.fill(1);
+			R.c.fill(C[0]);
+			for (let i = 0; i < W$1; i++, r += AX, nn += NX) {
+				const ang = nn / r;
+				let e = 0;
+				for (let j = 0; j < n; j++) {
+					const q2 = (ang - SC[j]) * SI[j];
+					if (q2 > -1 && q2 < 1) {
+						const w = 1 - q2 * q2;
+						e += SK[j] * w * Math.sqrt(w);
+					}
+				}
+				if (e <= 0) continue;
+				const fall = 1.35 - (r - 200) / 330, si = (ang + .36) * 700 | 0;
+				e *= (fall > 1 ? 1 : fall < 0 ? 0 : fall) * (.7 + .45 * STR[si < 0 ? 0 : si > 511 ? 511 : si]) * boost;
+				if (e < .06) continue;
+				const lv = e > 1.05 ? 6 : e > .78 ? 5 : e > .52 ? 4 : e > .3 ? 3 : 2;
+				R.c[i] = floor ? C[lv] : L[lv];
+				R.a[i] = floor ? .85 : Math.min(.78, .12 + e * .5);
+				R.l[i] = C[4];
+				R.k[i] = e * (floor ? .32 : .26);
+			}
+		});
+		q.glow(-168, -178, 130, C[3], .3);
+		q.glow(-168, -178, 50, C[5], .35);
+		motes(q, t, S, C, sh, false);
+	}
+	function draw$5(p, t, o) {
+		const q = clip(p, meta$5), S = o.seed;
+		motes(q, t, S, fit(o.palette, 7), shafts(t, S), true);
+	}
+	function shafts(t, S) {
+		for (let i = 0; i < 512; i++) {
+			const a = i / 512;
+			STR[i] = .5 + .5 * Math.sin(a * 190 + Math.sin(TAU * t / D$5) * 2 + S) * Math.sin(a * 77 - TAU * t / D$5 + S * 2);
+		}
+		return SHAFTS.map((s, i) => ({
+			c: s.c + s.sw * Math.sin(TAU * t / D$5 + i * 1.3),
+			h: s.h * (1 + .15 * Math.sin(TAU * s.b * t / D$5 + i)),
+			k: s.k * (.72 + .28 * Math.sin(TAU * s.b * t / D$5 + i * 2.1))
+		}));
+	}
+	function motes(q, t, S, C, sh, front) {
+		for (let i = front ? 0 : 50; i < (front ? 50 : 160); i++) {
+			const R = (k) => rand(S, i, k), n1 = 1 + Math.floor(R(1) * 2), n2 = 1 + Math.floor(R(2) * 2);
+			const x = -170 + R(3) * 340 + (8 + R(4) * 14) * Math.sin(TAU * n1 * t / D$5 + R(5) * TAU), y = -170 + R(6) * 172 + (6 + R(7) * 10) * Math.sin(TAU * n2 * t / D$5 + R(8) * TAU) + 4 * Math.sin(TAU * 3 * t / D$5 + i);
+			const e = lightAt(x, y, sh);
+			if (e < .12) continue;
+			const big = front && R(9) < .5, k = Math.min(1, e);
+			q.px(x, y, k > .6 ? WHITE : k > .3 ? C[5] : C[4]);
+			if (big && k > .5) q.px(x + 1, y, C[4]), q.px(x, y + 1, C[4]);
+			q.glow(x, y, big ? 6 : 4, C[4], .4 * k);
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/fx/weather/clouds.js
+	var clouds_exports = /* @__PURE__ */ __exportAll({
+		draw: () => draw$4,
+		meta: () => meta$4
+	});
+	var meta$4 = {
+		name: "Clouds",
+		desc: "Layers of clouds drift past a bright moon at night: silver-lit tops, dark bellies, edges that flare where they cross the moon, forming and thinning as they go.",
+		tags: [
+			"weather",
+			"clouds",
+			"moon",
+			"night",
+			"sky",
+			"ambient",
+			"loop"
+		],
+		size: [320, 180],
+		origin: [160, 180],
+		duration: 12,
+		loop: true,
+		fps: 30,
+		bg: "sky",
+		options: {
+			palette: [
+				"#0c0c18",
+				"#16172a",
+				"#232540",
+				"#363a5a",
+				"#545a80",
+				"#8088ae",
+				"#bcc4e2",
+				"#f2f4ff"
+			],
+			seed: 7
+		}
+	};
+	var D$4 = 12;
+	var MX = 92;
+	var MY = -128;
+	var MR = 12;
+	var LAYERS$2 = [
+		{
+			n: 7,
+			w: [40, 70],
+			h: [6, 11],
+			y: [-150, -110],
+			v: 3,
+			life: [8, 11],
+			tone: [
+				2,
+				3,
+				4,
+				5
+			],
+			alpha: .7
+		},
+		{
+			n: 6,
+			w: [60, 100],
+			h: [9, 15],
+			y: [-120, -70],
+			v: 6,
+			life: [8, 11],
+			tone: [
+				1,
+				2,
+				4,
+				6
+			],
+			alpha: .88
+		},
+		{
+			n: 5,
+			w: [90, 140],
+			h: [12, 20],
+			y: [-80, -30],
+			v: 10,
+			life: [9, 12],
+			tone: [
+				1,
+				2,
+				3,
+				6
+			],
+			alpha: 1
+		}
+	];
+	function draw$4(p, t, o) {
+		const q = clip(p, meta$4), S = o.seed, C = fit(o.palette, 8);
+		moon(q, C);
+		LAYERS$2.forEach((L, j) => {
+			for (let i = 0; i < L.n; i++) cloud(q, t, S, C, L, j, i);
+		});
+		q.glow(MX, MY, 110, C[4], .14);
+		q.glow(MX, MY, 40, C[5], .25);
+		q.glow(MX, MY, 18, C[6], .3);
+	}
+	function moon(q, C) {
+		q.shade(79, -141, 105, -115, (x, y, out) => {
+			const dx = x - MX, dy = y - MY, d = Math.hypot(dx, dy) / MR;
+			if (d > 1) return;
+			const sea = (dx + 4) ** 2 + (dy + 2) ** 2 < 14 || (dx - 3) ** 2 + (dy - 4) ** 2 < 9 || (dx - 5) ** 2 + (dy + 5) ** 2 < 4;
+			out.c = d > .86 ? dx + dy < 0 ? C[6] : WHITE : sea ? C[5] : d < .5 && dx + dy < 0 ? WHITE : C[7];
+		});
+	}
+	function cloud(q, t, S, C, L, j, i) {
+		const R = (k) => rand(S, j, i, k), life = L.life[0] + R(1) * (L.life[1] - L.life[0]), age = wrap(t - R(2) * D$4, D$4);
+		if (age >= life) return;
+		const u = age / life, grow = Math.min(1, u * 4) * Math.min(1, (1 - u) * 4), w = (L.w[0] + R(3) * (L.w[1] - L.w[0])) * (.6 + .4 * grow);
+		const x0 = -200 + R(4) * 330 + L.v * age, base = L.y[0] + R(5) * (L.y[1] - L.y[0]), H = (L.h[0] + R(6) * (L.h[1] - L.h[0])) * grow;
+		if (H < 1.5) return;
+		const n = 4 + Math.floor(R(7) * 4), puffs = [];
+		for (let k = 0; k < n; k++) {
+			const f = (k + .5) / n, r = H * (.5 + .35 * Math.sin(Math.PI * f)) * (.75 + .5 * R(10 + k)) * (1 + .06 * Math.sin(TAU * t / D$4 + k + i));
+			puffs.push([
+				x0 + w * (f - .5) + (R(20 + k) - .5) * 6,
+				base - r * .3 - R(30 + k) * H * .15,
+				r
+			]);
+		}
+		for (let k = 0; k < 1 + Math.floor(R(8) * 3); k++) {
+			const f = .3 + R(40 + k) * .4, r = H * (.75 + .35 * R(50 + k)) * (1 + .05 * Math.sin(TAU * t / D$4 + k * 2 + i));
+			puffs.push([
+				x0 + w * (f - .5),
+				base - H * .55 - r * .2,
+				r
+			]);
+		}
+		const x1 = x0 - w / 2 - H, x2 = x0 + w / 2 + H, B = box(meta$4);
+		for (let x = Math.max(B.x0, Math.floor(x1)); x <= Math.min(B.x1 - 1, Math.ceil(x2)); x++) {
+			const cx = x + .5;
+			let top = Infinity, top2 = Infinity;
+			for (const [px, py, r] of puffs) {
+				const dx = cx - px;
+				if (dx * dx >= r * r) continue;
+				const y = py - Math.sqrt(r * r - dx * dx);
+				if (y < top) top2 = top, top = y;
+				else if (y < top2) top2 = y;
+			}
+			if (top === Infinity) continue;
+			const end = Math.min(cx - x1, x2 - cx) / H, bot = base + 1.5 + Math.sin(cx * .21 + i) * .8 - (end < 1 ? (1 - end) * 4 : 0);
+			if (bot <= top) continue;
+			const h = bot - top, inner = top2 - top > 2.5 && top2 < bot - 2 ? Math.floor(top2) : -999;
+			for (let y = Math.floor(top); y < bot; y++) {
+				const d = y + .5 - top, v = d / h, th = bayer(x, y) * .12, md = Math.hypot(cx - MX, y - MY);
+				let c = d < 1 ? L.tone[3] : v < .25 + th ? L.tone[2] : v < .62 + th ? L.tone[1] : L.tone[0];
+				if (y === inner) c = Math.max(c, L.tone[2]);
+				if (bot - y - .5 < 1 && v > .5) c = Math.max(0, L.tone[0] - 1);
+				if (md < 46 && (d < 2 || y === inner || v < .3)) c = Math.min(7, c + (md < 24 ? 2 : 1));
+				const a = L.alpha * Math.min(1, grow * 1.5);
+				if (a >= 1) q.px(x, y, C[c]);
+				else q.blend(x, y, C[c], a);
+				if (d < 1 && md < 46) q.light(x, y, C[6], .35 * (1 - md / 46));
+			}
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/fx/weather/rain.js
+	var rain_exports = /* @__PURE__ */ __exportAll({
+		draw: () => draw$3,
+		drawBack: () => drawBack$3,
+		meta: () => meta$3
+	});
+	var meta$3 = {
+		name: "Rain",
+		desc: "Slanted rain at four depths: far drops fade into the dark, near ones glint and splash, drops ring the puddles and a low mist drifts over the wet floor.",
+		tags: [
+			"weather",
+			"rain",
+			"storm",
+			"water",
+			"ambient",
+			"loop"
+		],
+		size: [320, 180],
+		origin: [160, 170],
+		duration: 8,
+		loop: true,
+		fps: 30,
+		bg: "sky",
+		options: {
+			palette: [
+				"#0e1322",
+				"#1a2440",
+				"#283a5e",
+				"#3a5482",
+				"#5674a8",
+				"#84a6d6",
+				"#c0dcf8",
+				"#f2f8ff"
+			],
+			density: 1,
+			seed: 4
+		}
+	};
+	var D$3 = 8;
+	var SLANT$1 = -.2;
+	var UX = SLANT$1 / Math.hypot(SLANT$1, 1);
+	var UY = 1 / Math.hypot(SLANT$1, 1);
+	var LAYERS$1 = [
+		{
+			n: 200,
+			m: [10, 13],
+			len: 2,
+			col: [
+				2,
+				2,
+				3
+			],
+			stop: [-80, -6]
+		},
+		{
+			n: 150,
+			m: [14, 17],
+			len: 4,
+			col: [
+				2,
+				3,
+				4
+			],
+			stop: [-45, -2]
+		},
+		{
+			n: 96,
+			m: [19, 23],
+			len: 7,
+			col: [
+				3,
+				4,
+				5
+			],
+			z: [0, 1.4],
+			size: [.15, .4]
+		},
+		{
+			n: 42,
+			m: [25, 29],
+			len: 13,
+			col: [
+				3,
+				5,
+				7
+			],
+			z: [2, 6.5],
+			size: [.6, 1],
+			near: true
+		}
+	];
+	function pools(S) {
+		return Array.from({ length: 5 }, (_, i) => {
+			const x = -150 + i * 66 + rand(S, i, 61) * 30;
+			return {
+				x0: x,
+				x1: x + (16 + rand(S, i, 63) * 26),
+				y: 3 + Math.floor(rand(S, i, 62) * 3)
+			};
+		});
+	}
+	var poolAt = (P, x, y) => P.find((p) => x >= p.x0 + 2 && x <= p.x1 - 2 && Math.abs(y - p.y) < 1.5);
+	function drawBack$3(p, t, o) {
+		t = Math.round(t * 3e4) / 3e4;
+		const q = clip(p, meta$3), S = o.seed, C = fit(o.palette, 8), P = pools(S);
+		const haze = mix(C[0], C[1], .6);
+		pass(p, meta$3, -170, -.5, (x, y, out) => {
+			out.c = haze;
+			out.a = .3 + .26 * smooth(-170, 0, y);
+			out.b = 1;
+		});
+		floor$1(q, t, S, C, P);
+		for (let L = 0; L < 3; L++) layer$1(q, t, S, C, P, L, o.density);
+		mist(p, t, S, C);
+	}
+	function draw$3(p, t, o) {
+		t = Math.round(t * 3e4) / 3e4;
+		const q = clip(p, meta$3), S = o.seed, C = fit(o.palette, 8), P = pools(S);
+		layer$1(q, t, S, C, P, 3, o.density);
+	}
+	function layer$1(q, t, S, C, P, L, density) {
+		const Ly = LAYERS$1[L], sd = S * 11 + L, [c0, c1, c2] = Ly.col.map((i) => C[i]), len = Ly.len;
+		const n = Math.round(Ly.n * density), G = field(S + 21, 256, 128, [
+			4,
+			8,
+			16
+		]), sweep = 256 * t / D$3;
+		trips(t, D$3, n, sd, Ly.m[0], Ly.m[1], (u, k, m, i) => {
+			const j = wrap(k, m);
+			if (L < 2 && rand(sd, i, j, 7) > .35 + 1.3 * (sample(G, (-166 + rand(sd, i, j, 2) * 332) * .8 + sweep, 9 + L * 40) - .32)) return;
+			const end = Ly.z ? Ly.z[0] + rand(sd, i, j, 1) * (Ly.z[1] - Ly.z[0]) : Ly.stop[0] + rand(sd, i, j, 1) * (Ly.stop[1] - Ly.stop[0]);
+			const y0 = -172 - len, y = y0 + (end - y0) * u, x = -166 + rand(sd, i, j, 2) * 332 - (end - y) * SLANT$1;
+			const a = Ly.z ? 1 : Math.min(1, (1 - u) * 5);
+			if (len <= 2) q.dot(x, y, c2, a), q.dot(x - UX, y - UY, c1, a * .8);
+			else {
+				q.line(x - UX * len, y - UY * len, x - UX * len * .45, y - UY * len * .45, c0, (v) => a * (.35 + .65 * v));
+				q.line(x - UX * len * .45, y - UY * len * .45, x - UX, y - UY, c1, a);
+				q.dot(x, y, c2, a);
+			}
+			if (Ly.near) q.glow(x, y - 2, 4, C[5], .12);
+			if (!Ly.z) return;
+			const dur = D$3 / m;
+			for (let back = 1; back < 4; back++) {
+				const age = u * dur + (back - 1) * dur;
+				if (age > .7) break;
+				const jp = wrap(k - back, m), z = Ly.z[0] + rand(sd, i, jp, 1) * (Ly.z[1] - Ly.z[0]), xp = -166 + rand(sd, i, jp, 2) * 332;
+				if (rand(sd, i, jp, 5) > (Ly.near ? 1 : .7)) continue;
+				const size = Ly.size[0] + (z - Ly.z[0]) / (Ly.z[1] - Ly.z[0]) * (Ly.size[1] - Ly.size[0]), pool = Ly.near && poolAt(P, xp, z);
+				if (pool) rings(q, xp, pool, age, C);
+				else if (crown(q, xp, z, age, size, {
+					hot: C[6],
+					cool: C[4],
+					white: WHITE
+				}, rand(sd, i, jp, 4)) && Ly.near && age < .1) q.glow(xp, z - 1, 5, C[5], .3 * (1 - age / .1));
+			}
+		});
+	}
+	function rings(q, x, pool, age, C) {
+		const X = Math.round(x), y = pool.y;
+		if (age < .05) q.px(X, y, C[7]);
+		for (let r = 0; r < 2; r++) {
+			const u = (age - r * .16) / .5;
+			if (u <= 0 || u >= 1) continue;
+			const w = Math.round(1 + 7 * Math.sqrt(u)), c = u < .4 && !r ? C[6] : C[5];
+			for (const s of [-1, 1]) for (let d = 0; d < (u < .6 ? 2 : 1); d++) {
+				const px = X + s * (w - d);
+				if (px > pool.x0 && px < pool.x1) q.px(px, y, c);
+			}
+		}
+	}
+	function floor$1(q, t, S, C, P) {
+		pass(q, meta$3, 0, 9.5, (x, y, out) => {
+			if (y < 1) return void (out.c = C[4], out.l = C[5], out.k = .08);
+			if (y < 2) return void (out.c = C[1]);
+			out.c = C[0];
+			out.a = .55;
+			out.b = 1;
+			for (const p of P) if (x >= p.x0 && x < p.x1 && Math.floor(y) === p.y) {
+				out.c = x < p.x0 + 2 || x >= p.x1 - 2 ? C[3] : C[4];
+				out.a = 1;
+				out.b = 0;
+				out.l = C[5];
+				out.k = .06;
+			}
+		});
+		P.forEach((p, i) => {
+			const gx = Math.round(p.x0 + 3 + (p.x1 - p.x0 - 6) * (.5 + .5 * Math.sin(Math.PI * 2 * t / D$3 + i * 1.9)));
+			q.px(gx, p.y, C[6]);
+			q.glow(gx, p.y, 4, C[5], .2);
+		});
+	}
+	function mist(p, t, S, C) {
+		const M = field(S + 9, 256, 128, [
+			4,
+			8,
+			16,
+			32
+		]), drift = 256 * t / D$3, crest = mix(C[4], C[5], .5);
+		const dens = (x, y) => {
+			return smooth(-22, -4, y) * (1 - smooth(7, 10, y)) * (.62 + (sample(M, x * .45 + drift, y * 4 + 30) - .5) * 2);
+		};
+		pass(p, meta$3, -20, 9, (x, y, out) => {
+			const d = dens(x, y);
+			if (d < .28) return;
+			const th = bayer(x, y) * .06;
+			out.b = 1;
+			if (d > .46 + th && dens(x, y - 1) < .43) out.c = crest, out.a = .5;
+			else out.c = d > .58 + th ? C[4] : C[3], out.a = clamp((d - .28) * 1.6) * .5;
+			out.l = C[4];
+			out.k = (d - .3) * .1;
+		});
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/fx/weather/storm.js
+	var storm_exports = /* @__PURE__ */ __exportAll({
+		draw: () => draw$2,
+		drawBack: () => drawBack$2,
+		meta: () => meta$2
+	});
+	var meta$2 = {
+		name: "Storm",
+		desc: "Driving rain at two depths under a churning cloud deck; a forked bolt strikes in a double flash that lights the sky and the rain, then sheet lightning glows in the clouds.",
+		tags: [
+			"weather",
+			"storm",
+			"rain",
+			"lightning",
+			"thunder",
+			"ambient",
+			"loop"
+		],
+		size: [320, 180],
+		origin: [160, 170],
+		duration: 10,
+		loop: true,
+		fps: 30,
+		bg: "sky",
+		options: {
+			palette: [
+				"#09080f",
+				"#121120",
+				"#1b1a30",
+				"#262541",
+				"#363a5c",
+				"#4f5d8c",
+				"#7790c6",
+				"#c2d6ff"
+			],
+			bolt: [
+				"#2a1a6e",
+				"#4835c2",
+				"#6a6cff",
+				"#78b8ff",
+				"#c6ebff",
+				"#ffffff"
+			],
+			seed: 5
+		}
+	};
+	var D$2 = 10;
+	var SLANT = .42;
+	var T_LEAD = 2.62;
+	var T1 = 3;
+	var T2 = 3.3;
+	var T_SHEET = 6.4;
+	var T_FAR = 8.6;
+	var BX0 = 62;
+	var BY0 = -136;
+	var BX1 = 52;
+	var BY1 = 3;
+	var F1 = [
+		1,
+		.62,
+		.95,
+		.4,
+		.7,
+		.22
+	];
+	var F2 = [
+		.92,
+		.5,
+		.8,
+		.3,
+		.12
+	];
+	var env = (t, t0, E) => {
+		const i = Math.floor((t - t0) * 30 + .001);
+		return i >= 0 && i < E.length ? E[i] : 0;
+	};
+	var flashAt = (t) => Math.max(env(t, T1, F1), env(t, T2, F2));
+	function sheetAt(t) {
+		const a = t - T_SHEET;
+		if (a < 0 || a > .9) return 0;
+		const p1 = Math.exp(-(((a - .08) / .05) ** 2)), p2 = Math.exp(-(((a - .3) / .09) ** 2)), tail = a > .3 ? Math.exp(-(a - .3) * 6) * .5 : 0;
+		return Math.min(1, .7 * p1 + p2 + tail) * (Math.floor(a * 30) % 3 === 1 ? .75 : 1);
+	}
+	var blink = (a, k) => a < 0 || a > .3 ? 0 : k * (Math.exp(-(((a - .06) / .04) ** 2)) + .65 * Math.exp(-(((a - .18) / .05) ** 2)));
+	var farAt = (t) => blink(t - T_FAR, .45);
+	var far2At = (t) => blink(t - .9, .3);
+	var snap = (t) => Math.round(t * 3e4) / 3e4;
+	function drawBack$2(p, t, o) {
+		t = snap(t);
+		const q = clip(p, meta$2), B = box(meta$2), S = o.seed, C = fit(o.palette, 8), V = fit(o.bolt, 6);
+		const f = flashAt(t), sh = sheetAt(t), far = farAt(t), lead = t > T_LEAD && t < T1 ? .25 + .2 * Math.sin(t * 70) : 0;
+		const pre = t > 2.12 && t < T_LEAD ? .12 * Math.max(0, Math.sin((t - T_LEAD) * 41)) : 0;
+		const srcs = [];
+		if (f + lead + pre > 0) srcs.push([
+			BX0,
+			-142,
+			150,
+			f + lead * .5 + pre
+		]);
+		if (sh > 0) srcs.push([
+			-96,
+			-146,
+			120,
+			sh
+		]);
+		if (far > 0) srcs.push([
+			128,
+			-156,
+			80,
+			far
+		]);
+		if (far2At(t) > 0) srcs.push([
+			-40,
+			-160,
+			70,
+			far2At(t)
+		]);
+		const litAt = (x, y) => {
+			let L = 0;
+			for (const [sx, sy, R, k] of srcs) {
+				const d = Math.hypot(x - sx, (y - sy) * 1.5) / R;
+				if (d < 1) L += k * (1 - d) * (1 - d);
+			}
+			return Math.min(1, L);
+		};
+		sky(p, t, f, V);
+		if (sh > .05) pass(p, meta$2, -170, 0, (x, y, out) => {
+			const d = Math.hypot(x + 96, (y + 150) * 1.3) / 170;
+			if (d < 1) out.l = V[2], out.k = sh * .3 * (1 - d) * (1 - d);
+		});
+		veil(p, t, S, C, V, f);
+		rain(q, t, S, C, V, f, 0);
+		if (t > T_LEAD && t < 4) bolt(q, t, S, V);
+		deck(q, B, t, S, C, V, litAt, srcs.length > 0);
+		crawler(q, t, S, V);
+		floor(q, B, t, S, C, V, f);
+		strike(q, t, S, C, V);
+	}
+	function draw$2(p, t, o) {
+		t = snap(t);
+		const q = clip(p, meta$2), S = o.seed, C = fit(o.palette, 8), V = fit(o.bolt, 6), f = flashAt(t);
+		rain(q, t, S, C, V, f, 1);
+	}
+	function sky(p, t, f, V) {
+		const k = f * .36;
+		if (k <= .01) return;
+		const c = mix(V[2], V[3], .6);
+		pass(p, meta$2, -170, 9, (x, y, out) => {
+			const d = Math.abs(x - 57) / 230;
+			out.l = c;
+			out.k = k * (.2 + .8 * Math.max(0, 1 - d) ** 2.2);
+		});
+	}
+	var ROWS = [
+		{
+			base: -161,
+			wob: 3,
+			n: 18,
+			rx: [16, 30],
+			ry: .8,
+			drift: 15,
+			life: [4, 7],
+			tone: [
+				1,
+				2,
+				3,
+				4
+			],
+			tex: 1
+		},
+		{
+			base: -150,
+			wob: 3,
+			n: 22,
+			rx: [10, 20],
+			ry: .85,
+			drift: 10,
+			life: [3.5, 6.5],
+			tone: [
+				1,
+				2,
+				3,
+				5
+			],
+			tex: 1
+		},
+		{
+			base: -140,
+			wob: 3,
+			n: 26,
+			rx: [7, 14],
+			ry: .9,
+			drift: 6,
+			life: [3, 6],
+			tone: [
+				2,
+				2,
+				3,
+				5
+			],
+			tex: 0,
+			haze: true
+		}
+	];
+	var sag = (x) => 9 * Math.exp(-(((x - 40) / 95) ** 2)) - 3;
+	function rolls(S, t) {
+		return ROWS.map((Rw, j) => {
+			const out = [];
+			for (let i = 0; i < Rw.n; i++) {
+				const L = Rw.life[0] + rand(S, j, i, 1) * (Rw.life[1] - Rw.life[0]), age = wrap(t - rand(S, j, i, 2) * D$2, D$2);
+				if (age >= L) continue;
+				const u = age / L, g = Math.sin(Math.PI * u) ** .6;
+				const rx = Rw.rx[0] + rand(S, j, i, 3) * (Rw.rx[1] - Rw.rx[0]), ry = rx * Rw.ry, x = -200 + rand(S, j, i, 4) * 400 + Rw.drift * (age - L / 2);
+				out.push({
+					x,
+					h: ry * g * (.6 + .4 * rand(S, j, i, 5)),
+					rx: rx * (.8 + .2 * g)
+				});
+			}
+			return out;
+		});
+	}
+	function veil(p, t, S, C, V, f) {
+		const F = field(S + 11, 256, 128, [
+			4,
+			8,
+			16
+		]), shift = 512 * t / D$2, glow = mix(C[3], V[3], .5);
+		pass(p, meta$2, -170, -.5, (x, y, out) => {
+			const dens = clamp(.45 + (sample(F, (x - y * SLANT) * 1.9 - shift, y * .16 + 7) - .5) * 2.6);
+			out.c = f > .05 ? mix(C[1], glow, Math.min(1, f * dens * .7 * Math.max(.25, 1 - Math.abs(x - BX1) / 220))) : C[1];
+			out.a = .4 + .38 * dens;
+			out.b = 1;
+		});
+	}
+	function deck(q, B, t, S, C, V, litAt, lit) {
+		const R = rolls(S, t), F = field(S * 3 + 1, 256, 128), drift = 256 * t / D$2, n = ROWS.length, mo = Math.cos(Math.PI * t / D$2) ** 2;
+		const RAMP = [
+			C[0],
+			C[1],
+			C[2],
+			C[3],
+			C[4],
+			C[5],
+			C[6],
+			V[4],
+			WHITE
+		];
+		const top = new Float32Array(n), bot = new Float32Array(n), bulge = new Float32Array(n);
+		for (let x = B.x0; x < B.x1; x++) {
+			const cx = x + .5;
+			let low = -170;
+			for (let j = 0; j < n; j++) {
+				const Rw = ROWS[j];
+				const und = (sample(F, cx * .55 + j * 91, 3) * mo + sample(F, cx * .55 + j * 91, 60) * (1 - mo) - .5) * 2;
+				const c = Rw.base + sag(cx) * (.4 + j * .3) + 7 * und + Rw.wob * 2 * (sample(F, cx * 1.8 + j * 61 - drift * (.5 - j * .1), 20 + j * 17) - .5);
+				let bump = 0;
+				for (const b of R[j]) {
+					const dx = (cx - b.x) / b.rx;
+					if (dx * dx < 1) bump = Math.max(bump, b.h * Math.sqrt(1 - dx * dx));
+				}
+				const y1 = c + bump;
+				top[j] = -999;
+				bot[j] = y1;
+				bulge[j] = bump;
+				low = Math.max(low, y1);
+			}
+			let prev = -1, prevBot = -999;
+			for (let y = B.y0; y < low; y++) {
+				const cy = y + .5;
+				let j = 0;
+				while (j < n && !(cy >= top[j] && cy < bot[j])) j++;
+				if (j >= n) {
+					prev = -1;
+					continue;
+				}
+				if (j !== prev) {
+					if (prev >= 0 && prev < j) prevBot = cy;
+					prev = j;
+				}
+				const Rw = ROWS[j], d = bot[j] - cy, tone = Rw.tone, th = bayer(x, y);
+				let i;
+				if (d < 1) i = bulge[j] > 3 ? tone[3] : tone[3] - 1;
+				else if (cy - prevBot < 1.5 && j > 0) i = Math.max(0, tone[0] - 1);
+				else if (d < 2 + bulge[j] * .25 + th * 2) i = tone[2];
+				else if (d < 6 + bulge[j] * .4 + th * 3) i = tone[1];
+				else {
+					const nn = sample(F, cx * .9 + j * 77 - drift * (.6 - j * .12), cy * 1.7 + j * 31);
+					i = tone[0] + (Rw.tex && nn > .6 ? 1 : 0);
+				}
+				let lk = 0;
+				if (lit) {
+					const Lv = litAt(cx, cy);
+					if (Lv > .02) {
+						i = Math.min(8, i + Math.round(Lv * (d < 1 ? 4.4 : d < 4 ? 3.8 : 3.1)));
+						lk = Lv;
+					}
+				}
+				if (Rw.haze && !lk && d >= 1) q.blend(x, y, RAMP[i], .75);
+				else q.px(x, y, RAMP[Math.max(0, i)]);
+				if (lk > .03) q.light(x, y, V[3], lk * (d < 3 ? .4 : .22));
+			}
+		}
+	}
+	function rain(q, t, S, C, V, f, near) {
+		const litAt = (x) => {
+			const L = f * (.3 + .7 * Math.max(0, 1 - Math.abs(x - BX1) / 170));
+			return L > .45 ? 2 : L > .15 ? 1 : 0;
+		};
+		if (!near) {
+			const BODY = [
+				C[4],
+				C[4],
+				C[5]
+			], HEAD = [
+				C[5],
+				C[6],
+				C[6]
+			];
+			trips(t, D$2, 300, S * 7 + 1, 22, 28, (u, k, m, i) => {
+				const j = wrap(k, m), stop = -14 - rand(S, i, j, 1) * 90, y = -176 + (stop + 176) * u, x = -170 + rand(S, i, j, 2) * 360 - (stop - y) * SLANT;
+				const L = 3 + rand(S, i, j, 3) * 2, ux = SLANT / Math.hypot(SLANT, 1), uy = 1 / Math.hypot(SLANT, 1), lit = litAt(x), body = BODY[lit], head = HEAD[lit];
+				q.line(x - ux * L, y - uy * L, x - ux * L * .4, y - uy * L * .4, body);
+				q.line(x - ux * L * .4, y - uy * L * .4, x, y, head);
+			});
+			return;
+		}
+		const BODY = [
+			C[6],
+			C[6],
+			V[4]
+		], HEAD = [
+			C[7],
+			WHITE,
+			WHITE
+		], TAIL = [
+			C[4],
+			C[5],
+			V[3]
+		];
+		trips(t, D$2, 84, S * 7 + 2, 30, 38, (u, k, m, i) => {
+			const j = wrap(k, m), z = 1 + rand(S, i, j, 1) * 4, y = -180 + (z + 180) * u, x = -175 + rand(S, i, j, 2) * 370 - (z - y) * SLANT;
+			const L = 9 + rand(S, i, j, 3) * 5, ux = SLANT / Math.hypot(SLANT, 1), uy = 1 / Math.hypot(SLANT, 1), lit = litAt(x), body = BODY[lit], head = HEAD[lit], tail = TAIL[lit];
+			q.line(x - ux * L, y - uy * L, x - ux * L * .55, y - uy * L * .55, tail);
+			q.line(x - ux * L * .55, y - uy * L * .55, x - ux, y - uy, body);
+			q.px(x, y, head);
+			const age = u * (D$2 / m);
+			if (age < .4) {
+				const jp = wrap(k - 1, m), zp = 1 + rand(S, i, jp, 1) * 4, xp = -175 + rand(S, i, jp, 2) * 370;
+				const lit = litAt(xp);
+				splash(q, xp, zp, age, .25 + (zp - 1) / 5.3, {
+					hot: lit ? WHITE : C[7],
+					cool: [
+						C[5],
+						C[6],
+						V[4]
+					][lit]
+				}, rand(S, i, jp, 4));
+			}
+		});
+	}
+	function channel(S) {
+		const R = new Rng(S * 31 + 1), P = tree(R, BX0, BY0, BX1, BY1, .26, .18), pts = P[0].pts, side = R.sign();
+		[
+			.2,
+			.38,
+			.55
+		].forEach((u, i) => {
+			const k = Math.floor(u * (pts.length - 1)), [ax, ay] = pts[k], [bx, by] = pts[Math.min(pts.length - 1, k + 3)];
+			const a = Math.atan2(by - ay, bx - ax) + (i % 2 ? -side : side) * R.range(.6, 1), l = R.range(36, 56) * (1 - u * .45);
+			P.push(...tree(R, ax, ay, ax + Math.cos(a) * l, ay + Math.sin(a) * l, .3, .5, .6, 1));
+		});
+		return P;
+	}
+	function bolt(q, t, S, V) {
+		const P1 = channel(S);
+		if (t < T1) {
+			const reach = BY0 + 139 * Math.pow(Math.floor((t - T_LEAD) / .3799999999999999 * 9) / 9, 1.25);
+			for (const p of P1) for (let i = 0; i < p.pts.length - 1; i++) {
+				const [ax, ay] = p.pts[i], [bx, by] = p.pts[i + 1];
+				if (by > reach) break;
+				q.line(ax, ay, bx, by, p.w >= 1 ? V[2] : V[1]);
+				if (i % 4 === 0) q.glow(ax, ay, 6, V[3], .22 * p.w);
+			}
+			return;
+		}
+		const P2 = [P1[0], ...tree(new Rng(S * 31 + 2), BX0, BY0, BX1, BY1, .3, .3).slice(1).filter((_, i) => i < 2)];
+		const s = t >= T2 ? 2 : 1, a = t - (s === 2 ? T2 : T1), k = env(t, s === 2 ? T2 : T1, s === 2 ? F2 : F1), paths = s === 2 ? P2 : P1;
+		if (k > 0) stroke(q, paths, k, V);
+		else if (a < .5) {
+			const g = 1 - a / .5;
+			for (const p of paths) if (p.w >= 1) for (const [x, y] of p.pts) q.dot(x, y, V[1], g * .9);
+		}
+	}
+	function crawler(q, t, S, V) {
+		const a = t - T_SHEET - .22;
+		if (a < 0 || a > .17) return;
+		const P = tree(new Rng(S * 7 + 3), -150, -138, -26, -134, .2, .7), reach = -150 + 130 * Math.min(1, (Math.floor(a * 30) + 1) / 3), k = a < .1 ? 1 : .5;
+		for (const p of P) for (let i = 0; i < p.pts.length - 1; i++) {
+			const [ax, ay] = p.pts[i], [bx, by] = p.pts[i + 1];
+			if (ax > reach) break;
+			q.line(ax, ay, bx, by, p.w >= 1 && k > .6 ? V[4] : V[3]);
+			if (p.w >= 1) q.dot(ax, ay + 1, V[2], k);
+			if (i % 3 === 0) q.glow(ax, ay, 10, V[3], .35 * k * p.w);
+		}
+	}
+	function stroke(q, paths, k, V) {
+		for (const pass of [
+			0,
+			1,
+			2
+		]) for (const p of paths) {
+			const trunk = p.w >= 1;
+			if (!trunk && (k < .4 || pass === 0 && p.w < .5)) continue;
+			for (let i = 0; i < p.pts.length - 1; i++) {
+				const [ax, ay] = p.pts[i], [bx, by] = p.pts[i + 1], l = Math.max(1, Math.hypot(bx - ax, by - ay));
+				for (let d = 0; d <= l; d += .5) {
+					const x = ax + (bx - ax) * d / l, y = ay + (by - ay) * d / l;
+					if (pass === 0) q.circle(x, y, trunk ? k > .6 ? 2.3 : 1.7 : 1.2, k > .6 ? V[2] : V[1]);
+					else if (pass === 1) q.circle(x, y, trunk ? k > .6 ? 1.4 : .9 : .6, trunk ? V[4] : V[3]);
+					else if (trunk) {
+						q.px(x, y, k > .3 ? WHITE : V[4]);
+						if (k > .85) q.px(x + 1, y, WHITE);
+					} else if (p.w > .4 && k > .6) q.px(x, y, V[4]);
+				}
+				if (pass === 0 && i % 3 === 0) q.glow(ax, ay, trunk ? 18 : 8, V[3], (trunk ? .5 : .3) * k * p.w);
+			}
+		}
+	}
+	function strike(q, t, S, C, V) {
+		const a = t - T1;
+		if (a < 0 || a > 1.8) return;
+		const k = flashAt(t);
+		if (k > 0) {
+			const fr = Math.floor(t * 30 + .001), Rc = new Rng(S * 977 + fr);
+			for (let i = 0; i < 4; i++) {
+				const side = i % 2 ? 1 : -1, l = Rc.range(10, 30) * (.6 + .4 * k);
+				for (const p of tree(Rc, BX1 + side, 2, BX1 + side * l, BY1 + Rc.range(-2, 3), .35, .5, .6, 1)) {
+					q.polyline(p.pts, k > .6 && p.w > .5 ? V[4] : V[3]);
+					q.glow(p.pts[p.pts.length >> 1][0], p.pts[p.pts.length >> 1][1], 8, V[3], .3 * k);
+				}
+			}
+			q.circle(BX1, 2, 2 + 3 * k, V[4]);
+			q.circle(BX1, 2, 1 + 2 * k, WHITE);
+			q.glow(BX1, -9, 95, V[2], .55 * k);
+			q.glow(BX1, -1, 40, V[3], .5 * k);
+			q.glow(BX1, 1, 14, WHITE, .6 * k);
+		}
+		const ps = new Particles({
+			rng: new Rng(S * 13 + 5),
+			ground: () => 4,
+			sparks: [
+				WHITE,
+				V[4],
+				V[3],
+				V[2]
+			],
+			haze: V[2]
+		}), R = ps.R, steam = mix(C[4], V[3], .3);
+		const burst = (n, pow) => {
+			for (let i = 0; i < n; i++) {
+				const an = -Math.PI / 2 + R.range(-1.35, 1.35), sp = R.range(110, 420) * pow;
+				ps.spawn(P.SPARK, BX1, 2, Math.cos(an) * sp, Math.sin(an) * sp, R.range(.18, .6));
+			}
+			for (let i = 0; i < 6 * pow; i++) {
+				const sd = R.sign();
+				ps.spawn(P.VAPOUR, BX1 + sd * R.range(2, 8), BY1 - R.range(1, 3), sd * R.range(30, 90), -R.range(4, 16), R.range(.6, 1.2), steam, R.range(2.5, 4.5), R.range(0, .08));
+			}
+		};
+		burst(48, 1);
+		let tt = 0, second = false;
+		for (const dt = 1 / 120; tt + dt <= a; tt += dt) {
+			if (!second && tt >= .2999999999999998) second = true, burst(16, .7);
+			ps.update(dt);
+		}
+		ps.draw(q);
+		if (a < 1.6) q.glow(BX1, BY1, 16, V[2], .4 * (1 - a / 1.6) ** 2);
+	}
+	function floor(q, B, t, S, C, V, f) {
+		const F = field(S + 3, 256, 128), M = field(S + 4, 256, 128, [
+			4,
+			8,
+			16
+		]), wind = 768 * t / D$2;
+		pass(q, meta$2, -14, -.5, (x, y, out) => {
+			const m = sample(M, x * 1.1 - wind, y * 4 + 9) - .4;
+			if (m <= 0) return;
+			out.c = f > .1 ? mix(C[4], V[3], f) : C[4];
+			out.a = Math.min(.3, m * .9) * (1 + y / 14);
+			out.b = 1;
+		});
+		pass(q, meta$2, 0, 9, (x, y, out) => {
+			const pool = (yy) => sample(F, x * 1.3 + 31, yy * 9) > .6 - yy * .006;
+			const wet = pool(y), lip = wet && !pool(y - 1);
+			out.b = 1;
+			out.c = C[1];
+			out.a = .5;
+			if (y < 1) {
+				out.c = sample(F, x * 2, 50) > .5 ? C[4] : C[3];
+				out.a = 1;
+				out.b = 0;
+			} else if (wet) {
+				const d = Math.abs(x - BX1) / 150;
+				if (f > .06) {
+					out.c = d < .25 && f > .5 || lip ? V[4] : V[3];
+					out.a = clamp(f * (1.35 - d) * (lip ? 1.4 : 1));
+					out.b = 0;
+				} else {
+					out.c = lip ? C[5] : C[3];
+					out.a = lip ? 1 : .7;
+				}
+				out.l = V[3];
+				out.k = f * .25 * Math.max(0, 1 - d);
+			}
+		});
+		if (f > .2) {
+			for (let y = 1; y < 10; y++) if (rand(y, Math.floor(t * 30), 3) < .8) q.dot(BX1 + Math.sin(y * 1.7 + t * 40) * 1.2, y, y < 4 ? WHITE : V[4], f * (1.1 - y / 12));
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/fx/weather/snow.js
+	var snow_exports = /* @__PURE__ */ __exportAll({
+		draw: () => draw$1,
+		drawBack: () => drawBack$1,
+		meta: () => meta$1
+	});
+	var meta$1 = {
+		name: "Snow",
+		desc: "Snow at three depths in a gusty breeze: far specks, drifting flakes, big near crystals that spin and glow; they settle on a sparkling drift and melt away.",
+		tags: [
+			"weather",
+			"snow",
+			"winter",
+			"cold",
+			"ambient",
+			"loop"
+		],
+		size: [320, 180],
+		origin: [160, 170],
+		duration: 12,
+		loop: true,
+		fps: 30,
+		bg: "sky",
+		options: {
+			palette: [
+				"#0c1020",
+				"#161d36",
+				"#24304f",
+				"#3a4a72",
+				"#5f74a3",
+				"#93abd6",
+				"#cfe0fa",
+				"#ffffff"
+			],
+			seed: 6
+		}
+	};
+	var D$1 = 12;
+	var bank$1 = (x) => -3 + 1.6 * Math.sin(x * .045 + 1.3) + 1.1 * Math.sin(x * .12 + .4) + .6 * Math.sin(x * .31 + 2);
+	var gust = (t) => 10 * Math.sin(TAU * t / D$1 + .6) + 4 * Math.sin(TAU * 2 * t / D$1 + 2.1);
+	var LAYERS = [
+		{
+			n: 230,
+			m: [1, 2],
+			air: 1,
+			sway: [1, 3],
+			wind: 3,
+			gust: .4
+		},
+		{
+			n: 140,
+			m: [2, 3],
+			air: .8,
+			sway: [3, 7],
+			wind: 6,
+			gust: .7
+		},
+		{
+			n: 24,
+			m: [2, 3],
+			air: .74,
+			sway: [8, 15],
+			wind: 9,
+			gust: 1
+		}
+	];
+	function drawBack$1(p, t, o) {
+		const q = clip(p, meta$1), S = o.seed, C = fit(o.palette, 8);
+		const haze = mix(C[1], C[2], .4);
+		pass(p, meta$1, -170, 9, (x, y, out) => {
+			out.c = haze;
+			out.a = .26 + .22 * smooth(-170, 0, y);
+			out.b = 1;
+		});
+		layer(q, t, S, C, 0);
+		drift(q, t, S, C);
+		layer(q, t, S, C, 1);
+	}
+	function draw$1(p, t, o) {
+		const q = clip(p, meta$1), S = o.seed;
+		layer(q, t, S, fit(o.palette, 8), 2);
+	}
+	function layer(q, t, S, C, L) {
+		const Ly = LAYERS[L], sd = S * 13 + L;
+		trips(t, D$1, Ly.n, sd, Ly.m[0], Ly.m[1], (u, k, m, i) => {
+			const j = wrap(k, m), dur = D$1 / m, R = (n) => rand(sd, i, j, n);
+			const tf = dur * Ly.air, age = Math.min(u * dur, tf), sw = Ly.sway[0] + R(3) * (Ly.sway[1] - Ly.sway[0]), f = .25 + R(4) * .35, ph = R(5) * TAU;
+			const xAt = (a) => -175 + R(2) * 350 + Ly.wind * a + (gust(t - u * dur + a) - gust(t - u * dur)) * Ly.gust + sw * Math.sin(TAU * f * a + ph);
+			const x = xAt(age), xl = xAt(tf), y0 = -176, y1 = L ? bank$1(xl) - .5 : -110 + R(1) * 106;
+			const y = y0 + (y1 - y0) * (age / tf), rest = u * dur - tf;
+			if (L === 0) {
+				const a = Math.min(1, (1 - u) * 6);
+				q.dot(x, y, R(6) < .5 ? C[4] : C[5], a);
+				return;
+			}
+			const fade = rest > 0 ? 1 - rest / (dur - tf) : 1;
+			if (L === 1) {
+				const big = R(6) < .3;
+				if (rest > 0) return void q.dot(xl, y1, C[7], fade * .9);
+				q.px(x, y, big ? WHITE : C[7]);
+				if (big) for (const [dx, dy] of [
+					[1, 0],
+					[-1, 0],
+					[0, 1],
+					[0, -1]
+				]) q.px(x + dx, y + dy, C[5]);
+				else q.px(x + 1, y, C[6]), q.px(x, y + 1, C[6]), q.px(x + 1, y + 1, C[5]);
+				return;
+			}
+			const r = R(6) < .4 ? 3 : R(6) < .8 ? 4 : 5, spin = 1.5 + R(7) * 2.5;
+			if (rest > 0) {
+				q.dot(xl - 1, y1, C[6], fade);
+				q.dot(xl, y1, WHITE, fade);
+				q.dot(xl + 1, y1, C[6], fade);
+				q.glow(xl, y1, 5, C[5], .25 * fade);
+				return;
+			}
+			crystal(q, x, y, r, Math.floor(age * spin + R(8) * 2) % 2, C);
+		});
+	}
+	var AXIS = [
+		[1, 0],
+		[-1, 0],
+		[0, 1],
+		[0, -1]
+	];
+	var DIAG = [
+		[1, 1],
+		[-1, -1],
+		[1, -1],
+		[-1, 1]
+	];
+	function crystal(q, x, y, r, turn, C) {
+		const X = Math.round(x), Y = Math.round(y), long = turn ? DIAG : AXIS, short = turn ? AXIS : DIAG, R = turn ? r - 1 : r;
+		for (const [dx, dy] of long) {
+			for (let d = 1; d <= R; d++) q.px(X + dx * d, Y + dy * d, d === R ? WHITE : C[6]);
+			const nubs = turn ? R >= 3 ? [R - 1] : [] : R >= 5 ? [R - 1, R - 2] : R >= 4 ? [R - 1] : [];
+			for (const n of nubs) {
+				const ox = turn ? dx : dy, oy = turn ? -dy : -dx;
+				q.px(X + dx * n + (turn ? 0 : ox), Y + dy * n + (turn ? oy : oy), C[4]);
+				q.px(X + dx * n + (turn ? -dx : -ox) + (turn ? dx : 0), Y + dy * n + (turn ? dy * 0 : -oy), C[4]);
+			}
+		}
+		for (const [dx, dy] of short) for (let d = 1; d <= (turn ? 1 : Math.max(1, Math.floor(R / 2))); d++) q.px(X + dx * d, Y + dy * d, d === 1 ? C[6] : C[5]);
+		q.px(X, Y, WHITE);
+		q.glow(X + .5, Y + .5, r * 2.5 + 5, C[5], .13);
+		q.light(X, Y, C[6], .4);
+	}
+	function drift(q, t, S, C) {
+		pass(q, meta$1, -7, 9, (x, y, out) => {
+			const d = y - bank$1(x);
+			if (d < 0) return;
+			out.c = d < 1 ? WHITE : d < 2 ? C[7] : d < 3.5 ? C[6] : d < 6 ? C[5] : C[4];
+			if (d < 1) out.l = C[6], out.k = .12;
+		});
+		for (let i = 0; i < 18; i++) {
+			const x = -156 + rand(S, i, 81) * 312, c = 1 + Math.floor(rand(S, i, 82) * 3), tw = Math.sin(TAU * c * t / D$1 + rand(S, i, 83) * TAU);
+			if (tw < .55) continue;
+			const y = Math.ceil(bank$1(x)) + Math.floor(rand(S, i, 84) * 3), k = (tw - .55) / .45;
+			q.px(x, y, WHITE);
+			if (k > .5) for (const [dx, dy] of [
+				[1, 0],
+				[-1, 0],
+				[0, -1]
+			]) q.px(x + dx, y + dy, C[6]);
+			q.glow(x + .5, y + .5, 6, C[6], .35 * k);
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/pixelfx/fx/weather/fog.js
+	var fog_exports = /* @__PURE__ */ __exportAll({
+		draw: () => draw,
+		drawBack: () => drawBack,
+		meta: () => meta
+	});
+	var meta = {
+		name: "Fog",
+		desc: "Slow banks of moonlit fog at three depths drift past each other, crests catching the light, while thin streaks of mist slide by in front.",
+		tags: [
+			"weather",
+			"fog",
+			"mist",
+			"haze",
+			"night",
+			"ambient",
+			"loop"
+		],
+		size: [320, 180],
+		origin: [160, 170],
+		duration: 12,
+		loop: true,
+		fps: 30,
+		bg: "sky",
+		options: {
+			palette: [
+				"#14121e",
+				"#24213a",
+				"#363250",
+				"#4f4a6c",
+				"#6d688b",
+				"#918cab",
+				"#bdb8d4",
+				"#ece8f6"
+			],
+			seed: 5
+		}
+	};
+	var D = 12;
+	var W = 320;
+	var T = [
+		.3,
+		.5,
+		.7
+	];
+	var BW = .06;
+	var BANKS = [
+		{
+			top: -84,
+			base: -40,
+			bot: -20,
+			sx: 1.6,
+			sy: 2.2,
+			lap: 1,
+			alpha: .24,
+			tone: [
+				2,
+				3,
+				4
+			],
+			crest: 5,
+			warp: 16,
+			crestFrom: 3
+		},
+		{
+			top: -62,
+			base: -24,
+			bot: -2,
+			sx: 1.0667,
+			sy: 2.5,
+			lap: 1,
+			alpha: .3,
+			tone: [
+				2,
+				3,
+				4
+			],
+			crest: 5,
+			warp: 22,
+			crestFrom: 2
+		},
+		{
+			top: -42,
+			base: -8,
+			bot: 10,
+			sx: .8,
+			sy: 2.8,
+			lap: 1,
+			alpha: .36,
+			tone: [
+				2,
+				3,
+				5
+			],
+			crest: 6,
+			warp: 28,
+			crestFrom: 1
+		}
+	];
+	var BR = new Float32Array(W);
+	var P1 = BANKS.map(() => new Float32Array(W));
+	var P2 = BANKS.map(() => new Float32Array(W));
+	var WARP = new Float32Array(W);
+	function drawBack(p, t, o) {
+		const S = o.seed, C = fit(o.palette, 8);
+		bank(p, t, S, C, 0);
+		bank(p, t, S, C, 1);
+	}
+	function draw(p, t, o) {
+		const S = o.seed, C = fit(o.palette, 8);
+		bank(p, t, S, C, 2);
+		streaks(p, t, S, C, 1);
+	}
+	function bank(p, t, S, C, n) {
+		const B = BANKS[n], F = field(S * 7 + n, 256, 128), G = field(S * 7 + 11, 256, 128, [
+			4,
+			8,
+			16
+		]);
+		const drift = 256 * B.lap * t / D, boil = 128 * t / D, prev1 = P1[n], prev2 = P2[n];
+		const tones = B.tone.map((i) => C[i]), crest = mix(C[B.crest], WHITE, .12 + .08 * n);
+		prev1.fill(0);
+		prev2.fill(0);
+		for (let i = 0; i < W; i++) BR[i] = 2 * Math.sin(TAU * t / D + (i - 160) * .006 + n * 1.7);
+		rows(p, meta, B.top - 2, B.bot, (y, R) => {
+			const prof = smooth(B.top, B.base, y) * (1 - smooth(B.bot - (B.bot < 10 ? 14 : 4), B.bot + 1, y));
+			for (let i = 0; i < W; i += 2) WARP[i] = WARP[i + 1] = sample(G, i * .35 + n * 70, y * .5 + boil) - .5;
+			for (let i = 0; i < W; i++) {
+				const x = i - 160 + .5, w = WARP[i];
+				const nn = clamp((sample(F, x * B.sx + drift + w * B.warp, (y + BR[i]) * B.sy + w * 8) - .5) * 2.6 + .5) - .5;
+				const f = prof <= .01 ? 0 : (prof * .72 + nn * .95) * (.6 + .5 * prof);
+				const above = prev2[i];
+				prev2[i] = prev1[i];
+				prev1[i] = f;
+				if (f <= T[0]) continue;
+				const th = bayer(i, y) * BW, band = f > T[2] + th ? 2 : f > T[1] + th ? 1 : 0, solid = f > T[2] ? 2 : f > T[1] ? 1 : 0;
+				if (solid >= B.crestFrom && above < T[solid]) {
+					R.c[i] = crest;
+					R.a[i] = B.alpha * .95;
+					R.l[i] = C[6];
+					R.k[i] = .07;
+				} else {
+					R.c[i] = tones[band];
+					R.a[i] = B.alpha * (.55 + .25 * band);
+					if (band === 2) R.l[i] = C[5], R.k[i] = .03 + .02 * n;
+				}
+				R.b[i] = 1;
+			}
+		});
+	}
+	function streaks(p, t, S, C, front) {
+		const F = field(S * 7 + 20 + front, 256, 128), drift = 256 * t / D, sx = front ? .4 : .5, y0 = front ? -40 : -96, y1 = front ? 6 : -30;
+		rows(p, meta, y0, y1, (y, R) => {
+			const env = smooth(y0, y0 + 10, y) * (1 - smooth(y1 - 10, y1, y));
+			for (let i = 0; i < W; i++) {
+				const x = i - 160 + .5, s = (sample(F, x * sx + drift, y * 6.5 + 30) - .64) * 3 * env;
+				if (s <= .05) continue;
+				R.c[i] = s > .35 ? C[5] : C[4];
+				R.a[i] = Math.min(.4, s);
+				R.b[i] = 1;
+				R.l[i] = C[5];
+				R.k[i] = s * .05;
+			}
+		});
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/effects.ts
+	var EFFECT_MODULES = Object.freeze({
+		"god-rays": god_rays_exports,
+		clouds: clouds_exports,
+		rain: rain_exports,
+		storm: storm_exports,
+		snow: snow_exports,
+		fog: fog_exports
+	});
+	function effectModule(id) {
+		return EFFECT_MODULES[id] ?? null;
+	}
+	Object.freeze({
+		none: "clear",
+		"god-rays": "sunbeams",
+		clouds: "clouds",
+		rain: "rain",
+		storm: "storm",
+		snow: "snow",
+		fog: "fog"
+	});
+	// ../qubit-app/plugins/qubit-office/game/loading/effect-surface.ts
+	var defaultScheduler = {
+		request(callback) {
+			if (typeof requestAnimationFrame === "function") return requestAnimationFrame(callback);
+			return setTimeout(() => callback(defaultScheduler.now()), 16);
+		},
+		cancel(id) {
+			if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(id);
+			else clearTimeout(id);
+		},
+		now() {
+			if (typeof performance !== "undefined" && typeof performance.now === "function") return performance.now();
+			return Date.now();
+		}
+	};
+	/**
+	* Create a surface, or `null` when there is nothing to draw (effect `none`,
+	* no canvas, no 2D context, or a headless canvas that cannot allocate pixels).
+	* A null surface is a supported state: the screen simply shows its gradient.
+	*/
+	function createEffectSurface(options) {
+		const { canvas, effect, layer } = options;
+		if (!canvas || effect === "none") return null;
+		const module = effectModule(effect);
+		if (!module) return null;
+		const ctx = canvas.getContext("2d", { alpha: true });
+		if (!ctx || typeof ctx.putImageData !== "function") return null;
+		let image = null;
+		try {
+			if (typeof ctx.createImageData === "function") image = ctx.createImageData(320, 180);
+			else if (typeof ImageData !== "undefined") image = new ImageData(320, 180);
+		} catch {
+			image = null;
+		}
+		if (!image) return null;
+		canvas.width = 320;
+		canvas.height = 180;
+		const frame = createFrame(320, 180);
+		const origin = module.meta.origin ?? [160, 180];
+		const fx = createFx(module, {
+			x: origin[0],
+			y: origin[1]
+		});
+		const scheduler = options.scheduler ?? defaultScheduler;
+		const fps = Math.min(60, Math.max(1, options.fps ?? 30));
+		const interval = 1e3 / fps;
+		let running = false;
+		let disposed = false;
+		let rafId = null;
+		let lastPaint = 0;
+		let frames = 0;
+		let lastFrameMs = 0;
+		const paint = () => {
+			if (disposed || !image) return;
+			const t0 = scheduler.now();
+			try {
+				fx.update(1 / fps);
+				clearFrame(frame);
+				if (layer === "back") fx.draw(frame, "back");
+				else fx.draw(frame, "front");
+				composite(frame, image.data, null);
+				ctx.putImageData(image, 0, 0);
+			} finally {
+				lastFrameMs = scheduler.now() - t0;
+				frames += 1;
+				options.onFrame?.({
+					frames,
+					lastFrameMs,
+					t: fx.t
+				});
+			}
+		};
+		const schedule = () => {
+			if (disposed || !running || rafId !== null) return;
+			if (typeof document !== "undefined" && document.hidden) return;
+			rafId = scheduler.request((timestamp) => {
+				rafId = null;
+				if (disposed || !running) return;
+				if (lastPaint && timestamp - lastPaint < interval - 1) {
+					schedule();
+					return;
+				}
+				lastPaint = timestamp;
+				paint();
+				schedule();
+			});
+		};
+		const onVisibility = () => {
+			if (disposed || !running) return;
+			if (typeof document !== "undefined" && document.hidden) {
+				if (rafId !== null) {
+					scheduler.cancel(rafId);
+					rafId = null;
+				}
+			} else schedule();
+		};
+		if (typeof document !== "undefined" && typeof document.addEventListener === "function") document.addEventListener("visibilitychange", onVisibility);
+		const surface = {
+			effect,
+			layer,
+			get frames() {
+				return frames;
+			},
+			get lastFrameMs() {
+				return lastFrameMs;
+			},
+			isRunning: () => running,
+			start() {
+				if (disposed || running) return;
+				running = true;
+				if (options.reducedMotion) {
+					paint();
+					running = false;
+					return;
+				}
+				schedule();
+			},
+			stop() {
+				running = false;
+				if (rafId !== null) {
+					scheduler.cancel(rafId);
+					rafId = null;
+				}
+			},
+			dispose() {
+				if (disposed) return;
+				surface.stop();
+				disposed = true;
+				if (typeof document !== "undefined" && typeof document.removeEventListener === "function") document.removeEventListener("visibilitychange", onVisibility);
+			}
+		};
+		return surface;
+	}
+	// ../qubit-app/plugins/qubit-office/game/loading/OfficeLoadingScreen.tsx
+	var FADE_MS = 420;
+	var TIP_MS = 9e3;
+	function systemPrefersReducedMotion() {
+		try {
+			return typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+		} catch {
+			return false;
+		}
+	}
+	function detectLowPower() {
+		if (typeof navigator === "undefined") return false;
+		const nav = navigator;
+		if (nav.connection?.saveData) return true;
+		if (typeof nav.hardwareConcurrency === "number" && nav.hardwareConcurrency <= 2) return true;
+		if (typeof nav.deviceMemory === "number" && nav.deviceMemory <= 2) return true;
+		return false;
+	}
+	function weatherLabel(weather) {
+		if (!weather) return "Reading the weather…";
+		if (weather.condition === "fallback") {
+			if (weather.reason === "offline") return "Weather paused — offline.";
+			if (weather.reason === "timeout") return "Weather is taking too long; showing neutral light.";
+			return "Showing neutral weather.";
+		}
+		const label = weather.condition === "clear-night" ? "clear night" : weather.condition.replace(/-/g, " ");
+		if (weather.temperatureC !== null) return `${label} \u00b7 ${Math.round(weather.temperatureC)}\u00b0C`;
+		return label;
+	}
+	function pct(value) {
+		return Math.min(100, Math.max(0, Math.round(value * 100)));
+	}
+	function createOfficeLoadingScreen(R, hooks) {
+		const { useState, useEffect, useRef } = hooks;
+		return function OfficeLoadingScreen(props) {
+			const configRef = useRef(null);
+			if (!configRef.current) configRef.current = resolveLoadingConfig(props.config ?? null);
+			const config = configRef.current;
+			const [weather, setWeather] = useState(config.weather ?? null);
+			const [effect, setEffect] = useState(config.effects ? effectForInitial(config) : "none");
+			const [online, setOnline] = useState(typeof navigator === "undefined" || navigator.onLine !== false);
+			const [hidden, setHidden] = useState(false);
+			const [leaving, setLeaving] = useState(false);
+			const [tipIndex, setTipIndex] = useState(0);
+			const selectorRef = useRef(null);
+			if (!selectorRef.current) selectorRef.current = createEffectSelector({ hysteresisMs: config.hysteresisMs });
+			const backCanvas = useRef(null);
+			const frontCanvas = useRef(null);
+			const surfaces = useRef([]);
+			const reducedMotion = config.reducedMotion ?? props.prefersReducedMotion ?? systemPrefersReducedMotion();
+			const lowPower = config.lowPower ?? props.lowPower ?? detectLowPower();
+			const phase = props.phase ?? (props.error ? "error" : "loading");
+			useEffect(() => {
+				if (config.weather) {
+					setWeather(config.weather);
+					return;
+				}
+				if (!config.location) {
+					setWeather(fallbackWeather("no-location"));
+					return;
+				}
+				const controller = typeof AbortController === "function" ? new AbortController() : null;
+				let cancelled = false;
+				(props.weatherLoader ?? loadWeather)(config, { signal: controller?.signal ?? null }).then((next) => {
+					if (!cancelled) setWeather(next);
+				}).catch(() => {
+					if (!cancelled) setWeather(fallbackWeather("unknown"));
+				}).finally(() => {});
+				return () => {
+					cancelled = true;
+					controller?.abort();
+				};
+			}, []);
+			useEffect(() => {
+				if (!config.effects) {
+					setEffect("none");
+					return;
+				}
+				const next = selectorRef.current?.select(weather ?? fallbackWeather("init")) ?? "none";
+				setEffect(next);
+			}, [weather, config.effects]);
+			useEffect(() => {
+				if (typeof window === "undefined") return;
+				const update = () => setOnline(typeof navigator === "undefined" || navigator.onLine !== false);
+				update();
+				window.addEventListener("online", update);
+				window.addEventListener("offline", update);
+				return () => {
+					window.removeEventListener("online", update);
+					window.removeEventListener("offline", update);
+				};
+			}, []);
+			useEffect(() => {
+				if (!config.tips.length || hidden) return;
+				const id = setInterval(() => setTipIndex((i) => (i + 1) % config.tips.length), TIP_MS);
+				return () => clearInterval(id);
+			}, [config.tips.length, hidden]);
+			useEffect(() => {
+				const previous = surfaces.current.splice(0);
+				for (const surface of previous) surface.dispose();
+				if (effect === "none" || !config.effects || hidden) return;
+				const module = effectModule(effect);
+				if (!module) return;
+				const still = reducedMotion || lowPower;
+				const back = typeof module.drawBack === "function" ? createEffectSurface({
+					canvas: backCanvas.current,
+					effect,
+					layer: "back",
+					reducedMotion: still
+				}) : null;
+				const front = typeof module.draw === "function" ? createEffectSurface({
+					canvas: frontCanvas.current,
+					effect,
+					layer: "front",
+					reducedMotion: still
+				}) : null;
+				if (back) {
+					back.start();
+					surfaces.current.push(back);
+				}
+				if (front) {
+					front.start();
+					surfaces.current.push(front);
+				}
+				return () => {
+					for (const surface of surfaces.current.splice(0)) surface.dispose();
+				};
+			}, [
+				effect,
+				config.effects,
+				reducedMotion,
+				lowPower,
+				hidden
+			]);
+			useEffect(() => {
+				if (props.ready && phase !== "error") {
+					setLeaving(true);
+					setHidden(false);
+					const id = setTimeout(() => setHidden(true), FADE_MS);
+					return () => clearTimeout(id);
+				}
+				setLeaving(false);
+				setHidden(false);
+			}, [props.ready, phase]);
+			if (hidden) return null;
+			const statusText = phase === "error" ? props.error?.trim() || "The office could not be loaded." : !online ? "Offline — the office will connect when the network returns." : props.status?.trim() || "Preparing the office…";
+			const weatherText = weatherLabel(weather);
+			const tip = config.tips.length ? config.tips[tipIndex % config.tips.length] : "";
+			const bg = backgroundImageStyle(config);
+			const progressPct = typeof props.progress === "number" ? pct(props.progress) : null;
+			const style = { "--office-loading-dim": String(config.backgroundDim) };
+			const activeModule = config.effects && effect !== "none" ? effectModule(effect) : null;
+			const showBack = !!activeModule && typeof activeModule.drawBack === "function";
+			const showFront = !!activeModule && typeof activeModule.draw === "function";
+			const children = [
+				R.createElement("div", {
+					key: "bg",
+					className: "office-loading__bg",
+					"aria-hidden": "true",
+					style: {
+						...bg ?? {},
+						backgroundPosition: config.backgroundPosition
+					}
+				}),
+				R.createElement("div", {
+					key: "placeholder",
+					className: "office-loading__placeholder",
+					"aria-hidden": "true"
+				}),
+				R.createElement("div", {
+					key: "veil",
+					className: "office-loading__veil",
+					"aria-hidden": "true"
+				})
+			];
+			if (showBack) children.push(R.createElement("canvas", {
+				key: "fx-back",
+				ref: backCanvas,
+				className: "office-loading__fx office-loading__fx--back",
+				"data-testid": "office-loading-fx-back",
+				width: 320,
+				height: 180,
+				"aria-hidden": "true"
+			}));
+			const contentChildren = [
+				R.createElement("div", {
+					key: "mark",
+					className: "office-loading__mark",
+					"aria-hidden": "true"
+				}, R.createElement("span", { key: "ring" })),
+				R.createElement("h1", {
+					key: "brand",
+					className: "office-loading__brand"
+				}, config.brand),
+				R.createElement("p", {
+					key: "tagline",
+					className: "office-loading__tagline"
+				}, config.tagline),
+				R.createElement("div", {
+					key: "status",
+					className: "office-loading__status",
+					"data-testid": "office-loading-status",
+					role: phase === "error" ? "alert" : "status",
+					"aria-live": phase === "error" ? "assertive" : "polite"
+				}, [phase !== "error" ? R.createElement("span", {
+					key: "spin",
+					className: "office-loading__spinner",
+					"aria-hidden": "true"
+				}) : null, R.createElement("span", {
+					key: "text",
+					className: "office-loading__statusText"
+				}, statusText)]),
+				R.createElement("div", {
+					key: "progress",
+					className: `office-loading__progress${progressPct === null ? " is-indeterminate" : ""}`,
+					"data-testid": "office-loading-progress",
+					role: "progressbar",
+					"aria-label": "Loading the office",
+					...progressPct === null ? {} : {
+						"aria-valuemin": 0,
+						"aria-valuemax": 100,
+						"aria-valuenow": progressPct
+					}
+				}, R.createElement("span", {
+					key: "bar",
+					className: "office-loading__bar",
+					style: progressPct === null ? void 0 : { width: `${progressPct}%` }
+				})),
+				R.createElement("p", {
+					key: "weather",
+					className: "office-loading__weather",
+					"data-testid": "office-loading-weather",
+					"data-condition": weather?.condition ?? "none",
+					"data-effect": effect
+				}, weatherText)
+			];
+			if (phase === "error") contentChildren.push(R.createElement("div", {
+				key: "retry",
+				className: "office-loading__error",
+				"data-testid": "office-loading-retry"
+			}, [R.createElement("p", { key: "detail" }, statusText), props.onRetry ? R.createElement("button", {
+				key: "button",
+				type: "button",
+				className: "office-loading__button",
+				"data-testid": "office-loading-retry-button",
+				onClick: () => props.onRetry?.()
+			}, "Retry") : null]));
+			else if (tip) contentChildren.push(R.createElement("p", {
+				key: "tip",
+				className: "office-loading__tip",
+				"data-testid": "office-loading-tip"
+			}, tip));
+			children.push(R.createElement("div", {
+				key: "content",
+				className: "office-loading__content"
+			}, contentChildren));
+			if (showFront) children.push(R.createElement("canvas", {
+				key: "fx-front",
+				ref: frontCanvas,
+				className: "office-loading__fx office-loading__fx--front",
+				"data-testid": "office-loading-fx-front",
+				width: 320,
+				height: 180,
+				"aria-hidden": "true"
+			}));
+			children.push(R.createElement("div", {
+				key: "announcer",
+				className: "office-game__sr-only",
+				"data-testid": "office-loading-announcer",
+				role: "status",
+				"aria-live": "polite",
+				"aria-atomic": "true"
+			}, `${statusText} ${weatherText}`));
+			return R.createElement("div", {
+				className: "office-loading",
+				"data-testid": "office-loading",
+				"data-phase": phase,
+				"data-effect": effect,
+				"data-weather": weather?.condition ?? "none",
+				"data-reduced-motion": reducedMotion ? "1" : "0",
+				"data-low-power": lowPower ? "1" : "0",
+				"data-leaving": leaving ? "1" : "0",
+				"data-offline": online ? "0" : "1",
+				role: "region",
+				"aria-label": "Qubit Office loading",
+				"aria-busy": phase !== "error" && !props.ready,
+				style
+			}, children);
+		};
+	}
+	function effectForInitial(config) {
+		if (!config.effects || !config.weather) return "none";
+		return effectForCondition(config.weather.condition);
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
 	/** Always-present art credit; it must not depend on a theme being active. */
 	var OFFICE_ART_CREDIT = OFFICE_BRAND.credit;
@@ -193846,7 +197955,8 @@ create: function(game) {
 				base
 			}),
 			AgentsPanel: createAgentsPanel(R, hooks),
-			SeatModelPanel: createSeatModelPanel(R, hooks)
+			SeatModelPanel: createSeatModelPanel(R, hooks),
+			LoadingScreen: createOfficeLoadingScreen(R, hooks)
 		};
 		byBase.set(cacheKey, built);
 		SHELL_COMPONENT_CACHE.set(key, byBase);
@@ -193866,8 +197976,9 @@ create: function(game) {
 			const [agentsOpen, setAgentsOpen] = useState(false);
 			const [officeTheme, setOfficeTheme] = useState(null);
 			const [menuFallback, setMenuFallback] = useState(false);
+			const [retryToken, setRetryToken] = useState(0);
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
 			useEffect(() => {
@@ -193923,11 +198034,12 @@ create: function(game) {
 				frame.addEventListener("error", onError);
 				setFailed(null);
 				setLoaded(false);
-				frame.src = officeAppSrc({
+				const baseSrc = officeAppSrc({
 					base: props.base,
 					mock: props.mock,
 					theme: requestedTheme
 				});
+				frame.src = retryToken ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}` : baseSrc;
 				return () => {
 					frame.removeEventListener("load", onLoad);
 					frame.removeEventListener("error", onError);
@@ -193938,7 +198050,8 @@ create: function(game) {
 			}, [
 				props.base,
 				props.mock,
-				requestedTheme
+				requestedTheme,
+				retryToken
 			]);
 			useEffect(() => {
 				menuRef.current?.update({
@@ -193990,22 +198103,6 @@ create: function(game) {
 					title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`
 				}, OFFICE_BRAND.legalLabel))
 			];
-			if (!loaded && !failed) children.push(R.createElement("div", {
-				key: "loading",
-				className: "office-game__panel office-game__loading",
-				"data-testid": "office-app-loading",
-				role: "status",
-				"aria-live": "polite"
-			}, "Loading the office…"));
-			if (failed) children.push(R.createElement("div", {
-				key: "failed",
-				className: "office-game__refusal office-game__error",
-				"data-testid": "office-app-failed",
-				role: "alert"
-			}, [R.createElement("div", { key: "m" }, `${failed} Check Qubit's office connection; do not start a separate upstream server.`), R.createElement("div", {
-				key: "p",
-				style: { fontSize: "var(--office-fs-xs)" }
-			}, OFFICE_APP_PATH)]));
 			if (props.officeState) {
 				const state = props.officeState;
 				children.push(R.createElement("div", {
@@ -194158,6 +198255,18 @@ create: function(game) {
 					d: geometry.d
 				})));
 			})));
+			children.push(R.createElement(LoadingScreen, {
+				key: "loading-screen",
+				phase: failed ? "error" : "loading",
+				ready: loaded,
+				error: failed ? `${failed} Check Qubit's office connection; do not start a separate upstream server. (${OFFICE_APP_PATH})` : null,
+				config: props.loading,
+				onRetry: () => {
+					setFailed(null);
+					setLoaded(false);
+					setRetryToken((n) => n + 1);
+				}
+			}));
 			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
 			const dualDocks = agentsOpen && hudOpen;
 			const dockOpen = agentsOpen || hudOpen;
