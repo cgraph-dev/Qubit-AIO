@@ -604,3 +604,112 @@ No full matrix before implementation freeze. Focused checks per change.
 - It does not claim all 283+ agents animate at once.
 - It does not make the office the source of business truth.
 - It does not invent dates, percentages, or completion claims.
+
+---
+
+## 22. New external projects reviewed (2026)
+
+| Project | Licence / status | What to take |
+|---|---|---|
+| **DAACS OS** (`omnify2026/DAACS`) | Licence not finalized — **concepts only** | Goal → PM plan → execute → review → verify → approve; local desktop/web; approval queue; custom agents; office view; dynamic sequencer |
+| **Canopy** (`kinnerkarmanish/mak`) | MIT | Workspace protocol (markdown), 5-layer org, workflow DAG, cron/heartbeats, 330-agent roster, budgets/governance, cost console, virtual office, marketplace |
+| **OctoOffice** (`Chepko932/OctoOffice`) | Apache 2.0 | 7 departments, mission control, YAML workflows, Tiled/Pixi office, SQLite, live terminal, meetings |
+| **Blank Collar** (`The-Blank-Collar/blankcollar-agentic-os`) | MIT | Goal-first orchestration, department abstraction, policy engine (`allow/approve/deny`), memory, simulation, Stripe, channels, observability, feedback |
+| **Agent Office** (`AgentSystemLabs/agent-office`) | MIT | Floor per project, workers at desks, live terminal, voice, GitHub issues/PRs, git worktrees, agents managing agents, `/lite` 2D mode |
+| **Outworked** | Public; licence verify | Desktop office, asset packs, scheduled tasks, Slack/iMessage, browser, MCP, approvals, cost dashboard |
+| **BagIdea Office** | Public; licence verify | Wallpaper office, social simulation, self-extending plugins/proposals, memory/skills, approval security center |
+| **PixelDesk** | Public/open-core; verify | Humans + agents as colleagues, shared brain, cost transparency, PWA, proximity |
+| **Veska / AI Workforce** | Apache 2.0 | AI-native ERP/CRM: 52 tools, 12 departments, CRM/support/finance/HR/ops |
+| **Oryh** | Apache 2.0 | Agent-first ERP/CRM, skills-not-SDK, audit, durable business records |
+| **AgenticCRM** | MIT | WhatsApp CRM, tickets/SLA, invoices/payments, 24/7 keepalive, multi-agent workflows |
+| **Autonomous Business OS** | MIT | Lead → qualify → onboard → deliver → finance → knowledge; HITL; integrations |
+| **OOSDK** | MIT | Ontology/policy-as-code, deterministic decisions, caged LLM advisors, order-to-cash |
+| **FusionClaw** | MIT | Business OS over MCP, CRM/ops/finance, scoped keys, confirmation gates, audit |
+| **RevealUI** | MIT | Auth/content/offers/payments/agents runtime, one permission model |
+| **Agent Company AI** | MIT | 9 roles, Stripe/Gumroad, invoices, spend caps, autonomous CEO loop |
+| **JSM HQ** | MIT | Lead/worker office, per-agent repo clone + Docker sandbox, MCP coordination, PR completion |
+| **HermitShell** | MIT | Per-agent Docker isolation, Telegram, scheduler, dashboard |
+
+**Rules:** verify the exact repository licence/commit before copying. No licence = no code/assets. Concepts are safe. Personal/local use still does not erase attribution or security obligations.
+
+---
+
+## 23. Plan review v3 — critical corrections
+
+1. **The world is a projection, not the product.** Every room must map to a real capability/workflow. Decorative rooms are allowed only as furnished dormant shells.
+2. **Full world does not mean full live businesses.** All suites exist; one pilot business is activated first; the rest are dormant but persistent.
+3. **The map must not define the domain.** Business objects, permissions and workflows are independent of rooms, desks, animations and pixels.
+4. **Business OS is a separate product.** Do not rebuild ERP/CRM/accounting from scratch in the first release. Own the control plane; integrate systems of record.
+5. **Full campus has content debt.** Use archetype/style generators, goldens and dormant furnished shells; do not hand-build every room.
+6. **Room style must be constrained.** 16×16 baseline; one shadow policy; single-direction furniture by socket; validation and visual QA.
+7. **Active set must be capability-aware.** Camera is one input. Deadlines, approvals, incidents, business priority and interaction also activate.
+8. **Business work is independent of view.** Dormant rooms keep schedules, approvals, payments, tickets and queues via durable workflows.
+9. **Loading weather is an enhancement, not a dependency.** Background and progress render immediately; weather timeout/fallback; reduced motion; no location leak by default.
+10. **Rebrand is a migration, not a search/replace.** Inventory, brand layer, visible surfaces, canonical routes + aliases, bundle/manifest, notices, then remove old names.
+11. **MIT notice must stay.** Hide Habblaud from users; keep copyright/licence/provenance.
+12. **Self-host contract must be designed now.** Portability, migrations, storage/queue abstraction, config schema, backups/restore, telemetry; even if World ships later.
+13. **One pilot business before factory.** Prove one real workflow with money/customer/artifact/receipt; then clone.
+14. **No agent is a legal person.** Human owner/entity, approvals, insurance, contracts, tax, on-call.
+15. **No fake success.** No “done” without artifact/receipt; no phantom agents; no invented floors/businesses.
+
+---
+
+## 24. Phase order v3 (supersedes the earlier list)
+
+### Phase 0 — Decisions, inventory, contracts
+Pilot business, legal entity, systems of record, approval thresholds, budgets, hosting, World scope, style baseline. Inventory all Habblaud references; licence/SBOM; baseline screenshots/tests; define API aliases and deployment contract.
+**Gate:** decisions signed; inventory/SBOM; legal placement; baseline.
+
+### Phase 1 — Qubit Office shell + full static world
+Rebrand visible surfaces; loading screen + weather pixelfx; full campus manifest; wings/rooms/cells/clusters; room-style catalog + archetypes; active/dormant state machine; static caches/culling/minimap.
+**Gate:** no visible Habblaud; loading works offline/reduced-motion; full world loads; every room styled/validated; active/dormant tests; performance budgets.
+
+### Phase 2 — Business OS foundation + pilot
+Postgres + durable workflows + queues/timers/leases/retries/dead-letter; systems-of-record adapters; tool gateway; approvals; budgets; audit; one pilot business end-to-end.
+**Gate:** real artifact/payment/receipt; restart/approval/unknown outcome; no duplicate; 24/7 with on-call.
+
+### Phase 3 — Agent workforce + panels
+3–5 roles; task board; meetings; skills; context; analytics; deliveries; terminal; approvals; active/dormant visuals; maintenance agents.
+**Gate:** real work visible/actionable; panels honest.
+
+### Phase 4 — Business Factory
+Playbooks/templates; create business → suite activates; isolation; budgets/books; lifecycle; clone/compare.
+**Gate:** second business from playbook; independent operation.
+
+### Phase 5 — World/self-host/social
+Single-user local World → invite-only → social; city/chunks/visits; auth/privacy/validation; character/FX.
+**Gate:** optional World local; office unaffected; no privacy leaks.
+
+### Phase 6 — Hardening/release
+Threat model; sandbox; tenant isolation; DR; load/failure; evals; one full matrix; live deploy/rollback.
+**Gate:** evidence; `VERIFIED` only then.
+
+**Why this order:** the world and brand are visible early; the business control plane is proven before scaling; the factory comes after one real business; World/social never blocks the office.
+
+---
+
+## 25. First-wave execution contract (4 agents)
+
+Owner has authorized a **bounded technical first wave**. No live deploy. Each agent gets its own worktree from `plan/qoffice-master`; no edits to `main`; no live service/config; no paid art committed; no unlicensed code; keep MIT notices; focused tests; commit small units.
+
+| Lane | Owns | Must not touch | Deliverable |
+|---|---|---|---|
+| **A. Rebrand** | brand constants; visible shell/metadata/About/PWA/docs; inventory map; legal notice entry | loading screen; API route renames; vendored asset bundle renames | Qubit Office brand layer + inventory/aliases plan + tests |
+| **B. Loading/weather** | new loading component; placeholder background; weather provider/normalizer; pixelfx weather subset; shell integration for loading | API/business modules; room styles | loading screen with rain/storm/snow/god-rays/clouds/fog + tests |
+| **C. World/room styles** | campus manifest; wings/rooms/cells/clusters; active/dormant state; LimeZu asset catalog/style recipes/archetypes; validation/goldens harness | UI rebrand/loading; business OS | world/room-style foundation + tests |
+| **D. Business OS foundation** | business objects; approval/idempotency/ledger/job schema; tool gateway contract; tests | UI rebrand/loading; world rendering | durable control-plane skeleton + tests |
+
+**Global agent rules:** no `main`/live; no full matrix; no fake TODO completion; no `VERIFIED`; report exact commands and blockers; if a decision is missing, use the documented default and list it.
+
+---
+
+## 26. Decisions needed from the owner (plain language)
+
+1. **What is the first business?** Pick one simple real business to prove, e.g. lead follow-up service, content/SEO service, or e-commerce ops.
+2. **Who owns it legally?** You or a company; country; tax; who signs contracts.
+3. **Which tools does the business already use?** CRM, payments, email, support, accounting, website.
+4. **What can agents spend/do without asking?** Daily/monthly budget; refunds; discounts; emails; ads; contracts.
+5. **Where will it run?** Your PC, a VPS, or cloud; who is on-call if it breaks.
+6. **Do you want the online World?** Local only, invite-only, or public self-hosted.
+7. **Which room style baseline?** Recommended 16×16 LimeZu world, 32/48 only for portraits.
+8. **Personal only or eventual product?** Personal/private is simpler; selling later reopens licensing/distribution.
