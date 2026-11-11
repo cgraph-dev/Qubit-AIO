@@ -15,7 +15,7 @@ import {
   BusinessApiError, addWarRoomEvidence, addWarRoomSource,
   createWarRoomSession, createWarRoomTasks, fetchDirectory, fetchOverview,
   fetchWarRoomBundle, fetchWarRoomSessions, newIdempotencyKey,
-  recordWarRoomDecision, startEtsyPilot,
+  recordWarRoomDecision, researchWarRoomSession, startEtsyPilot,
 } from "./business-api";
 import { createTowerNavigator } from "./TowerNavigator";
 import { type WorldTower, fetchWorldTower } from "./world-tower";
@@ -100,6 +100,7 @@ export function createWarRoomPanel(
     const [evidenceLabel, setEvidenceLabel] = useState("INFERENCE");
     const [evidenceClaim, setEvidenceClaim] = useState("");
     const [evidenceSource, setEvidenceSource] = useState("");
+    const [researchQuery, setResearchQuery] = useState("");
     const [decisionNote, setDecisionNote] = useState("");
     const [busy, setBusy] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
@@ -476,6 +477,39 @@ export function createWarRoomPanel(
                 }),
               }, "Add source"),
             ]),
+          ]));
+
+          const canResearch = session.state === "intake"
+            || session.state === "research";
+          children.push(section(R, "research", "Research with Perplexity", [
+            R.createElement("div", { key: "row", className: "warroom__row" }, [
+              input(R, "research-query", {
+                "data-testid": "warroom-research-query",
+                placeholder: "Question about the idea or a source",
+                value: researchQuery,
+                onInput: (event: { target: { value: string } }) =>
+                  setResearchQuery(event.target.value),
+              }),
+              R.createElement("button", {
+                key: "run", type: "button", className: "office-game__btn",
+                "data-testid": "warroom-research-perplexity",
+                disabled: busy !== null || !canResearch,
+                onClick: () => run("Research", async () => {
+                  await researchWarRoomSession(session.session_id, {
+                    query: researchQuery.trim() || session.title,
+                    provider: "perplexity",
+                  }, opts);
+                  setResearchQuery("");
+                }),
+              }, "Research with Perplexity"),
+            ]),
+            R.createElement("span", {
+              key: "hint", className: "warroom__muted",
+              "data-testid": "warroom-research-hint",
+            }, canResearch
+              ? "Adds cited source URLs and labelled evidence only. No "
+                + "decision, task, publish, spend or contact."
+              : "Research runs while the session is in intake or research."),
           ]));
 
           children.push(section(R, "evidence", "Evidence", [

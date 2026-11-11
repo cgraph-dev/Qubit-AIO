@@ -364,3 +364,88 @@ describe("Etsy pilot action", () => {
     expect(byTestId(h, "warroom-notice")).toHaveLength(0);
   });
 });
+
+describe("Perplexity research action", () => {
+  function researchBackend(fail = false) {
+    let current = bundle({ session: session({ state: "research" }) });
+    const { calls, impl } = recordingFetch((call) => {
+      const path = new URL(call.url).pathname;
+      if (path.endsWith("/overview")) return respond(200, OVERVIEW);
+      if (path.endsWith("/research")) {
+        if (fail) {
+          return respond(400, {
+            ok: false, code: "BUSINESS_RESEARCH_NOT_CONFIGURED",
+            detail: "PERPLEXITY_API_KEY is not configured",
+          });
+        }
+        current = bundle({
+          session: session({ state: "research" }),
+          sources: [
+            ...bundle().sources,
+            { source_id: "wsrc_research", session_id: "wrs_1", kind: "url",
+              locator: "https://source.test/planners",
+              title: "Planner market report", status: "extracted",
+              adapter: "perplexity", artifact_id: null, text: "planners sell",
+              metadata: { research_provider: "perplexity" },
+              created_at: "2026-01-02" },
+          ],
+          evidence: [
+            ...bundle().evidence,
+            { evidence_id: "wev_research", session_id: "wrs_1", label: "FACT",
+              claim: "Printable planners sell on Etsy.",
+              source_id: "wsrc_research", quote: "", metadata: {},
+              created_at: "2026-01-02" },
+          ],
+        });
+        return respond(200, {
+          ok: true, schema: "qubit-office-business-warroom-research/1",
+          provider: "perplexity", query: "do planners sell",
+          query_digest: "d", created: true,
+          source_ids: ["wsrc_research"], evidence_ids: ["wev_research"],
+          sources: current.sources, evidence: current.evidence,
+        });
+      }
+      if (path.endsWith("/warroom/sessions")) {
+        return respond(200, {
+          ok: true, tenant_id: "ten_1", sessions: [current.session],
+        });
+      }
+      if (path.includes("/warroom/sessions/")) return respond(200, current);
+      return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+    });
+    return { calls, impl };
+  }
+
+  it("runs the owner-gated Perplexity action and refreshes the sources", async () => {
+    const { calls, impl } = researchBackend();
+    const { h } = await mount(impl);
+    const input = byTestId(h, "warroom-research-query")[0];
+    (input.props.onInput as (e: unknown) => void)(
+      { target: { value: "do planners sell" } });
+    h.flush();
+    (byTestId(h, "warroom-research-perplexity")[0].props.onClick as
+      () => void)();
+    await h.settle();
+
+    const post = calls.find((c) => c.method === "POST"
+      && c.url.endsWith("/research"));
+    expect(post?.body.owner).toBe(true);
+    expect(post?.body.provider).toBe("perplexity");
+    expect(post?.body.query).toBe("do planners sell");
+    expect(textOf(byTestId(h, "warroom-notice")[0])).toContain("Research");
+    expect(allByTestId(h, "warroom-source")).toHaveLength(2);
+    expect(allByTestId(h, "warroom-evidence-item")
+      .some((item) => item.props["data-label"] === "FACT")).toBe(true);
+  });
+
+  it("renders a typed research refusal and no fake evidence", async () => {
+    const { impl } = researchBackend(true);
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-research-perplexity")[0].props.onClick as
+      () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-error")[0]))
+      .toContain("BUSINESS_RESEARCH_NOT_CONFIGURED");
+    expect(byTestId(h, "warroom-notice")).toHaveLength(0);
+  });
+});

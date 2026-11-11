@@ -558,6 +558,34 @@ export const startEtsyPilot = (
 ) => businessFetch<EtsyPilotBootstrap>(
   "/warroom/etsy-pilot", { ...opts, method: "POST", body });
 
+export interface WarRoomResearchResult {
+  ok: true;
+  schema: string;
+  provider: string;
+  query: string;
+  query_digest: string;
+  created: boolean;
+  source_ids: string[];
+  evidence_ids: string[];
+  sources: WarRoomSource[];
+  evidence: WarRoomEvidence[];
+}
+
+/** Run the owner-gated, idempotent research action for one session.
+ *
+ * `businessFetch` adds `owner: true`. The backend only appends cited sources
+ * and labelled evidence; a refusal (missing key, provider failure) arrives as
+ * a typed `BusinessApiError`, never as a fabricated success.
+ */
+export const researchWarRoomSession = (
+  sessionId: string,
+  body: { query?: string; provider?: string;
+          inputs?: Array<Record<string, unknown> | string> } = {},
+  opts: BusinessFetchOptions = {},
+) => businessFetch<WarRoomResearchResult>(
+  `/warroom/sessions/${encodeURIComponent(sessionId)}/research`,
+  { ...opts, method: "POST", body });
+
 export const createWarRoomTasks = (
   sessionId: string, opts: BusinessFetchOptions = {},
 ) => businessFetch<{ ok: true; tasks: BusinessTask[] }>(
