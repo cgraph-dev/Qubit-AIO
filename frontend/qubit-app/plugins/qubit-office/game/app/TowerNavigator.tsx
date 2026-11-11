@@ -19,8 +19,8 @@
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import type { FloorTemplate } from "./business-api";
 import {
-  type WorldCell, type WorldFloor, type WorldRoom, type WorldTower,
-  templateFloorScene,
+  type WorldCell, type WorldFloor, type WorldOccupant, type WorldRoom,
+  type WorldTower, templateFloorScene,
 } from "./world-tower";
 
 export interface TowerNavigatorProps {
@@ -63,6 +63,22 @@ function occupiedSlots(room: WorldRoom): number {
     }
   }
   return occupied;
+}
+
+function roomOccupants(room: WorldRoom): WorldOccupant[] {
+  const seen = new Set<string>();
+  const people: WorldOccupant[] = [];
+  for (const cell of room.cells) {
+    for (const slot of cell.desk_slots) {
+      const who = slot.occupied_by;
+      if (!who) continue;
+      const key = who.agent_id || who.name;
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      people.push(who);
+    }
+  }
+  return people;
 }
 
 function cellStyle(cell: WorldCell) {
@@ -261,13 +277,20 @@ export function createTowerNavigator(
           "data-desk": slot.desk_id,
           "data-seat": slot.seat_id ?? "",
           "data-occupied": slot.occupied_by ? "true" : "false",
+          "data-occupant-id": slot.occupied_by?.agent_id ?? "",
+          "data-placement-source": slot.occupied_by?.source ?? "",
           title: slot.occupied_by
-            ? `Desk ${slot.desk_id} — ${slot.occupied_by}`
+            ? `Desk ${slot.desk_id} — ${slot.occupied_by.name}`
+              + ` (${slot.occupied_by.source})`
             : `Desk ${slot.desk_id} — empty`,
           "aria-label": slot.occupied_by
-            ? `Desk ${slot.desk_id}, occupied by ${slot.occupied_by}`
+            ? `Desk ${slot.desk_id}, occupied by ${slot.occupied_by.name}`
             : `Desk ${slot.desk_id}, empty`,
-        })),
+        }, slot.occupied_by
+          ? R.createElement("span", {
+              key: "who", className: "tower__deskInitial",
+            }, slot.occupied_by.emoji || slot.occupied_by.initials)
+          : null)),
       ]);
 
     const roomCard = (room: WorldRoom) => {
@@ -308,6 +331,33 @@ export function createTowerNavigator(
           }, `${occupied} staffed · ${Math.max(0, room.capacity - occupied)} `
             + "empty"),
         ]),
+        roomOccupants(room).length
+          ? R.createElement("div", {
+              key: "people", className: "tower__occupants",
+              "data-testid": "tower-room-occupants",
+            }, roomOccupants(room).map((who) => R.createElement("span", {
+              key: who.agent_id || who.name,
+              className: "tower__occupant",
+              "data-testid": "tower-occupant",
+              "data-agent": who.agent_id,
+              "data-source": who.source,
+              title: `${who.name} — ${who.source}`,
+            }, [
+              R.createElement("span", {
+                key: "i", className: "tower__occupantInitial",
+                "aria-hidden": "true",
+              }, who.initials),
+              who.emoji
+                ? R.createElement("span", {
+                    key: "e", className: "tower__occupantEmoji",
+                    "aria-hidden": "true",
+                  }, who.emoji)
+                : null,
+              R.createElement("span", {
+                key: "n", className: "tower__occupantName",
+              }, who.name),
+            ])))
+          : null,
         R.createElement("div", {
           key: "cells", className: "tower__cells",
         }, room.cells.map((cell) => cellCard(room, cell))),
@@ -357,10 +407,68 @@ export function createTowerNavigator(
         R.createElement("p", {
           key: "note", className: "tower__sceneNote",
           "data-testid": "tower-scene-note",
-        }, "Template rooms, not staffed agents. Empty desks stay empty until "
-          + "a real Business OS presence is linked."),
+        }, world?.occupancy
+          ? "Occupancy comes only from explicit Business OS links; empty "
+            + "desks stay empty and unplaced agents are listed below with "
+            + "their reason. A room-scene projection, not a rendered 3D world."
+          : "Template rooms, not staffed agents. Empty desks stay empty until "
+            + "a real Business OS presence is linked."),
       ]);
     };
+
+    const occupancy = world?.occupancy ?? null;
+    const unplaced = occupancy?.unplaced ?? [];
+    const shownUnplaced = unplaced.slice(0, 12);
+    const occupancySection = occupancy
+      ? R.createElement("section", {
+          key: "occupancy",
+          className: "tower__occupancy",
+          "data-testid": "tower-occupancy",
+          "data-agents-source": occupancy.agents_source ?? "",
+          "data-seat-source": occupancy.seat_source ?? "",
+        }, [
+          R.createElement("p", {
+            key: "summary", className: "tower__occupancySummary",
+            "data-testid": "tower-occupancy-summary",
+          }, `${occupancy.counts.placed ?? 0} staffed · `
+            + `${occupancy.counts.unplaced ?? 0} unplaced · `
+            + `${occupancy.counts.occupied_desks ?? 0} occupied desks`),
+          unplaced.length
+            ? R.createElement("div", {
+                key: "list", className: "tower__unplaced",
+                "data-testid": "tower-unplaced",
+              }, [
+                R.createElement("span", {
+                  key: "title", className: "tower__unplacedTitle",
+                }, "Unplaced agents"),
+                ...shownUnplaced.map((who) => R.createElement("span", {
+                  key: who.agent_id,
+                  className: "tower__unplacedAgent",
+                  "data-testid": "tower-unplaced-agent",
+                  "data-agent": who.agent_id,
+                  "data-reason": who.reason,
+                  title: who.placement_detail || who.reason,
+                }, [
+                  R.createElement("span", {
+                    key: "n", className: "tower__unplacedName",
+                  }, who.name),
+                  R.createElement("span", {
+                    key: "r", className: "tower__unplacedReason",
+                  }, who.reason),
+                ])),
+                unplaced.length > shownUnplaced.length
+                  ? R.createElement("span", {
+                      key: "more", className: "tower__unplacedMore",
+                      "data-testid": "tower-unplaced-more",
+                    }, `+${unplaced.length - shownUnplaced.length} more`)
+                  : null,
+              ])
+            : R.createElement("p", {
+                key: "none", className: "tower__unplacedNone",
+                "data-testid": "tower-unplaced-none",
+              }, "Every Business OS agent has an explicit tower desk."),
+        ])
+      : null;
 
     const detail = selected
       ? R.createElement("aside", {
@@ -427,6 +535,7 @@ export function createTowerNavigator(
               "tower-detail-expansion"),
           ]),
           scene ? roomScene(scene) : null,
+          occupancySection,
           R.createElement("p", {
             key: "note", className: "tower__detailNote",
             "data-testid": "tower-detail-note",

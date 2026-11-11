@@ -28,12 +28,44 @@ const DESK_TILES: ReadonlyArray<readonly [number, number]> = [
   [2, 8], [7, 8], [12, 8],
 ];
 
+/** A real agent explicitly placed on a desk by the backend projection. */
+export interface WorldOccupant {
+  agent_id: string;
+  name: string;
+  initials: string;
+  status: string;
+  emoji: string;
+  color: string;
+  source: string;
+}
+
 export interface WorldDeskSlot {
   desk_id: string;
   seat_id: string | null;
   tile: { x: number; y: number };
   footprint: { w: number; h: number };
-  occupied_by: string | null;
+  occupied_by: WorldOccupant | null;
+}
+
+/** An agent with no explicit tower coordinate, kept separate and honest. */
+export interface WorldUnplacedAgent {
+  agent_id: string;
+  name: string;
+  status: string;
+  reason: string;
+  placement_source?: string;
+  placement_detail?: string;
+}
+
+export interface WorldOccupancy {
+  schema: string;
+  staffed: boolean;
+  counts: Record<string, number>;
+  unplaced: WorldUnplacedAgent[];
+  truncated: { placed: boolean; unplaced: boolean };
+  digest: string;
+  agents_source?: string;
+  seat_source?: string;
 }
 
 export interface WorldCell {
@@ -111,6 +143,8 @@ export interface WorldTower {
   floors: WorldFloor[];
   /** Present only on the fallback path; names why the endpoint was skipped. */
   fallback_reason?: string;
+  /** Explicit placement/unplaced projection; absent when unstaffed. */
+  occupancy?: WorldOccupancy | null;
 }
 
 export interface WorldFetchOptions {
@@ -118,6 +152,8 @@ export interface WorldFetchOptions {
   fetchImpl?: typeof fetch;
   win?: Window | null;
   signal?: AbortSignal;
+  /** Ask for the explicit occupancy projection. Default: true. */
+  staffed?: boolean;
 }
 
 export class WorldApiError extends Error {
@@ -229,6 +265,87 @@ export function templateRooms(
   });
 }
 
+function initialsOf(name: string, agentId: string): string {
+  const words = String(name || "").replace(/_/g, " ").trim().split(/\s+/)
+    .filter(Boolean);
+  if (words.length) {
+    return words.slice(0, 2).map((word) => word[0].toUpperCase()).join("");
+  }
+  return String(agentId || "?").slice(0, 2).toUpperCase();
+}
+
+/** Accept the object occupant, or a legacy bare string, never invent one. */
+export function normalizeOccupant(value: unknown): WorldOccupant | null {
+  if (typeof value === "string") {
+    const name = value.trim();
+    if (!name) return null;
+    return {
+      agent_id: "", name, initials: initialsOf(name, ""), status: "",
+      emoji: "", color: "", source: "unknown",
+    };
+  }
+  const row = record(value);
+  if (!row) return null;
+  const agentId = typeof row.agent_id === "string" ? row.agent_id : "";
+  const name = typeof row.name === "string" && row.name
+    ? row.name : agentId;
+  if (!agentId && !name) return null;
+  return {
+    agent_id: agentId,
+    name,
+    initials: typeof row.initials === "string" && row.initials
+      ? row.initials : initialsOf(name, agentId),
+    status: typeof row.status === "string" ? row.status : "",
+    emoji: typeof row.emoji === "string" ? row.emoji : "",
+    color: typeof row.color === "string" ? row.color : "",
+    source: typeof row.source === "string" && row.source
+      ? row.source : "unknown",
+  };
+}
+
+function normalizeUnplaced(raw: unknown): WorldUnplacedAgent[] {
+  const items = Array.isArray(raw) ? raw : [];
+  return items.map((item, index) => {
+    const row = record(item) ?? {};
+    return {
+      agent_id: typeof row.agent_id === "string" ? row.agent_id
+        : `unplaced-${index}`,
+      name: typeof row.name === "string" && row.name ? row.name
+        : (typeof row.agent_id === "string" ? row.agent_id : "Unknown agent"),
+      status: typeof row.status === "string" ? row.status : "",
+      reason: typeof row.reason === "string" && row.reason ? row.reason
+        : "no_explicit_match",
+      placement_source: typeof row.placement_source === "string"
+        ? row.placement_source : undefined,
+      placement_detail: typeof row.placement_detail === "string"
+        ? row.placement_detail : undefined,
+    };
+  });
+}
+
+function normalizeOccupancy(raw: unknown): WorldOccupancy | null {
+  const row = record(raw);
+  if (!row) return null;
+  const counts = record(row.counts) ?? {};
+  const truncated = record(row.truncated) ?? {};
+  return {
+    schema: typeof row.schema === "string" ? row.schema : "",
+    staffed: row.staffed === true,
+    counts: Object.fromEntries(
+      Object.entries(counts).map(([key, value]) => [key, int(value, 0)])),
+    unplaced: normalizeUnplaced(row.unplaced),
+    truncated: {
+      placed: truncated.placed === true,
+      unplaced: truncated.unplaced === true,
+    },
+    digest: typeof row.digest === "string" ? row.digest : "",
+    agents_source: typeof row.agents_source === "string"
+      ? row.agents_source : undefined,
+    seat_source: typeof row.seat_source === "string"
+      ? row.seat_source : undefined,
+  };
+}
+
 function normalizeSlots(raw: unknown): WorldDeskSlot[] {
   const items = Array.isArray(raw) ? raw : [];
   return items.map((item, index) => {
@@ -240,10 +357,8 @@ function normalizeSlots(raw: unknown): WorldDeskSlot[] {
       ? row.desk_id : `desk-${index}`;
     const seatId = typeof row.seat_id === "string" ? row.seat_id
       : typeof seat?.seat_id === "string" ? seat.seat_id : null;
-    const occupied = typeof row.occupied_by === "string" && row.occupied_by
-      ? row.occupied_by
-      : typeof seat?.occupied_by === "string" && seat.occupied_by
-        ? seat.occupied_by : null;
+    const occupied = normalizeOccupant(
+      row.occupied_by !== undefined ? row.occupied_by : seat?.occupied_by);
     return {
       desk_id: deskId,
       seat_id: seatId,
@@ -364,7 +479,9 @@ function countTower(floors: WorldFloor[]): WorldTowerCounts {
       desks += room.capacity;
       for (const cell of room.cells) {
         for (const slot of cell.desk_slots) {
-          if (slot.occupied_by) occupied.add(slot.occupied_by);
+          const key = slot.occupied_by
+            ? (slot.occupied_by.agent_id || slot.occupied_by.name) : "";
+          if (key) occupied.add(key);
         }
       }
     }
@@ -421,16 +538,18 @@ function normalizeTower(raw: unknown): WorldTower {
       "The world endpoint returned zero floors.", "WORLD_EMPTY", 200);
   }
   const counts = countTower(floors);
+  const occupancy = normalizeOccupancy(row.occupancy);
   return {
     ok: true,
     schema: typeof row.schema === "string" && row.schema ? row.schema : WORLD_SCHEMA,
     source: "endpoint",
     server_source: typeof row.source === "string" ? row.source : undefined,
-    staffed: counts.agents > 0,
+    staffed: occupancy ? occupancy.staffed : (counts.agents > 0 || row.staffed === true),
     campus: record(row.campus) as WorldTower["campus"],
     counts,
     wings: wingSummaries(floors),
     floors,
+    occupancy,
   };
 }
 
@@ -493,7 +612,8 @@ export async function fetchWorldTower(
   fallbackFloors: FloorTemplate[], opts: WorldFetchOptions = {},
 ): Promise<WorldTower> {
   const f = opts.fetchImpl ?? fetch;
-  const url = worldUrl("/tower", opts.base);
+  const base = worldUrl("/tower", opts.base);
+  const url = opts.staffed === false ? base : `${base}?staffed=1`;
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = readToken(opts.win);
   if (token) headers["X-Qubit-Session-Token"] = token;

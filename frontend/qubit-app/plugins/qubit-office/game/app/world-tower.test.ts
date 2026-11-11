@@ -155,3 +155,116 @@ describe("world tower client", () => {
       .toBe(true);
   });
 });
+
+describe("staffed occupancy normalization", () => {
+  function staffedPayload() {
+    const base = buildTemplateWorldTower(realFloors());
+    const floor = base.floors[0];
+    const slot = floor.rooms[0].cells[0].desk_slots[0];
+    const occupant = {
+      agent_id: "agt_ada", name: "Ada Lovelace", initials: "AL",
+      status: "active", emoji: "🧮", color: "#123456",
+      source: "metadata.world_desk",
+    };
+    return {
+      ok: true,
+      schema: "qubit-office-world-tower/1",
+      source: "templates",
+      staffed: true,
+      counts: { ...base.counts, agents: 1, occupied_desks: 1 },
+      wings: base.wings,
+      floors: base.floors.map((item) => item.floor_id !== floor.floor_id
+        ? item
+        : {
+            ...item,
+            rooms: item.rooms.map((room, index) => index !== 0 ? room : {
+              ...room,
+              cells: room.cells.map((cell, cellIndex) => cellIndex !== 0
+                ? cell
+                : {
+                    ...cell,
+                    desk_slots: cell.desk_slots.map((desk, deskIndex) =>
+                      desk.desk_id === slot.desk_id
+                        ? { ...desk, occupied_by: occupant } : desk),
+                  }),
+            }),
+          }),
+      occupancy: {
+        schema: "qubit-office-world-occupancy/1",
+        staffed: true,
+        counts: {
+          agents: 2, placed: 1, unplaced: 1, ignored: 0,
+          occupied_desks: 1, floors_staffed: 1, rooms_staffed: 1,
+        },
+        placed: [],
+        unplaced: [{
+          agent_id: "agt_grace", name: "Grace Hopper", status: "active",
+          reason: "no_explicit_match",
+        }],
+        truncated: { placed: false, unplaced: false },
+        digest: "abc",
+        agents_source: "business_db",
+        seat_source: "office_plan",
+      },
+    };
+  }
+
+  it("requests the staffed projection by default", async () => {
+    const { calls, impl } = recordingFetch(() => respond(200, staffedPayload()));
+    await fetchWorldTower(realFloors(), { fetchImpl: impl });
+    expect(calls[0].url).toContain("?staffed=1");
+  });
+
+  it("can request the unstaffed read explicitly", async () => {
+    const { calls, impl } = recordingFetch(() => respond(200, endpointPayload()));
+    await fetchWorldTower(realFloors(), { fetchImpl: impl, staffed: false });
+    expect(calls[0].url).not.toContain("staffed=1");
+  });
+
+  it("normalizes an object occupant and the unplaced list", async () => {
+    const { impl } = recordingFetch(() => respond(200, staffedPayload()));
+    const tower = await fetchWorldTower(realFloors(), { fetchImpl: impl });
+    expect(tower.staffed).toBe(true);
+    expect(tower.counts.agents).toBe(1);
+    expect(tower.occupancy?.agents_source).toBe("business_db");
+    expect(tower.occupancy?.unplaced).toEqual([{
+      agent_id: "agt_grace", name: "Grace Hopper", status: "active",
+      reason: "no_explicit_match", placement_source: undefined,
+      placement_detail: undefined,
+    }]);
+    const slot = tower.floors[0].rooms[0].cells[0].desk_slots[0];
+    expect(slot.occupied_by).toEqual({
+      agent_id: "agt_ada", name: "Ada Lovelace", initials: "AL",
+      status: "active", emoji: "🧮", color: "#123456",
+      source: "metadata.world_desk",
+    });
+  });
+
+  it("accepts a legacy bare-string occupant without inventing an id", async () => {
+    const payload = staffedPayload();
+    payload.floors[0].rooms[0].cells[0].desk_slots[0].occupied_by =
+      "Ada Lovelace" as never;
+    const { impl } = recordingFetch(() => respond(200, payload));
+    const tower = await fetchWorldTower(realFloors(), { fetchImpl: impl });
+    expect(tower.floors[0].rooms[0].cells[0].desk_slots[0].occupied_by)
+      .toEqual({
+        agent_id: "", name: "Ada Lovelace", initials: "AL", status: "",
+        emoji: "", color: "", source: "unknown",
+      });
+  });
+
+  it("never fabricates an occupant from a malformed row", () => {
+    const tower = buildTemplateWorldTower(realFloors());
+    expect(tower.staffed).toBe(false);
+    expect(tower.occupancy ?? null).toBeNull();
+    for (const floor of tower.floors) {
+      for (const room of floor.rooms) {
+        for (const cell of room.cells) {
+          for (const slot of cell.desk_slots) {
+            expect(slot.occupied_by).toBeNull();
+          }
+        }
+      }
+    }
+  });
+});
