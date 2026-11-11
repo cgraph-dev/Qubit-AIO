@@ -1416,8 +1416,14 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
         # the real backing surface; the item gets an explicit typed row with a
         # real fork capability backend and proving test.
         fork = item.get("fork_disposition")
+        # OPERATOR_ONLY belongs in this set. It is a TYPED disposition -- the
+        # surface is accounted for and an owner ruled it out (a route the compat
+        # layer answers with a deliberate policy refusal, for one) -- so it is
+        # explained coverage, exactly like IMPLEMENTED and GATED. Without it a
+        # refusal fell through to the "no ledger row anywhere" branch and was
+        # recorded MISSING, which read as a missing capability.
         if isinstance(fork, dict) and fork.get("status") in (
-                "IMPLEMENTED", "GATED"):
+                "IMPLEMENTED", "GATED", "OPERATOR_ONLY", "SAFE_EQUIVALENT"):
             row_id = _inventory_row_id(item_id)
             base_id = row_id
             suffix = 2
@@ -1433,6 +1439,8 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
             if status == "IMPLEMENTED":
                 dispositioned_impl += 1
             else:
+                # GATED / OPERATOR_ONLY / SAFE_EQUIVALENT: accounted for and
+                # deliberately not served as-is.
                 dispositioned_gated += 1
             # A typed disposition (IMPLEMENTED or GATED) is explained coverage:
             # it is neither an uncovered distinct capability nor an omission.

@@ -544,14 +544,71 @@ def _live_cli_positional_surface(repo: Path) -> set[str]:
 
 
 def _normalise_route(route: str) -> str:
-    """A route with its placeholder NAMES erased: ``{job_id}`` -> ``{}``.
+    """A route with regex decoration removed: ``{job_id}`` -> ``{}``, ``x.*`` -> ``x``.
 
     The two trees spell path parameters differently (upstream ``{job_id}``,
-    compat ``(?P<id>...)``) while the shape a request actually travels is
-    identical. Comparing normalised forms distinguishes "not served" from
-    "served under another parameter name", which is the honest question.
+    compat ``(?P<id>...)``) and the compat layer also registers optional
+    suffixes as a regex (``/api/credentials/pool.*`` to match the pool and every
+    entry under it). Both differences describe the SAME path shape, which is the
+    question being asked; comparing raw strings turns a served route into a
+    MISSING row for spelling alone.
     """
-    return re.sub(r"\{[^}]*\}", "{}", route)
+    route = re.sub(r"\{[^}]*\}", "{}", route)
+    # A trailing ``.*`` makes the route match itself and anything under it, so
+    # the bare path is the shape an inventory id names.
+    return re.sub(r"\.\*$", "", route)
+
+
+def _live_route_patterns(repo: Path) -> tuple[set[str], set[str]]:
+    """``(served, gated)`` route sets from ``voicebridge/qubit_compat.py``.
+
+    Both are ``"METHOD <path>"`` with the regex normalised to the concrete shape
+    an inventory id uses. A **gated** route is one registered with the
+    ``"__gate__"`` handler: it exists, it is reachable, and it deliberately
+    REFUSES with a typed policy error (secrets never leave the vault, process
+    supervision stays with the operator, and so on). That is a different claim
+    from "missing", and the ledger has a status for it.
+    """
+    src_path = repo / "voicebridge" / "qubit_compat.py"
+    try:
+        src = src_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set(), set()
+
+    def _shape(pattern: str) -> str:
+        pattern = re.sub(r"\(\?P<([A-Za-z_][A-Za-z0-9_]*)>[^)]*\)", r"{\1}", pattern)
+        pattern = re.sub(r"\([^)]*\)", "", pattern)
+        return pattern.replace("$", "").lstrip("^")
+
+    served: set[str] = set()
+    gated: set[str] = set()
+    # Capture the handler so a gated registration is distinguishable. The
+    # handler is the THIRD positional argument; a call with only two has no
+    # gate and is a plain served route.
+    for method, pattern, handler in re.findall(
+            r'^_r\(\s*"([A-Z]+)"\s*,\s*r?"([^"]+)"\s*,\s*(?:"([^"]*)")?',
+            src, re.MULTILINE):
+        key = f"{method} {_shape(pattern)}"
+        served.add(key)
+        if handler == "__gate__":
+            gated.add(key)
+
+    # A second, larger set of deliberate refusals lives in the module-level
+    # ``GATED`` table: ``(method, pattern, gate)`` tuples where the gate is a
+    # typed policy error (_NO_SECRET, _NO_PTY, _NO_CONSOLE, ...). Those routes
+    # exist and answer, with a refusal — they are not missing capabilities.
+    # Parse the table body only, so an unrelated tuple elsewhere in the module
+    # cannot be mistaken for a route.
+    # The annotation itself contains brackets (``List[Dict[str, Any]]``), so do
+    # not try to match it — anchor on the name and the opening ``[`` only.
+    table = re.search(r"^GATED\s*:[^=]*=\s*\[(.*?)^\]",
+                      src, re.MULTILINE | re.DOTALL)
+    if table:
+        for method, pattern in re.findall(
+                r'\(\s*"([A-Z]+)"\s*,\s*r?"([^"]+)"\s*,', table.group(1)):
+            gated.add(f"{method} {_shape(pattern)}")
+    served |= gated
+    return served, gated
 
 
 def _live_route_surface(repo: Path) -> set[str]:
@@ -562,24 +619,8 @@ def _live_route_surface(repo: Path) -> set[str]:
     literal ``_r("METHOD", r"pattern", "handler")`` call, which is a stronger
     proof of existence than a ledger row ever was.
     """
-    import re as _re
-
-    src_path = repo / "voicebridge" / "qubit_compat.py"
-    try:
-        src = src_path.read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return set()
-    found: set[str] = set()
-    for method, pattern in _re.findall(
-            r'^_r\(\s*"([A-Z]+)"\s*,\s*r?"([^"]+)"', src, _re.MULTILINE):
-        # Normalise a regex route to the concrete path shape an inventory id
-        # uses: ``(?P<id>[^/]+)`` -> ``{id}``, leftover groups dropped, anchors
-        # stripped. Without this the id never matches an upstream path.
-        pattern = _re.sub(r"\(\?P<([A-Za-z_][A-Za-z0-9_]*)>[^)]*\)", r"{\1}", pattern)
-        pattern = _re.sub(r"\([^)]*\)", "", pattern)
-        pattern = pattern.replace("$", "").lstrip("^")
-        found.add(f"{method} {pattern}")
-    return found
+    served, _gated = _live_route_patterns(repo)
+    return served
 
 
 def _live_dashboard_surface(repo: Path) -> set[str]:
@@ -634,11 +675,13 @@ def _live_surface_disposition(repo: Path, item: dict,
         return None
     if surfaces is None:
         _routes = _live_route_surface(repo)
+        _served_routes, _gated_routes = _live_route_patterns(repo)
         surfaces = {
             "cli": _live_cli_surface(repo),
             "cli_positionals": _live_cli_positional_surface(repo),
             "route": _routes,
             "route_norm": {_normalise_route(r) for r in _routes},
+            "route_gated": _gated_routes,
             "page": _live_dashboard_surface(repo),
             "spa": _live_spa_routes(repo),
         }
@@ -719,6 +762,25 @@ def _live_surface_disposition(repo: Path, item: dict,
     if cat == "qubit_backend_route":
         method = str(item.get("method") or "").upper()
         route = str(item.get("route") or "")
+        # A deliberate REFUSAL is checked FIRST. The gated routes are also in the
+        # served set (they answer, with a typed policy error), so testing
+        # "served" before "gated" would file every refusal as IMPLEMENTED —
+        # claiming a capability that the product explicitly denies.
+        _gated = surfaces.get("route_gated") or set()
+        if _gated:
+            _gated_norm = {_normalise_route(r) for r in _gated}
+            if _normalise_route(f"{method} {route}") in _gated_norm:
+                return {
+                    "status": "OPERATOR_ONLY", "capability": "qubit_backend_route",
+                    "backend": "voicebridge.qubit_compat:GATED",
+                    "proving_test": "tests/test_backend_routes_integration8u.py",
+                    "reason": (f"{method} {route} is registered as a deliberate typed "
+                               "refusal in voicebridge/qubit_compat.py (GATED table / "
+                               "__gate__ handler): the route answers with a policy "
+                               "error by design, so the capability is accounted for "
+                               "and refused, not missing."),
+                    "needs": "owner",
+                }
         if f"{method} {route}" in surfaces["route"]:
             return {
                 "status": "IMPLEMENTED", "capability": "qubit_backend_route",
@@ -2629,11 +2691,13 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
     # imports the argparse tree or scans a 12k-line module, which is far too
     # expensive to repeat per inventory item.
     _routes = _live_route_surface(repo)
+    _served_routes, _gated_routes = _live_route_patterns(repo)
     live_surfaces = {
         "cli": _live_cli_surface(repo),
         "cli_positionals": _live_cli_positional_surface(repo),
         "route": _routes,
         "route_norm": {_normalise_route(r) for r in _routes},
+        "route_gated": _gated_routes,
         "page": _live_dashboard_surface(repo),
         "spa": _live_spa_routes(repo),
     }
