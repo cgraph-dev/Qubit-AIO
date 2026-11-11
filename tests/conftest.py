@@ -206,6 +206,16 @@ def _isolate_qubit_runtime(tmp_path, monkeypatch):  # noqa: D103
     # operator's real config instead of its isolated one. Same fail-closed
     # intent as the QUBIT_HOME/HERMES_HOME/OPENCLAW_* clears above.
     monkeypatch.delenv("VOICE_BRIDGE_CONFIG", raising=False)
+    # Clear the kanban write fence. ``HERMES_DELEGATED_CHILD_CONTEXT`` is set by
+    # the dispatcher to the fenced board root for a spawned descendant (here: an
+    # agent process running the suite), and ``kanban_path_is_fenced`` then opens
+    # EVERY board DB under that root -- which is the operator's whole runtime
+    # home -- read-only via ``mode=ro``. A per-test QUBIT_HOME is still under it,
+    # so the very first ``kanban connect()`` on a not-yet-created DB dies with
+    # "unable to open database file" (the plugin surfaces it as PLUGIN_ERROR
+    # 500) instead of initializing. Tests that need the fence set it themselves;
+    # test_store_consolidation and test_workbench_kanban already did this by hand.
+    monkeypatch.delenv("HERMES_DELEGATED_CHILD_CONTEXT", raising=False)
     yield
 
 
