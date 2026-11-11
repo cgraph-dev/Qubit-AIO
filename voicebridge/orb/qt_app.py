@@ -1338,7 +1338,46 @@ _COLOR_CACHE: Dict[Any, Any] = {}
 _COLOR_CACHE_MAX = 2048
 
 
-def _ghost_content_box(image: Any) -> tuple[int, int, int, int] | None:
+def _ghost_static_box(atlas: Any) -> "tuple[int, int, int, int] | None":
+    """One FIXED source box for every frame of the atlas.
+
+    Per-frame bounding boxes must NOT be used to place the sprite. The ghost's
+    bbox legitimately moves every frame (measured across the loop: x 12..83,
+    y 24..96) because the artwork itself drifts, bobs and ripples — that motion
+    IS the animation. Centring each frame on its own bbox cancels the drift and
+    keeps the silhouette pinned, so the sprite visibly trembles in place instead
+    of floating. That was the measured defect.
+
+    One box for the whole loop keeps the original motion intact. The box is the
+    union of every frame's extent, so no frame is ever clipped.
+    """
+    try:
+        min_x, min_y, max_x, max_y = atlas.w, atlas.h, -1, -1
+        for index in range(atlas.frames):
+            data = atlas.rgba(index)
+            for y in range(atlas.h):
+                row = y * atlas.w
+                for x in range(atlas.w):
+                    if data[(row + x) * 4 + 3] > 8:
+                        if x < min_x:
+                            min_x = x
+                        if x > max_x:
+                            max_x = x
+                        if y < min_y:
+                            min_y = y
+                        if y > max_y:
+                            max_y = y
+    except Exception:  # noqa: BLE001 - a probe failure declines, never raises
+        return None
+    if max_x < min_x or max_y < min_y:
+        return None
+    return min_x, min_y, max_x, max_y
+
+
+_STATIC_BOX: dict[str, "tuple[int, int, int, int] | None"] = {}
+
+
+def _ghost_content_box(image: Any) -> "tuple[int, int, int, int] | None":
     """Bounding box of the non-transparent pixels in one atlas frame.
 
     The atlas canvas is larger than the artwork and the artwork is not centred in
@@ -1501,10 +1540,18 @@ def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
         # a 524x545 pre-scaled image painted zero pixels while the same image at
         # 131x137 painted 467), and drawImage(rect, image) is the optimised path.
         scale = (R * 2.0) / float(ghost_atlas.ART_SPAN)
-        index = ghost_atlas.frame_index(t)
-        if index not in _CONTENT_BOX:
-            _CONTENT_BOX[index] = _ghost_content_box(image)
-        box = _CONTENT_BOX[index]
+        # A SINGLE box for the whole loop, not the current frame's own extent.
+        # The ghost's silhouette moves every frame by design (drift, bob, hem
+        # ripple); re-centring on each frame's bbox cancels that motion and makes
+        # the sprite tremble in place. Measured per-frame extents across the loop:
+        # x 12..83, y 24..96 -- a 71px swing that must be allowed to move.
+        atlas = ghost_atlas._atlas()
+        if atlas is None:
+            return False
+        cache_key = "atlas"
+        if cache_key not in _STATIC_BOX:
+            _STATIC_BOX[cache_key] = _ghost_static_box(atlas)
+        box = _STATIC_BOX[cache_key]
         if box is None:
             return False
         min_x, min_y, max_x, max_y = box
@@ -1522,6 +1569,23 @@ def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
         left = cx - draw_w * 0.5
         top = cy - draw_h * 0.5
         p.setOpacity(max(0.0, min(1.0, float(brightness))))
+        # Blend across the frame boundary using the fractional position. The orb
+        # paints at ~31 fps against a 30 fps atlas, so drawing only whole frames
+        # shows some source frames twice and others once -- a visible stutter.
+        # Two overlapping draws at complementary alpha is a crossfade and keeps
+        # the motion as smooth as the original's own playback.
+        position = ghost_atlas.frame_position(t)
+        frac = position - math.floor(position)
+        if frac > 0.02:
+            nxt = ghost_atlas.frame_at_index(int(math.floor(position)) + 1)
+            if nxt is not None:
+                p.setOpacity(max(0.0, min(1.0, float(brightness) * frac)))
+                p.drawImage(
+                    QRectF(left, top, draw_w, draw_h),
+                    nxt[0],
+                    QRectF(float(min_x), float(min_y), src_w, src_h),
+                )
+                p.setOpacity(max(0.0, min(1.0, float(brightness) * (1.0 - frac))))
         p.drawImage(
             QRectF(left, top, draw_w, draw_h),
             image,

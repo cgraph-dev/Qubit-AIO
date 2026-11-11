@@ -118,6 +118,28 @@ def header() -> Dict[str, Any]:
     return dict(atlas.header) if atlas else {}
 
 
+def frame_position(t: Any) -> float:
+    """Fractional frame position for clock *t* (e.g. 18.4 = 40% from 18 to 19).
+
+    The orb repaints at ~31 fps while the atlas is authored at 30 fps, so the
+    fractional part matters: snapping to the nearest integer frame makes some
+    source frames display twice and others once, which reads as a stutter. The
+    painter uses this to blend between adjacent frames and keep the motion the
+    smoothness the original has.
+    """
+    atlas = _atlas()
+    if atlas is None:
+        return 0.0
+    try:
+        clock = float(t)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(clock):
+        return 0.0
+    total = clock * atlas.frames / atlas.duration
+    return total % atlas.frames
+
+
 def frame_index(t: Any) -> int:
     """Frame index for clock time *t*, looping over the atlas duration.
 
@@ -130,22 +152,38 @@ def frame_index(t: Any) -> int:
     atlas = _atlas()
     if atlas is None:
         return 0
-    try:
-        clock = float(t)
-    except (TypeError, ValueError):
-        return 0
-    if not math.isfinite(clock):
-        return 0
-    # Frames per second is frames/duration, not the declared fps: the atlas holds
-    # 72 frames over 2.4s (= 30fps), and using ``fps`` directly only coincides when
-    # the two happen to agree. Scaling by the real count keeps the wrap exact.
-    total = clock * atlas.frames / atlas.duration
-    # Snap a value within float noise of an integer onto it, so the loop seam
-    # (t and t+duration) lands on the same frame instead of one short.
-    nearest = round(total)
-    if abs(total - nearest) < 1e-9:
-        total = float(nearest)
-    return int(total) % atlas.frames
+    position = frame_position(t)
+    nearest = round(position)
+    if abs(position - nearest) < 1e-9:
+        position = float(nearest)
+    return int(position) % atlas.frames
+
+
+def frame_at_index(index: int) -> Optional[Tuple[Any, Tuple[float, float]]]:
+    """(QImage, origin) for an explicit frame index, wrapping at the loop end."""
+    atlas = _atlas()
+    if atlas is None:
+        return None
+    index %= atlas.frames
+    image = _IMAGE_CACHE.get(index)
+    if image is None:
+        try:
+            from PySide6.QtGui import QImage
+        except Exception:  # noqa: BLE001 - Tk fallback / headless without Qt
+            return None
+        data = atlas.rgba(index)
+        if not data:
+            return None
+        image = QImage(data, atlas.w, atlas.h, atlas.w * 4,
+                       QImage.Format.Format_RGBA8888).copy()
+        if image.isNull():
+            return None
+        _IMAGE_CACHE[index] = image
+    origin = (
+        float(atlas.header.get("originX", atlas.w / 2)),
+        float(atlas.header.get("originY", atlas.h)),
+    )
+    return image, origin
 
 
 def frame_at(t: Any) -> Optional[Tuple[Any, Tuple[float, float]]]:
