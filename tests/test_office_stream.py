@@ -673,7 +673,7 @@ def test_feed_is_bounded_so_repeated_stream_snapshots_cannot_replay_history():
 def test_repeated_feed_events_are_deduplicated_by_the_shipped_habblaud_store():
     """The stream resends feed rows each snapshot; the actual vendor client
     must de-duplicate their IDs, not append history every two seconds."""
-    chunk = REPO / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle/app-U4Pwh2XA.js"
+    chunk = next((REPO / "frontend/qubit-app/plugins/qubit-office/habblaud/bundle").glob("app-*.js"))
     code = chunk.read_text(encoding="utf-8")
     assert "applyFeed(e){if(!e.length)return" in code
     assert "new Set(this.feed.map(e=>e.id))" in code

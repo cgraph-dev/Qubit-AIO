@@ -163,13 +163,17 @@ def _bundle_api_paths():
     matches on the PATH only, so ``/api/stats?day=…`` is just ``/api/stats``.
     """
     paths = set()
-    for name in ("app-U4Pwh2XA.js", "ptypane-DxPqTDKo.js",
-                 "daystats-CUw1NUBG.js"):
-        js = (BUNDLE / name).read_text(encoding="utf-8", errors="replace")
-        for m in re.finditer(r"`(/api/[^`]*)`", js):
-            p = m.group(1).split("?", 1)[0]        # drop the query
-            p = re.sub(r"\$\{[^}]*\}", "X", p)     # a template hole -> a segment
-            paths.add(p)
+    # A re-vendor renames the hash-suffixed chunks; resolve each family from
+    # disk instead of hardcoding one revision's hashes.
+    for pattern in ("app-*.js", "ptypane-*.js", "daystats-*.js"):
+        chunks = sorted(BUNDLE.glob(pattern))
+        assert chunks, f"vendored Habblaud bundle has no {pattern}"
+        for chunk in chunks:
+            js = chunk.read_text(encoding="utf-8", errors="replace")
+            for m in re.finditer(r"`(/api/[^`]*)`", js):
+                p = m.group(1).split("?", 1)[0]        # drop the query
+                p = re.sub(r"\$\{[^}]*\}", "X", p)     # a template hole -> a segment
+                paths.add(p)
     return {p for p in paths if not p.startswith("/api/orders")}
 
 
