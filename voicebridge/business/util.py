@@ -53,8 +53,23 @@ def json_loads(text: str | None, default: Any) -> Any:
         return default
 
 
+_NON_SECRET_TOKEN_KEYS = frozenset(
+    {
+        "max_tokens",
+        "max_tokens_per_turn",
+        "tokens",
+        "token_count",
+        "prompt_tokens",
+        "completion_tokens",
+        "total_tokens",
+    }
+)
+
+
 def _sensitive_key(key: str) -> bool:
     flat = key.lower().replace("-", "_")
+    if flat in _NON_SECRET_TOKEN_KEYS:
+        return False
     return any(part in flat for part in _SENSITIVE_PARTS)
 
 
