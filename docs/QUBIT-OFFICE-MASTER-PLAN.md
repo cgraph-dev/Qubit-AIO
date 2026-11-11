@@ -1267,3 +1267,18 @@ The agent selector model, session/run/task/workspace/checkpoint contract, multi-
 verified repo evidence and the 15 Perplexity suggestions are persisted in
 `docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` §21–§25. That file is the reference; this is
 a pointer, not a second authority.
+
+
+---
+
+## 48. External research: gaps and forgotten requirements
+
+A three-part Perplexity review (agent-platform patterns, security/privacy/ops, business
+operations) plus reference-repo inspection found foundation gaps that the earlier plan did not
+enforce: durable execution/reconciliation, real identity/tenancy, sandbox/secrets/egress, leases
+and message fabric, durable approvals, observability/evals, backups/DR, and actual business
+systems of record.
+
+The full synthesis, company patterns, must-haves, forgotten requirements and revised execution
+order are in `docs/QUBIT-OFFICE-RESEARCH-GAPS.md`. That file is the reference; this section is a
+pointer, not a second authority.
