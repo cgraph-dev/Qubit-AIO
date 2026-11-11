@@ -29,13 +29,11 @@ from typing import Any, Dict, Optional, Tuple
 #: exact upstream pin and the licence line.
 ATLAS_FILENAME = "ghost_atlas.bin"
 
-#: Upstream art span in its own pixels: the height from the ghost's crown to its
-#: hem is ~30 art px on a 96x100 canvas whose origin sits at (48, 90). The orb
-#: scales so this span maps onto its diameter. This is deliberately close to the
-#: sprite's real extent -- a smaller value magnifies until the ghost overflows the
-#: widget (measured at ART_SPAN=44: a 524x545 rect in a 336 px canvas, drawing
-#: nothing visible).
-ART_SPAN = 100.0
+#: Upstream art span in its own pixels. The exporter pads the frame by `margin`
+#: (60) so the outer glow fits, so the full frame is 216x220 and this span is the
+#: frame's LONGER side. Deriving it from the atlas keeps it correct if the margin
+#: ever changes, instead of drifting into a hand-tuned constant.
+ART_SPAN = 220.0
 
 _MAGIC = b""
 

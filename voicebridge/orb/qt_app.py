@@ -1339,39 +1339,24 @@ _COLOR_CACHE_MAX = 2048
 
 
 def _ghost_static_box(atlas: Any) -> "tuple[int, int, int, int] | None":
-    """One FIXED source box for every frame of the atlas.
+    """The FULL frame box for the atlas — never a content crop.
 
-    Per-frame bounding boxes must NOT be used to place the sprite. The ghost's
-    bbox legitimately moves every frame (measured across the loop: x 12..83,
-    y 24..96) because the artwork itself drifts, bobs and ripples — that motion
-    IS the animation. Centring each frame on its own bbox cancels the drift and
-    keeps the silhouette pinned, so the sprite visibly trembles in place instead
-    of floating. That was the measured defect.
+    Placement must use the whole frame, not the ghost's silhouette extent. The
+    sprite carries a cold outer glow that fades radially to nothing, and cropping
+    to the opaque body cuts that glow off at a hard rectangle — the "square aura"
+    the owner reported. The exporter already sizes the canvas to exactly contain
+    the largest glow (see export_ghost.mjs `margin`), so the frame IS the box.
 
-    One box for the whole loop keeps the original motion intact. The box is the
-    union of every frame's extent, so no frame is ever clipped.
+    (An earlier version measured the alpha extent per frame and centred on it;
+    that cancelled the ghost's own drift and made it tremble, and also cropped
+    the halo. Both defects have the same root: the sprite must be drawn whole.)
     """
     try:
-        min_x, min_y, max_x, max_y = atlas.w, atlas.h, -1, -1
-        for index in range(atlas.frames):
-            data = atlas.rgba(index)
-            for y in range(atlas.h):
-                row = y * atlas.w
-                for x in range(atlas.w):
-                    if data[(row + x) * 4 + 3] > 8:
-                        if x < min_x:
-                            min_x = x
-                        if x > max_x:
-                            max_x = x
-                        if y < min_y:
-                            min_y = y
-                        if y > max_y:
-                            max_y = y
+        if atlas.w <= 0 or atlas.h <= 0:
+            return None
     except Exception:  # noqa: BLE001 - a probe failure declines, never raises
         return None
-    if max_x < min_x or max_y < min_y:
-        return None
-    return min_x, min_y, max_x, max_y
+    return 0, 0, atlas.w - 1, atlas.h - 1
 
 
 _STATIC_BOX: dict[str, "tuple[int, int, int, int] | None"] = {}
