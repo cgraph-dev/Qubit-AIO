@@ -157,3 +157,5 @@ for f in docs/IDENTITY.md docs/DECISIONS.md docs/STATUS.md docs/ARCHITECTURE.md 
   printf '%-45s %s\n' "$f" "$(test -f "$f" && echo present || echo MISSING)"
 done
 ```
+
+| `QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` | Departments, sessions, memory, interactions, builder, FX and implementation order |
