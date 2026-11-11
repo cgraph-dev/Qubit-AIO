@@ -365,7 +365,21 @@ RETIRED_CODES = {"MOA_SUPERSEDED": "MOA_READ_ONLY"}
 #: ``MOA_READ_ONLY``: introduced by the MoA read-only lane (docs/STATUS.md,
 #: 2026-11-05) AFTER the audit doc was frozen; the frozen doc still carries only
 #: its predecessor ``MOA_SUPERSEDED``.
-UNPURGED_DOC_MISSING = frozenset({"MOA_READ_ONLY"})
+#: Refusal codes that are live in the ledger but have NO honest home in the audit
+#: doc, which was purged (eafb54e26) and must never be re-authored. Each entry is
+#: asserted to still exist in the ledger and to still be absent from the doc, so
+#: this cannot silently rot into a blanket allowlist.
+#:   MOA_READ_ONLY            -- recorded when the MoA surface narrowed.
+#:   ACP_* / HARNESS_CAPS /   -- introduced by the wave-6 openclaw extension
+#:   VISION_MEDIA_UNAVAILABLE    audit (scripts/rebuild_ledger_openclaw.py
+#:                               WAVE6_AUDIT) after the doc was already gone.
+UNPURGED_DOC_MISSING = frozenset({
+    "MOA_READ_ONLY",
+    "ACP_HARNESS_UNAVAILABLE",
+    "ACP_REFUSED",
+    "HARNESS_CAPS",
+    "VISION_MEDIA_UNAVAILABLE",
+})
 
 
 @functools.lru_cache(maxsize=1)
