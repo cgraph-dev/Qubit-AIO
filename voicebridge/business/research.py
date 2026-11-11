@@ -471,22 +471,30 @@ def _answer_text(payload: Mapping[str, Any]) -> str:
 
 def _citation_entries(payload: Mapping[str, Any]) -> list[dict[str, str]]:
     entries: list[dict[str, str]] = []
-    seen: set[str] = set()
+    by_url: dict[str, dict[str, str]] = {}
 
     def add(url: Any, title: Any = "", text: Any = "") -> None:
         clean = str(url or "").strip()
-        if not clean or clean in seen:
+        if not clean:
             return
         if not clean.startswith(("http://", "https://")):
             return
-        seen.add(clean)
-        entries.append(
-            {
-                "url": clean,
-                "title": str(title or "")[:300],
-                "text": str(text or "")[:2000],
-            }
-        )
+        existing = by_url.get(clean)
+        if existing is not None:
+            # Later rows (``search_results``) carry the title/snippet, while
+            # the ``citations`` list may hold the bare URL. Enrich in place.
+            if title and not existing["title"]:
+                existing["title"] = str(title)[:300]
+            if text and not existing["text"]:
+                existing["text"] = str(text)[:2000]
+            return
+        entry = {
+            "url": clean,
+            "title": str(title or "")[:300],
+            "text": str(text or "")[:2000],
+        }
+        by_url[clean] = entry
+        entries.append(entry)
 
     citations = payload.get("citations")
     if isinstance(citations, list):
