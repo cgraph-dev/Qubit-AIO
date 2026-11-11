@@ -448,6 +448,13 @@ UNPURGED_DOC_MISSING = frozenset({
     "ACP_REFUSED",
     "HARNESS_CAPS",
     "VISION_MEDIA_UNAVAILABLE",
+    # Added 2026-11-05 (5b6c043e8), AFTER the audit doc was frozen. The doc is
+    # read from pre-purge history (eafb54e26, 2026-10-09) because the live copy
+    # is not in the tree, so a code introduced later can never appear in it --
+    # an artefact of the frozen evidence, not an undocumented refusal. The
+    # guard below keeps this honest in both directions: it must still resolve
+    # from a live row, and it must still be absent from the doc.
+    "DESKTOP_PLUGINS_RECONCILE_UNAVAILABLE",
 })
 
 
