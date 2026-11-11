@@ -25,15 +25,23 @@ can be plugged in without changing the War Room service.
 from __future__ import annotations
 
 import hashlib
+import json
+import os
+import re
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable, Mapping, Protocol, runtime_checkable
 
 from .errors import (
     BAD_INPUT_CODE,
+    RESEARCH_FAILED_CODE,
     RESEARCH_NOT_CONFIGURED_CODE,
     RESEARCH_UNAVAILABLE_CODE,
     BusinessError,
 )
+from .util import redact
 from .warroom import EVIDENCE_LABELS
 
 #: The material shapes a research provider accepts. These are the War Room's
@@ -43,6 +51,12 @@ RESEARCH_KINDS = ("url", "youtube", "note", "post")
 
 LOCAL_PROVIDER_ID = "local-deterministic"
 REMOTE_PROVIDER_ID = "remote"
+PERPLEXITY_PROVIDER_ID = "perplexity"
+
+#: Perplexity defaults, matching the voice orchestrator's ``intent`` settings.
+DEFAULT_PERPLEXITY_URL = "https://api.perplexity.ai/chat/completions"
+DEFAULT_PERPLEXITY_MODEL = "sonar-pro"
+DEFAULT_PERPLEXITY_TIMEOUT_S = 45.0
 
 
 def _clean_text(value: Any, label: str, *, max_len: int = 4096) -> str:
@@ -257,6 +271,460 @@ class RemoteResearchProvider:
         return result
 
 
+@dataclass(frozen=True, slots=True)
+class PerplexityRequest:
+    """One request to the Perplexity chat-completions endpoint.
+
+    ``payload`` is the exact JSON body a transport posts. The API key is not
+    part of this object: it travels in the headers the caller builds, so a
+    request can be logged or asserted without ever exposing the credential.
+    """
+
+    url: str
+    model: str
+    prompt: str
+    inputs: tuple[ResearchInput, ...]
+    timeout_s: float = DEFAULT_PERPLEXITY_TIMEOUT_S
+    max_tokens: int = 900
+    temperature: float = 0.2
+
+    def payload(self) -> dict[str, Any]:
+        return {
+            "model": self.model,
+            "messages": [{"role": "user", "content": self.prompt}],
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+        }
+
+
+#: A transport receives the request and the headers (including the bearer
+#: token) and returns the decoded JSON mapping. Tests inject a fake; the
+#: shipped default is :func:`_http_post_json`.
+PerplexityTransport = Callable[
+    [PerplexityRequest, Mapping[str, str]], Mapping[str, Any]
+]
+
+_CITATION_MARKER = re.compile(r"\[(\d+)\]")
+
+
+def _cfg_value(cfg: Any, *path: str, default: Any = None) -> Any:
+    """Read a nested config value from a ``Config`` or a plain mapping."""
+    try:
+        getter = getattr(cfg, "get", None)
+        if callable(getter):
+            try:
+                return getter(*path, default=default)
+            except TypeError:
+                node: Any = cfg
+                for part in path:
+                    if isinstance(node, Mapping):
+                        node = node.get(part)
+                    else:
+                        return default
+                return default if node is None else node
+    except Exception:  # noqa: BLE001 - a bad config must not crash routing
+        return default
+    return default
+
+
+def _env_file_value(name: str, candidates: list[str]) -> str:
+    for candidate in candidates:
+        path = Path(candidate).expanduser()
+        try:
+            lines = path.read_text(errors="replace").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            line = line.strip()
+            if line.startswith(name + "="):
+                return (
+                    line.split("=", 1)[1].strip().strip('"').strip("'")
+                )
+    return ""
+
+
+def perplexity_settings(
+    cfg: Any = None,
+    *,
+    environ: Mapping[str, str] | None = None,
+) -> tuple[str, str, str]:
+    """Resolve ``(api_key, endpoint, model)`` without ever logging the key.
+
+    Order for the key: the explicit ``environ`` mapping / process environment,
+    then the configured ``intent.perplexity_env`` file, then the deepseek /
+    canonical VoiceBridge ``.env``, then the canonical runtime ``.env``. A
+    configured ``intent.perplexity_enabled: false`` disables the provider even
+    when a key is present. The endpoint/model come from ``intent`` with the
+    documented defaults.
+    """
+    explicit_env = environ is not None
+    env = os.environ if environ is None else environ
+    key = str(env.get("PERPLEXITY_API_KEY") or "").strip()
+
+    # An explicit ``environ`` mapping is the whole credential source. Tests use
+    # this to stay hermetic; production passes None so the configured files
+    # are consulted after the process environment.
+    if not explicit_env and not key:
+        candidates: list[str] = []
+        configured = str(
+            _cfg_value(cfg, "intent", "perplexity_env", default="") or ""
+        ).strip()
+        if configured:
+            candidates.append(configured)
+        deepseek_env = str(
+            _cfg_value(cfg, "intent", "deepseek_env", default="") or ""
+        ).strip()
+        candidates.append(
+            deepseek_env or "~/.config/qubit-voicebridge/.env"
+        )
+        try:
+            from ..config import canonical_runtime_env_path
+
+            runtime_env = str(canonical_runtime_env_path())
+        except Exception:  # noqa: BLE001 - unresolvable path means skip it
+            runtime_env = ""
+        if runtime_env and runtime_env not in candidates:
+            candidates.append(runtime_env)
+        key = _env_file_value("PERPLEXITY_API_KEY", candidates).strip()
+
+    enabled = _cfg_value(cfg, "intent", "perplexity_enabled", default=True)
+    if enabled is False:
+        key = ""
+
+    endpoint = str(
+        _cfg_value(cfg, "intent", "perplexity_url",
+                   default=DEFAULT_PERPLEXITY_URL)
+        or DEFAULT_PERPLEXITY_URL
+    ).strip()
+    model = str(
+        _cfg_value(cfg, "intent", "perplexity_model",
+                   default=DEFAULT_PERPLEXITY_MODEL)
+        or DEFAULT_PERPLEXITY_MODEL
+    ).strip()
+    return key, endpoint, model
+
+
+def _build_perplexity_prompt(inputs: tuple[ResearchInput, ...]) -> str:
+    question = ""
+    material: list[str] = []
+    for item in inputs:
+        meta = dict(item.metadata or {})
+        text = str(
+            meta.get("text") or meta.get("transcript") or ""
+        ).strip()
+        if meta.get("query") or meta.get("role") == "query":
+            question = question or text or item.locator
+        elif not question and item.kind == "note" and not text:
+            question = item.locator
+        label = item.title or item.locator
+        if text:
+            material.append(
+                f"- {item.kind}: {label}\n  excerpt: {text[:1200]}"
+            )
+        else:
+            material.append(f"- {item.kind}: {label}")
+    if not question:
+        question = (
+            "Assess the idea or material supplied for this War Room session."
+        )
+    lines = [
+        "You are the War Room research analyst. Answer the research question"
+        " using current, verifiable web sources.",
+        "Return a concise answer in complete sentences. Cite the web source"
+        " for every factual sentence with bracketed numbers like [1].",
+        "Every statement of fact must be backed by a cited URL. If you cannot"
+        " source a claim, state it as an inference instead of a fact.",
+        f"Research question: {question}",
+    ]
+    if material:
+        lines.append("Material supplied by the operator:")
+        lines.extend(material)
+    return "\n".join(lines)
+
+
+def _answer_text(payload: Mapping[str, Any]) -> str:
+    choices = payload.get("choices")
+    if isinstance(choices, list) and choices:
+        first = choices[0]
+        message = first.get("message") if isinstance(first, Mapping) else None
+        if isinstance(message, Mapping):
+            content = message.get("content")
+            if isinstance(content, str):
+                return content
+            if isinstance(content, list):
+                parts: list[str] = []
+                for part in content:
+                    if isinstance(part, Mapping):
+                        text = part.get("text")
+                        if isinstance(text, str):
+                            parts.append(text)
+                    elif isinstance(part, str):
+                        parts.append(part)
+                if parts:
+                    return "".join(parts)
+    for key in ("answer", "output_text", "text"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value
+    return ""
+
+
+def _citation_entries(payload: Mapping[str, Any]) -> list[dict[str, str]]:
+    entries: list[dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add(url: Any, title: Any = "", text: Any = "") -> None:
+        clean = str(url or "").strip()
+        if not clean or clean in seen:
+            return
+        if not clean.startswith(("http://", "https://")):
+            return
+        seen.add(clean)
+        entries.append(
+            {
+                "url": clean,
+                "title": str(title or "")[:300],
+                "text": str(text or "")[:2000],
+            }
+        )
+
+    citations = payload.get("citations")
+    if isinstance(citations, list):
+        for item in citations:
+            if isinstance(item, str):
+                add(item)
+            elif isinstance(item, Mapping):
+                add(item.get("url"), item.get("title"),
+                    item.get("text") or item.get("snippet"))
+    results = payload.get("search_results")
+    if isinstance(results, list):
+        for item in results:
+            if isinstance(item, Mapping):
+                add(item.get("url"), item.get("title"),
+                    item.get("text") or item.get("snippet")
+                    or item.get("date"))
+    return entries
+
+
+def _split_sentences(text: str) -> list[str]:
+    parts = re.split(r"(?<=[.!?])\s+", text.strip())
+    return [part.strip() for part in parts if part.strip()]
+
+
+def _claims_from_answer(
+    answer: str, sources: tuple[ResearchSource, ...]
+) -> tuple[ResearchClaim, ...]:
+    digests = [source.digest for source in sources]
+    claims: list[ResearchClaim] = []
+    for sentence in _split_sentences(answer)[:12]:
+        markers = sorted({int(item) for item in _CITATION_MARKER.findall(sentence)})
+        cited = tuple(
+            digests[index - 1]
+            for index in markers
+            if 1 <= index <= len(digests)
+        )
+        clean = _CITATION_MARKER.sub("", sentence)
+        clean = re.sub(r"\s{2,}", " ", clean).strip()
+        if not clean:
+            continue
+        if cited:
+            claims.append(
+                ResearchClaim(
+                    label="FACT",
+                    claim=clean,
+                    source_digests=cited,
+                    rationale="the answer cites the matched source URL",
+                )
+            )
+        else:
+            claims.append(
+                ResearchClaim(
+                    label="INFERENCE",
+                    claim=clean,
+                    source_digests=tuple(digests),
+                    rationale=(
+                        "the answer did not cite a specific source for this"
+                        " sentence"
+                    ),
+                )
+            )
+    if not claims:
+        claims.append(
+            ResearchClaim(
+                label="UNKNOWN",
+                claim=answer[:2000],
+                rationale="the provider returned no discrete sentence",
+            )
+        )
+    return tuple(claims)
+
+
+def _scrub_secret(value: Any, secret: str) -> str:
+    text = str(value)
+    if secret:
+        text = text.replace(secret, "***REDACTED***")
+    return str(redact(text))
+
+
+def _http_post_json(
+    request: PerplexityRequest, headers: Mapping[str, str]
+) -> Mapping[str, Any]:
+    """The shipped transport. Only called when a real provider is configured."""
+    body = json.dumps(request.payload()).encode("utf-8")
+    http_request = urllib.request.Request(
+        request.url, data=body, headers=dict(headers), method="POST"
+    )
+    try:
+        with urllib.request.urlopen(
+            http_request, timeout=request.timeout_s
+        ) as response:
+            raw = response.read(2_000_000)
+    except urllib.error.HTTPError as exc:
+        # The response body is never echoed: it can contain the key hint or
+        # provider account metadata, and the status is enough to act on.
+        raise RuntimeError(f"HTTP {exc.code} from the Perplexity endpoint") from None
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"network error: {exc.reason}") from None
+    except OSError as exc:
+        raise RuntimeError(f"transport error: {exc}") from None
+    try:
+        decoded = json.loads(raw.decode("utf-8", "replace"))
+    except ValueError:
+        raise RuntimeError("Perplexity returned invalid JSON") from None
+    if not isinstance(decoded, Mapping):
+        raise RuntimeError("Perplexity returned a non-object response")
+    return decoded
+
+
+class PerplexityResearchProvider:
+    """Real, optional Perplexity research behind an injected transport.
+
+    No request is made until :meth:`research` is called *and* a key is
+    configured. Tests pass a fake ``transport``; the shipped
+    :func:`_http_post_json` is only used when the operator configured
+    ``PERPLEXITY_API_KEY``. The API key travels only in the ``Authorization``
+    header and is scrubbed from every error string.
+    """
+
+    provider_id = PERPLEXITY_PROVIDER_ID
+
+    def __init__(
+        self,
+        *,
+        api_key: str = "",
+        endpoint: str = DEFAULT_PERPLEXITY_URL,
+        model: str = DEFAULT_PERPLEXITY_MODEL,
+        transport: PerplexityTransport | None = None,
+        timeout_s: float = DEFAULT_PERPLEXITY_TIMEOUT_S,
+    ) -> None:
+        self._api_key = str(api_key or "").strip()
+        self.endpoint = str(endpoint or DEFAULT_PERPLEXITY_URL).strip()
+        self.model = str(model or DEFAULT_PERPLEXITY_MODEL).strip()
+        self._transport = transport
+        self.timeout_s = float(timeout_s)
+
+    @classmethod
+    def from_config(
+        cls,
+        cfg: Any = None,
+        *,
+        transport: PerplexityTransport | None = None,
+        environ: Mapping[str, str] | None = None,
+    ) -> "PerplexityResearchProvider":
+        key, endpoint, model = perplexity_settings(cfg, environ=environ)
+        return cls(
+            api_key=key,
+            endpoint=endpoint,
+            model=model,
+            transport=transport,
+        )
+
+    @property
+    def configured(self) -> bool:
+        return bool(self._api_key)
+
+    def research(self, inputs: list[ResearchInput]) -> ResearchResult:
+        clean_inputs = tuple(item.normalised() for item in inputs)
+        if not clean_inputs:
+            raise BusinessError(
+                BAD_INPUT_CODE, "research needs at least one input"
+            )
+        if not self._api_key:
+            raise BusinessError(
+                RESEARCH_NOT_CONFIGURED_CODE,
+                "PERPLEXITY_API_KEY is not configured; add it to the"
+                " VoiceBridge .env or set intent.perplexity_enabled and a key"
+                " before running Perplexity research",
+            )
+        request = PerplexityRequest(
+            url=self.endpoint,
+            model=self.model,
+            prompt=_build_perplexity_prompt(clean_inputs),
+            inputs=clean_inputs,
+            timeout_s=self.timeout_s,
+        )
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        transport = self._transport or _http_post_json
+        try:
+            payload = transport(request, headers)
+        except BusinessError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - external seam
+            detail = _scrub_secret(
+                f"Perplexity research request failed: "
+                f"{type(exc).__name__}: {str(exc)[:200]}",
+                self._api_key,
+            )
+            raise BusinessError(RESEARCH_FAILED_CODE, detail) from None
+        return _perplexity_result(clean_inputs, payload, self._api_key)
+
+
+def _perplexity_result(
+    inputs: tuple[ResearchInput, ...],
+    payload: Any,
+    api_key: str,
+) -> ResearchResult:
+    if not isinstance(payload, Mapping):
+        raise BusinessError(
+            RESEARCH_FAILED_CODE,
+            "Perplexity returned a non-object response",
+        )
+    error = payload.get("error")
+    if error:
+        if isinstance(error, Mapping):
+            error = error.get("message") or error.get("detail") or error
+        raise BusinessError(
+            RESEARCH_FAILED_CODE,
+            _scrub_secret(f"Perplexity returned an error: {error}", api_key),
+        )
+    answer = _answer_text(payload).strip()
+    if not answer:
+        raise BusinessError(
+            RESEARCH_FAILED_CODE, "Perplexity returned no answer text"
+        )
+    sources = tuple(
+        ResearchSource(
+            kind="url",
+            locator=entry["url"],
+            title=entry["title"] or entry["url"][:120],
+            text=entry["text"] or answer,
+            digest=_digest(f"{PERPLEXITY_PROVIDER_ID}\0{entry['url']}"),
+            adapter=PERPLEXITY_PROVIDER_ID,
+        )
+        for entry in _citation_entries(payload)
+    )
+    return ResearchResult(
+        provider=PERPLEXITY_PROVIDER_ID,
+        inputs=inputs,
+        sources=sources,
+        claims=_claims_from_answer(answer, sources),
+    )
+
+
 class UnavailableResearchProvider:
     """A provider that is deliberately absent, for typed-refusal paths."""
 
@@ -269,22 +737,35 @@ class UnavailableResearchProvider:
         )
 
 
-def resolve_provider(name: str | None = None) -> ResearchProvider:
+def resolve_provider(
+    name: str | None = None,
+    *,
+    cfg: Any = None,
+    transport: PerplexityTransport | None = None,
+    environ: Mapping[str, str] | None = None,
+) -> ResearchProvider:
     """Resolve a provider by name. The local deterministic adapter is default.
 
-    ``remote`` resolves to the disabled seam (a typed ``not_configured``
-    refusal); anything unknown is a typed ``unavailable`` refusal. No name
-    reads an environment variable or performs I/O.
+    ``perplexity`` resolves to the real provider, configured from the passed
+    config/environment; without a key it is constructed but refuses with a
+    typed ``not_configured`` when called. ``remote`` resolves to the disabled
+    generic seam. Anything unknown is a typed ``unavailable`` refusal. Only
+    the Perplexity resolver reads a key, and it never logs it.
     """
     requested = (name or LOCAL_PROVIDER_ID).strip().lower()
     if requested in ("", LOCAL_PROVIDER_ID, "local"):
         return LocalResearchProvider()
+    if requested in (PERPLEXITY_PROVIDER_ID, "real-perplexity", "pplx"):
+        return PerplexityResearchProvider.from_config(
+            cfg, transport=transport, environ=environ
+        )
     if requested in (REMOTE_PROVIDER_ID, "real"):
         return RemoteResearchProvider()
     raise BusinessError(
         RESEARCH_UNAVAILABLE_CODE,
         f"unknown research provider {name!r}; expected "
-        f"{LOCAL_PROVIDER_ID!r} or {REMOTE_PROVIDER_ID!r}",
+        f"{LOCAL_PROVIDER_ID!r}, {PERPLEXITY_PROVIDER_ID!r} or "
+        f"{REMOTE_PROVIDER_ID!r}",
     )
 
 
@@ -353,10 +834,17 @@ def _claims_for(item: ResearchInput, digest: str) -> list[ResearchClaim]:
 
 
 __all__ = [
+    "DEFAULT_PERPLEXITY_MODEL",
+    "DEFAULT_PERPLEXITY_TIMEOUT_S",
+    "DEFAULT_PERPLEXITY_URL",
     "LOCAL_PROVIDER_ID",
+    "PERPLEXITY_PROVIDER_ID",
     "REMOTE_PROVIDER_ID",
     "RESEARCH_KINDS",
     "LocalResearchProvider",
+    "PerplexityRequest",
+    "PerplexityResearchProvider",
+    "PerplexityTransport",
     "RemoteResearchProvider",
     "ResearchClaim",
     "ResearchInput",
@@ -364,5 +852,6 @@ __all__ = [
     "ResearchResult",
     "ResearchSource",
     "UnavailableResearchProvider",
+    "perplexity_settings",
     "resolve_provider",
 ]

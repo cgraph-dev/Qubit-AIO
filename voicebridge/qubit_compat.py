@@ -12100,6 +12100,10 @@ _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/sources",
    "h_business_warroom_source_add")
 _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/evidence",
    "h_business_warroom_evidence_add")
+# Owner-gated, idempotent research run. Appends the provider's source URLs and
+# labelled claims only; no decision, task, approval, publish, spend or contact.
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/research",
+   "h_business_warroom_research")
 _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/arguments",
    "h_business_warroom_argument_add")
 _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/decisions",
@@ -21730,7 +21734,8 @@ for _name in (
     "h_business_roles",
     "h_business_floors", "h_business_warroom_list", "h_business_warroom_create",
     "h_business_warroom_get", "h_business_warroom_source_add",
-    "h_business_warroom_evidence_add", "h_business_warroom_argument_add",
+    "h_business_warroom_evidence_add", "h_business_warroom_research",
+    "h_business_warroom_argument_add",
     "h_business_warroom_decide", "h_business_warroom_tasks_create",
     "h_business_warroom_etsy_pilot",
     "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",

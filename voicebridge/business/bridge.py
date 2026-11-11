@@ -34,6 +34,7 @@ from ..office.world import model as WORLD
 from . import agents as AGENTS
 from . import office_seats as OFFICE_SEATS
 from . import pilot as ETSY_PILOT
+from . import research_run as RESEARCH_RUN
 from . import warroom as WARROOM
 from .errors import BusinessError
 from .roles import RoleRegistry, RoleRegistryError
@@ -743,6 +744,48 @@ def h_business_warroom_etsy_pilot(cfg: Any, q: Dict[str, str],
         return _error(exc)
 
 
+def h_business_warroom_research(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any], p: Dict[str, str]
+                                ) -> Tuple[int, Dict[str, Any]]:
+    """POST /.../warroom/sessions/<id>/research -> cited sources + evidence.
+
+    Owner-gated and idempotent per session+query. It appends the provider's
+    source URLs and labelled claims only; it never records a decision, creates a
+    task, requests an approval, publishes, spends or contacts anyone.
+    """
+    if not _owner_ok(b):
+        return _owner_refusal("running War Room research")
+    try:
+        store = _store(cfg)
+        tenant = _tenant(store, q, b)
+        session_id = _text((p or {}).get("id"), "session id", max_len=80)
+        provider = b.get("provider")
+        if provider is not None and not isinstance(provider, str):
+            raise BusinessError(
+                "BUSINESS_BAD_INPUT", "provider must be a string when supplied"
+            )
+        raw_inputs = b.get("inputs")
+        if raw_inputs is not None and not isinstance(raw_inputs, list):
+            raise BusinessError("BUSINESS_BAD_INPUT", "inputs must be a list")
+        result = RESEARCH_RUN.run_research(
+            store,
+            tenant_id=tenant,
+            session_id=session_id,
+            query=_optional_text(b.get("query"), max_len=2000) or "",
+            inputs=raw_inputs,
+            provider=(provider or "perplexity").strip() or "perplexity",
+            cfg=cfg,
+        )
+        return _ok(
+            schema="qubit-office-business-warroom-research/1",
+            **_asdict(result),
+            source_ids=list(result.source_ids),
+            evidence_ids=list(result.evidence_ids),
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
 # ---------------------------------------------------------------------------
 # Agent controls
 # ---------------------------------------------------------------------------
@@ -903,6 +946,7 @@ __all__ = [
     "h_business_warroom_evidence_add",
     "h_business_warroom_get",
     "h_business_warroom_list",
+    "h_business_warroom_research",
     "h_business_warroom_source_add",
     "h_business_warroom_tasks_create",
     "h_world_tower",
