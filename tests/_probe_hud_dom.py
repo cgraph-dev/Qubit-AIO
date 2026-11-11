@@ -139,8 +139,13 @@ def main() -> int:
     stg = REPO / "frontend/qubit-web" / ".hud-domcheck.mjs"
     mod = (REPO / "frontend/qubit-app/plugins/qubit-office/game/ui"
            / "hud-panel.mjs")
-    stg.write_text(src.read_text(encoding="utf-8"))
-    mod.write_text(compiled.read_text())
+    # `hud-panel.mjs` is the check's import target. It is NOT tracked, but it
+    # lives in the owner's live edit tree: if the owner already has one, the
+    # unconditional `unlink` below would DELETE it. Never destroy a file we did
+    # not create — keep the bytes and put them back in `finally`.
+    _preexisting = mod.read_bytes() if mod.is_file() else None
+    stg.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+    mod.write_text(compiled.read_text(encoding="utf-8"), encoding="utf-8")
     try:
         env = dict(os.environ)
         env["HUD_DOCK_DIR"] = str(src.parent)
@@ -149,7 +154,10 @@ def main() -> int:
                            env=env, text=True, capture_output=True, timeout=300)
     finally:
         stg.unlink(missing_ok=True)
-        mod.unlink(missing_ok=True)
+        if _preexisting is None:
+            mod.unlink(missing_ok=True)
+        else:
+            mod.write_bytes(_preexisting)
     print(p.stdout)
     if p.stderr.strip():
         print("--- stderr ---")
