@@ -49,7 +49,12 @@ def test_install_sh_launcher_has_no_stale_targets():
     # the installer exposes the repair mode and delegates to the console script
     assert "--launcher-only" in text
     assert "QUBIT_REPO" in text
-    assert "__QUBIT_REPO__" in text
+    # The install-time placeholder is the venv bin dir, not the repo root:
+    # 0423f1e3d moved the launcher onto the console script so a --prefix
+    # install still delegates to $QUBIT_HOME/.venv/bin/qubit.  Asserted
+    # unexpanded (does NOT hold), so a half-rename would fail here.
+    assert "__QUBIT_VENV_BIN__" in text
+    assert "__QUBIT_REPO__" not in text
     assert ".venv/bin/qubit" in text
     # a normal install wires the launcher in (opt-out only via env)
     assert "install_launcher" in text
@@ -59,9 +64,23 @@ def test_install_sh_launcher_has_no_stale_targets():
 def test_rendered_launcher_points_at_the_authoritative_checkout(tmp_path):
     target = _render(tmp_path)
     text = target.read_text(encoding="utf-8")
-    # the install-time placeholder is fully resolved to THIS checkout
-    assert "__QUBIT_REPO__" not in text
-    assert str(REPO) in text
+    # the install-time placeholder is fully resolved to a real console script
+    for placeholder in ("__QUBIT_VENV_BIN__", "__QUBIT_HOME_PIN__",
+                        "__QUBIT_REPO__"):
+        assert placeholder not in text, placeholder
+    # the baked target must be this checkout's venv ...
+    baked = REPO / ".venv" / "bin" / "qubit"
+    assert str(baked) in text or str(baked.parent) in text
+    # ... and the shim must actually resolve to it.  The baking branch wins over
+    # PATH discovery, so a PATH-free shell proves the baked path is what runs.
+    env = {"PATH": "/usr/bin:/bin", "HOME": str(tmp_path / "home")}
+    env.pop("QUBIT_REPO", None)
+    r = subprocess.run(
+        ["bash", "-c", 'source <(sed -n "/^repo_for()/,/^}/p" "$1"); '
+                       'repo_for', "_", str(target)],
+        capture_output=True, text=True, env=env, timeout=60)
+    assert r.returncode == 0, r.stderr
+    assert str(baked.parent) in r.stdout.strip(), r.stdout
     for marker in STALE_MARKERS:
         assert marker not in text, f"rendered launcher still references {marker}"
     assert os.access(target, os.X_OK)
