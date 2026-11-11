@@ -1,7 +1,7 @@
 # Qubit Office — Master Plan
 
-**Status:** planning baseline. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete.
-**Execution mode:** PLAN ONLY. No implementation agents, code changes, deployments or live-service changes are authorized until the owner signs this plan off.
+**Status:** planning baseline plus wave-1/wave-2 implementation in isolated worktrees. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete or deployed.
+**Execution mode:** implementation is underway in isolated worktrees; main/live deployment still requires explicit owner action. No `VERIFIED` claim.
 **Scope:** Qubit Office (the campus/office product) + Qubit Business OS (the durable business-operations layer).
 **Rule:** the world is complete from day one; only active businesses/rooms are simulated. Business truth lives in systems of record, never in the renderer.
 
@@ -949,3 +949,19 @@ Evidence labels: FACT / INFERENCE / ASSUMPTION / UNKNOWN; source artifacts; diss
 - **D. Platform integration + Etsy pilot** — official API/dry-run adapters for Etsy/social/CRM/email, platform-policy gates, approval/rate-limit handling, Etsy playbook; no credentials/network/live actions.
 
 Each lane owns its worktree; no main/live/paid art/fake success; focused tests; commit; report blockers.
+
+
+---
+
+## 37. Wave-2 implementation results
+
+Landed on `integration/qoffice-wave1` from `61cc97bff`; not merged to `main`, not deployed, not live-verified.
+
+- **War Room / Idea Lab:** `c8ed98cb9`, tests `705f0ec8b`; schema v2, six source kinds, evidence labels, 13 debate roles, dissent, owner-only decisions, approval-gated task creation, offline adapters. 18 tests.
+- **Role/capability registry:** `c57612c14`; 22 departments, **132 roles**, 100 floor/wing templates (22 active, 78 dormant), 5 wings, validation for permissions/approvals/autonomy. 27 tests.
+- **Agent controls:** `194fdbe57`, tests `5d73e5f59`; durable `bos_agent`/turn/usage/operation tables, model/provider/reasoning/fallback, explicit permissions, budgets/rate limits, autonomy L0–L5, approvals, pause/resume/stop/takeover/revoke/archive, append-only audit. 34 tests.
+- **Etsy + platform policy:** `fa9272426`, `d9af53f29`, `0fa4d5113`; policy registry for Etsy/X/Meta/LinkedIn/TikTok/YouTube/Pinterest/Reddit/email/web/CRM, dry-run Etsy/social/CRM/email adapters, approval/rate/idempotency gates, Etsy pilot playbook, docs. 81 tests.
+
+**Combined verification:** 274 Python tests passed across BOS, War Room, roles, agent controls, platform policy, Etsy/social/CRM/email, world/room-style, asset catalog, office business and Qubit Office brand. Ruff/compile/diff checks passed. No real credentials, network calls, paid art, live service restart, or main merge.
+
+**Still not done:** UI wiring for War Room/roles/agent controls, ToolGateway executors for adapters, real platform apps/OAuth (Etsy/X/Meta/LinkedIn/TikTok/YouTube), pilot niche/product selection, office floor/room instantiation beyond templates, 100/500/1,000-agent load tests, main merge, deployment, and the final full matrix.
