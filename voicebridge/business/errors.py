@@ -24,6 +24,11 @@ WARROOM_OWNER_ONLY_CODE = "BUSINESS_WARROOM_OWNER_ONLY"
 WARROOM_UNVERIFIED_FACT_CODE = "BUSINESS_WARROOM_UNVERIFIED_FACT"
 WARROOM_ADAPTER_UNAVAILABLE_CODE = "BUSINESS_WARROOM_ADAPTER_UNAVAILABLE"
 WARROOM_ADAPTER_FAILED_CODE = "BUSINESS_WARROOM_ADAPTER_FAILED"
+# Research-provider seam. ``UNAVAILABLE`` means no provider implements the
+# requested kind; ``NOT_CONFIGURED`` means the real provider seam exists but is
+# disabled (the default). Neither implies a successful, empty result.
+RESEARCH_UNAVAILABLE_CODE = "BUSINESS_RESEARCH_UNAVAILABLE"
+RESEARCH_NOT_CONFIGURED_CODE = "BUSINESS_RESEARCH_NOT_CONFIGURED"
 
 # Agent control plane. These are separate from the generic business codes so a
 # UI can tell "the agent is archived" from "the tenant is wrong".
