@@ -404,10 +404,30 @@ def test_the_driver_is_cron_shaped_never_a_thread_or_a_busy_loop():
         assert banned not in driver, f"the driver is not cron-shaped: {banned}"
 
     # every office module, not just this one (L1's acceptance check #6)
+    #
+    # The banned constructs are the ones that make a module a resident worker:
+    # a thread, a scheduled task, or an UNBOUNDED loop. A `while True:` that
+    # always breaks is a bounded loop, not a busy loop -- theme_cli.py's zip
+    # streaming copy (`while True: chunk = source.read(...)` / `if not chunk:
+    # break`) is the honest idiom for "read until EOF" and tripped a plain
+    # substring check. Judge the loop's SHAPE instead: a `while True` with no
+    # `break` anywhere in its body is the actual defect.
     for path in (REPO / "voicebridge" / "office").glob("*.py"):
         text = code_only(path)
-        for banned in ("threading.Thread", "asyncio.create_task", "while True"):
+        for banned in ("threading.Thread", "asyncio.create_task"):
             assert banned not in text, f"{path.name} is not cron-shaped: {banned}"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.While):
+                continue
+            test = node.test
+            if not (isinstance(test, ast.Constant) and test.value is True):
+                continue
+            has_break = any(isinstance(inner, ast.Break)
+                            for inner in ast.walk(node))
+            assert has_break, (
+                f"{path.name}:{node.lineno} has an unbounded `while True` with "
+                f"no break -- not cron-shaped")
 
 
 # ===========================================================================
