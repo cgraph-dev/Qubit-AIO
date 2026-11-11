@@ -188,6 +188,10 @@ def _wrap_command_script(
     parts += restore
     parts += [
         'export AI_AGENT="${AI_AGENT:-hermes-agent}" HERMES_AGENT="${HERMES_AGENT:-true}"',
+        # Marker read by qubit_state's live-write tripwire: this shell (and every
+        # command it spawns) is an agent subprocess, so a WRITE to the operator's
+        # live state.db must be refused even if the child rebuilds its env.
+        'export QUBIT_AGENT_SUBPROCESS=1',
         'export GIT_PAGER="${GIT_PAGER:-cat}" PAGER="${PAGER:-cat}"',
         # ``--`` keeps hyphen-prefixed directory names from being parsed as options.
         f"builtin cd -- {quoted_cwd} || exit 126",

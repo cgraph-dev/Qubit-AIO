@@ -29,9 +29,14 @@ Non-negotiables enforced in code:
 
 Run::
 
-    python scripts/route_e2e_audit.py                 # full audit
+    python scripts/route_e2e_audit.py                 # reads only (safe default)
     python scripts/route_e2e_audit.py --read-only     # reads only, no mutations
+    python scripts/route_e2e_audit.py --allow-live-mutations   # include mutations
     python scripts/route_e2e_audit.py --check         # determinism check
+
+Mutations are OFF by default, matching ``scripts/controls_e2e_audit.py``: the
+2026-11-10 incident showed an accidental run deleting live profile/webhook
+records. Pass ``--allow-live-mutations`` explicitly to exercise them.
 
 The artifact is written to ``docs/generated/QUBIT_ROUTE_E2E_2026-09-23.json``.
 ``docs/archive/`` is historical-only and is never an input or output here.
@@ -49,7 +54,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 REPO = Path(__file__).resolve().parents[1]
 INVENTORY = REPO / "docs/generated/parity_inventory.json"
@@ -621,7 +626,7 @@ def _service_staleness() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
-def run_audit(base: str = DEFAULT_BASE, read_only: bool = False,
+def run_audit(base: str = DEFAULT_BASE, read_only: bool = True,
               timeout: float = 20.0) -> Dict[str, Any]:
     base = validate_target(base)
     token = scrape_token(base)
@@ -704,12 +709,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--base", default=DEFAULT_BASE)
     ap.add_argument("--out", default=str(OUT))
     ap.add_argument("--read-only", action="store_true")
+    ap.add_argument("--allow-live-mutations", action="store_true",
+                    help="exercise the mutating route subset (OFF by default; "
+                         "the 2026-11-10 incident deleted live profile records)")
     ap.add_argument("--check", action="store_true",
                     help="compare the stored stable_digest (no write)")
     ap.add_argument("--timeout", type=float, default=20.0)
     args = ap.parse_args(argv)
 
-    doc = run_audit(args.base, read_only=args.read_only, timeout=args.timeout)
+    read_only = args.read_only or not args.allow_live_mutations
+    if read_only and not args.read_only:
+        print("mutations skipped (pass --allow-live-mutations to exercise them)",
+              file=sys.stderr)
+    doc = run_audit(args.base, read_only=read_only, timeout=args.timeout)
     out = Path(args.out)
     if args.check:
         if not out.is_file():

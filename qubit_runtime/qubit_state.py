@@ -47,7 +47,7 @@ from qubit_state_errors import (
 )
 from qubit_state_guard import (
     _STATE_DB_GUARD_BYPASS_ENV, _in_test_context, _is_production_state_db, _real_platform_state_root,
-    _legacy_platform_state_root,
+    _legacy_platform_state_root, _in_agent_subprocess, _looks_like_live_service, LiveStateDbWriteRefused,
     _register_test_instance, _set_last_init_error, get_last_init_error,
 )
 from qubit_state_readpool import _READ_POOL_MAX, _proc_fd_targets, _read_budget_for
@@ -213,6 +213,47 @@ def _default_db_path() -> Path:
 # and ``_EXTRA_DENY_ROOTS`` (the pre-sandbox root, so custom-QUBIT_HOME deployments are covered).
 _STATE_DB_GUARD_BYPASS = False
 _STATE_DB_GUARD_EXTRA_DENY_ROOTS: Tuple[Path, ...] = ()
+
+
+def _ensure_live_write_allowed(db_path: Path) -> None:
+    """Refuse a WRITE to a production state.db from a test/agent subprocess.
+
+    Narrower than :func:`_ensure_test_isolation` (which refuses all opens): this
+    tripwire only fires for writable opens, so a read-only audit may still read
+    the live store. It closes the remaining env-rebuild hole — a child that lost
+    ``PYTEST_*``/``QUBIT_HOME`` but descends from a test or an agent harness —
+    using the marker the shell wrapper exports into the child env plus process
+    ancestry, which survives a child's own env rebuild.
+
+    The live service and a user's normal CLI are exempt (no test/agent signal),
+    as is the sanctioned ``HERMES_STATE_DB_GUARD_BYPASS`` escape hatch.
+    """
+    if _STATE_DB_GUARD_BYPASS or os.environ.get(_STATE_DB_GUARD_BYPASS_ENV):
+        return
+    if not (_in_test_context() or _in_agent_subprocess()):
+        return
+    if _looks_like_live_service():
+        return
+    try:
+        resolved = Path(db_path).expanduser().resolve()
+    except Exception:
+        return
+    roots = [r for r in (_real_platform_state_root(), _legacy_platform_state_root()) if r is not None]
+    for extra in _STATE_DB_GUARD_EXTRA_DENY_ROOTS:
+        try:
+            roots.append(Path(extra).expanduser().resolve())
+        except Exception:
+            continue
+    for root in roots:
+        if _is_production_state_db(resolved, root):
+            raise LiveStateDbWriteRefused(
+                "live-system guard: refusing a WRITE to the production "
+                f"state.db at {resolved} (under real Qubit root {root}) from a "
+                "test/agent subprocess. Reads are still allowed; tests must use "
+                "a temporary QUBIT_HOME. A spawned child that genuinely needs the "
+                f"live store must export {_STATE_DB_GUARD_BYPASS_ENV}=1.",
+                path=resolved, root=root,
+            )
 
 
 def _ensure_test_isolation(db_path: Path) -> None:
@@ -590,6 +631,11 @@ class SessionDB(
 
     def __init__(self, db_path: Path | None = None, read_only: bool = False):
         self.db_path = db_path or _default_db_path()
+        if not read_only:
+            # Writes from a test/agent subprocess are refused before the broader
+            # read guard below so callers get the typed write refusal; reads keep
+            # the historical all-open isolation guard.
+            _ensure_live_write_allowed(self.db_path)
         _ensure_test_isolation(self.db_path)  # before any connection/pragma/mkdir
         self.read_only = read_only
         # Keep only the opening call site, never a frame (which pins caller locals).

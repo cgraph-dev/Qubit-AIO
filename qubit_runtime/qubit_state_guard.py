@@ -60,6 +60,12 @@ def _platform_state_root_for(dir_name: str, win_name: str) -> Optional[Path]:
 # while carrying it is, by : definition, an isolation escape (#82770).
 _TEST_ISOLATION_MARKER_ENV = "HERMES_TEST_ISOLATION"
 
+#: The root ``tests/conftest.py`` marker. Kept separate from
+#: ``HERMES_TEST_ISOLATION`` because that name also flips strict wire-contract
+#: validation (``tui_gateway.contracts.registry.STRICT``); the root suite must
+#: not silently change contract strictness. Both count as test context here.
+_ROOT_TEST_ISOLATION_MARKER_ENV = "QUBIT_TEST_ISOLATION"
+
 
 def _running_under_pytest() -> bool:
     """True when this process (or a parent test process) is a pytest run."""
@@ -67,7 +73,94 @@ def _running_under_pytest() -> bool:
         os.environ.get("PYTEST_CURRENT_TEST")
         or os.environ.get("PYTEST_VERSION")
         or os.environ.get(_TEST_ISOLATION_MARKER_ENV)
+        or os.environ.get(_ROOT_TEST_ISOLATION_MARKER_ENV)
     )
+
+
+class _ProcAncestor:
+    """Minimal psutil-like ancestor used when psutil is unavailable (Linux /proc)."""
+
+    __slots__ = ("pid",)
+
+    def __init__(self, pid: int) -> None:
+        self.pid = pid
+
+    def cmdline(self) -> list:
+        try:
+            with open(f"/proc/{self.pid}/cmdline", "rb") as fh:
+                raw = fh.read()
+        except Exception:
+            return []
+        return [part.decode("utf-8", "replace") for part in raw.split(b"\0") if part]
+
+    def environ(self) -> dict:
+        try:
+            with open(f"/proc/{self.pid}/environ", "rb") as fh:
+                raw = fh.read()
+        except Exception:
+            return {}
+        env: dict = {}
+        for item in raw.split(b"\0"):
+            if b"=" in item:
+                key, value = item.split(b"=", 1)
+                env[key.decode("utf-8", "replace")] = value.decode("utf-8", "replace")
+        return env
+
+
+def _proc_ppid(pid: int) -> int:
+    """Parent pid from ``/proc/<pid>/stat`` (field 4; ``comm`` may contain spaces/parens)."""
+    try:
+        with open(f"/proc/{pid}/stat", "rb") as fh:
+            data = fh.read()
+        rest = data.rsplit(b")", 1)[1].split()
+        return int(rest[1])
+    except Exception:
+        return 0
+
+
+def _iter_ancestors():
+    """Yield ancestor processes nearest-first. psutil when present; Linux ``/proc`` fallback.
+
+    Ancestry is the one test/agent signal that survives a child's rebuilt environment
+    (``PYTEST_*``, ``QUBIT_HOME`` and harness markers all live in the same env carrier and
+    are lost together — #82770). The ``/proc`` path keeps that signal available on hosts
+    without psutil instead of silently failing open.
+    """
+    if psutil is not None:
+        try:
+            yield from psutil.Process().parents()
+            return
+        except Exception:
+            return
+    pid, seen = os.getpid(), {os.getpid()}
+    while True:
+        ppid = _proc_ppid(pid)
+        if not ppid or ppid in seen:
+            return
+        seen.add(ppid)
+        yield _ProcAncestor(ppid)
+        pid = ppid
+
+
+def _current_cmdline() -> list:
+    """This process's argv (psutil, Linux /proc, then ``sys.argv``)."""
+    if psutil is not None:
+        try:
+            return list(psutil.Process().cmdline() or [])
+        except Exception:
+            pass
+    try:
+        with open("/proc/self/cmdline", "rb") as fh:
+            return [part.decode("utf-8", "replace") for part in fh.read().split(b"\0") if part]
+    except Exception:
+        return list(sys.argv)
+
+
+def _argv_basename(arg: Any) -> str:
+    try:
+        return str(arg).strip('"').strip("'").replace("\\", "/").rsplit("/", 1)[-1].lower()
+    except Exception:
+        return ""
 
 
 #: pytest launcher names, matched against each argv token's *basename* so
@@ -85,21 +178,15 @@ def _process_looks_like_pytest(proc: Any) -> bool:
         cmdline = proc.cmdline() or []
     except Exception:
         return False
-    for arg in cmdline:
-        try:
-            # Split on both separators on every host so the answer is platform-independent.
-            name = str(arg).strip('"').strip("'").replace("\\", "/").rsplit("/", 1)[-1].lower()
-        except Exception:
-            continue
-        if name in _PYTEST_LAUNCHER_NAMES:
-            return True
-    return False
+    # Split on both separators on every host so the answer is platform-independent.
+    return any(_argv_basename(arg) in _PYTEST_LAUNCHER_NAMES for arg in cmdline)
 
 
 def _has_pytest_ancestor() -> bool:
     """True when an ancestor process is a pytest run: a child spawned with a
     rebuilt env loses PYTEST_* and the QUBIT_HOME redirect together, ancestry
-    survives that. Fails open without psutil / on walk errors.
+    survives that. Uses psutil when present, Linux ``/proc`` otherwise; fails
+    open only when neither can be read.
 
     ``_running_under_pytest`` reads ``PYTEST_*`` env vars, which a child spawned with a rebuilt environment
     loses at the same moment it loses the ``QUBIT_HOME`` redirect: that child aims at the production DB
@@ -109,12 +196,10 @@ def _has_pytest_ancestor() -> bool:
     global _PYTEST_ANCESTOR
     if _PYTEST_ANCESTOR is not None:
         return _PYTEST_ANCESTOR
-    found = False
-    if psutil is not None:
-        try:
-            found = any(_process_looks_like_pytest(p) for p in psutil.Process().parents())
-        except Exception:
-            found = False
+    try:
+        found = any(_process_looks_like_pytest(p) for p in _iter_ancestors())
+    except Exception:
+        found = False
     _PYTEST_ANCESTOR = found
     return found
 
@@ -122,6 +207,123 @@ def _has_pytest_ancestor() -> bool:
 def _in_test_context() -> bool:
     """Test run by environment or ancestry (memoised; env checked first)."""
     return _running_under_pytest() or _has_pytest_ancestor()
+
+
+# --- Agent-subprocess signal -------------------------------------------------
+# A test/agent subprocess may open the live ``state.db`` directly (a shell tool
+# command, a spawned audit, a worker) even though it is not the live service.
+# Writes from that shape are refused (reads stay allowed) so a rebuilt child env
+# cannot mutate the operator's store (#2026-11-10 profile-delete incident).
+#
+# The marker below is OURS and is exported by the Qubit terminal/shell wrapper at
+# the point a command is spawned, so it inherits into grandchildren. External
+# coding-agent harnesses advertise themselves with their own markers; ancestry
+# backs both up when a child rebuilds its environment and loses them.
+_AGENT_SUBPROCESS_MARKER_ENV = "QUBIT_AGENT_SUBPROCESS"
+
+#: Markers set by external coding-agent harnesses for their subprocesses.
+_EXTERNAL_AGENT_ENV_MARKERS = (
+    "OPENCODE", "CLAUDE_CODE", "CURSOR_AGENT", "CODEX", "AIDER", "GOOSE", "AGENT",
+)
+
+#: Agent launcher basenames; matched against argv tokens, never path prefixes.
+_EXTERNAL_AGENT_NAMES = frozenset({
+    "opencode", "claude", "claude-code", "codex", "cursor-agent", "aider", "goose",
+})
+
+#: Memoised ancestry answer for the agent signal.
+_AGENT_ANCESTOR: Optional[bool] = None
+
+
+def _process_looks_like_agent(proc: Any) -> bool:
+    """True when *proc* is an external agent harness (cmdline basename or marker)."""
+    try:
+        cmdline = proc.cmdline() or []
+    except Exception:
+        cmdline = []
+    if any(_argv_basename(arg) in _EXTERNAL_AGENT_NAMES for arg in cmdline):
+        return True
+    try:
+        env = proc.environ() or {}
+    except Exception:
+        env = {}
+    return any(key in env for key in _EXTERNAL_AGENT_ENV_MARKERS)
+
+
+def _has_agent_ancestor() -> bool:
+    """True when an ancestor is an external agent harness (survives env rebuilds)."""
+    global _AGENT_ANCESTOR
+    if _AGENT_ANCESTOR is not None:
+        return _AGENT_ANCESTOR
+    try:
+        found = any(_process_looks_like_agent(p) for p in _iter_ancestors())
+    except Exception:
+        found = False
+    _AGENT_ANCESTOR = found
+    return found
+
+
+def _in_agent_subprocess() -> bool:
+    """True when this process is (or descends from) an agent-spawned subprocess.
+
+    Deliberately NOT keyed on ``HERMES_AGENT``: the live gateway advertises that
+    marker for its own children, so it cannot distinguish the service from a
+    tool command. The Qubit-specific marker is set only by the shell wrapper.
+    """
+    if os.environ.get(_AGENT_SUBPROCESS_MARKER_ENV):
+        return True
+    if any(os.environ.get(key) for key in _EXTERNAL_AGENT_ENV_MARKERS):
+        return True
+    return _has_agent_ancestor()
+
+
+def _looks_like_live_service() -> bool:
+    """True for the live Qubit service/CLI entry points.
+
+    A dev service launched from an agent shell must not be blocked by the
+    agent-subprocess tripwire: its process (not its descendants) is exempt.
+    Matches argv tokens, never arbitrary substrings (``pytest tests/test_voicebridge.py``
+    must not look like the service).
+    """
+    cmdline = [str(arg) for arg in _current_cmdline()]
+    bases = [_argv_basename(arg) for arg in cmdline]
+    if "-m" in cmdline:
+        try:
+            module = cmdline[cmdline.index("-m") + 1].strip().lower()
+        except IndexError:
+            module = ""
+        if module == "voicebridge" or module.startswith("voicebridge."):
+            return True
+        if module in {"qubit_cli.web_server", "qubit_cli.dashboard_procs"}:
+            return True
+        if module == "qubit_cli.main" and any(
+            word in {"serve", "dashboard", "gateway", "webui"} for word in bases
+        ):
+            return True
+    if bases and bases[0] in {"voicebridge", "voicebridge.exe", "qubit", "qubit.exe"}:
+        return True
+    return any(name in {"gateway_daemon.py", "web_server.py"} for name in bases)
+
+
+class LiveStateDbWriteRefused(RuntimeError):
+    """Typed refusal: a test/agent subprocess tried to WRITE the live state.db.
+
+    Subclasses ``RuntimeError`` (the historical guard type) and keeps the
+    ``live-system guard`` phrase so existing handlers keep matching. ``code``
+    is stable for callers that need to distinguish it.
+    """
+
+    code = "LIVE_STATE_DB_WRITE_REFUSED"
+
+    def __init__(self, detail: str, *, path: Any = None, root: Any = None) -> None:
+        super().__init__(detail)
+        self.detail = str(detail)
+        self.path = str(path) if path is not None else ""
+        self.root = str(root) if root is not None else ""
+
+    def as_dict(self) -> dict:
+        return {"state": "REFUSED", "code": self.code, "detail": self.detail,
+                "path": self.path, "root": self.root}
 
 
 def _is_production_state_db(resolved: Path, root: Path) -> bool:

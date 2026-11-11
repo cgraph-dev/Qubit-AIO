@@ -174,6 +174,12 @@ def _isolate_qubit_runtime(tmp_path, monkeypatch):  # noqa: D103
     # sets it after this fixture (monkeypatch restores the original at teardown,
     # including a value assigned directly by runtime code during the test).
     monkeypatch.setenv("QUBIT_HOME", str(tmp_path / "qubit-home"))
+    # Subprocess-surviving isolation marker (#82770): a child spawned by the test
+    # inherits it even when the test strips pytest's own PYTEST_* vars, so
+    # qubit_state's live-write tripwire stays armed. Deliberately NOT
+    # HERMES_TEST_ISOLATION — that name also flips strict TUI wire-contract
+    # validation, which the root suite must not change implicitly.
+    monkeypatch.setenv("QUBIT_TEST_ISOLATION", str(tmp_path / "qubit-home"))
     # Also clear HERMES_HOME, the foreign alias of QUBIT_HOME declared in
     # agent_compat's env_aliases. EnvAliaser mirrors an unset QUBIT_HOME from a
     # set HERMES_HOME (framework.py `EnvAliaser.apply`), so a process launched by
