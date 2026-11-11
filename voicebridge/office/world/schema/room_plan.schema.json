@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qubit.local/schema/office/room_plan.schema.json",
+  "title": "Qubit Office 16x12 room plan",
+  "description": "A style plan for one fixed cell. Geometry is part of the contract: cells never stretch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cols", "rows", "entry", "capacity", "placements", "desk_anchors", "required_anchors"],
+  "properties": {
+    "cols": { "const": 16 },
+    "rows": { "const": 12 },
+    "entry": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": {
+        "x": { "type": "integer", "minimum": 0, "maximum": 15 },
+        "y": { "type": "integer", "minimum": 0, "maximum": 11 }
+      }
+    },
+    "capacity": { "type": "integer", "minimum": 0 },
+    "placements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["asset_id", "tile", "footprint", "layer", "surface"],
+        "properties": {
+          "asset_id": { "type": "string", "minLength": 1 },
+          "tile": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y"],
+            "properties": {
+              "x": { "type": "integer" },
+              "y": { "type": "integer" }
+            }
+          },
+          "footprint": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "integer", "minimum": 1 }
+          },
+          "layer": { "type": "string" },
+          "surface": { "type": "string" },
+          "orientation": { "type": "string" },
+          "shadow_variant": { "type": ["string", "null"] },
+          "tags": { "type": "array", "items": { "type": "string" } },
+          "category": { "type": ["string", "null"] },
+          "anchor_id": { "type": ["string", "null"] },
+          "interaction_tile": { "type": ["object", "null"] },
+          "socket_bound": { "type": "boolean" },
+          "single_direction": { "type": "boolean" },
+          "blocks": { "type": "boolean" }
+        }
+      }
+    },
+    "desk_anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["x", "y"],
+        "properties": {
+          "x": { "type": "integer", "minimum": 0, "maximum": 15 },
+          "y": { "type": "integer", "minimum": 0, "maximum": 11 }
+        }
+      }
+    },
+    "required_anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["anchor_id", "access"],
+        "properties": {
+          "anchor_id": { "type": "string" },
+          "access": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["x", "y"],
+            "properties": {
+              "x": { "type": "integer", "minimum": 0, "maximum": 15 },
+              "y": { "type": "integer", "minimum": 0, "maximum": 11 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
