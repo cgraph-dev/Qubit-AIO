@@ -86,6 +86,8 @@ OPENCLAW_OVERLAY = "OPENCLAW_OVERLAY"
 QUBIT_ADDED = "QUBIT_ADDED"
 MISSING = "MISSING"
 INTENTIONALLY_OMITTED = "INTENTIONALLY_OMITTED"
+#: Deleted by an owner directive (the English-only ruling), not a sync gap.
+OWNER_PURGED = "OWNER_PURGED"
 EOL_NORMALIZED = "EOL_NORMALIZED"
 UNEXPLAINED = "UNEXPLAINED"
 
@@ -297,9 +299,12 @@ _EXTRA_PATH_RENAMES: dict[str, str] = {
     "ui-tui/src/types/hermes-ink.d.ts": "ui-tui/src/types/qubit-ink.d.ts",
     # Compound segment the per-segment translator cannot catch (the basename is
     # ``hermes-kanban-dispatcher.service``, not a bare ``hermes`` segment).
-    # The Qubit copy is byte-identical apart from the rebrand.
+    # NOTE: no ``qubit_runtime/`` prefix — the local walk is rooted INSIDE
+    # qubit_runtime, so manifest keys are relative to it. Adding the prefix made
+    # the rename map resolve to a path the walk never produces, which left the
+    # file permanently MISSING.
     "plugins/kanban/systemd/hermes-kanban-dispatcher.service":
-        "qubit_runtime/plugins/kanban/systemd/qubit-kanban-dispatcher.service",
+        "plugins/kanban/systemd/qubit-kanban-dispatcher.service",
     "web/src/components/HermesConsoleModal.tsx":
         "web/src/components/QubitConsoleModal.tsx",
     # desktop product asset renamed by the deep rebrand
@@ -1500,12 +1505,14 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
     files: dict[str, dict] = {}
     counts = {c: 0 for c in _CLASSIFICATIONS}
     counts[UNEXPLAINED] = 0
+    counts[OWNER_PURGED] = 0
     eol_normalized: list[dict] = []
     blockers: list[str] = []
     patched: list[str] = []
     added: list[str] = []
     missing: list[str] = []
     omitted: list[str] = []
+    owner_purged: list[str] = []
 
     # Local git-index modes must be known before enumeration so an untracked
     # disposable artifact (installed dependency / build output) is skipped while
@@ -1635,10 +1642,13 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
         reason = _intentional_omission_reason(rel)
         if reason is None and _owner_purged(rel):
             # Deleted by the English-only owner directive, not a sync gap.
-            # Classified as omitted so it never enters ``blockers``: an owner
-            # decision must not be reported as an unexplained divergence.
-            classification = INTENTIONALLY_OMITTED
-            omitted.append(rel)
+            # Recorded in its OWN bucket rather than ``intentionally_omitted``:
+            # that list is contractually upstream-test trees only (see
+            # tests/test_vendor_manifest_test_classification.py), and mixing
+            # translations into it broke that contract. Neither bucket feeds
+            # ``blockers``, so an owner decision is never a sync failure.
+            classification = OWNER_PURGED
+            owner_purged.append(rel)
         elif reason is None:
             classification = MISSING
             missing.append(rel)
@@ -1730,7 +1740,7 @@ def build_vendor_manifest(upstream: Path, local: Path, local_label: str) -> dict
         "intentionally_omitted": sorted(omitted),
         # Subset of missing_from_local deleted by the English-only owner
         # directive (eafb54e26), not a vendoring gap. Never re-create these.
-        "owner_purged": sorted(r for r in missing if _owner_purged(r)),
+        "owner_purged": sorted(owner_purged),
         "classification_counts": counts,
         "eol_normalized": eol_normalized,
         "upstream_mode_counts": _mode_counts(lambda e: e["upstream_mode"]),
