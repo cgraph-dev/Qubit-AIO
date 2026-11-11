@@ -356,6 +356,27 @@ describe("host theme + rerender stability", () => {
     both.cleanup();
   });
 
+  it("marks the root to start the sheets below the app's top bar", () => {
+    // The vendored app's fixed top bar hosts the injected Panels icons that
+    // open these docks. Marking the root whenever a sheet is open lets the
+    // stylesheet offset the sheets below that bar; without it the HUD covered
+    // the icons (measured live at 1440x900).
+    const none = createStatefulHarness();
+    none.render({});
+    const noneRoot = none.tree.find(
+      (e) => e.props["data-testid"] === "office-app");
+    expect(noneRoot?.props["data-office-dock-top"]).toBeUndefined();
+    none.cleanup();
+
+    for (const seed of [{ 3: true }, { 4: true }, { 3: true, 4: true }]) {
+      const h = createStatefulHarness(seed);
+      h.render({});
+      const root = h.tree.find((e) => e.props["data-testid"] === "office-app");
+      expect(root?.props["data-office-dock-top"]).toBe("toolbar");
+      h.cleanup();
+    }
+  });
+
   it("opts the docks and buttons into a declared 9-slice", () => {
     const slicedTheme = {
       id: "demo",

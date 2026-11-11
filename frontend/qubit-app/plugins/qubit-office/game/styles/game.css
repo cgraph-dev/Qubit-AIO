@@ -255,6 +255,18 @@
   color: var(--office-ink);
 }
 
+/* THE APP'S TOOLBAR STAYS VISIBLE AND CLICKABLE. The vendored app's top bar is
+   `position: fixed` at the top of the iframe (`--top-h`: 64px, 124px with the
+   usage row, 108px at phone width) and it owns the injected Panels group whose
+   icons open these docks. A sheet anchored at `top: 0` covered that group
+   (measured live at 1440x900: HUD sheet top≈75, Panels at y≈90), so after the
+   Agents dock closed its icons could not be clicked. Anchor both sheets below
+   the bar instead; `bottom: 0`, the single-dock width and the dual-dock split
+   are unchanged, only the sheets get shorter by the token. */
+.office-game[data-office-dock-top="toolbar"] > .office-game__dock {
+  top: var(--office-dock-top);
+}
+
 .office-game__dockHead {
   display: flex;
   align-items: center;

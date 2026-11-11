@@ -541,10 +541,16 @@ export function createOfficeApp(
     // a single sheet keeps its original width because the selector only
     // matches while both are open.
     const dualDocks = agentsOpen && hudOpen;
+    // Either sheet open means the root is marked so the stylesheet can start
+    // the sheets BELOW the vendored app's fixed top bar. That bar hosts the
+    // injected Panels group that opens them; an offset sheet leaves the group
+    // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
+    const dockOpen = agentsOpen || hudOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
       "data-office-docks": dualDocks ? "both" : undefined,
+      "data-office-dock-top": dockOpen ? "toolbar" : undefined,
       className: rootClass,
     }, children);
   };

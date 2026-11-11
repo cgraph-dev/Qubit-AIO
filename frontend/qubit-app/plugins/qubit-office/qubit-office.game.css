@@ -39,6 +39,14 @@
   --office-border-strong: 1px solid var(--office-line-strong);
   --office-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 
+  /* Where the side sheets begin, BELOW the vendored app's fixed top bar.
+     The app's own `--top-h` is 64px (default), 124px while the usage row is
+     shown, and 108px at phone width; that bar also hosts the injected Panels
+     group whose icons open these docks. 128px clears the tallest measured bar
+     (124px) with a 4px gap, so the HUD can never cover the group again
+     (measured live: HUD top≈75, Panels at y≈90). */
+  --office-dock-top: 128px;
+
   /* spacing scale: 4px base. Every gap in the shell is one of these. */
   --office-s1: 4px;
   --office-s2: 8px;
@@ -343,6 +351,18 @@
   border-bottom: 0;
   background: var(--office-void);
   color: var(--office-ink);
+}
+
+/* THE APP'S TOOLBAR STAYS VISIBLE AND CLICKABLE. The vendored app's top bar is
+   `position: fixed` at the top of the iframe (`--top-h`: 64px, 124px with the
+   usage row, 108px at phone width) and it owns the injected Panels group whose
+   icons open these docks. A sheet anchored at `top: 0` covered that group
+   (measured live at 1440x900: HUD sheet top≈75, Panels at y≈90), so after the
+   Agents dock closed its icons could not be clicked. Anchor both sheets below
+   the bar instead; `bottom: 0`, the single-dock width and the dual-dock split
+   are unchanged, only the sheets get shorter by the token. */
+.office-game[data-office-dock-top="toolbar"] > .office-game__dock {
+  top: var(--office-dock-top);
 }
 
 .office-game__dockHead {
