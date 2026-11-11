@@ -972,6 +972,9 @@ QUBIT_READ_AUTHORITY: tuple = (
     # The office tower is the Qubit office store authority; never read the
     # upstream Habblaud backend's unrelated organization.
     "/api/office/tower",
+    # The deterministic 100-floor world projection is built from the shipped
+    # Qubit role/floor templates; the vendored fork has no such tower.
+    "/api/office/world",
     # The office theme payload is Qubit's local, data-only theme contract
     # (voicebridge.office.theme). Proxying it would serve the fork's unrelated
     # theme/overlay store; the compat handler is the authority.
