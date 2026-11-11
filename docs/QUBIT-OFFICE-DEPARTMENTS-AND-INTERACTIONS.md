@@ -414,3 +414,146 @@ Assets remain outside the public tree when the license forbids redistribution.
 | Business/room/agent implementation | Covered | 1 business, 283 records, no operations |
 
 **Nothing above is `VERIFIED`; the table is a scope map, not a completion claim.**
+
+---
+
+## 21. Agent configuration — what an agent can select and use
+
+**Decision:** the agent is the security principal. Desk, room and department are presentation and
+organisation metadata; they never grant access.
+
+### AgentProfile
+
+```
+AgentProfile
+  agent_id, owner_id, display_name
+  department_id, room_id, desk_id, role_id
+  security_principal_id
+  model_policy { primary provider/model, reasoning, fallback chain, context/latency/data rules }
+  capability_grants[] { capability, resource, action, data_class, environment, expires_at, approval }
+  skills[] { skill_id, version, binding source }
+  mcp_servers[] { server_id, version, tool allow/deny, health }
+  memory_scopes[] { scope, read/write/append, retention }
+  secret_refs[] { secret_id, allowed tools, expiry }
+  autonomy_ceiling, budgets, rate limits, concurrency
+  session_policy { owner, visibility, retention, default workspace }
+  appearance { CharacterProfile id, portrait, voice, animation preset }
+  policy_revision, status, created_at, retired_at
+```
+
+### Selector groups in the UI
+
+1. **Identity/ownership** — immutable owner, department assignment history, security principal,
+   session owner, cross-department grants with expiry.
+2. **Permissions** — deny-by-default; selectors for subject, capability, resource, action,
+   environment and data classification. Separate read / draft / execute / approve / administer /
+   delegate. Deny wins. Time/task/approval-bound grants.
+3. **Skills** — versioned, schema-bound, selectable by agent/role/department/task/risk. A skill
+   can **require** capabilities but cannot grant them. Pin the skill revision per run.
+4. **MCP and tools** — server allowlist per agent/session, then tool-level allow/deny within each
+   server. Catalog shows health, version, risk, scopes, approvals and budgets. One gateway.
+5. **Models/providers** — per-agent primary model/provider, per-task policy (reasoning, context,
+   latency, data residency), fallback chain pinned at run start; model permissions separate from
+   tool permissions; budget-aware downgrade and human escalation.
+6. **Autonomy and budgets** — per-agent ceiling; per-run tokens/wall-clock/tool calls/concurrency/
+   money; department and office aggregate budgets; provider/tool/agent rate limits; dead-man
+   switch and automatic pause on anomalous spend.
+7. **Memory scopes** — agent-private, session/run, department, office, task-scoped shared context;
+   explicit read/write/append per scope; provenance, visibility, retention, conflict metadata.
+8. **Secrets** — vault only; gateway injects the one credential a call needs; no secrets in
+   prompts, workspaces, memory, logs, checkpoints or artifacts; immediate rotation/revocation.
+9. **UI controls** — effective capabilities, inherited vs explicit grants, model/provider, memory
+   boundaries, active sessions/leases, budget reservations, approvals and recent policy decisions;
+   diff, simulate, start/pause/stop/revoke/archive/delegate.
+
+## 22. Session, run, task, workspace and checkpoint model
+
+**Decision:** durable session, bounded run, durable task, pinned workspace, checkpointed effects.
+
+| Component | Purpose | Key fields | Lifecycle |
+|---|---|---|---|
+| Agent principal | Stable identity/accountability | agent_id, owner, department, role, autonomy ceiling, policy revision, model policy | provision → approve → active → suspended/revoked → archived |
+| Durable session | Long-lived owner↔agent lane | session_id, agent_id, owner, participants, visibility, memory scopes, workspace, status, last checkpoint | create → active → paused → resumed → archived |
+| Run/turn | One bounded execution attempt | run_id, session_id, task_id, parent_run, model/provider, prompt revision, capability snapshot, budget snapshot, lease, status | queued → leased → executing → waiting/approval → checkpointed → completed/failed/cancelled/unknown |
+| Task | Durable work that can move between agents | task_id, objective, acceptance criteria, priority, owner, assignee, dependencies, required capabilities, data class, budget, deadline, artifacts | draft → assigned → claimed → blocked → handed off → completed/rejected/cancelled |
+| Checkpoint | Restart/handoff recovery | checkpoint_id, run_id, sequence, state summary, pending actions, tool receipts, artifacts, memory writes, approvals, workspace revision, safe resume point | write before/after side effects; validate policy before resume; old checkpoints readable |
+| Workspace | Durable files/artifacts | workspace_id, owner scope, task_id, session_id, repository/worktree ref, storage class, access policy, revision, manifest, retention | provision → active → checkpointed → frozen/handed off → archived/deleted |
+| Sandbox/worktree | Execution isolation | sandbox_id, workspace_id, base revision, branch, filesystem/network policy, resources, secret bindings, execution log | create pinned → execute under lease → commit artifact → destroy/read-only |
+| Capability snapshot | Freeze effective policy | snapshot_id, agent, policy revision, grants/denials, tool/server versions, model constraints, expiry | materialize at run start; every call checks it; revocation invalidates immediately |
+| Message/event log | Canonical interaction record | event_id, conversation, sender, recipients, correlation, causation, type, payload ref, visibility, idempotency, timestamp | append → deliver → ack/dead-letter; replayable |
+| Handoff | Transfer without losing context | handoff_id, task, from, to, reason, checkpoint, artifacts, unresolved questions, required capabilities, deadline | proposed → accepted/rejected → ownership transfer; source read-only |
+| Policy/budget ledger | Explain and enforce limits | policy revision, grant, budget, subject, scope, counters, reservations, approver, expiry | draft → approved → active → amended/revoked → retained |
+
+### Work-loss and recovery rules
+
+- Checkpoint before and after side effects; record tool receipts and workspace revision.
+- Resume only from a validated checkpoint; revalidate policy and capability snapshot.
+- Lease every run/task/workspace; heartbeat and fencing token; expiry stops execution.
+- Unknown provider outcomes are reconciled, never marked complete.
+- Stop revokes leases/tokens, interrupts gateway calls, writes a checkpoint and surfaces unknowns.
+- Handoff carries artifacts, unresolved questions, acceptance criteria and read-only source state.
+
+## 23. Multi-agent collaboration patterns
+
+| Pattern | Use | Avoid | Safeguards |
+|---|---|---|---|
+| Supervisor + bounded delegation | Lead decomposes work | Inheriting all child authority or self-approval | typed subtasks, budgets, data class, deadline, acceptance, parent ceiling, audited/revocable |
+| Work queue + leases | Independent tasks | Shared mutable task state / first responder wins | atomic claim, expiry, heartbeat, fencing, retry, dead letter |
+| Artifact collaboration | Research, coding, review, docs | Passing raw long chat history | immutable artifacts, typed summaries, citations, read scopes, validation |
+| Reviewer/council | High-impact decisions | Many agents writing the system of record / voting on facts | independent contexts/budgets, dissent, one commit authority, human approval |
+| Pairing | Coding/docs | Concurrent writes to one branch/filesystem | single-writer lease; others propose patches; conflict tests |
+| Shared department context | SOPs, decisions, status | Unrestricted scratchpad | typed namespaces, append-only decisions, provenance, retention, ACLs |
+| Office broadcast/channels | Announcements, incidents, cross-floor requests | One global chat with every secret | topic ACLs, recipient filtering, rate limits, threading, receipts, size limits |
+| Conflict resolution | Competing edits/recommendations | Last-write-wins | commit authority, version checks, deterministic priority, owner escalation, evidence, merge/reject events |
+
+**Anti-patterns:** desk/department as permission boundary; one global chat; one mutable workspace
+shared across tasks; wildcard MCP access; skills that grant capabilities; fallback without pinned
+policy; checkpoint as chat summary only; global memory retrieval; concurrent worktree writers;
+delegation by natural-language request alone; last-write-wins; stop that only hides the agent;
+secrets in prompts/workspaces/logs; office UI as source of truth; unbounded fan-out;
+resume-last-message instead of validated checkpoint.
+
+## 24. Repo patterns — verified evidence
+
+- **agents-office:** per-agent roster fields (name, role, does, tools, brief, model, effort),
+  MCP allow/deny/departments, team limits, skills bound to agents/departments, fixed seats.
+  Take: selector model and skill binding. Avoid: local JSON as authority, fixed 35 seats, full MCP
+  list by default, a Brain folder as security boundary.
+- **agent-monitor:** multi-agent meeting UI, WebSocket chat, session/sub-agent grouping, agent
+  cards. Take: session inspection/grouping and meeting UI. Avoid: simulated chat as durable task
+  state, authorization or execution control.
+- **agent-quest:** per-session agent state manager, subagent detection, idle/busy/completed
+  lifecycle, live-session oracle. Take: session identity and subagent lifecycle. Avoid: inferring
+  provider architecture beyond the observed state manager.
+- **pixel-agents:** lead + teammate relationships, inline vs separate tmux sessions, promoted
+  background agents. Take: lead/teammate identity and routing attention. Avoid: assuming runtime
+  persistence it does not prove.
+- **claw-empire:** isolated git worktrees, departments, meetings, deliverables, skills library,
+  agent management, encrypted provider/messenger tokens, active-agent kill. Take: worktree
+  isolation, department UI, token encryption and kill control. Avoid: copying its database/model
+  assumptions without checking.
+- **SkyOffice:** bounded room chat (max 100 messages), room/player commands. Take: room chat
+  envelope. Avoid: chat room state as the canonical conversation store.
+
+## 25. Perplexity review — 15 agent/session suggestions
+
+| # | Suggestion | Why | Do | Phase | Effort | Risk |
+|---|---|---|---|---|---|---|
+| 1 | Define canonical agent runtime contract | Records exist without enforceable lifecycle/ownership | Agent, Session, Run, Task, Workspace, Checkpoint, Handoff, CapabilitySnapshot, Message, Lease schemas + transitions/idempotency | 0 | M | M |
+| 2 | Build one durable agent lane before more floors | Must prove runtime durability, not UI presence | One agent: owner chat, task queue, gateway calls, checkpoint/restart, artifact, scoped memory | 1 | L | L |
+| 3 | Make ToolGateway mandatory | Catalog/permissions are not an execution boundary | Every tool/MCP/terminal/connector/memory/model/delegation call passes through it | 1 | L | L |
+| 4 | Replace static capability lists with effective-policy evaluation | Selectors/inheritance without wildcard privilege | Grants on subject/capability/resource/action/data/environment/expiry; explainable allow/deny | 1 | L | M |
+| 5 | Add dynamic capability catalog with health/versioning | Provider calls must not be hardcoded | Catalog servers/tools/skills/models/providers/connectors/memory adapters with schema/risk/scopes/health/version | 1 | M | M |
+| 6 | Implement leases and fencing before concurrency | Retries/multiple agents create duplicate writes | Task/workspace/run leases, heartbeats, fencing tokens, expiry, single writer | 1 | M | L |
+| 7 | Separate durable sessions from bounded runs | One global chat rejected; durable lane needs bounded runs | Session context durable; run gets frozen policy/model/budget and checkpoint chain | 1 | M | L |
+| 8 | Pin workspaces/worktrees to tasks | Agent-owned workspace alone contaminates tasks | Agent base + task overlay; pinned revision; filesystem/network isolation; immutable artifacts; single writer | 1 | L | M |
+| 9 | Implement explicit handoff protocol | Handoffs undefined | Checkpoint, artifact manifest, unresolved questions, capability requirements, recipient acceptance, source read-only | 1 | M | L |
+| 10 | Unify Obsidian/OpenViking authorization | Two memory systems can diverge in ACL/retention/provenance | One memory policy service; typed scopes; note/artifact IDs; visibility/retention/conflict | 1 | L | M |
+| 11 | Add real message fabric | Chat proposed, no substrate | Append-only events with topics/ACLs/threading/delivery/ack/correlation/idempotency/retries/dead letters/replay | 1 | L | M |
+| 12 | Make revocation interrupt execution | Future-run-only revocation is insufficient | Short-lived capability tokens; gateway checks per call; kill leases and secret bindings on stop/policy change | 1 | M | L |
+| 13 | Effective-state and audit UI | Configuration without operational control | Show effective permissions/inherited sources/model/memory/workspace/leases/reservations/approvals/decisions; diff/stop/revoke/archive | 2 | M | L |
+| 14 | Prompt-injection/untrusted-content boundaries | Agents read files/web/MCP/messages/memory | Label provenance/trust; isolate retrieved content from control instructions; confirm instruction-derived capability changes; redact; tools cannot change policy | 1 | M | M |
+| 15 | Test failure/collaboration semantics | Restart/handoff/concurrency/revocation/unknown outcomes are core | Crash after side effect, lease expiry, duplicate delivery, mid-run revocation, stale checkpoint, conflicting patch, poisoned memory, fallback, budget exhaustion, child failure | 1 | L | M |
+
+**Decision:** build the first agent lane using this contract before expanding the office, character
+studio, world or department count. Agent configuration is useful only when the gateway enforces it.

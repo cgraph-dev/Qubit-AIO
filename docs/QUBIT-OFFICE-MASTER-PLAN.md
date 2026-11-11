@@ -1257,3 +1257,13 @@ templates and projections rather than one usable department.
 | 13 | Implement Character Studio transactionally | Habblaud/LimeZu save authorities conflict | Versioned CharacterProfile; validate assets/licenses; publish projections; rollback | After first slice | M | Medium |
 | 14 | Add asset/license ledger before more assets | Paid-art constraints lack build/runtime enforcement | Ledger required; fail-closed builders; scan bundles/caches/screenshots/backups | Next | M | High |
 | 15 | Add security/privacy/recovery gates | Promised surface includes terminal, credentials, payments, personal data | Threat model, secret broker, sandbox, egress, jail, injection defense, kill switch | Next | XL | Critical |
+
+
+---
+
+## 47. Agent configuration, sessions and multi-agent runtime
+
+The agent selector model, session/run/task/workspace/checkpoint contract, multi-agent patterns,
+verified repo evidence and the 15 Perplexity suggestions are persisted in
+`docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` §21–§25. That file is the reference; this is
+a pointer, not a second authority.
