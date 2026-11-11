@@ -33,18 +33,34 @@ def _build() -> dict:
 
 
 def _committed() -> dict:
-    return json.loads(COMMITTED.read_text(encoding="utf-8"))
+    """The binding manifest, built on demand if the artifact is absent.
+
+    ``docs/generated/`` is gitignored (regenerable artifacts; the vendor
+    manifest alone is 17 MB), so a clean checkout has no manifest on disk.
+    Asserting existence failed on every fresh clone while the product was fine —
+    the same defect that broke test_compat_handler_reachability. Build it
+    in-process instead; when the file IS present, prefer it so a stale artifact
+    still fails.
+    """
+    if COMMITTED.is_file():
+        return json.loads(COMMITTED.read_text(encoding="utf-8"))
+    return _build()
 
 
 def test_committed_manifest_is_current():
-    assert COMMITTED.is_file(), COMMITTED
-    assert _committed() == _build(), (
-        "docs/generated/QUBIT_CONFIG_BINDING_MANIFEST.json is stale; regenerate with "
-        "`python scripts/config_binding_manifest.py`")
+    built = _build()
+    if COMMITTED.is_file():
+        assert json.loads(COMMITTED.read_text(encoding="utf-8")) == built, (
+            "docs/generated/QUBIT_CONFIG_BINDING_MANIFEST.json is stale; regenerate with "
+            "`python scripts/config_binding_manifest.py`")
 
 
 def test_manifest_has_no_secret_values():
-    assert not _SECRET_VALUE_RE.search(COMMITTED.read_text(encoding="utf-8")), (
+    # Scan whatever the gate above validated: the on-disk artifact when present,
+    # otherwise a fresh build. Both are the real manifest.
+    text = (COMMITTED.read_text(encoding="utf-8") if COMMITTED.is_file()
+            else json.dumps(_build()))
+    assert not _SECRET_VALUE_RE.search(text), (
         "secret-shaped value present in the binding manifest")
 
 
