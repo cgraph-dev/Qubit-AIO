@@ -290,3 +290,117 @@ describe("TowerNavigator room scenes", () => {
     expect(h.tree.length).toBeLessThan(3000);
   });
 });
+
+describe("TowerNavigator staffed occupancy", () => {
+  const OCCUPANT = {
+    agent_id: "agt_ada", name: "Ada Lovelace", initials: "AL",
+    status: "active", emoji: "🧮", color: "#123456",
+    source: "metadata.world_desk",
+  };
+
+  function staffedWorld(unplaced = [{
+    agent_id: "agt_grace", name: "Grace Hopper", status: "active",
+    reason: "no_explicit_match",
+  }]): WorldTower {
+    const base = buildTemplateWorldTower(realFloors());
+    const floor = base.floors[0];
+    const occupiedId = floor.rooms[0].cells[0].desk_slots[0].desk_id;
+    return {
+      ...base,
+      staffed: true,
+      floors: base.floors.map((item) => item.floor_id !== floor.floor_id
+        ? item
+        : {
+            ...item,
+            rooms: item.rooms.map((room, index) => index !== 0 ? room : {
+              ...room,
+              cells: room.cells.map((cell) => ({
+                ...cell,
+                desk_slots: cell.desk_slots.map((desk) =>
+                  desk.desk_id === occupiedId
+                    ? { ...desk, occupied_by: OCCUPANT } : desk),
+              })),
+            }),
+          }),
+      occupancy: {
+        schema: "qubit-office-world-occupancy/1",
+        staffed: true,
+        counts: {
+          agents: 1 + unplaced.length, placed: 1, unplaced: unplaced.length,
+          ignored: 0, occupied_desks: 1, floors_staffed: 1,
+          rooms_staffed: 1,
+        },
+        unplaced,
+        truncated: { placed: false, unplaced: false },
+        digest: "abc",
+        agents_source: "business_db",
+        seat_source: "office_plan",
+      },
+    };
+  }
+
+  it("marks only the occupied desk and shows the agent name/initials", () => {
+    const h = mount({ world: staffedWorld() });
+    const desks = allByTestId(h, "tower-desk");
+    const occupied = desks.filter((desk) =>
+      desk.props["data-occupied"] === "true");
+    expect(occupied).toHaveLength(1);
+    expect(occupied[0].props["data-occupant-id"]).toBe("agt_ada");
+    expect(occupied[0].props["data-placement-source"])
+      .toBe("metadata.world_desk");
+    expect(textOf(occupied[0])).toContain("🧮");
+    expect(desks.filter((desk) => desk.props["data-occupied"] === "false")
+      .length).toBe(desks.length - 1);
+    expect(textOf(occupied[0])).not.toContain("Grace");
+    // The room strip names the occupant so a tiny desk is still readable.
+    const people = allByTestId(h, "tower-occupant");
+    expect(people).toHaveLength(1);
+    expect(people[0].props["data-agent"]).toBe("agt_ada");
+    expect(textOf(people[0])).toContain("Ada Lovelace");
+    expect(textOf(people[0])).toContain("AL");
+    expect(textOf(byTestId(h, "tower-scene-note")[0]))
+      .toContain("not a rendered 3D world");
+  });
+
+  it("lists unplaced agents separately with their reason", () => {
+    const h = mount({ world: staffedWorld() });
+    expect(byTestId(h, "tower-occupancy")).toHaveLength(1);
+    expect(byTestId(h, "tower-occupancy")[0].props["data-agents-source"])
+      .toBe("business_db");
+    expect(textOf(byTestId(h, "tower-occupancy-summary")[0]))
+      .toBe("1 staffed · 1 unplaced · 1 occupied desks");
+    const rows = allByTestId(h, "tower-unplaced-agent");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].props["data-agent"]).toBe("agt_grace");
+    expect(rows[0].props["data-reason"]).toBe("no_explicit_match");
+    expect(textOf(rows[0])).toContain("Grace Hopper");
+    expect(textOf(rows[0])).toContain("no_explicit_match");
+  });
+
+  it("bounds the unplaced list and keeps the total honest", () => {
+    const many = Array.from({ length: 15 }, (_, i) => ({
+      agent_id: `agt_${i}`, name: `Agent ${i}`, status: "active",
+      reason: "unknown_department",
+    }));
+    const h = mount({ world: staffedWorld(many) });
+    expect(allByTestId(h, "tower-unplaced-agent")).toHaveLength(12);
+    expect(textOf(byTestId(h, "tower-unplaced-more")[0])).toBe("+3 more");
+    expect(textOf(byTestId(h, "tower-occupancy-summary")[0]))
+      .toBe("1 staffed · 15 unplaced · 1 occupied desks");
+  });
+
+  it("names the empty case without inventing an unplaced agent", () => {
+    const h = mount({ world: staffedWorld([]) });
+    expect(allByTestId(h, "tower-unplaced-agent")).toHaveLength(0);
+    expect(textOf(byTestId(h, "tower-unplaced-none")[0]))
+      .toContain("explicit tower desk");
+  });
+
+  it("renders no occupancy block for the unstaffed template scene", () => {
+    const h = mount();
+    expect(byTestId(h, "tower-occupancy")).toHaveLength(0);
+    expect(byTestId(h, "tower-room-occupants")).toHaveLength(0);
+    expect(textOf(byTestId(h, "tower-scene-note")[0]))
+      .toContain("Template rooms, not staffed agents");
+  });
+});

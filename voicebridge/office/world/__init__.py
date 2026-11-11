@@ -19,11 +19,15 @@ stand on.
   extractor. It never opens, copies or commits art.
 * :mod:`voicebridge.office.world.tower_plan` — the deterministic 100-floor,
   5-wing projection over the shipped templates (fixed cells, bounded payload).
+* :mod:`voicebridge.office.world.occupancy` — explicit agent occupancy: only a
+  real Business OS agent with an explicit world/office-seat link reaches a
+  desk; everything else stays unplaced with a typed reason.
 
 Nothing here is ``VERIFIED``; the module is covered by focused unit tests.
 """
 from __future__ import annotations
 
-from . import active, catalog, model, recipes, style, tower_plan
+from . import active, catalog, model, occupancy, recipes, style, tower_plan
 
-__all__ = ["model", "active", "style", "recipes", "catalog", "tower_plan"]
+__all__ = ["model", "active", "style", "recipes", "catalog", "tower_plan",
+           "occupancy"]

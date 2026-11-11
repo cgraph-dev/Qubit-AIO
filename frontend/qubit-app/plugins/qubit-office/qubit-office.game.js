@@ -195283,6 +195283,73 @@ create: function(game) {
 			};
 		});
 	}
+	function initialsOf(name, agentId) {
+		const words = String(name || "").replace(/_/g, " ").trim().split(/\s+/).filter(Boolean);
+		if (words.length) return words.slice(0, 2).map((word) => word[0].toUpperCase()).join("");
+		return String(agentId || "?").slice(0, 2).toUpperCase();
+	}
+	/** Accept the object occupant, or a legacy bare string, never invent one. */
+	function normalizeOccupant(value) {
+		if (typeof value === "string") {
+			const name = value.trim();
+			if (!name) return null;
+			return {
+				agent_id: "",
+				name,
+				initials: initialsOf(name, ""),
+				status: "",
+				emoji: "",
+				color: "",
+				source: "unknown"
+			};
+		}
+		const row = record$1(value);
+		if (!row) return null;
+		const agentId = typeof row.agent_id === "string" ? row.agent_id : "";
+		const name = typeof row.name === "string" && row.name ? row.name : agentId;
+		if (!agentId && !name) return null;
+		return {
+			agent_id: agentId,
+			name,
+			initials: typeof row.initials === "string" && row.initials ? row.initials : initialsOf(name, agentId),
+			status: typeof row.status === "string" ? row.status : "",
+			emoji: typeof row.emoji === "string" ? row.emoji : "",
+			color: typeof row.color === "string" ? row.color : "",
+			source: typeof row.source === "string" && row.source ? row.source : "unknown"
+		};
+	}
+	function normalizeUnplaced(raw) {
+		return (Array.isArray(raw) ? raw : []).map((item, index) => {
+			const row = record$1(item) ?? {};
+			return {
+				agent_id: typeof row.agent_id === "string" ? row.agent_id : `unplaced-${index}`,
+				name: typeof row.name === "string" && row.name ? row.name : typeof row.agent_id === "string" ? row.agent_id : "Unknown agent",
+				status: typeof row.status === "string" ? row.status : "",
+				reason: typeof row.reason === "string" && row.reason ? row.reason : "no_explicit_match",
+				placement_source: typeof row.placement_source === "string" ? row.placement_source : void 0,
+				placement_detail: typeof row.placement_detail === "string" ? row.placement_detail : void 0
+			};
+		});
+	}
+	function normalizeOccupancy(raw) {
+		const row = record$1(raw);
+		if (!row) return null;
+		const counts = record$1(row.counts) ?? {};
+		const truncated = record$1(row.truncated) ?? {};
+		return {
+			schema: typeof row.schema === "string" ? row.schema : "",
+			staffed: row.staffed === true,
+			counts: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, int(value, 0)])),
+			unplaced: normalizeUnplaced(row.unplaced),
+			truncated: {
+				placed: truncated.placed === true,
+				unplaced: truncated.unplaced === true
+			},
+			digest: typeof row.digest === "string" ? row.digest : "",
+			agents_source: typeof row.agents_source === "string" ? row.agents_source : void 0,
+			seat_source: typeof row.seat_source === "string" ? row.seat_source : void 0
+		};
+	}
 	function normalizeSlots(raw) {
 		return (Array.isArray(raw) ? raw : []).map((item, index) => {
 			const row = record$1(item) ?? {};
@@ -195291,7 +195358,7 @@ create: function(game) {
 			const fallback = DESK_TILES[index % DESK_TILES.length];
 			const deskId = typeof row.desk_id === "string" && row.desk_id ? row.desk_id : `desk-${index}`;
 			const seatId = typeof row.seat_id === "string" ? row.seat_id : typeof seat?.seat_id === "string" ? seat.seat_id : null;
-			const occupied = typeof row.occupied_by === "string" && row.occupied_by ? row.occupied_by : typeof seat?.occupied_by === "string" && seat.occupied_by ? seat.occupied_by : null;
+			const occupied = normalizeOccupant(row.occupied_by !== void 0 ? row.occupied_by : seat?.occupied_by);
 			return {
 				desk_id: deskId,
 				seat_id: seatId,
@@ -195394,7 +195461,10 @@ create: function(game) {
 				if (room.active) activeRooms += 1;
 				cells += room.cell_count;
 				desks += room.capacity;
-				for (const cell of room.cells) for (const slot of cell.desk_slots) if (slot.occupied_by) occupied.add(slot.occupied_by);
+				for (const cell of room.cells) for (const slot of cell.desk_slots) {
+					const key = slot.occupied_by ? slot.occupied_by.agent_id || slot.occupied_by.name : "";
+					if (key) occupied.add(key);
+				}
 			}
 		}
 		agents = occupied.size;
@@ -195441,16 +195511,18 @@ create: function(game) {
 		const floors = row.floors.map((floor, index) => normalizeFloor(floor, index));
 		if (!floors.length) throw new WorldApiError("The world endpoint returned zero floors.", "WORLD_EMPTY", 200);
 		const counts = countTower(floors);
+		const occupancy = normalizeOccupancy(row.occupancy);
 		return {
 			ok: true,
 			schema: typeof row.schema === "string" && row.schema ? row.schema : WORLD_SCHEMA,
 			source: "endpoint",
 			server_source: typeof row.source === "string" ? row.source : void 0,
-			staffed: counts.agents > 0,
+			staffed: occupancy ? occupancy.staffed : counts.agents > 0 || row.staffed === true,
 			campus: record$1(row.campus),
 			counts,
 			wings: wingSummaries(floors),
-			floors
+			floors,
+			occupancy
 		};
 	}
 	/** A template floor scene derived only from the directory row. */
@@ -195507,7 +195579,8 @@ create: function(game) {
 	*/
 	async function fetchWorldTower(fallbackFloors, opts = {}) {
 		const f = opts.fetchImpl ?? fetch;
-		const url = worldUrl("/tower", opts.base);
+		const base = worldUrl("/tower", opts.base);
+		const url = opts.staffed === false ? base : `${base}?staffed=1`;
 		const headers = { Accept: "application/json" };
 		const token = readToken(opts.win);
 		if (token) headers["X-Qubit-Session-Token"] = token;
@@ -195542,6 +195615,19 @@ create: function(game) {
 		let occupied = 0;
 		for (const cell of room.cells) for (const slot of cell.desk_slots) if (slot.occupied_by) occupied += 1;
 		return occupied;
+	}
+	function roomOccupants(room) {
+		const seen = /* @__PURE__ */ new Set();
+		const people = [];
+		for (const cell of room.cells) for (const slot of cell.desk_slots) {
+			const who = slot.occupied_by;
+			if (!who) continue;
+			const key = who.agent_id || who.name;
+			if (!key || seen.has(key)) continue;
+			seen.add(key);
+			people.push(who);
+		}
+		return people;
 	}
 	function cellStyle(cell) {
 		return { aspectRatio: `${cell.cols} / ${cell.rows}` };
@@ -195688,9 +195774,14 @@ create: function(game) {
 				"data-desk": slot.desk_id,
 				"data-seat": slot.seat_id ?? "",
 				"data-occupied": slot.occupied_by ? "true" : "false",
-				title: slot.occupied_by ? `Desk ${slot.desk_id} — ${slot.occupied_by}` : `Desk ${slot.desk_id} — empty`,
-				"aria-label": slot.occupied_by ? `Desk ${slot.desk_id}, occupied by ${slot.occupied_by}` : `Desk ${slot.desk_id}, empty`
-			}))]);
+				"data-occupant-id": slot.occupied_by?.agent_id ?? "",
+				"data-placement-source": slot.occupied_by?.source ?? "",
+				title: slot.occupied_by ? `Desk ${slot.desk_id} — ${slot.occupied_by.name} (${slot.occupied_by.source})` : `Desk ${slot.desk_id} — empty`,
+				"aria-label": slot.occupied_by ? `Desk ${slot.desk_id}, occupied by ${slot.occupied_by.name}` : `Desk ${slot.desk_id}, empty`
+			}, slot.occupied_by ? R.createElement("span", {
+				key: "who",
+				className: "tower__deskInitial"
+			}, slot.occupied_by.emoji || slot.occupied_by.initials) : null))]);
 			const roomCard = (room) => {
 				const occupied = occupiedSlots(room);
 				return R.createElement("article", {
@@ -195734,6 +195825,33 @@ create: function(game) {
 							"data-testid": "tower-room-occupancy"
 						}, `${occupied} staffed · ${Math.max(0, room.capacity - occupied)} empty`)
 					]),
+					roomOccupants(room).length ? R.createElement("div", {
+						key: "people",
+						className: "tower__occupants",
+						"data-testid": "tower-room-occupants"
+					}, roomOccupants(room).map((who) => R.createElement("span", {
+						key: who.agent_id || who.name,
+						className: "tower__occupant",
+						"data-testid": "tower-occupant",
+						"data-agent": who.agent_id,
+						"data-source": who.source,
+						title: `${who.name} — ${who.source}`
+					}, [
+						R.createElement("span", {
+							key: "i",
+							className: "tower__occupantInitial",
+							"aria-hidden": "true"
+						}, who.initials),
+						who.emoji ? R.createElement("span", {
+							key: "e",
+							className: "tower__occupantEmoji",
+							"aria-hidden": "true"
+						}, who.emoji) : null,
+						R.createElement("span", {
+							key: "n",
+							className: "tower__occupantName"
+						}, who.name)
+					]))) : null,
 					R.createElement("div", {
 						key: "cells",
 						className: "tower__cells"
@@ -195787,9 +195905,55 @@ create: function(game) {
 						key: "note",
 						className: "tower__sceneNote",
 						"data-testid": "tower-scene-note"
-					}, "Template rooms, not staffed agents. Empty desks stay empty until a real Business OS presence is linked.")
+					}, world?.occupancy ? "Occupancy comes only from explicit Business OS links; empty desks stay empty and unplaced agents are listed below with their reason. A room-scene projection, not a rendered 3D world." : "Template rooms, not staffed agents. Empty desks stay empty until a real Business OS presence is linked.")
 				]);
 			};
+			const occupancy = world?.occupancy ?? null;
+			const unplaced = occupancy?.unplaced ?? [];
+			const shownUnplaced = unplaced.slice(0, 12);
+			const occupancySection = occupancy ? R.createElement("section", {
+				key: "occupancy",
+				className: "tower__occupancy",
+				"data-testid": "tower-occupancy",
+				"data-agents-source": occupancy.agents_source ?? "",
+				"data-seat-source": occupancy.seat_source ?? ""
+			}, [R.createElement("p", {
+				key: "summary",
+				className: "tower__occupancySummary",
+				"data-testid": "tower-occupancy-summary"
+			}, `${occupancy.counts.placed ?? 0} staffed · ${occupancy.counts.unplaced ?? 0} unplaced · ${occupancy.counts.occupied_desks ?? 0} occupied desks`), unplaced.length ? R.createElement("div", {
+				key: "list",
+				className: "tower__unplaced",
+				"data-testid": "tower-unplaced"
+			}, [
+				R.createElement("span", {
+					key: "title",
+					className: "tower__unplacedTitle"
+				}, "Unplaced agents"),
+				...shownUnplaced.map((who) => R.createElement("span", {
+					key: who.agent_id,
+					className: "tower__unplacedAgent",
+					"data-testid": "tower-unplaced-agent",
+					"data-agent": who.agent_id,
+					"data-reason": who.reason,
+					title: who.placement_detail || who.reason
+				}, [R.createElement("span", {
+					key: "n",
+					className: "tower__unplacedName"
+				}, who.name), R.createElement("span", {
+					key: "r",
+					className: "tower__unplacedReason"
+				}, who.reason)])),
+				unplaced.length > shownUnplaced.length ? R.createElement("span", {
+					key: "more",
+					className: "tower__unplacedMore",
+					"data-testid": "tower-unplaced-more"
+				}, `+${unplaced.length - shownUnplaced.length} more`) : null
+			]) : R.createElement("p", {
+				key: "none",
+				className: "tower__unplacedNone",
+				"data-testid": "tower-unplaced-none"
+			}, "Every Business OS agent has an explicit tower desk.")]) : null;
 			const detail = selected ? R.createElement("aside", {
 				key: "detail",
 				className: "tower__detail" + (selected.active_by_default ? " is-active" : " is-dormant"),
@@ -195836,6 +196000,7 @@ create: function(game) {
 					detailRow("expansion", "Expansion", `${selected.expansion_allowed ? "allowed" : "locked"} · ${capText(selected.max_rooms, "rooms")} · ${capText(selected.max_agents, "agents")}`, "tower-detail-expansion")
 				]),
 				scene ? roomScene(scene) : null,
+				occupancySection,
 				R.createElement("p", {
 					key: "note",
 					className: "tower__detailNote",

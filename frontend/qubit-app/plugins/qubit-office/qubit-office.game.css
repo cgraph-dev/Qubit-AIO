@@ -1829,6 +1829,118 @@
   border-color: var(--office-ok);
 }
 
+.tower__deskInitial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--office-void);
+  font-size: 0.42rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tower__occupants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 var(--office-s2) var(--office-s1);
+}
+
+.tower__occupant {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 12rem;
+  padding: 1px 6px 1px 3px;
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  background: color-mix(in srgb, var(--office-ok) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--office-ok) 55%, transparent);
+  border-radius: 999px;
+}
+
+.tower__occupantInitial {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 2px;
+  color: var(--office-void);
+  font-size: 0.5rem;
+  font-weight: 700;
+  background: var(--office-ok);
+  border-radius: 999px;
+}
+
+.tower__occupantEmoji {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.tower__occupantName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tower__occupancy {
+  display: grid;
+  gap: var(--office-s1);
+  padding: var(--office-s2);
+  border: 1px solid color-mix(in srgb, var(--office-line-strong) 70%,
+    transparent);
+  border-radius: 2px;
+}
+
+.tower__occupancySummary {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__unplaced {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.tower__unplacedTitle {
+  flex-basis: 100%;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__unplacedAgent {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  max-width: 100%;
+  padding: 1px 6px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  border: 1px dashed color-mix(in srgb, var(--office-line-strong) 80%,
+    transparent);
+  border-radius: 999px;
+}
+
+.tower__unplacedReason {
+  color: var(--office-warn, var(--office-muted));
+  font-size: 0.55rem;
+}
+
+.tower__unplacedMore,
+.tower__unplacedNone {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
 .tower__room.is-dormant .tower__desk {
   opacity: 0.55;
 }
