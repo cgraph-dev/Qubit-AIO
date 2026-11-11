@@ -192380,6 +192380,21 @@ create: function(game) {
 	function samePlace(a, b) {
 		return a.kind === b.kind && a.building === b.building && a.floor === b.floor && a.room === b.room;
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/brand.ts
+	var OFFICE_BRAND = {
+		id: "qubit-office",
+		name: "Qubit Office",
+		shortName: "Office",
+		title: "Qubit Office",
+		description: "Qubit Office — your agents' office: who is working, who needs you, and what was delivered.",
+		logoPath: "/favicon.svg",
+		credit: "Office art: LimeZu — https://limezu.itch.io",
+		creditUrl: "https://limezu.itch.io",
+		legalLabel: "Qubit Office includes modified Habblaud under the MIT License.",
+		legalUrl: "/plugin-apps/qubit-office/habblaud/LICENSE",
+		upstream: "https://github.com/marmottajr/habblaud",
+		upstreamCommit: "4ccce2537472fe5a8d432f06974494d2e778ff15"
+	};
 	// ../qubit-app/plugins/qubit-office/game/ui/HudPanel.ts
 	/** The HUD's own dashboard route. Framed by the dock; also the fallback link. */
 	var HUD_PATH = "/qubit-hud";
@@ -193744,7 +193759,7 @@ create: function(game) {
 			client: "recording/replay",
 			qubit: null,
 			readOnly: true,
-			note: "Qubit has no Habblaud screen recording/replay source."
+			note: "Qubit has no screen recording/replay source."
 		}
 	];
 	var SNAPSHOT_ROUTE = "/agent/api/office/tower";
@@ -193772,8 +193787,8 @@ create: function(game) {
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
 	/** Always-present art credit; it must not depend on a theme being active. */
-	var OFFICE_ART_CREDIT = "Office art: LimeZu — https://limezu.itch.io";
-	var OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
+	var OFFICE_ART_CREDIT = OFFICE_BRAND.credit;
+	var OFFICE_ART_CREDIT_URL = OFFICE_BRAND.creditUrl;
 	/**
 	* The theme the host page asked for (`/qubit-office?theme=<id>`).
 	*
@@ -193937,10 +193952,10 @@ create: function(game) {
 				R.createElement("iframe", {
 					key: "frame",
 					ref: frameRef,
-					title: "Habblaud virtual office",
+					title: OFFICE_BRAND.title,
 					"data-testid": "office-app-frame",
 					className: "office-game__frame",
-					"aria-label": "Habblaud office game",
+					"aria-label": OFFICE_BRAND.name,
 					"aria-describedby": "office-app-description",
 					"aria-busy": !loaded && !failed,
 					"data-state": failed ? "error" : loaded ? "ready" : "loading",
@@ -193957,7 +193972,7 @@ create: function(game) {
 					key: "description",
 					id: "office-app-description",
 					className: "office-game__sr-only"
-				}, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled."),
+				}, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled.`),
 				R.createElement("div", {
 					key: "credits",
 					className: "office-game__credits",
@@ -193969,7 +193984,11 @@ create: function(game) {
 					href: OFFICE_ART_CREDIT_URL,
 					target: "_blank",
 					rel: "noopener noreferrer"
-				}, OFFICE_ART_CREDIT))
+				}, OFFICE_ART_CREDIT), R.createElement("span", { key: "sep" }, " · "), R.createElement("a", {
+					key: "legal",
+					href: OFFICE_BRAND.legalUrl,
+					title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`
+				}, OFFICE_BRAND.legalLabel))
 			];
 			if (!loaded && !failed) children.push(R.createElement("div", {
 				key: "loading",
