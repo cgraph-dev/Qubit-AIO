@@ -158,10 +158,20 @@ def main() -> int:
             mod.unlink(missing_ok=True)
         else:
             mod.write_bytes(_preexisting)
-    print(p.stdout)
+    # Write the check's report to the REAL stdout fd, not `sys.stdout`.
+    # The idle-proof handler this probe serves (`/agent/api/health/idle`) reaches
+    # `tui_gateway.server` on first use, and that module does a process-wide
+    # `sys.stdout = sys.stderr` at import. After it lands, `print()` silently
+    # goes to stderr and the caller (`tests/test_office_hud_drawer.py`, which
+    # asserts `"ALL CHECKS PASS" in run.stdout`) sees an empty stdout even
+    # though the check passed. `os.write(1, ...)` is unaffected by the rebind.
+    report = p.stdout
     if p.stderr.strip():
-        print("--- stderr ---")
-        print(p.stderr[-4000:])
+        report += "--- stderr ---\n" + p.stderr[-4000:]
+    try:
+        os.write(1, report.encode("utf-8", "replace"))
+    except OSError:
+        print(report)          # no usable fd 1 (closed pipe): best effort
     return p.returncode
 
 
