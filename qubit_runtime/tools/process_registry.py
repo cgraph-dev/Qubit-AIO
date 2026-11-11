@@ -355,6 +355,12 @@ def _build_systemd_scope_argv(shell_argv: list[str], unit_suffix: str) -> list[s
 # the PTY protocol, or the direct-spawn path used when systemd is unavailable.
 _AGENT_SCOPE_SLICE = "qubit-agents.slice"
 _AGENT_SCOPE_DISABLED_VALUES = frozenset({"0", "false", "no", "off"})
+#: Cache for the slice-specific probe.  The generic probe above only proves that a
+#: scope can be created; a host that rejects ``qubit-agents.slice`` would let this
+#: wrapper start and immediately exit, without raising the OSError the PTY fallback
+#: catches.  Probe the same ``--slice`` flag once per TTL before wrapping.
+_AGENT_SLICE_AVAILABLE: Optional[bool] = None
+_AGENT_SLICE_PROBED_AT = 0.0
 
 
 def agent_cgroup_isolation_enabled() -> bool:
@@ -364,6 +370,59 @@ def agent_cgroup_isolation_enabled() -> bool:
     restores the pre-isolation direct spawn.
     """
     return os.getenv("QUBIT_AGENT_CGROUP_ISOLATION", "1").strip().lower() not in _AGENT_SCOPE_DISABLED_VALUES
+
+
+def _agent_slice_cached() -> Optional[bool]:
+    if _AGENT_SLICE_AVAILABLE is None:
+        return None
+    stale = time.monotonic() - _AGENT_SLICE_PROBED_AT >= _SYSTEMD_SCOPE_PROBE_TTL_SECONDS
+    return None if stale else _AGENT_SLICE_AVAILABLE
+
+
+def _agent_scope_slice_available() -> bool:
+    """True when ``systemd-run --user --scope --slice=qubit-agents.slice`` works.
+
+    The generic scope probe does not include the slice argument, so a host that
+    cannot create this slice would accept the wrapper and exit before the PTY
+    child starts.  This probe uses the same flags a real spawn will use and is
+    cached on the shared TTL.
+    """
+    global _AGENT_SLICE_AVAILABLE, _AGENT_SLICE_PROBED_AT
+    cached = _agent_slice_cached()
+    if cached is not None:
+        return cached
+    with _SYSTEMD_SCOPE_PROBE_LOCK:
+        cached = _agent_slice_cached()
+        if cached is not None:
+            return cached
+        available = False
+        if _IS_LINUX:
+            import shutil
+            binary = shutil.which("systemd-run")
+            if binary:
+                no_expand = ["--expand-environment=no"] if _SYSTEMD_RUN_NO_EXPAND else []
+                unit = f"qubit-agent-probe-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+                try:
+                    result = subprocess.run(
+                        [binary, "--user", "--scope", "--quiet", *no_expand,
+                         "--unit", unit, "--collect",
+                         f"--slice={_AGENT_SCOPE_SLICE}",
+                         "--", "/bin/sh", "-c", "exit 0"],
+                        stdin=subprocess.DEVNULL, capture_output=True,
+                        timeout=3, env=systemd_user_bus_env(), check=False,
+                    )
+                    available = result.returncode == 0
+                    if not available:
+                        logger.debug(
+                            "agent slice probe failed (rc=%s): %s",
+                            result.returncode,
+                            (result.stderr or b"").decode("utf-8", "replace").strip(),
+                        )
+                except Exception as exc:
+                    logger.debug("agent slice probe error: %s", exc)
+        _AGENT_SLICE_AVAILABLE = available
+        _AGENT_SLICE_PROBED_AT = time.monotonic()
+        return available
 
 
 def _running_in_service_cgroup() -> bool:
@@ -422,6 +481,11 @@ def build_agent_scope_argv(argv: Sequence[str], *, unit_suffix: str) -> Optional
             "agent cgroup isolation unavailable (systemd-run --user --scope probe failed, "
             "usually no reachable user D-Bus session); agent PTY children share the "
             "launching service cgroup")
+        return None
+    if not _agent_scope_slice_available():
+        logger.info(
+            "agent cgroup isolation unavailable (cannot create %s); agent PTY children "
+            "share the launching service cgroup", _AGENT_SCOPE_SLICE)
         return None
     no_expand = ["--expand-environment=no"] if _SYSTEMD_RUN_NO_EXPAND else []
     return [

@@ -24,6 +24,8 @@ import qubit_cli.pty_bridge as pty_bridge
 from qubit_cli.pty_bridge import PTY_HOST_DASHBOARD, PTY_HOST_ENV, PtyBridge
 from tools import process_registry as pr
 
+_AGENT_SLICE_PROBE = pr._agent_scope_slice_available
+
 skip_on_windows = pytest.mark.skipif(
     sys.platform.startswith("win"), reason="PTY bridge is POSIX-only"
 )
@@ -34,6 +36,9 @@ def _fresh_scope_probe(monkeypatch):
     """Never inherit a cached systemd verdict or cgroup classification from another test."""
     monkeypatch.setattr(pr, "_SYSTEMD_SCOPE_AVAILABLE", None, raising=False)
     monkeypatch.setattr(pr, "_SYSTEMD_SCOPE_PROBED_AT", 0.0, raising=False)
+    monkeypatch.setattr(pr, "_AGENT_SLICE_AVAILABLE", None, raising=False)
+    monkeypatch.setattr(pr, "_AGENT_SLICE_PROBED_AT", 0.0, raising=False)
+    monkeypatch.setattr(pr, "_agent_scope_slice_available", lambda: True, raising=False)
     monkeypatch.delenv("QUBIT_AGENT_CGROUP_ISOLATION", raising=False)
 
 
@@ -114,6 +119,40 @@ class TestBuildAgentScopeArgv:
         # No --pty: the caller's controlling terminal must be preserved.
         assert "--pty" not in argv
         assert argv[-3:] == ["--", "qubit", "--tui"]
+
+    def test_slice_probe_failure_disables_scope(self, monkeypatch):
+        _enable_service(monkeypatch)
+        monkeypatch.setattr(pr, "_IS_LINUX", True)
+        monkeypatch.setattr(pr, "_systemd_run_user_scope_available", lambda: True)
+        monkeypatch.setattr(pr, "_agent_scope_slice_available", lambda: False)
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/systemd-run")
+
+        assert pr.build_agent_scope_argv(["x"], unit_suffix="a") is None
+
+    def test_slice_probe_uses_the_real_slice_flag(self, monkeypatch):
+        monkeypatch.setattr(pr, "_IS_LINUX", True)
+        monkeypatch.setattr(pr, "_SYSTEMD_RUN_NO_EXPAND", True)
+        monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/systemd-run")
+        captured = {}
+
+        class _Result:
+            returncode = 0
+            stderr = b""
+
+        def _run(argv, **kwargs):
+            captured["argv"] = argv
+            return _Result()
+
+        monkeypatch.setattr(pr.subprocess, "run", _run)
+        monkeypatch.setattr(pr, "_agent_scope_slice_available", _AGENT_SLICE_PROBE, raising=False)
+        monkeypatch.setattr(pr, "_AGENT_SLICE_AVAILABLE", None, raising=False)
+        monkeypatch.setattr(pr, "_AGENT_SLICE_PROBED_AT", 0.0, raising=False)
+
+        assert pr._agent_scope_slice_available() is True
+        argv = captured["argv"]
+        assert "--slice=qubit-agents.slice" in argv
+        assert argv[-4:] == ["--", "/bin/sh", "-c", "exit 0"]
+        assert argv[argv.index("--unit") + 1].startswith("qubit-agent-probe-")
 
     def test_disabled_knob_returns_none(self, monkeypatch):
         _enable_service(monkeypatch)
