@@ -28,9 +28,10 @@ import hashlib
 import json
 import secrets
 import sqlite3
-from typing import Any, Dict, Mapping, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 from ..office.world import model as WORLD
+from ..office.world import occupancy as OCCUPANCY
 from . import agents as AGENTS
 from . import office_seats as OFFICE_SEATS
 from . import pilot as ETSY_PILOT
@@ -360,7 +361,70 @@ def h_business_floors(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _error(exc)
 
 
-def _world_room(room: Any, *, active: bool) -> Dict[str, Any]:
+def _truthy(value: Any) -> bool:
+    return str(value or "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _occupancy_agent_records(cfg: Any) -> Tuple[list[Dict[str, Any]], str]:
+    """Read Business OS agent records through a read-only SQLite connection.
+
+    A missing database is an empty, named state. This function never creates
+    the store, never migrates it and never writes: ``?staffed=1`` must stay a
+    read even on a machine that has never run the bootstrap.
+    """
+    store = BusinessStore.from_config(cfg)
+    path = store.path
+    if not path.exists():
+        return [], "missing"
+    conn = None
+    try:
+        conn = sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT agent_id, tenant_id, business_id, department,"
+            " display_name, status, desk, room, role_id, metadata_json"
+            " FROM bos_agent ORDER BY agent_id"
+        ).fetchall()
+    except sqlite3.Error:
+        return [], "unavailable"
+    finally:
+        if conn is not None:
+            conn.close()
+    agents: list[Dict[str, Any]] = []
+    for row in rows:
+        try:
+            metadata = json.loads(row["metadata_json"] or "{}")
+        except (TypeError, ValueError):
+            metadata = {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        agents.append({
+            "agent_id": row["agent_id"],
+            "tenant_id": row["tenant_id"],
+            "business_id": row["business_id"],
+            "department": row["department"] or "",
+            "display_name": row["display_name"] or "",
+            "status": row["status"] or "active",
+            "desk": row["desk"] or "",
+            "room": row["room"] or "",
+            "role_id": row["role_id"] or "",
+            "metadata": metadata,
+        })
+    return agents, "business_db"
+
+
+def _occupancy_seat_records() -> Tuple[list[Dict[str, Any]], str]:
+    """Read the office-plan seat list (filesystem only; no network, no store)."""
+    try:
+        _plan, seats = OFFICE_SEATS.plan_building_seats()
+    except Exception:  # noqa: BLE001 - a read surface must not 500
+        return [], "unavailable"
+    return [dict(seat) for seat in seats], "office_plan"
+
+
+def _world_room(room: Any, *, active: bool,
+                occupants: Optional[Mapping[str, Dict[str, Any]]] = None
+                ) -> Dict[str, Any]:
     """Project one room template into the world scene shape.
 
     Cells come from :mod:`voicebridge.office.world.model`, which owns the fixed
@@ -387,7 +451,7 @@ def _world_room(room: Any, *, active: bool) -> Dict[str, Any]:
                         "w": int(desk.width),
                         "h": int(desk.height),
                     },
-                    "occupied_by": desk.seat.occupied_by,
+                    "occupied_by": (occupants or {}).get(desk.desk_id),
                 }
                 for desk in cell.desks
             ],
@@ -411,13 +475,26 @@ def h_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                   p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """GET /api/office/world/tower -> the 100-floor tower as room scenes.
 
-    A pure projection over the shipped floor/room templates. It is explicitly
-    unstaffed: rooms are template scenes with empty desk slots, not agents.
-    The endpoint is read-only and never creates a floor, a room, a seat or a
+    A pure projection over the shipped floor/room templates. By default it is
+    explicitly unstaffed: rooms are template scenes with empty desk slots, not
+    agents. ``?staffed=1`` adds the explicit occupancy projection: a Business
+    OS agent reaches a desk only through an explicit link, and an unmatched
+    agent is returned in ``occupancy.unplaced`` with its reason. The endpoint
+    is read-only and never creates a floor, a room, a seat, an agent or a
     Business OS record.
     """
     try:
         registry = _registry()
+        staffed_mode = _truthy((q or {}).get("staffed"))
+        projection = None
+        occupants: Dict[str, Dict[str, Any]] = {}
+        agents_source = seat_source = ""
+        if staffed_mode:
+            records, agents_source = _occupancy_agent_records(cfg)
+            seats, seat_source = _occupancy_seat_records()
+            projection = OCCUPANCY.project_occupancy(
+                registry=registry, agents=records, office_seats=seats)
+            occupants = projection.by_desk()
         floors: Dict[str, Any] = []
         wing_order: list[str] = []
         wing_counts: Dict[str, Dict[str, int]] = {}
@@ -425,8 +502,9 @@ def h_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         for floor in registry.floors:
             if floor.wing not in wing_order:
                 wing_order.append(floor.wing)
-            rooms = [_world_room(room, active=floor.active_by_default)
-                     for room in floor.rooms]
+            rooms = [_world_room(
+                room, active=floor.active_by_default,
+                occupants=occupants or None) for room in floor.rooms]
             floor_cells = sum(room["cell_count"] for room in rooms)
             floor_desks = sum(room["capacity"] for room in rooms)
             active_rooms = sum(1 for room in rooms if room["active"])
@@ -476,10 +554,11 @@ def h_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             }
             for wing in wing_order
         ]
-        return _ok(
+        occupancy_counts = projection.counts() if projection else {}
+        payload = _ok(
             WORLD_SCHEMA,
             source="templates",
-            staffed=False,
+            staffed=bool(occupancy_counts.get("placed")),
             campus={"campus_id": "campus:office", "name": "Qubit Office"},
             counts={
                 "floors": len(floors),
@@ -491,11 +570,20 @@ def h_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                 "desks": desk_total,
                 "active_rooms": active_room_total,
                 "dormant_rooms": room_total - active_room_total,
-                "agents": 0,
+                "agents": int(occupancy_counts.get("placed", 0)),
+                "occupied_desks": int(occupancy_counts.get("placed", 0)),
             },
             wings=wings,
             floors=floors,
-        )
+        )[1]
+        if projection is not None:
+            occupancy = OCCUPANCY.occupancy_payload(projection)
+            occupancy["agents_source"] = agents_source
+            occupancy["seat_source"] = seat_source
+            occupancy["requested"] = True
+            payload["occupancy"] = occupancy
+            payload["staffed"] = bool(occupancy["staffed"])
+        return 200, payload
     except Exception as exc:  # noqa: BLE001
         return _error(exc)
 
