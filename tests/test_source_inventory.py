@@ -347,6 +347,144 @@ def test_omissions_report_consistent(inventory, omissions_text):
     assert om["unreproducible_evidence"] == []
 
 
+def test_normalise_route_erases_placeholder_names():
+    """``{job_id}`` / ``(?P<id>[^/]+)`` compare equal; nothing else is erased.
+
+    A non-greedy ``\\{[^}]*\\}`` leaves the regex form untouched: the
+    ``[^/]`` inside ``(?P<id>[^/]+)`` closes the brace match early, so every
+    parameterized compat route failed the normalised comparison and read as
+    MISSING even with a literal identical shape.
+    """
+    import importlib.machinery
+    import importlib.util
+
+    loader = importlib.machinery.SourceFileLoader(
+        "source_inventory_under_test", str(SCRIPT))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    norm = mod._normalise_route
+    assert norm("GET /api/cron/jobs/{job_id}") == "GET /api/cron/jobs/{}"
+    assert norm("GET /api/cron/jobs/(?P<id>[^/]+)") == "GET /api/cron/jobs/{}"
+    assert norm("GET /api/cron/jobs/{job_id}") == norm(
+        "GET /api/cron/jobs/(?P<id>[^/]+)")
+    # Two params keep their positions: erasing names must not collapse shape.
+    assert norm("GET /a/{x}/b/{y}") == "GET /a/{}/b/{}"
+    assert norm("GET /a/{x}/b") != norm("GET /a/b/{y}")
+    # A concrete segment is never erased.
+    assert norm("GET /api/sessions/empty/count") == "GET /api/sessions/empty/count"
+
+
+def test_route_disposition_discriminates_served_from_absent():
+    """Positive controls resolve; negative controls stay MISSING.
+
+    Guards the ``GET /api/sessions/{session_id}`` trap: an upstream
+    ``{param}`` segment is a required path segment, never a wildcard that
+    swallows the literal ``{session_id}/export`` fragment.
+    """
+    import importlib.machinery
+    import importlib.util
+
+    loader = importlib.machinery.SourceFileLoader(
+        "source_inventory_under_test", str(SCRIPT))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    surfaces = {
+        "cli": set(),
+        "route": {"GET /api/cron/jobs", "GET /api/cron/jobs/{id}/runs",
+                  "DELETE /api/mcp/servers/{id}",
+                  "GET /api/sessions/(?!shares$){id}"},
+        "page": set(), "spa": set(),
+    }
+    surfaces["route_norm"] = {mod._normalise_route(r) for r in surfaces["route"]}
+
+    def disposition(method, route):
+        return mod._live_surface_disposition(
+            REPO_ROOT,
+            {"category": "qubit_backend_route", "id": f"api:{method} {route}",
+             "method": method, "route": route},
+            surfaces)
+
+    # A path catch-all template normalises to one segment and must not claim a
+    # concrete single-segment route: the dispatcher runs ``re.fullmatch``, so
+    # ``/api/health`` is never served by ``/{full_path:path}``.
+    surfaces["route"].add("GET /{full_path:path}")
+    surfaces["route_norm"] = {mod._normalise_route(r) for r in surfaces["route"]}
+    assert disposition("GET", "/api/health") is None
+    assert disposition("GET", "/{full_path:path}")  # its own literal row
+
+    # Positives: same shape, differently-named parameter (or a lookahead).
+    assert disposition("GET", "/api/cron/jobs/{job_id}/runs")
+    assert disposition("DELETE", "/api/mcp/servers/{name}")
+    assert disposition("GET", "/api/sessions/{session_id}")
+    # A path catch-all is one segment upstream but zero-or-more on the wire: it
+    # must never claim a concrete single-segment route. (No live registration of
+    # ``/{full_path:path}`` exists, and none must be invented as a stand-in.)
+    surfaces["route"].add("GET /dashboard-plugins/providers/x")
+    surfaces["route_norm"] = {mod._normalise_route(r) for r in surfaces["route"]}
+    assert disposition("GET", "/dashboard-plugins/providers/x")
+    # Negatives: must never be claimed as served.
+    assert disposition("GET", "/api/definitely-not-real") is None
+    assert disposition("POST", "/api/cron/jobs/{job_id}/nope") is None
+    assert disposition("PUT", "/api/cron/jobs/{job_id}") is None
+    # A REQUIRED extra segment is a different route: ``{id}/export`` is not
+    # served by the bare ``/api/sessions/{id}`` row. (``/export`` itself is a
+    # real registration, so the discriminating pair must not contain it.)
+    assert disposition("GET", "/api/sessions/{session_id}/timeline/extra") is None
+
+
+def test_route_rows_never_match_a_sibling_route_by_name_fragment():
+    """A route item is keyed by ``METHOD /path``; a shared ``name:path`` is not it.
+
+    Four upstream routes carry the fragment ``name:path``. Falling through to
+    the name matcher returned the first sibling route row for all of them, so
+    three unported routes (/``{full_path:path}``, ``/dashboard-plugins/...``,
+    the MCP OAuth callback) closed on
+    ``api:DELETE /api/dashboard/agent-plugins/{name:path}``'s row while that
+    row itself stayed open.
+    """
+    import importlib.machinery
+    import importlib.util
+
+    loader = importlib.machinery.SourceFileLoader(
+        "source_inventory_under_test", str(SCRIPT))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    all_ids = {"inv:api:DELETE_/api/dashboard/agent-plugins/{name:path}"}
+    # A name matcher that WOULD resolve the shared fragment: this is what the
+    # old fallthrough used, and it is exactly what must no longer be consulted
+    # for a route.
+    hit = ("qubit", {"id": "inv:api:DELETE_/api/dashboard/agent-plugins/{name:path}"})
+    find_by_name = lambda _name: hit  # noqa: E731 - prove it is not used
+    # Positive control: the row's own id still matches itself (when an id is
+    # shaped like a ledger row id at all).
+    assert mod._match_hermes_item(
+        {"category": "qubit_backend_route", "name": "GET /api/cron/jobs/{job_id}",
+         "id": "inv:api:GET_/api/cron/jobs/{job_id}", "method": "GET",
+         "route": "/api/cron/jobs/{job_id}"},
+        all_ids | {"inv:api:GET_/api/cron/jobs/{job_id}"},
+        find_by_name) == "inv:api:GET_/api/cron/jobs/{job_id}"
+    # Negative control: a sibling sharing the ``name:path`` fragment does not.
+    for method, route in (("GET", "/{full_path:path}"),
+                          ("GET", "/dashboard-plugins/{plugin_name}/{file_path:path}"),
+                          ("GET", "/api/mcp/oauth/callback/{server_name:path}")):
+        assert mod._match_hermes_item(
+            {"category": "qubit_backend_route", "name": f"{method} {route}",
+             "id": f"api:{method} {route}", "method": method, "route": route},
+            all_ids, find_by_name) is None
+    # The declared rename still resolves (it is an exact route mapping).
+    assert mod._match_hermes_item(
+        {"category": "qubit_backend_route", "name": "POST /api/hermes/update",
+         "id": "api:POST /api/hermes/update", "method": "POST",
+         "route": "/api/hermes/update"},
+        {"api:POST /api/qubit/update"}, find_by_name) == "api:POST /api/qubit/update"
+
+
 @pytest.mark.skipif(not _pins_available(),
                     reason="pinned upstream trees not present")
 def test_committed_inventory_in_sync(tmp_path):

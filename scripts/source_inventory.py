@@ -544,7 +544,7 @@ def _live_cli_positional_surface(repo: Path) -> set[str]:
 
 
 def _normalise_route(route: str) -> str:
-    """A route with regex decoration removed: ``{job_id}`` -> ``{}``, ``x.*`` -> ``x``.
+    """A route with regex decoration removed: ``{job_id}``/``(?P<id>...)`` -> ``{}``.
 
     The two trees spell path parameters differently (upstream ``{job_id}``,
     compat ``(?P<id>...)``) and the compat layer also registers optional
@@ -552,7 +552,15 @@ def _normalise_route(route: str) -> str:
     entry under it). Both differences describe the SAME path shape, which is the
     question being asked; comparing raw strings turns a served route into a
     MISSING row for spelling alone.
+
+    A parameter stands for exactly ONE required path segment. That is what keeps
+    ``/api/sessions/{session_id}`` from swallowing
+    ``/api/sessions/{session_id}/export``: the segment count still has to match.
+    A lookaround consumes nothing, so it is dropped outright.
     """
+    route = re.sub(r"\(\?P<[A-Za-z_][A-Za-z0-9_]*>[^)]*\)", "{}", route)
+    route = re.sub(r"\(\?:?\^?\[\^/\]\+\)", "{}", route)
+    route = re.sub(r"\(\?[=!][^()]*(?:\([^()]*\)[^()]*)*\)", "", route)
     route = re.sub(r"\{[^}]*\}", "{}", route)
     # A trailing ``.*`` makes the route match itself and anything under it, so
     # the bare path is the shape an inventory id names.
@@ -786,6 +794,7 @@ def _live_surface_disposition(repo: Path, item: dict,
                 "status": "IMPLEMENTED", "capability": "qubit_backend_route",
                 "backend": "voicebridge.qubit_compat:_r",
                 "proving_test": "tests/test_backend_routes_integration8u.py",
+                "match_strategy": "literal",
                 "reason": (f"{method} {route} is registered by a literal "
                            "`_r(...)` call in voicebridge/qubit_compat.py."),
                 "needs": "none",
@@ -798,10 +807,14 @@ def _live_surface_disposition(repo: Path, item: dict,
         # spell the wildcard differently.
         normalised = _normalise_route(f"{method} {route}")
         if normalised in surfaces.get("route_norm", set()):
+            candidates = sorted(r for r in surfaces["route"]
+                                if _normalise_route(r) == normalised)
             return {
                 "status": "IMPLEMENTED", "capability": "qubit_backend_route",
                 "backend": "voicebridge.qubit_compat:_r",
                 "proving_test": "tests/test_backend_routes_integration8u.py",
+                "match_strategy": "normalised_shape",
+                "matched_route": candidates[0],
                 "reason": (f"{method} {route} is served by a `_r(...)` route with "
                            "the same path shape and a differently-named path "
                            "parameter in voicebridge/qubit_compat.py."),
@@ -2259,13 +2272,28 @@ def _match_hermes_item(item: dict, all_ids: set, find_by_name):
         if lid in all_ids:
             return lid
     elif cat == "qubit_backend_route":
-        if item["id"] in all_ids:
-            return item["id"]
+        # A route is keyed by ``METHOD /path`` -- never by a bare name. The
+        # generic name fallthrough below is what used to resolve routes, and
+        # because four upstream routes share the ``name:path`` fragment
+        # (``GET /{full_path:path}``,
+        # ``GET /dashboard-plugins/{plugin_name}/{file_path:path}``, the MCP
+        # OAuth callback, ``DELETE /api/dashboard/agent-plugins/{name:path}``)
+        # each of them "matched" whichever sibling row came first. Resolve a
+        # route only by: its own row id, its declared rename, or the typed-gate
+        # row the ledger designates as the parent of a gated upstream route.
+        if str(item.get("id") or "") in all_ids:
+            return str(item["id"])
         renamed = _UPSTREAM_ROUTE_RENAMES.get(str(item.get("route") or ""))
         if renamed:
             candidate = f"api:{item.get('method')} {renamed}"
             if candidate in all_ids:
                 return candidate
+        # ``Gated upstream route: <CODE>`` rows exist so a route Qubit refuses
+        # by policy is covered by that refusal rather than dropped. Those codes
+        # are already carried by the registry's own gate table, which
+        # ``_live_surface_disposition`` reads; a route with a real handler must
+        # NOT be attributed to a gate row (that is the same name-collision bug).
+        return None
     elif cat == "hermes_dashboard_page":
         rid = f"dashboard:/{item['name'].replace('Page', '').lower()}"
         if rid in all_ids:

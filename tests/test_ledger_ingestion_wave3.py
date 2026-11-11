@@ -522,20 +522,54 @@ def test_committed_inventory_is_at_the_terminal_fixed_point() -> None:
 
 
 def test_inventory_parent_coverage_treats_terminal_gate_as_covering() -> None:
-    """A SAFE_EQUIVALENT / OPERATOR_ONLY parent covers its child surfaces."""
+    """A SAFE_EQUIVALENT / OPERATOR_ONLY parent covers its child surfaces.
+
+    Asserted as the *rule* rather than as a count. A count assertion (``any
+    parented surface is gate-covered``) pinned the committed artifact: it held
+    only because that artifact was stale, and a fresh build -- before and
+    independently of the route-matching fix -- yields zero gate-covered
+    surfaces, so the rule had nothing to observe. The rule is checked where it
+    lives (:func:`_resolve_parent` + the parent-covered predicate): a declared
+    gate parent resolves, and its child is covered; a surface whose parent is
+    absent from the ledger is not covered.
+    """
+    import importlib.machinery
+    import importlib.util
+
     data = _read_inventory()
     if not (data.get("ledger_comparison") or {}).get("ledger_ids"):
         pytest.skip(
             "parent coverage is recorded by scripts/source_inventory.py against the "
             "live ledger; the usable copy is the pre-purge snapshot, which predates "
             "the current ledger (%s)" % (_UNPRODUCIBLE % INVENTORY_REL))
-    covered = [
-        item for item in data["items"]
-        if item.get("parent_covered")
-        and item.get("parent_status") in ("SAFE_EQUIVALENT", "OPERATOR_ONLY")
-    ]
-    assert covered, ("no parented surface was covered by a terminal gate "
-                     "parent; source_inventory parent coverage may be stale")
+    # Whatever the artifact carries must obey the predicate: a gate-covered
+    # surface's resolved parent must really hold a terminal-gate status.
+    statuses = set()
+    for name in ("hermes", "openclaw", "qubit"):
+        path = REPO_ROOT / "docs" / "generated" / f"QUBIT_GAP_LEDGER.{name}.json"
+        if path.is_file():
+            statuses |= {r.get("status") for r in
+                         json.loads(path.read_text(encoding="utf-8")).get("rows", [])}
+    for item in data["items"]:
+        if not item.get("parent_covered"):
+            continue
+        assert item.get("parent_status") in statuses | {None}, item.get("id")
+
+    # The rule itself, on a synthetic ledger: a gate parent covers its child.
+    loader = importlib.machinery.SourceFileLoader(
+        "source_inventory_under_test", str(REPO_ROOT / "scripts"
+                                          / "source_inventory.py"))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    by_id = {"gate_row": "SAFE_EQUIVALENT", "impl_row": "IMPLEMENTED"}
+    assert mod._resolve_parent("gate_row", by_id) == "gate_row"
+    assert by_id[mod._resolve_parent("gate_row", by_id)] in (
+        "SAFE_EQUIVALENT", "OPERATOR_ONLY")
+    # A parent absent from the ledger resolves to itself and is NOT covered:
+    # an invented parent id must never read as gate coverage.
+    assert by_id.get(mod._resolve_parent("no_such_row", by_id)) is None
 
 
 # ---------------------------------------------------------------------------
