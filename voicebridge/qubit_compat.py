@@ -7656,12 +7656,53 @@ def h_ops_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ops_result(out)
 
 
+_APPROVAL_DISPLAY_FIELDS = ("action", "risk", "requested_by", "session",
+                            "op", "name", "target")
+
+
+def _approval_display_meta(approval: Any) -> Dict[str, str]:
+    """Safe, redacted display metadata for a pending approval row.
+
+    The journal's ``meta`` carries whatever the staging channel needed to
+    settle the record (staged args, sensitive-field NAMES, payloads, digests).
+    None of that belongs on the read surface: it is either secret-bearing or
+    meaningless to a reviewer. Only the bounded, human-meaningful keys are
+    projected, and every value passes the same redaction as the summary.
+    """
+    meta = getattr(approval, "meta", {}) or {}
+    if not isinstance(meta, dict):
+        return {}
+    out: Dict[str, str] = {}
+    for key in _APPROVAL_DISPLAY_FIELDS:
+        value = meta.get(key)
+        if value in (None, "", []):
+            continue
+        out[key] = _redact(str(value))[:64]
+    # ``action`` reads ``op`` on dashboard confirmations; expose one canonical
+    # field so the UI does not have to know each channel's spelling.
+    if "action" not in out and "op" in out:
+        out["action"] = out["op"]
+    # ``requested_by`` falls back to the actor/issuer the channel recorded.
+    if "requested_by" not in out:
+        for alias in ("actor", "issued_by", "requested_by"):
+            value = meta.get(alias)
+            if value not in (None, ""):
+                out["requested_by"] = _redact(str(value))[:64]
+                break
+    return out
+
+
 def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Pending confirmations on the SHARED journal (same records CLI
     `qubit approvals`, voice yes/no, and the classic dashboard settle).
     The pending-approvals banner polls this; confirm/cancel below settle
     through the same OPS journal path — one permission/confirmation path.
+
+    Each row additionally carries bounded, redacted DISPLAY metadata (action,
+    risk, requested_by, session) pulled from the journal record's own meta so
+    a reviewer can see what is being asked. Raw staged args/payloads/digests
+    are never projected.
     """
     from .approvals import ApprovalJournal
     journal_path = Path(cfg.state_dir()) / "approvals.jsonl"
@@ -7671,11 +7712,14 @@ def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return cached[0], cached[1]
     try:
         journal = ApprovalJournal(journal_path, default_ttl_s=120.0)
-        items = [{"id": a.id, "capability": str(a.capability or ""),
-                  "summary": _redact(a.summary)[:300],
-                  "created_at": a.created_at, "expires_at": a.expires_at,
-                  "state": a.state}
-                 for a in journal.pending()]
+        items = []
+        for a in journal.pending():
+            row = {"id": a.id, "capability": str(a.capability or ""),
+                   "summary": _redact(a.summary)[:300],
+                   "created_at": a.created_at, "expires_at": a.expires_at,
+                   "state": a.state}
+            row.update(_approval_display_meta(a))
+            items.append(row)
     except Exception as exc:
         return _fail(exc)
     result = _ok(approvals=items, count=len(items))
