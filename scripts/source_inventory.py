@@ -502,6 +502,47 @@ _CLI_PATH_ALIASES: dict[str, str] = {
 }
 
 
+def _live_cli_positional_surface(repo: Path) -> set[str]:
+    """``{"import zipfile", "sessions rename title", ...}`` from the parser.
+
+    Companion to :func:`_live_cli_surface` for ``qubit_cli_positional`` rows.
+    A positional has no ``option_strings``; it is identified by the
+    ``dest`` argparse registers on the command's own parser, so
+    ``qubit import <zipfile>`` yields ``import zipfile``.  Empty set on any
+    import/build failure, matching ``_live_cli_surface``.
+    """
+    roots = [repo / "qubit_runtime", repo]
+    for root in roots:
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+    try:
+        from qubit_cli import main as _main
+
+        built = _main._build_cli_parser()
+        parser = built[0] if isinstance(built, tuple) else built
+    except Exception:  # noqa: BLE001 - a missing CLI is not a generator failure
+        return set()
+
+    found: set[str] = set()
+
+    def _walk(actions, prefix: str) -> None:
+        for action in actions:
+            if not action.option_strings and prefix:
+                dest = getattr(action, "dest", "") or ""
+                # Only real positionals: argparse's own ``command``/``<cmd>``
+                # dispatch dest and the ``-h`` placeholder are not surfaces.
+                if dest and dest != "help" and not dest.startswith("__"):
+                    found.add(f"{prefix} {dest}")
+            choices = getattr(action, "choices", None)
+            if not isinstance(choices, dict):
+                continue
+            for name, sub in choices.items():
+                _walk(getattr(sub, "_actions", ()), f"{prefix} {name}".strip())
+
+    _walk(parser._actions, "")
+    return found
+
+
 def _normalise_route(route: str) -> str:
     """A route with its placeholder NAMES erased: ``{job_id}`` -> ``{}``.
 
@@ -588,14 +629,14 @@ def _live_surface_disposition(repo: Path, item: dict,
     """
     cat = item.get("category")
     if cat not in ("qubit_cli_command", "qubit_cli_subcommand",
-                   "qubit_cli_option", "qubit_cli_positional",
-                   "qubit_backend_route",
+                   "qubit_cli_option", "qubit_cli_positional", "qubit_backend_route",
                    "hermes_dashboard_page", "hermes_dashboard_route"):
         return None
     if surfaces is None:
         _routes = _live_route_surface(repo)
         surfaces = {
             "cli": _live_cli_surface(repo),
+            "cli_positionals": _live_cli_positional_surface(repo),
             "route": _routes,
             "route_norm": {_normalise_route(r) for r in _routes},
             "page": _live_dashboard_surface(repo),
@@ -649,24 +690,28 @@ def _live_surface_disposition(repo: Path, item: dict,
         return None
 
     if cat == "qubit_cli_positional":
-        # A positional (``hermes cron create prompt``) is carried by its command
-        # path: argparse has no name to look up, so the command's existence in
-        # the parser is the whole claim, exactly as for a subcommand. These were
-        # never dispositioned at all -- 82 of this wave's rows -- so every
-        # positional of a command that ships read MISSING.
-        cmd = str(item.get("command") or "").strip()
-        cmd = cmd[len("hermes "):] if cmd.startswith("hermes ") else cmd
-        cmd = cmd.replace("qubit ", "", 1) if cmd.startswith("qubit ") else cmd
-        live_cmd = _CLI_PATH_ALIASES.get(cmd, cmd)
-        if cmd and live_cmd in surfaces["cli"]:
+        # Positionals are parented to their command exactly like options
+        # (``hermes import zipfile`` -> command ``import``), but the parent
+        # ``cli:<command>`` rows were purged with the capability ledger, so
+        # every positional read as MISSING no matter what the parser accepts.
+        # The parser is the authority for positional names too: a command path
+        # in ``surfaces["cli"]`` whose argparse action for ``dest`` takes no
+        # ``option_strings`` is a real positional.
+        command = str(item.get("command") or "").strip()
+        command = (command[len("hermes "):] if command.startswith("hermes ")
+                   else command)
+        command = (command.replace("qubit ", "", 1)
+                   if command.startswith("qubit ") else command)
+        dest = str(item.get("name") or "").strip()
+        if command and f"{command} {dest}" in surfaces["cli_positionals"]:
             return {
-                "status": "IMPLEMENTED", "capability": "qubit_cli_positional",
+                "status": "IMPLEMENTED",
+                "capability": "qubit_cli_positional",
                 "backend": "qubit_cli.main:_build_cli_parser",
                 "proving_test": "tests/test_cli_agent1_families.py",
-                "reason": (f"the `{item.get('name') or 'positional'}` positional "
-                           f"of `qubit {live_cmd}` is a positional its live "
-                           "argparse parser declares; the command path is in "
-                           "qubit_cli.main._build_cli_parser()."),
+                "reason": (f"`qubit {command} {dest}` is a positional argument "
+                           "of a command path that "
+                           "qubit_cli.main._build_cli_parser() defines."),
                 "needs": "none",
             }
         return None
@@ -2586,6 +2631,7 @@ def build_inventory(repo: Path, hermes: Path, openclaw: Path,
     _routes = _live_route_surface(repo)
     live_surfaces = {
         "cli": _live_cli_surface(repo),
+        "cli_positionals": _live_cli_positional_surface(repo),
         "route": _routes,
         "route_norm": {_normalise_route(r) for r in _routes},
         "page": _live_dashboard_surface(repo),
