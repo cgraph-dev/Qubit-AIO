@@ -19,8 +19,11 @@ import threading
 from http.server import ThreadingHTTPServer
 from pathlib import Path
 
-REPO = Path("/tmp/qubit-v2-office-hudfix")
-sys.path.insert(0, str(REPO))
+REPO = Path(__file__).resolve().parents[1]
+# The Python packages (voicebridge, agent, ...) live under qubit_runtime/, not at
+# the repo root. The previous hardcoded /tmp path happened to have them importable
+# from the top, so insert the package root explicitly.
+sys.path.insert(0, str(REPO / "qubit_runtime"))
 
 TMP = Path(tempfile.mkdtemp())
 os.environ.update(XDG_CONFIG_HOME=str(TMP / "c"), XDG_STATE_HOME=str(TMP / "s"),
