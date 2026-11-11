@@ -210,13 +210,17 @@ class EtsyDigitalListingWorkflow:
                 worker=f"workflow:{actor}",
                 actor=actor,
             )
-        self._request_approval(
-            job.tenant_id,
-            job.business_id,
-            actor,
-            job,
-            expires_at=expires_at,
-        )
+        try:
+            self._request_approval(
+                job.tenant_id,
+                job.business_id,
+                actor,
+                job,
+                expires_at=expires_at,
+            )
+        except BusinessError as exc:
+            self._fail_job(tenant_id, job_id, actor, exc)
+            raise
         return self.state(tenant_id, job_id)
 
     def decide(
