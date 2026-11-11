@@ -531,6 +531,33 @@ export const recordWarRoomDecision = (
   `/warroom/sessions/${encodeURIComponent(sessionId)}/decisions`,
   { ...opts, method: "POST", body });
 
+export interface EtsyPilotBootstrap {
+  ok: true;
+  schema: string;
+  tenant_id: string;
+  business_id: string | null;
+  created: boolean;
+  session: WarRoomSession;
+  playbook_id: string;
+  source_ids: string[];
+  evidence_ids: string[];
+  experiment_names: string[];
+  research_provider: string;
+}
+
+/** Bootstrap the owner-reviewable Etsy digital-shop pilot.
+ *
+ * Owner intent is added by `businessFetch`. The backend records the playbook,
+ * labelled evidence and experiments, then leaves the session at
+ * `owner_decision` with no decision, task, publish, spend or contact.
+ */
+export const startEtsyPilot = (
+  body: { tenant_id?: string; business_id?: string; provider?: string;
+          idempotency_key?: string } = {},
+  opts: BusinessFetchOptions = {},
+) => businessFetch<EtsyPilotBootstrap>(
+  "/warroom/etsy-pilot", { ...opts, method: "POST", body });
+
 export const createWarRoomTasks = (
   sessionId: string, opts: BusinessFetchOptions = {},
 ) => businessFetch<{ ok: true; tasks: BusinessTask[] }>(

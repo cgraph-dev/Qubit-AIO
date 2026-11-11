@@ -295,3 +295,72 @@ describe("War Room renders durable rows", () => {
     expect(textOf(byTestId(h, "warroom-session-head")[0])).toContain("Printable planner");
   });
 });
+
+describe("Etsy pilot action", () => {
+  const PILOT_TITLE = "Etsy digital shop pilot";
+
+  function pilotBackend(fail = false) {
+    let created = false;
+    return recordingFetch((call) => {
+      const path = new URL(call.url).pathname;
+      if (path.endsWith("/overview")) return respond(200, OVERVIEW);
+      if (path.endsWith("/warroom/etsy-pilot")) {
+        if (fail) {
+          return respond(400, {
+            ok: false, code: "BUSINESS_RESEARCH_NOT_CONFIGURED",
+            detail: "the remote research provider is disabled by default",
+          });
+        }
+        created = true;
+        return respond(200, {
+          ok: true, schema: "qubit-office-business-warroom-etsy-pilot/1",
+          tenant_id: "ten_1", business_id: null, created: true,
+          session: session({ title: PILOT_TITLE, state: "owner_decision" }),
+          playbook_id: "etsy-digital-downloads", source_ids: ["wsrc_1"],
+          evidence_ids: ["wev_1"], experiment_names: ["Niche demand check"],
+          research_provider: "local-deterministic",
+        });
+      }
+      if (path.endsWith("/warroom/sessions")) {
+        return respond(200, {
+          ok: true, tenant_id: "ten_1",
+          sessions: created
+            ? [session({ title: PILOT_TITLE, state: "owner_decision" })]
+            : [],
+        });
+      }
+      if (path.includes("/warroom/sessions/")) {
+        return respond(200, bundle({
+          session: session({ title: PILOT_TITLE, state: "owner_decision" }),
+        }));
+      }
+      return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+    });
+  }
+
+  it("starts the pilot, opens the created session and says what did not happen", async () => {
+    const { calls, impl } = pilotBackend();
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-etsy-pilot")[0].props.onClick as () => void)();
+    await h.settle();
+
+    const post = calls.find((c) => c.method === "POST"
+      && c.url.endsWith("/warroom/etsy-pilot"));
+    expect(post?.body.owner).toBe(true);
+    expect(textOf(byTestId(h, "warroom-session-head")[0])).toContain(PILOT_TITLE);
+    expect(byTestId(h, "warroom-session-head")[0].props["data-session-state"])
+      .toBe("owner_decision");
+    expect(textOf(byTestId(h, "warroom-notice")[0])).toContain("recorded");
+  });
+
+  it("renders a typed pilot refusal instead of a fake session", async () => {
+    const { impl } = pilotBackend(true);
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-etsy-pilot")[0].props.onClick as () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-error")[0]))
+      .toContain("BUSINESS_RESEARCH_NOT_CONFIGURED");
+    expect(byTestId(h, "warroom-session-head")).toHaveLength(0);
+    expect(byTestId(h, "warroom-notice")).toHaveLength(0);
+  });
+});

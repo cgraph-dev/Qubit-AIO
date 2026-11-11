@@ -193845,6 +193845,17 @@ create: function(game) {
 		method: "POST",
 		body
 	});
+	/** Bootstrap the owner-reviewable Etsy digital-shop pilot.
+	*
+	* Owner intent is added by `businessFetch`. The backend records the playbook,
+	* labelled evidence and experiments, then leaves the session at
+	* `owner_decision` with no decision, task, publish, spend or contact.
+	*/
+	var startEtsyPilot = (body = {}, opts = {}) => businessFetch("/warroom/etsy-pilot", {
+		...opts,
+		method: "POST",
+		body
+	});
 	var createWarRoomTasks = (sessionId, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/tasks`, {
 		...opts,
 		method: "POST",
@@ -194709,7 +194720,7 @@ create: function(game) {
 				setError(null);
 				setNotice(null);
 				try {
-					await fn();
+					const explicit = await fn();
 					const overview = await fetchOverview(opts);
 					const tenantId = overview.default_tenant_id;
 					if (!tenantId) {
@@ -194729,7 +194740,7 @@ create: function(game) {
 						tenantId,
 						businessId
 					});
-					const nextSelected = selectedId ?? sessions[0]?.session_id ?? null;
+					const nextSelected = typeof explicit === "string" && explicit ? explicit : selectedId ?? sessions[0]?.session_id ?? null;
 					if (nextSelected) {
 						setSelectedId(nextSelected);
 						setBundle(await fetchWarRoomBundle(nextSelected, { tenant_id: tenantId }, opts));
@@ -194882,7 +194893,26 @@ create: function(game) {
 						setTitle("");
 						setSelectedId(created.session.session_id);
 					})
-				}, "Open session")])]));
+				}, "Open session")]), R.createElement("div", {
+					key: "pilot",
+					className: "warroom__row"
+				}, [R.createElement("button", {
+					key: "etsy",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "warroom-etsy-pilot",
+					disabled: busy !== null,
+					onClick: () => run("Etsy pilot", async () => {
+						return (await startEtsyPilot({
+							tenant_id: load.kind === "ready" ? load.tenantId : void 0,
+							business_id: load.kind === "ready" ? load.businessId ?? void 0 : void 0,
+							idempotency_key: newIdempotencyKey("warroom.etsy-pilot")
+						}, opts)).session.session_id;
+					})
+				}, "Start Etsy pilot"), R.createElement("span", {
+					key: "hint",
+					className: "warroom__muted"
+				}, "Creates one pilot session and leaves the decision to you. No publish, task, spend or contact.")])]));
 				if (bundle) {
 					const session = bundle.session;
 					children.push(R.createElement("div", {

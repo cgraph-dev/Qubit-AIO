@@ -15,7 +15,7 @@ import {
   BusinessApiError, addWarRoomEvidence, addWarRoomSource,
   createWarRoomSession, createWarRoomTasks, fetchDirectory, fetchOverview,
   fetchWarRoomBundle, fetchWarRoomSessions, newIdempotencyKey,
-  recordWarRoomDecision,
+  recordWarRoomDecision, startEtsyPilot,
 } from "./business-api";
 import { createTowerNavigator } from "./TowerNavigator";
 
@@ -184,12 +184,14 @@ export function createWarRoomPanel(
     }, [selectedId, load.kind, props.base, props.fetchImpl,
         load.kind === "ready" ? load.tenantId : ""]);
 
-    const run = async (label: string, fn: () => Promise<unknown>) => {
+    const run = async (
+      label: string, fn: () => Promise<string | void>,
+    ) => {
       setBusy(label);
       setError(null);
       setNotice(null);
       try {
-        await fn();
+        const explicit = await fn();
         // Re-read the real scope and rows after every mutation. This also
         // promotes an empty store to a ready one when the first idea creates
         // the local Personal workspace.
@@ -205,7 +207,9 @@ export function createWarRoomPanel(
         const businessId = overview.default_business_id;
         const sessions = await loadSessions(tenantId, businessId);
         setLoad({ kind: "ready", overview, sessions, tenantId, businessId });
-        const nextSelected = selectedId ?? sessions[0]?.session_id ?? null;
+        const nextSelected = (typeof explicit === "string" && explicit)
+          ? explicit
+          : selectedId ?? sessions[0]?.session_id ?? null;
         if (nextSelected) {
           setSelectedId(nextSelected);
           setBundle(await fetchWarRoomBundle(nextSelected, {
@@ -373,6 +377,26 @@ export function createWarRoomPanel(
                 setSelectedId(created.session.session_id);
               }),
             }, "Open session"),
+          ]),
+          R.createElement("div", { key: "pilot", className: "warroom__row" }, [
+            R.createElement("button", {
+              key: "etsy", type: "button", className: "office-game__btn",
+              "data-testid": "warroom-etsy-pilot",
+              disabled: busy !== null,
+              onClick: () => run("Etsy pilot", async () => {
+                const result = await startEtsyPilot({
+                  tenant_id: load.kind === "ready" ? load.tenantId : undefined,
+                  business_id: load.kind === "ready"
+                    ? load.businessId ?? undefined : undefined,
+                  idempotency_key: newIdempotencyKey("warroom.etsy-pilot"),
+                }, opts);
+                return result.session.session_id;
+              }),
+            }, "Start Etsy pilot"),
+            R.createElement("span", {
+              key: "hint", className: "warroom__muted",
+            }, "Creates one pilot session and leaves the decision to you. "
+              + "No publish, task, spend or contact."),
           ]),
         ]));
 
