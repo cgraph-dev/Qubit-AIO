@@ -41,12 +41,25 @@ _MAGIC = b""
 
 
 def atlas_path() -> Optional[Path]:
-    """Where the atlas should live, or None when it has not been generated."""
-    here = Path(__file__).resolve().parent
-    for candidate in (
-        here / ATLAS_FILENAME,
-        here.parent.parent / "qubit_runtime" / "vendor" / "pixelfx" / ATLAS_FILENAME,
-    ):
+    """Locate the atlas in a source checkout OR an installed package.
+
+    Two layouts exist and both must work:
+      source    <repo>/voicebridge/orb/  + <repo>/qubit_runtime/vendor/pixelfx/
+      installed <site-packages>/voicebridge/orb/ + <pkg>/_data/qubit_runtime/vendor/pixelfx/
+
+    The installed package keeps bulk assets under ``_data``, so a single
+    ``../..`` hop is wrong there — that lands on ``site-packages``. Enumerate the
+    real candidates instead of assuming one depth.
+    """
+    here = Path(__file__).resolve().parent          # .../voicebridge/orb
+    pkg = here.parent                               # .../voicebridge
+    candidates = [
+        here / ATLAS_FILENAME,                      # beside this module
+        pkg / ATLAS_FILENAME,
+        pkg / "_data" / "qubit_runtime" / "vendor" / "pixelfx" / ATLAS_FILENAME,
+        pkg.parent / "qubit_runtime" / "vendor" / "pixelfx" / ATLAS_FILENAME,
+    ]
+    for candidate in candidates:
         if candidate.is_file():
             return candidate
     return None

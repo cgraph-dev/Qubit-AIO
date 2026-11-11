@@ -4243,12 +4243,38 @@ if QWidget is not None:
                 # orb can never paint nothing, and a missing ghost atlas falls back the
                 # same way.
                 if _orb_style() == "ghost":
-                    if not _paint_ghost(p, cx, cy, R, t, _bright_eff):
+                    drew_ghost = False
+                    try:
+                        drew_ghost = _paint_ghost(p, cx, cy, R, t, _bright_eff)
+                    except Exception:  # noqa: BLE001 - never blank the orb
+                        drew_ghost = False
+                    if not drew_ghost:
                         try:
                             _paint_mark(p, cx, cy, R, t, self.orb_state,
                                         _bright_eff, fam)
-                        except Exception:  # noqa: BLE001 - never blank the orb
+                        except Exception:  # noqa: BLE001
                             pass
+                    # The ghost is the WHOLE mark, not a sprite inside the atom.
+                    # Return here: everything below is atom furniture (ambient
+                    # mesh, pulse rings, equalizer bands, nucleus core) and drawing
+                    # it around the ghost is exactly the "ghost inside the orb" the
+                    # owner rejected. Only the offline/notice dots are kept, since
+                    # they are status, not ornament.
+                    s = size / 96.0
+                    try:
+                        rr_, gg_, bb_ = (int(v) for v in _ember.INDICATOR_RED)
+                    except Exception:
+                        rr_, gg_, bb_ = (255, 60, 50)
+                    p.setPen(Qt.NoPen)
+                    if self.offline:
+                        p.setBrush(QColor(rr_, gg_, bb_, int(255 * 0.8)))
+                        p.drawEllipse(cx + 24 * s, cy + 24 * s, 8 * s, 8 * s)
+                    if time.time() < self.notice_until:
+                        p.setBrush(QColor(rr_, gg_, bb_, int(255 * 0.95)))
+                        p.drawEllipse(cx + 24 * s, cy - 32 * s, 8 * s, 8 * s)
+                    p.end()
+                    self.frames += 1
+                    return
                 if _orb_style() == "mark":
                     try:
                         _paint_mark(p, cx, cy, R, t, self.orb_state,
