@@ -159,3 +159,4 @@ done
 ```
 
 | `QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` | Departments, sessions, memory, interactions, builder, FX and implementation order |
+| `QUBIT-OFFICE-RESEARCH-GAPS.md` | External research — platform/security/business gaps and forgotten requirements |
