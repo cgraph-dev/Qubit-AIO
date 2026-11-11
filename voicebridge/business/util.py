@@ -62,6 +62,9 @@ _NON_SECRET_TOKEN_KEYS = frozenset(
         "prompt_tokens",
         "completion_tokens",
         "total_tokens",
+        "estimated_prompt_tokens",
+        "projected_tokens",
+        "remaining_tokens",
     }
 )
 

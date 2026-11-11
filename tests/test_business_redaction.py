@@ -10,6 +10,9 @@ def test_token_limits_are_not_redacted():
             "prompt_tokens": 12,
             "completion_tokens": 34,
             "total_tokens": 46,
+            "estimated_prompt_tokens": 56,
+            "projected_tokens": 78,
+            "remaining_tokens": 90,
         }
     )
     assert out == {
@@ -18,6 +21,9 @@ def test_token_limits_are_not_redacted():
         "prompt_tokens": 12,
         "completion_tokens": 34,
         "total_tokens": 46,
+        "estimated_prompt_tokens": 56,
+        "projected_tokens": 78,
+        "remaining_tokens": 90,
     }
 
 
