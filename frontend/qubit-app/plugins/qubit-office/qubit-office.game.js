@@ -192644,27 +192644,41 @@ create: function(game) {
 		win.fetch = bridge;
 		return restore;
 	}
-	var MENU_BUTTONS = [{
-		id: "agents",
-		label: "Agents",
-		title: "Agents: every seat the office plans, by division",
-		testId: "office-menu-agents",
-		icon: {
-			cols: 27,
-			rows: 14,
-			d: "M5 0h4v1H5zM4 1h6v1H4zM13 1h3v1H13zM3 2h7v1H3zM12 2h5v1H12zM3 3h7v1H3zM12 3h5v1H12zM3 4h7v1H3zM12 4h5v1H12zM24 4h1v1H24zM3 5h7v1H3zM12 5h5v1H12zM24 5h1v1H24zM4 6h5v1H4zM13 6h3v1H13zM22 6h5v1H22zM4 7h5v1H4zM13 7h3v1H13zM24 7h1v1H24zM5 8h3v1H5zM11 8h7v1H11zM24 8h1v1H24zM3 9h7v1H3zM12 9h7v1H12zM1 10h11v1H1zM13 10h6v1H13zM0 11h13v1H0zM0 12h13v1H0zM0 13h13v1H0z"
+	var MENU_BUTTONS = [
+		{
+			id: "agents",
+			label: "Agents",
+			title: "Agents: every seat the office plans, by division",
+			testId: "office-menu-agents",
+			icon: {
+				cols: 27,
+				rows: 14,
+				d: "M5 0h4v1H5zM4 1h6v1H4zM13 1h3v1H13zM3 2h7v1H3zM12 2h5v1H12zM3 3h7v1H3zM12 3h5v1H12zM3 4h7v1H3zM12 4h5v1H12zM24 4h1v1H24zM3 5h7v1H3zM12 5h5v1H12zM24 5h1v1H24zM4 6h5v1H4zM13 6h3v1H13zM22 6h5v1H22zM4 7h5v1H4zM13 7h3v1H13zM24 7h1v1H24zM5 8h3v1H5zM11 8h7v1H11zM24 8h1v1H24zM3 9h7v1H3zM12 9h7v1H12zM1 10h11v1H1zM13 10h6v1H13zM0 11h13v1H0zM0 12h13v1H0zM0 13h13v1H0z"
+			}
+		},
+		{
+			id: "hud",
+			label: "HUD",
+			title: "HUD: the office and agent vitals",
+			testId: "office-menu-hud",
+			icon: {
+				cols: 19,
+				rows: 17,
+				d: "M0 0h5v1H0zM17 0h1v1H17zM0 1h1v1H0zM0 2h1v1H0zM0 3h1v1H0zM7 3h2v1H7zM10 3h2v1H10zM18 3h1v1H18zM5 4h8v1H5zM5 5h2v1H5zM9 5h1v1H9zM12 5h2v1H12zM4 6h2v1H4zM13 6h1v1H13zM4 7h1v1H4zM9 7h1v1H9zM13 7h1v1H13zM3 8h3v1H3zM8 8h1v1H8zM10 8h1v1H10zM12 8h3v1H12zM3 9h2v1H3zM9 9h1v1H9zM13 9h2v1H13zM4 10h1v1H4zM13 10h1v1H13zM4 11h2v1H4zM12 11h2v1H12zM5 12h2v1H5zM9 12h1v1H9zM11 12h2v1H11zM0 13h1v1H0zM6 13h6v1H6zM0 14h1v1H0zM9 14h1v1H9zM0 15h1v1H0zM0 16h4v1H0zM11 16h3v1H11z"
+			}
+		},
+		{
+			id: "approvals",
+			label: "Approvals",
+			title: "Approvals: pending confirmations on the shared journal",
+			testId: "office-menu-approvals",
+			icon: {
+				cols: 13,
+				rows: 11,
+				d: "M12 0h1v1H12zM11 1h1v1H11zM10 2h1v1H10zM1 3h1v1H1zM9 3h1v1H9zM2 4h1v1H2zM8 4h1v1H8zM3 5h1v1H3zM7 5h1v1H7zM4 6h1v1H4zM6 6h1v1H6zM5 7h1v1H5z"
+			}
 		}
-	}, {
-		id: "hud",
-		label: "HUD",
-		title: "HUD: the office and agent vitals",
-		testId: "office-menu-hud",
-		icon: {
-			cols: 19,
-			rows: 17,
-			d: "M0 0h5v1H0zM17 0h1v1H17zM0 1h1v1H0zM0 2h1v1H0zM0 3h1v1H0zM7 3h2v1H7zM10 3h2v1H10zM18 3h1v1H18zM5 4h8v1H5zM5 5h2v1H5zM9 5h1v1H9zM12 5h2v1H12zM4 6h2v1H4zM13 6h1v1H13zM4 7h1v1H4zM9 7h1v1H9zM13 7h1v1H13zM3 8h3v1H3zM8 8h1v1H8zM10 8h1v1H10zM12 8h3v1H12zM3 9h2v1H3zM9 9h1v1H9zM13 9h2v1H13zM4 10h1v1H4zM13 10h1v1H13zM4 11h2v1H4zM12 11h2v1H12zM5 12h2v1H5zM9 12h1v1H9zM11 12h2v1H11zM0 13h1v1H0zM6 13h6v1H6zM0 14h1v1H0zM9 14h1v1H9zM0 15h1v1H0zM0 16h4v1H0zM11 16h3v1H11z"
-		}
-	}];
+	];
 	/** The group the office renders its own panel buttons in. */
 	var PANELS_GROUP_SELECTOR = ".ui-btn-group[aria-label=\"Panels\"]";
 	/**
@@ -192714,6 +192728,15 @@ create: function(game) {
 		path.setAttribute("d", geometry.d);
 		svg.appendChild(path);
 		button.appendChild(svg);
+		if (spec.id === "approvals") {
+			const badge = doc.createElement("span");
+			badge.className = "office-menu-badge";
+			badge.setAttribute("data-testid", "office-menu-approvals-badge");
+			badge.setAttribute("aria-hidden", "true");
+			badge.hidden = true;
+			button.appendChild(badge);
+			button.setAttribute("data-has-badge", "true");
+		}
 		return button;
 	}
 	/**
@@ -192728,20 +192751,40 @@ create: function(game) {
 		if (!doc || !doc.body) return null;
 		const byId = {
 			agents: null,
-			hud: null
+			hud: null,
+			approvals: null
 		};
 		const state = {
 			agents: false,
-			hud: false
+			hud: false,
+			approvals: false
 		};
 		let fallbackShown = false;
 		let attachedOnce = false;
 		const findGroup = () => doc.querySelector(PANELS_GROUP_SELECTOR);
-		const isAttached = () => Boolean(byId.agents && byId.agents.isConnected && byId.hud && byId.hud.isConnected);
+		const isAttached = () => Boolean(byId.agents && byId.agents.isConnected && byId.hud && byId.hud.isConnected && byId.approvals && byId.approvals.isConnected);
 		const setFallback = (show) => {
 			if (fallbackShown === show) return;
 			fallbackShown = show;
 			opts.onFallback?.(show);
+		};
+		const badgeFor = (id) => {
+			if (id !== "approvals") return null;
+			return byId.approvals?.querySelector(".office-menu-badge");
+		};
+		const paintApprovals = () => {
+			const button = byId.approvals;
+			const badge = badgeFor("approvals");
+			const count = Math.max(0, Math.floor(Number(state.pendingApprovals ?? 0) || 0));
+			if (badge) {
+				badge.textContent = count > 0 ? String(count) : "";
+				badge.hidden = count <= 0;
+			}
+			if (button) {
+				button.setAttribute("aria-pressed", state.approvals ? "true" : "false");
+				button.setAttribute("aria-label", count > 0 ? `Approvals (${count} pending)` : "Approvals");
+				button.setAttribute("data-pending", String(count));
+			}
 		};
 		const insert = (group, button) => {
 			const settings = Array.from(group.querySelectorAll("button")).find((b) => (b.getAttribute("title") || "") === "Settings");
@@ -192754,12 +192797,13 @@ create: function(game) {
 			for (const spec of MENU_BUTTONS) {
 				const existing = byId[spec.id];
 				if (existing && existing.isConnected) continue;
-				const onActivate = spec.id === "agents" ? opts.onToggleAgents : opts.onToggleHud;
+				const onActivate = spec.id === "agents" ? opts.onToggleAgents : spec.id === "hud" ? opts.onToggleHud : opts.onToggleApprovals ?? (() => {});
 				const button = buildButton(doc, spec, onActivate);
 				button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
 				byId[spec.id] = button;
 				insert(group, button);
 			}
+			paintApprovals();
 			if (!attachedOnce && isAttached()) {
 				attachedOnce = true;
 				clearTimeout(fallbackTimer);
@@ -192791,10 +192835,13 @@ create: function(game) {
 			update(next) {
 				state.agents = Boolean(next.agents);
 				state.hud = Boolean(next.hud);
+				state.approvals = Boolean(next.approvals);
+				state.pendingApprovals = Math.max(0, Math.floor(Number(next.pendingApprovals ?? 0) || 0));
 				for (const spec of MENU_BUTTONS) {
 					const button = byId[spec.id];
 					if (button) button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
 				}
+				paintApprovals();
 			},
 			attached() {
 				return isAttached();
@@ -192855,7 +192902,7 @@ create: function(game) {
 		return `The change was not saved (HTTP ${status}).`;
 	}
 	/** Attach the host session token, exactly as api-bridge.ts does for reads. */
-	function authHeaders(token) {
+	function authHeaders$1(token) {
 		const headers = { "Content-Type": "application/json" };
 		if (token) headers["X-Qubit-Session-Token"] = token;
 		return headers;
@@ -192875,7 +192922,7 @@ create: function(game) {
 		const res = await fetchImpl(seatModelUrl(agentId), {
 			method: "GET",
 			credentials: "same-origin",
-			headers: authHeaders(hostToken(win))
+			headers: authHeaders$1(hostToken(win))
 		});
 		const body = await res.json().catch(() => ({}));
 		if (!res.ok || body.ok === false) return {
@@ -192892,7 +192939,7 @@ create: function(game) {
 		const res = await fetchImpl(seatModelUrl(agentId), {
 			method: "POST",
 			credentials: "same-origin",
-			headers: authHeaders(hostToken(win)),
+			headers: authHeaders$1(hostToken(win)),
 			body: JSON.stringify(assignmentPayload(provider, model))
 		});
 		const body = await res.json().catch(() => ({}));
@@ -194545,7 +194592,7 @@ create: function(game) {
 		ASSUMPTION: "#facc15",
 		UNKNOWN: "#a1a1aa"
 	};
-	function chip(R, text, key, color) {
+	function chip$1(R, text, key, color) {
 		return R.createElement("span", {
 			key,
 			className: "warroom__chip",
@@ -194892,7 +194939,7 @@ create: function(game) {
 						"data-session-state": session.state
 					}, [
 						R.createElement("strong", { key: "t" }, session.title),
-						chip(R, session.state, "state"),
+						chip$1(R, session.state, "state"),
 						R.createElement("span", {
 							key: "id",
 							className: "warroom__muted"
@@ -194910,7 +194957,7 @@ create: function(game) {
 					}, [
 						R.createElement("strong", { key: "k" }, source.kind),
 						R.createElement("span", { key: "l" }, ` ${source.locator}`),
-						chip(R, source.status, "s")
+						chip$1(R, source.status, "s")
 					]))), R.createElement("div", {
 						key: "row",
 						className: "warroom__row"
@@ -194961,7 +195008,7 @@ create: function(game) {
 						"data-testid": "warroom-evidence-item",
 						"data-label": item.label
 					}, [
-						chip(R, item.label, "c", LABEL_COLORS[item.label]),
+						chip$1(R, item.label, "c", LABEL_COLORS[item.label]),
 						R.createElement("span", { key: "t" }, ` ${item.claim}`),
 						item.source_id ? R.createElement("span", {
 							key: "src",
@@ -195138,6 +195185,382 @@ create: function(game) {
 				className: "warroom",
 				"data-testid": "warroom",
 				"data-tab": tab
+			}, children);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/approvals-panel.ts
+	/** The pending-approvals read route. */
+	var APPROVALS_PATH = "/api/ops/approvals";
+	/** The two settle routes the classic banner and CLI already use. */
+	var APPROVAL_CONFIRM_PATH = "/api/ops/confirm";
+	var APPROVAL_CANCEL_PATH = "/api/ops/cancel";
+	/** One settle failure, carrying the server's typed code when it sent one. */
+	var ApprovalApiError = class extends Error {
+		code;
+		status;
+		constructor(message, code, status) {
+			super(message);
+			this.name = "ApprovalApiError";
+			this.code = code;
+			this.status = status;
+		}
+	};
+	function rebase(base, path) {
+		const raw = base === void 0 ? hostBasePath$1() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX$1}${path}`;
+	}
+	/** The pending-approvals URL, rebased onto the dashboard's base path. */
+	function approvalsUrl(base) {
+		return rebase(base, APPROVALS_PATH);
+	}
+	/** The settle URL for one decision. */
+	function approvalActionUrl(decision, base) {
+		return rebase(base, decision === "approve" ? APPROVAL_CONFIRM_PATH : APPROVAL_CANCEL_PATH);
+	}
+	function authHeaders(token) {
+		const headers = { Accept: "application/json" };
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		return headers;
+	}
+	function errorText(exc) {
+		return exc instanceof Error ? exc.message : String(exc);
+	}
+	/**
+	* Fetch the pending list. Never throws: a failure is a named error state so
+	* an empty office and an unreachable one can never look the same.
+	*/
+	async function fetchApprovals(opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		const url = approvalsUrl(opts.base);
+		const headers = authHeaders(readToken(opts.win));
+		try {
+			const res = await f(url, {
+				headers,
+				credentials: "same-origin",
+				signal: opts.signal
+			});
+			if (res.status === 401) return {
+				kind: "error",
+				message: "Pending approvals were refused (HTTP 401); the office session token was not accepted. Reload the page to refresh it.",
+				code: "UNAUTHORIZED"
+			};
+			if (res.status === 404) return {
+				kind: "error",
+				message: `The approvals route is not served here (HTTP 404: ${url}).`,
+				code: "NOT_FOUND"
+			};
+			const body = await res.json().catch(() => null);
+			if (!body || typeof body !== "object") return {
+				kind: "error",
+				message: `The approvals route answered HTTP ${res.status} with no JSON body.`
+			};
+			if (body.ok !== true) return {
+				kind: "error",
+				message: body.detail || body.code ? `Pending approvals could not be read: ${body.detail || body.code}` : `Pending approvals answered not-ok (HTTP ${res.status}).`,
+				code: body.code
+			};
+			return {
+				kind: "ready",
+				items: Array.isArray(body.approvals) ? body.approvals : []
+			};
+		} catch (exc) {
+			return {
+				kind: "error",
+				message: `Pending approvals could not be reached: ${errorText(exc)}`
+			};
+		}
+	}
+	/**
+	* Settle ONE pending record through the shared journal route.
+	*
+	* Resolves only when the backend reports ``ok:true`` and ``state:"executed"``.
+	* Anything else (a typed refusal, an expired id, a non-JSON body) throws
+	* ``ApprovalApiError`` so the caller renders the real reason. This function
+	* never retries and never assumes the decision landed.
+	*/
+	async function decideApproval(id, decision, opts = {}) {
+		const trimmed = String(id ?? "").trim();
+		if (!trimmed) throw new ApprovalApiError("An approval id is required to settle a pending record.", "MALFORMED", 400);
+		const f = opts.fetchImpl ?? fetch;
+		const url = approvalActionUrl(decision, opts.base);
+		const headers = authHeaders(readToken(opts.win));
+		headers["Content-Type"] = "application/json";
+		let res;
+		try {
+			res = await f(url, {
+				method: "POST",
+				headers,
+				credentials: "same-origin",
+				body: JSON.stringify({ confirmation_id: trimmed }),
+				signal: opts.signal
+			});
+		} catch (exc) {
+			throw new ApprovalApiError(`The approval request could not be sent: ${errorText(exc)}`, "NETWORK", 0);
+		}
+		const body = await res.json().catch(() => null);
+		if (!body || typeof body !== "object") throw new ApprovalApiError(`The approval route answered HTTP ${res.status} with no JSON body.`, "NO_BODY", res.status);
+		if (!res.ok || body.ok !== true || body.state !== "executed") throw new ApprovalApiError(body.detail || `The journal did not settle that record (HTTP ${res.status}).`, body.code || `HTTP_${res.status}`, res.status);
+	}
+	/** A compact, honest age label from the record's epoch-seconds timestamp. */
+	function formatAge(createdAt, nowSeconds = Date.now() / 1e3) {
+		const created = Number(createdAt);
+		if (!Number.isFinite(created) || created <= 0) return "age unknown";
+		const seconds = Math.max(0, Math.floor(nowSeconds - created));
+		if (seconds < 60) return `${seconds}s ago`;
+		if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+		if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+		return `${Math.floor(seconds / 86400)}d ago`;
+	}
+	/** The tool/action a reader recognizes: the capability, never a summary. */
+	function approvalTool(item) {
+		return String(item.capability || "").trim() || "unknown capability";
+	}
+	/** The reviewer-facing action, from the record's meta; empty when absent. */
+	function approvalAction(item) {
+		return String(item.action || "").trim();
+	}
+	/** The reviewer-facing risk, from the record's meta; empty when absent. */
+	function approvalRisk(item) {
+		return String(item.risk || "").trim();
+	}
+	/** Who asked, from the record's meta; empty when absent. */
+	function approvalRequester(item) {
+		return String(item.requested_by || "").trim();
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/ApprovalsPanel.tsx
+	function actionError(exc) {
+		if (exc instanceof ApprovalApiError) return {
+			message: exc.message,
+			code: exc.code
+		};
+		return { message: exc instanceof Error ? exc.message : String(exc) };
+	}
+	function chip(R, key, label, value, testId) {
+		return R.createElement("span", {
+			key,
+			className: "approvals-panel__chip",
+			"data-testid": testId,
+			"data-value": value
+		}, [R.createElement("span", {
+			key: "k",
+			className: "approvals-panel__chipKey"
+		}, `${label} `), R.createElement("span", {
+			key: "v",
+			className: "approvals-panel__chipValue"
+		}, value)]);
+	}
+	function metaLine(R, item, nowValue) {
+		const parts = [R.createElement("span", {
+			key: "tool",
+			className: "approvals-panel__tool",
+			"data-testid": "approval-tool"
+		}, approvalTool(item))];
+		const action = approvalAction(item);
+		if (action) parts.push(chip(R, "action", "action", action, "approval-action"));
+		const risk = approvalRisk(item);
+		if (risk) parts.push(chip(R, "risk", "risk", risk, "approval-risk"));
+		const requester = approvalRequester(item);
+		parts.push(R.createElement("span", {
+			key: "by",
+			className: "approvals-panel__requester",
+			"data-testid": "approval-requester"
+		}, `requested by ${requester || "unknown"}`));
+		parts.push(R.createElement("span", {
+			key: "age",
+			className: "approvals-panel__age",
+			"data-testid": "approval-age"
+		}, formatAge(item.created_at, nowValue)));
+		return R.createElement("div", {
+			key: "meta",
+			className: "approvals-panel__meta"
+		}, parts);
+	}
+	function row(R, item, nowValue, busyId, onDecide) {
+		const busy = busyId === item.id;
+		const label = approvalTool(item);
+		return R.createElement("li", {
+			key: item.id,
+			className: "approvals-panel__row",
+			"data-testid": "approval-row",
+			"data-approval-id": item.id,
+			"data-approval-capability": item.capability,
+			role: "listitem"
+		}, [
+			R.createElement("p", {
+				key: "summary",
+				className: "approvals-panel__summary",
+				"data-testid": "approval-summary"
+			}, String(item.summary || "").trim() || label),
+			metaLine(R, item, nowValue),
+			R.createElement("div", {
+				key: "id",
+				className: "approvals-panel__idLine"
+			}, [R.createElement("span", {
+				key: "label",
+				className: "approvals-panel__idLabel"
+			}, "id "), R.createElement("code", {
+				key: "id",
+				className: "approvals-panel__id",
+				"data-testid": "approval-id"
+			}, item.id)]),
+			R.createElement("div", {
+				key: "actions",
+				className: "approvals-panel__actions"
+			}, [R.createElement("button", {
+				key: "approve",
+				type: "button",
+				className: "office-game__btn approvals-panel__approve",
+				"data-testid": "approval-approve",
+				"data-approval-id": item.id,
+				"aria-label": `Approve ${label} (${item.id})`,
+				disabled: busy,
+				onClick: () => onDecide(item, "approve")
+			}, busy ? "Approving…" : "Approve"), R.createElement("button", {
+				key: "reject",
+				type: "button",
+				className: "office-game__btn approvals-panel__reject",
+				"data-testid": "approval-reject",
+				"data-approval-id": item.id,
+				"aria-label": `Reject ${label} (${item.id})`,
+				disabled: busy,
+				onClick: () => onDecide(item, "deny")
+			}, busy ? "Rejecting…" : "Reject")])
+		]);
+	}
+	function createApprovalsPanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function ApprovalsPanel(props) {
+			const [state, setState] = useState({ kind: "loading" });
+			const [busyId, setBusyId] = useState(null);
+			const [notice, setNotice] = useState(null);
+			const [failure, setFailure] = useState(null);
+			const [refresh, setRefresh] = useState(0);
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				fetchApprovals({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then((next) => {
+					if (!live) return;
+					setState(next);
+					if (next.kind === "ready") props.onCountChange?.(next.items.length);
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [props.base, refresh]);
+			const onDecide = (item, decision) => {
+				if (busyId) return;
+				setBusyId(item.id);
+				setNotice(null);
+				setFailure(null);
+				decideApproval(item.id, decision, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				}).then(() => {
+					setNotice(decision === "approve" ? `Approved ${approvalTool(item)}.` : `Rejected ${approvalTool(item)}.`);
+				}).catch((exc) => {
+					setFailure(actionError(exc));
+				}).finally(() => {
+					setBusyId(null);
+					setRefresh((n) => n + 1);
+				});
+			};
+			const nowValue = props.now ? props.now() : Date.now() / 1e3;
+			const items = state.kind === "ready" ? state.items : [];
+			const count = items.length;
+			const head = R.createElement("div", {
+				key: "head",
+				className: "approvals-panel__head"
+			}, [
+				R.createElement("h3", {
+					key: "title",
+					className: "approvals-panel__title",
+					"data-testid": "approvals-title"
+				}, "Approvals"),
+				R.createElement("span", {
+					key: "count",
+					className: "approvals-panel__count",
+					"data-testid": "approvals-count",
+					"data-count": String(count),
+					"aria-label": `${count} pending approval${count === 1 ? "" : "s"}`
+				}, `${count} pending`),
+				R.createElement("button", {
+					key: "refresh",
+					type: "button",
+					className: "office-game__btn approvals-panel__refresh",
+					"data-testid": "approvals-refresh",
+					"aria-label": "Refresh pending approvals",
+					disabled: state.kind === "loading",
+					onClick: () => setRefresh((n) => n + 1)
+				}, "Refresh")
+			]);
+			const body = [];
+			if (state.kind === "loading") body.push(R.createElement("p", {
+				key: "loading",
+				className: "approvals-panel__status",
+				"data-testid": "approvals-loading",
+				role: "status",
+				"aria-live": "polite"
+			}, "Loading pending approvals…"));
+			else if (state.kind === "error") body.push(R.createElement("div", {
+				key: "error",
+				className: "approvals-panel__error",
+				"data-testid": "approvals-error",
+				role: "alert"
+			}, [R.createElement("p", { key: "m" }, state.message), state.code ? R.createElement("p", {
+				key: "c",
+				className: "approvals-panel__code"
+			}, state.code) : null]));
+			else if (items.length === 0) body.push(R.createElement("p", {
+				key: "empty",
+				className: "approvals-panel__empty",
+				"data-testid": "approvals-empty",
+				role: "status"
+			}, "No pending approvals."));
+			else body.push(R.createElement("ul", {
+				key: "list",
+				className: "approvals-panel__list",
+				"data-testid": "approvals-list",
+				role: "list",
+				"aria-label": "Pending approvals"
+			}, items.map((item) => row(R, item, nowValue, busyId, onDecide))));
+			if (notice) body.push(R.createElement("p", {
+				key: "notice",
+				className: "approvals-panel__notice",
+				"data-testid": "approvals-notice",
+				role: "status",
+				"aria-live": "polite"
+			}, notice));
+			if (failure) body.push(R.createElement("div", {
+				key: "failure",
+				className: "approvals-panel__actionError",
+				"data-testid": "approvals-action-error",
+				role: "alert"
+			}, [R.createElement("p", { key: "m" }, failure.code ? `${failure.code}: ${failure.message}` : failure.message)]));
+			const children = [head, ...body];
+			if (props.onClose) children.unshift(R.createElement("div", {
+				key: "closeRow",
+				className: "approvals-panel__closeRow"
+			}, R.createElement("button", {
+				key: "close",
+				type: "button",
+				className: "office-game__btn approvals-panel__close",
+				"data-testid": "approvals-close",
+				"aria-label": "Close approvals",
+				onClick: () => props.onClose?.()
+			}, "Close")));
+			return R.createElement("div", {
+				className: "approvals-panel",
+				"data-testid": "approvals-panel",
+				"data-state": state.kind,
+				"data-count": String(count),
+				role: "region",
+				"aria-label": "Office approvals",
+				"aria-busy": state.kind === "loading" ? "true" : "false"
 			}, children);
 		};
 	}
@@ -199421,6 +199844,7 @@ create: function(game) {
 			SeatModelPanel: createSeatModelPanel(R, hooks),
 			AgentControlDrawer: createAgentControlDrawer(R, hooks),
 			WarRoomPanel: createWarRoomPanel(R, hooks),
+			ApprovalsPanel: createApprovalsPanel(R, hooks),
 			LoadingScreen: createOfficeLoadingScreen(R, hooks)
 		};
 		byBase.set(cacheKey, built);
@@ -199444,8 +199868,10 @@ create: function(game) {
 			const [retryToken, setRetryToken] = useState(0);
 			const [warRoomOpen, setWarRoomOpen] = useState(false);
 			const [controlSeat, setControlSeat] = useState(null);
+			const [approvalsOpen, setApprovalsOpen] = useState(false);
+			const [approvalCount, setApprovalCount] = useState(0);
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
 			useEffect(() => {
@@ -199464,6 +199890,21 @@ create: function(game) {
 				if (typeof document === "undefined") return;
 				return applyHostTheme(document, officeTheme);
 			}, [officeTheme]);
+			useEffect(() => {
+				if (typeof window === "undefined") return;
+				let live = true;
+				const read = () => {
+					fetchApprovals({ base: props.base }).then((next) => {
+						if (live && next.kind === "ready") setApprovalCount(next.items.length);
+					});
+				};
+				read();
+				const handle = window.setInterval(read, 3e4);
+				return () => {
+					live = false;
+					window.clearInterval(handle);
+				};
+			}, [props.base]);
 			useEffect(() => {
 				const frame = frameRef.current;
 				if (!frame) return;
@@ -199486,17 +199927,30 @@ create: function(game) {
 					menuRef.current?.dispose();
 					setMenuFallback(false);
 					menuRef.current = installOfficeMenuButtons(win, {
-						onToggleAgents: () => setAgentsOpen((v) => !v),
+						onToggleAgents: () => {
+							setApprovalsOpen(false);
+							setAgentsOpen((v) => !v);
+						},
 						onToggleHud: () => {
+							setApprovalsOpen(false);
 							setControlSeat(null);
 							setHudOpen((v) => !v);
+						},
+						onToggleApprovals: () => {
+							setAgentsOpen(false);
+							setHudOpen(false);
+							setWarRoomOpen(false);
+							setControlSeat(null);
+							setApprovalsOpen((v) => !v);
 						},
 						onFallback: (show) => setMenuFallback(show),
 						onAttach: () => setMenuFallback(false)
 					});
 					menuRef.current?.update({
 						agents: agentsOpen,
-						hud: hudOpen
+						hud: hudOpen,
+						approvals: approvalsOpen,
+						pendingApprovals: approvalCount
 					});
 					props.onReady?.();
 				};
@@ -199527,7 +199981,9 @@ create: function(game) {
 			useEffect(() => {
 				menuRef.current?.update({
 					agents: agentsOpen,
-					hud: hudOpen
+					hud: hudOpen,
+					approvals: approvalsOpen,
+					pendingApprovals: approvalCount
 				});
 			});
 			const dockSlice = officeSliceName(officeTheme, "dock");
@@ -199658,6 +200114,7 @@ create: function(game) {
 					"data-office-slice": buttonSlice,
 					onClick: () => {
 						setAgentsOpen(false);
+						setApprovalsOpen(false);
 						setControlSeat(null);
 						setWarRoomOpen(true);
 					}
@@ -199678,6 +200135,7 @@ create: function(game) {
 				onOpenAgent: (seat) => {
 					setAgentsOpen(false);
 					setHudOpen(false);
+					setApprovalsOpen(false);
 					setControlSeat(seat);
 				}
 			})]));
@@ -199709,6 +200167,44 @@ create: function(game) {
 				base: props.base,
 				seat: controlSeat,
 				onClose: () => setControlSeat(null)
+			})]));
+			if (approvalsOpen) children.push(R.createElement("div", {
+				key: "approvals-dock",
+				id: "office-game-approvals-dock",
+				className: "office-game__dock office-game__panel office-theme-dock office-game__approvalsDock",
+				"data-testid": "office-game-approvals-dock",
+				"data-office-dock": "approvals",
+				"data-office-slice": dockSlice,
+				role: "region",
+				"aria-label": "Office approvals"
+			}, [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead office-theme-dock-head"
+			}, [
+				R.createElement("span", {
+					key: "t",
+					className: "office-theme-dock-title"
+				}, "Approvals"),
+				R.createElement("span", {
+					key: "count",
+					className: "office-game__approvalsCount",
+					"data-testid": "office-game-approvals-count",
+					"data-count": String(approvalCount)
+				}, String(approvalCount)),
+				R.createElement("button", {
+					key: "x",
+					type: "button",
+					className: "office-game__btn office-theme-dock-close",
+					"data-testid": "office-game-approvals-close",
+					"aria-label": "Close approvals",
+					"data-office-slice": buttonSlice,
+					onClick: () => setApprovalsOpen(false)
+				}, "Close")
+			]), R.createElement(ApprovalsPanel, {
+				key: "body",
+				base: props.base,
+				onCountChange: (n) => setApprovalCount(n),
+				onClose: () => setApprovalsOpen(false)
 			})]));
 			if (hudOpen) children.push(R.createElement("div", {
 				key: "hud-dock",
@@ -199751,22 +200247,24 @@ create: function(game) {
 				"aria-label": "Office panels"
 			}, MENU_BUTTONS.map((spec) => {
 				const geometry = menuIconGeometry(spec);
-				const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
-				const onActivate = spec.id === "agents" ? () => setAgentsOpen((v) => !v) : () => {
+				const pressed = spec.id === "agents" ? agentsOpen : spec.id === "hud" ? hudOpen : approvalsOpen;
+				const onActivate = spec.id === "agents" ? () => {
+					setApprovalsOpen(false);
+					setAgentsOpen((v) => !v);
+				} : spec.id === "hud" ? () => {
+					setApprovalsOpen(false);
 					setControlSeat(null);
 					setHudOpen((v) => !v);
+				} : () => {
+					setAgentsOpen(false);
+					setHudOpen(false);
+					setWarRoomOpen(false);
+					setControlSeat(null);
+					setApprovalsOpen((v) => !v);
 				};
-				return R.createElement("button", {
-					key: spec.id,
-					type: "button",
-					className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
-					"data-testid": `${spec.testId}-fallback`,
-					"aria-label": spec.label,
-					title: spec.title,
-					"aria-pressed": pressed ? "true" : "false",
-					"data-office-slice": buttonSlice,
-					onClick: onActivate
-				}, R.createElement("svg", {
+				const label = spec.id === "approvals" && approvalCount > 0 ? `${spec.label} (${approvalCount} pending)` : spec.label;
+				const parts = [R.createElement("svg", {
+					key: "icon",
 					className: "ui-px-icon",
 					width: geometry.width,
 					height: geometry.height,
@@ -199777,7 +200275,25 @@ create: function(game) {
 				}, R.createElement("path", {
 					fill: "currentColor",
 					d: geometry.d
-				})));
+				}))];
+				if (spec.id === "approvals" && approvalCount > 0) parts.push(R.createElement("span", {
+					key: "badge",
+					className: "office-menu-badge",
+					"data-testid": "office-menu-approvals-badge-fallback",
+					"aria-hidden": "true"
+				}, String(approvalCount)));
+				return R.createElement("button", {
+					key: spec.id,
+					type: "button",
+					className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
+					"data-testid": `${spec.testId}-fallback`,
+					"aria-label": label,
+					title: spec.title,
+					"aria-pressed": pressed ? "true" : "false",
+					"data-pending": spec.id === "approvals" ? String(approvalCount) : void 0,
+					"data-office-slice": buttonSlice,
+					onClick: onActivate
+				}, ...parts);
 			})));
 			children.push(R.createElement(LoadingScreen, {
 				key: "loading-screen",
@@ -199793,7 +200309,7 @@ create: function(game) {
 			}));
 			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
 			const dualDocks = agentsOpen && hudOpen || warRoomOpen && controlSeat !== null;
-			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null;
+			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null || approvalsOpen;
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				"data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : void 0,
