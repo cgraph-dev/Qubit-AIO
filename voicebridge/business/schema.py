@@ -10,7 +10,7 @@ and ``BEFORE DELETE`` triggers that raise ``ABORT``. A correction is a new row.
 """
 from __future__ import annotations
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _V1 = [
     """
@@ -265,6 +265,133 @@ for _table in _APPEND_ONLY_TABLES:
         """
     )
 
+# Schema v2 adds the per-agent control plane: the durable agent record, its
+# turns, its usage ledger and an idempotent operation log. Status and mutable
+# configuration live on ``bos_agent``; turns and usage are their own rows so a
+# stop records ``interrupted`` instead of overwriting a turn's outcome.
+_V2 = [
+    """
+    CREATE TABLE bos_agent (
+        agent_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        business_id TEXT NOT NULL REFERENCES bos_business(business_id) ON DELETE RESTRICT,
+        role_id TEXT NOT NULL,
+        department TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        human_owner TEXT NOT NULL,
+        room TEXT,
+        desk TEXT,
+        status TEXT NOT NULL CHECK(status IN
+            ('active','paused','revoked','archived')),
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        reasoning_effort TEXT NOT NULL,
+        fallback_model TEXT,
+        fallback_provider TEXT,
+        temperature REAL,
+        max_tokens INTEGER NOT NULL CHECK(max_tokens > 0),
+        schedule TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        max_concurrent_turns INTEGER NOT NULL CHECK(max_concurrent_turns > 0),
+        permissions_json TEXT NOT NULL,
+        safety_json TEXT NOT NULL,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        taken_over_by TEXT,
+        taken_over_at TEXT,
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 1 CHECK(revision > 0),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        archived_at TEXT,
+        UNIQUE(tenant_id, idempotency_key)
+    )
+    """,
+    """
+    CREATE INDEX bos_agent_listing
+        ON bos_agent(tenant_id, business_id, status)
+    """,
+    """
+    CREATE INDEX bos_agent_role_listing
+        ON bos_agent(tenant_id, role_id)
+    """,
+    """
+    CREATE TABLE bos_agent_turn (
+        turn_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL REFERENCES bos_agent(agent_id) ON DELETE RESTRICT,
+        status TEXT NOT NULL CHECK(status IN
+            ('active','interrupted','completed','failed')),
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        note TEXT NOT NULL DEFAULT ''
+    )
+    """,
+    """
+    CREATE INDEX bos_agent_turn_active
+        ON bos_agent_turn(tenant_id, agent_id, status)
+    """,
+    """
+    CREATE TABLE bos_agent_usage (
+        usage_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL REFERENCES bos_agent(agent_id) ON DELETE RESTRICT,
+        turn_id TEXT,
+        kind TEXT NOT NULL,
+        cost_minor INTEGER NOT NULL DEFAULT 0 CHECK(cost_minor >= 0),
+        tokens INTEGER NOT NULL DEFAULT 0 CHECK(tokens >= 0),
+        day TEXT NOT NULL,
+        month TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, idempotency_key)
+    )
+    """,
+    """
+    CREATE INDEX bos_agent_usage_listing
+        ON bos_agent_usage(tenant_id, agent_id, created_at)
+    """,
+    """
+    CREATE TABLE bos_agent_operation (
+        operation_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL REFERENCES bos_agent(agent_id) ON DELETE RESTRICT,
+        action TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        result_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, idempotency_key)
+    )
+    """,
+]
+
+# Usage and the operation log are records of truth: a correction is a new row.
+# Turns are intentionally absent because ``active`` legitimately becomes
+# ``interrupted``/``completed``/``failed`` once.
+_V2_APPEND_ONLY_TABLES = ("bos_agent_usage", "bos_agent_operation")
+for _table in _V2_APPEND_ONLY_TABLES:
+    _V2.append(
+        f"""
+        CREATE TRIGGER {_table}_no_update
+        BEFORE UPDATE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+    _V2.append(
+        f"""
+        CREATE TRIGGER {_table}_no_delete
+        BEFORE DELETE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+
 MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
     (1, tuple(_V1)),
+    (2, tuple(_V2)),
 )

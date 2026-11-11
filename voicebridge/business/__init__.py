@@ -20,7 +20,15 @@ adapters, UI, voice commands, real payouts. See
 """
 from __future__ import annotations
 
-from . import approvals, jobs, ledger, tools
+from . import agents, approvals, jobs, ledger, tools
+from .agents import (
+    Agent,
+    AgentControlService,
+    AgentTurn,
+    AgentUsage,
+    Permissions,
+    Safety,
+)
 from .errors import BusinessError
 from .models import (
     Approval,
@@ -39,6 +47,10 @@ from .store import BusinessStore
 from .tools import Policy, ToolGateway, ToolOutcome, ToolRequest
 
 __all__ = [
+    "Agent",
+    "AgentControlService",
+    "AgentTurn",
+    "AgentUsage",
     "Approval",
     "Artifact",
     "AuditEvent",
@@ -49,13 +61,16 @@ __all__ = [
     "JobEvent",
     "JobRun",
     "LedgerEntry",
+    "Permissions",
     "Policy",
+    "Safety",
     "Task",
     "Tenant",
     "ToolGateway",
     "ToolInvocation",
     "ToolOutcome",
     "ToolRequest",
+    "agents",
     "approvals",
     "jobs",
     "ledger",
