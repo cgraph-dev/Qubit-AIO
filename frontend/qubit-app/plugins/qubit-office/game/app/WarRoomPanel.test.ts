@@ -76,15 +76,22 @@ function backend(overrides: {
           memory_refs: [], human_owner: "owner", service_lines: [],
           active_by_default: true,
         })),
-        floors: Array.from({ length: 100 }, (_, i) => ({
-          floor_id: `floor-${i}`, index: i + 1, wing: i < 50 ? "north" : "south",
-          name: `Floor ${i + 1}`, department_ids: ["revenue"],
-          role_ids: ["role-0"], room_count: 1, desk_capacity: 4,
-          active_by_default: i < 22, max_rooms: null, max_agents: null,
-          expansion_allowed: true,
-        })),
+        floors: Array.from({ length: 100 }, (_, i) => {
+          const wings = ["north", "east", "south", "west", "central"];
+          const wing = wings[Math.floor(i / 20)];
+          return {
+            floor_id: `floor-${String(i + 1).padStart(3, "0")}`,
+            index: i + 1, wing,
+            name: `${wing[0].toUpperCase()}${wing.slice(1)} Wing · `
+              + `Floor ${String(i + 1).padStart(3, "0")}`,
+            department_ids: ["revenue"], role_ids: ["role-0"],
+            room_count: 3, desk_capacity: 24,
+            active_by_default: i < 22, max_rooms: null, max_agents: null,
+            expansion_allowed: true,
+          };
+        }),
         counts: { departments: 1, roles: 132, floors: 100,
-                  active_floors: 22, dormant_floors: 78, wings: 2 },
+                  active_floors: 22, dormant_floors: 78, wings: 5 },
       });
     }
     if (path.endsWith("/decisions")) {
@@ -198,10 +205,48 @@ describe("War Room renders durable rows", () => {
     expect(textOf(byTestId(h, "warroom-directory-counts")[0]))
       .toContain("132 roles");
     expect(allByTestId(h, "warroom-role")).toHaveLength(132);
-    expect(allByTestId(h, "warroom-floor")).toHaveLength(100);
     expect(allByTestId(h, "warroom-department")).toHaveLength(1);
+    // The flat list is replaced by the tower navigator, which receives the
+    // directory's own 100 floors (rendering is pinned by TowerNavigator tests).
+    const tower = byTestId(h, "warroom-tower");
+    expect(tower).toHaveLength(1);
+    expect((tower[0].props.floors as unknown[])).toHaveLength(100);
+    expect(new Set((tower[0].props.floors as Array<{ wing: string }>)
+      .map((item) => item.wing)).size).toBe(5);
     // Templates are not agents: no roster/control record is rendered here.
     expect(byTestId(h, "agent-control")).toHaveLength(0);
+  });
+
+  it("shows the directory loading state before the catalog resolves", async () => {
+    const { impl } = backend();
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-tab-directory")[0].props.onClick as () => void)();
+    h.flush();
+    expect(byTestId(h, "warroom-directory-loading")).toHaveLength(1);
+    await h.settle();
+    expect(byTestId(h, "warroom-directory-loading")).toHaveLength(0);
+    expect(byTestId(h, "warroom-tower")).toHaveLength(1);
+  });
+
+  it("renders a typed directory failure instead of an empty tower", async () => {
+    const { impl } = recordingFetch((call) => {
+      const path = new URL(call.url).pathname;
+      if (path.endsWith("/overview")) return respond(200, OVERVIEW);
+      if (path.endsWith("/warroom/sessions")) {
+        return respond(200, { ok: true, tenant_id: "ten_1", sessions: [] });
+      }
+      if (path.endsWith("/directory")) {
+        return respond(500, { ok: false, code: "BUSINESS_DIRECTORY_FAILED",
+                              detail: "registry unavailable" });
+      }
+      return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+    });
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-tab-directory")[0].props.onClick as () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-error")[0]))
+      .toContain("BUSINESS_DIRECTORY_FAILED");
+    expect(byTestId(h, "tower-navigator")).toHaveLength(0);
   });
 
   it("closes through the host's callback", async () => {

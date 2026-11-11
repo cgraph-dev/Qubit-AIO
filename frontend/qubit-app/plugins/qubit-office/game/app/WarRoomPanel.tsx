@@ -17,6 +17,7 @@ import {
   fetchWarRoomBundle, fetchWarRoomSessions, newIdempotencyKey,
   recordWarRoomDecision,
 } from "./business-api";
+import { createTowerNavigator } from "./TowerNavigator";
 
 export interface WarRoomPanelProps {
   base?: string;
@@ -79,6 +80,10 @@ export function createWarRoomPanel(
   hooks: OfficeGameShellProps["hooks"],
 ) {
   const { useState, useEffect } = hooks;
+  // Built ONCE per War Room instance: a factory called inside the render body
+  // would return a new component type every render and remount the tower
+  // (the same class of bug fixed for the HUD/agents docks).
+  const TowerNavigator = createTowerNavigator(R, hooks);
 
   return function WarRoomPanel(props: WarRoomPanelProps) {
     const [tab, setTab] = useState<"idea" | "directory">("idea");
@@ -297,24 +302,11 @@ export function createWarRoomPanel(
                 + `${role.model.model_hint || "model?"}`),
             ]))),
         ]));
-        children.push(section(R, "floors", "Floors & wings", [
-          R.createElement("ul", {
-            key: "list", className: "warroom__list warroom__list--scroll",
-            "data-testid": "warroom-floors",
-          }, directory.floors.map((floor) =>
-            R.createElement("li", {
-              key: floor.floor_id, "data-testid": "warroom-floor",
-              "data-floor": floor.floor_id,
-              "data-active": floor.active_by_default ? "true" : "false",
-            }, [
-              R.createElement("strong", { key: "t" },
-                `Floor ${floor.index} — ${floor.name}`),
-              R.createElement("span", {
-                key: "m", className: "warroom__muted",
-              }, ` · ${floor.wing} · ${floor.room_count} rooms · `
-                + `${floor.desk_capacity} desks · `
-                + `${floor.active_by_default ? "active" : "dormant"}`),
-            ]))),
+        children.push(section(R, "floors", "Tower directory", [
+          R.createElement(TowerNavigator as never, {
+            key: "tower", floors: directory.floors,
+            "data-testid": "warroom-tower",
+          }),
         ]));
       }
     } else {
