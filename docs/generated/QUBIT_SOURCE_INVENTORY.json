@@ -10698,7 +10698,7 @@
    },
    {
     "path": "scripts/build-bundle.ps1",
-    "local_sha256": "c5625075d520e5af6196518405b3301eba8c25acba58e2a43eb4a7af4e37e6bb"
+    "local_sha256": "938554764971a99f8132c79d8dc8ef67646db721a115786bbd08dfae484c2d42"
    },
    {
     "path": "scripts/build-bundle.sh",
@@ -22842,7 +22842,7 @@
    },
    {
     "path": "ui-tui/dist/hermes-build.json",
-    "local_sha256": "8c3b13c80606071c084f882f2a515f7fd60747c5fd446a5bc9648d0e6be3dc2d"
+    "local_sha256": "455dfdadc48d47af7ebb0e2e16e11deb47eafe4906dd16936ce5eb8e716c95fc"
    },
    {
     "path": "ui-tui/scripts/bench-native-history.tsx",
@@ -84132,124 +84132,20 @@
   "hermes": {
    "ledger_rows": 0,
    "inventory_items": 1802,
-   "matched": 1368,
-   "unmatched": 434,
+   "matched": 1366,
+   "unmatched": 436,
    "evidence": 6261
   },
   "openclaw": {
-   "ledger_rows": 104,
+   "ledger_rows": 0,
    "extensions": 138,
    "matched": 138,
    "unmatched": 0
   },
   "qubit": {
-   "ledger_rows": 2131
+   "ledger_rows": 2195
   },
   "ledger_ids": [
-   "OC-01",
-   "OC-02",
-   "OC-03",
-   "OC-04",
-   "OC-05",
-   "OC-06",
-   "OC-07",
-   "OC-08",
-   "OC-09",
-   "OC-10",
-   "OC-11",
-   "OC-12",
-   "OC-13",
-   "OC-14",
-   "OC-15",
-   "OC-16",
-   "OC-17",
-   "OC-18",
-   "OC-19",
-   "OC-20",
-   "OC-21",
-   "OC-22",
-   "OC-23",
-   "OC-24",
-   "OC-25",
-   "OC-26",
-   "OC-27",
-   "OC-28",
-   "OC-29",
-   "OC-30",
-   "OC-31",
-   "OC-32",
-   "OC-33",
-   "OC-34",
-   "OC-35",
-   "OC-36",
-   "OC-37",
-   "OC-38",
-   "OC-39",
-   "OC-40",
-   "OC-41",
-   "OC-42",
-   "OC-43",
-   "OC-44",
-   "OC-45",
-   "OC-46",
-   "OC-47",
-   "OC-48",
-   "OC-49",
-   "OC-50",
-   "OC-51",
-   "OC-52",
-   "OC-53",
-   "OC-54",
-   "OC-55",
-   "OC-56",
-   "OC-57",
-   "OC-58",
-   "OC-59",
-   "OC-60",
-   "OC-61",
-   "OC-62",
-   "OC-63",
-   "OC-64",
-   "OC-65",
-   "OC-66",
-   "OC-67",
-   "OC-68",
-   "OC-69",
-   "OC-70",
-   "OC-71",
-   "OC-72",
-   "OC-D01",
-   "OC-D02",
-   "OC-D03",
-   "OC-D04",
-   "OC-D05",
-   "OC-D06",
-   "OC-D07",
-   "OC-D08",
-   "OC-D09",
-   "OC-D10",
-   "OC-D11",
-   "OC-D12",
-   "OC-D13",
-   "OC-D14",
-   "OC-D15",
-   "OC-D16",
-   "OC-D17",
-   "OC-D18",
-   "OC-D19",
-   "OC-D20",
-   "OC-D21",
-   "OC-D22",
-   "OC-D23",
-   "OC-D24",
-   "OC-D25",
-   "OC-D26",
-   "OC-D27",
-   "OC-D28",
-   "OC-D29",
-   "OC-D30",
-   "OC-D31",
-   "OC-D32",
    "acp",
    "acp_accept_hooks",
    "acp_accept_hooks_refusal",
@@ -84567,6 +84463,7 @@
    "inv:api:GET_/api/analytics/usage",
    "inv:api:GET_/api/audio/elevenlabs/voices",
    "inv:api:GET_/api/audio/voice-config",
+   "inv:api:GET_/api/audio/voice-live/status",
    "inv:api:GET_/api/auth/me",
    "inv:api:GET_/api/auth/providers",
    "inv:api:GET_/api/chat/workspaces",
@@ -84586,6 +84483,7 @@
    "inv:api:GET_/api/dashboard/plugins/catalog",
    "inv:api:GET_/api/dashboard/plugins/hub",
    "inv:api:GET_/api/dashboard/plugins/rescan",
+   "inv:api:GET_/api/dashboard/themes",
    "inv:api:GET_/api/egress/status",
    "inv:api:GET_/api/env",
    "inv:api:GET_/api/files",
@@ -84598,6 +84496,7 @@
    "inv:api:GET_/api/fs/list",
    "inv:api:GET_/api/fs/read-data-url",
    "inv:api:GET_/api/fs/read-text",
+   "inv:api:GET_/api/gateway/migrate/plan",
    "inv:api:GET_/api/git/base-branches",
    "inv:api:GET_/api/git/branches",
    "inv:api:GET_/api/git/file-diff",
@@ -84609,6 +84508,8 @@
    "inv:api:GET_/api/git/review/ship-info",
    "inv:api:GET_/api/git/status",
    "inv:api:GET_/api/git/worktrees",
+   "inv:api:GET_/api/health",
+   "inv:api:GET_/api/health/idle",
    "inv:api:GET_/api/hermes/update/check",
    "inv:api:GET_/api/hermes/update/receipt",
    "inv:api:GET_/api/host/identity",
@@ -84663,6 +84564,7 @@
    "inv:api:GET_/api/sessions/{session_id}/messages",
    "inv:api:GET_/api/sessions/{session_id}/messages/around",
    "inv:api:GET_/api/sessions/{session_id}/timeline",
+   "inv:api:GET_/api/skills",
    "inv:api:GET_/api/skills/content",
    "inv:api:GET_/api/skills/hub/official",
    "inv:api:GET_/api/skills/hub/preview",
@@ -84841,6 +84743,7 @@
    "inv:dashboard-route:/pairing",
    "inv:dashboard-route:/plugins",
    "inv:dashboard-route:/profiles",
+   "inv:dashboard-route:/sessions",
    "inv:dashboard-route:/skills",
    "inv:dashboard-route:/system",
    "inv:dashboard-route:/webhooks",
@@ -84853,6 +84756,7 @@
    "inv:hermes_acp_-y",
    "inv:hermes_approvals",
    "inv:hermes_approvals_suggest",
+   "inv:hermes_approvals_suggest_--apply",
    "inv:hermes_approvals_suggest_--days",
    "inv:hermes_approvals_suggest_--db",
    "inv:hermes_approvals_suggest_--limit",
@@ -84883,12 +84787,16 @@
    "inv:hermes_auth_priority",
    "inv:hermes_auth_priority_priority",
    "inv:hermes_auth_priority_provider",
+   "inv:hermes_auth_priority_target",
    "inv:hermes_auth_refresh",
    "inv:hermes_auth_refresh_provider",
+   "inv:hermes_auth_refresh_target",
    "inv:hermes_auth_remove",
    "inv:hermes_auth_remove_provider",
+   "inv:hermes_auth_remove_target",
    "inv:hermes_auth_reset",
    "inv:hermes_auth_reset_provider",
+   "inv:hermes_auth_reset_target",
    "inv:hermes_auth_spotify",
    "inv:hermes_auth_spotify_--client-id",
    "inv:hermes_auth_spotify_--no-browser",
@@ -84915,12 +84823,16 @@
    "inv:hermes_browser_close-profile_--browser",
    "inv:hermes_bundles",
    "inv:hermes_chat",
+   "inv:hermes_chat_--accept-hooks",
    "inv:hermes_chat_--checkpoints",
    "inv:hermes_chat_--cli",
    "inv:hermes_chat_--continue",
    "inv:hermes_chat_--create-if-missing",
    "inv:hermes_chat_--dev",
    "inv:hermes_chat_--format",
+   "inv:hermes_chat_--ignore-rules",
+   "inv:hermes_chat_--ignore-user-config",
+   "inv:hermes_chat_--image",
    "inv:hermes_chat_--in",
    "inv:hermes_chat_--max-turns",
    "inv:hermes_chat_--model",
@@ -84931,13 +84843,17 @@
    "inv:hermes_chat_--query",
    "inv:hermes_chat_--query-file",
    "inv:hermes_chat_--quiet",
+   "inv:hermes_chat_--reasoning",
    "inv:hermes_chat_--resume",
    "inv:hermes_chat_--run-budget",
    "inv:hermes_chat_--safe-mode",
    "inv:hermes_chat_--skills",
    "inv:hermes_chat_--source",
    "inv:hermes_chat_--toolsets",
+   "inv:hermes_chat_--tui",
    "inv:hermes_chat_--verbose",
+   "inv:hermes_chat_--worktree",
+   "inv:hermes_chat_--yolo",
    "inv:hermes_chat_-Q",
    "inv:hermes_chat_-c",
    "inv:hermes_chat_-m",
@@ -84990,6 +84906,7 @@
    "inv:hermes_config_set",
    "inv:hermes_config_set_--force",
    "inv:hermes_config_set_key",
+   "inv:hermes_config_set_value",
    "inv:hermes_config_show",
    "inv:hermes_config_unset",
    "inv:hermes_config_unset_key",
@@ -85050,6 +84967,7 @@
    "inv:hermes_cron_notepad_job_id",
    "inv:hermes_cron_notepad_key",
    "inv:hermes_cron_notepad_notepad_action",
+   "inv:hermes_cron_notepad_value",
    "inv:hermes_cron_pause",
    "inv:hermes_cron_pause_job_id",
    "inv:hermes_cron_remove",
@@ -85068,6 +84986,7 @@
    "inv:hermes_curator",
    "inv:hermes_dashboard",
    "inv:hermes_dashboard_--no-open",
+   "inv:hermes_dashboard_--tui",
    "inv:hermes_dashboard_register",
    "inv:hermes_dashboard_register_--name",
    "inv:hermes_dashboard_register_--portal-url",
@@ -85235,6 +85154,7 @@
    "inv:hermes_migrate_relay_--all-profiles",
    "inv:hermes_migrate_relay_--no-validate",
    "inv:hermes_migrate_xai",
+   "inv:hermes_migrate_xai_--apply",
    "inv:hermes_migrate_xai_--no-backup",
    "inv:hermes_moa",
    "inv:hermes_moa_config",
@@ -85297,6 +85217,7 @@
    "inv:hermes_plugins_disable_name",
    "inv:hermes_plugins_doctor",
    "inv:hermes_plugins_doctor_--ci",
+   "inv:hermes_plugins_doctor_target",
    "inv:hermes_plugins_enable",
    "inv:hermes_plugins_enable_--allow-tool-override",
    "inv:hermes_plugins_enable_--no-allow-tool-override",
@@ -85482,6 +85403,7 @@
    "inv:hermes_sessions_recover_--work-dir",
    "inv:hermes_sessions_rename",
    "inv:hermes_sessions_rename_session_id",
+   "inv:hermes_sessions_rename_title",
    "inv:hermes_sessions_repair",
    "inv:hermes_sessions_repair-profiles",
    "inv:hermes_sessions_repair-profiles_--legacy-main",
@@ -85491,6 +85413,7 @@
    "inv:hermes_sessions_retitle-skills_--limit",
    "inv:hermes_sessions_set-journal-mode",
    "inv:hermes_sessions_set-journal-mode_--db",
+   "inv:hermes_sessions_set-journal-mode_mode",
    "inv:hermes_sessions_stats",
    "inv:hermes_sessions_unpin",
    "inv:hermes_sessions_unpin_session_ids",
@@ -85543,6 +85466,7 @@
    "inv:hermes_skills_snapshot_import_input",
    "inv:hermes_skills_tap",
    "inv:hermes_skills_tap_add",
+   "inv:hermes_skills_tap_add_repo",
    "inv:hermes_skills_tap_list",
    "inv:hermes_skills_tap_remove",
    "inv:hermes_skills_tap_remove_name",
@@ -85559,6 +85483,7 @@
    "inv:hermes_skin_set",
    "inv:hermes_skin_set_--skin",
    "inv:hermes_skin_set_key",
+   "inv:hermes_skin_set_value",
    "inv:hermes_skin_use",
    "inv:hermes_skin_use_name",
    "inv:hermes_slack",
@@ -85768,6 +85693,7 @@
    "inv:openclaw-ext:opencode-go",
    "inv:openclaw-ext:openrouter",
    "inv:openclaw-ext:openshell",
+   "inv:openclaw-ext:parallel",
    "inv:openclaw-ext:perplexity",
    "inv:openclaw-ext:phone-control",
    "inv:openclaw-ext:pixverse",
@@ -85782,6 +85708,7 @@
    "inv:openclaw-ext:searxng",
    "inv:openclaw-ext:senseaudio",
    "inv:openclaw-ext:sglang",
+   "inv:openclaw-ext:signal",
    "inv:openclaw-ext:slack",
    "inv:openclaw-ext:sms",
    "inv:openclaw-ext:stepfun",
@@ -85815,8 +85742,25 @@
    "inv:openclaw-ext:zai",
    "inv:openclaw-ext:zalo",
    "inv:openclaw-ext:zalouser",
+   "inv:page:AnalyticsPage",
+   "inv:page:ChannelsPage",
+   "inv:page:ChatPage",
+   "inv:page:ConfigPage",
+   "inv:page:CronPage",
+   "inv:page:DocsPage",
+   "inv:page:EnvPage",
    "inv:page:FilesPage",
+   "inv:page:LogsPage",
+   "inv:page:McpPage",
+   "inv:page:ModelsPage",
+   "inv:page:PairingPage",
+   "inv:page:PluginsPage",
+   "inv:page:ProfileBuilderPage",
+   "inv:page:ProfilesPage",
    "inv:page:SessionsPage",
+   "inv:page:SkillsPage",
+   "inv:page:SystemPage",
+   "inv:page:WebhooksPage",
    "inv:plugin-api:hermes-achievements",
    "inv:plugin-api:kanban",
    "inv:plugin-asset:hermes-achievements:index.js",
@@ -85854,10 +85798,14 @@
    "inv:skill:optional-skills/email",
    "inv:skill:optional-skills/finance",
    "inv:skill:optional-skills/gaming",
+   "inv:skill:optional-skills/health",
+   "inv:skill:optional-skills/mcp",
+   "inv:skill:optional-skills/migration",
    "inv:skill:optional-skills/mlops",
    "inv:skill:optional-skills/payments",
    "inv:skill:optional-skills/productivity",
    "inv:skill:optional-skills/research",
+   "inv:skill:optional-skills/security",
    "inv:skill:optional-skills/smart-home",
    "inv:skill:optional-skills/social-media",
    "inv:skill:optional-skills/software-development",
@@ -85878,10 +85826,13 @@
    "inv:tool:annotate_preview",
    "inv:tool:apply_layout",
    "inv:tool:browser_back",
+   "inv:tool:browser_cdp",
+   "inv:tool:browser_click",
    "inv:tool:browser_console",
    "inv:tool:browser_dialog",
    "inv:tool:browser_exec",
    "inv:tool:browser_get_images",
+   "inv:tool:browser_navigate",
    "inv:tool:browser_press",
    "inv:tool:browser_scroll",
    "inv:tool:browser_snapshot",
@@ -85920,10 +85871,17 @@
    "inv:tool:kanban_attach",
    "inv:tool:kanban_attach_url",
    "inv:tool:kanban_attachments",
+   "inv:tool:kanban_block",
+   "inv:tool:kanban_comment",
+   "inv:tool:kanban_complete",
+   "inv:tool:kanban_create",
    "inv:tool:kanban_heartbeat",
    "inv:tool:kanban_link",
+   "inv:tool:kanban_list",
    "inv:tool:kanban_request_changes",
    "inv:tool:kanban_request_review",
+   "inv:tool:kanban_show",
+   "inv:tool:kanban_unblock",
    "inv:tool:manage_catalog",
    "inv:tool:manage_connections",
    "inv:tool:meet_join",
@@ -85943,6 +85901,7 @@
    "inv:tool:show_tip",
    "inv:tool:skill_manage",
    "inv:tool:skill_view",
+   "inv:tool:skills_list",
    "inv:tool:spotify_albums",
    "inv:tool:spotify_devices",
    "inv:tool:spotify_library",
@@ -85959,6 +85918,7 @@
    "inv:tool:vision_analyze",
    "inv:tool:web",
    "inv:tool:web_extract",
+   "inv:tool:web_search",
    "inv:tool:write_file",
    "inv:tool:x_search",
    "inv:tool:xai_video_edit",
@@ -86386,11 +86346,11 @@
  },
  "parent_mapping": {
   "method": "Mechanical parent mapping: a CLI option/positional belongs to its command family (nearest existing cli: row); a CLI alias to its target; a model/provider entry to model/proxy_providers; a plugin asset/API/test/manifest to its plugin; an OpenClaw extension to the audited OC-* capability of its name or first mapped manifest category; a workflow source file to its area capability; a dashboard component/dialog/form/nav to webui_status.  A surface is covered when it matches its own ledger row or its resolved parent row is IMPLEMENTED in the live ledger, so it must not create a standalone MISSING row.  Parented and distinct uncovered items are counted and listed separately.",
-  "parented_surfaces": 1045,
-  "parented_covered": 1044,
-  "parented_uncovered": 1,
-  "distinct_surfaces": 895,
-  "distinct_covered": 895,
+  "parented_surfaces": 1029,
+  "parented_covered": 1029,
+  "parented_uncovered": 0,
+  "distinct_surfaces": 911,
+  "distinct_covered": 911,
   "distinct_uncovered": 0,
   "by_coverage": {
    "(distinct)": 773,
@@ -86407,21 +86367,6 @@
    "workflow-surface": 132
   },
   "by_parent_covered": {
-   "OC-01": 1,
-   "OC-09": 1,
-   "OC-18": 2,
-   "OC-23": 1,
-   "OC-30": 1,
-   "OC-34": 1,
-   "OC-35": 1,
-   "OC-67": 1,
-   "OC-D03": 1,
-   "OC-D04": 1,
-   "OC-D12": 1,
-   "OC-D13": 1,
-   "OC-D15": 1,
-   "OC-D16": 1,
-   "OC-D17": 1,
    "browser_status": 25,
    "channels_status": 8,
    "cli:acp": 6,
@@ -86540,7 +86485,7 @@
    "cli:project use": 1,
    "cli:prompt-size": 1,
    "cli:proxy start": 3,
-   "cli:screen install": 1,
+   "cli:screen install": 2,
    "cli:screen stop": 1,
    "cli:secrets bitwarden": 1,
    "cli:secrets onepassword": 2,
@@ -86613,31 +86558,21 @@
    "schedules_list": 32,
    "webui_status": 48
   },
-  "by_parent_uncovered": {
-   "cli:screen install": 1
-  },
+  "by_parent_uncovered": {},
   "uncovered_by_category": {
    "distinct": {},
-   "parented": {
-    "qubit_cli_option": 1
-   }
+   "parented": {}
   }
  },
  "omissions": {
-  "total": 1,
+  "total": 0,
   "distinct_total": 0,
-  "parented_uncovered": 1,
-  "parented_covered": 1044,
-  "by_category": {
-   "qubit_cli_option": 1
-  },
+  "parented_uncovered": 0,
+  "parented_covered": 1029,
+  "by_category": {},
   "distinct_by_category": {},
-  "parented_by_category": {
-   "qubit_cli_option": 1
-  },
-  "by_parent": {
-   "cli:screen install": 1
-  },
+  "parented_by_category": {},
+  "by_parent": {},
   "unreproducible_evidence": []
  },
  "items": [
@@ -87083,9 +87018,9 @@
    "name": "Analytics",
    "path": "web/src/App.tsx:196",
    "route": "/analytics",
-   "ledger_match": "OC-50",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": null,
+   "ledger_source": null,
+   "ledger_status": null,
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
    "parent_resolved": "webui_status",
@@ -87147,9 +87082,9 @@
    "name": "Cron",
    "path": "web/src/App.tsx:209",
    "route": "/cron",
-   "ledger_match": "OC-D22",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "plugin_qubit-hud",
+   "ledger_source": "qubit",
+   "ledger_status": "UNVERIFIED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
    "parent_resolved": "webui_status",
@@ -87195,9 +87130,9 @@
    "name": "Files",
    "path": "web/src/App.tsx:195",
    "route": "/files",
-   "ledger_match": "OC-61",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": null,
+   "ledger_source": null,
+   "ledger_status": null,
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
    "parent_resolved": "webui_status",
@@ -87227,8 +87162,8 @@
    "name": "MCP",
    "path": "web/src/App.tsx:212",
    "route": "/mcp",
-   "ledger_match": "OC-D10",
-   "ledger_source": "openclaw",
+   "ledger_match": "mcp",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
@@ -87259,8 +87194,8 @@
    "name": "Pairing",
    "path": "web/src/App.tsx:215",
    "route": "/pairing",
-   "ledger_match": "OC-07",
-   "ledger_source": "openclaw",
+   "ledger_match": "pairing_create",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
@@ -87531,8 +87466,8 @@
    "category": "hermes_dashboard_page",
    "name": "FilesPage",
    "path": "web/src/pages/FilesPage.tsx",
-   "ledger_match": "OC-61",
-   "ledger_source": "openclaw",
+   "ledger_match": "page_filespage",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -87715,8 +87650,8 @@
    "category": "hermes_dashboard_page",
    "name": "SessionsPage",
    "path": "web/src/pages/SessionsPage.tsx",
-   "ledger_match": "OC-43",
-   "ledger_source": "openclaw",
+   "ledger_match": "page_sessionspage",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -87840,8 +87775,8 @@
    "tab_path": "/kanban",
    "entry": "dist/index.js",
    "api": "plugin_api.py",
-   "ledger_match": "OC-30",
-   "ledger_source": "openclaw",
+   "ledger_match": "guard_kanban_import",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:kanban",
    "coverage": "plugin-surface",
@@ -105755,9 +105690,9 @@
    "category": "hermes_model",
    "name": "default",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-14",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "actions_execute",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107195,9 +107130,9 @@
    "category": "hermes_model",
    "name": "minimax/minimax-m3:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107450,9 +107385,9 @@
    "category": "hermes_model",
    "name": "nvidia/nemotron-3-super-120b-a12b:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107480,9 +107415,9 @@
    "category": "hermes_model",
    "name": "nvidia/nemotron-3-ultra-550b-a55b:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107510,9 +107445,9 @@
    "category": "hermes_model",
    "name": "nvidia/nemotron-3.5-lightning:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107810,9 +107745,9 @@
    "category": "hermes_model",
    "name": "poolside/laguna-s-2.1:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107825,9 +107760,9 @@
    "category": "hermes_model",
    "name": "poolside/laguna-xs-2.1:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -108065,9 +108000,9 @@
    "category": "hermes_model",
    "name": "thinkingmachines/inkling-small:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -108080,9 +108015,9 @@
    "category": "hermes_model",
    "name": "thinkingmachines/inkling:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -108410,9 +108345,9 @@
    "category": "hermes_model",
    "name": "z-ai/glm-5.2:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "questions_ask",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -108515,8 +108450,8 @@
    "category": "hermes_plugin",
    "name": "browser",
    "path": "plugins/browser",
-   "ledger_match": "OC-09",
-   "ledger_source": "openclaw",
+   "ledger_match": "browser_activate",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108699,8 +108634,8 @@
    "category": "hermes_plugin",
    "name": "kanban",
    "path": "plugins/kanban",
-   "ledger_match": "OC-30",
-   "ledger_source": "openclaw",
+   "ledger_match": "guard_kanban_import",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108722,8 +108657,8 @@
    "category": "hermes_plugin",
    "name": "memory",
    "path": "plugins/memory",
-   "ledger_match": "OC-41",
-   "ledger_source": "openclaw",
+   "ledger_match": "brain",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108745,8 +108680,8 @@
    "category": "hermes_plugin",
    "name": "model-providers",
    "path": "plugins/model-providers",
-   "ledger_match": "OC-D28",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:plugin:model-providers",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108906,8 +108841,8 @@
    "category": "hermes_plugin",
    "name": "web",
    "path": "plugins/web",
-   "ledger_match": "OC-43",
-   "ledger_source": "openclaw",
+   "ledger_match": "web_fetch",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108954,8 +108889,8 @@
    "name": "kanban",
    "path": "plugins/kanban/dashboard/plugin_api.py",
    "plugin": "kanban",
-   "ledger_match": "OC-30",
-   "ledger_source": "openclaw",
+   "ledger_match": "guard_kanban_import",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:kanban",
    "coverage": "plugin-surface",
@@ -109099,7 +109034,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:cloudflare-ai-gateway",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109129,7 +109064,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:anthropic",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109144,7 +109079,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:arcee",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109174,7 +109109,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:amazon-bedrock",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109219,7 +109154,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:deepseek",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109234,7 +109169,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:fireworks",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109264,7 +109199,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:gmi",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109279,7 +109214,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:huggingface",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109294,7 +109229,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:kilocode",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109309,7 +109244,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:kimi-coding",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109339,7 +109274,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:lmstudio",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109354,7 +109289,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:minimax",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109429,7 +109364,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:novita",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109444,7 +109379,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:nvidia",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109504,7 +109439,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:opencode-go",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109534,7 +109469,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:openrouter",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109564,7 +109499,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:stepfun",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109622,7 +109557,7 @@
    "category": "hermes_provider",
    "name": "xai",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "inv:hermes_migrate_xai_--no-backup",
+   "ledger_match": "inv:hermes_migrate_xai_--apply",
    "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
@@ -109654,7 +109589,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:xiaomi",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -109669,7 +109604,7 @@
    "path": "hermes_cli/models_catalog_static.py",
    "ledger_match": "inv:openclaw-ext:zai",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "proxy_providers",
    "coverage": "provider-entry",
    "parent_resolved": "proxy_providers",
@@ -110355,9 +110290,9 @@
    "name": "media",
    "path": "skills/media",
    "root": "skills",
-   "ledger_match": "OC-56",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "media_gen_catalog",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -110499,8 +110434,8 @@
    "name": "web",
    "path": "skills/web",
    "root": "skills",
-   "ledger_match": "OC-43",
-   "ledger_source": "openclaw",
+   "ledger_match": "web_fetch",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -111028,8 +110963,8 @@
    "category": "hermes_tool",
    "name": "computer_use",
    "path": "tools/*.py",
-   "ledger_match": "OC-13",
-   "ledger_source": "openclaw",
+   "ledger_match": "computer_doctor",
+   "ledger_source": "qubit",
    "ledger_status": "OPERATOR_ONLY",
    "parent_id": null,
    "coverage": "",
@@ -111143,8 +111078,8 @@
    "category": "hermes_tool",
    "name": "discord",
    "path": "tools/*.py",
-   "ledger_match": "OC-D12",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:tool:discord",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -111350,8 +111285,8 @@
    "category": "hermes_tool",
    "name": "file",
    "path": "tools/*.py",
-   "ledger_match": "OC-62",
-   "ledger_source": "openclaw",
+   "ledger_match": "backup_create",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112040,8 +111975,8 @@
    "category": "hermes_tool",
    "name": "memory",
    "path": "tools/*.py",
-   "ledger_match": "OC-41",
-   "ledger_source": "openclaw",
+   "ledger_match": "brain",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112063,8 +111998,8 @@
    "category": "hermes_tool",
    "name": "patch",
    "path": "tools/*.py",
-   "ledger_match": "OC-62",
-   "ledger_source": "openclaw",
+   "ledger_match": "file_patch_rollback",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112132,8 +112067,8 @@
    "category": "hermes_tool",
    "name": "read_file",
    "path": "tools/*.py",
-   "ledger_match": "OC-61",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:tool:read_file",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112500,8 +112435,8 @@
    "category": "hermes_tool",
    "name": "terminal",
    "path": "tools/*.py",
-   "ledger_match": "OC-71",
-   "ledger_source": "openclaw",
+   "ledger_match": "console_help",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112615,9 +112550,9 @@
    "category": "hermes_tool",
    "name": "vision",
    "path": "tools/*.py",
-   "ledger_match": "OC-51",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "vision_describe",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -112661,8 +112596,8 @@
    "category": "hermes_tool",
    "name": "web",
    "path": "tools/*.py",
-   "ledger_match": "OC-43",
-   "ledger_source": "openclaw",
+   "ledger_match": "web_fetch",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112753,8 +112688,8 @@
    "category": "hermes_tool",
    "name": "x_search",
    "path": "tools/*.py",
-   "ledger_match": "OC-63",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:tool:x_search",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -205379,7 +205314,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_surface",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser. It is served as `qubit computer-use screen`.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes secrets",
@@ -209516,15 +209459,7 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:debug share",
    "parent_status": null,
-   "parent_covered": false,
-   "fork_disposition": {
-    "status": "IMPLEMENTED",
-    "capability": "qubit_cli_option",
-    "backend": "qubit_cli.main:_build_cli_parser",
-    "proving_test": "tests/test_cli_agent1_families.py",
-    "reason": "`qubit debug share --nous` lives on a command path that qubit_cli.main._build_cli_parser() defines.",
-    "needs": "none"
-   }
+   "parent_covered": false
   },
   {
    "id": "hermes debug share --yes",
@@ -213151,7 +213086,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:screen install",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_option",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen install --yes` lives on a command path that qubit_cli.main._build_cli_parser() defines.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes screen install -y",
@@ -213168,7 +213111,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:screen install",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_option",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen install -y` lives on a command path that qubit_cli.main._build_cli_parser() defines.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes screen stop --force",
@@ -213185,7 +213136,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:screen stop",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_option",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen stop --force` lives on a command path that qubit_cli.main._build_cli_parser() defines.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes security audit --fail-on",
@@ -215952,7 +215911,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:approvals test",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `command_words` positional of `qubit approvals test` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth add provider",
@@ -215962,14 +215929,22 @@
    "command": "hermes auth add",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id (for example: anthropic, openai-codex, openrouter)",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth add",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth add",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth add` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth list provider",
@@ -215979,14 +215954,22 @@
    "command": "hermes auth list",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Optional provider filter",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth list",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth list",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth list` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth logout provider",
@@ -215996,14 +215979,22 @@
    "command": "hermes auth logout",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth logout",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth logout",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth logout` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth priority priority",
@@ -216020,7 +216011,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:auth priority",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `priority` positional of `qubit auth priority` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth priority provider",
@@ -216030,14 +216029,22 @@
    "command": "hermes auth priority",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth priority",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth priority",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth priority` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth priority target",
@@ -216054,7 +216061,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:auth priority",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `target` positional of `qubit auth priority` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth refresh provider",
@@ -216064,14 +216079,22 @@
    "command": "hermes auth refresh",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth refresh",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth refresh",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth refresh` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth refresh target",
@@ -216088,7 +216111,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:auth refresh",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `target` positional of `qubit auth refresh` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth remove provider",
@@ -216098,14 +216129,22 @@
    "command": "hermes auth remove",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth remove",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth remove target",
@@ -216122,7 +216161,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:auth remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `target` positional of `qubit auth remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth reset provider",
@@ -216132,14 +216179,22 @@
    "command": "hermes auth reset",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth reset",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth reset",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth reset` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth reset target",
@@ -216156,7 +216211,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:auth reset",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `target` positional of `qubit auth reset` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth spotify spotify_action",
@@ -216173,7 +216236,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:auth spotify",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `spotify_action` positional of `qubit auth spotify` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes auth status provider",
@@ -216183,14 +216254,22 @@
    "command": "hermes auth status",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth status",
    "coverage": "cli-option",
    "parent_resolved": "cli:auth status",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit auth status` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes completion shell",
@@ -216200,14 +216279,22 @@
    "command": "hermes completion",
    "path": "hermes_cli/subcommands/completion.py",
    "help": "Shell type (default: bash)",
-   "ledger_match": "OC-29",
-   "ledger_source": "openclaw",
+   "ledger_match": "computer_ops",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:completion",
    "coverage": "cli-option",
    "parent_resolved": "cli:completion",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `shell` positional of `qubit completion` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes config get key",
@@ -216217,14 +216304,22 @@
    "command": "hermes config get",
    "path": "hermes_cli/subcommands/config.py",
    "help": "Configuration key (e.g., model)",
-   "ledger_match": "OC-14",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "create_model_profile",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:config get",
    "coverage": "cli-option",
    "parent_resolved": "cli:config get",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `key` positional of `qubit config get` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes config set key",
@@ -216234,14 +216329,22 @@
    "command": "hermes config set",
    "path": "hermes_cli/subcommands/config.py",
    "help": "Configuration key (e.g., model, terminal.backend)",
-   "ledger_match": "OC-14",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "create_model_profile",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:config set",
    "coverage": "cli-option",
    "parent_resolved": "cli:config set",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `key` positional of `qubit config set` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes config set value",
@@ -216258,7 +216361,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:config set",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `value` positional of `qubit config set` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes config unset key",
@@ -216268,14 +216379,22 @@
    "command": "hermes config unset",
    "path": "hermes_cli/subcommands/config.py",
    "help": "Configuration key to remove",
-   "ledger_match": "OC-14",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "create_model_profile",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:config unset",
    "coverage": "cli-option",
    "parent_resolved": "cli:config unset",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `key` positional of `qubit config unset` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron create prompt",
@@ -216285,14 +216404,22 @@
    "command": "hermes cron create",
    "path": "hermes_cli/subcommands/cron.py",
    "help": "Optional self-contained prompt or task instruction",
-   "ledger_match": "OC-58",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "bot_task_pause",
+   "ledger_source": "qubit",
+   "ledger_status": "UNVERIFIED",
    "parent_id": "cli:cron create",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron create",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `prompt` positional of `qubit cron create` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron create schedule",
@@ -216302,14 +216429,22 @@
    "command": "hermes cron create",
    "path": "hermes_cli/subcommands/cron.py",
    "help": "Schedule like '30m', 'every 2h', or '0 9 * * *'",
-   "ledger_match": "OC-26",
-   "ledger_source": "openclaw",
+   "ledger_match": "schedule_dispatch",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron create",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron create",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `schedule` positional of `qubit cron create` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron edit job_id",
@@ -216326,7 +216461,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron edit",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `job_id` positional of `qubit cron edit` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron incidents incident_action",
@@ -216343,7 +216486,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron incidents",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `incident_action` positional of `qubit cron incidents` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron incidents incident_id",
@@ -216360,7 +216511,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron incidents",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `incident_id` positional of `qubit cron incidents` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron notepad job_id",
@@ -216377,7 +216536,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron notepad",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `job_id` positional of `qubit cron notepad` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron notepad key",
@@ -216387,14 +216554,22 @@
    "command": "hermes cron notepad",
    "path": "hermes_cli/subcommands/cron.py",
    "help": "Notepad key (get/set/delete)",
-   "ledger_match": "OC-14",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "create_model_profile",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron notepad",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron notepad",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `key` positional of `qubit cron notepad` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron notepad notepad_action",
@@ -216411,7 +216586,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron notepad",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `notepad_action` positional of `qubit cron notepad` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron notepad value",
@@ -216428,7 +216611,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron notepad",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `value` positional of `qubit cron notepad` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron pause job_id",
@@ -216445,7 +216636,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron pause",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `job_id` positional of `qubit cron pause` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron remove job_id",
@@ -216462,7 +216661,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `job_id` positional of `qubit cron remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron resume job_id",
@@ -216479,7 +216686,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron resume",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `job_id` positional of `qubit cron resume` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron run job_id",
@@ -216496,7 +216711,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron run",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `job_id` positional of `qubit cron run` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes cron runs job_id",
@@ -216513,7 +216736,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:cron runs",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `job_id` positional of `qubit cron runs` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes debug delete urls",
@@ -216530,7 +216761,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:debug delete",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `urls` positional of `qubit debug delete` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes hooks revoke command",
@@ -216540,14 +216779,22 @@
    "command": "hermes hooks revoke",
    "path": "hermes_cli/subcommands/hooks.py",
    "help": "The exact command string to revoke (as declared in config.yaml)",
-   "ledger_match": "OC-68",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "browser_close_refusal",
+   "ledger_source": "qubit",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:hooks revoke",
    "coverage": "cli-option",
    "parent_resolved": "cli:hooks revoke",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `command` positional of `qubit hooks revoke` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes hooks test event",
@@ -216557,14 +216804,22 @@
    "command": "hermes hooks test",
    "path": "hermes_cli/subcommands/hooks.py",
    "help": "Hook event name (e.g. pre_tool_call, pre_llm_call, subagent_stop)",
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "gateway_supervision",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:hooks test",
    "coverage": "cli-option",
    "parent_resolved": "cli:hooks test",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `event` positional of `qubit hooks test` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes import zipfile",
@@ -216581,7 +216836,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:import",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `zipfile` positional of `qubit import` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes import-agent agent",
@@ -216591,8 +216854,8 @@
    "command": "hermes import-agent",
    "path": "hermes_cli/subcommands/import_agent.py",
    "help": "Which agent to import from (default: auto-detect ~/.claude or ~/.codex)",
-   "ledger_match": "OC-41",
-   "ledger_source": "openclaw",
+   "ledger_match": "import_agent_import",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:import-agent",
    "coverage": "cli-option",
@@ -216615,7 +216878,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:logs",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `log_name` positional of `qubit logs` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes mcp add name",
@@ -216625,14 +216896,22 @@
    "command": "hermes mcp add",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name (used as config key)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp add",
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp add",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit mcp add` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes mcp configure name",
@@ -216642,14 +216921,22 @@
    "command": "hermes mcp configure",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to configure",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp configure",
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp configure",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit mcp configure` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes mcp install identifier",
@@ -216666,7 +216953,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp install",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `identifier` positional of `qubit mcp install` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes mcp login name",
@@ -216676,14 +216971,22 @@
    "command": "hermes mcp login",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to re-authenticate",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp login",
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp login",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit mcp login` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes mcp reauth name",
@@ -216693,14 +216996,22 @@
    "command": "hermes mcp reauth",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to re-authenticate (omit with --all)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp reauth",
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp reauth",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit mcp reauth` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes mcp remove name",
@@ -216710,14 +217021,22 @@
    "command": "hermes mcp remove",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to remove",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp remove",
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit mcp remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes mcp test name",
@@ -216727,14 +217046,22 @@
    "command": "hermes mcp test",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to test",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp test",
    "coverage": "cli-option",
    "parent_resolved": "cli:mcp test",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit mcp test` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes memory setup provider",
@@ -216744,14 +217071,22 @@
    "command": "hermes memory setup",
    "path": "hermes_cli/subcommands/memory.py",
    "help": "Provider to configure directly (e.g. honcho), skipping the picker",
-   "ledger_match": "OC-40",
-   "ledger_source": "openclaw",
+   "ledger_match": "auth_verify",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:memory setup",
    "coverage": "cli-option",
    "parent_resolved": "cli:memory setup",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `provider` positional of `qubit memory setup` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes moa configure name",
@@ -216761,14 +217096,22 @@
    "command": "hermes moa configure",
    "path": "hermes_cli/subcommands/moa.py",
    "help": "Preset name to create or update",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:moa configure",
    "coverage": "cli-option",
    "parent_resolved": "cli:moa configure",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit moa configure` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes moa delete name",
@@ -216778,14 +217121,22 @@
    "command": "hermes moa delete",
    "path": "hermes_cli/subcommands/moa.py",
    "help": "Preset name to delete",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:moa delete",
    "coverage": "cli-option",
    "parent_resolved": "cli:moa delete",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit moa delete` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes pairing approve code",
@@ -216795,14 +217146,22 @@
    "command": "hermes pairing approve",
    "path": "hermes_cli/subcommands/pairing.py",
    "help": "Request ID from 'pairing list', or the code the bot DM'd the user",
-   "ledger_match": "OC-08",
-   "ledger_source": "openclaw",
+   "ledger_match": "pairing_accept",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:pairing approve",
    "coverage": "cli-option",
    "parent_resolved": "cli:pairing approve",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `code` positional of `qubit pairing approve` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes pairing approve platform",
@@ -216812,14 +217171,22 @@
    "command": "hermes pairing approve",
    "path": "hermes_cli/subcommands/pairing.py",
    "help": "Platform name (telegram, discord, slack, whatsapp)",
-   "ledger_match": "OC-D16",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "inv:hermes_prompt-size_--platform",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:pairing approve",
    "coverage": "cli-option",
    "parent_resolved": "cli:pairing approve",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `platform` positional of `qubit pairing approve` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes pairing revoke platform",
@@ -216829,14 +217196,22 @@
    "command": "hermes pairing revoke",
    "path": "hermes_cli/subcommands/pairing.py",
    "help": "Platform name",
-   "ledger_match": "OC-D16",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "inv:hermes_prompt-size_--platform",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:pairing revoke",
    "coverage": "cli-option",
    "parent_resolved": "cli:pairing revoke",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `platform` positional of `qubit pairing revoke` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes pairing revoke user_id",
@@ -216853,7 +217228,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:pairing revoke",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `user_id` positional of `qubit pairing revoke` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes peer add name",
@@ -216863,14 +217246,22 @@
    "command": "hermes peer add",
    "path": "hermes_cli/subcommands/peer.py",
    "help": "Peer name (lowercase slug, e.g. spark, homelab)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:peer add",
    "coverage": "cli-option",
    "parent_resolved": "cli:peer add",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit peer add` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes peer remove name",
@@ -216880,14 +217271,22 @@
    "command": "hermes peer remove",
    "path": "hermes_cli/subcommands/peer.py",
    "help": "Peer name",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:peer remove",
    "coverage": "cli-option",
    "parent_resolved": "cli:peer remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit peer remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins adopt name",
@@ -216897,14 +217296,22 @@
    "command": "hermes plugins adopt",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Self-cloned plugin directory name",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins adopt",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins adopt",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins adopt` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins capabilities name",
@@ -216914,14 +217321,22 @@
    "command": "hermes plugins capabilities",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin id to inspect (omit to list all plugins with capabilities)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins capabilities",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins capabilities",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins capabilities` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins compat path",
@@ -216931,9 +217346,9 @@
    "command": "hermes plugins compat",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Scan one plugin directory instead of the installed set (for plugin authors)",
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "backup_create",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins compat",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins compat",
@@ -216948,14 +217363,22 @@
    "command": "hermes plugins disable",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name to disable",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins disable",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins disable",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins disable` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins doctor target",
@@ -216972,7 +217395,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins doctor",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `target` positional of `qubit plugins doctor` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins enable name",
@@ -216982,14 +217413,22 @@
    "command": "hermes plugins enable",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name to enable",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins enable",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins enable",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins enable` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins install identifier",
@@ -217006,7 +217445,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins install",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `identifier` positional of `qubit plugins install` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins pack install source",
@@ -217016,14 +217463,22 @@
    "command": "hermes plugins pack install",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Path to a hermes-pack.yaml file, or an https:// URL",
-   "ledger_match": "OC-06",
-   "ledger_source": "openclaw",
+   "ledger_match": "clone_model_profile",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins pack install",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins pack install",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `source` positional of `qubit plugins pack install` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins pack show source",
@@ -217033,14 +217488,22 @@
    "command": "hermes plugins pack show",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Path to a hermes-pack.yaml file, or an https:// URL",
-   "ledger_match": "OC-06",
-   "ledger_source": "openclaw",
+   "ledger_match": "clone_model_profile",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins pack show",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins pack show",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `source` positional of `qubit plugins pack show` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins remove name",
@@ -217050,14 +217513,22 @@
    "command": "hermes plugins remove",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin directory name to remove",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins remove",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins search term",
@@ -217074,7 +217545,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins search",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `term` positional of `qubit plugins search` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins show name",
@@ -217084,14 +217563,22 @@
    "command": "hermes plugins show",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name or key to show",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins show",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins show",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins show` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins trust-update-url name",
@@ -217101,14 +217588,22 @@
    "command": "hermes plugins trust-update-url",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins trust-update-url",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins trust-update-url",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins trust-update-url` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins update name",
@@ -217118,14 +217613,22 @@
    "command": "hermes plugins update",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name to update",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins update",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins update",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit plugins update` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes plugins validate path",
@@ -217135,14 +217638,22 @@
    "command": "hermes plugins validate",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Path to the plugin directory",
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "backup_create",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins validate",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins validate",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `path` positional of `qubit plugins validate` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile alias profile_name",
@@ -217159,7 +217670,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile alias",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile alias` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile create profile_name",
@@ -217176,7 +217695,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile create",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile create` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile delete profile_name",
@@ -217193,7 +217720,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile delete",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile delete` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile describe profile_name",
@@ -217210,7 +217745,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile describe",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile describe` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile export profile_name",
@@ -217227,7 +217770,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile export",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile export` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile import archive",
@@ -217237,14 +217788,22 @@
    "command": "hermes profile import",
    "path": "hermes_cli/subcommands/profile.py",
    "help": "Path to .tar.gz archive",
-   "ledger_match": "OC-34",
-   "ledger_source": "openclaw",
+   "ledger_match": "kanban_archive",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:profile import",
    "coverage": "cli-option",
    "parent_resolved": "cli:profile import",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `archive` positional of `qubit profile import` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile info profile_name",
@@ -217261,7 +217820,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile info",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile info` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile install source",
@@ -217271,14 +217838,22 @@
    "command": "hermes profile install",
    "path": "hermes_cli/subcommands/profile.py",
    "help": "Distribution source (git URL or local directory)",
-   "ledger_match": "OC-06",
-   "ledger_source": "openclaw",
+   "ledger_match": "clone_model_profile",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:profile install",
    "coverage": "cli-option",
    "parent_resolved": "cli:profile install",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `source` positional of `qubit profile install` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile migrate-identity new_name",
@@ -217295,7 +217870,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile migrate-identity",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `new_name` positional of `qubit profile migrate-identity` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile migrate-identity old_name",
@@ -217312,7 +217895,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile migrate-identity",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `old_name` positional of `qubit profile migrate-identity` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile purge-identity profile_name",
@@ -217329,7 +217920,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile purge-identity",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile purge-identity` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile rename new_name",
@@ -217346,7 +217945,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile rename",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `new_name` positional of `qubit profile rename` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile rename old_name",
@@ -217363,7 +217970,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile rename",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `old_name` positional of `qubit profile rename` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile show profile_name",
@@ -217380,7 +217995,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile show",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile show` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile update profile_name",
@@ -217397,7 +218020,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile update",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile update` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes profile use profile_name",
@@ -217414,7 +218045,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:profile use",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `profile_name` positional of `qubit profile use` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes project create folders",
@@ -217431,7 +218070,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:project create",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `folders` positional of `qubit project create` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes project create name",
@@ -217441,14 +218088,22 @@
    "command": "hermes project create",
    "path": "hermes_cli/projects_cmd.py",
    "help": "Human name, e.g. 'Hermes Agent'",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:project create",
    "coverage": "cli-option",
    "parent_resolved": "cli:project create",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit project create` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes project use project",
@@ -217458,14 +218113,22 @@
    "command": "hermes project use",
    "path": "hermes_cli/projects_cmd.py",
    "help": "Project id or slug (omit to clear)",
-   "ledger_match": "OC-32",
-   "ledger_source": "openclaw",
+   "ledger_match": "browser_download",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:project use",
    "coverage": "cli-option",
    "parent_resolved": "cli:project use",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `project` positional of `qubit project use` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions delete session_id",
@@ -217482,7 +218145,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions delete",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `session_id` positional of `qubit sessions delete` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions export output",
@@ -217492,14 +218163,22 @@
    "command": "hermes sessions export",
    "path": "hermes_cli/subcommands/sessions.py",
    "help": "Where to write. jsonl/html/trace: a file path, or a directory (existing, or ending in /) to write a default-named file into; - for stdout (jsonl/trace only; jsonl requires OUTPUT). md/qmd: a directory, one file per session (default: <hermes home>/session-exports)",
-   "ledger_match": "OC-28",
-   "ledger_source": "openclaw",
+   "ledger_match": "reasoning",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sessions export",
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions export",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `output` positional of `qubit sessions export` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions import path",
@@ -217509,14 +218188,22 @@
    "command": "hermes sessions import",
    "path": "hermes_cli/subcommands/sessions.py",
    "help": "Path to a specific session JSONL file (skips the picker)",
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "backup_create",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sessions import",
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions import",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `path` positional of `qubit sessions import` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions pin session_ids",
@@ -217533,7 +218220,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions pin",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `session_ids` positional of `qubit sessions pin` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions rename session_id",
@@ -217550,7 +218245,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions rename",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `session_id` positional of `qubit sessions rename` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions rename title",
@@ -217567,7 +218270,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions rename",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `title` positional of `qubit sessions rename` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions set-journal-mode mode",
@@ -217584,7 +218295,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions set-journal-mode",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `mode` positional of `qubit sessions set-journal-mode` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sessions unpin session_ids",
@@ -217601,7 +218320,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions unpin",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `session_ids` positional of `qubit sessions unpin` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes setup section",
@@ -217611,14 +218338,22 @@
    "command": "hermes setup",
    "path": "hermes_cli/subcommands/setup.py",
    "help": "Run a specific setup section instead of the full wizard",
-   "ledger_match": "inv:hermes_setup_section",
+   "ledger_match": "inv:api:DELETE_/api/credentials/pool/{provider}/{index}",
    "ledger_source": "qubit",
    "ledger_status": "MISSING",
    "parent_id": "cli:setup",
    "coverage": "cli-option",
    "parent_resolved": "cli:setup",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `section` positional of `qubit setup` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills audit name",
@@ -217628,14 +218363,22 @@
    "command": "hermes skills audit",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Specific skill to audit (default: all)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills audit",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills audit",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills audit` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills check name",
@@ -217645,14 +218388,22 @@
    "command": "hermes skills check",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Specific skill to check (default: all)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills check",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills check",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills check` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills diff name",
@@ -217662,14 +218413,22 @@
    "command": "hermes skills diff",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Skill name to diff (e.g. google-workspace)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills diff",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills diff",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills diff` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills inspect identifier",
@@ -217686,7 +218445,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:skills inspect",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `identifier` positional of `qubit skills inspect` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills install identifier",
@@ -217703,7 +218470,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:skills install",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `identifier` positional of `qubit skills install` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills publish skill_path",
@@ -217720,7 +218495,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:skills publish",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `skill_path` positional of `qubit skills publish` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills repair-official name",
@@ -217730,14 +218513,22 @@
    "command": "hermes skills repair-official",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Official optional skill folder/frontmatter name, or 'all'",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills repair-official",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills repair-official",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills repair-official` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills reset name",
@@ -217747,14 +218538,22 @@
    "command": "hermes skills reset",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Skill name to reset (e.g. google-workspace)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills reset",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills reset",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills reset` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills search query",
@@ -217771,7 +218570,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:skills search",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `query` positional of `qubit skills search` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills snapshot export output",
@@ -217781,14 +218588,22 @@
    "command": "hermes skills snapshot export",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Output JSON file path (use - for stdout)",
-   "ledger_match": "OC-28",
-   "ledger_source": "openclaw",
+   "ledger_match": "reasoning",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills snapshot export",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills snapshot export",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `output` positional of `qubit skills snapshot export` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills snapshot import input",
@@ -217805,7 +218620,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:skills snapshot import",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `input` positional of `qubit skills snapshot import` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills tap add repo",
@@ -217822,7 +218645,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:skills tap add",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `repo` positional of `qubit skills tap add` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills tap remove name",
@@ -217832,14 +218663,22 @@
    "command": "hermes skills tap remove",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Tap name to remove",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills tap remove",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills tap remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills tap remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills trust path",
@@ -217849,14 +218688,22 @@
    "command": "hermes skills trust",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Project root to trust (default: enclosing git checkout of cwd)",
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "backup_create",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills trust",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills trust",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `path` positional of `qubit skills trust` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills uninstall name",
@@ -217866,14 +218713,22 @@
    "command": "hermes skills uninstall",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Skill name to remove",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills uninstall",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills uninstall",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills uninstall` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills untrust path",
@@ -217883,14 +218738,22 @@
    "command": "hermes skills untrust",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Project root to untrust (default: enclosing git checkout of cwd)",
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "backup_create",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills untrust",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills untrust",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `path` positional of `qubit skills untrust` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skills update name",
@@ -217900,14 +218763,22 @@
    "command": "hermes skills update",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Specific skill to update (default: all outdated skills)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills update",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills update",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skills update` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skin set key",
@@ -217917,14 +218788,22 @@
    "command": "hermes skin set",
    "path": "hermes_cli/subcommands/skin.py",
    "help": "Color key (e.g. ui_tool, ui_accent, background)",
-   "ledger_match": "OC-14",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
+   "ledger_match": "create_model_profile",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skin set",
    "coverage": "cli-option",
    "parent_resolved": "cli:skin set",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `key` positional of `qubit skin set` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skin set value",
@@ -217941,7 +218820,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:skin set",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `value` positional of `qubit skin set` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes skin use name",
@@ -217951,14 +218838,22 @@
    "command": "hermes skin use",
    "path": "hermes_cli/subcommands/skin.py",
    "help": "Skin name",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skin use",
    "coverage": "cli-option",
    "parent_resolved": "cli:skin use",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit skin use` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sync disable skill",
@@ -217968,14 +218863,22 @@
    "command": "hermes sync disable",
    "path": "hermes_cli/subcommands/sync.py",
    "help": "Skill name (frontmatter name / directory name)",
-   "ledger_match": "OC-39",
-   "ledger_source": "openclaw",
+   "ledger_match": "skills_disable",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sync disable",
    "coverage": "cli-option",
    "parent_resolved": "cli:sync disable",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `skill` positional of `qubit sync disable` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sync enable skill",
@@ -217985,14 +218888,22 @@
    "command": "hermes sync enable",
    "path": "hermes_cli/subcommands/sync.py",
    "help": "Skill name (frontmatter name / directory name)",
-   "ledger_match": "OC-39",
-   "ledger_source": "openclaw",
+   "ledger_match": "skills_disable",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sync enable",
    "coverage": "cli-option",
    "parent_resolved": "cli:sync enable",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `skill` positional of `qubit sync enable` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes sync propose name",
@@ -218002,14 +218913,22 @@
    "command": "hermes sync propose",
    "path": "hermes_cli/subcommands/sync.py",
    "help": "Skill name to share",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sync propose",
    "coverage": "cli-option",
    "parent_resolved": "cli:sync propose",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit sync propose` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes tools disable names",
@@ -218019,14 +218938,22 @@
    "command": "hermes tools disable",
    "path": "hermes_cli/subcommands/tools.py",
    "help": "Toolset name (e.g. web) or MCP tool in server:tool form",
-   "ledger_match": "OC-48",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY_ARCHITECTURE",
+   "ledger_match": "auth_status",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:tools disable",
    "coverage": "cli-option",
    "parent_resolved": "cli:tools disable",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `names` positional of `qubit tools disable` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes tools enable names",
@@ -218036,14 +218963,22 @@
    "command": "hermes tools enable",
    "path": "hermes_cli/subcommands/tools.py",
    "help": "Toolset name or MCP tool in server:tool form",
-   "ledger_match": "OC-48",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY_ARCHITECTURE",
+   "ledger_match": "auth_status",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:tools enable",
    "coverage": "cli-option",
    "parent_resolved": "cli:tools enable",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `names` positional of `qubit tools enable` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes tools post-setup post_setup_key",
@@ -218060,7 +218995,15 @@
    "coverage": "cli-option",
    "parent_resolved": "cli:tools post-setup",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `post_setup_key` positional of `qubit tools post-setup` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes verify path",
@@ -218070,14 +219013,22 @@
    "command": "hermes verify",
    "path": "hermes_cli/subcommands/verify.py",
    "help": "Project root to verify (default: current directory)",
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "backup_create",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:verify",
    "coverage": "cli-option",
    "parent_resolved": "cli:verify",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `path` positional of `qubit verify` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes webhook remove name",
@@ -218087,14 +219038,22 @@
    "command": "hermes webhook remove",
    "path": "hermes_cli/subcommands/webhook.py",
    "help": "Subscription name to remove",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:webhook remove",
    "coverage": "cli-option",
    "parent_resolved": "cli:webhook remove",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit webhook remove` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes webhook subscribe name",
@@ -218104,14 +219063,22 @@
    "command": "hermes webhook subscribe",
    "path": "hermes_cli/subcommands/webhook.py",
    "help": "Route name (used in URL: /webhooks/<name>)",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:webhook subscribe",
    "coverage": "cli-option",
    "parent_resolved": "cli:webhook subscribe",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit webhook subscribe` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes webhook test name",
@@ -218121,14 +219088,22 @@
    "command": "hermes webhook test",
    "path": "hermes_cli/subcommands/webhook.py",
    "help": "Subscription name to test",
-   "ledger_match": "OC-10",
-   "ledger_source": "openclaw",
+   "ledger_match": "session_rename",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:webhook test",
    "coverage": "cli-option",
    "parent_resolved": "cli:webhook test",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_positional",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "the `name` positional of `qubit webhook test` is a positional its live argparse parser declares; the command path is in qubit_cli.main._build_cli_parser().",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes approvals suggest",
@@ -222210,7 +223185,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_surface",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen install` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser. It is served as `qubit computer-use screen install`.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes screen start",
@@ -222227,7 +223210,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_surface",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen start` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser. It is served as `qubit computer-use screen start`.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes screen status",
@@ -222244,7 +223235,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_surface",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen status` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser. It is served as `qubit computer-use screen status`.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes screen stop",
@@ -222261,7 +223260,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_cli_surface",
+    "backend": "qubit_cli.main:_build_cli_parser",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "`qubit computer-use screen stop` is a live argparse command path in qubit_cli.main._build_cli_parser(); the bundle row it used to match was purged with the capability ledger, so coverage is read from the parser. It is served as `qubit computer-use screen stop`.",
+    "needs": "none"
+   }
   },
   {
    "id": "hermes secrets 1password",
@@ -224330,14 +225337,14 @@
    "enabled_by_default": null,
    "file_count": 6,
    "in_audit_docs": false,
-   "ledger_match": "OC-D04",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:openclaw-ext:active-memory",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D04",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D04",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "IMPLEMENTED",
     "capability": "openclaw extension active-memory",
@@ -224417,7 +225424,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:amazon-bedrock",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -224471,7 +225478,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:anthropic",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -224525,7 +225532,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:arcee",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -224623,14 +225630,14 @@
    "enabled_by_default": true,
    "file_count": 338,
    "in_audit_docs": false,
-   "ledger_match": "OC-09",
-   "ledger_source": "openclaw",
+   "ledger_match": "browser_activate",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-09",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-09",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:byteplus",
@@ -224669,14 +225676,14 @@
    "enabled_by_default": true,
    "file_count": 47,
    "in_audit_docs": false,
-   "ledger_match": "OC-35",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-35",
+   "ledger_match": "canvas_add",
+   "ledger_source": "qubit",
+   "ledger_status": "UNVERIFIED",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-35",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:cerebras",
@@ -224694,7 +225701,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:cerebras",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -224725,7 +225732,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:chutes",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -224789,7 +225796,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:cloudflare-ai-gateway",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -224874,7 +225881,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:cohere",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225013,7 +226020,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:deepinfra",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225044,7 +226051,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:deepseek",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225222,14 +226229,14 @@
    "enabled_by_default": null,
    "file_count": 541,
    "in_audit_docs": false,
-   "ledger_match": "OC-D12",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:tool:discord",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D12",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D12",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:document-extract",
@@ -225370,14 +226377,14 @@
    "enabled_by_default": null,
    "file_count": 213,
    "in_audit_docs": false,
-   "ledger_match": "OC-D16",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
-   "parent_id": "OC-D16",
+   "ledger_match": "inv:openclaw-ext:feishu",
+   "ledger_source": "qubit",
+   "ledger_status": "SAFE_EQUIVALENT",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D16",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension feishu",
@@ -225401,14 +226408,14 @@
    "enabled_by_default": true,
    "file_count": 37,
    "in_audit_docs": false,
-   "ledger_match": "OC-D03",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:openclaw-ext:file-transfer",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D03",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D03",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "IMPLEMENTED",
     "capability": "openclaw extension file-transfer",
@@ -225457,7 +226464,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:fireworks",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225488,7 +226495,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:github-copilot",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225519,7 +226526,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:gmi",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225550,7 +226557,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:google",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225660,7 +226667,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:groq",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225691,7 +226698,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:huggingface",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225753,14 +226760,14 @@
    "enabled_by_default": null,
    "file_count": 149,
    "in_audit_docs": false,
-   "ledger_match": "OC-D15",
-   "ledger_source": "openclaw",
-   "ledger_status": "OPERATOR_ONLY",
-   "parent_id": "OC-D15",
+   "ledger_match": "inv:openclaw-ext:imessage",
+   "ledger_source": "qubit",
+   "ledger_status": "SAFE_EQUIVALENT",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D15",
-   "parent_status": "OPERATOR_ONLY",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension imessage",
@@ -225842,7 +226849,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:kilocode",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -225873,7 +226880,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:kimi-coding",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226014,7 +227021,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:lmstudio",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226076,14 +227083,14 @@
    "enabled_by_default": null,
    "file_count": 341,
    "in_audit_docs": false,
-   "ledger_match": "OC-D17",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D17",
+   "ledger_match": "inv:openclaw-ext:matrix",
+   "ledger_source": "qubit",
+   "ledger_status": "MISSING",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D17",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:mattermost",
@@ -226326,7 +227333,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:minimax",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226357,7 +227364,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:mistral",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226388,7 +227395,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:moonshot",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226518,7 +227525,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:novita",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226549,7 +227556,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:nvidia",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226657,7 +227664,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:openai",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226686,14 +227693,14 @@
    "enabled_by_default": true,
    "file_count": 13,
    "in_audit_docs": false,
-   "ledger_match": "OC-30",
-   "ledger_source": "openclaw",
+   "ledger_match": "guard_opencode_prepare",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-30",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-30",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "IMPLEMENTED",
     "capability": "openclaw extension opencode",
@@ -226719,7 +227726,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:opencode-go",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226750,7 +227757,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:openrouter",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226827,7 +227834,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:perplexity",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -226902,14 +227909,14 @@
    "enabled_by_default": null,
    "file_count": 27,
    "in_audit_docs": false,
-   "ledger_match": "OC-01",
-   "ledger_source": "openclaw",
-   "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": "OC-01",
+   "ledger_match": "autonomy_status",
+   "ledger_source": "qubit",
+   "ledger_status": "IMPLEMENTED",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-01",
-   "parent_status": "SAFE_EQUIVALENT",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:qa-channel",
@@ -227054,7 +228061,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:qwen",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -227202,14 +228209,14 @@
    "enabled_by_default": null,
    "file_count": 282,
    "in_audit_docs": false,
-   "ledger_match": "OC-18",
-   "ledger_source": "openclaw",
+   "ledger_match": "msg_account_add",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-18",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-18",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:sms",
@@ -227260,7 +228267,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:stepfun",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -227324,7 +228331,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:synthetic",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -227401,14 +228408,14 @@
    "enabled_by_default": null,
    "file_count": 349,
    "in_audit_docs": false,
-   "ledger_match": "OC-D13",
-   "ledger_source": "openclaw",
+   "ledger_match": "inv:api:DELETE_/api/messaging/telegram/onboarding/{pairing_id}",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-D13",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-D13",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:tencent",
@@ -227426,7 +228433,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:tencent",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -227654,7 +228661,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:venice",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -227685,7 +228692,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:vercel-ai-gateway",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -227760,14 +228767,14 @@
    "enabled_by_default": null,
    "file_count": 124,
    "in_audit_docs": false,
-   "ledger_match": "OC-67",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-67",
+   "ledger_match": "inv:openclaw-ext:voice-call",
+   "ledger_source": "qubit",
+   "ledger_status": "SAFE_EQUIVALENT",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-67",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true,
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension voice-call",
@@ -227793,7 +228800,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:volcengine",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -227899,14 +228906,14 @@
    "enabled_by_default": null,
    "file_count": 11,
    "in_audit_docs": false,
-   "ledger_match": "OC-23",
-   "ledger_source": "openclaw",
+   "ledger_match": "webhook_add",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-23",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-23",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:whatsapp",
@@ -227924,14 +228931,14 @@
    "enabled_by_default": null,
    "file_count": 270,
    "in_audit_docs": false,
-   "ledger_match": "OC-18",
-   "ledger_source": "openclaw",
+   "ledger_match": "msg_account_add",
+   "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-18",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-18",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:workboard",
@@ -227947,14 +228954,14 @@
    "enabled_by_default": false,
    "file_count": 24,
    "in_audit_docs": false,
-   "ledger_match": "OC-34",
-   "ledger_source": "openclaw",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": "OC-34",
+   "ledger_match": "inv:openclaw-ext:workboard",
+   "ledger_source": "qubit",
+   "ledger_status": "MISSING",
+   "parent_id": null,
    "coverage": "openclaw-capability",
-   "parent_resolved": "OC-34",
-   "parent_status": "IMPLEMENTED",
-   "parent_covered": true
+   "parent_resolved": null,
+   "parent_status": null,
+   "parent_covered": false
   },
   {
    "id": "openclaw-ext:xai",
@@ -227970,7 +228977,7 @@
    "enabled_by_default": true,
    "file_count": 72,
    "in_audit_docs": false,
-   "ledger_match": "inv:hermes_migrate_xai_--no-backup",
+   "ledger_match": "inv:hermes_migrate_xai_--apply",
    "ledger_source": "qubit",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
@@ -228003,7 +229010,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:xiaomi",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,
@@ -228034,7 +229041,7 @@
    "in_audit_docs": false,
    "ledger_match": "inv:openclaw-ext:zai",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "openclaw-capability",
    "parent_resolved": null,

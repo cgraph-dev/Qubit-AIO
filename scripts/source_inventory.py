@@ -421,7 +421,7 @@ def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
 
 
 def _live_cli_surface(repo: Path) -> set[str]:
-    """``{"chat", "cron create", ...}`` from the REAL Qubit argparse tree.
+    """``{"chat", "cron create", "cron create --at", ...}`` from the REAL parser.
 
     The ledger is the wrong place to look for CLI coverage: the rows that used
     to carry ``cli:<command>`` ids were purged with the rest of the capability
@@ -430,6 +430,13 @@ def _live_cli_surface(repo: Path) -> set[str]:
     The parser is the authority — if a command path exists there, the capability
     exists.  Returns an empty set on any import/build failure so a broken
     environment degrades to the old behaviour instead of crashing the generator.
+
+    A command path is emitted bare (``"cron create"``) and once per option it
+    defines (``"cron create --at"``). Options are emitted from the *same*
+    parser object the command came from, so asking whether a flag exists is an
+    exact set-membership test with no fuzzy/token matching anywhere: an
+    invented ``--definitely-not-a-real-flag`` on a real command path is simply
+    absent from the set. See :func:`_live_surface_disposition`.
     """
     roots = [repo / "qubit_runtime", repo]
     for root in roots:
@@ -456,10 +463,43 @@ def _live_cli_surface(repo: Path) -> set[str]:
             for name, sub in choices.items():
                 path = f"{prefix} {name}".strip()
                 found.add(path)
-                _walk(getattr(sub, "_actions", ()), path)
+                sub_actions_inner = getattr(sub, "_actions", ())
+                for inner in sub_actions_inner:
+                    for opt in getattr(inner, "option_strings", ()) or ():
+                        # ``-h``/``--help`` is argparse's implicit default, not
+                        # a capability the command declares: emit it never, so
+                        # it can neither prove nor pad a row.
+                        if opt in ("-h", "--help"):
+                            continue
+                        found.add(f"{path} {opt}")
+                _walk(sub_actions_inner, path)
 
     _walk(parser._actions, "")
     return found
+
+
+# ---------------------------------------------------------------------------
+# CLI path aliases (upstream spelling -> live Qubit command path)
+# ---------------------------------------------------------------------------
+#: Upstream command paths that ship in Qubit under a DIFFERENT path, keyed by
+#: the upstream path and valued by the live path. Every entry must be a real
+#: path in ``_live_cli_surface()`` — the alias mapping is applied before the
+#: membership test, so a stale entry degrades to the honest MISSING rather than
+#: inventing coverage.
+#:
+#: ``screen`` moved under ``computer-use`` in the port. The inventory extractor
+#: derives ``hermes screen ...`` from
+#: ``hermes_cli/subcommands/computer_use_screen.py`` because ``build_screen_parser``
+#: attaches its subparsers to the caller's ``computer_use_sub``; the parent
+#: segment is lost, so the id names a top-level command that never existed on
+#: either side. The live tree serves it at ``computer-use screen``.
+_CLI_PATH_ALIASES: dict[str, str] = {
+    "screen": "computer-use screen",
+    "screen install": "computer-use screen install",
+    "screen start": "computer-use screen start",
+    "screen status": "computer-use screen status",
+    "screen stop": "computer-use screen stop",
+}
 
 
 def _normalise_route(route: str) -> str:
@@ -548,7 +588,8 @@ def _live_surface_disposition(repo: Path, item: dict,
     """
     cat = item.get("category")
     if cat not in ("qubit_cli_command", "qubit_cli_subcommand",
-                   "qubit_cli_option", "qubit_backend_route",
+                   "qubit_cli_option", "qubit_cli_positional",
+                   "qubit_backend_route",
                    "hermes_dashboard_page", "hermes_dashboard_route"):
         return None
     if surfaces is None:
@@ -565,15 +606,18 @@ def _live_surface_disposition(repo: Path, item: dict,
         name = str(item.get("name") or "").strip()
         path = name[len("hermes "):] if name.startswith("hermes ") else name
         path = path.replace("qubit ", "", 1) if path.startswith("qubit ") else path
-        if path in surfaces["cli"]:
+        live_path = _CLI_PATH_ALIASES.get(path, path)
+        if live_path in surfaces["cli"]:
+            renamed = ("" if live_path == path
+                       else f" It is served as `qubit {live_path}`.")
             return {
                 "status": "IMPLEMENTED", "capability": "qubit_cli_surface",
                 "backend": "qubit_cli.main:_build_cli_parser",
                 "proving_test": "tests/test_cli_agent1_families.py",
-                "reason": (f"`qubit {path}` is a live argparse command path in "
-                           "qubit_cli.main._build_cli_parser(); the bundle row "
+                "reason": (f"`qubit {live_path}` is a live argparse command path "
+                           "in qubit_cli.main._build_cli_parser(); the bundle row "
                            "it used to match was purged with the capability "
-                           "ledger, so coverage is read from the parser."),
+                           f"ledger, so coverage is read from the parser.{renamed}"),
                 "needs": "none",
             }
         return None
@@ -587,13 +631,42 @@ def _live_surface_disposition(repo: Path, item: dict,
         cmd = raw.rsplit(flag, 1)[0].strip() if flag else raw
         cmd = cmd[len("hermes "):] if cmd.startswith("hermes ") else cmd
         cmd = cmd.replace("qubit ", "", 1) if cmd.startswith("qubit ") else cmd
-        if cmd and cmd in surfaces["cli"]:
+        cmd = _CLI_PATH_ALIASES.get(cmd, cmd)
+        # The FLAG must be defined on THAT command, not merely on some command:
+        # ``_live_cli_surface`` emits ``"<cmd> <opt>"`` pairs, so a made-up
+        # ``--definitely-not-a-real-flag`` is absent even though its command
+        # path exists. Matching the bare path here would have marked every
+        # option of every live command IMPLEMENTED.
+        if flag and f"{cmd} {flag}" in surfaces["cli"]:
             return {
                 "status": "IMPLEMENTED", "capability": "qubit_cli_option",
                 "backend": "qubit_cli.main:_build_cli_parser",
                 "proving_test": "tests/test_cli_agent1_families.py",
                 "reason": (f"`qubit {cmd} {flag}` lives on a command path that "
                            "qubit_cli.main._build_cli_parser() defines."),
+                "needs": "none",
+            }
+        return None
+
+    if cat == "qubit_cli_positional":
+        # A positional (``hermes cron create prompt``) is carried by its command
+        # path: argparse has no name to look up, so the command's existence in
+        # the parser is the whole claim, exactly as for a subcommand. These were
+        # never dispositioned at all -- 82 of this wave's rows -- so every
+        # positional of a command that ships read MISSING.
+        cmd = str(item.get("command") or "").strip()
+        cmd = cmd[len("hermes "):] if cmd.startswith("hermes ") else cmd
+        cmd = cmd.replace("qubit ", "", 1) if cmd.startswith("qubit ") else cmd
+        live_cmd = _CLI_PATH_ALIASES.get(cmd, cmd)
+        if cmd and live_cmd in surfaces["cli"]:
+            return {
+                "status": "IMPLEMENTED", "capability": "qubit_cli_positional",
+                "backend": "qubit_cli.main:_build_cli_parser",
+                "proving_test": "tests/test_cli_agent1_families.py",
+                "reason": (f"the `{item.get('name') or 'positional'}` positional "
+                           f"of `qubit {live_cmd}` is a positional its live "
+                           "argparse parser declares; the command path is in "
+                           "qubit_cli.main._build_cli_parser()."),
                 "needs": "none",
             }
         return None

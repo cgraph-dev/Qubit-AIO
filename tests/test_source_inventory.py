@@ -446,3 +446,97 @@ def test_openclaw_extensions_have_category_and_manifest(inventory):
     # unknown extensions are explicitly flagged as not audited
     for e in exts:
         assert "in_audit_docs" in e
+
+
+# ---------------------------------------------------------------------------
+# CLI matcher discrimination (positive AND negative controls)
+# ---------------------------------------------------------------------------
+def _cli_disposition(item):
+    """Run the live CLI disposition for one inventory item; True if IMPLEMENTED."""
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    try:
+        import source_inventory as si
+    finally:
+        sys.path.pop(0)
+    surfaces = {"cli": si._live_cli_surface(REPO_ROOT)}
+    disp = si._live_surface_disposition(REPO_ROOT, item, surfaces)
+    return bool(disp and disp["status"] == "IMPLEMENTED")
+
+
+def _opt_item(cmd, flag):
+    """An option item shaped exactly as the extractor emits it: id + bare flag."""
+    return {"category": "qubit_cli_option",
+            "id": f"hermes {cmd} {flag}", "name": flag}
+
+
+def _pos_item(cmd, positional):
+    return {"category": "qubit_cli_positional",
+            "id": f"hermes {cmd} {positional}", "name": positional,
+            "command": f"hermes {cmd}"}
+
+
+def test_cli_matcher_resolves_real_commands_and_flags():
+    """POSITIVE controls: rows that really ship must resolve to IMPLEMENTED.
+
+    Each of these is a genuine surface of the live argparse tree; before the
+    matcher was fixed, ``qubit_cli_positional`` items were never dispositioned
+    at all (82 rows) and ``_live_cli_surface`` emitted no option paths, so none
+    of them could match.
+    """
+    assert _cli_disposition({"category": "qubit_cli_subcommand",
+                             "name": "hermes screen"})
+    assert _cli_disposition({"category": "qubit_cli_subcommand",
+                             "name": "hermes cron rm"})
+    # A real flag on a real command.
+    assert _cli_disposition(_opt_item("plugins list", "--json"))
+    assert _cli_disposition(_opt_item("cron resume", "--at"))
+    # The upstream ``screen`` path ships under ``computer-use screen``.
+    assert _cli_disposition(_opt_item("screen stop", "--force"))
+    assert _cli_disposition(_opt_item("screen install", "-y"))
+    # Positionals are carried by their command path.
+    assert _cli_disposition(_pos_item("cron create", "prompt"))
+    assert _cli_disposition(_pos_item("profile use", "profile_name"))
+
+
+def test_cli_matcher_still_refuses_absent_flags():
+    """NEGATIVE controls: the fix must NOT make every row pass.
+
+    An invented flag is absent from the parser set, so it must read MISSING
+    even though its command path is live. A real flag on the WRONG command
+    must also fail: the matcher compares ``"<cmd> <flag>"`` pairs, never the
+    bare command path.
+    """
+    assert not _cli_disposition(_opt_item("cron create", "--definitely-not-a-real-flag"))
+    assert not _cli_disposition(_opt_item("plugins list", "--definitely-not-a-real-flag"))
+    # ``--at`` exists on ``cron resume`` but not on ``cron list``.
+    assert not _cli_disposition(_opt_item("cron list", "--at"))
+    # Absent command paths stay absent (``claw`` left core; ``plugins compat``
+    # has no live subparser).
+    assert not _cli_disposition({"category": "qubit_cli_subcommand",
+                                 "name": "hermes claw"})
+    assert not _cli_disposition({"category": "qubit_cli_subcommand",
+                                 "name": "hermes plugins compat"})
+    assert not _cli_disposition(_opt_item("plugins compat", "--json"))
+    assert not _cli_disposition(_pos_item("cron frobnicate", "prompt"))
+
+
+def test_cli_option_matching_is_per_command_not_substring():
+    """A flag is only proven by its OWN command's parser entry.
+
+    ``_live_cli_surface`` emits ``"<cmd> <opt>"`` pairs, so matching the bare
+    command path would have marked every option of every live command
+    IMPLEMENTED -- the exact false-positive this guards against.
+    """
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    try:
+        import source_inventory as si
+    finally:
+        sys.path.pop(0)
+    surface = si._live_cli_surface(REPO_ROOT)
+    if not surface:
+        pytest.skip("live CLI parser unavailable")
+    assert "cron resume --at" in surface
+    assert "cron list --at" not in surface
+    # argparse's implicit help flag is never emitted as a capability.
+    assert "cron resume -h" not in surface
+    assert "cron resume --help" not in surface
