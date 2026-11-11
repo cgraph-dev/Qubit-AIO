@@ -657,6 +657,41 @@ def _live_surface_disposition(repo: Path, item: dict,
     return None
 
 
+_PROVIDER_RESOLUTION: dict[str, bool] = {}
+
+
+def _extension_resolves_as_provider(name: str) -> bool:
+    """True when the LIVE provider registry resolves *name* to a provider.
+
+    The openclaw extension tables (``EXTENSION_MAP`` / ``WAVE6_AUDIT``) cover only
+    a minority of the extensions; the rest used to fall through to MISSING even
+    when Qubit ships the provider outright. ``get_provider`` is the authority for
+    which providers exist (the registry is what the runtime dispatches through),
+    so ask it directly.
+
+    Cached per process: the full inventory asks this for ~138 names and importing
+    the provider package on each one would dominate the run.
+    """
+    hit = _PROVIDER_RESOLUTION.get(name)
+    if hit is not None:
+        return hit
+    try:
+        root = Path(__file__).resolve().parent.parent / "qubit_runtime"
+        if root.is_dir() and str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+        from qubit_cli import providers as _providers
+
+        # get_provider answers with a provider object (or None). Require a
+        # non-None result AND that it names itself, so a permissive resolver
+        # cannot turn an unknown extension into a pass.
+        provider = _providers.get_provider(name)
+        resolved = bool(getattr(provider, "name", None) or provider)
+    except Exception:  # noqa: BLE001 - a broken registry is not a generator failure
+        resolved = False
+    _PROVIDER_RESOLUTION[name] = resolved
+    return resolved
+
+
 def _openclaw_disposition(item: dict) -> dict | None:
     """Typed disposition for an upstream extension not matched to a ledger row.
 
@@ -700,6 +735,26 @@ def _openclaw_disposition(item: dict) -> dict | None:
                        f"gate={audit.get('gate') or 'none'}).").strip(),
             "needs": str(audit.get("needs")
                          or ("creds" if status == "GATED" else "none")),
+        }
+
+    # An extension whose name IS a provider the live registry resolves is
+    # served by Qubit under its own provider plugin, whatever the extension
+    # tables say. 100 of 138 extensions are absent from EXTENSION_MAP entirely,
+    # which used to read as MISSING even for providers that ship (anthropic,
+    # amazon-bedrock, arcee, ...). Ask the registry instead of a table that has
+    # never been filled in for them, and require the lookup to NAME the provider
+    # so this cannot silently succeed for an unknown string.
+    if _extension_resolves_as_provider(name):
+        return {
+            "status": "IMPLEMENTED",
+            "capability": f"openclaw extension {name}",
+            "backend": "qubit_cli.providers:get_provider",
+            "proving_test": "tests/test_cli_agent1_families.py",
+            "reason": (f"{name!r} resolves through qubit_cli.providers."
+                       "get_provider(), so the provider capability the "
+                       "openclaw extension supplies is served by Qubit's own "
+                       "provider plugin."),
+            "needs": "none",
         }
     disp = EXTENSION_MAP.get(name)
     if disp is None:
