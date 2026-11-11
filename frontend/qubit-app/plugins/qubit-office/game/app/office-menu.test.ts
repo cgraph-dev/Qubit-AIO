@@ -215,3 +215,60 @@ describe("office menu fallback (upstream DOM changes)", () => {
     }
   });
 });
+
+describe("approvals icon and pending badge", () => {
+  it("adds a third icon before Settings and forwards its click", () => {
+    const group = makeMenu();
+    const onToggleApprovals = vi.fn();
+    const menu = installOfficeMenuButtons(window, {
+      onToggleAgents: () => {},
+      onToggleHud: () => {},
+      onToggleApprovals,
+    });
+    const approvals = group.querySelector(
+      '[data-testid="office-menu-approvals"]') as HTMLButtonElement;
+    expect(approvals).not.toBeNull();
+    // Order is unchanged: the new icon lands after the other two, before the
+    // app's own utilities.
+    expect(group.children[4].getAttribute("data-testid"))
+      .toBe("office-menu-approvals");
+    expect(group.children[5].getAttribute("title")).toBe("Settings");
+    expect(approvals.querySelector("svg")?.getAttribute("shape-rendering"))
+      .toBe("crispEdges");
+    approvals.click();
+    expect(onToggleApprovals).toHaveBeenCalledTimes(1);
+    menu?.dispose();
+  });
+
+  it("paints the live pending count and hides the badge at zero", () => {
+    const group = makeMenu();
+    const menu = installOfficeMenuButtons(window, {
+      onToggleAgents: () => {},
+      onToggleHud: () => {},
+      onToggleApprovals: () => {},
+    });
+    const approvals = group.querySelector(
+      '[data-testid="office-menu-approvals"]') as HTMLButtonElement;
+    const badge = approvals.querySelector(
+      '[data-testid="office-menu-approvals-badge"]') as HTMLSpanElement;
+    expect(badge).not.toBeNull();
+    expect(badge.hidden).toBe(true);
+
+    menu?.update({ agents: false, hud: false, approvals: false,
+                   pendingApprovals: 3 });
+    expect(approvals.getAttribute("aria-pressed")).toBe("false");
+    expect(approvals.getAttribute("aria-label")).toBe("Approvals (3 pending)");
+    expect(approvals.getAttribute("data-pending")).toBe("3");
+    expect(badge.textContent).toBe("3");
+    expect(badge.hidden).toBe(false);
+
+    menu?.update({ agents: false, hud: false, approvals: true,
+                   pendingApprovals: 0 });
+    expect(approvals.getAttribute("aria-pressed")).toBe("true");
+    expect(approvals.getAttribute("aria-label")).toBe("Approvals");
+    expect(approvals.getAttribute("data-pending")).toBe("0");
+    expect(badge.textContent).toBe("");
+    expect(badge.hidden).toBe(true);
+    menu?.dispose();
+  });
+});

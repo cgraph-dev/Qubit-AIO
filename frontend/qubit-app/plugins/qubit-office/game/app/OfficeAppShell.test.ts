@@ -469,4 +469,60 @@ describe("host theme + rerender stability", () => {
       (e) => e.props["data-testid"] === "office-menu-fallback")).toBeUndefined();
     h.cleanup();
   });
+
+  it("renders the Approvals dock with the real pending count", () => {
+    // State order now: ..., warRoomOpen (8), controlSeat (9),
+    // approvalsOpen (10), approvalCount (11). Seeded open with count 3.
+    const h = createStatefulHarness({ 10: true, 11: 3 });
+    h.render({});
+    const dock = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-approvals-dock");
+    expect(dock).toBeDefined();
+    expect(dock?.props["data-office-dock"]).toBe("approvals");
+    const count = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-approvals-count");
+    expect(count?.props["data-count"]).toBe("3");
+    // The panel is mounted from the shell (it owns its own journal read).
+    const panel = h.tree.find(
+      (e) => e.props.key === "body"
+        && typeof e.props.onCountChange === "function");
+    expect(panel).toBeDefined();
+    expect(typeof panel?.type).toBe("function");
+    const root = h.tree.find((e) => e.props["data-testid"] === "office-app");
+    expect(root?.props["data-office-dock-top"]).toBe("toolbar");
+    h.cleanup();
+  });
+
+  it("offers an Approvals fallback button carrying the pending badge", () => {
+    // menuFallback (6) is shown; approvalCount (11) is 4.
+    const h = createStatefulHarness({ 6: true, 11: 4 });
+    h.render({});
+    const approvals = h.tree.find(
+      (e) => e.props["data-testid"] === "office-menu-approvals-fallback");
+    expect(approvals).toBeDefined();
+    expect(approvals?.props["aria-label"]).toBe("Approvals (4 pending)");
+    expect(approvals?.props["data-pending"]).toBe("4");
+    const badge = h.tree.find(
+      (e) => e.props["data-testid"] === "office-menu-approvals-badge-fallback");
+    expect(badge).toBeDefined();
+    expect(String(badge?.props.children)).toBe("4");
+    h.cleanup();
+  });
+
+  it("keeps Approvals exclusive: the fallback opener closes other docks", () => {
+    // HUD open (3) + fallback shown (6); clicking Approvals opens it and
+    // closes the HUD, so two sheets can never cover each other.
+    const h = createStatefulHarness({ 3: true, 6: true });
+    h.render({});
+    const approvals = h.tree.find(
+      (e) => e.props["data-testid"] === "office-menu-approvals-fallback");
+    (approvals?.props.onClick as () => void)();
+    h.render({});
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-approvals-dock"))
+      .toBeDefined();
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-hud-dock")).toBeUndefined();
+    h.cleanup();
+  });
 });
