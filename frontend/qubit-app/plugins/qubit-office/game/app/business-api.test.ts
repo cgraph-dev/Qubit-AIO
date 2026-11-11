@@ -4,6 +4,7 @@ import {
   BusinessApiError,
   businessUrl,
   createWarRoomSession,
+  bootstrapOfficeSeats,
   fetchAgents,
   businessFetch,
 } from "./business-api";
@@ -72,6 +73,22 @@ describe("mutations carry owner intent and the session token", () => {
     const get = calls.find((call) => call.method === "GET");
     expect(post?.body.owner).toBe(true);
     expect(get?.body).toBeNull();
+  });
+
+  it("bootstraps the office roster through one owner-gated POST", async () => {
+    const { calls, impl } = recordingFetch(() => respond(200, {
+      ok: true, schema: "qubit-office-business-bootstrap/1",
+      tenant_id: "ten_personal", business_id: "biz_1",
+      created_tenant: true, created_business: true, plan_ok: true,
+      total: 283, created: 283, existing: 0, created_slugs: [],
+    }));
+    const result = await bootstrapOfficeSeats({}, { fetchImpl: impl });
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("POST");
+    expect(new URL(calls[0].url).pathname).toBe(
+      "/agent/api/office/business/bootstrap");
+    expect(calls[0].body.owner).toBe(true);
+    expect(result.created).toBe(283);
   });
 
   it("keeps an explicit owner value when a caller supplies one", async () => {

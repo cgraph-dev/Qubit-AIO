@@ -193786,6 +193786,16 @@ create: function(game) {
 		return parsed;
 	}
 	var fetchOverview = (opts = {}) => businessFetch("/overview", opts);
+	/** Create the local Personal scope and import the office seat roster once.
+	*
+	* Idempotent: a repeat creates zero records. Owner intent is added by
+	* `businessFetch`; the backend refuses without it.
+	*/
+	var bootstrapOfficeSeats = (body = {}, opts = {}) => businessFetch("/bootstrap", {
+		...opts,
+		method: "POST",
+		body
+	});
 	var fetchDirectory = (opts = {}) => businessFetch("/directory", opts);
 	var fetchWarRoomSessions = (query = {}, opts = {}) => businessFetch("/warroom/sessions", {
 		...opts,
@@ -193981,7 +193991,7 @@ create: function(game) {
 		}, `${event.outcome} · ${event.actor} · ${event.created_at}`)]);
 	}
 	function createAgentControlDrawer(R, hooks) {
-		const { useState, useEffect } = hooks;
+		const { useState, useEffect, useRef } = hooks;
 		return function AgentControlDrawer(props) {
 			const [load, setLoad] = useState({ kind: "loading" });
 			const [selectedId, setSelectedId] = useState(null);
@@ -193991,6 +194001,7 @@ create: function(game) {
 			const [actionError, setActionError] = useState(null);
 			const seatSlug = props.seat?.slug ?? "";
 			const seatName = props.seat?.name ?? "";
+			const bootstrapped = useRef(false);
 			useEffect(() => {
 				let live = true;
 				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
@@ -194001,22 +194012,38 @@ create: function(game) {
 				};
 				(async () => {
 					try {
-						const overview = await fetchOverview(opts);
-						const tenantId = overview.default_tenant_id;
-						if (!tenantId) {
+						let overview = await fetchOverview(opts);
+						let tenantId = overview.default_tenant_id;
+						let businessId = overview.default_business_id;
+						let listed = tenantId ? await fetchAgents({
+							tenant_id: tenantId,
+							business_id: businessId ?? void 0
+						}, opts) : { agents: [] };
+						let linked = matchAgentToSeat(listed.agents, props.seat);
+						if (!linked && !bootstrapped.current) {
+							bootstrapped.current = true;
 							if (live) setLoad({
+								kind: "loading",
+								message: "Importing the office roster into the Business OS…"
+							});
+							await bootstrapOfficeSeats({}, opts);
+							overview = await fetchOverview(opts);
+							tenantId = overview.default_tenant_id;
+							businessId = overview.default_business_id;
+							listed = tenantId ? await fetchAgents({
+								tenant_id: tenantId,
+								business_id: businessId ?? void 0
+							}, opts) : { agents: [] };
+							linked = matchAgentToSeat(listed.agents, props.seat);
+						}
+						if (!live) return;
+						if (!tenantId) {
+							setLoad({
 								kind: "empty",
-								message: "The Business OS has no tenant yet. Open a War Room session to create the local Personal workspace."
+								message: "The Business OS still reports no tenant after the seat import. Check the Business OS store and retry."
 							});
 							return;
 						}
-						const businessId = overview.default_business_id;
-						const listed = await fetchAgents({
-							tenant_id: tenantId,
-							business_id: businessId ?? void 0
-						}, opts);
-						const linked = matchAgentToSeat(listed.agents, props.seat);
-						if (!live) return;
 						setLoad({
 							kind: "ready",
 							tenantId,
@@ -194121,7 +194148,7 @@ create: function(game) {
 				className: "agent-control__state",
 				"data-testid": "agent-control-loading",
 				role: "status"
-			}, "Loading the agent control record…"));
+			}, load.message ?? "Loading the agent control record…"));
 			else if (load.kind === "error" || load.kind === "empty") children.push(R.createElement("div", {
 				key: "state",
 				className: "agent-control__state agent-control__state--error",

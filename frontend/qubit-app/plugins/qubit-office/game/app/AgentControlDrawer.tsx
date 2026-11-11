@@ -11,8 +11,8 @@ import type { OfficeGameShellProps } from "../OfficeGameShell";
 import type { AgentSeat } from "./agents-panel";
 import {
   type AgentDetail, type AgentRecord, type AuditEvent,
-  BusinessApiError, archiveAgent, fetchAgent, fetchAgents, fetchOverview,
-  pauseAgent, resumeAgent, revokeAgent, stopAgent, takeoverAgent,
+  BusinessApiError, archiveAgent, bootstrapOfficeSeats, fetchAgent, fetchAgents,
+  fetchOverview, pauseAgent, resumeAgent, revokeAgent, stopAgent, takeoverAgent,
 } from "./business-api";
 import {
   autonomyLabel, budgetSummary, canArchive, canPause, canResume, canRevoke,
@@ -28,7 +28,7 @@ export interface AgentControlDrawerProps {
 }
 
 type LoadState =
-  | { kind: "loading" }
+  | { kind: "loading"; message?: string }
   | { kind: "ready"; tenantId: string; businessId: string | null;
       agents: AgentRecord[]; linked: AgentRecord | null }
   | { kind: "empty"; message: string }
@@ -82,7 +82,7 @@ export function createAgentControlDrawer(
   R: OfficeGameShellProps["React"],
   hooks: OfficeGameShellProps["hooks"],
 ) {
-  const { useState, useEffect } = hooks;
+  const { useState, useEffect, useRef } = hooks;
 
   return function AgentControlDrawer(props: AgentControlDrawerProps) {
     const [load, setLoad] = useState<LoadState>({ kind: "loading" });
@@ -94,8 +94,14 @@ export function createAgentControlDrawer(
 
     const seatSlug = props.seat?.slug ?? "";
     const seatName = props.seat?.name ?? "";
+    // The office roster is imported at most once per open drawer. A repeat is
+    // idempotent on the backend, but there is no reason to ask twice.
+    const bootstrapped = useRef(false);
 
-    // Resolve the scope and the seat's linked agent once per seat.
+    // Resolve the scope and the seat's linked agent once per seat. A clicked
+    // seat with no tenant or no linked agent triggers ONE owner-gated import of
+    // the office roster, then the overview/agents are re-read. A failed import
+    // surfaces its typed code; the drawer never invents an agent.
     useEffect(() => {
       let live = true;
       const ctl = typeof AbortController === "undefined" ? undefined
@@ -105,21 +111,43 @@ export function createAgentControlDrawer(
       };
       (async () => {
         try {
-          const overview = await fetchOverview(opts);
-          const tenantId = overview.default_tenant_id;
-          if (!tenantId) {
+          let overview = await fetchOverview(opts);
+          let tenantId = overview.default_tenant_id;
+          let businessId = overview.default_business_id;
+          let listed = tenantId
+            ? await fetchAgents(
+              { tenant_id: tenantId, business_id: businessId ?? undefined },
+              opts)
+            : { agents: [] as AgentRecord[] };
+          let linked = matchAgentToSeat(listed.agents, props.seat);
+
+          if (!linked && !bootstrapped.current) {
+            bootstrapped.current = true;
             if (live) setLoad({
+              kind: "loading",
+              message: "Importing the office roster into the Business OS…",
+            });
+            await bootstrapOfficeSeats({}, opts);
+            overview = await fetchOverview(opts);
+            tenantId = overview.default_tenant_id;
+            businessId = overview.default_business_id;
+            listed = tenantId
+              ? await fetchAgents(
+                { tenant_id: tenantId, business_id: businessId ?? undefined },
+                opts)
+              : { agents: [] as AgentRecord[] };
+            linked = matchAgentToSeat(listed.agents, props.seat);
+          }
+
+          if (!live) return;
+          if (!tenantId) {
+            setLoad({
               kind: "empty",
-              message: "The Business OS has no tenant yet. Open a War Room "
-                + "session to create the local Personal workspace.",
+              message: "The Business OS still reports no tenant after the "
+                + "seat import. Check the Business OS store and retry.",
             });
             return;
           }
-          const businessId = overview.default_business_id;
-          const listed = await fetchAgents(
-            { tenant_id: tenantId, business_id: businessId ?? undefined }, opts);
-          const linked = matchAgentToSeat(listed.agents, props.seat);
-          if (!live) return;
           setLoad({
             kind: "ready", tenantId, businessId,
             agents: listed.agents, linked,
@@ -209,7 +237,7 @@ export function createAgentControlDrawer(
       children.push(R.createElement("div", {
         key: "loading", className: "agent-control__state",
         "data-testid": "agent-control-loading", role: "status",
-      }, "Loading the agent control record…"));
+      }, load.message ?? "Loading the agent control record…"));
     } else if (load.kind === "error" || load.kind === "empty") {
       children.push(R.createElement("div", {
         key: "state",

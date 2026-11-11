@@ -177,6 +177,20 @@ export interface BusinessOverview {
   counts: { tenants: number };
 }
 
+export interface OfficeSeatBootstrap {
+  ok: true;
+  schema: string;
+  tenant_id: string;
+  business_id: string;
+  created_tenant: boolean;
+  created_business: boolean;
+  plan_ok: boolean;
+  total: number;
+  created: number;
+  existing: number;
+  created_slugs: string[];
+}
+
 export interface WarRoomSession {
   session_id: string;
   tenant_id: string;
@@ -419,6 +433,17 @@ export interface BusinessDirectory {
 // ---------------------------------------------------------------------------
 export const fetchOverview = (opts: BusinessFetchOptions = {}) =>
   businessFetch<BusinessOverview>("/overview", opts);
+
+/** Create the local Personal scope and import the office seat roster once.
+ *
+ * Idempotent: a repeat creates zero records. Owner intent is added by
+ * `businessFetch`; the backend refuses without it.
+ */
+export const bootstrapOfficeSeats = (
+  body: { idempotency_key?: string } = {},
+  opts: BusinessFetchOptions = {},
+) => businessFetch<OfficeSeatBootstrap>(
+  "/bootstrap", { ...opts, method: "POST", body });
 
 export const fetchDirectory = (opts: BusinessFetchOptions = {}) =>
   businessFetch<BusinessDirectory>("/directory", opts);
