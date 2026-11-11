@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import { OFFICE_BRAND } from "./brand";
 
@@ -32,5 +33,25 @@ describe("Qubit Office brand", () => {
   it("keeps the LimeZu art credit", () => {
     expect(OFFICE_BRAND.credit).toContain("LimeZu");
     expect(OFFICE_BRAND.creditUrl).toBe("https://limezu.itch.io");
+  });
+});
+
+describe("office brand patch", () => {
+  it("replaces the vendored topbar identity without removing legal credit", async () => {
+    document.body.innerHTML = `
+      <div class="ui-brand">
+        <span class="ui-brand__mark"><img id="upstream-logo"></span>
+        <div class="ui-brand__text">
+          <span class="ui-brand__name"><svg class="ui-wordmark"></svg><span class="ui-sr">Habblaud</span></span>
+          <div class="ui-topbar__status">Connected</div>
+        </div>
+      </div>`;
+    const { installOfficeBrand } = await import("./brand-patch");
+    installOfficeBrand(window);
+    expect(document.querySelector(".ui-brand__mark")).toBeNull();
+    expect(document.querySelector(".ui-wordmark")).toBeNull();
+    expect(document.querySelector(".ui-brand__name")?.textContent).toBe("Qubit Office");
+    expect(document.querySelector(".ui-topbar__status")?.textContent).toBe("Connected");
+    expect(document.title).toBe("Qubit Office");
   });
 });

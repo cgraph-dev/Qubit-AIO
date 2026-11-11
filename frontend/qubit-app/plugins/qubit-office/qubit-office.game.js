@@ -192406,6 +192406,34 @@ create: function(game) {
 		upstream: "https://github.com/marmottajr/habblaud",
 		upstreamCommit: "4ccce2537472fe5a8d432f06974494d2e778ff15"
 	};
+	// ../qubit-app/plugins/qubit-office/game/app/brand-patch.ts
+	function installOfficeBrand(win) {
+		const doc = win?.document;
+		if (!doc || !doc.body) return;
+		const patch = () => {
+			const brand = doc.querySelector(".ui-brand");
+			if (!brand) return;
+			brand.querySelector(".ui-brand__mark")?.remove();
+			brand.querySelector(".ui-wordmark")?.remove();
+			const name = brand.querySelector(".ui-brand__name");
+			if (!name) return;
+			if (name.textContent?.trim() !== "Qubit Office") {
+				name.textContent = "Qubit Office";
+				name.setAttribute("style", "display:inline-flex;align-items:center;color:#f4f1ea;font:700 16px/1 ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.02em;white-space:nowrap;");
+			}
+			if (doc.title !== "Qubit Office") doc.title = "Qubit Office";
+		};
+		patch();
+		const Observer = win.MutationObserver;
+		if (!Observer) return;
+		const observer = new Observer(() => patch());
+		observer.observe(doc.body, {
+			childList: true,
+			characterData: true,
+			subtree: true
+		});
+		win.setTimeout(() => observer.disconnect(), 6e4);
+	}
 	// ../qubit-app/plugins/qubit-office/game/ui/HudPanel.ts
 	/** The HUD's own dashboard route. Framed by the dock; also the fallback link. */
 	var HUD_PATH = "/qubit-hud";
@@ -199225,6 +199253,7 @@ create: function(game) {
 				const onLoad = () => {
 					setLoaded(true);
 					setFailed(null);
+					installOfficeBrand(win);
 					menuRef.current?.dispose();
 					setMenuFallback(false);
 					menuRef.current = installOfficeMenuButtons(win, {

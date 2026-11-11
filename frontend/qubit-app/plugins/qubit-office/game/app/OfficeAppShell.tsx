@@ -7,6 +7,7 @@
 
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { OFFICE_BRAND } from "./brand";
+import { installOfficeBrand } from "./brand-patch";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
@@ -266,6 +267,7 @@ export function createOfficeApp(
       const onLoad = () => {
         setLoaded(true);
         setFailed(null);
+        installOfficeBrand(win);
         // Put the Agents and HUD icons where the office keeps its own panel
         // buttons. The document is same-origin, so the shell can append to the
         // group; the buttons drive THIS component's dock state.
