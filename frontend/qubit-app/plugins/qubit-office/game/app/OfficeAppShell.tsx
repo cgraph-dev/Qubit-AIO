@@ -16,6 +16,9 @@ import {
 } from "./office-menu";
 import { createSeatModelPanel } from "./SeatModelPanel";
 import { createAgentsPanel } from "./AgentsPanel";
+import { createAgentControlDrawer } from "./AgentControlDrawer";
+import { createWarRoomPanel } from "./WarRoomPanel";
+import type { AgentSeat } from "./agents-panel";
 import {
   applyHostTheme, loadOfficeTheme, officeSliceName, officeThemeClass,
   type OfficeTheme,
@@ -114,6 +117,8 @@ type ShellComponents = {
   HudDock: ReturnType<typeof createHudDock>;
   AgentsPanel: ReturnType<typeof createAgentsPanel>;
   SeatModelPanel: ReturnType<typeof createSeatModelPanel>;
+  AgentControlDrawer: ReturnType<typeof createAgentControlDrawer>;
+  WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
 
@@ -150,6 +155,8 @@ function shellComponents(
     HudDock: createHudDock({ React: R, hooks, base }),
     AgentsPanel: createAgentsPanel(R, hooks),
     SeatModelPanel: createSeatModelPanel(R, hooks),
+    AgentControlDrawer: createAgentControlDrawer(R, hooks),
+    WarRoomPanel: createWarRoomPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
   byBase.set(cacheKey, built);
@@ -196,9 +203,18 @@ export function createOfficeApp(
     // the src so assigning the same URL still reloads the document. Declared
     // LAST so existing state slots/tests keep their indices.
     const [retryToken, setRetryToken] = useState(0);
+    // The War Room / role directory, and the one office seat whose Business OS
+    // control record is open. Both are Qubit-shell docks; neither mutates the
+    // vendored office document. Declared AFTER ``retryToken`` for the same
+    // state-slot stability reason as the comment above.
+    const [warRoomOpen, setWarRoomOpen] = useState(false);
+    const [controlSeat, setControlSeat] = useState<AgentSeat | null>(null);
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
-    const { HudDock, AgentsPanel, SeatModelPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+    const {
+      HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
+      LoadingScreen,
+    } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
@@ -257,7 +273,10 @@ export function createOfficeApp(
         setMenuFallback(false);
         menuRef.current = installOfficeMenuButtons(win, {
           onToggleAgents: () => setAgentsOpen((v: boolean) => !v),
-          onToggleHud: () => setHudOpen((v: boolean) => !v),
+          onToggleHud: () => {
+            setControlSeat(null);
+            setHudOpen((v: boolean) => !v);
+          },
           onFallback: (show: boolean) => setMenuFallback(show),
           onAttach: () => setMenuFallback(false),
         });
@@ -441,6 +460,18 @@ export function createOfficeApp(
         R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
           R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Agents"),
           R.createElement("button", {
+            key: "warroom", type: "button",
+            className: "office-game__btn office-theme-dock-link",
+            "data-testid": "office-game-warroom-open",
+            "aria-label": "Open War Room and role directory",
+            "data-office-slice": buttonSlice,
+            onClick: () => {
+              setAgentsOpen(false);
+              setControlSeat(null);
+              setWarRoomOpen(true);
+            },
+          }, "War Room"),
+          R.createElement("button", {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
             "data-office-slice": buttonSlice,
@@ -449,6 +480,53 @@ export function createOfficeApp(
         ]),
         R.createElement(AgentsPanel as never, {
           key: "body", base: props.base, theme: officeTheme,
+          onOpenAgent: (seat: AgentSeat) => {
+            setAgentsOpen(false);
+            setHudOpen(false);
+            setControlSeat(seat);
+          },
+        }),
+      ]));
+    }
+
+    // THE WAR ROOM / IDEA LAB. A Qubit shell dock beside the office, opened
+    // from the Agents dock header. It reads/writes only the durable Business
+    // OS (owner-scoped), never the vendored office document.
+    if (warRoomOpen) {
+      children.push(R.createElement("div", {
+        key: "warroom-dock",
+        id: "office-game-warroom-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__warRoomDock",
+        "data-testid": "office-game-warroom-dock",
+        "data-office-dock": "warroom",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "War Room and role directory",
+      }, [
+        R.createElement(WarRoomPanel as never, {
+          key: "body", base: props.base,
+          onClose: () => setWarRoomOpen(false),
+        }),
+      ]));
+    }
+
+    // THE AGENT CONTROL DRAWER. Opened by clicking a seat in the Agents panel.
+    // It resolves that seat to a Business OS agent by an explicit durable link
+    // and says so when none exists; it never invents a control record.
+    if (controlSeat) {
+      children.push(R.createElement("div", {
+        key: "agent-control-dock",
+        id: "office-game-agent-control-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__agentControlDock",
+        "data-testid": "office-game-agent-control-dock",
+        "data-office-dock": "agent-control",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Agent controls",
+      }, [
+        R.createElement(AgentControlDrawer as never, {
+          key: "body", base: props.base, seat: controlSeat,
+          onClose: () => setControlSeat(null),
         }),
       ]));
     }
@@ -504,7 +582,10 @@ export function createOfficeApp(
         const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
         const onActivate = spec.id === "agents"
           ? () => setAgentsOpen((v: boolean) => !v)
-          : () => setHudOpen((v: boolean) => !v);
+          : () => {
+              setControlSeat(null);
+              setHudOpen((v: boolean) => !v);
+            };
         return R.createElement("button", {
           key: spec.id,
           type: "button",
@@ -558,12 +639,13 @@ export function createOfficeApp(
     // stylesheet split the row into two non-overlapping halves with a gap;
     // a single sheet keeps its original width because the selector only
     // matches while both are open.
-    const dualDocks = agentsOpen && hudOpen;
+    const dualDocks = (agentsOpen && hudOpen)
+      || (warRoomOpen && controlSeat !== null);
     // Either sheet open means the root is marked so the stylesheet can start
     // the sheets BELOW the vendored app's fixed top bar. That bar hosts the
     // injected Panels group that opens them; an offset sheet leaves the group
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
-    const dockOpen = agentsOpen || hudOpen;
+    const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,

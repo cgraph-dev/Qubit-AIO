@@ -45,6 +45,11 @@ import {
 export interface AgentsPanelProps {
   /** An explicit base path (a test); otherwise the host's injected global. */
   base?: string;
+  /**
+   * Open the Business OS control drawer for a seat. Optional: without it the
+   * panel keeps its original select-and-preview behaviour exactly.
+   */
+  onOpenAgent?: (seat: AgentSeat) => void;
   /** Injected for tests; defaults to the page's own fetch. */
   fetchImpl?: typeof fetch;
   /**
@@ -71,7 +76,8 @@ interface SeatKeyEvent {
  */
 interface SeatInteraction {
   activeSlug: string | null;
-  onActivate: (slug: string) => void;
+  onActivate: (seat: AgentSeat) => void;
+  onOpenAgent?: (seat: AgentSeat) => void;
   rowId: (slug: string) => string;
 }
 
@@ -164,8 +170,11 @@ function seatRow(
     // Native list semantics stay intact; ``aria-current`` marks the row feeding
     // the card without inventing a listbox selection model for many lists.
     "aria-current": active ? "true" : undefined,
-    onMouseEnter: () => interaction.onActivate(seat.slug),
-    onClick: () => interaction.onActivate(seat.slug),
+    onMouseEnter: () => interaction.onActivate(seat),
+    onClick: () => {
+      interaction.onActivate(seat);
+      interaction.onOpenAgent?.(seat);
+    },
   }, [
     R.createElement("span", {
       key: "a", className: "agents-panel__avatar",
@@ -449,7 +458,8 @@ export function createAgentsPanel(
     };
     const interaction: SeatInteraction = {
       activeSlug: activeSeat ? activeSeat.slug : null,
-      onActivate: (slug: string) => setActiveSlug(slug),
+      onActivate: (seat: AgentSeat) => setActiveSlug(seat.slug),
+      onOpenAgent: props.onOpenAgent,
       rowId,
     };
 
