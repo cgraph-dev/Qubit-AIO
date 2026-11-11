@@ -23,7 +23,6 @@ import time
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Mapping, Protocol, runtime_checkable
 
-from ..business.ids import fingerprint
 from .platform_policy import (
     PlatformPolicy,
     PolicyDecision,
@@ -292,6 +291,11 @@ class BaseAdapter:
 
     # -- idempotency ---------------------------------------------------
     def _fingerprint(self, operation: str, payload: Any) -> str:
+        # Local import: importing the whole Business OS package from this
+        # module would form a cycle (business.integration_tools imports this
+        # adapter foundation), so ``integrations`` must be importable first.
+        from ..business.ids import fingerprint
+
         return fingerprint(
             {
                 "platform": self.platform_id,

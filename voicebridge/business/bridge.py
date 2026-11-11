@@ -30,6 +30,19 @@ import secrets
 import sqlite3
 from typing import Any, Dict, Mapping, Tuple
 
+from ..integrations.etsy_auth import (
+    ETSY_BAD_INPUT,
+    ETSY_EXCHANGE_FAILED,
+    ETSY_NOT_CONFIGURED,
+    ETSY_PKCE_MISMATCH,
+    ETSY_REFRESH_FAILED,
+    ETSY_STATE_INVALID,
+    ETSY_STORE_ERROR,
+    ETSY_TRANSPORT_ERROR,
+    EtsyAuthError,
+    EtsyOAuth,
+)
+from ..integrations.etsy_auth_transport import EtsyOAuthHttpTransport
 from ..office.world import model as WORLD
 from . import agents as AGENTS
 from . import office_seats as OFFICE_SEATS
@@ -922,6 +935,124 @@ h_business_agent_archive = _lifecycle_handler("agent.archive", "archive")
 h_business_agent_stop = _lifecycle_handler("agent.stop", "stop")
 
 
+# ---------------------------------------------------------------------------
+# Etsy OAuth connection (connection only; never publishes or spends)
+# ---------------------------------------------------------------------------
+ETSY_STATUS_SCHEMA = "qubit-office-business-etsy-status/1"
+ETSY_CONNECT_SCHEMA = "qubit-office-business-etsy-connect/1"
+
+
+def _etsy_transport() -> Any:
+    """The production HTTP transport for the token endpoint.
+
+    Injected explicitly so the pure OAuth state machine never imports a network
+    client. A test monkeypatches this factory with a fake.
+    """
+    return EtsyOAuthHttpTransport()
+
+
+def _etsy_oauth(cfg: Any, *, transport: Any = None) -> EtsyOAuth:
+    return EtsyOAuth.from_config(
+        cfg,
+        transport=_etsy_transport() if transport is None else transport,
+    )
+
+
+def _etsy_status_code(code: str) -> int:
+    if code in (ETSY_NOT_CONFIGURED, ETSY_BAD_INPUT):
+        return 400
+    if code in (ETSY_STATE_INVALID, ETSY_PKCE_MISMATCH):
+        return 409
+    if code in (ETSY_TRANSPORT_ERROR, ETSY_EXCHANGE_FAILED, ETSY_REFRESH_FAILED):
+        return 502
+    if code == ETSY_STORE_ERROR:
+        return 500
+    return 400
+
+
+def _etsy_failure(exc: EtsyAuthError) -> Tuple[int, Dict[str, Any]]:
+    return _refusal(_etsy_status_code(exc.code), exc.code, exc.detail)
+
+
+def h_business_etsy_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                           p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/business/etsy/status -> typed connection status.
+
+    Read-only. The payload carries no access/refresh value and no client
+    secret; only the configured/missing labels, the canonical state and
+    timestamps. A read never creates the store, starts an authorization or
+    contacts Etsy.
+    """
+    try:
+        status = _etsy_oauth(cfg).status()
+    except EtsyAuthError as exc:
+        status = {
+            "platform": "etsy",
+            "configured": False,
+            "state": "error",
+            "code": exc.code,
+            "detail": exc.detail,
+            "connected": False,
+            "missing": [],
+        }
+    return _ok(ETSY_STATUS_SCHEMA, etsy=status)
+
+
+def h_business_etsy_authorize(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/business/etsy/authorize -> PKCE authorization URL.
+
+    Owner-gated. It stores the pending state/PKCE verifier and returns the URL
+    the operator opens at Etsy. It does not use a token and does not contact
+    Etsy.
+    """
+    if not _owner_ok(b):
+        return _owner_refusal("starting an Etsy OAuth connection")
+    try:
+        flow = _etsy_oauth(cfg).begin_authorization()
+    except EtsyAuthError as exc:
+        return _etsy_failure(exc)
+    return _ok(ETSY_CONNECT_SCHEMA, etsy=flow)
+
+
+def h_business_etsy_complete(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/business/etsy/complete {code, state} -> exchange.
+
+    Owner-gated. Validates the pending state and PKCE challenge before the
+    injected transport exchanges the code, stores the tokens privately and
+    returns the resulting status. It never echoes the code, verifier or token.
+    """
+    if not _owner_ok(b):
+        return _owner_refusal("completing an Etsy OAuth connection")
+    code = b.get("code")
+    state = b.get("state")
+    if not isinstance(code, str) or not isinstance(state, str):
+        return _refusal(400, ETSY_BAD_INPUT,
+                        "the Etsy callback requires string code and state")
+    try:
+        status = _etsy_oauth(cfg).complete_authorization(code, state)
+    except EtsyAuthError as exc:
+        return _etsy_failure(exc)
+    return _ok(ETSY_STATUS_SCHEMA, etsy=status)
+
+
+def h_business_etsy_disconnect(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/business/etsy/disconnect -> clear the local token.
+
+    Owner-gated. Removes only local OAuth state; it does not call Etsy and it
+    cannot affect a listing, order or payout.
+    """
+    if not _owner_ok(b):
+        return _owner_refusal("disconnecting Etsy")
+    try:
+        status = _etsy_oauth(cfg).disconnect()
+    except EtsyAuthError as exc:
+        return _etsy_failure(exc)
+    return _ok(ETSY_STATUS_SCHEMA, etsy=status)
+
+
 __all__ = [
     "SCHEMA",
     "h_business_agent_archive",
@@ -936,6 +1067,10 @@ __all__ = [
     "h_business_agents_list",
     "h_business_bootstrap",
     "h_business_directory",
+    "h_business_etsy_authorize",
+    "h_business_etsy_complete",
+    "h_business_etsy_disconnect",
+    "h_business_etsy_status",
     "h_business_floors",
     "h_business_overview",
     "h_business_roles",
