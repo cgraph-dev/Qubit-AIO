@@ -6,6 +6,7 @@
  */
 
 import type { OfficeGameShellProps } from "../OfficeGameShell";
+import { OFFICE_BRAND } from "./brand";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
@@ -25,8 +26,8 @@ import {
 } from "./office-api";
 
 /** Always-present art credit; it must not depend on a theme being active. */
-export const OFFICE_ART_CREDIT = "Office art: LimeZu — https://limezu.itch.io";
-export const OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
+export const OFFICE_ART_CREDIT = OFFICE_BRAND.credit;
+export const OFFICE_ART_CREDIT_URL = OFFICE_BRAND.creditUrl;
 
 export interface OfficeAppProps {
   /** The dashboard's base path (empty at the root). */
@@ -282,10 +283,10 @@ export function createOfficeApp(
       R.createElement("iframe", {
         key: "frame",
         ref: frameRef,
-        title: "Habblaud virtual office",
+        title: OFFICE_BRAND.title,
         "data-testid": "office-app-frame",
         className: "office-game__frame",
-        "aria-label": "Habblaud office game",
+        "aria-label": OFFICE_BRAND.name,
         "aria-describedby": "office-app-description",
         "aria-busy": !loaded && !failed,
         "data-state": failed ? "error" : loaded ? "ready" : "loading",
@@ -301,7 +302,7 @@ export function createOfficeApp(
         key: "description",
         id: "office-app-description",
         className: "office-game__sr-only",
-      }, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled."),
+      }, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled.`),
       // The persistent Credits/About surface. It is part of the Qubit shell,
       // not the vendored client and not the theme, so the LimeZu attribution
       // stays visible with `classic` and after a theme is removed.
@@ -316,7 +317,13 @@ export function createOfficeApp(
         href: OFFICE_ART_CREDIT_URL,
         target: "_blank",
         rel: "noopener noreferrer",
-      }, OFFICE_ART_CREDIT)),
+      }, OFFICE_ART_CREDIT),
+      R.createElement("span", { key: "sep" }, " · "),
+      R.createElement("a", {
+        key: "legal",
+        href: OFFICE_BRAND.legalUrl,
+        title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`,
+      }, OFFICE_BRAND.legalLabel)),
     ];
 
     if (!loaded && !failed) {

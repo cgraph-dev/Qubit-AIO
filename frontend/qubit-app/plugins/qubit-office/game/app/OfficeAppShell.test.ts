@@ -53,14 +53,14 @@ const createHarness = () => {
   };
 };
 
-describe("Habblaud embedding", () => {
+describe("Qubit Office embedding", () => {
   it("keeps the iframe full-frame and accessibly described", () => {
     const h = createHarness();
     const App = createOfficeApp(h.React as never, h.hooks as never);
     expect(() => App()).not.toThrow();
     const frameElement = h.tree.find((element) => element.type === "iframe");
-    expect(frameElement?.props.title).toBe("Habblaud virtual office");
-    expect(frameElement?.props["aria-label"]).toBe("Habblaud office game");
+    expect(frameElement?.props.title).toBe("Qubit Office");
+    expect(frameElement?.props["aria-label"]).toBe("Qubit Office");
     expect(frameElement?.props["aria-describedby"]).toBe("office-app-description");
     expect(frameElement?.props.style).toMatchObject({ width: "100%", height: "100%", display: "block" });
     expect(frameElement?.props.sandbox).toContain("allow-scripts");
@@ -84,6 +84,11 @@ describe("Habblaud embedding", () => {
     expect(link).toBeDefined();
     expect(String((link?.props.children as unknown[])[0]))
       .toBe(OFFICE_ART_CREDIT);
+    const legal = children.find(
+      (child) => String(child.props.href).endsWith("/habblaud/LICENSE"));
+    expect(legal).toBeDefined();
+    expect(String((legal?.props.children as unknown[])[0]))
+      .toContain("MIT");
     // Classic payload: no theme class and still the same persistent credit.
     expect(h.tree.find((e) => e.props["data-office-theme"])).toBeUndefined();
   });

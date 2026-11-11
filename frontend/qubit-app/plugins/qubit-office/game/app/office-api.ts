@@ -42,7 +42,7 @@ export const ROUTES: readonly RouteBinding[] = [
   { client: "deliveries", qubit: null, readOnly: true,
     note: "No Qubit delivery store is bound." },
   { client: "recording/replay", qubit: null, readOnly: true,
-    note: "Qubit has no Habblaud screen recording/replay source." },
+    note: "Qubit has no screen recording/replay source." },
 ];
 
 export const SNAPSHOT_ROUTE = "/agent/api/office/tower";
