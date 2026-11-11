@@ -20,7 +20,7 @@ adapters, UI, voice commands, real payouts. See
 """
 from __future__ import annotations
 
-from . import approvals, jobs, ledger, tools
+from . import approvals, jobs, ledger, role_catalog, roles, tools
 from .errors import BusinessError
 from .models import (
     Approval,
@@ -35,6 +35,14 @@ from .models import (
     Tenant,
     ToolInvocation,
 )
+from .roles import (
+    Department,
+    FloorTemplate,
+    RoleRegistry,
+    RoleRegistryError,
+    RoleTemplate,
+    RoomTemplate,
+)
 from .store import BusinessStore
 from .tools import Policy, ToolGateway, ToolOutcome, ToolRequest
 
@@ -46,10 +54,16 @@ __all__ = [
     "BusinessError",
     "BusinessStore",
     "Contact",
+    "Department",
+    "FloorTemplate",
     "JobEvent",
     "JobRun",
     "LedgerEntry",
     "Policy",
+    "RoleRegistry",
+    "RoleRegistryError",
+    "RoleTemplate",
+    "RoomTemplate",
     "Task",
     "Tenant",
     "ToolGateway",
@@ -59,5 +73,7 @@ __all__ = [
     "approvals",
     "jobs",
     "ledger",
+    "role_catalog",
+    "roles",
     "tools",
 ]
