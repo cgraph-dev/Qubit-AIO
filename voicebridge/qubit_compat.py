@@ -12118,6 +12118,8 @@ _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/decisions",
    "h_business_warroom_decide")
 _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/tasks",
    "h_business_warroom_tasks_create")
+_r("POST", r"/api/office/business/agents/world-assign",
+   "h_business_agents_assign_world")
 _r("GET", r"/api/office/business/agents", "h_business_agents_list")
 _r("GET", r"/api/office/business/agents/(?P<id>[^/]+)/audit",
    "h_business_agent_audit")

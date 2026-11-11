@@ -29,5 +29,8 @@ from __future__ import annotations
 
 from . import active, catalog, model, occupancy, recipes, style, tower_plan
 
-__all__ = ["model", "active", "style", "recipes", "catalog", "tower_plan",
+__all__ = [
+    "assign","model", "active", "style", "recipes", "catalog", "tower_plan",
            "occupancy"]
+
+from . import assign  # noqa: E402

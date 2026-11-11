@@ -43,6 +43,7 @@ from ..integrations.etsy_auth import (
     EtsyOAuth,
 )
 from ..integrations.etsy_auth_transport import EtsyOAuthHttpTransport
+from ..office.world import assign as WORLD_ASSIGN
 from ..office.world import model as WORLD
 from ..office.world import occupancy as OCCUPANCY
 from . import agents as AGENTS
@@ -972,6 +973,32 @@ def _agent_mutation(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _error(exc)
 
 
+def h_business_agents_assign_world(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                  p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/business/agents/world-assign -> assign free tower desks.
+
+    Owner-gated and idempotent per agent+desk. Only active BOS agents without a
+    ``world_desk`` are assigned; explicit links are preserved. No model, spend,
+    publish or contact.
+    """
+    if not _owner_ok(b):
+        return _owner_refusal("assigning office agents to the world")
+    try:
+        store, service = _service(cfg)
+        tenant = _tenant(store, q, b)
+        business_id = _optional_text(
+            (b or {}).get("business_id") or (q or {}).get("business_id"))
+        result = WORLD_ASSIGN.assign_agents(
+            service, tenant, business_id=business_id,
+            actor="dashboard:owner")
+        return _ok(schema="qubit-office-world-assignment/1",
+                   tenant_id=tenant, business_id=business_id,
+                   counts=result["counts"], assigned=result["assigned"],
+                   skipped=result["skipped"])
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
 def h_business_agent_preview(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Owner-gated, read-only plan for one prospective agent turn.
@@ -1187,6 +1214,7 @@ __all__ = [
     "h_business_agent_stop",
     "h_business_agent_takeover",
     "h_business_agent_update",
+    "h_business_agents_assign_world",
     "h_business_agents_list",
     "h_business_bootstrap",
     "h_business_directory",
