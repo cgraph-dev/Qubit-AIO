@@ -329,6 +329,188 @@ class AuditEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class WarRoomSession:
+    session_id: str
+    tenant_id: str
+    business_id: str | None
+    title: str
+    state: str
+    idempotency_key: str
+    request_hash: str
+    brief: dict[str, Any]
+    score: dict[str, Any]
+    dissent: list[Any]
+    owner_note: str
+    created_at: str
+    updated_at: str
+
+    @classmethod
+    def from_row(cls, row: Any) -> "WarRoomSession":
+        data = _row(row)
+        return cls(
+            session_id=data["session_id"],
+            tenant_id=data["tenant_id"],
+            business_id=data["business_id"],
+            title=data["title"],
+            state=data["state"],
+            idempotency_key=data["idempotency_key"],
+            request_hash=data["request_hash"],
+            brief=json_loads(data.get("brief_json"), {}),
+            score=json_loads(data.get("score_json"), {}),
+            dissent=json_loads(data.get("dissent_json"), []),
+            owner_note=data["owner_note"],
+            created_at=data["created_at"],
+            updated_at=data["updated_at"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WarRoomSource:
+    source_id: str
+    tenant_id: str
+    session_id: str
+    kind: str
+    locator: str
+    title: str
+    status: str
+    adapter: str
+    artifact_id: str | None
+    text: str | None
+    metadata: dict[str, Any]
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: Any) -> "WarRoomSource":
+        data = _row(row)
+        return cls(
+            source_id=data["source_id"],
+            tenant_id=data["tenant_id"],
+            session_id=data["session_id"],
+            kind=data["kind"],
+            locator=data["locator"],
+            title=data["title"],
+            status=data["status"],
+            adapter=data["adapter"],
+            artifact_id=data["artifact_id"],
+            text=data["text"],
+            metadata=json_loads(data.get("metadata_json"), {}),
+            created_at=data["created_at"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WarRoomEvidence:
+    evidence_id: str
+    tenant_id: str
+    session_id: str
+    label: str
+    claim: str
+    source_id: str | None
+    quote: str
+    metadata: dict[str, Any]
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: Any) -> "WarRoomEvidence":
+        data = _row(row)
+        return cls(
+            evidence_id=data["evidence_id"],
+            tenant_id=data["tenant_id"],
+            session_id=data["session_id"],
+            label=data["label"],
+            claim=data["claim"],
+            source_id=data["source_id"],
+            quote=data["quote"],
+            metadata=json_loads(data.get("metadata_json"), {}),
+            created_at=data["created_at"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WarRoomArgument:
+    argument_id: str
+    tenant_id: str
+    session_id: str
+    round_no: int
+    role: str
+    stance: str
+    text: str
+    evidence_ids: list[str]
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: Any) -> "WarRoomArgument":
+        data = _row(row)
+        return cls(
+            argument_id=data["argument_id"],
+            tenant_id=data["tenant_id"],
+            session_id=data["session_id"],
+            round_no=data["round_no"],
+            role=data["role"],
+            stance=data["stance"],
+            text=data["text"],
+            evidence_ids=json_loads(data.get("evidence_ids_json"), []),
+            created_at=data["created_at"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WarRoomExperiment:
+    experiment_id: str
+    tenant_id: str
+    session_id: str
+    name: str
+    hypothesis: str
+    method: str
+    success_metric: str
+    status: str
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: Any) -> "WarRoomExperiment":
+        data = _row(row)
+        return cls(
+            experiment_id=data["experiment_id"],
+            tenant_id=data["tenant_id"],
+            session_id=data["session_id"],
+            name=data["name"],
+            hypothesis=data["hypothesis"],
+            method=data["method"],
+            success_metric=data["success_metric"],
+            status=data["status"],
+            created_at=data["created_at"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class WarRoomDecision:
+    decision_id: str
+    tenant_id: str
+    session_id: str
+    status: str
+    decided_by: str
+    note: str
+    idempotency_key: str
+    request_hash: str
+    created_at: str
+
+    @classmethod
+    def from_row(cls, row: Any) -> "WarRoomDecision":
+        data = _row(row)
+        return cls(
+            decision_id=data["decision_id"],
+            tenant_id=data["tenant_id"],
+            session_id=data["session_id"],
+            status=data["status"],
+            decided_by=data["decided_by"],
+            note=data["note"],
+            idempotency_key=data["idempotency_key"],
+            request_hash=data["request_hash"],
+            created_at=data["created_at"],
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class ToolInvocation:
     invocation_id: str
     tenant_id: str

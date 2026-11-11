@@ -10,7 +10,7 @@ and ``BEFORE DELETE`` triggers that raise ``ABORT``. A correction is a new row.
 """
 from __future__ import annotations
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 _V1 = [
     """
@@ -265,6 +265,151 @@ for _table in _APPEND_ONLY_TABLES:
         """
     )
 
+# -- v2: War Room / Idea Lab ------------------------------------------------
+# Additive only. A war-room session is an intake that a human started; every
+# claim it records is an evidence row with an explicit label, every debate turn
+# is append-only, and the owner decision is its own immutable row. Nothing here
+# can publish, spend or contact anyone: those remain tool-gateway actions that
+# require a pending approval.
+_V2 = [
+    """
+    CREATE TABLE bos_warroom_session (
+        session_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        business_id TEXT REFERENCES bos_business(business_id) ON DELETE RESTRICT,
+        title TEXT NOT NULL,
+        state TEXT NOT NULL DEFAULT 'intake'
+            CHECK(state IN ('intake','research','debate','synthesis',
+                            'owner_decision','approved','rejected',
+                            'tasks_created')),
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        brief_json TEXT NOT NULL DEFAULT '{}',
+        score_json TEXT NOT NULL DEFAULT '{}',
+        dissent_json TEXT NOT NULL DEFAULT '[]',
+        owner_note TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(tenant_id, idempotency_key)
+    )
+    """,
+    """
+    CREATE INDEX bos_warroom_session_listing
+        ON bos_warroom_session(tenant_id, state, created_at)
+    """,
+    """
+    CREATE TABLE bos_warroom_source (
+        source_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        session_id TEXT NOT NULL REFERENCES bos_warroom_session(session_id)
+            ON DELETE RESTRICT,
+        kind TEXT NOT NULL CHECK(kind IN
+            ('youtube','url','post','note','image','doc')),
+        locator TEXT NOT NULL,
+        title TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'pending'
+            CHECK(status IN ('pending','extracted','failed')),
+        adapter TEXT NOT NULL DEFAULT '',
+        artifact_id TEXT REFERENCES bos_artifact(artifact_id) ON DELETE RESTRICT,
+        text TEXT,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, session_id, kind, locator)
+    )
+    """,
+    """
+    CREATE TABLE bos_warroom_evidence (
+        evidence_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        session_id TEXT NOT NULL REFERENCES bos_warroom_session(session_id)
+            ON DELETE RESTRICT,
+        label TEXT NOT NULL CHECK(label IN
+            ('FACT','INFERENCE','ASSUMPTION','UNKNOWN')),
+        claim TEXT NOT NULL,
+        source_id TEXT REFERENCES bos_warroom_source(source_id) ON DELETE RESTRICT,
+        quote TEXT NOT NULL DEFAULT '',
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, session_id, label, claim)
+    )
+    """,
+    """
+    CREATE TABLE bos_warroom_argument (
+        argument_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        session_id TEXT NOT NULL REFERENCES bos_warroom_session(session_id)
+            ON DELETE RESTRICT,
+        round_no INTEGER NOT NULL CHECK(round_no > 0),
+        role TEXT NOT NULL,
+        stance TEXT NOT NULL CHECK(stance IN
+            ('support','oppose','neutral','question')),
+        text TEXT NOT NULL,
+        evidence_ids_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, session_id, round_no, role, stance, text)
+    )
+    """,
+    """
+    CREATE TABLE bos_warroom_experiment (
+        experiment_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        session_id TEXT NOT NULL REFERENCES bos_warroom_session(session_id)
+            ON DELETE RESTRICT,
+        name TEXT NOT NULL,
+        hypothesis TEXT NOT NULL DEFAULT '',
+        method TEXT NOT NULL DEFAULT '',
+        success_metric TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'planned'
+            CHECK(status IN ('planned','running','done','abandoned')),
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, session_id, name)
+    )
+    """,
+    """
+    CREATE TABLE bos_warroom_decision (
+        decision_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        session_id TEXT NOT NULL REFERENCES bos_warroom_session(session_id)
+            ON DELETE RESTRICT,
+        status TEXT NOT NULL CHECK(status IN ('approved','rejected')),
+        decided_by TEXT NOT NULL,
+        note TEXT NOT NULL DEFAULT '',
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, idempotency_key)
+    )
+    """,
+]
+
+# Evidence, debate turns and the owner decision are a record of what was said
+# and decided. A correction is a new row, never an edit: dissent cannot be
+# quietly deleted before a decision is made.
+for _table in (
+    "bos_warroom_evidence",
+    "bos_warroom_argument",
+    "bos_warroom_decision",
+):
+    _V2.append(
+        f"""
+        CREATE TRIGGER {_table}_no_update
+        BEFORE UPDATE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+    _V2.append(
+        f"""
+        CREATE TRIGGER {_table}_no_delete
+        BEFORE DELETE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+
 MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
     (1, tuple(_V1)),
+    (2, tuple(_V2)),
 )

@@ -20,7 +20,7 @@ adapters, UI, voice commands, real payouts. See
 """
 from __future__ import annotations
 
-from . import approvals, jobs, ledger, tools
+from . import approvals, jobs, ledger, tools, warroom
 from .errors import BusinessError
 from .models import (
     Approval,
@@ -34,6 +34,12 @@ from .models import (
     Task,
     Tenant,
     ToolInvocation,
+    WarRoomArgument,
+    WarRoomDecision,
+    WarRoomEvidence,
+    WarRoomExperiment,
+    WarRoomSession,
+    WarRoomSource,
 )
 from .store import BusinessStore
 from .tools import Policy, ToolGateway, ToolOutcome, ToolRequest
@@ -56,8 +62,15 @@ __all__ = [
     "ToolInvocation",
     "ToolOutcome",
     "ToolRequest",
+    "WarRoomArgument",
+    "WarRoomDecision",
+    "WarRoomEvidence",
+    "WarRoomExperiment",
+    "WarRoomSession",
+    "WarRoomSource",
     "approvals",
     "jobs",
     "ledger",
     "tools",
+    "warroom",
 ]
