@@ -12011,6 +12011,11 @@ _r("GET", r"/api/office/business/roles", "h_business_roles")
 _r("GET", r"/api/office/business/org/floors", "h_business_floors")
 _r("GET", r"/api/office/business/warroom/sessions", "h_business_warroom_list")
 _r("POST", r"/api/office/business/warroom/sessions", "h_business_warroom_create")
+# Owner-gated bootstrap of the Etsy digital-shop pilot. Idempotent: one
+# pending War Room session; it never approves, creates tasks, publishes or
+# spends. Registered before the parameterized session routes.
+_r("POST", r"/api/office/business/warroom/etsy-pilot",
+   "h_business_warroom_etsy_pilot")
 _r("GET", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)",
    "h_business_warroom_get")
 _r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/sources",
@@ -21648,6 +21653,7 @@ for _name in (
     "h_business_warroom_get", "h_business_warroom_source_add",
     "h_business_warroom_evidence_add", "h_business_warroom_argument_add",
     "h_business_warroom_decide", "h_business_warroom_tasks_create",
+    "h_business_warroom_etsy_pilot",
     "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
     "h_business_agent_update", "h_business_agent_pause", "h_business_agent_resume",
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
