@@ -156,7 +156,11 @@ def artifact():
 def test_artifact_schema_and_target(artifact):
     assert artifact["schema"] == "qubit-controls-e2e/1"
     assert artifact["mode"].startswith("real browser")
-    assert artifact["target"] == "http://127.0.0.1:8890"
+    # The artifact records the dashboard it actually exercised. The mutating
+    # profile/webhook controls require a scratch dashboard, so a fixed port
+    # cannot be pinned here; ``validate_target`` is the safety contract (it
+    # refuses the reference dashboard and every non-loopback host).
+    assert C.validate_target(artifact["target"]) == artifact["target"]
     policy = artifact["target_policy"]
     assert policy["loopback_only"] is True
     assert policy["no_deletes_of_user_data"] is True
