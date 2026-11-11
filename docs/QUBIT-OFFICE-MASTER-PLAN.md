@@ -1282,3 +1282,15 @@ systems of record.
 The full synthesis, company patterns, must-haves, forgotten requirements and revised execution
 order are in `docs/QUBIT-OFFICE-RESEARCH-GAPS.md`. That file is the reference; this section is a
 pointer, not a second authority.
+
+
+---
+
+## 49. Additional research findings
+
+Ten more must-haves (test/staging/replay, data lineage, schema/policy migration, access
+recertification, notification/on-call, jurisdiction rules, moderation/asset-use, verifiable
+receipts, feature flags, backup-restore verification) and ten nice-to-haves (agent scorecards,
+synthetic monitoring, trace review, knowledge lifecycle, search/dedup/entity resolution, trust
+center, vendor/model risk registry, deployment rings, disaster game days, local-first sync) are
+recorded in `docs/QUBIT-OFFICE-RESEARCH-GAPS.md` §8.

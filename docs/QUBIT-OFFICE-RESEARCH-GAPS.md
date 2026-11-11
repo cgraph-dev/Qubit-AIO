@@ -186,3 +186,33 @@ The gap is not vocabulary. The gap is foundation and enforcement.
 
 **If these gates are not met, the tower, character studio, outside world, mature interactions and
 extra departments are decoration, not product.**
+
+---
+
+## 8. Additional 20 findings (not duplicates of §4–§5)
+
+### 10 must-have additions
+
+1. **Isolated test, staging and replay environments** — disposable tenants, fake external systems, deterministic seeds, recorded traces, fault injection, production-like policy/data fixtures. Without this, agent changes are tested only in production.
+2. **Data lineage and provenance graph** — field-level source, retrieval, transformation, prompt, model, handoff and output lineage. Without it, wrong outputs cannot be investigated, corrected or defended.
+3. **Schema and policy migration framework** — version schemas/policies/prompts/tools/checkpoints, compatibility adapters, dry-run migrations, dual-read/write, rollback and ownership. Old runs outlive new code.
+4. **Periodic identity and access recertification** — scheduled owner/manager reviews, dormant-access flags, expiring temporary grants, explicit agent renewal. Agent sprawl otherwise accumulates permanent access.
+5. **Notification, escalation and on-call policy engine** — severity/tenant/workflow/business-hours routing, acknowledgements, paging, suppression, escalation tiers and handoff history. Observability without ownership is noise.
+6. **Jurisdiction-aware legal/regulatory rule engine** — runtime evaluation of jurisdiction, residency, sector, consent, retention, disclosure and action restrictions, with versioned effective dates. One global policy is not enough.
+7. **Content moderation and asset-use enforcement** — scan text/images/audio/video/uploads, enforce blocked categories, audience/age rules, provenance labels, takedown and appeal. An asset ledger does not prevent misuse.
+8. **Verifiable action and decision receipts** — signed, redacted receipts containing inputs, sources, policy checks, approvals, tool calls, outcomes, uncertainty and reversibility. Audit logs alone are not customer-understandable evidence.
+9. **Feature flags and controlled experimentation** — tenant/cohort flags, holdouts, kill switches, experiment metrics, eligibility and automatic rollback. Prompt/model/tool changes need controlled comparison.
+10. **Backup restoration verification** — automated restore drills into isolated environments, referential-integrity checks, workflow replay, RPO/RTO measurement and unrestorable-object reporting. A backup is not recovery until restored.
+
+### 10 nice-to-have additions
+
+1. **Agent performance scorecards** — outcome quality, groundedness, intervention rate, tool-error rate, latency, cost, drift and business KPI impact per agent.
+2. **Synthetic end-to-end monitoring** — scheduled synthetic users through login, retrieval, handoff, approval, tool execution, notification and export across representative tenants.
+3. **Trace review and incident learning workspace** — label traces, compare expected vs actual, assign root causes, redact examples, promote incidents into regression tests.
+4. **Knowledge-base lifecycle and ownership** — owners, freshness SLAs, review queues, supersession, archival, approval states, authoritative-passage links.
+5. **Semantic search, deduplication and entity resolution** — lexical+vector search, duplicate detection, canonicalization, aliases, conflict display, merge/split.
+6. **Customer trust center and self-service controls** — data flows, model routing, subprocessors, retention, export/delete, incident notices and trust documentation.
+7. **Vendor/model supply-chain risk registry** — versions, regions, data handling, licenses, SBOMs, security posture, concentration risk, exit plans and change notices.
+8. **Deployment rings and progressive release** — internal, synthetic, pilot, low-risk and general rings with promotion gates, opt-outs, region-aware scheduling and rollback.
+9. **Disaster exercises and operational game days** — provider outage, corrupted index, compromised agent, lost keys, region loss, notification failure and partial restore.
+10. **Local-first synchronization and conflict resolution** — append-only local queues, encrypted caches, causal metadata, merge screens and safe replay after reconnect.
