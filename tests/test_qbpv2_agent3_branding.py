@@ -121,6 +121,13 @@ def test_served_bundle_matches_tracked_source_bundle(tmp_path):
                 f"http://127.0.0.1:{port}/plugins/fleet.json",
                 timeout=15) as _r:
             fleet = json.loads(_r.read())
-        assert {m["name"] for m in fleet} == {"qubit-achievements", "kanban"}
+        # Assert the REQUIRED plugins are registered, not the exact fleet set.
+        # An exact set is a change detector: it fails every time a plugin ships,
+        # and it just did — qubit-office (the owner's own build) registers here
+        # too. The contract is that the shipped bundle's required plugins are
+        # served; extra plugins are legitimate.
+        required = {"qubit-achievements", "kanban"}
+        names = {m["name"] for m in fleet}
+        assert required <= names, sorted(required - names)
     finally:
         ui.stop()

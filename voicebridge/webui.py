@@ -4264,6 +4264,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
                 or path.startswith("/plugins/")):
             self._serve_qubit_static(path)
             return
+        # Root-level files of the built dashboard. These do not sit under one of
+        # the asset prefixes above, so without this branch /build-info.json and
+        # /favicon.svg fell through to the SPA shell and were answered with the
+        # dashboard HTML — a JSON consumer got HTML with a 200. build-info.json
+        # is exactly what the stale-bundle check reads
+        # (tests/test_qbpv2_agent3_branding.py compares served bytes to disk).
+        # Serving is confined to files that really exist in the dist root, so a
+        # unknown root path still reaches the shell for SPA routing.
+        if path.count("/") == 1 and path != "/":
+            _dist = self._qubit_dist()
+            if (Path(_dist) / path.lstrip("/")).is_file():
+                self._serve_qubit_static(path)
+                return
         if path.startswith("/dashboard-plugins/"):
             self._serve_qubit_plugin(path[len("/dashboard-plugins/"):])
             return
