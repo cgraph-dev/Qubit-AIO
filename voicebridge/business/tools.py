@@ -17,11 +17,13 @@ adapters are deliberately deferred (see ``docs/QUBIT-BUSINESS-OS-FOUNDATION.md``
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from . import models
 from .errors import (
+    APPROVAL_EXPIRED_CODE,
     APPROVAL_REQUIRED_CODE,
     BAD_INPUT_CODE,
     BUDGET_EXCEEDED_CODE,
@@ -68,7 +70,13 @@ class Policy:
 
 @dataclass(frozen=True, slots=True)
 class ToolRequest:
-    """What an executor receives. It contains no database handle."""
+    """What an executor receives. It contains no database handle.
+
+    Scope (``tenant_id``/``business_id``/``actor``), the effective ``policy``,
+    the durable ``approval_id`` and the caller's ``idempotency_key`` travel with
+    every call. ``rate_limit``/``rate_window_seconds`` are optional caller
+    hints; the integration adapters enforce their own fixed-window limiter.
+    """
 
     invocation_id: str
     tenant_id: str
@@ -82,6 +90,10 @@ class ToolRequest:
     policy_version: str
     cost_minor: int
     currency: str
+    approval_id: str | None = None
+    policy: "Policy | None" = None
+    rate_limit: int | None = None
+    rate_window_seconds: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,7 +103,54 @@ class ToolOutcome:
     replayed: bool
 
 
+@dataclass(frozen=True, slots=True)
+class ExecutorResult:
+    """An executor's typed answer.
+
+    A plain return value keeps the historical "the executor succeeded" meaning.
+    An ``ExecutorResult`` lets a dry-run adapter state that it validated and
+    planned without executing, so the gateway records ``dry_run`` instead of
+    claiming a success that never happened. ``ledger`` is a directive the
+    gateway appends once (idempotently) for a money-moving tool.
+    """
+
+    result: Any = None
+    executed: bool = True
+    dry_run: bool = False
+    ledger: Mapping[str, Any] | None = None
+
+
 Executor = Callable[[ToolRequest], Any]
+
+LEDGER_KEY = "_ledger"
+
+
+def _coerce_result(
+    raw: Any,
+) -> tuple[Any, bool, bool, Mapping[str, Any] | None]:
+    """Normalise an executor return value into gateway terms.
+
+    Returns ``(result, executed, adapter_dry_run, ledger_directive)``. The
+    ledger directive (if any) stays inside the stored result so a later replay
+    can re-assert the same idempotent ledger row.
+    """
+    if isinstance(raw, ExecutorResult):
+        base: Any = {} if raw.result is None else raw.result
+        directive = raw.ledger
+        if directive is not None:
+            if not isinstance(base, Mapping):
+                raise BusinessError(
+                    BAD_INPUT_CODE,
+                    "a ledger directive requires a mapping result",
+                )
+            base = {**base, LEDGER_KEY: directive}
+        return base, raw.executed, raw.dry_run, directive
+    if isinstance(raw, Mapping) and LEDGER_KEY in raw:
+        directive = raw.get(LEDGER_KEY)
+        base = {key: value for key, value in raw.items() if key != LEDGER_KEY}
+        base[LEDGER_KEY] = directive
+        return base, True, False, directive
+    return ({} if raw is None else raw), True, False, None
 
 
 def _text(value: Any, label: str, *, max_len: int = 4096) -> str:
@@ -131,6 +190,8 @@ class ToolGateway:
         currency: str = "USD",
         dry_run: bool = False,
         approval_id: str | None = None,
+        rate_limit: int | None = None,
+        rate_window_seconds: float | None = None,
     ) -> ToolOutcome:
         actor_clean = _text(actor, "actor", max_len=200)
         tool_clean = _text(tool, "tool", max_len=120)
@@ -199,6 +260,9 @@ class ToolGateway:
             )
             raise
         if existing is not None:
+            self._replay_ledger(
+                tenant_id, business_id, actor_clean, tool_clean, existing
+            )
             return ToolOutcome(existing, executed=False, replayed=True)
         assert invocation_id is not None
 
@@ -215,6 +279,10 @@ class ToolGateway:
             policy_version=policy.policy_version,
             cost_minor=cost_minor,
             currency=code,
+            approval_id=approval_id,
+            policy=policy,
+            rate_limit=rate_limit,
+            rate_window_seconds=rate_window_seconds,
         )
         if dry_run:
             preview = {
@@ -229,26 +297,48 @@ class ToolGateway:
             )
         try:
             raw = self._executor(request)  # type: ignore[misc]
-        except Exception as exc:  # noqa: BLE001 - executor is an external seam
-            message = redact(f"{type(exc).__name__}: {exc}")[:2000]
+            result, executed, adapter_dry, ledger_directive = _coerce_result(raw)
+            if executed and ledger_directive is not None:
+                self._record_ledger(
+                    tenant_id=tenant_id,
+                    business_id=business_id,
+                    actor=actor_clean,
+                    tool=tool_clean,
+                    invocation_id=invocation_id,
+                    directive=ledger_directive,
+                )
+            if not executed and not adapter_dry:
+                raise BusinessError(
+                    TOOL_FAILED_CODE,
+                    f"tool {tool_clean!r} reported neither execution nor a dry run",
+                )
+        except BusinessError as exc:
             self._complete(
                 tenant_id, invocation_id, "failed", None,
-                cost_minor=cost_minor, error_code=TOOL_FAILED_CODE, dry_run=False,
+                cost_minor=cost_minor, error_code=exc.code, dry_run=False,
             )
-            with self._store.transaction() as conn:
-                self._store._audit(
-                    conn, tenant_id, business_id, actor_clean, "tool.result",
-                    "tool_invocation", invocation_id, "error",
-                    {"tool": tool_clean, "error": message},
-                )
+            raise
+        except Exception as exc:  # noqa: BLE001 - executor is an external seam
+            code = getattr(exc, "code", None) or TOOL_FAILED_CODE
+            detail = getattr(exc, "detail", None)
+            message = redact(
+                str(detail) if detail else f"{type(exc).__name__}: {exc}"
+            )[:2000]
+            self._complete(
+                tenant_id, invocation_id, "failed", None,
+                cost_minor=cost_minor, error_code=str(code), dry_run=False,
+            )
             raise BusinessError(
-                TOOL_FAILED_CODE,
-                f"tool {tool_clean!r} failed: {message}",
+                str(code), f"tool {tool_clean!r} failed: {message}"
             ) from exc
-        result = raw if raw is not None else {}
         return self._complete(
-            tenant_id, invocation_id, "success", result,
-            cost_minor=cost_minor, error_code=None, dry_run=False,
+            tenant_id,
+            invocation_id,
+            "success" if executed else "dry_run",
+            result,
+            cost_minor=cost_minor if executed else 0,
+            error_code=None,
+            dry_run=not executed,
         )
 
     # -- internals -----------------------------------------------------
@@ -307,6 +397,13 @@ class ToolGateway:
                         APPROVAL_REQUIRED_CODE,
                         f"tool {tool!r} at autonomy {autonomy!r} needs an approved"
                         f" approval with action 'tool:{tool}'",
+                    )
+                expires_at = approved["expires_at"]
+                if expires_at is not None and float(expires_at) < time.time():
+                    raise BusinessError(
+                        APPROVAL_EXPIRED_CODE,
+                        f"approval {approval_id!r} expired before tool {tool!r}"
+                        " could run; request a fresh approval",
                     )
             budget = self._store._budget_status_conn(
                 conn,
@@ -433,6 +530,70 @@ class ToolGateway:
                 )
         except BusinessError:
             pass
+
+    def _record_ledger(
+        self,
+        *,
+        tenant_id: str,
+        business_id: str,
+        actor: str,
+        tool: str,
+        invocation_id: str,
+        directive: Mapping[str, Any],
+    ) -> None:
+        """Append the money effect once, keyed by the invocation id."""
+        if not isinstance(directive, Mapping):
+            raise BusinessError(
+                BAD_INPUT_CODE, "a ledger directive must be a mapping"
+            )
+        from . import ledger
+
+        ledger.append(
+            self._store,
+            tenant_id=tenant_id,
+            business_id=business_id,
+            account=str(directive.get("account") or ""),
+            direction=str(directive.get("direction") or ""),
+            amount_minor=directive.get("amount_minor"),
+            currency=str(directive.get("currency") or "USD"),
+            idempotency_key=f"tool-ledger:{invocation_id}",
+            memo=str(
+                directive.get("memo")
+                or f"{tool} invocation {invocation_id}"
+            ),
+            actor=actor,
+        )
+
+    def _replay_ledger(
+        self,
+        tenant_id: str,
+        business_id: str,
+        actor: str,
+        tool: str,
+        invocation: models.ToolInvocation,
+    ) -> None:
+        """Re-assert a success's ledger row without appending a second one.
+
+        The append is idempotent on ``tool-ledger:<invocation_id>``, so a
+        replay heals a crash between the result write and the ledger write but
+        can never create a duplicate entry.
+        """
+        if invocation.status != "success":
+            return
+        result = invocation.result
+        if not isinstance(result, Mapping):
+            return
+        directive = result.get(LEDGER_KEY)
+        if directive is None:
+            return
+        self._record_ledger(
+            tenant_id=tenant_id,
+            business_id=business_id,
+            actor=actor,
+            tool=tool,
+            invocation_id=invocation.invocation_id,
+            directive=directive,
+        )
 
     def invocation(
         self, tenant_id: str, invocation_id: str

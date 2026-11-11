@@ -219,6 +219,15 @@ class BaseAdapter:
         return self._dry_run
 
     # -- guards --------------------------------------------------------
+    def check_ready(self, operation: str = "read") -> None:
+        """Public readiness probe: transport and credentials, typed refusal.
+
+        Executors call this before dispatching so a missing transport or
+        credential is an ``adapter_unavailable``/``adapter_not_configured``
+        refusal rather than an ambiguous later failure.
+        """
+        self._require_ready(operation)
+
     def _require_ready(self, operation: str) -> None:
         if self._transport is None:
             raise AdapterError(
