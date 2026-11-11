@@ -19,6 +19,8 @@ import { createSeatModelPanel } from "./SeatModelPanel";
 import { createAgentsPanel } from "./AgentsPanel";
 import { createAgentControlDrawer } from "./AgentControlDrawer";
 import { createWarRoomPanel } from "./WarRoomPanel";
+import { createApprovalsPanel } from "./ApprovalsPanel";
+import { fetchApprovals } from "./approvals-panel";
 import type { AgentSeat } from "./agents-panel";
 import {
   applyHostTheme, loadOfficeTheme, officeSliceName, officeThemeClass,
@@ -120,6 +122,7 @@ type ShellComponents = {
   SeatModelPanel: ReturnType<typeof createSeatModelPanel>;
   AgentControlDrawer: ReturnType<typeof createAgentControlDrawer>;
   WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
+  ApprovalsPanel: ReturnType<typeof createApprovalsPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
 
@@ -158,6 +161,7 @@ function shellComponents(
     SeatModelPanel: createSeatModelPanel(R, hooks),
     AgentControlDrawer: createAgentControlDrawer(R, hooks),
     WarRoomPanel: createWarRoomPanel(R, hooks),
+    ApprovalsPanel: createApprovalsPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
   byBase.set(cacheKey, built);
@@ -210,11 +214,16 @@ export function createOfficeApp(
     // state-slot stability reason as the comment above.
     const [warRoomOpen, setWarRoomOpen] = useState(false);
     const [controlSeat, setControlSeat] = useState<AgentSeat | null>(null);
+    // The Approvals dock and its real pending count (the injected menu icon's
+    // badge). Declared AFTER every existing slot so seeded state indices in the
+    // shell's own tests stay stable.
+    const [approvalsOpen, setApprovalsOpen] = useState(false);
+    const [approvalCount, setApprovalCount] = useState(0);
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
-      LoadingScreen,
+      ApprovalsPanel, LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
@@ -245,6 +254,27 @@ export function createOfficeApp(
       return applyHostTheme(document, officeTheme);
     }, [officeTheme]);
 
+    // The pending-approval count for the injected badge. Read-only, on the
+    // existing session-token-gated route, at a slow cadence; the panel itself
+    // re-reads on open and after every action and reports its own count, so
+    // this only keeps the badge honest while the dock is closed. Guarded on
+    // `window` so the node-env shell tests issue no request at all.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      let live = true;
+      const read = () => {
+        fetchApprovals({ base: props.base }).then((next) => {
+          if (live && next.kind === "ready") setApprovalCount(next.items.length);
+        });
+      };
+      read();
+      const handle = window.setInterval(read, 30000);
+      return () => {
+        live = false;
+        window.clearInterval(handle);
+      };
+    }, [props.base]);
+
     useEffect(() => {
       const frame = frameRef.current;
       if (!frame) return;
@@ -274,15 +304,29 @@ export function createOfficeApp(
         menuRef.current?.dispose();
         setMenuFallback(false);
         menuRef.current = installOfficeMenuButtons(win, {
-          onToggleAgents: () => setAgentsOpen((v: boolean) => !v),
+          onToggleAgents: () => {
+            setApprovalsOpen(false);
+            setAgentsOpen((v: boolean) => !v);
+          },
           onToggleHud: () => {
+            setApprovalsOpen(false);
             setControlSeat(null);
             setHudOpen((v: boolean) => !v);
+          },
+          onToggleApprovals: () => {
+            setAgentsOpen(false);
+            setHudOpen(false);
+            setWarRoomOpen(false);
+            setControlSeat(null);
+            setApprovalsOpen((v: boolean) => !v);
           },
           onFallback: (show: boolean) => setMenuFallback(show),
           onAttach: () => setMenuFallback(false),
         });
-        menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
+        menuRef.current?.update({
+          agents: agentsOpen, hud: hudOpen,
+          approvals: approvalsOpen, pendingApprovals: approvalCount,
+        });
         props.onReady?.();
       };
       const onError = () => setFailed("The office app failed to load.");
@@ -306,9 +350,13 @@ export function createOfficeApp(
     }, [props.base, props.mock, requestedTheme, retryToken]);
 
     // Mirror the dock state onto the injected buttons after every render: the
-    // office paints its own active state from `aria-pressed`.
+    // office paints its own active state from `aria-pressed`, and the
+    // Approvals icon carries the live pending count badge.
     useEffect(() => {
-      menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
+      menuRef.current?.update({
+        agents: agentsOpen, hud: hudOpen,
+        approvals: approvalsOpen, pendingApprovals: approvalCount,
+      });
     });
 
     // Optional 9-slice: the pack declares which shell roles carry art, and
@@ -469,6 +517,7 @@ export function createOfficeApp(
             "data-office-slice": buttonSlice,
             onClick: () => {
               setAgentsOpen(false);
+              setApprovalsOpen(false);
               setControlSeat(null);
               setWarRoomOpen(true);
             },
@@ -485,6 +534,7 @@ export function createOfficeApp(
           onOpenAgent: (seat: AgentSeat) => {
             setAgentsOpen(false);
             setHudOpen(false);
+            setApprovalsOpen(false);
             setControlSeat(seat);
           },
         }),
@@ -529,6 +579,45 @@ export function createOfficeApp(
         R.createElement(AgentControlDrawer as never, {
           key: "body", base: props.base, seat: controlSeat,
           onClose: () => setControlSeat(null),
+        }),
+      ]));
+    }
+
+    // THE APPROVALS DOCK. The pending records on the SHARED journal, opened
+    // from the Approvals icon injected into the office's own panel group (or
+    // the host fallback). It is an exclusive right-hand sheet: opening it
+    // closes the other docks so two sheets can never cover each other, while
+    // every existing dock remains available and unchanged.
+    if (approvalsOpen) {
+      children.push(R.createElement("div", {
+        key: "approvals-dock",
+        id: "office-game-approvals-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__approvalsDock",
+        "data-testid": "office-game-approvals-dock",
+        "data-office-dock": "approvals",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Office approvals",
+      }, [
+        R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
+          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Approvals"),
+          R.createElement("span", {
+            key: "count",
+            className: "office-game__approvalsCount",
+            "data-testid": "office-game-approvals-count",
+            "data-count": String(approvalCount),
+          }, String(approvalCount)),
+          R.createElement("button", {
+            key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
+            "data-testid": "office-game-approvals-close", "aria-label": "Close approvals",
+            "data-office-slice": buttonSlice,
+            onClick: () => setApprovalsOpen(false),
+          }, "Close"),
+        ]),
+        R.createElement(ApprovalsPanel as never, {
+          key: "body", base: props.base,
+          onCountChange: (n: number) => setApprovalCount(n),
+          onClose: () => setApprovalsOpen(false),
         }),
       ]));
     }
@@ -581,24 +670,30 @@ export function createOfficeApp(
         "aria-label": "Office panels",
       }, MENU_BUTTONS.map((spec: MenuButtonSpec) => {
         const geometry = menuIconGeometry(spec);
-        const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
+        const pressed = spec.id === "agents" ? agentsOpen
+          : spec.id === "hud" ? hudOpen : approvalsOpen;
         const onActivate = spec.id === "agents"
-          ? () => setAgentsOpen((v: boolean) => !v)
-          : () => {
+          ? () => {
+              setApprovalsOpen(false);
+              setAgentsOpen((v: boolean) => !v);
+            }
+          : spec.id === "hud"
+          ? () => {
+              setApprovalsOpen(false);
               setControlSeat(null);
               setHudOpen((v: boolean) => !v);
+            }
+          : () => {
+              setAgentsOpen(false);
+              setHudOpen(false);
+              setWarRoomOpen(false);
+              setControlSeat(null);
+              setApprovalsOpen((v: boolean) => !v);
             };
-        return R.createElement("button", {
-          key: spec.id,
-          type: "button",
-          className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
-          "data-testid": `${spec.testId}-fallback`,
-          "aria-label": spec.label,
-          title: spec.title,
-          "aria-pressed": pressed ? "true" : "false",
-          "data-office-slice": buttonSlice,
-          onClick: onActivate,
-        }, R.createElement("svg", {
+        const label = spec.id === "approvals" && approvalCount > 0
+          ? `${spec.label} (${approvalCount} pending)` : spec.label;
+        const parts: unknown[] = [R.createElement("svg", {
+          key: "icon",
           className: "ui-px-icon",
           width: geometry.width,
           height: geometry.height,
@@ -609,7 +704,26 @@ export function createOfficeApp(
         }, R.createElement("path", {
           fill: "currentColor",
           d: geometry.d,
-        })));
+        }))];
+        if (spec.id === "approvals" && approvalCount > 0) {
+          parts.push(R.createElement("span", {
+            key: "badge", className: "office-menu-badge",
+            "data-testid": "office-menu-approvals-badge-fallback",
+            "aria-hidden": "true",
+          }, String(approvalCount)));
+        }
+        return R.createElement("button", {
+          key: spec.id,
+          type: "button",
+          className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
+          "data-testid": `${spec.testId}-fallback`,
+          "aria-label": label,
+          title: spec.title,
+          "aria-pressed": pressed ? "true" : "false",
+          "data-pending": spec.id === "approvals" ? String(approvalCount) : undefined,
+          "data-office-slice": buttonSlice,
+          onClick: onActivate,
+        }, ...parts);
       })));
     }
 
@@ -647,7 +761,8 @@ export function createOfficeApp(
     // the sheets BELOW the vendored app's fixed top bar. That bar hosts the
     // injected Panels group that opens them; an offset sheet leaves the group
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
-    const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null;
+    const dockOpen = agentsOpen || hudOpen || warRoomOpen
+      || controlSeat !== null || approvalsOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,

@@ -58,9 +58,16 @@ export const AGENTS_ICON: MenuIcon = {
   d: "M5 0h4v1H5zM4 1h6v1H4zM13 1h3v1H13zM3 2h7v1H3zM12 2h5v1H12zM3 3h7v1H3zM12 3h5v1H12zM3 4h7v1H3zM12 4h5v1H12zM24 4h1v1H24zM3 5h7v1H3zM12 5h5v1H12zM24 5h1v1H24zM4 6h5v1H4zM13 6h3v1H13zM22 6h5v1H22zM4 7h5v1H4zM13 7h3v1H13zM24 7h1v1H24zM5 8h3v1H5zM11 8h7v1H11zM24 8h1v1H24zM3 9h7v1H3zM12 9h7v1H12zM1 10h11v1H1zM13 10h6v1H13zM0 11h13v1H0zM0 12h13v1H0zM0 13h13v1H0z",
 };
 
+/** Approvals: a check glyph authored for the same 1-cell grid. */
+export const APPROVALS_ICON: MenuIcon = {
+  cols: 13,
+  rows: 11,
+  d: "M12 0h1v1H12zM11 1h1v1H11zM10 2h1v1H10zM1 3h1v1H1zM9 3h1v1H9zM2 4h1v1H2zM8 4h1v1H8zM3 5h1v1H3zM7 5h1v1H7zM4 6h1v1H4zM6 6h1v1H6zM5 7h1v1H5z",
+};
+
 /** The buttons' outward-facing identity: labels, titles, test ids. */
 export interface MenuButtonSpec {
-  id: "agents" | "hud";
+  id: "agents" | "hud" | "approvals";
   label: string;
   title: string;
   testId: string;
@@ -82,20 +89,32 @@ export const MENU_BUTTONS: readonly MenuButtonSpec[] = [
     testId: "office-menu-hud",
     icon: HUD_ICON,
   },
+  {
+    id: "approvals",
+    label: "Approvals",
+    title: "Approvals: pending confirmations on the shared journal",
+    testId: "office-menu-approvals",
+    icon: APPROVALS_ICON,
+  },
 ];
 
 /** The group the office renders its own panel buttons in. */
 export const PANELS_GROUP_SELECTOR = '.ui-btn-group[aria-label="Panels"]';
 
-/** The dock state the two buttons mirror. */
+/** The dock state the buttons mirror (approvals also carries its badge). */
 export interface OfficeMenuState {
   agents: boolean;
   hud: boolean;
+  approvals?: boolean;
+  /** Pending approvals the button's badge should show (0 hides it). */
+  pendingApprovals?: number;
 }
 
 export interface OfficeMenuOptions {
   onToggleAgents: () => void;
   onToggleHud: () => void;
+  /** Optional so existing callers/tests keep the two-button menu. */
+  onToggleApprovals?: () => void;
   /**
    * How long to wait for the app's own Panels group before telling the shell
    * to render its fallback buttons. Default 1500 ms.
@@ -182,6 +201,17 @@ function buildButton(
   path.setAttribute("d", geometry.d);
   svg.appendChild(path);
   button.appendChild(svg);
+  if (spec.id === "approvals") {
+    // The pending-count badge. It is part of THIS appended button only; no
+    // existing node or style in the app's group is touched.
+    const badge = doc.createElement("span");
+    badge.className = "office-menu-badge";
+    badge.setAttribute("data-testid", "office-menu-approvals-badge");
+    badge.setAttribute("aria-hidden", "true");
+    badge.hidden = true;
+    button.appendChild(badge);
+    button.setAttribute("data-has-badge", "true");
+  }
   return button;
 }
 
@@ -199,11 +229,12 @@ export function installOfficeMenuButtons(
   const doc = win.document;
   if (!doc || !doc.body) return null;
 
-  const byId: Record<"agents" | "hud", HTMLButtonElement | null> = {
+  const byId: Record<"agents" | "hud" | "approvals", HTMLButtonElement | null> = {
     agents: null,
     hud: null,
+    approvals: null,
   };
-  const state: OfficeMenuState = { agents: false, hud: false };
+  const state: OfficeMenuState = { agents: false, hud: false, approvals: false };
   let fallbackShown = false;
   let attachedOnce = false;
 
@@ -211,12 +242,35 @@ export function installOfficeMenuButtons(
 
   const isAttached = (): boolean => Boolean(
     byId.agents && byId.agents.isConnected
-    && byId.hud && byId.hud.isConnected);
+    && byId.hud && byId.hud.isConnected
+    && byId.approvals && byId.approvals.isConnected);
 
   const setFallback = (show: boolean): void => {
     if (fallbackShown === show) return;
     fallbackShown = show;
     opts.onFallback?.(show);
+  };
+
+  const badgeFor = (id: "agents" | "hud" | "approvals"): HTMLSpanElement | null => {
+    if (id !== "approvals") return null;
+    return byId.approvals?.querySelector(".office-menu-badge") as
+      HTMLSpanElement | null;
+  };
+
+  const paintApprovals = (): void => {
+    const button = byId.approvals;
+    const badge = badgeFor("approvals");
+    const count = Math.max(0, Math.floor(Number(state.pendingApprovals ?? 0) || 0));
+    if (badge) {
+      badge.textContent = count > 0 ? String(count) : "";
+      badge.hidden = count <= 0;
+    }
+    if (button) {
+      button.setAttribute("aria-pressed", state.approvals ? "true" : "false");
+      button.setAttribute("aria-label",
+        count > 0 ? `Approvals (${count} pending)` : "Approvals");
+      button.setAttribute("data-pending", String(count));
+    }
   };
 
   const insert = (group: Element, button: HTMLButtonElement): void => {
@@ -234,12 +288,15 @@ export function installOfficeMenuButtons(
     for (const spec of MENU_BUTTONS) {
       const existing = byId[spec.id];
       if (existing && existing.isConnected) continue;
-      const onActivate = spec.id === "agents" ? opts.onToggleAgents : opts.onToggleHud;
+      const onActivate = spec.id === "agents" ? opts.onToggleAgents
+        : spec.id === "hud" ? opts.onToggleHud
+        : (opts.onToggleApprovals ?? (() => {}));
       const button = buildButton(doc, spec, onActivate);
       button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
       byId[spec.id] = button;
       insert(group, button);
     }
+    paintApprovals();
     if (!attachedOnce && isAttached()) {
       attachedOnce = true;
       clearTimeout(fallbackTimer);
@@ -276,10 +333,14 @@ export function installOfficeMenuButtons(
     update(next: OfficeMenuState): void {
       state.agents = Boolean(next.agents);
       state.hud = Boolean(next.hud);
+      state.approvals = Boolean(next.approvals);
+      state.pendingApprovals = Math.max(
+        0, Math.floor(Number(next.pendingApprovals ?? 0) || 0));
       for (const spec of MENU_BUTTONS) {
         const button = byId[spec.id];
         if (button) button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
       }
+      paintApprovals();
     },
     attached(): boolean {
       return isAttached();

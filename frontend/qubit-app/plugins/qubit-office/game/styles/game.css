@@ -1552,3 +1552,218 @@
   gap: var(--office-s2);
   align-items: center;
 }
+
+/* -------------------------------------------------------------------------
+   APPROVALS (shared journal)
+   The pending records the CLI/voice/banner settle, in the same shell dock
+   system as Agents/HUD/War Room. It is an exclusive right-hand sheet so it
+   can never cover another dock; the injected menu icon carries a live count
+   badge. Nothing here styles the vendored Habblaud document.
+   ------------------------------------------------------------------------- */
+.office-game__dock.office-game__approvalsDock {
+  right: 0;
+  left: auto;
+}
+
+.office-game__approvalsCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--office-accent);
+  color: var(--office-void);
+  font-size: var(--office-fs-xs);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.office-game .approvals-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--office-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+}
+
+.approvals-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--office-s2);
+  border-bottom: var(--office-border);
+  padding-bottom: var(--office-s2);
+}
+
+.approvals-panel__title {
+  margin: 0;
+  flex: 1 1 auto;
+  font-size: var(--office-fs-md);
+  font-weight: 600;
+}
+
+.approvals-panel__count {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  white-space: nowrap;
+}
+
+.approvals-panel__closeRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.approvals-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+}
+
+.approvals-panel__row {
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  padding: var(--office-s2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: color-mix(in srgb, var(--office-plate) 22%, transparent);
+}
+
+.approvals-panel__summary {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s1) var(--office-s2);
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.approvals-panel__tool {
+  color: var(--office-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__chip {
+  display: inline-flex;
+  gap: 2px;
+  padding: 1px 6px;
+  border: var(--office-border);
+  border-radius: 999px;
+  font-size: var(--office-fs-xs);
+}
+
+.approvals-panel__chipKey {
+  color: var(--office-muted);
+}
+
+.approvals-panel__chipValue {
+  color: var(--office-ink);
+}
+
+.approvals-panel__chip[data-testid="approval-risk"][data-value="high"],
+.approvals-panel__chip[data-testid="approval-risk"][data-value="critical"] {
+  border-color: var(--office-bad);
+  color: var(--office-bad);
+}
+
+.approvals-panel__idLine {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.approvals-panel__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--office-dim);
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+}
+
+.approvals-panel__approve {
+  border-color: var(--office-ok);
+}
+
+.approvals-panel__reject {
+  border-color: var(--office-bad);
+}
+
+.approvals-panel__empty,
+.approvals-panel__status {
+  margin: 0;
+  padding: var(--office-s3) 0;
+  color: var(--office-muted);
+}
+
+.approvals-panel__error,
+.approvals-panel__actionError {
+  border: 1px solid var(--office-bad);
+  border-radius: var(--office-radius);
+  padding: var(--office-s2);
+  color: var(--office-bad);
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__error p,
+.approvals-panel__actionError p {
+  margin: 0;
+}
+
+.approvals-panel__code {
+  margin-top: var(--office-s1);
+  font-size: var(--office-fs-xs);
+  opacity: 0.85;
+}
+
+.approvals-panel__notice {
+  margin: 0;
+  color: var(--office-ok);
+  font-size: var(--office-fs-xs);
+}
+
+/* The pending-count badge on the injected/host menu icon. */
+.office-theme-menu-btn {
+  position: relative;
+}
+
+.office-menu-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--office-bad);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.office-menu-badge[hidden] {
+  display: none;
+}
