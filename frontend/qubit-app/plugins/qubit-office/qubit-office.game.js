@@ -192418,7 +192418,7 @@ create: function(game) {
 	* seam `office-app.ts::hostBasePath` uses. A deployment behind a subpath must
 	* frame `<base>/qubit-hud`, not `/qubit-hud`.
 	*/
-	function hostBasePath$2() {
+	function hostBasePath$3() {
 		if (typeof window === "undefined") return "";
 		const raw = window.__QUBIT_BASE_PATH__;
 		if (!raw) return "";
@@ -192433,13 +192433,13 @@ create: function(game) {
 	* An explicit empty string means "served at the root" and is honoured.
 	*/
 	function hudFrameSrc(base) {
-		const raw = base === void 0 ? hostBasePath$2() : base;
+		const raw = base === void 0 ? hostBasePath$3() : base;
 		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${HUD_PATH}`;
 	}
 	/** The dock's body: the framed HUD, with its refusals named. */
 	function createHudDock(args) {
 		const { React: R, hooks, base } = args;
-		const src = hudFrameSrc(base ?? hostBasePath$2());
+		const src = hudFrameSrc(base ?? hostBasePath$3());
 		return function HudDock() {
 			const [loaded, setLoaded] = hooks.useState(false);
 			const note = (id, text) => R.createElement("div", {
@@ -192505,14 +192505,14 @@ create: function(game) {
 	* into index.html (`window.__QUBIT_BASE_PATH__`) is the same seam the dashboard
 	* itself uses, so there is one source of truth for the base, not two.
 	*/
-	function hostBasePath$1() {
+	function hostBasePath$2() {
 		if (typeof window === "undefined") return "";
 		const raw = window.__QUBIT_BASE_PATH__;
 		if (!raw) return "";
 		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
 	}
 	function officeAppSrc(opts = {}) {
-		const url = officeAppUrl(opts.base ?? hostBasePath$1());
+		const url = officeAppUrl(opts.base ?? hostBasePath$2());
 		const query = new URLSearchParams();
 		if (opts.mock) query.set("mock", "1");
 		const theme = String(opts.theme ?? "").trim();
@@ -193004,7 +193004,7 @@ create: function(game) {
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/agents-panel.ts
 	/** The Office API prefix: the server serves the compat family under `/agent`. */
-	var API_PREFIX = "/agent";
+	var API_PREFIX$1 = "/agent";
 	/**
 	* The panel's route. Named after the resource it reads (`agents/panel`), so it
 	* sits under the office family the api-bridge already owns and cannot be
@@ -193018,14 +193018,14 @@ create: function(game) {
 	* id) adds nothing, keeping the classic request byte-identical to before.
 	*/
 	function agentsPanelUrl(base, theme) {
-		const raw = base === void 0 ? hostBasePath() : base;
-		const url = `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${AGENTS_PANEL_PATH}`;
+		const raw = base === void 0 ? hostBasePath$1() : base;
+		const url = `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX$1}${AGENTS_PANEL_PATH}`;
 		const id = String(theme ?? "").trim();
 		if (!id || id === "classic") return url;
 		return `${url}?theme=${encodeURIComponent(id)}`;
 	}
 	/** The dashboard's base path, from the host's injected global (may be absent). */
-	function hostBasePath() {
+	function hostBasePath$1() {
 		if (typeof window === "undefined") return "";
 		const raw = window.__QUBIT_BASE_PATH__;
 		if (!raw) return "";
@@ -193226,7 +193226,7 @@ create: function(game) {
 	}
 	/** Prefix a root-relative URL with the dashboard base (subpath deployments). */
 	function withHostBase(url) {
-		const base = hostBasePath$1();
+		const base = hostBasePath$2();
 		if (!url || !base || !url.startsWith("/")) return url;
 		if (url === base || url.startsWith(`${base}/`)) return url;
 		return `${base}${url}`;
@@ -193273,7 +193273,7 @@ create: function(game) {
 	}
 	/** Normalise a dashboard base path the same way `office-app.ts` does. */
 	function themeBase(base) {
-		const raw = base === void 0 ? hostBasePath$1() : base;
+		const raw = base === void 0 ? hostBasePath$2() : base;
 		return raw.endsWith("/") ? raw.slice(0, -1) : raw;
 	}
 	/** Read the document's injected session token (or the parent's, in an app). */
@@ -193449,8 +193449,11 @@ create: function(game) {
 			"data-seat-slug": seat.slug,
 			"data-seat-type": seat.seat_type,
 			"aria-current": active ? "true" : void 0,
-			onMouseEnter: () => interaction.onActivate(seat.slug),
-			onClick: () => interaction.onActivate(seat.slug)
+			onMouseEnter: () => interaction.onActivate(seat),
+			onClick: () => {
+				interaction.onActivate(seat);
+				interaction.onOpenAgent?.(seat);
+			}
 		}, [
 			R.createElement("span", {
 				key: "a",
@@ -193651,7 +193654,8 @@ create: function(game) {
 			};
 			const interaction = {
 				activeSlug: activeSeat ? activeSeat.slug : null,
-				onActivate: (slug) => setActiveSlug(slug),
+				onActivate: (seat) => setActiveSlug(seat.slug),
+				onOpenAgent: props.onOpenAgent,
 				rowId
 			};
 			return R.createElement("div", {
@@ -193676,6 +193680,1208 @@ create: function(game) {
 					"data-testid": "agents-panel-types"
 				}, Object.entries(counts.seat_types).map(([type, n]) => `${n} ${seatTypeLabel(type).toLowerCase()}`).join(" · ")) : null
 			]);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/business-api.ts
+	/** The compat family prefix (the SPA reaches it under `/agent`). */
+	var API_PREFIX = "/agent";
+	var BUSINESS_PATH = "/api/office/business";
+	var BusinessApiError = class extends Error {
+		code;
+		status;
+		body;
+		constructor(message, code, status, body = null) {
+			super(message);
+			this.name = "BusinessApiError";
+			this.code = code;
+			this.status = status;
+			this.body = body;
+		}
+	};
+	function hostBasePath() {
+		if (typeof window === "undefined") return "";
+		const raw = window.__QUBIT_BASE_PATH__;
+		if (!raw) return "";
+		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
+	}
+	/** Build a Business OS URL, rebased onto the dashboard's base path. */
+	function businessUrl(path, base, query) {
+		const raw = base === void 0 ? hostBasePath() : base;
+		let url = `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${BUSINESS_PATH}${path.startsWith("/") ? path : `/${path}`}`;
+		const params = new URLSearchParams();
+		for (const [key, value] of Object.entries(query ?? {})) if (value !== void 0 && value !== null && String(value) !== "") params.set(key, String(value));
+		const suffix = params.toString();
+		return suffix ? `${url}?${suffix}` : url;
+	}
+	/** A fresh idempotency key for one user action (double-click safe). */
+	function newIdempotencyKey(action) {
+		return `ui:${action}:${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
+	}
+	/** Fetch one Business OS route and return its `ok:true` payload.
+	*
+	* Throws `BusinessApiError` for an auth failure, a non-JSON body, a typed
+	* refusal, or any HTTP failure. The panel decides what to render; nothing here
+	* converts an error into an empty/successful state.
+	*/
+	async function businessFetch(path, opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		const method = opts.method ?? "GET";
+		const url = businessUrl(path, opts.base, opts.query);
+		const headers = { Accept: "application/json" };
+		const token = readToken(opts.win);
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		const init = {
+			method,
+			headers,
+			credentials: "same-origin",
+			signal: opts.signal
+		};
+		if (method === "POST") {
+			headers["Content-Type"] = "application/json";
+			const body = { ...opts.body ?? {} };
+			if (body.owner === void 0) body.owner = true;
+			init.body = JSON.stringify(body);
+		}
+		let res;
+		try {
+			res = await f(url, init);
+		} catch (err) {
+			throw new BusinessApiError(`The Business OS could not be reached: ${err instanceof Error ? err.message : String(err)}`, "BUSINESS_UNREACHABLE", 0);
+		}
+		const parsed = await res.json().catch(() => null);
+		if (res.status === 401) throw new BusinessApiError("The Business OS refused the request (HTTP 401); the office session token was not accepted. Reload the page to refresh it.", "BUSINESS_UNAUTHORIZED", 401, parsed);
+		if (!parsed || typeof parsed !== "object") throw new BusinessApiError(`The Business OS answered HTTP ${res.status} with no JSON body.`, "BUSINESS_BAD_RESPONSE", res.status);
+		if (!res.ok || parsed.ok !== true) {
+			const code = String(parsed.code || `BUSINESS_HTTP_${res.status}`);
+			throw new BusinessApiError(String(parsed.detail || parsed.explanation || `HTTP ${res.status}`), code, res.status, parsed);
+		}
+		return parsed;
+	}
+	var fetchOverview = (opts = {}) => businessFetch("/overview", opts);
+	var fetchDirectory = (opts = {}) => businessFetch("/directory", opts);
+	var fetchWarRoomSessions = (query = {}, opts = {}) => businessFetch("/warroom/sessions", {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var fetchWarRoomBundle = (sessionId, query = {}, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}`, {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var fetchAgents = (query = {}, opts = {}) => businessFetch("/agents", {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var fetchAgent = (agentId, query = {}, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}`, {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var createWarRoomSession = (body, opts = {}) => businessFetch("/warroom/sessions", {
+		...opts,
+		method: "POST",
+		body
+	});
+	var addWarRoomSource = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/sources`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var addWarRoomEvidence = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/evidence`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var recordWarRoomDecision = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/decisions`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var createWarRoomTasks = (sessionId, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/tasks`, {
+		...opts,
+		method: "POST",
+		body: {}
+	});
+	var pauseAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/pause`, {
+		...opts,
+		method: "POST"
+	});
+	var resumeAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/resume`, {
+		...opts,
+		method: "POST"
+	});
+	var stopAgent = (agentId, body = {}, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/stop`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var takeoverAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/takeover`, {
+		...opts,
+		method: "POST"
+	});
+	var revokeAgent = (agentId, scopes, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/revoke`, {
+		...opts,
+		method: "POST",
+		body: { scopes }
+	});
+	var archiveAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/archive`, {
+		...opts,
+		method: "POST"
+	});
+	// ../qubit-app/plugins/qubit-office/game/app/agent-control.ts
+	function matchAgentToSeat(agents, seat) {
+		if (!seat) return null;
+		const slug = (seat.slug || "").trim();
+		const name = (seat.name || "").trim().toLowerCase();
+		for (const agent of agents) {
+			const meta = agent.metadata || {};
+			const linked = [
+				meta.office_seat_slug,
+				meta.seat_slug,
+				meta.office_slug
+			].map((value) => String(value ?? "").trim()).filter(Boolean);
+			if (slug && linked.includes(slug)) return agent;
+			if (slug && (agent.desk || "").trim() === slug) return agent;
+		}
+		for (const agent of agents) if (name && (agent.display_name || "").trim().toLowerCase() === name) return agent;
+		return null;
+	}
+	function formatMinor(value) {
+		const minor = Number(value);
+		if (!Number.isFinite(minor)) return "unset";
+		return `$${(minor / 100).toFixed(2)}`;
+	}
+	function budgetSummary(agent) {
+		if (!agent) return "";
+		const safety = agent.safety;
+		return `${formatMinor(safety.daily_spend_minor)}/day · ${formatMinor(safety.monthly_spend_minor)}/month · ${formatMinor(safety.per_action_limit_minor)}/action`;
+	}
+	function rateSummary(agent) {
+		if (!agent) return "";
+		const safety = agent.safety;
+		return `${safety.rate_limit_per_minute}/min · ${safety.max_turns_per_day} turns/day · ${safety.max_tokens_per_turn} tokens/turn`;
+	}
+	function autonomyLabel(level) {
+		switch (String(level || "").toUpperCase()) {
+			case "L0": return "L0 — observe only";
+			case "L1": return "L1 — draft, no action";
+			case "L2": return "L2 — act within budgets";
+			case "L3": return "L3 — act, approval for risky";
+			case "L4": return "L4 — act, approval for spend/legal";
+			case "L5": return "L5 — full, owner-audited";
+			default: return level ? String(level) : "unset";
+		}
+	}
+	function permissionRows(agent) {
+		if (!agent) return [];
+		return Object.entries(agent.permissions || {}).map(([category, scopes]) => [category, Array.isArray(scopes) ? scopes : []]).sort(([a], [b]) => a.localeCompare(b));
+	}
+	function permissionSummary(agent) {
+		const rows = permissionRows(agent).filter(([, scopes]) => scopes.length > 0);
+		if (!rows.length) return "deny by default (no scopes granted)";
+		return rows.map(([category, scopes]) => `${category}: ${scopes.length}`).join(" · ");
+	}
+	function scheduleSummary(agent) {
+		if (!agent) return "";
+		return `${agent.schedule || "manual"} (${agent.timezone || "UTC"})`;
+	}
+	function canPause(agent) {
+		return Boolean(agent && agent.status === "active");
+	}
+	function canResume(agent) {
+		return Boolean(agent && agent.status === "paused");
+	}
+	function canRevoke(agent) {
+		return Boolean(agent && agent.status !== "archived");
+	}
+	function canArchive(agent) {
+		return Boolean(agent && agent.status !== "archived");
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/AgentControlDrawer.tsx
+	function errText$1(exc) {
+		if (exc instanceof BusinessApiError) return {
+			message: exc.message,
+			code: exc.code
+		};
+		return { message: exc instanceof Error ? exc.message : String(exc) };
+	}
+	function section$1(R, title, key, children) {
+		return R.createElement("section", {
+			key,
+			className: "agent-control__section",
+			"data-testid": `agent-control-section-${key}`
+		}, [R.createElement("h4", {
+			key: "h",
+			className: "agent-control__sectionTitle"
+		}, title), ...children]);
+	}
+	function kv(R, label, value, key) {
+		return R.createElement("div", {
+			key,
+			className: "agent-control__kv",
+			"data-testid": `agent-control-${key}`
+		}, [R.createElement("span", {
+			key: "l",
+			className: "agent-control__k"
+		}, label), R.createElement("span", {
+			key: "v",
+			className: "agent-control__v"
+		}, value)]);
+	}
+	function auditRow(R, event, index) {
+		return R.createElement("li", {
+			key: `${event.event_id}:${index}`,
+			className: "agent-control__auditRow",
+			"data-testid": "agent-control-audit-row",
+			"data-action": event.action
+		}, [R.createElement("span", {
+			key: "a",
+			className: "agent-control__auditAction"
+		}, event.action), R.createElement("span", {
+			key: "o",
+			className: "agent-control__auditMeta"
+		}, `${event.outcome} · ${event.actor} · ${event.created_at}`)]);
+	}
+	function createAgentControlDrawer(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function AgentControlDrawer(props) {
+			const [load, setLoad] = useState({ kind: "loading" });
+			const [selectedId, setSelectedId] = useState(null);
+			const [detail, setDetail] = useState(null);
+			const [busy, setBusy] = useState(null);
+			const [notice, setNotice] = useState(null);
+			const [actionError, setActionError] = useState(null);
+			const seatSlug = props.seat?.slug ?? "";
+			const seatName = props.seat?.name ?? "";
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				const opts = {
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				};
+				(async () => {
+					try {
+						const overview = await fetchOverview(opts);
+						const tenantId = overview.default_tenant_id;
+						if (!tenantId) {
+							if (live) setLoad({
+								kind: "empty",
+								message: "The Business OS has no tenant yet. Open a War Room session to create the local Personal workspace."
+							});
+							return;
+						}
+						const businessId = overview.default_business_id;
+						const listed = await fetchAgents({
+							tenant_id: tenantId,
+							business_id: businessId ?? void 0
+						}, opts);
+						const linked = matchAgentToSeat(listed.agents, props.seat);
+						if (!live) return;
+						setLoad({
+							kind: "ready",
+							tenantId,
+							businessId,
+							agents: listed.agents,
+							linked
+						});
+						setSelectedId(linked ? linked.agent_id : null);
+					} catch (exc) {
+						if (!live) return;
+						const { message, code } = errText$1(exc);
+						setLoad({
+							kind: "error",
+							message,
+							code
+						});
+					}
+				})();
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				props.base,
+				props.fetchImpl,
+				seatSlug,
+				seatName
+			]);
+			useEffect(() => {
+				if (!selectedId || load.kind !== "ready") {
+					setDetail(null);
+					return;
+				}
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				(async () => {
+					try {
+						const next = await fetchAgent(selectedId, { tenant_id: load.tenantId }, {
+							base: props.base,
+							fetchImpl: props.fetchImpl,
+							signal: ctl?.signal
+						});
+						if (live) setDetail(next);
+					} catch (exc) {
+						if (!live) return;
+						const { message, code } = errText$1(exc);
+						setActionError(code ? `${code}: ${message}` : message);
+					}
+				})();
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				selectedId,
+				load.kind,
+				props.base,
+				props.fetchImpl,
+				load.kind === "ready" ? load.tenantId : ""
+			]);
+			const selected = detail?.agent ?? (load.kind === "ready" ? load.agents.find((a) => a.agent_id === selectedId) ?? null : null);
+			const refresh = async () => {
+				if (!selectedId || load.kind !== "ready") return;
+				const next = await fetchAgent(selectedId, { tenant_id: load.tenantId }, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				});
+				setDetail(next);
+			};
+			const run = async (label, fn) => {
+				setBusy(label);
+				setActionError(null);
+				setNotice(null);
+				try {
+					await fn();
+					await refresh();
+					setNotice(`${label} recorded by the Business OS.`);
+				} catch (exc) {
+					const { message, code } = errText$1(exc);
+					setActionError(code ? `${code}: ${message}` : message);
+				} finally {
+					setBusy(null);
+				}
+			};
+			const close = () => props.onClose?.();
+			const children = [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead office-theme-dock-head"
+			}, [R.createElement("span", {
+				key: "t",
+				className: "office-theme-dock-title"
+			}, seatName ? `Agent controls — ${seatName}` : "Agent controls"), R.createElement("button", {
+				key: "x",
+				type: "button",
+				className: "office-game__btn office-theme-dock-close",
+				"data-testid": "agent-control-close",
+				"aria-label": "Close agent controls",
+				onClick: close
+			}, "Close")])];
+			if (load.kind === "loading") children.push(R.createElement("div", {
+				key: "loading",
+				className: "agent-control__state",
+				"data-testid": "agent-control-loading",
+				role: "status"
+			}, "Loading the agent control record…"));
+			else if (load.kind === "error" || load.kind === "empty") children.push(R.createElement("div", {
+				key: "state",
+				className: "agent-control__state agent-control__state--error",
+				"data-testid": "agent-control-state",
+				role: "alert",
+				"data-code": load.kind === "error" ? load.code : void 0
+			}, load.message));
+			else if (load.agents.length === 0) children.push(R.createElement("div", {
+				key: "noagents",
+				className: "agent-control__state",
+				"data-testid": "agent-control-empty",
+				role: "status"
+			}, "No managed agents exist in the Business OS yet. The office roster is not a control record; create an agent through the Business OS service before controlling one here."));
+			else if (!selected) {
+				children.push(R.createElement("div", {
+					key: "unlinked",
+					className: "agent-control__state",
+					"data-testid": "agent-control-unlinked",
+					role: "status"
+				}, "This office seat has no linked Business OS agent. Choose a managed agent below; nothing is linked automatically."));
+				children.push(R.createElement("label", {
+					key: "picker",
+					className: "agent-control__picker"
+				}, "Managed agent", R.createElement("select", {
+					key: "select",
+					"data-testid": "agent-control-picker",
+					value: selectedId ?? "",
+					onChange: (event) => setSelectedId(event.target.value || null)
+				}, [R.createElement("option", {
+					key: "",
+					value: ""
+				}, "Choose…"), ...load.agents.map((agent) => R.createElement("option", {
+					key: agent.agent_id,
+					value: agent.agent_id
+				}, `${agent.display_name} — ${agent.role_id} (${agent.status})`))])));
+			}
+			if (selected) {
+				const identity = [
+					kv(R, "Role", `${selected.role_id} · ${selected.department}`, "role"),
+					kv(R, "Room", selected.room || "unassigned", "room"),
+					kv(R, "Desk", selected.desk || "unassigned", "desk"),
+					kv(R, "Status", selected.status, "status"),
+					kv(R, "Revision", String(selected.revision), "revision")
+				];
+				children.push(section$1(R, "Identity", "identity", identity));
+				children.push(section$1(R, "Brain", "brain", [
+					kv(R, "Provider", selected.provider || "unset", "provider"),
+					kv(R, "Model", selected.model || "unset", "model"),
+					kv(R, "Reasoning", selected.reasoning_effort || "unset", "reasoning"),
+					kv(R, "Fallback", selected.fallback_provider && selected.fallback_model ? `${selected.fallback_provider} / ${selected.fallback_model}` : "none", "fallback"),
+					kv(R, "Max tokens", String(selected.max_tokens), "max-tokens")
+				]));
+				const permRows = permissionRows(selected).map(([category, scopes]) => kv(R, category, scopes.length ? scopes.join(", ") : "deny", `perm-${category}`));
+				children.push(section$1(R, "Permissions", "permissions", [R.createElement("p", {
+					key: "summary",
+					className: "agent-control__muted",
+					"data-testid": "agent-control-permission-summary"
+				}, permissionSummary(selected)), ...permRows]));
+				children.push(section$1(R, "Limits", "limits", [
+					kv(R, "Spend", budgetSummary(selected), "budget"),
+					kv(R, "Rate", rateSummary(selected), "rate"),
+					kv(R, "Approvals", selected.safety.approval_required.join(", ") || "none", "approvals"),
+					kv(R, "Escalation", selected.safety.escalation_target, "escalation")
+				]));
+				children.push(section$1(R, "Autonomy & schedule", "autonomy", [
+					kv(R, "Autonomy", autonomyLabel(selected.safety.autonomy), "autonomy-level"),
+					kv(R, "Schedule", scheduleSummary(selected), "schedule"),
+					kv(R, "Concurrent turns", String(selected.max_concurrent_turns), "concurrency")
+				]));
+				children.push(section$1(R, "Audit", "audit", [R.createElement("ul", {
+					key: "rows",
+					className: "agent-control__audit",
+					"data-testid": "agent-control-audit"
+				}, (detail?.audit ?? []).map((event, index) => auditRow(R, event, index)))]));
+				const buttons = [];
+				if (canPause(selected)) buttons.push(R.createElement("button", {
+					key: "pause",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "agent-control-pause",
+					disabled: busy !== null,
+					onClick: () => run("Pause", () => pauseAgent(selected.agent_id, {
+						base: props.base,
+						fetchImpl: props.fetchImpl
+					}))
+				}, "Pause"));
+				if (canResume(selected)) buttons.push(R.createElement("button", {
+					key: "resume",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "agent-control-resume",
+					disabled: busy !== null,
+					onClick: () => run("Resume", () => resumeAgent(selected.agent_id, {
+						base: props.base,
+						fetchImpl: props.fetchImpl
+					}))
+				}, "Resume"));
+				buttons.push(R.createElement("button", {
+					key: "stop",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "agent-control-stop",
+					disabled: busy !== null,
+					onClick: () => run("Stop", () => stopAgent(selected.agent_id, {}, {
+						base: props.base,
+						fetchImpl: props.fetchImpl
+					}))
+				}, "Stop turn"));
+				buttons.push(R.createElement("button", {
+					key: "takeover",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "agent-control-takeover",
+					disabled: busy !== null,
+					onClick: () => run("Takeover", () => takeoverAgent(selected.agent_id, {
+						base: props.base,
+						fetchImpl: props.fetchImpl
+					}))
+				}, "Take over"));
+				if (canRevoke(selected)) buttons.push(R.createElement("button", {
+					key: "revoke",
+					type: "button",
+					className: "office-game__btn agent-control__danger",
+					"data-testid": "agent-control-revoke",
+					disabled: busy !== null,
+					onClick: () => run("Revoke", () => revokeAgent(selected.agent_id, void 0, {
+						base: props.base,
+						fetchImpl: props.fetchImpl
+					}))
+				}, "Revoke all scopes"));
+				if (canArchive(selected)) buttons.push(R.createElement("button", {
+					key: "archive",
+					type: "button",
+					className: "office-game__btn agent-control__danger",
+					"data-testid": "agent-control-archive",
+					disabled: busy !== null,
+					onClick: () => run("Archive", () => archiveAgent(selected.agent_id, {
+						base: props.base,
+						fetchImpl: props.fetchImpl
+					}))
+				}, "Archive"));
+				children.push(R.createElement("div", {
+					key: "actions",
+					className: "agent-control__actions",
+					"data-testid": "agent-control-actions"
+				}, buttons));
+			}
+			if (busy) children.push(R.createElement("div", {
+				key: "busy",
+				className: "agent-control__state",
+				"data-testid": "agent-control-busy",
+				role: "status"
+			}, `${busy}…`));
+			if (actionError) children.push(R.createElement("div", {
+				key: "error",
+				className: "agent-control__state agent-control__state--error",
+				"data-testid": "agent-control-error",
+				role: "alert"
+			}, actionError));
+			if (notice) children.push(R.createElement("div", {
+				key: "notice",
+				className: "agent-control__state",
+				"data-testid": "agent-control-notice",
+				role: "status"
+			}, notice));
+			return R.createElement("div", {
+				className: "agent-control",
+				"data-testid": "agent-control",
+				"data-state": load.kind,
+				"data-seat-slug": seatSlug || void 0
+			}, children);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/WarRoomPanel.tsx
+	function errText(exc) {
+		if (exc instanceof BusinessApiError) return {
+			message: exc.message,
+			code: exc.code
+		};
+		return { message: exc instanceof Error ? exc.message : String(exc) };
+	}
+	var LABEL_COLORS = {
+		FACT: "#4ade80",
+		INFERENCE: "#60a5fa",
+		ASSUMPTION: "#facc15",
+		UNKNOWN: "#a1a1aa"
+	};
+	function chip(R, text, key, color) {
+		return R.createElement("span", {
+			key,
+			className: "warroom__chip",
+			"data-testid": "warroom-chip",
+			style: color ? {
+				borderColor: color,
+				color
+			} : void 0
+		}, text);
+	}
+	function section(R, id, title, children) {
+		return R.createElement("section", {
+			key: id,
+			className: "warroom__section",
+			"data-testid": `warroom-section-${id}`
+		}, [R.createElement("h4", {
+			key: "h",
+			className: "warroom__sectionTitle"
+		}, title), ...children]);
+	}
+	function input(R, key, props) {
+		return R.createElement("input", {
+			key,
+			className: "warroom__input",
+			autoComplete: "off",
+			...props
+		});
+	}
+	function createWarRoomPanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function WarRoomPanel(props) {
+			const [tab, setTab] = useState("idea");
+			const [load, setLoad] = useState({ kind: "loading" });
+			const [selectedId, setSelectedId] = useState(props.sessionId ?? null);
+			const [bundle, setBundle] = useState(null);
+			const [directory, setDirectory] = useState(null);
+			const [title, setTitle] = useState("");
+			const [sourceKind, setSourceKind] = useState("note");
+			const [sourceLocator, setSourceLocator] = useState("");
+			const [evidenceLabel, setEvidenceLabel] = useState("INFERENCE");
+			const [evidenceClaim, setEvidenceClaim] = useState("");
+			const [evidenceSource, setEvidenceSource] = useState("");
+			const [decisionNote, setDecisionNote] = useState("");
+			const [busy, setBusy] = useState(null);
+			const [notice, setNotice] = useState(null);
+			const [error, setError] = useState(null);
+			const opts = {
+				base: props.base,
+				fetchImpl: props.fetchImpl
+			};
+			const loadSessions = async (tenantId, businessId) => {
+				return (await fetchWarRoomSessions({
+					tenant_id: tenantId,
+					business_id: businessId ?? void 0
+				}, opts)).sessions;
+			};
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				(async () => {
+					try {
+						const overview = await fetchOverview({
+							...opts,
+							signal: ctl?.signal
+						});
+						const tenantId = overview.default_tenant_id;
+						if (!tenantId) {
+							if (live) setLoad({
+								kind: "empty",
+								message: "No Business OS tenant yet. Opening the first idea creates the local Personal workspace."
+							});
+							return;
+						}
+						const businessId = overview.default_business_id;
+						const sessions = await loadSessions(tenantId, businessId);
+						if (!live) return;
+						setLoad({
+							kind: "ready",
+							overview,
+							sessions,
+							tenantId,
+							businessId
+						});
+						setSelectedId((current) => current ?? sessions[0]?.session_id ?? null);
+					} catch (exc) {
+						if (!live) return;
+						const { message, code } = errText(exc);
+						setLoad({
+							kind: "error",
+							message,
+							code
+						});
+					}
+				})();
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [props.base, props.fetchImpl]);
+			useEffect(() => {
+				if (tab !== "directory" || directory) return;
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				(async () => {
+					try {
+						const next = await fetchDirectory({
+							...opts,
+							signal: ctl?.signal
+						});
+						if (live) setDirectory(next);
+					} catch (exc) {
+						if (!live) return;
+						const { message, code } = errText(exc);
+						setError(code ? `${code}: ${message}` : message);
+					}
+				})();
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				tab,
+				directory,
+				props.base,
+				props.fetchImpl
+			]);
+			useEffect(() => {
+				if (!selectedId || load.kind !== "ready") {
+					setBundle(null);
+					return;
+				}
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				(async () => {
+					try {
+						const next = await fetchWarRoomBundle(selectedId, { tenant_id: load.tenantId }, {
+							...opts,
+							signal: ctl?.signal
+						});
+						if (live) setBundle(next);
+					} catch (exc) {
+						if (!live) return;
+						const { message, code } = errText(exc);
+						setError(code ? `${code}: ${message}` : message);
+					}
+				})();
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				selectedId,
+				load.kind,
+				props.base,
+				props.fetchImpl,
+				load.kind === "ready" ? load.tenantId : ""
+			]);
+			const run = async (label, fn) => {
+				setBusy(label);
+				setError(null);
+				setNotice(null);
+				try {
+					await fn();
+					const overview = await fetchOverview(opts);
+					const tenantId = overview.default_tenant_id;
+					if (!tenantId) {
+						setLoad({
+							kind: "empty",
+							message: "No Business OS tenant yet. Opening the first idea creates the local Personal workspace."
+						});
+						setNotice(`${label} recorded.`);
+						return;
+					}
+					const businessId = overview.default_business_id;
+					const sessions = await loadSessions(tenantId, businessId);
+					setLoad({
+						kind: "ready",
+						overview,
+						sessions,
+						tenantId,
+						businessId
+					});
+					const nextSelected = selectedId ?? sessions[0]?.session_id ?? null;
+					if (nextSelected) {
+						setSelectedId(nextSelected);
+						setBundle(await fetchWarRoomBundle(nextSelected, { tenant_id: tenantId }, opts));
+					}
+					setNotice(`${label} recorded.`);
+				} catch (exc) {
+					const { message, code } = errText(exc);
+					setError(code ? `${code}: ${message}` : message);
+				} finally {
+					setBusy(null);
+				}
+			};
+			const children = [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead office-theme-dock-head"
+			}, [R.createElement("span", {
+				key: "t",
+				className: "office-theme-dock-title"
+			}, "War Room / Idea Lab"), R.createElement("button", {
+				key: "x",
+				type: "button",
+				className: "office-game__btn office-theme-dock-close",
+				"data-testid": "warroom-close",
+				"aria-label": "Close War Room",
+				onClick: () => props.onClose?.()
+			}, "Close")])];
+			children.push(R.createElement("div", {
+				key: "tabs",
+				className: "warroom__tabs",
+				role: "tablist"
+			}, [R.createElement("button", {
+				key: "idea",
+				type: "button",
+				role: "tab",
+				"aria-selected": tab === "idea" ? "true" : "false",
+				"data-testid": "warroom-tab-idea",
+				className: "warroom__tab" + (tab === "idea" ? " is-active" : ""),
+				onClick: () => setTab("idea")
+			}, "Idea Lab"), R.createElement("button", {
+				key: "directory",
+				type: "button",
+				role: "tab",
+				"aria-selected": tab === "directory" ? "true" : "false",
+				"data-testid": "warroom-tab-directory",
+				className: "warroom__tab" + (tab === "directory" ? " is-active" : ""),
+				onClick: () => setTab("directory")
+			}, "Roles & floors")]));
+			if (tab === "directory") {
+				if (!directory) children.push(R.createElement("div", {
+					key: "dloading",
+					className: "warroom__state",
+					"data-testid": "warroom-directory-loading",
+					role: "status"
+				}, "Loading the role/floor catalog…"));
+				else {
+					children.push(R.createElement("div", {
+						key: "dcounts",
+						className: "warroom__counts",
+						"data-testid": "warroom-directory-counts"
+					}, `${directory.counts.departments} departments · ${directory.counts.roles} roles · ${directory.counts.floors} floors (${directory.counts.active_floors} active / ${directory.counts.dormant_floors} dormant) · ${directory.counts.wings} wings`));
+					children.push(section(R, "departments", "Departments", [R.createElement("ul", {
+						key: "list",
+						className: "warroom__list",
+						"data-testid": "warroom-departments"
+					}, directory.departments.map((dept) => R.createElement("li", {
+						key: dept.id,
+						"data-testid": "warroom-department",
+						"data-department": dept.id
+					}, [R.createElement("strong", { key: "t" }, dept.title), R.createElement("span", {
+						key: "m",
+						className: "warroom__muted"
+					}, ` ${dept.id} · ${dept.service_lines.length} service lines`)])))]));
+					children.push(section(R, "roles", "Role templates", [R.createElement("ul", {
+						key: "list",
+						className: "warroom__list warroom__list--scroll",
+						"data-testid": "warroom-roles"
+					}, directory.roles.map((role) => R.createElement("li", {
+						key: role.id,
+						"data-testid": "warroom-role",
+						"data-role": role.id
+					}, [R.createElement("strong", { key: "t" }, role.title), R.createElement("span", {
+						key: "m",
+						className: "warroom__muted"
+					}, ` · ${role.department} · ${role.autonomy} · ${role.model.provider_hint || "provider?"}/${role.model.model_hint || "model?"}`)])))]));
+					children.push(section(R, "floors", "Floors & wings", [R.createElement("ul", {
+						key: "list",
+						className: "warroom__list warroom__list--scroll",
+						"data-testid": "warroom-floors"
+					}, directory.floors.map((floor) => R.createElement("li", {
+						key: floor.floor_id,
+						"data-testid": "warroom-floor",
+						"data-floor": floor.floor_id,
+						"data-active": floor.active_by_default ? "true" : "false"
+					}, [R.createElement("strong", { key: "t" }, `Floor ${floor.index} — ${floor.name}`), R.createElement("span", {
+						key: "m",
+						className: "warroom__muted"
+					}, ` · ${floor.wing} · ${floor.room_count} rooms · ${floor.desk_capacity} desks · ${floor.active_by_default ? "active" : "dormant"}`)])))]));
+				}
+			} else if (load.kind === "loading") children.push(R.createElement("div", {
+				key: "loading",
+				className: "warroom__state",
+				"data-testid": "warroom-loading",
+				role: "status"
+			}, "Loading War Room sessions…"));
+			else if (load.kind === "error") children.push(R.createElement("div", {
+				key: "state",
+				className: "warroom__state warroom__state--error",
+				"data-testid": "warroom-state",
+				role: "alert",
+				"data-code": load.code
+			}, load.code ? `${load.code}: ${load.message}` : load.message));
+			else {
+				if (load.kind === "empty") children.push(R.createElement("div", {
+					key: "empty",
+					className: "warroom__state",
+					"data-testid": "warroom-empty",
+					role: "status"
+				}, load.message));
+				else if (!load.sessions.length) children.push(R.createElement("div", {
+					key: "empty",
+					className: "warroom__state",
+					"data-testid": "warroom-empty",
+					role: "status"
+				}, "No War Room sessions yet. Open one below to record intake."));
+				else children.push(R.createElement("label", {
+					key: "picker",
+					className: "warroom__picker"
+				}, "Session", R.createElement("select", {
+					key: "s",
+					"data-testid": "warroom-session-picker",
+					value: selectedId ?? "",
+					onChange: (event) => setSelectedId(event.target.value || null)
+				}, load.sessions.map((session) => R.createElement("option", {
+					key: session.session_id,
+					value: session.session_id
+				}, `${session.title} — ${session.state}`)))));
+				children.push(section(R, "new", "New idea", [R.createElement("div", {
+					key: "row",
+					className: "warroom__row"
+				}, [input(R, "title", {
+					"data-testid": "warroom-new-title",
+					placeholder: "Idea title",
+					value: title,
+					onInput: (event) => setTitle(event.target.value)
+				}), R.createElement("button", {
+					key: "create",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "warroom-new-create",
+					disabled: busy !== null || !title.trim(),
+					onClick: () => run("Idea", async () => {
+						const created = await createWarRoomSession({
+							title: title.trim(),
+							tenant_id: load.kind === "ready" ? load.tenantId : void 0,
+							business_id: load.kind === "ready" ? load.businessId ?? void 0 : void 0,
+							idempotency_key: newIdempotencyKey("warroom.create")
+						}, opts);
+						setTitle("");
+						setSelectedId(created.session.session_id);
+					})
+				}, "Open session")])]));
+				if (bundle) {
+					const session = bundle.session;
+					children.push(R.createElement("div", {
+						key: "sessionHead",
+						className: "warroom__sessionHead",
+						"data-testid": "warroom-session-head",
+						"data-session-state": session.state
+					}, [
+						R.createElement("strong", { key: "t" }, session.title),
+						chip(R, session.state, "state"),
+						R.createElement("span", {
+							key: "id",
+							className: "warroom__muted"
+						}, session.session_id)
+					]));
+					children.push(section(R, "sources", "Sources", [R.createElement("ul", {
+						key: "list",
+						className: "warroom__list",
+						"data-testid": "warroom-sources"
+					}, bundle.sources.map((source) => R.createElement("li", {
+						key: source.source_id,
+						"data-testid": "warroom-source",
+						"data-source-kind": source.kind,
+						"data-status": source.status
+					}, [
+						R.createElement("strong", { key: "k" }, source.kind),
+						R.createElement("span", { key: "l" }, ` ${source.locator}`),
+						chip(R, source.status, "s")
+					]))), R.createElement("div", {
+						key: "row",
+						className: "warroom__row"
+					}, [
+						R.createElement("select", {
+							key: "kind",
+							"data-testid": "warroom-source-kind",
+							value: sourceKind,
+							onChange: (event) => setSourceKind(event.target.value)
+						}, [
+							"note",
+							"url",
+							"youtube",
+							"document",
+							"image",
+							"text"
+						].map((kind) => R.createElement("option", {
+							key: kind,
+							value: kind
+						}, kind))),
+						input(R, "locator", {
+							"data-testid": "warroom-source-locator",
+							placeholder: "URL, note or document text",
+							value: sourceLocator,
+							onInput: (event) => setSourceLocator(event.target.value)
+						}),
+						R.createElement("button", {
+							key: "add",
+							type: "button",
+							className: "office-game__btn",
+							"data-testid": "warroom-source-add",
+							disabled: busy !== null || !sourceLocator.trim(),
+							onClick: () => run("Source", async () => {
+								await addWarRoomSource(session.session_id, {
+									kind: sourceKind,
+									locator: sourceLocator.trim()
+								}, opts);
+								setSourceLocator("");
+							})
+						}, "Add source")
+					])]));
+					children.push(section(R, "evidence", "Evidence", [R.createElement("ul", {
+						key: "list",
+						className: "warroom__list",
+						"data-testid": "warroom-evidence"
+					}, bundle.evidence.map((item) => R.createElement("li", {
+						key: item.evidence_id,
+						"data-testid": "warroom-evidence-item",
+						"data-label": item.label
+					}, [
+						chip(R, item.label, "c", LABEL_COLORS[item.label]),
+						R.createElement("span", { key: "t" }, ` ${item.claim}`),
+						item.source_id ? R.createElement("span", {
+							key: "src",
+							className: "warroom__muted"
+						}, ` (source ${item.source_id})`) : null
+					]))), R.createElement("div", {
+						key: "row",
+						className: "warroom__row"
+					}, [
+						R.createElement("select", {
+							key: "label",
+							"data-testid": "warroom-evidence-label",
+							value: evidenceLabel,
+							onChange: (event) => setEvidenceLabel(event.target.value)
+						}, [
+							"FACT",
+							"INFERENCE",
+							"ASSUMPTION",
+							"UNKNOWN"
+						].map((label) => R.createElement("option", {
+							key: label,
+							value: label
+						}, label))),
+						input(R, "claim", {
+							"data-testid": "warroom-evidence-claim",
+							placeholder: "Claim",
+							value: evidenceClaim,
+							onInput: (event) => setEvidenceClaim(event.target.value)
+						}),
+						R.createElement("select", {
+							key: "source",
+							"data-testid": "warroom-evidence-source",
+							value: evidenceSource,
+							onChange: (event) => setEvidenceSource(event.target.value)
+						}, [R.createElement("option", {
+							key: "",
+							value: ""
+						}, "no source"), ...bundle.sources.map((source) => R.createElement("option", {
+							key: source.source_id,
+							value: source.source_id
+						}, `${source.kind}: ${source.locator.slice(0, 40)}`))]),
+						R.createElement("button", {
+							key: "add",
+							type: "button",
+							className: "office-game__btn",
+							"data-testid": "warroom-evidence-add",
+							disabled: busy !== null || !evidenceClaim.trim(),
+							onClick: () => run("Evidence", async () => {
+								await addWarRoomEvidence(session.session_id, {
+									label: evidenceLabel,
+									claim: evidenceClaim.trim(),
+									source_id: evidenceSource || void 0
+								}, opts);
+								setEvidenceClaim("");
+							})
+						}, "Add evidence")
+					])]));
+					children.push(section(R, "debate", "Debate & dissent", [R.createElement("ul", {
+						key: "list",
+						className: "warroom__list",
+						"data-testid": "warroom-arguments"
+					}, bundle.arguments.map((argument) => R.createElement("li", {
+						key: argument.argument_id,
+						"data-testid": "warroom-argument",
+						"data-stance": argument.stance
+					}, [R.createElement("strong", { key: "r" }, `${argument.role} (${argument.stance})`), R.createElement("span", { key: "t" }, ` ${argument.text}`)]))), bundle.session.dissent.length ? R.createElement("p", {
+						key: "dissent",
+						className: "warroom__dissent",
+						"data-testid": "warroom-dissent"
+					}, `${bundle.session.dissent.length} dissenting/questioning argument${bundle.session.dissent.length === 1 ? "" : "s"} preserved.`) : null]));
+					if (bundle.session.brief && Object.keys(bundle.session.brief).length) children.push(section(R, "synthesis", "Synthesis", [R.createElement("p", {
+						key: "brief",
+						className: "warroom__brief",
+						"data-testid": "warroom-brief"
+					}, String(bundle.session.brief.idea || "Idea brief recorded")), R.createElement("p", {
+						key: "score",
+						className: "warroom__muted",
+						"data-testid": "warroom-score"
+					}, Object.entries(bundle.session.score || {}).map(([key, value]) => `${key}=${value}`).join(" · ") || "no score recorded")]));
+					const decided = bundle.decisions[bundle.decisions.length - 1];
+					children.push(section(R, "decision", "Owner decision", [
+						decided ? R.createElement("p", {
+							key: "d",
+							"data-testid": "warroom-decision",
+							"data-status": decided.status
+						}, `${decided.status} by ${decided.decided_by}` + (decided.note ? ` — ${decided.note}` : "")) : null,
+						session.state === "owner_decision" ? R.createElement("div", {
+							key: "row",
+							className: "warroom__row"
+						}, [
+							input(R, "note", {
+								"data-testid": "warroom-decision-note",
+								placeholder: "Decision note (optional)",
+								value: decisionNote,
+								onInput: (event) => setDecisionNote(event.target.value)
+							}),
+							R.createElement("button", {
+								key: "approve",
+								type: "button",
+								className: "office-game__btn",
+								"data-testid": "warroom-approve",
+								disabled: busy !== null,
+								onClick: () => run("Decision", () => recordWarRoomDecision(session.session_id, {
+									decision: "approved",
+									note: decisionNote.trim(),
+									idempotency_key: newIdempotencyKey("warroom.decision")
+								}, opts))
+							}, "Approve"),
+							R.createElement("button", {
+								key: "reject",
+								type: "button",
+								className: "office-game__btn warroom__danger",
+								"data-testid": "warroom-reject",
+								disabled: busy !== null,
+								onClick: () => run("Decision", () => recordWarRoomDecision(session.session_id, {
+									decision: "rejected",
+									note: decisionNote.trim(),
+									idempotency_key: newIdempotencyKey("warroom.decision")
+								}, opts))
+							}, "Reject")
+						]) : null,
+						session.state === "approved" ? R.createElement("button", {
+							key: "tasks",
+							type: "button",
+							className: "office-game__btn",
+							"data-testid": "warroom-create-tasks",
+							disabled: busy !== null,
+							onClick: () => run("Tasks", () => createWarRoomTasks(session.session_id, opts))
+						}, "Create approved tasks") : null
+					]));
+					children.push(section(R, "outputs", "Outputs", [R.createElement("ul", {
+						key: "tasks",
+						className: "warroom__list",
+						"data-testid": "warroom-tasks"
+					}, bundle.tasks.map((task) => R.createElement("li", {
+						key: task.task_id,
+						"data-testid": "warroom-task",
+						"data-status": task.status
+					}, [R.createElement("strong", { key: "t" }, task.title), R.createElement("span", {
+						key: "m",
+						className: "warroom__muted"
+					}, ` · ${task.status}`)]))), R.createElement("ul", {
+						key: "experiments",
+						className: "warroom__list",
+						"data-testid": "warroom-experiments"
+					}, bundle.experiments.map((experiment) => R.createElement("li", {
+						key: experiment.experiment_id,
+						"data-testid": "warroom-experiment"
+					}, [R.createElement("strong", { key: "n" }, experiment.name), R.createElement("span", {
+						key: "m",
+						className: "warroom__muted"
+					}, ` · ${experiment.status} · ${experiment.success_metric}`)])))]));
+				}
+			}
+			if (busy) children.push(R.createElement("div", {
+				key: "busy",
+				className: "warroom__state",
+				"data-testid": "warroom-busy",
+				role: "status"
+			}, `${busy}…`));
+			if (error) children.push(R.createElement("div", {
+				key: "error",
+				className: "warroom__state warroom__state--error",
+				"data-testid": "warroom-error",
+				role: "alert"
+			}, error));
+			if (notice) children.push(R.createElement("div", {
+				key: "notice",
+				className: "warroom__state",
+				"data-testid": "warroom-notice",
+				role: "status"
+			}, notice));
+			return R.createElement("div", {
+				className: "warroom",
+				"data-testid": "warroom",
+				"data-tab": tab
+			}, children);
 		};
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/office-api.ts
@@ -197956,6 +199162,8 @@ create: function(game) {
 			}),
 			AgentsPanel: createAgentsPanel(R, hooks),
 			SeatModelPanel: createSeatModelPanel(R, hooks),
+			AgentControlDrawer: createAgentControlDrawer(R, hooks),
+			WarRoomPanel: createWarRoomPanel(R, hooks),
 			LoadingScreen: createOfficeLoadingScreen(R, hooks)
 		};
 		byBase.set(cacheKey, built);
@@ -197977,8 +199185,10 @@ create: function(game) {
 			const [officeTheme, setOfficeTheme] = useState(null);
 			const [menuFallback, setMenuFallback] = useState(false);
 			const [retryToken, setRetryToken] = useState(0);
+			const [warRoomOpen, setWarRoomOpen] = useState(false);
+			const [controlSeat, setControlSeat] = useState(null);
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
 			useEffect(() => {
@@ -198019,7 +199229,10 @@ create: function(game) {
 					setMenuFallback(false);
 					menuRef.current = installOfficeMenuButtons(win, {
 						onToggleAgents: () => setAgentsOpen((v) => !v),
-						onToggleHud: () => setHudOpen((v) => !v),
+						onToggleHud: () => {
+							setControlSeat(null);
+							setHudOpen((v) => !v);
+						},
 						onFallback: (show) => setMenuFallback(show),
 						onAttach: () => setMenuFallback(false)
 					});
@@ -198173,21 +199386,71 @@ create: function(game) {
 			}, [R.createElement("div", {
 				key: "head",
 				className: "office-game__dockHead office-theme-dock-head"
-			}, [R.createElement("span", {
-				key: "t",
-				className: "office-theme-dock-title"
-			}, "Agents"), R.createElement("button", {
-				key: "x",
-				type: "button",
-				className: "office-game__btn office-theme-dock-close",
-				"data-testid": "office-game-agents-close",
-				"aria-label": "Close agents",
-				"data-office-slice": buttonSlice,
-				onClick: () => setAgentsOpen(false)
-			}, "Close")]), R.createElement(AgentsPanel, {
+			}, [
+				R.createElement("span", {
+					key: "t",
+					className: "office-theme-dock-title"
+				}, "Agents"),
+				R.createElement("button", {
+					key: "warroom",
+					type: "button",
+					className: "office-game__btn office-theme-dock-link",
+					"data-testid": "office-game-warroom-open",
+					"aria-label": "Open War Room and role directory",
+					"data-office-slice": buttonSlice,
+					onClick: () => {
+						setAgentsOpen(false);
+						setControlSeat(null);
+						setWarRoomOpen(true);
+					}
+				}, "War Room"),
+				R.createElement("button", {
+					key: "x",
+					type: "button",
+					className: "office-game__btn office-theme-dock-close",
+					"data-testid": "office-game-agents-close",
+					"aria-label": "Close agents",
+					"data-office-slice": buttonSlice,
+					onClick: () => setAgentsOpen(false)
+				}, "Close")
+			]), R.createElement(AgentsPanel, {
 				key: "body",
 				base: props.base,
-				theme: officeTheme
+				theme: officeTheme,
+				onOpenAgent: (seat) => {
+					setAgentsOpen(false);
+					setHudOpen(false);
+					setControlSeat(seat);
+				}
+			})]));
+			if (warRoomOpen) children.push(R.createElement("div", {
+				key: "warroom-dock",
+				id: "office-game-warroom-dock",
+				className: "office-game__dock office-game__panel office-theme-dock office-game__warRoomDock",
+				"data-testid": "office-game-warroom-dock",
+				"data-office-dock": "warroom",
+				"data-office-slice": dockSlice,
+				role: "region",
+				"aria-label": "War Room and role directory"
+			}, [R.createElement(WarRoomPanel, {
+				key: "body",
+				base: props.base,
+				onClose: () => setWarRoomOpen(false)
+			})]));
+			if (controlSeat) children.push(R.createElement("div", {
+				key: "agent-control-dock",
+				id: "office-game-agent-control-dock",
+				className: "office-game__dock office-game__panel office-theme-dock office-game__agentControlDock",
+				"data-testid": "office-game-agent-control-dock",
+				"data-office-dock": "agent-control",
+				"data-office-slice": dockSlice,
+				role: "region",
+				"aria-label": "Agent controls"
+			}, [R.createElement(AgentControlDrawer, {
+				key: "body",
+				base: props.base,
+				seat: controlSeat,
+				onClose: () => setControlSeat(null)
 			})]));
 			if (hudOpen) children.push(R.createElement("div", {
 				key: "hud-dock",
@@ -198231,7 +199494,10 @@ create: function(game) {
 			}, MENU_BUTTONS.map((spec) => {
 				const geometry = menuIconGeometry(spec);
 				const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
-				const onActivate = spec.id === "agents" ? () => setAgentsOpen((v) => !v) : () => setHudOpen((v) => !v);
+				const onActivate = spec.id === "agents" ? () => setAgentsOpen((v) => !v) : () => {
+					setControlSeat(null);
+					setHudOpen((v) => !v);
+				};
 				return R.createElement("button", {
 					key: spec.id,
 					type: "button",
@@ -198268,8 +199534,8 @@ create: function(game) {
 				}
 			}));
 			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
-			const dualDocks = agentsOpen && hudOpen;
-			const dockOpen = agentsOpen || hudOpen;
+			const dualDocks = agentsOpen && hudOpen || warRoomOpen && controlSeat !== null;
+			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null;
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				"data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : void 0,
