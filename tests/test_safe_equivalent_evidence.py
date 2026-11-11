@@ -77,6 +77,54 @@ REPORTED_EMPTY_BACKEND = frozenset()
 
 
 # --------------------------------------------------------------------------- io
+def _live_gate_rows() -> list[dict]:
+    """The current generator's gate table, as SAFE_EQUIVALENT-shaped rows.
+
+    ``scripts/rebuild_ledger_openclaw.py`` is the live producer of the openclaw
+    ledger section: ``WAVE6_AUDIT`` records a typed ``gate`` code for every
+    current-pin extension it dispositions as ``gated``.  The frozen 2026-09-12
+    sections predate that table, so reading them alone loses those codes —
+    which is a property of the frozen evidence, not of the product.  This helper
+    reads the table straight from the live generator (no cached copy, no
+    re-authored doc) so every code the shipped generator declares is checked.
+    """
+    import importlib.util  # noqa: PLC0415
+
+    path = REPO_ROOT / "scripts" / "rebuild_ledger_openclaw.py"
+    if not path.is_file():  # pragma: no cover - the generator is tracked
+        return []
+    spec = importlib.util.spec_from_file_location(
+        "_live_openclaw_gate_table", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    rows: list[dict] = []
+    for name in sorted(module.WAVE6_AUDIT):
+        entry = module.WAVE6_AUDIT[name]
+        if str(entry.get("status") or "").lower() != "gated":
+            continue
+        code = str(entry.get("gate") or "").strip()
+        if not code:
+            continue
+        rows.append({
+            "id": f"openclaw-ext:{name}",
+            "area": "openclaw_extension",
+            "capability": name,
+            "upstream_ref": "scripts/rebuild_ledger_openclaw.py WAVE6_AUDIT",
+            "qubit_backend": str(entry.get("form") or ""),
+            "cli": "",
+            "dashboard": "",
+            "voice": "",
+            "status": "SAFE_EQUIVALENT",
+            # The generator keeps the proof beside the gate; carried here so the
+            # proving-test check still has something real to verify on disk.
+            "proving_test": str(entry.get("proving") or ""),
+            "note": (f"typed gate {code}: {entry.get('why') or ''}"),
+            "needs": str(entry.get("needs") or ""),
+        })
+    return rows
+
+
 def _sections() -> list[dict]:
     # docs/generated/ ledgers were removed in eafb54e26 and the path is
     # gitignored, so they are absent from a fresh checkout. AGENTS.md forbids
@@ -86,6 +134,12 @@ def _sections() -> list[dict]:
 
 
 def _rows() -> list[dict]:
+    """The frozen ledger's SAFE_EQUIVALENT rows.
+
+    Use :func:`_all_rows` for anything that judges a row's *evidence* — the
+    live generator's gate table is added there — and this for the frozen
+    record's own id set.
+    """
     rows: list[dict] = []
     for data in _sections():
         for row in data["rows"]:
@@ -94,8 +148,22 @@ def _rows() -> list[dict]:
     return rows
 
 
+def _all_rows() -> list[dict]:
+    """Every SAFE_EQUIVALENT row the shipped evidence knows about.
+
+    The frozen sections plus the live openclaw generator's gate table.  The
+    generator keeps its gated rows' proof in ``WAVE6_AUDIT[name]["proving"]``
+    (and names its backend in ``form``), so both fields are carried through
+    here — a gate row with no on-disk proof still fails the proving-test check.
+    """
+    rows = _rows()
+    for row in _live_gate_rows():
+        rows.append(row)
+    return rows
+
+
 def _row_ids() -> set[str]:
-    return {row["id"] for row in _rows()}
+    return {row["id"] for row in _all_rows()}
 
 
 # ------------------------------------------------------------- live evidence
@@ -213,18 +281,19 @@ def _backend_errors(row: dict) -> list[str]:
 # ------------------------------------------------------------------- asserts
 def test_every_safe_equivalent_row_has_proving_test_on_disk() -> None:
     offenders = [(row["id"], _proving_errors(row))
-                 for row in _rows() if _proving_errors(row)]
+                 for row in _all_rows() if _proving_errors(row)]
     assert offenders == [], offenders
 
 
 def test_every_safe_equivalent_row_has_valid_gate_need() -> None:
     offenders = [(row["id"], _need_errors(row))
-                 for row in _rows() if _need_errors(row)]
+                 for row in _all_rows() if _need_errors(row)]
     assert offenders == [], offenders
 
 
 def test_every_safe_equivalent_row_names_a_typed_gate_or_refusal_code() -> None:
-    discovered = frozenset(row["id"] for row in _rows() if not _row_codes(row))
+    discovered = frozenset(row["id"] for row in _all_rows()
+                           if not _row_codes(row))
     new = sorted(discovered - REPORTED_CODE_GAPS)
     fixed = sorted(REPORTED_CODE_GAPS - discovered)
     assert new == [], (
@@ -237,7 +306,7 @@ def test_every_safe_equivalent_row_names_a_typed_gate_or_refusal_code() -> None:
 
 
 def test_every_safe_equivalent_row_has_a_real_backend_path() -> None:
-    discovered = frozenset(row["id"] for row in _rows()
+    discovered = frozenset(row["id"] for row in _all_rows()
                            if _backend_errors(row))
     assert discovered == REPORTED_EMPTY_BACKEND, sorted(discovered)
 
@@ -245,7 +314,7 @@ def test_every_safe_equivalent_row_has_a_real_backend_path() -> None:
 def test_audit_doc_lists_every_distinct_refusal_code() -> None:
     doc = _audit_doc_text()
     codes = set()
-    for row in _rows():
+    for row in _all_rows():
         codes |= _row_codes(row)
     assert codes, "no typed gate/refusal codes resolved from the ledger"
     # The frozen ledger's retired codes are not expected in the audit doc
@@ -402,7 +471,7 @@ def test_named_refusal_codes_are_emitted_by_production_source() -> None:
     """
     corpus = _production_corpus()
     missing: dict[str, list[str]] = {}
-    for row in _rows():
+    for row in _all_rows():
         codes = {c for c in CODE_RE.findall(str(row.get("note", "")))
                  if c not in _STATUS_WORDS
                  and not c.startswith(("QUBIT_", "HERMES_", "OPENCLAW_"))}

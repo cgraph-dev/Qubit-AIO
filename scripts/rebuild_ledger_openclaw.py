@@ -504,6 +504,7 @@ WAVE6_AUDIT: Dict[str, Dict[str, str]] = {
         "status": "gated", "parent": "OC-58",
         "gate": "ACP_HARNESS_UNAVAILABLE", "needs": "hardware",
         "form": "voicebridge/acp_client.py HARNESS_CAPS/catalog/handshake",
+        "proving": "tests/test_acp_client8u.py::test_catalog_and_status_honest",
         "why": ("codex is a declared ACP harness: Qubit shapes the real "
                 "handshake but never executes it, and the catalog reports "
                 "ACP_HARNESS_UNAVAILABLE until the `codex` binary and a "
@@ -513,6 +514,12 @@ WAVE6_AUDIT: Dict[str, Dict[str, str]] = {
         "status": "gated", "parent": "OC-58",
         "gate": "ACP_HARNESS_UNAVAILABLE", "needs": "hardware",
         "form": "voicebridge/acp_client.py HARNESS_CAPS/adapters",
+        # `adapters` is the harness-adapter surface itself (HARNESS_CAPS, the
+        # table `catalog`/`status` render); test_acp_client8u covers that
+        # surface.  `acpx` is the OpenClaw *extension name* -- Qubit has no
+        # `acpx` harness in HARNESS_CAPS, which is exactly the gate the row
+        # records, so the row is a declared gate, never an implementation.
+        "proving": "tests/test_acp_client8u.py::test_catalog_and_status_honest",
         "why": ("the ACP harness *client* contract is real; the acpx harness "
                 "runtime is not shipped, so execution has no transport."),
     },
@@ -520,6 +527,8 @@ WAVE6_AUDIT: Dict[str, Dict[str, str]] = {
         "status": "gated", "parent": "OC-58",
         "gate": "ACP_HARNESS_UNAVAILABLE", "needs": "hardware",
         "form": "voicebridge/acp_client.py HARNESS_CAPS/send",
+        "proving": ("tests/test_acp_client8u.py::"
+                    "test_handshake_gates_absent_and_unconfigured"),
         "why": ("same ACP boundary: send always resolves to the typed "
                 "ACP_REFUSED gate, so no live harness runs in Qubit."),
     },
