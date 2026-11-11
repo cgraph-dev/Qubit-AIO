@@ -278,6 +278,17 @@ ARTIFACT_ONLY_TESTS = {
     "test_voice_edit_ui_fix9u.py",
     "test_voice_orb_live_capture9u.py",
     "test_wait_for_display.py",
+    # Loads the live-controls audit script (scripts/controls_e2e_audit.py) by
+    # path to guard that its mutating steps stay behind --allow-live-mutations;
+    # it does not import production modules.
+    "test_controls_e2e_audit_gate9v.py",
+    # Prose guards over the licence paragraphs in THIRD_PARTY_NOTICES.md; they
+    # assert repository text, not production behaviour.
+    "test_office_theme_licences.py",
+    # Guards the WAVE6_AUDIT table in the generated gap ledger
+    # (docs/generated/QUBIT_GAP_LEDGER.qubit.json): every audited ``form``
+    # symbol and ``proving`` test must exist on disk.
+    "test_openclaw_extensions_wave6.py",
 }
 
 _PROD_IMPORT_RE = re.compile(
