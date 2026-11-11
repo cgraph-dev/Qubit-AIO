@@ -429,7 +429,7 @@ def cmd_status(args) -> None:
             if install:
                 print(f"  Install it with: {install}")
             else:
-                print(f"  Install the '{provider_name}' memory plugin to ~/.qubit/plugins/")
+                print(f"  Install the '{provider_name}' memory plugin to {display_qubit_home()}/plugins/")
 
     if providers:
         print("\n  Installed plugins:")
