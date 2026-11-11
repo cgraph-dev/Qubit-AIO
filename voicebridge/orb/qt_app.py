@@ -1370,8 +1370,93 @@ def _ghost_content_box(image: Any) -> tuple[int, int, int, int] | None:
 _CONTENT_BOX: dict[int, "tuple[int, int, int, int] | None"] = {}
 
 
+def _luma_range(image: Any) -> tuple[float, float]:
+    """(min, max) luma of the frame's visible pixels, cached by frame index."""
+    key = id(image)
+    cached = _LUMA_RANGE.get(key)
+    if cached is not None:
+        return cached
+    lo, hi = 0.0, 255.0
+    try:
+        vals = []
+        for y in range(image.height()):
+            for x in range(image.width()):
+                px = image.pixelColor(x, y)
+                if px.alpha() == 0:
+                    continue
+                vals.append((px.red() * 299 + px.green() * 587
+                             + px.blue() * 114) / 1000.0)
+        if vals:
+            lo, hi = min(vals), max(vals)
+    except Exception:  # noqa: BLE001 - a probe failure keeps the full range
+        pass
+    _LUMA_RANGE[key] = (lo, hi)
+    return lo, hi
+
+
+_LUMA_RANGE: dict[int, tuple[float, float]] = {}
+
+
+def _tint_ghost(image: Any, core: tuple[int, int, int], strength: float) -> Any:
+    """Recolour one ghost frame toward a state colour, preserving its shading.
+
+    The atlas is drawn in pixelfx's own blue palette, but the orb's states are
+    colour-coded (idle orange, listening cyan, thinking indigo, working amber,
+    speaking violet, error red) and the old mark honoured them. Recolouring here
+    keeps the WHOLE ghost -- highlights, shadows and the pale glow -- while giving
+    it the state's hue.
+
+    Method: for each pixel, keep its luma relative to the sprite's own range, then
+    rebuild the colour as ``lerp(white, core, shade)`` where ``shade`` is how dark
+    that pixel was. Bright pixels stay near-white (the ghost's gloss and eyes),
+    dark pixels take the core colour, so it reads as the same ghost wearing the
+    state's light rather than a flat hue swap.
+    """
+    try:
+        from PySide6.QtGui import QImage
+
+        w, h = image.width(), image.height()
+        out = QImage(w, h, QImage.Format.Format_ARGB32)
+        cr, cg, cb = core
+        k = max(0.0, min(1.0, float(strength)))
+        for y in range(h):
+            for x in range(w):
+                px = image.pixelColor(x, y)
+                a = px.alpha()
+                if a == 0:
+                    continue
+                # Normalise the sprite's own range: pixelfx draws the sheet in
+                # pale blues that never reach either extreme, so a straight
+                # luma/255 leaves everything near-white and the tint barely shows.
+                # Stretch luma across the frame's actual min..max first.
+                luma = (px.red() * 299 + px.green() * 587 + px.blue() * 114) / 1000.0
+                lo, hi = _luma_range(image)
+                span = max(1.0, hi - lo)
+                shade = max(0.0, min(1.0, (luma - lo) / span))
+                # dark -> core, bright -> near white, but biased so most of the
+                # sheet carries the state colour instead of washing out
+                mix = shade ** 1.35
+                r = int(cr * (1.0 - mix) + 255 * mix)
+                g = int(cg * (1.0 - mix) + 255 * mix)
+                b = int(cb * (1.0 - mix) + 255 * mix)
+                # preserve the original brightness distribution so the sheet's
+                # form still reads; blend toward the tint by `k` only
+                out.setPixelColor(
+                    x, y,
+                    px.__class__(int(px.red() + (r - px.red()) * k),
+                                 int(px.green() + (g - px.green()) * k),
+                                 int(px.blue() + (b - px.blue()) * k), a))
+        return out
+    except Exception:  # noqa: BLE001 - fall back to the untinted frame
+        return image
+
+
+_TINT_CACHE: dict[tuple, Any] = {}
+
+
 def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
-                 brightness: float) -> bool:
+                 brightness: float, core: "tuple[int, int, int] | None" = None,
+                 tint: float = 0.0) -> bool:
     """Paint the pixelfx sheet ghost. Returns True when it drew.
 
     The ghost is a SPRITE, not a field: it comes from a pre-rendered frame atlas
@@ -1391,6 +1476,18 @@ def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
     if frame is None:
         return False
     image, origin = frame
+    # Per-state colour: the states are colour-coded and the atom mark honoured
+    # them, so the ghost must too. Cached by (frame, core, strength) — tinting
+    # is a per-pixel Python loop and would dominate the paint otherwise.
+    if core is not None and tint > 0.0:
+        key = (ghost_atlas.frame_index(t), tuple(core), round(float(tint), 3))
+        cached = _TINT_CACHE.get(key)
+        if cached is None:
+            cached = _tint_ghost(image, tuple(core), float(tint))
+            if len(_TINT_CACHE) > 256:
+                _TINT_CACHE.clear()
+            _TINT_CACHE[key] = cached
+        image = cached
     try:
         from PySide6.QtCore import QPointF, QRectF, Qt
 
@@ -4244,8 +4341,20 @@ if QWidget is not None:
                 # same way.
                 if _orb_style() == "ghost":
                     drew_ghost = False
+                    # The ghost wears the same per-state colour the atom mark does
+                    # (idle orange, listening cyan, thinking indigo, working amber,
+                    # speaking violet, error red): _ember.state_core resolves the
+                    # state, including any user colour override.
                     try:
-                        drew_ghost = _paint_ghost(p, cx, cy, R, t, _bright_eff)
+                        ghost_core = _ember.state_core(
+                            self.orb_state,
+                            overrides=_options.color_overrides(self._options))
+                    except Exception:  # noqa: BLE001 - colour is never fatal
+                        ghost_core = None
+                    try:
+                        drew_ghost = _paint_ghost(
+                            p, cx, cy, R, t, _bright_eff,
+                            core=ghost_core, tint=0.85)
                     except Exception:  # noqa: BLE001 - never blank the orb
                         drew_ghost = False
                     if not drew_ghost:

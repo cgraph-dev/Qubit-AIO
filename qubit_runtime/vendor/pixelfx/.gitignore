@@ -1,5 +1,40 @@
+# Upstream entries (kept verbatim).
 node_modules/
 dist/
 records/
 sheets/
 .DS_Store
+
+# Qubit: only what the orb actually needs is tracked -- src/core, the critters
+# effect it renders, the tools/lib helpers that drive rendering, and the export
+# script. The rest of the upstream library (244 effects, gallery, docs, skills,
+# Claude plugin metadata) is fetched by `git clone` when regenerating and is not
+# tracked: it would add megabytes to every checkout for content the product
+# never reads. `spawn/` is NOT ignored -- it is a real upstream directory the
+# critters helpers import.
+/src/fx/arcane/
+/src/fx/explosions/
+/src/fx/fire/
+/src/fx/holy/
+/src/fx/ice/
+/src/fx/impacts/
+/src/fx/lightning/
+/src/fx/melee/
+/src/fx/moves/
+/src/fx/nature/
+/src/fx/pickups/
+/src/fx/projectiles/
+/src/fx/scifi/
+/src/fx/shadow/
+/src/fx/spawn-death/
+/src/fx/status/
+/src/fx/transitions/
+/src/fx/ui/
+/src/fx/water/
+/src/fx/weather/
+/gallery/
+/docs/
+/skills/
+/.claude-plugin/
+/.github/
+/compare.mjs
