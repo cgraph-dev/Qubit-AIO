@@ -20,7 +20,15 @@ adapters, UI, voice commands, real payouts. See
 """
 from __future__ import annotations
 
-from . import approvals, jobs, ledger, role_catalog, roles, tools, warroom
+from . import agents, approvals, jobs, ledger, role_catalog, roles, tools, warroom
+from .agents import (
+    Agent,
+    AgentControlService,
+    AgentTurn,
+    AgentUsage,
+    Permissions,
+    Safety,
+)
 from .errors import BusinessError
 from .models import (
     Approval,
@@ -53,6 +61,10 @@ from .store import BusinessStore
 from .tools import Policy, ToolGateway, ToolOutcome, ToolRequest
 
 __all__ = [
+    "Agent",
+    "AgentControlService",
+    "AgentTurn",
+    "AgentUsage",
     "Approval",
     "Artifact",
     "AuditEvent",
@@ -65,11 +77,13 @@ __all__ = [
     "JobEvent",
     "JobRun",
     "LedgerEntry",
+    "Permissions",
     "Policy",
     "RoleRegistry",
     "RoleRegistryError",
     "RoleTemplate",
     "RoomTemplate",
+    "Safety",
     "Task",
     "Tenant",
     "ToolGateway",
@@ -82,6 +96,7 @@ __all__ = [
     "WarRoomExperiment",
     "WarRoomSession",
     "WarRoomSource",
+    "agents",
     "approvals",
     "jobs",
     "ledger",

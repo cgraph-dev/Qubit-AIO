@@ -715,6 +715,29 @@ class BusinessStore:
             rows = conn.execute(query, params).fetchall()
         return [models.AuditEvent.from_row(row) for row in rows]
 
+    def list_audit_for_resource(
+        self,
+        tenant_id: str,
+        resource_type: str,
+        resource_id: str,
+        *,
+        limit: int = 500,
+    ) -> list[models.AuditEvent]:
+        """Every audit row for one resource, oldest first.
+
+        The audit log is append-only, so this is the durable history a control
+        panel renders for one agent. It never invents an event from state.
+        """
+        with self.read() as conn:
+            self._require_tenant(conn, tenant_id)
+            rows = conn.execute(
+                "SELECT * FROM bos_audit_event WHERE tenant_id=?"
+                " AND resource_type=? AND resource_id=?"
+                " ORDER BY created_at, event_id LIMIT ?",
+                (tenant_id, str(resource_type), str(resource_id), max(1, int(limit))),
+            ).fetchall()
+        return [models.AuditEvent.from_row(row) for row in rows]
+
     # -- budgets -------------------------------------------------------
     def set_budget(
         self,

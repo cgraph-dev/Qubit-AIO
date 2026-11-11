@@ -265,12 +265,9 @@ for _table in _APPEND_ONLY_TABLES:
         """
     )
 
-# -- v2: War Room / Idea Lab ------------------------------------------------
-# Additive only. A war-room session is an intake that a human started; every
-# claim it records is an evidence row with an explicit label, every debate turn
-# is append-only, and the owner decision is its own immutable row. Nothing here
-# can publish, spend or contact anyone: those remain tool-gateway actions that
-# require a pending approval.
+# -- v2: War Room + per-agent control plane -------------------------------
+# Additive only. War-room evidence/debate/decisions and agent usage/operations
+# are append-only truth; agent turns may transition once from active.
 _V2 = [
     """
     CREATE TABLE bos_warroom_session (
@@ -291,12 +288,10 @@ _V2 = [
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         UNIQUE(tenant_id, idempotency_key)
-    )
-    """,
+    )""",
     """
     CREATE INDEX bos_warroom_session_listing
-        ON bos_warroom_session(tenant_id, state, created_at)
-    """,
+        ON bos_warroom_session(tenant_id, state, created_at)""",
     """
     CREATE TABLE bos_warroom_source (
         source_id TEXT PRIMARY KEY,
@@ -315,8 +310,7 @@ _V2 = [
         metadata_json TEXT NOT NULL DEFAULT '{}',
         created_at TEXT NOT NULL,
         UNIQUE(tenant_id, session_id, kind, locator)
-    )
-    """,
+    )""",
     """
     CREATE TABLE bos_warroom_evidence (
         evidence_id TEXT PRIMARY KEY,
@@ -331,8 +325,7 @@ _V2 = [
         metadata_json TEXT NOT NULL DEFAULT '{}',
         created_at TEXT NOT NULL,
         UNIQUE(tenant_id, session_id, label, claim)
-    )
-    """,
+    )""",
     """
     CREATE TABLE bos_warroom_argument (
         argument_id TEXT PRIMARY KEY,
@@ -347,8 +340,7 @@ _V2 = [
         evidence_ids_json TEXT NOT NULL DEFAULT '[]',
         created_at TEXT NOT NULL,
         UNIQUE(tenant_id, session_id, round_no, role, stance, text)
-    )
-    """,
+    )""",
     """
     CREATE TABLE bos_warroom_experiment (
         experiment_id TEXT PRIMARY KEY,
@@ -363,8 +355,7 @@ _V2 = [
             CHECK(status IN ('planned','running','done','abandoned')),
         created_at TEXT NOT NULL,
         UNIQUE(tenant_id, session_id, name)
-    )
-    """,
+    )""",
     """
     CREATE TABLE bos_warroom_decision (
         decision_id TEXT PRIMARY KEY,
@@ -378,17 +369,102 @@ _V2 = [
         request_hash TEXT NOT NULL,
         created_at TEXT NOT NULL,
         UNIQUE(tenant_id, idempotency_key)
-    )
-    """,
+    )""",
+    """
+    CREATE TABLE bos_agent (
+        agent_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        business_id TEXT NOT NULL REFERENCES bos_business(business_id) ON DELETE RESTRICT,
+        role_id TEXT NOT NULL,
+        department TEXT NOT NULL,
+        display_name TEXT NOT NULL,
+        human_owner TEXT NOT NULL,
+        room TEXT,
+        desk TEXT,
+        status TEXT NOT NULL CHECK(status IN
+            ('active','paused','revoked','archived')),
+        provider TEXT NOT NULL,
+        model TEXT NOT NULL,
+        reasoning_effort TEXT NOT NULL,
+        fallback_model TEXT,
+        fallback_provider TEXT,
+        temperature REAL,
+        max_tokens INTEGER NOT NULL CHECK(max_tokens > 0),
+        schedule TEXT NOT NULL,
+        timezone TEXT NOT NULL,
+        max_concurrent_turns INTEGER NOT NULL CHECK(max_concurrent_turns > 0),
+        permissions_json TEXT NOT NULL,
+        safety_json TEXT NOT NULL,
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        taken_over_by TEXT,
+        taken_over_at TEXT,
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 1 CHECK(revision > 0),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        archived_at TEXT,
+        UNIQUE(tenant_id, idempotency_key)
+    )""",
+    """
+    CREATE INDEX bos_agent_listing
+        ON bos_agent(tenant_id, business_id, status)""",
+    """
+    CREATE INDEX bos_agent_role_listing
+        ON bos_agent(tenant_id, role_id)""",
+    """
+    CREATE TABLE bos_agent_turn (
+        turn_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL REFERENCES bos_agent(agent_id) ON DELETE RESTRICT,
+        status TEXT NOT NULL CHECK(status IN
+            ('active','interrupted','completed','failed')),
+        started_at TEXT NOT NULL,
+        ended_at TEXT,
+        note TEXT NOT NULL DEFAULT ''
+    )""",
+    """
+    CREATE INDEX bos_agent_turn_active
+        ON bos_agent_turn(tenant_id, agent_id, status)""",
+    """
+    CREATE TABLE bos_agent_usage (
+        usage_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL REFERENCES bos_agent(agent_id) ON DELETE RESTRICT,
+        turn_id TEXT,
+        kind TEXT NOT NULL,
+        cost_minor INTEGER NOT NULL DEFAULT 0 CHECK(cost_minor >= 0),
+        tokens INTEGER NOT NULL DEFAULT 0 CHECK(tokens >= 0),
+        day TEXT NOT NULL,
+        month TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, idempotency_key)
+    )""",
+    """
+    CREATE INDEX bos_agent_usage_listing
+        ON bos_agent_usage(tenant_id, agent_id, created_at)""",
+    """
+    CREATE TABLE bos_agent_operation (
+        operation_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL,
+        agent_id TEXT NOT NULL REFERENCES bos_agent(agent_id) ON DELETE RESTRICT,
+        action TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        result_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, idempotency_key)
+    )""",
 ]
 
-# Evidence, debate turns and the owner decision are a record of what was said
-# and decided. A correction is a new row, never an edit: dissent cannot be
-# quietly deleted before a decision is made.
 for _table in (
     "bos_warroom_evidence",
     "bos_warroom_argument",
     "bos_warroom_decision",
+    "bos_agent_usage",
+    "bos_agent_operation",
 ):
     _V2.append(
         f"""
