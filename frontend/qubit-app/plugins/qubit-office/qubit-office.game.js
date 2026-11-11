@@ -194141,10 +194141,12 @@ create: function(game) {
 			})));
 			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
 			const dualDocks = agentsOpen && hudOpen;
+			const dockOpen = agentsOpen || hudOpen;
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				"data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : void 0,
 				"data-office-docks": dualDocks ? "both" : void 0,
+				"data-office-dock-top": dockOpen ? "toolbar" : void 0,
 				className: rootClass
 			}, children);
 		};

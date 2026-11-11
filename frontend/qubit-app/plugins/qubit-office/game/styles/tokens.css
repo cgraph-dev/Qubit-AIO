@@ -39,6 +39,14 @@
   --office-border-strong: 1px solid var(--office-line-strong);
   --office-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
 
+  /* Where the side sheets begin, BELOW the vendored app's fixed top bar.
+     The app's own `--top-h` is 64px (default), 124px while the usage row is
+     shown, and 108px at phone width; that bar also hosts the injected Panels
+     group whose icons open these docks. 128px clears the tallest measured bar
+     (124px) with a 4px gap, so the HUD can never cover the group again
+     (measured live: HUD top≈75, Panels at y≈90). */
+  --office-dock-top: 128px;
+
   /* spacing scale: 4px base. Every gap in the shell is one of these. */
   --office-s1: 4px;
   --office-s2: 8px;

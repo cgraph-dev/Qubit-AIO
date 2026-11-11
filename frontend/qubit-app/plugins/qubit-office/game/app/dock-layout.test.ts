@@ -100,3 +100,61 @@ describe("dual-dock geometry", () => {
     expect(closeRight).toBeGreaterThan(0);
   });
 });
+
+/*
+ * Toolbar clearance — the measured HUD occlusion.
+ *
+ * The vendored app's top bar is `position: fixed`, 64px tall by default and
+ * 124px when it shows the usage row (108px at phone width). It hosts the
+ * injected Panels group whose HUD/Agents icons OPEN these side sheets. The
+ * sheet was anchored at `top: 0`, so at 1440x900 the HUD sheet (top≈75) covered
+ * the Panels icons at y≈90; after the Agents sheet closed, the icons were
+ * behind the HUD and could not be clicked.
+ *
+ * jsdom has no layout engine, so this pins the SAME contract the dual-dock test
+ * pins: the marker the component sets, the selector the stylesheet uses, and
+ * the token value, then proves the token clears every measured bar height.
+ */
+describe("dock toolbar clearance", () => {
+  // The vendored app's own `--top-h` values (app CSS): 64 default, 124 with the
+  // usage row, 108 at phone width. The tallest wins.
+  const TOPBAR_DEFAULT = 64;
+  const TOPBAR_USAGE_ROW = 124;
+  const TOPBAR_PHONE = 108;
+  const TOPBAR_MAX = Math.max(TOPBAR_DEFAULT, TOPBAR_USAGE_ROW, TOPBAR_PHONE);
+
+  // The live 1440x900 measurement: the office host begins at y=75 and the
+  // Panels icons sit at y≈90, i.e. ~15px below the host, inside the top bar.
+  const PANELS_Y = 90;
+  const PANELS_ICON_H = 28; // `.ui-topbar__right .ui-icon-btn` is 28x28
+
+  const DOCK_TOP = tokenPx("--office-dock-top");
+
+  it("anchors the sheets below the top bar only through the root marker", () => {
+    // The component sets `data-office-dock-top="toolbar"` whenever either
+    // sheet is open; the stylesheet consumes that marker.
+    const rule = /\.office-game\[data-office-dock-top="toolbar"\]\s*>\s*\.office-game__dock\s*\{([^}]*)\}/
+      .exec(css);
+    expect(rule).not.toBeNull();
+    expect(rule?.[1] ?? "").toMatch(/top:\s*var\(--office-dock-top\)/);
+
+    // The base sheet still fills to the bottom; only the top edge moved.
+    const base = /\.office-game__dock\s*\{([^}]*)\}/.exec(css);
+    expect(base).not.toBeNull();
+    expect(base?.[1] ?? "").toMatch(/bottom:\s*0/);
+    // And the base rule is NOT offset by itself: the marker is load-bearing.
+    expect(base?.[1] ?? "").toMatch(/top:\s*0/);
+  });
+
+  it("clears every measured top-bar height, including the usage row", () => {
+    expect(DOCK_TOP).toBeGreaterThanOrEqual(TOPBAR_MAX);
+    // The Panels icons (bottom edge) must sit above the sheet's top edge.
+    expect(DOCK_TOP).toBeGreaterThanOrEqual(PANELS_Y + PANELS_ICON_H);
+  });
+
+  it("keeps the single-dock width and skeleton untouched by the offset", () => {
+    const base = /\.office-game__dock\s*\{([^}]*)\}/.exec(css);
+    expect(base?.[1] ?? "").toMatch(/width:\s*min\(44rem,\s*92%\)/);
+    expect(base?.[1] ?? "").toMatch(/position:\s*absolute/);
+  });
+});
