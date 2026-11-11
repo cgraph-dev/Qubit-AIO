@@ -85,12 +85,17 @@ def _pick_interpreter(repo: Path) -> str:
     candidates = []
     for base in (repo, *repo.parents):
         candidates += [base / ".venv/bin/python", base / ".venv/bin/python3"]
-    candidates += [Path.home() / ".hermes/hermes-agent/venv/bin/python"]
+    # No app interpreter anywhere. Refuse loudly instead of silently measuring
+    # an environment that cannot import the code under test.
+    #
+    # There is deliberately NO fallback to the operator's external stale
+    # install (``~/.hermes/<checkout>/venv/bin/python``) -- the one this file's
+    # own docstring says the gate exists to catch. A gate that silently grades
+    # the tree under a foreign interpreter is the measurement defect described
+    # above, and PRA-07 forbids that path in product source.
     for cand in candidates:
         if cand.exists():
             return str(cand)
-    # No app interpreter anywhere. Refuse loudly instead of silently measuring
-    # an environment that cannot import the code under test.
     raise SystemExit(
         "sync_import_gate: no project venv found near "
         f"{repo} (searched parents up to {repo.parents[-1]}). Refusing to run "
