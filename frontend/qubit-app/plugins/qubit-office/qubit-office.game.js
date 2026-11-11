@@ -193919,6 +193919,17 @@ create: function(game) {
 		method: "POST",
 		body: {}
 	});
+	/** Validate one prospective turn and return the plan.
+	*
+	* The backend is owner-gated and writes nothing: no turn, usage, audit, ledger,
+	* job, spend, model call or tool side effect. A refusal throws the typed
+	* `BusinessApiError`; the panel renders that reason rather than a fake success.
+	*/
+	var previewAgentTurn = (agentId, body, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/preview`, {
+		...opts,
+		method: "POST",
+		body
+	});
 	var updateAgent = (agentId, changes, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/update`, {
 		...opts,
 		method: "POST",
@@ -194379,6 +194390,12 @@ create: function(game) {
 			const [draft, setDraft] = useState(null);
 			const [fieldErrors, setFieldErrors] = useState({});
 			const [permInput, setPermInput] = useState({});
+			const [previewPrompt, setPreviewPrompt] = useState("");
+			const [previewTools, setPreviewTools] = useState("");
+			const [previewSpend, setPreviewSpend] = useState("");
+			const [previewPlan, setPreviewPlan] = useState(null);
+			const [previewError, setPreviewError] = useState(null);
+			const [previewBusy, setPreviewBusy] = useState(false);
 			const seatSlug = props.seat?.slug ?? "";
 			const seatName = props.seat?.name ?? "";
 			const bootstrapped = useRef(false);
@@ -194453,6 +194470,11 @@ create: function(game) {
 				seatName
 			]);
 			useEffect(() => {
+				setPreviewPlan(null);
+				setPreviewError(null);
+				setPreviewPrompt("");
+				setPreviewTools("");
+				setPreviewSpend("");
 				if (!selectedId || load.kind !== "ready") {
 					setDetail(null);
 					return;
@@ -194593,6 +194615,37 @@ create: function(game) {
 			const removeScope = (category, scope) => {
 				if (!draft) return;
 				patchDraft({ permissions: removePermissionScope(draft.permissions, category, scope) });
+			};
+			const runPreview = async () => {
+				if (!selected) return;
+				setPreviewBusy(true);
+				setPreviewError(null);
+				setPreviewPlan(null);
+				const body = { prompt: previewPrompt };
+				const tools = previewTools.split(/[\s,]+/).map((value) => value.trim()).filter(Boolean);
+				if (tools.length) body.requested_tools = tools;
+				const spendText = previewSpend.trim();
+				if (spendText) {
+					const amount = Number(spendText);
+					if (!Number.isFinite(amount) || amount < 0) {
+						setPreviewError({ message: "Estimated spend must be a non-negative number of USD." });
+						setPreviewBusy(false);
+						return;
+					}
+					body.spend_minor = Math.round(amount * 100);
+				}
+				try {
+					const result = await previewAgentTurn(selected.agent_id, body, {
+						base: props.base,
+						fetchImpl: props.fetchImpl,
+						query: { tenant_id: load.kind === "ready" ? load.tenantId : void 0 }
+					});
+					setPreviewPlan(result.plan);
+				} catch (exc) {
+					setPreviewError(errText$1(exc));
+				} finally {
+					setPreviewBusy(false);
+				}
 			};
 			const close = () => props.onClose?.();
 			const children = [R.createElement("div", {
@@ -194843,6 +194896,131 @@ create: function(game) {
 					kv(R, "Autonomy", autonomyLabel(selected.safety.autonomy), "autonomy-level"),
 					kv(R, "Schedule", scheduleSummary(selected), "schedule"),
 					kv(R, "Concurrent turns", String(selected.max_concurrent_turns), "concurrency")
+				]));
+				const previewGranted = previewPlan ? Object.entries(previewPlan.tool_scopes).filter(([, scopes]) => scopes.length > 0).map(([category, scopes]) => `${category}: ${scopes.length}`).join(" · ") || "deny by default" : "";
+				const previewPlanning = previewPlan ? [R.createElement("div", {
+					key: "plan",
+					className: "agent-control__previewPlan",
+					"data-testid": "agent-control-preview-plan",
+					"data-allowed": String(previewPlan.allowed)
+				}, [
+					R.createElement("p", {
+						key: "allowed",
+						className: "agent-control__previewVerdict",
+						"data-testid": "agent-control-preview-allowed",
+						role: "status"
+					}, previewPlan.allowed ? "ALLOWED — preview only" : "REFUSED — see the reason"),
+					kv(R, "Provider", previewPlan.provider, "preview-provider"),
+					kv(R, "Model", previewPlan.model, "preview-model"),
+					kv(R, "Reasoning", previewPlan.reasoning_effort, "preview-reasoning"),
+					kv(R, "Autonomy", autonomyLabel(previewPlan.autonomy), "preview-autonomy"),
+					kv(R, "Max tokens", String(previewPlan.max_tokens), "preview-max-tokens"),
+					kv(R, "Prompt estimate", `${previewPlan.estimated_prompt_tokens} tokens`, "preview-prompt-tokens"),
+					kv(R, "Projected", `${previewPlan.projected_tokens} tokens`, "preview-projected"),
+					kv(R, "Approvals", previewPlan.approval_actions_required.join(", ") || "none", "preview-approvals"),
+					kv(R, "Approvals satisfied", previewPlan.approvals_satisfied ? "yes" : "no", "preview-approvals-satisfied"),
+					kv(R, "Requested tools", previewPlan.requested_tools.join(", ") || "none", "preview-tools"),
+					kv(R, "Granted scopes", previewGranted, "preview-scopes"),
+					kv(R, "Estimated spend", formatMinor(previewPlan.estimated.spend_minor), "preview-spend"),
+					kv(R, "Daily spend left", formatMinor(previewPlan.estimated.remaining.daily_spend_remaining_minor), "preview-daily-left"),
+					kv(R, "Turns left today", String(previewPlan.estimated.remaining.turns_remaining_today), "preview-turns-left"),
+					R.createElement("p", {
+						key: "reason",
+						className: "agent-control__muted",
+						"data-testid": "agent-control-preview-reason"
+					}, previewPlan.reason)
+				])] : [];
+				children.push(section$1(R, "Preview turn", "preview", [
+					R.createElement("p", {
+						key: "note",
+						className: "agent-control__muted",
+						"data-testid": "agent-control-preview-note"
+					}, "Plan a turn without running it. Preview validates the model, permissions, budgets, limits and approvals and writes nothing: no model call, no spend, no job, no tool side effect."),
+					R.createElement("label", {
+						key: "prompt-field",
+						className: "agent-control__field",
+						"data-testid": "agent-control-field-preview-prompt"
+					}, [R.createElement("span", {
+						key: "l",
+						className: "agent-control__k"
+					}, "Prompt"), R.createElement("textarea", {
+						key: "i",
+						className: "agent-control__input",
+						"data-testid": "agent-control-preview-prompt",
+						rows: 3,
+						value: previewPrompt,
+						disabled: lock || previewBusy,
+						placeholder: "What should this agent do next?",
+						onChange: (event) => {
+							setPreviewPrompt(event.target.value);
+							setPreviewPlan(null);
+							setPreviewError(null);
+						}
+					})]),
+					R.createElement("label", {
+						key: "tools-field",
+						className: "agent-control__field",
+						"data-testid": "agent-control-field-preview-tools"
+					}, [R.createElement("span", {
+						key: "l",
+						className: "agent-control__k"
+					}, "Requested tools (optional)"), R.createElement("input", {
+						key: "i",
+						type: "text",
+						className: "agent-control__input",
+						"data-testid": "agent-control-preview-tools",
+						value: previewTools,
+						disabled: lock || previewBusy,
+						placeholder: "comma-separated granted tool names",
+						onChange: (event) => {
+							setPreviewTools(event.target.value);
+							setPreviewPlan(null);
+							setPreviewError(null);
+						}
+					})]),
+					R.createElement("label", {
+						key: "spend-field",
+						className: "agent-control__field",
+						"data-testid": "agent-control-field-preview-spend"
+					}, [R.createElement("span", {
+						key: "l",
+						className: "agent-control__k"
+					}, "Estimated spend (USD, optional)"), R.createElement("input", {
+						key: "i",
+						type: "text",
+						className: "agent-control__input",
+						"data-testid": "agent-control-preview-spend",
+						value: previewSpend,
+						disabled: lock || previewBusy,
+						placeholder: "0.00",
+						onChange: (event) => {
+							setPreviewSpend(event.target.value);
+							setPreviewPlan(null);
+							setPreviewError(null);
+						}
+					})]),
+					R.createElement("div", {
+						key: "preview-actions",
+						className: "agent-control__actions",
+						"data-testid": "agent-control-preview-actions"
+					}, [R.createElement("button", {
+						key: "run",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-preview-run",
+						disabled: lock || previewBusy,
+						onClick: () => {
+							runPreview();
+						}
+					}, previewBusy ? "Planning…" : "Preview turn")]),
+					previewError ? R.createElement("div", {
+						key: "preview-error",
+						className: "agent-control__state agent-control__state--error",
+						"data-testid": "agent-control-preview-error",
+						role: "alert",
+						"data-code": previewError.code
+					}, previewError.code ? `${previewError.code}: ${previewError.message}` : previewError.message) : null,
+					...previewPlanning
 				]));
 				children.push(section$1(R, "Audit", "audit", [R.createElement("ul", {
 					key: "rows",

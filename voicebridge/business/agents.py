@@ -34,11 +34,19 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from . import models
 from .errors import (
     AGENT_APPROVAL_REQUIRED_CODE,
+    AGENT_ARCHIVED_CODE,
+    AGENT_AUTONOMY_DENIED_CODE,
     AGENT_BUDGET_EXCEEDED_CODE,
+    AGENT_MODEL_NOT_READY_CODE,
     AGENT_NO_ACTIVE_TURN_CODE,
     AGENT_NOT_FOUND_CODE,
+    AGENT_PAUSED_CODE,
+    AGENT_PROVIDER_NOT_READY_CODE,
     AGENT_RATE_LIMITED_CODE,
+    AGENT_REVOKED_CODE,
     AGENT_TOKEN_LIMIT_CODE,
+    AGENT_TOOL_DENIED_CODE,
+    AGENT_TOOL_UNKNOWN_CODE,
     AGENT_TURN_LIMIT_CODE,
     AGENT_UNKNOWN_SCOPE_CODE,
     BAD_INPUT_CODE,
@@ -425,6 +433,80 @@ def _approval_actions(value: Any) -> tuple[str, ...]:
             )
         cleaned.append(token)
     return tuple(sorted(dict.fromkeys(cleaned)))
+
+
+_UNREADY_VALUES = frozenset({"", "unset", "none", "null", "unknown", "-"})
+_TOOL_APPROVAL_HINTS: dict[str, frozenset[str]] = {
+    "spend": frozenset(
+        {"charge", "payment", "pay", "invoice", "purchase", "buy", "price"}
+    ),
+    "publish": frozenset({"publish", "posting", "listing", "upload"}),
+    "contact": frozenset(
+        {"send", "email", "message", "contact", "reply", "dm", "outreach"}
+    ),
+    "legal": frozenset(
+        {"legal", "contract", "terms", "agreement", "compliance", "policy"}
+    ),
+    "irreversible": frozenset(
+        {"delete", "destroy", "remove", "refund", "deploy", "transfer", "purge"}
+    ),
+}
+
+
+def _configured(value: Any) -> bool:
+    """A provider/model is ready only if it names something real.
+
+    This is a configuration check, never a network or model probe: a preview
+    must not contact a provider to decide whether a prospective turn is
+    admissible.
+    """
+    return isinstance(value, str) and value.strip().lower() not in _UNREADY_VALUES
+
+
+def _requested_tools(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, str) or not isinstance(
+        value, (list, tuple, set, frozenset)
+    ):
+        raise BusinessError(
+            BAD_INPUT_CODE,
+            "requested_tools must be a list of explicit tool names",
+        )
+    cleaned: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise BusinessError(
+                AGENT_TOOL_UNKNOWN_CODE,
+                "requested tool entries must be non-empty strings",
+            )
+        token = item.strip()
+        if "*" in token or token.lower() in _WILDCARD_SCOPES:
+            raise BusinessError(
+                AGENT_TOOL_UNKNOWN_CODE,
+                f"requested tool {token!r} is a wildcard; name explicit tools",
+            )
+        if not _SCOPE_TOKEN_RE.match(token):
+            raise BusinessError(
+                AGENT_TOOL_UNKNOWN_CODE,
+                f"requested tool {token!r} is not a valid tool name",
+            )
+        cleaned.append(token)
+    return tuple(sorted(dict.fromkeys(cleaned)))
+
+
+def _tool_approval_hints(tool: str) -> set[str]:
+    flat = re.sub(r"[^a-z0-9]+", "_", tool.lower()).strip("_")
+    parts = set(flat.split("_")) if flat else set()
+    actions: set[str] = set()
+    for action, hints in _TOOL_APPROVAL_HINTS.items():
+        if parts & hints:
+            actions.add(action)
+    # A bare ``post`` tool publishes; ``draft_post`` does not. Drafting tools
+    # stay draft-only unless they name an explicit acting verb above.
+    if flat in {"post", "posts"}:
+        actions.add("publish")
+    return actions
 
 
 # -- records ------------------------------------------------------------
@@ -1363,6 +1445,181 @@ class AgentControlService:
             ),
             "remaining": remaining,
         }
+
+    def preview_turn(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        prompt: Any,
+        requested_tools: Any = None,
+        spend_minor: int = 0,
+        human_approved: bool = False,
+    ) -> dict[str, Any]:
+        """Plan one prospective turn without doing any of it.
+
+        This is a read-only admission check over the same durable rows every
+        real turn uses. It **never** starts a turn, records usage or an audit
+        event, calls a model/provider, spends money, creates a job, or runs a
+        tool. Refusals are the control plane's own typed codes so a panel can
+        render the exact reason instead of guessing.
+        """
+        prompt_clean = _text(prompt, "prompt", max_len=20000)
+        spend = _int(spend_minor, "spend_minor", minimum=0)
+        tools = _requested_tools(requested_tools)
+        approved = bool(human_approved)
+
+        with self.store.read() as conn:
+            agent = Agent.from_row(self._require_agent(conn, tenant_id, agent_id))
+            self._require_previewable(agent)
+            self._require_runtime_ready(agent)
+
+            safety = agent.safety
+            if (tools or spend) and safety.autonomy in ("L0", "L1"):
+                raise BusinessError(
+                    AGENT_AUTONOMY_DENIED_CODE,
+                    f"autonomy {safety.autonomy} cannot act with tools or spend;"
+                    " raise it to L2 or above",
+                )
+
+            granted = set(agent.permissions.tools)
+            for tool in tools:
+                if tool not in granted:
+                    raise BusinessError(
+                        AGENT_TOOL_DENIED_CODE,
+                        f"tool {tool!r} is not granted; permissions are"
+                        " deny-by-default, so name it in the agent's tools scopes",
+                    )
+
+            estimated_prompt_tokens = max(1, (len(prompt_clean) + 3) // 4)
+            if agent.max_tokens > safety.max_tokens_per_turn:
+                raise BusinessError(
+                    AGENT_TOKEN_LIMIT_CODE,
+                    f"the agent's max_tokens ({agent.max_tokens}) exceeds the"
+                    f" per-turn limit of {safety.max_tokens_per_turn}",
+                )
+            if estimated_prompt_tokens > safety.max_tokens_per_turn:
+                raise BusinessError(
+                    AGENT_TOKEN_LIMIT_CODE,
+                    f"the prompt is ~{estimated_prompt_tokens} tokens and exceeds"
+                    f" the per-turn limit of {safety.max_tokens_per_turn}",
+                )
+
+            active = int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM bos_agent_turn WHERE tenant_id=?"
+                    " AND agent_id=? AND status='active'",
+                    (tenant_id, agent_id),
+                ).fetchone()[0]
+            )
+            if active >= agent.max_concurrent_turns:
+                raise BusinessError(
+                    AGENT_TURN_LIMIT_CODE,
+                    f"agent already has {active} active turn(s); the limit is"
+                    f" {agent.max_concurrent_turns}",
+                )
+
+            required = self._preview_approvals(agent, tools, spend)
+            if required and not approved:
+                raise BusinessError(
+                    AGENT_APPROVAL_REQUIRED_CODE,
+                    "this turn needs a human approval for: "
+                    + ", ".join(required)
+                    + "; preview it with human_approved once the owner signs off",
+                )
+
+            remaining = self._check_budgets(
+                conn,
+                agent,
+                cost_minor=spend,
+                tokens=agent.max_tokens,
+                action=None,
+                kind="turn",
+                human_approved=approved,
+            )
+
+        permissions = agent.permissions.to_dict()
+        return {
+            "allowed": True,
+            "state": "ALLOWED",
+            "tenant_id": tenant_id,
+            "agent_id": agent_id,
+            "business_id": agent.business_id,
+            "provider": agent.provider,
+            "model": agent.model,
+            "reasoning_effort": agent.reasoning_effort,
+            "autonomy": agent.safety.autonomy,
+            "max_tokens": agent.max_tokens,
+            "estimated_prompt_tokens": estimated_prompt_tokens,
+            "projected_tokens": estimated_prompt_tokens + agent.max_tokens,
+            "requested_tools": list(tools),
+            "tool_scopes": permissions,
+            "approval_actions_required": required,
+            "approvals_satisfied": not required or approved,
+            "limits": agent.safety.to_dict(),
+            "estimated": {
+                "spend_minor": spend,
+                "prompt_tokens": estimated_prompt_tokens,
+                "output_tokens": agent.max_tokens,
+                "active_turns": active,
+                "remaining": remaining,
+            },
+            "side_effects": False,
+            "reason": (
+                "All control-plane checks passed. This is a preview only: no"
+                " model call, spend, job, turn or tool side effect was made."
+            ),
+        }
+
+    def _require_previewable(self, agent: Agent) -> None:
+        status = agent.status
+        if status == "paused":
+            raise BusinessError(
+                AGENT_PAUSED_CODE,
+                f"agent {agent.agent_id!r} is paused; resume it before previewing"
+                " a turn",
+            )
+        if status == "revoked":
+            raise BusinessError(
+                AGENT_REVOKED_CODE,
+                f"agent {agent.agent_id!r} is revoked; restore explicit scopes"
+                " before previewing a turn",
+            )
+        if status == "archived":
+            raise BusinessError(
+                AGENT_ARCHIVED_CODE,
+                f"agent {agent.agent_id!r} is archived and cannot run or preview",
+            )
+        if status != "active":
+            raise BusinessError(
+                BAD_STATE_CODE,
+                f"agent {agent.agent_id!r} is {status!r}, not active",
+            )
+
+    def _require_runtime_ready(self, agent: Agent) -> None:
+        if not _configured(agent.provider):
+            raise BusinessError(
+                AGENT_PROVIDER_NOT_READY_CODE,
+                f"agent {agent.agent_id!r} has no configured provider",
+            )
+        if not _configured(agent.model):
+            raise BusinessError(
+                AGENT_MODEL_NOT_READY_CODE,
+                f"agent {agent.agent_id!r} has no configured model",
+            )
+
+    def _preview_approvals(
+        self, agent: Agent, tools: tuple[str, ...], spend_minor: int
+    ) -> list[str]:
+        declared = set(agent.safety.approval_required)
+        actions: set[str] = set()
+        if spend_minor > 0:
+            actions.add("spend")
+        for tool in tools:
+            actions |= _tool_approval_hints(tool)
+        if (tools or spend_minor > 0) and agent.safety.autonomy in APPROVAL_LEVELS:
+            actions |= declared
+        return sorted(actions & declared)
 
     def record_usage(
         self,

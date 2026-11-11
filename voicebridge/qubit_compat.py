@@ -12124,6 +12124,10 @@ _r("GET", r"/api/office/business/agents/(?P<id>[^/]+)/audit",
 _r("GET", r"/api/office/business/agents/(?P<id>[^/]+)", "h_business_agent_get")
 _r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/update",
    "h_business_agent_update")
+# Read-only turn preview: owner-gated, validates the control plane and returns
+# the plan. It never starts a turn, spends, writes usage/audit or calls a model.
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/preview",
+   "h_business_agent_preview")
 _r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/pause",
    "h_business_agent_pause")
 _r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/resume",
@@ -21749,7 +21753,8 @@ for _name in (
     "h_business_etsy_status", "h_business_etsy_authorize",
     "h_business_etsy_complete", "h_business_etsy_disconnect",
     "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
-    "h_business_agent_update", "h_business_agent_pause", "h_business_agent_resume",
+    "h_business_agent_update", "h_business_agent_preview",
+    "h_business_agent_pause", "h_business_agent_resume",
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
     "h_business_agent_archive", "h_world_tower",
 ):

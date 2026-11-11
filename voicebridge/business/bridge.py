@@ -104,12 +104,23 @@ def _status_for(code: str) -> int:
         "AGENT_TOKEN_LIMIT",
         "AGENT_TURN_LIMIT",
         "AGENT_RATE_LIMITED",
+        "AGENT_PAUSED",
+        "AGENT_REVOKED",
+        "AGENT_ARCHIVED",
+        "AGENT_PROVIDER_NOT_READY",
+        "AGENT_MODEL_NOT_READY",
     ):
         return 409
+    if code in (
+        "AGENT_TOOL_DENIED",
+        "AGENT_AUTONOMY_DENIED",
+    ):
+        return 403
     if code in (
         "BUSINESS_BAD_INPUT",
         "BUSINESS_WARROOM_UNVERIFIED_FACT",
         "AGENT_UNKNOWN_SCOPE",
+        "AGENT_TOOL_UNKNOWN",
         "BUSINESS_TOOL_NOT_ALLOWED",
     ):
         return 400
@@ -873,6 +884,29 @@ def _agent_mutation(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _error(exc)
 
 
+def h_business_agent_preview(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """Owner-gated, read-only plan for one prospective agent turn.
+
+    No turn, usage row, audit event, ledger entry, job or tool call is written.
+    A refusal is the service's typed code; an allowed answer is the plan.
+    """
+    def run(store: BusinessStore, service: AGENTS.AgentControlService,
+            tenant: str, agent_id: str):
+        plan = service.preview_turn(
+            tenant,
+            agent_id,
+            prompt=b.get("prompt"),
+            requested_tools=b.get("requested_tools"),
+            spend_minor=b.get("spend_minor", 0),
+            human_approved=b.get("human_approved", False),
+        )
+        return _ok(schema="qubit-office-business-agent-preview/1",
+                   tenant_id=tenant, agent_id=agent_id,
+                   allowed=bool(plan.get("allowed")), plan=plan)
+    return _agent_mutation(cfg, q, b, p, "previewing an agent turn", run)
+
+
 def h_business_agent_update(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                             p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     def run(store: BusinessStore, service: AGENTS.AgentControlService,
@@ -1059,6 +1093,7 @@ __all__ = [
     "h_business_agent_audit",
     "h_business_agent_get",
     "h_business_agent_pause",
+    "h_business_agent_preview",
     "h_business_agent_resume",
     "h_business_agent_revoke",
     "h_business_agent_stop",

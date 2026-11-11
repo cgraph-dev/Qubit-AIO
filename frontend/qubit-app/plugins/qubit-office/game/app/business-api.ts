@@ -366,6 +366,51 @@ export interface AgentDetail {
   audit: AuditEvent[];
 }
 
+/** A prospective-turn plan. It is never an executed turn: `side_effects`
+ * stays false, and a refusal arrives as `BusinessApiError` with the backend's
+ * typed code and reason. */
+export interface AgentTurnPlan {
+  allowed: boolean;
+  state: string;
+  tenant_id: string;
+  agent_id: string;
+  business_id: string;
+  provider: string;
+  model: string;
+  reasoning_effort: string;
+  autonomy: string;
+  max_tokens: number;
+  estimated_prompt_tokens: number;
+  projected_tokens: number;
+  requested_tools: string[];
+  tool_scopes: Record<string, string[]>;
+  approval_actions_required: string[];
+  approvals_satisfied: boolean;
+  limits: AgentSafety;
+  estimated: {
+    spend_minor: number;
+    prompt_tokens: number;
+    output_tokens: number;
+    active_turns: number;
+    remaining: {
+      daily_spend_remaining_minor: number;
+      monthly_spend_remaining_minor: number;
+      turns_remaining_today: number;
+    };
+  };
+  side_effects: false;
+  reason: string;
+}
+
+export interface AgentTurnPreview {
+  ok: true;
+  schema: string;
+  tenant_id: string;
+  agent_id: string;
+  allowed: boolean;
+  plan: AgentTurnPlan;
+}
+
 export interface RoleTemplate {
   id: string;
   department: string;
@@ -591,6 +636,24 @@ export const createWarRoomTasks = (
 ) => businessFetch<{ ok: true; tasks: BusinessTask[] }>(
   `/warroom/sessions/${encodeURIComponent(sessionId)}/tasks`,
   { ...opts, method: "POST", body: {} });
+
+// ---------------------------------------------------------------------------
+// Agent turn preview (read-only)
+// ---------------------------------------------------------------------------
+/** Validate one prospective turn and return the plan.
+ *
+ * The backend is owner-gated and writes nothing: no turn, usage, audit, ledger,
+ * job, spend, model call or tool side effect. A refusal throws the typed
+ * `BusinessApiError`; the panel renders that reason rather than a fake success.
+ */
+export const previewAgentTurn = (
+  agentId: string,
+  body: { prompt: string; requested_tools?: string[];
+          spend_minor?: number; human_approved?: boolean },
+  opts: BusinessFetchOptions = {},
+) => businessFetch<AgentTurnPreview>(
+  `/agents/${encodeURIComponent(agentId)}/preview`,
+  { ...opts, method: "POST", body });
 
 // ---------------------------------------------------------------------------
 // Agent mutations
