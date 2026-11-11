@@ -18,14 +18,22 @@
  */
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import type { FloorTemplate } from "./business-api";
+import {
+  type WorldCell, type WorldFloor, type WorldRoom, type WorldTower,
+  templateFloorScene,
+} from "./world-tower";
 
 export interface TowerNavigatorProps {
   /** The directory's own floors; the source of truth for every band. */
   floors: FloorTemplate[];
+  /** Optional endpoint scene. Absent/blank floors fall back to templates. */
+  world?: WorldTower | null;
   /** For tests/host: start on this floor instead of the first. */
   initialFloorId?: string | null;
   /** Called after a floor becomes the selection. */
   onSelect?: (floor: FloorTemplate) => void;
+  /** Called when the detail is closed. */
+  onClose?: () => void;
 }
 
 function wingTitle(wing: string): string {
@@ -47,6 +55,33 @@ function floorNumber(index: number): string {
   return String(index).padStart(3, "0");
 }
 
+function occupiedSlots(room: WorldRoom): number {
+  let occupied = 0;
+  for (const cell of room.cells) {
+    for (const slot of cell.desk_slots) {
+      if (slot.occupied_by) occupied += 1;
+    }
+  }
+  return occupied;
+}
+
+function cellStyle(cell: WorldCell) {
+  return {
+    aspectRatio: `${cell.cols} / ${cell.rows}`,
+  };
+}
+
+function deskStyle(slot: WorldCell["desk_slots"][number], cell: WorldCell) {
+  const width = Math.max(1, slot.footprint.w) / Math.max(1, cell.cols);
+  const height = Math.max(1, slot.footprint.h) / Math.max(1, cell.rows);
+  return {
+    left: `${(slot.tile.x / Math.max(1, cell.cols)) * 100}%`,
+    top: `${(slot.tile.y / Math.max(1, cell.rows)) * 100}%`,
+    width: `${width * 100}%`,
+    height: `${height * 100}%`,
+  };
+}
+
 export function createTowerNavigator(
   R: OfficeGameShellProps["React"],
   hooks: OfficeGameShellProps["hooks"],
@@ -60,16 +95,23 @@ export function createTowerNavigator(
     // Refs let a keyboard move put real DOM focus on the newly selected band.
     // The map is a ref (not state) so focus never causes a render.
     const refs = useRef<Record<string, HTMLElement | null>>({});
+    // True once the directory has produced a floor. An empty first payload
+    // still selects a floor when it arrives; a user-closed detail does not
+    // reopen itself on the next payload refresh.
+    const hadFloors = useRef(floors.length > 0);
 
     // Keep the selection valid if the payload changes (or arrives empty first).
     useEffect(() => {
+      const arrived = !hadFloors.current && floors.length > 0;
+      hadFloors.current = floors.length > 0;
       if (!floors.length) return;
+      if (!arrived && selectedId === null) return;
       if (selectedId
           && floors.some((floor) => floor.floor_id === selectedId)) {
         return;
       }
-      setSelectedId(floors[0].floor_id);
-    }, [floors, selectedId]);
+      setSelectedId(props.initialFloorId ?? floors[0].floor_id);
+    }, [floors, selectedId, props.initialFloorId]);
 
     const total = floors.length;
     const wings: string[] = [];
@@ -80,10 +122,24 @@ export function createTowerNavigator(
     const dormantCount = total - activeCount;
     const selected = floors.find((floor) => floor.floor_id === selectedId)
       ?? null;
+    const world = props.world ?? null;
+    const worldFloor = selected && world
+      ? world.floors.find((floor) => floor.floor_id === selected.floor_id)
+        ?? null
+      : null;
+    const scene: WorldFloor | null = selected
+      ? (worldFloor ?? templateFloorScene(selected))
+      : null;
+    const sceneSource = worldFloor ? (world?.source ?? "endpoint") : "template";
 
     const select = (floor: FloorTemplate) => {
       setSelectedId(floor.floor_id);
       props.onSelect?.(floor);
+    };
+
+    const closeDetail = () => {
+      setSelectedId(null);
+      props.onClose?.();
     };
 
     const focusFloor = (floorId: string) => {
@@ -111,6 +167,10 @@ export function createTowerNavigator(
         nextIndex = total - 1;
       } else if (event.key === "Enter" || event.key === " ") {
         nextIndex = index;
+      } else if (event.key === "Escape") {
+        event.preventDefault?.();
+        closeDetail();
+        return;
       } else {
         return;
       }
@@ -133,7 +193,8 @@ export function createTowerNavigator(
         },
         className,
         role: "option",
-        tabIndex: isSelected ? 0 : -1,
+        tabIndex: isSelected || (selectedId === null
+          && floor.floor_id === floors[0]?.floor_id) ? 0 : -1,
         "aria-selected": isSelected ? "true" : "false",
         "aria-label": `Floor ${floor.index}, ${floor.name}, `
           + `${stateText(active)}, ${floor.room_count} rooms, `
@@ -176,6 +237,131 @@ export function createTowerNavigator(
         }, value),
       ]);
 
+    const cellCard = (room: WorldRoom, cell: WorldCell) =>
+      R.createElement("div", {
+        key: cell.cell_id,
+        className: "tower__cell",
+        style: cellStyle(cell),
+        role: "group",
+        "aria-label": `${room.name} ${cell.cell_id}, ${cell.cols}x${cell.rows}, `
+          + `${cell.desk_slots.length} desk slots`,
+        "data-testid": "tower-cell",
+        "data-cell": cell.cell_id,
+        "data-cols": cell.cols,
+        "data-rows": cell.rows,
+      }, [
+        R.createElement("span", {
+          key: "label", className: "tower__cellLabel",
+        }, cell.cell_id.toUpperCase()),
+        ...cell.desk_slots.map((slot) => R.createElement("span", {
+          key: slot.desk_id,
+          className: "tower__desk" + (slot.occupied_by ? " is-occupied" : ""),
+          style: deskStyle(slot, cell),
+          "data-testid": "tower-desk",
+          "data-desk": slot.desk_id,
+          "data-seat": slot.seat_id ?? "",
+          "data-occupied": slot.occupied_by ? "true" : "false",
+          title: slot.occupied_by
+            ? `Desk ${slot.desk_id} — ${slot.occupied_by}`
+            : `Desk ${slot.desk_id} — empty`,
+          "aria-label": slot.occupied_by
+            ? `Desk ${slot.desk_id}, occupied by ${slot.occupied_by}`
+            : `Desk ${slot.desk_id}, empty`,
+        })),
+      ]);
+
+    const roomCard = (room: WorldRoom) => {
+      const occupied = occupiedSlots(room);
+      return R.createElement("article", {
+        key: room.room_id,
+        className: "tower__room" + (room.active ? " is-active" : " is-dormant"),
+        "data-testid": "tower-room",
+        "data-room": room.room_id,
+        "data-kind": room.kind,
+        "data-archetype": room.archetype,
+        "data-active": room.active ? "true" : "false",
+        "data-template": room.template ? "true" : "false",
+      }, [
+        R.createElement("div", {
+          key: "head", className: "tower__roomHead",
+        }, [
+          R.createElement("span", {
+            key: "name", className: "tower__roomName",
+          }, room.name),
+          R.createElement("span", {
+            key: "arch", className: "tower__roomArchetype",
+          }, `${room.archetype} · ${room.kind}`),
+          R.createElement("span", {
+            key: "state", className: "tower__floorState",
+          }, stateText(room.active)),
+        ]),
+        R.createElement("div", {
+          key: "meta", className: "tower__roomMeta",
+        }, [
+          R.createElement("span", {
+            key: "cap", "data-testid": "tower-room-capacity",
+          }, `${room.capacity} desks`),
+          R.createElement("span", { key: "cells" },
+            `${room.cell_count} cells`),
+          R.createElement("span", {
+            key: "occ", "data-testid": "tower-room-occupancy",
+          }, `${occupied} staffed · ${Math.max(0, room.capacity - occupied)} `
+            + "empty"),
+        ]),
+        R.createElement("div", {
+          key: "cells", className: "tower__cells",
+        }, room.cells.map((cell) => cellCard(room, cell))),
+      ]);
+    };
+
+    const roomScene = (floor: WorldFloor) => {
+      const occupied = floor.rooms.reduce(
+        (sum, room) => sum + occupiedSlots(room), 0);
+      return R.createElement("section", {
+        key: "scene",
+        className: "tower__scene",
+        "data-testid": "tower-room-scene",
+        "data-floor": floor.floor_id,
+        "data-source": sceneSource,
+        "data-room-count": floor.rooms.length,
+        "data-cell-count": floor.cells,
+        "data-occupied": occupied > 0 ? "true" : "false",
+        "aria-label": `Room scene for floor ${floor.index}`,
+      }, [
+        R.createElement("div", {
+          key: "head", className: "tower__sceneHead",
+        }, [
+          R.createElement("span", {
+            key: "title", className: "tower__sceneTitle",
+            "data-testid": "tower-scene-title",
+          }, `Floor ${floorNumber(floor.index)} · ${wingTitle(floor.wing)}`),
+          R.createElement("span", {
+            key: "cap", className: "tower__sceneMeta",
+            "data-testid": "tower-scene-capacity",
+          }, `${floor.rooms.length} rooms · ${floor.cells} cells · `
+            + `${floor.desk_capacity} desks`),
+          R.createElement("span", {
+            key: "source", className: "tower__sceneSource",
+            "data-testid": "tower-scene-source",
+          }, sceneSource === "endpoint" ? "endpoint rooms" : "template rooms"),
+        ]),
+        floor.rooms.length
+          ? R.createElement("div", {
+              key: "rooms", className: "tower__rooms",
+              "data-testid": "tower-room-grid",
+            }, floor.rooms.map(roomCard))
+          : R.createElement("div", {
+              key: "empty", className: "tower__emptyRooms",
+              "data-testid": "tower-scene-empty", role: "status",
+            }, "This floor has no rooms planned."),
+        R.createElement("p", {
+          key: "note", className: "tower__sceneNote",
+          "data-testid": "tower-scene-note",
+        }, "Template rooms, not staffed agents. Empty desks stay empty until "
+          + "a real Business OS presence is linked."),
+      ]);
+    };
+
     const detail = selected
       ? R.createElement("aside", {
           key: "detail",
@@ -200,6 +386,13 @@ export function createTowerNavigator(
               className: "tower__floorState",
               "data-testid": "tower-detail-state",
             }, stateText(selected.active_by_default)),
+            R.createElement("button", {
+              key: "close", type: "button",
+              className: "tower__close",
+              "data-testid": "tower-detail-close",
+              "aria-label": "Close floor detail",
+              onClick: closeDetail,
+            }, "Close"),
           ]),
           R.createElement("div", {
             key: "rows", className: "tower__detailRows",
@@ -222,12 +415,18 @@ export function createTowerNavigator(
             detailRow("desks", "Planned desks",
                       `${selected.desk_capacity}`, "tower-detail-desks"),
             detailRow(
+              "scene", "Room scene",
+              `${scene?.rooms.length ?? 0} rooms · ${scene?.cells ?? 0} cells`
+                + ` · ${scene?.desk_capacity ?? 0} desks`,
+              "tower-detail-scene"),
+            detailRow(
               "expansion", "Expansion",
               `${selected.expansion_allowed ? "allowed" : "locked"} · `
                 + `${capText(selected.max_rooms, "rooms")} · `
                 + `${capText(selected.max_agents, "agents")}`,
               "tower-detail-expansion"),
           ]),
+          scene ? roomScene(scene) : null,
           R.createElement("p", {
             key: "note", className: "tower__detailNote",
             "data-testid": "tower-detail-note",
@@ -298,8 +497,9 @@ export function createTowerNavigator(
       R.createElement("p", {
         key: "honesty", className: "tower__honesty",
         "data-testid": "tower-honesty",
-      }, "Tower directory — a navigation layer over the real floor templates, "
-        + "not a rendered 3D scene."),
+      }, "Tower directory and room scenes — a navigation layer over the real "
+        + "floor templates, not a rendered 3D scene. Only the selected floor "
+        + "paints rooms; the other 99 stay a directory."),
       body,
     ]);
   };

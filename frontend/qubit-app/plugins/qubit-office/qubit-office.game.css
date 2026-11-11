@@ -1661,6 +1661,192 @@
   font-size: var(--office-fs-xs);
 }
 
+.tower__close {
+  margin-left: auto;
+  padding: 1px 8px;
+  color: var(--office-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--office-fs-xs);
+  background: transparent;
+  border: var(--office-border);
+  border-radius: 2px;
+}
+
+.tower__close:hover,
+.tower__close:focus-visible {
+  color: var(--office-ink);
+  border-color: var(--office-accent);
+  outline: none;
+}
+
+/* Room scene: DOM/CSS only. One selected floor paints rooms; the 99 other
+   floors stay flat directory bands, so a 100-floor payload is never 100
+   canvases. Cells are drawn as a 16x12 grid via gradients; desk slots are the
+   only per-seat nodes. */
+.tower__scene {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: var(--office-border);
+}
+
+.tower__sceneHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--office-s2);
+}
+
+.tower__sceneTitle {
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.tower__sceneMeta {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__sceneSource {
+  margin-left: auto;
+  color: var(--office-muted);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--office-s2);
+}
+
+.tower__room {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px;
+  background: color-mix(in srgb, var(--office-plate) 45%, transparent);
+  border: var(--office-border);
+  border-left: 3px solid var(--office-ok);
+  border-radius: 2px;
+}
+
+.tower__room.is-dormant {
+  opacity: 0.76;
+  border-left-style: dashed;
+  border-left-color: var(--office-line-strong);
+}
+
+.tower__roomHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+}
+
+.tower__roomName {
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+}
+
+.tower__roomArchetype {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  text-transform: lowercase;
+}
+
+.tower__roomHead .tower__floorState {
+  margin-left: auto;
+}
+
+.tower__roomMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 4px;
+}
+
+.tower__cell {
+  position: relative;
+  width: 100%;
+  min-height: 4.5rem;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--office-void) 70%,
+    var(--office-ground));
+  background-image:
+    linear-gradient(to right,
+      color-mix(in srgb, var(--office-line-strong) 55%, transparent) 1px,
+      transparent 1px),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--office-line-strong) 55%, transparent) 1px,
+      transparent 1px);
+  background-size: calc(100% / 16) calc(100% / 12);
+  border: var(--office-border);
+  border-radius: 2px;
+}
+
+.tower__cellLabel {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  color: var(--office-muted);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.tower__desk {
+  position: absolute;
+  display: block;
+  min-width: 4px;
+  min-height: 3px;
+  background: color-mix(in srgb, var(--office-plate) 85%, var(--office-ink));
+  border: 1px solid color-mix(in srgb, var(--office-line-strong) 80%,
+    transparent);
+  border-radius: 1px;
+}
+
+.tower__desk.is-occupied {
+  background: var(--office-ok);
+  border-color: var(--office-ok);
+}
+
+.tower__room.is-dormant .tower__desk {
+  opacity: 0.55;
+}
+
+.tower__sceneNote {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__emptyRooms {
+  padding: var(--office-s2);
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  border: 1px dashed var(--office-line-strong);
+  border-radius: 2px;
+}
+
 @media (max-width: 520px) {
   .tower__floor {
     grid-template-columns: 2.4rem minmax(0, 1fr) auto;

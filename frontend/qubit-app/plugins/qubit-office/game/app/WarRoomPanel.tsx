@@ -18,6 +18,7 @@ import {
   recordWarRoomDecision,
 } from "./business-api";
 import { createTowerNavigator } from "./TowerNavigator";
+import { type WorldTower, fetchWorldTower } from "./world-tower";
 
 export interface WarRoomPanelProps {
   base?: string;
@@ -92,6 +93,7 @@ export function createWarRoomPanel(
       props.sessionId ?? null);
     const [bundle, setBundle] = useState<WarRoomBundle | null>(null);
     const [directory, setDirectory] = useState<BusinessDirectory | null>(null);
+    const [world, setWorld] = useState<WorldTower | null>(null);
     const [title, setTitle] = useState("");
     const [sourceKind, setSourceKind] = useState("note");
     const [sourceLocator, setSourceLocator] = useState("");
@@ -156,6 +158,23 @@ export function createWarRoomPanel(
           const { message, code } = errText(exc);
           setError(code ? `${code}: ${message}` : message);
         }
+      })();
+      return () => { live = false; ctl?.abort(); };
+    }, [tab, directory, props.base, props.fetchImpl]);
+
+    // The room scene is an enhancement over the directory: the navigator
+    // already renders template rooms, so an absent/malformed endpoint simply
+    // leaves the explicit template fallback in place.
+    useEffect(() => {
+      if (tab !== "directory" || !directory) return;
+      let live = true;
+      const ctl = typeof AbortController === "undefined" ? undefined
+        : new AbortController();
+      (async () => {
+        const next = await fetchWorldTower(directory.floors, {
+          ...opts, signal: ctl?.signal,
+        });
+        if (live) setWorld(next);
       })();
       return () => { live = false; ctl?.abort(); };
     }, [tab, directory, props.base, props.fetchImpl]);
@@ -304,7 +323,7 @@ export function createWarRoomPanel(
         ]));
         children.push(section(R, "floors", "Tower directory", [
           R.createElement(TowerNavigator as never, {
-            key: "tower", floors: directory.floors,
+            key: "tower", floors: directory.floors, world,
             "data-testid": "warroom-tower",
           }),
         ]));

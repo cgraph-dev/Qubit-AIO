@@ -4,6 +4,7 @@ import type { FloorTemplate } from "./business-api";
 import {
   allByTestId, byTestId, createHarness, textOf,
 } from "./business-test-harness";
+import { buildTemplateWorldTower, type WorldTower } from "./world-tower";
 
 /* Mirrors the real `build_floor_templates` shape: 100 floors, the five shipped
  * wings in generator order, and 22 active (one per department) / 78 dormant. */
@@ -175,5 +176,117 @@ describe("TowerNavigator renders the real 100-floor directory", () => {
       .toContain("ids —");
     expect(textOf(byTestId(h, "tower-detail-note")[0]))
       .toContain("not staffed agents");
+  });
+});
+
+describe("TowerNavigator room scenes", () => {
+  it("renders the selected floor's rooms, 16x12 cells and empty desks", () => {
+    const h = mount();
+    const scene = byTestId(h, "tower-room-scene");
+    expect(scene).toHaveLength(1);
+    expect(scene[0].props["data-floor"]).toBe("floor-001");
+    expect(scene[0].props["data-source"]).toBe("template");
+    expect(allByTestId(h, "tower-room")).toHaveLength(3);
+    const cells = allByTestId(h, "tower-cell");
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      expect(cell.props["data-cols"]).toBe(16);
+      expect(cell.props["data-rows"]).toBe(12);
+      expect(cell.props.style.aspectRatio).toBe("16 / 12");
+    }
+    const desks = allByTestId(h, "tower-desk");
+    expect(desks.length).toBeGreaterThan(0);
+    expect(desks.every((desk) => desk.props["data-occupied"] === "false"))
+      .toBe(true);
+    expect(textOf(byTestId(h, "tower-scene-note")[0]))
+      .toContain("Template rooms, not staffed agents");
+    expect(textOf(byTestId(h, "tower-scene-capacity")[0]))
+      .toContain("3 rooms");
+    expect(byTestId(h, "agent-control")).toHaveLength(0);
+    expect(byTestId(h, "agents-panel")).toHaveLength(0);
+  });
+
+  it("renders endpoint rooms when the world payload provides them", () => {
+    const world: WorldTower = {
+      ...buildTemplateWorldTower(realFloors()),
+      source: "endpoint",
+      floors: buildTemplateWorldTower(realFloors()).floors.map((floor) =>
+        floor.floor_id === "floor-001"
+          ? {
+              ...floor,
+              rooms: floor.rooms.map((room, index) => ({
+                ...room,
+                room_id: `live-${index}`,
+                name: `Endpoint Room ${index + 1}`,
+                archetype: "open_office",
+                kind: "work",
+              })),
+            }
+          : floor),
+    };
+    const h = mount({ world });
+    const scene = byTestId(h, "tower-room-scene")[0];
+    expect(scene.props["data-source"]).toBe("endpoint");
+    expect(textOf(byTestId(h, "tower-scene-source")[0]))
+      .toBe("endpoint rooms");
+    const rooms = allByTestId(h, "tower-room");
+    expect(rooms).toHaveLength(3);
+    expect(textOf(rooms[0])).toContain("Endpoint Room 1");
+    expect(rooms[0].props["data-archetype"]).toBe("open_office");
+    expect(rooms[0].props["data-kind"]).toBe("work");
+  });
+
+  it("stays dormant/active with the floor and the room", () => {
+    const h = mount();
+    const active = allByTestId(h, "tower-room");
+    expect(active.every((room) => room.props["data-active"] === "true"))
+      .toBe(true);
+    (floor(h, "floor-050")!.props.onClick as () => void)();
+    h.flush();
+    const dormant = allByTestId(h, "tower-room");
+    expect(dormant.length).toBeGreaterThan(0);
+    expect(dormant.every((room) => room.props["data-active"] === "false"))
+      .toBe(true);
+    expect(dormant[0].props.className).toContain("is-dormant");
+  });
+
+  it("closes the detail with the button and Escape without the list vanishing", () => {
+    const h = mount();
+    expect(byTestId(h, "tower-floor-detail")).toHaveLength(1);
+    (byTestId(h, "tower-detail-close")[0].props.onClick as () => void)();
+    h.flush();
+    expect(byTestId(h, "tower-floor-detail")).toHaveLength(0);
+    expect(byTestId(h, "tower-detail-empty")).toHaveLength(1);
+    expect(allByTestId(h, "tower-floor")).toHaveLength(100);
+    // Opening a floor again works, and Escape closes it again.
+    (floor(h, "floor-002")!.props.onClick as () => void)();
+    h.flush();
+    expect(byTestId(h, "tower-floor-detail")).toHaveLength(1);
+    press(h, "floor-002", "Escape");
+    expect(byTestId(h, "tower-floor-detail")).toHaveLength(0);
+  });
+
+  it("guards a large payload: only the selected floor paints rooms", () => {
+    const huge: FloorTemplate[] = Array.from({ length: 100 }, (_, i) => ({
+      floor_id: `floor-${String(i + 1).padStart(3, "0")}`,
+      index: i + 1,
+      wing: WINGS[Math.floor(i / 20)],
+      name: `Floor ${i + 1}`,
+      department_ids: ["revenue"],
+      role_ids: ["role-1"],
+      room_count: 8,
+      desk_capacity: 192,
+      active_by_default: i < 22,
+      max_rooms: null,
+      max_agents: null,
+      expansion_allowed: true,
+    }));
+    const world = buildTemplateWorldTower(huge);
+    const h = mount({ floors: huge, world });
+    expect(allByTestId(h, "tower-floor")).toHaveLength(100);
+    expect(allByTestId(h, "tower-room")).toHaveLength(8);
+    expect(allByTestId(h, "tower-cell")).toHaveLength(32);
+    expect(h.tree.some((el) => el.type === "canvas")).toBe(false);
+    expect(h.tree.length).toBeLessThan(3000);
   });
 });

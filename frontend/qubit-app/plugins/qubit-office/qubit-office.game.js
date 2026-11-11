@@ -194322,6 +194322,359 @@ create: function(game) {
 			}, children);
 		};
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/world-tower.ts
+	var WORLD_PATH = "/api/office/world";
+	var WORLD_SCHEMA = "qubit-office-world-tower/1";
+	/** Fixed desk slots inside one 16x12 cell (top-left tiles of a 2x1 desk). */
+	var DESK_TILES = [
+		[2, 2],
+		[7, 2],
+		[12, 2],
+		[2, 8],
+		[7, 8],
+		[12, 8]
+	];
+	var WorldApiError = class extends Error {
+		code;
+		status;
+		constructor(message, code, status) {
+			super(message);
+			this.name = "WorldApiError";
+			this.code = code;
+			this.status = status;
+		}
+	};
+	function worldUrl(path, base) {
+		const raw = base === void 0 ? hostBasePath() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${WORLD_PATH}${path.startsWith("/") ? path : `/${path}`}`;
+	}
+	function int(value, fallback = 0) {
+		const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+		return Number.isFinite(n) ? Math.trunc(n) : fallback;
+	}
+	function record$1(value) {
+		return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+	}
+	function strings(value) {
+		return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+	}
+	function tile(value, fallback) {
+		const row = record$1(value);
+		return {
+			x: Math.max(0, Math.min(15, int(row?.x, fallback[0]))),
+			y: Math.max(0, Math.min(11, int(row?.y, fallback[1])))
+		};
+	}
+	/** Plan fixed 16x12 cells for an exact desk count. Never stretches a cell. */
+	function planCellCluster(roomId, desks) {
+		const safeDesks = Math.max(0, int(desks));
+		const count = Math.max(1, Math.ceil(safeDesks / 6));
+		const base = Math.floor(safeDesks / count);
+		const extra = safeDesks % count;
+		let seat = 0;
+		const cells = [];
+		for (let index = 0; index < count; index += 1) {
+			const cellDesks = base + (index < extra ? 1 : 0);
+			const slots = [];
+			for (let slot = 0; slot < cellDesks; slot += 1) {
+				const [x, y] = DESK_TILES[slot % DESK_TILES.length];
+				slots.push({
+					desk_id: `${roomId}:c${index}:d${slot}`,
+					seat_id: `${roomId}:c${index}:s${seat}`,
+					tile: {
+						x,
+						y
+					},
+					footprint: {
+						w: 2,
+						h: 1
+					},
+					occupied_by: null
+				});
+				seat += 1;
+			}
+			const col = index % 2;
+			const row = Math.floor(index / 2);
+			cells.push({
+				cell_id: `c${index}`,
+				index,
+				cols: 16,
+				rows: 12,
+				origin: {
+					x: col * 18,
+					y: row * 14
+				},
+				desk_slots: slots
+			});
+		}
+		return cells;
+	}
+	/** Derive labeled template rooms from a floor's room/desk counts. */
+	function templateRooms(floorId, roomCount, capacity, active, roleIds = []) {
+		const count = Math.max(0, int(roomCount));
+		const desksTotal = Math.max(0, int(capacity));
+		const base = count > 0 ? Math.floor(desksTotal / count) : 0;
+		const extra = count > 0 ? desksTotal % count : 0;
+		return Array.from({ length: count }, (_, index) => {
+			const id = `${floorId}-room-${index + 1}`;
+			const desks = base + (index < extra ? 1 : 0);
+			const cells = planCellCluster(id, desks);
+			return {
+				room_id: id,
+				name: `Room ${index + 1}`,
+				kind: "template",
+				archetype: "template",
+				role_ids: roleIds,
+				active,
+				state: "template",
+				template: true,
+				capacity: desks,
+				cell_count: cells.length,
+				cells
+			};
+		});
+	}
+	function normalizeSlots(raw) {
+		return (Array.isArray(raw) ? raw : []).map((item, index) => {
+			const row = record$1(item) ?? {};
+			const seat = record$1(row.seat);
+			const footprint = record$1(row.footprint);
+			const fallback = DESK_TILES[index % DESK_TILES.length];
+			const deskId = typeof row.desk_id === "string" && row.desk_id ? row.desk_id : `desk-${index}`;
+			const seatId = typeof row.seat_id === "string" ? row.seat_id : typeof seat?.seat_id === "string" ? seat.seat_id : null;
+			const occupied = typeof row.occupied_by === "string" && row.occupied_by ? row.occupied_by : typeof seat?.occupied_by === "string" && seat.occupied_by ? seat.occupied_by : null;
+			return {
+				desk_id: deskId,
+				seat_id: seatId,
+				tile: tile(row.tile ?? seat?.tile, fallback),
+				footprint: {
+					w: Math.max(1, int(footprint?.w, 2)),
+					h: Math.max(1, int(footprint?.h, 1))
+				},
+				occupied_by: occupied
+			};
+		});
+	}
+	function normalizeCells(raw, roomId, capacity) {
+		const items = Array.isArray(raw) ? raw : [];
+		if (!items.length) return planCellCluster(roomId, capacity);
+		const cells = items.map((item, index) => {
+			const row = record$1(item) ?? {};
+			const slots = normalizeSlots(row.desk_slots ?? row.desks);
+			const origin = record$1(row.origin);
+			return {
+				cell_id: typeof row.cell_id === "string" && row.cell_id ? row.cell_id : `c${index}`,
+				index: int(row.index, index),
+				cols: int(row.cols, 16),
+				rows: int(row.rows, 12),
+				origin: {
+					x: int(origin?.x, index % 2 * 18),
+					y: int(origin?.y, Math.floor(index / 2) * 14)
+				},
+				desk_slots: slots
+			};
+		});
+		const slots = cells.reduce((sum, cell) => sum + cell.desk_slots.length, 0);
+		return capacity > 0 && slots === 0 ? planCellCluster(roomId, capacity) : cells;
+	}
+	function normalizeRoom(raw, floorActive, index) {
+		const row = record$1(raw) ?? {};
+		const roomId = typeof row.room_id === "string" && row.room_id ? row.room_id : `room-${index + 1}`;
+		const name = typeof row.name === "string" && row.name ? row.name : `Room ${index + 1}`;
+		const kind = typeof row.kind === "string" && row.kind ? row.kind : "template";
+		const archetype = typeof row.archetype === "string" && row.archetype ? row.archetype : kind;
+		const state = typeof row.state === "string" ? row.state : "template";
+		const active = typeof row.active === "boolean" ? row.active : state.toUpperCase() !== "DORMANT" && floorActive;
+		const declared = int(row.capacity ?? row.desk_count ?? row.desks, 0);
+		const cells = normalizeCells(row.cells, roomId, declared);
+		const slots = cells.reduce((sum, cell) => sum + cell.desk_slots.length, 0);
+		const capacity = slots > 0 ? slots : Math.max(0, declared);
+		return {
+			room_id: roomId,
+			name,
+			kind,
+			archetype,
+			role_ids: strings(row.role_ids),
+			active,
+			state,
+			template: row.template !== false,
+			capacity,
+			cell_count: cells.length,
+			cells
+		};
+	}
+	function normalizeFloor(raw, index) {
+		const row = record$1(raw) ?? {};
+		const floorId = typeof row.floor_id === "string" && row.floor_id ? row.floor_id : `floor-${String(index + 1).padStart(3, "0")}`;
+		const wing = typeof row.wing === "string" && row.wing ? row.wing : "central";
+		const active = row.active_by_default === true || row.active_by_default === void 0 && row.active === true;
+		const roomsRaw = Array.isArray(row.rooms) ? row.rooms : [];
+		const expectedRooms = int(row.room_count ?? record$1(row.capacity)?.rooms, 0);
+		const expectedDesks = int(row.desk_capacity ?? record$1(row.capacity)?.desks, 0);
+		const rooms = roomsRaw.length ? roomsRaw.map((room, i) => normalizeRoom(room, active, i)) : expectedRooms > 0 ? templateRooms(floorId, expectedRooms, expectedDesks, active, strings(row.role_ids)) : [];
+		const cells = rooms.reduce((sum, room) => sum + room.cell_count, 0);
+		const desks = rooms.reduce((sum, room) => sum + room.capacity, 0);
+		return {
+			floor_id: floorId,
+			index: int(row.index, index + 1),
+			wing,
+			wing_name: typeof row.wing_name === "string" && row.wing_name ? row.wing_name : `${wing.charAt(0).toUpperCase()}${wing.slice(1)} Wing`,
+			name: typeof row.name === "string" && row.name ? row.name : `Floor ${String(index + 1).padStart(3, "0")}`,
+			active,
+			active_by_default: active,
+			department_ids: strings(row.department_ids),
+			role_ids: strings(row.role_ids),
+			room_count: rooms.length,
+			desk_capacity: desks,
+			cells,
+			capacity: {
+				rooms: rooms.length,
+				cells,
+				desks
+			},
+			rooms
+		};
+	}
+	function countTower(floors) {
+		let rooms = 0, cells = 0, desks = 0, activeRooms = 0;
+		let agents = 0;
+		const occupied = /* @__PURE__ */ new Set();
+		for (const floor of floors) {
+			rooms += floor.rooms.length;
+			for (const room of floor.rooms) {
+				if (room.active) activeRooms += 1;
+				cells += room.cell_count;
+				desks += room.capacity;
+				for (const cell of room.cells) for (const slot of cell.desk_slots) if (slot.occupied_by) occupied.add(slot.occupied_by);
+			}
+		}
+		agents = occupied.size;
+		const activeFloors = floors.filter((floor) => floor.active).length;
+		return {
+			floors: floors.length,
+			wings: new Set(floors.map((floor) => floor.wing)).size,
+			active_floors: activeFloors,
+			dormant_floors: floors.length - activeFloors,
+			rooms,
+			cells,
+			desks,
+			active_rooms: activeRooms,
+			dormant_rooms: rooms - activeRooms,
+			agents
+		};
+	}
+	function wingSummaries(floors) {
+		const order = [];
+		const map = /* @__PURE__ */ new Map();
+		for (const floor of floors) {
+			if (!map.has(floor.wing)) {
+				order.push(floor.wing);
+				map.set(floor.wing, {
+					wing: floor.wing,
+					name: floor.wing_name,
+					floor_count: 0,
+					active_floors: 0,
+					dormant_floors: 0,
+					rooms: 0
+				});
+			}
+			const item = map.get(floor.wing);
+			item.floor_count += 1;
+			item.active_floors += floor.active ? 1 : 0;
+			item.dormant_floors += floor.active ? 0 : 1;
+			item.rooms += floor.rooms.length;
+		}
+		return order.map((wing) => map.get(wing));
+	}
+	function normalizeTower(raw) {
+		const row = record$1(raw);
+		if (!row || row.ok !== true || !Array.isArray(row.floors)) throw new WorldApiError("The world endpoint returned no usable tower.", "WORLD_BAD_RESPONSE", 200);
+		const floors = row.floors.map((floor, index) => normalizeFloor(floor, index));
+		if (!floors.length) throw new WorldApiError("The world endpoint returned zero floors.", "WORLD_EMPTY", 200);
+		const counts = countTower(floors);
+		return {
+			ok: true,
+			schema: typeof row.schema === "string" && row.schema ? row.schema : WORLD_SCHEMA,
+			source: "endpoint",
+			server_source: typeof row.source === "string" ? row.source : void 0,
+			staffed: counts.agents > 0,
+			campus: record$1(row.campus),
+			counts,
+			wings: wingSummaries(floors),
+			floors
+		};
+	}
+	/** A template floor scene derived only from the directory row. */
+	function templateFloorScene(floor) {
+		const rooms = templateRooms(floor.floor_id, floor.room_count, floor.desk_capacity, floor.active_by_default, []);
+		const cells = rooms.reduce((sum, room) => sum + room.cell_count, 0);
+		const desks = rooms.reduce((sum, room) => sum + room.capacity, 0);
+		return {
+			floor_id: floor.floor_id,
+			index: floor.index,
+			wing: floor.wing,
+			wing_name: `${floor.wing.charAt(0).toUpperCase()}${floor.wing.slice(1)} Wing`,
+			name: floor.name,
+			active: floor.active_by_default,
+			active_by_default: floor.active_by_default,
+			department_ids: floor.department_ids,
+			role_ids: floor.role_ids,
+			room_count: rooms.length,
+			desk_capacity: desks,
+			cells,
+			capacity: {
+				rooms: rooms.length,
+				cells,
+				desks
+			},
+			rooms
+		};
+	}
+	/** Project the whole directory into scene floors without any network call. */
+	function buildTemplateWorldTower(floors, reason = "The world endpoint is unavailable.") {
+		const scenes = (floors ?? []).map(templateFloorScene);
+		return {
+			ok: true,
+			schema: WORLD_SCHEMA,
+			source: "template",
+			staffed: false,
+			counts: countTower(scenes),
+			wings: wingSummaries(scenes),
+			floors: scenes,
+			fallback_reason: reason
+		};
+	}
+	function fallbackReason(exc) {
+		if (exc instanceof WorldApiError) return exc.message;
+		if (exc instanceof Error && exc.message) return exc.message;
+		return "The world endpoint is unavailable.";
+	}
+	/** Fetch the tower scene; always answer with a usable payload.
+	*
+	* A 404, an unreachable host, a malformed body or an empty floor list all
+	* project the directory templates instead. The fallback marks every room as a
+	* template and every desk as empty, so a missing endpoint never fabricates
+	* staff.
+	*/
+	async function fetchWorldTower(fallbackFloors, opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		const url = worldUrl("/tower", opts.base);
+		const headers = { Accept: "application/json" };
+		const token = readToken(opts.win);
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		try {
+			const res = await f(url, {
+				method: "GET",
+				headers,
+				credentials: "same-origin",
+				signal: opts.signal
+			});
+			if (!res.ok) throw new WorldApiError(`The world endpoint answered HTTP ${res.status}.`, `WORLD_HTTP_${res.status}`, res.status);
+			return normalizeTower(await res.json().catch(() => null));
+		} catch (exc) {
+			return buildTemplateWorldTower(fallbackFloors, fallbackReason(exc));
+		}
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/TowerNavigator.tsx
 	function wingTitle(wing) {
 		if (!wing) return "Unassigned wing";
@@ -194336,26 +194689,60 @@ create: function(game) {
 	function floorNumber(index) {
 		return String(index).padStart(3, "0");
 	}
+	function occupiedSlots(room) {
+		let occupied = 0;
+		for (const cell of room.cells) for (const slot of cell.desk_slots) if (slot.occupied_by) occupied += 1;
+		return occupied;
+	}
+	function cellStyle(cell) {
+		return { aspectRatio: `${cell.cols} / ${cell.rows}` };
+	}
+	function deskStyle(slot, cell) {
+		const width = Math.max(1, slot.footprint.w) / Math.max(1, cell.cols);
+		const height = Math.max(1, slot.footprint.h) / Math.max(1, cell.rows);
+		return {
+			left: `${slot.tile.x / Math.max(1, cell.cols) * 100}%`,
+			top: `${slot.tile.y / Math.max(1, cell.rows) * 100}%`,
+			width: `${width * 100}%`,
+			height: `${height * 100}%`
+		};
+	}
 	function createTowerNavigator(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
 		return function TowerNavigator(props) {
 			const floors = props.floors ?? [];
 			const [selectedId, setSelectedId] = useState(props.initialFloorId ?? floors[0]?.floor_id ?? null);
 			const refs = useRef({});
+			const hadFloors = useRef(floors.length > 0);
 			useEffect(() => {
+				const arrived = !hadFloors.current && floors.length > 0;
+				hadFloors.current = floors.length > 0;
 				if (!floors.length) return;
+				if (!arrived && selectedId === null) return;
 				if (selectedId && floors.some((floor) => floor.floor_id === selectedId)) return;
-				setSelectedId(floors[0].floor_id);
-			}, [floors, selectedId]);
+				setSelectedId(props.initialFloorId ?? floors[0].floor_id);
+			}, [
+				floors,
+				selectedId,
+				props.initialFloorId
+			]);
 			const total = floors.length;
 			const wings = [];
 			for (const floor of floors) if (!wings.includes(floor.wing)) wings.push(floor.wing);
 			const activeCount = floors.filter((floor) => floor.active_by_default).length;
 			const dormantCount = total - activeCount;
 			const selected = floors.find((floor) => floor.floor_id === selectedId) ?? null;
+			const world = props.world ?? null;
+			const worldFloor = selected && world ? world.floors.find((floor) => floor.floor_id === selected.floor_id) ?? null : null;
+			const scene = selected ? worldFloor ?? templateFloorScene(selected) : null;
+			const sceneSource = worldFloor ? world?.source ?? "endpoint" : "template";
 			const select = (floor) => {
 				setSelectedId(floor.floor_id);
 				props.onSelect?.(floor);
+			};
+			const closeDetail = () => {
+				setSelectedId(null);
+				props.onClose?.();
 			};
 			const focusFloor = (floorId) => {
 				const node = refs.current[floorId];
@@ -194370,7 +194757,11 @@ create: function(game) {
 				else if (event.key === "Home") nextIndex = 0;
 				else if (event.key === "End") nextIndex = total - 1;
 				else if (event.key === "Enter" || event.key === " ") nextIndex = index;
-				else return;
+				else if (event.key === "Escape") {
+					event.preventDefault?.();
+					closeDetail();
+					return;
+				} else return;
 				event.preventDefault?.();
 				const next = floors[nextIndex];
 				select(next);
@@ -194387,7 +194778,7 @@ create: function(game) {
 					},
 					className,
 					role: "option",
-					tabIndex: isSelected ? 0 : -1,
+					tabIndex: isSelected || selectedId === null && floor.floor_id === floors[0]?.floor_id ? 0 : -1,
 					"aria-selected": isSelected ? "true" : "false",
 					"aria-label": `Floor ${floor.index}, ${floor.name}, ${stateText(active)}, ${floor.room_count} rooms, ${floor.desk_capacity} desks`,
 					"data-testid": "tower-floor",
@@ -194427,6 +194818,129 @@ create: function(game) {
 				className: "tower__detailValue",
 				"data-testid": testId
 			}, value)]);
+			const cellCard = (room, cell) => R.createElement("div", {
+				key: cell.cell_id,
+				className: "tower__cell",
+				style: cellStyle(cell),
+				role: "group",
+				"aria-label": `${room.name} ${cell.cell_id}, ${cell.cols}x${cell.rows}, ${cell.desk_slots.length} desk slots`,
+				"data-testid": "tower-cell",
+				"data-cell": cell.cell_id,
+				"data-cols": cell.cols,
+				"data-rows": cell.rows
+			}, [R.createElement("span", {
+				key: "label",
+				className: "tower__cellLabel"
+			}, cell.cell_id.toUpperCase()), ...cell.desk_slots.map((slot) => R.createElement("span", {
+				key: slot.desk_id,
+				className: "tower__desk" + (slot.occupied_by ? " is-occupied" : ""),
+				style: deskStyle(slot, cell),
+				"data-testid": "tower-desk",
+				"data-desk": slot.desk_id,
+				"data-seat": slot.seat_id ?? "",
+				"data-occupied": slot.occupied_by ? "true" : "false",
+				title: slot.occupied_by ? `Desk ${slot.desk_id} — ${slot.occupied_by}` : `Desk ${slot.desk_id} — empty`,
+				"aria-label": slot.occupied_by ? `Desk ${slot.desk_id}, occupied by ${slot.occupied_by}` : `Desk ${slot.desk_id}, empty`
+			}))]);
+			const roomCard = (room) => {
+				const occupied = occupiedSlots(room);
+				return R.createElement("article", {
+					key: room.room_id,
+					className: "tower__room" + (room.active ? " is-active" : " is-dormant"),
+					"data-testid": "tower-room",
+					"data-room": room.room_id,
+					"data-kind": room.kind,
+					"data-archetype": room.archetype,
+					"data-active": room.active ? "true" : "false",
+					"data-template": room.template ? "true" : "false"
+				}, [
+					R.createElement("div", {
+						key: "head",
+						className: "tower__roomHead"
+					}, [
+						R.createElement("span", {
+							key: "name",
+							className: "tower__roomName"
+						}, room.name),
+						R.createElement("span", {
+							key: "arch",
+							className: "tower__roomArchetype"
+						}, `${room.archetype} · ${room.kind}`),
+						R.createElement("span", {
+							key: "state",
+							className: "tower__floorState"
+						}, stateText(room.active))
+					]),
+					R.createElement("div", {
+						key: "meta",
+						className: "tower__roomMeta"
+					}, [
+						R.createElement("span", {
+							key: "cap",
+							"data-testid": "tower-room-capacity"
+						}, `${room.capacity} desks`),
+						R.createElement("span", { key: "cells" }, `${room.cell_count} cells`),
+						R.createElement("span", {
+							key: "occ",
+							"data-testid": "tower-room-occupancy"
+						}, `${occupied} staffed · ${Math.max(0, room.capacity - occupied)} empty`)
+					]),
+					R.createElement("div", {
+						key: "cells",
+						className: "tower__cells"
+					}, room.cells.map((cell) => cellCard(room, cell)))
+				]);
+			};
+			const roomScene = (floor) => {
+				const occupied = floor.rooms.reduce((sum, room) => sum + occupiedSlots(room), 0);
+				return R.createElement("section", {
+					key: "scene",
+					className: "tower__scene",
+					"data-testid": "tower-room-scene",
+					"data-floor": floor.floor_id,
+					"data-source": sceneSource,
+					"data-room-count": floor.rooms.length,
+					"data-cell-count": floor.cells,
+					"data-occupied": occupied > 0 ? "true" : "false",
+					"aria-label": `Room scene for floor ${floor.index}`
+				}, [
+					R.createElement("div", {
+						key: "head",
+						className: "tower__sceneHead"
+					}, [
+						R.createElement("span", {
+							key: "title",
+							className: "tower__sceneTitle",
+							"data-testid": "tower-scene-title"
+						}, `Floor ${floorNumber(floor.index)} · ${wingTitle(floor.wing)}`),
+						R.createElement("span", {
+							key: "cap",
+							className: "tower__sceneMeta",
+							"data-testid": "tower-scene-capacity"
+						}, `${floor.rooms.length} rooms · ${floor.cells} cells · ${floor.desk_capacity} desks`),
+						R.createElement("span", {
+							key: "source",
+							className: "tower__sceneSource",
+							"data-testid": "tower-scene-source"
+						}, sceneSource === "endpoint" ? "endpoint rooms" : "template rooms")
+					]),
+					floor.rooms.length ? R.createElement("div", {
+						key: "rooms",
+						className: "tower__rooms",
+						"data-testid": "tower-room-grid"
+					}, floor.rooms.map(roomCard)) : R.createElement("div", {
+						key: "empty",
+						className: "tower__emptyRooms",
+						"data-testid": "tower-scene-empty",
+						role: "status"
+					}, "This floor has no rooms planned."),
+					R.createElement("p", {
+						key: "note",
+						className: "tower__sceneNote",
+						"data-testid": "tower-scene-note"
+					}, "Template rooms, not staffed agents. Empty desks stay empty until a real Business OS presence is linked.")
+				]);
+			};
 			const detail = selected ? R.createElement("aside", {
 				key: "detail",
 				className: "tower__detail" + (selected.active_by_default ? " is-active" : " is-dormant"),
@@ -194440,15 +194954,26 @@ create: function(game) {
 				R.createElement("div", {
 					key: "head",
 					className: "tower__detailHead"
-				}, [R.createElement("h4", {
-					key: "t",
-					className: "tower__detailTitle",
-					"data-testid": "tower-detail-name"
-				}, `Floor ${floorNumber(selected.index)} — ${selected.name}`), R.createElement("span", {
-					key: "s",
-					className: "tower__floorState",
-					"data-testid": "tower-detail-state"
-				}, stateText(selected.active_by_default))]),
+				}, [
+					R.createElement("h4", {
+						key: "t",
+						className: "tower__detailTitle",
+						"data-testid": "tower-detail-name"
+					}, `Floor ${floorNumber(selected.index)} — ${selected.name}`),
+					R.createElement("span", {
+						key: "s",
+						className: "tower__floorState",
+						"data-testid": "tower-detail-state"
+					}, stateText(selected.active_by_default)),
+					R.createElement("button", {
+						key: "close",
+						type: "button",
+						className: "tower__close",
+						"data-testid": "tower-detail-close",
+						"aria-label": "Close floor detail",
+						onClick: closeDetail
+					}, "Close")
+				]),
 				R.createElement("div", {
 					key: "rows",
 					className: "tower__detailRows"
@@ -194458,8 +194983,10 @@ create: function(game) {
 					detailRow("roles", "Role templates", `${selected.role_ids.length} ids — ` + (selected.role_ids.length ? selected.role_ids.join(", ") : "none"), "tower-detail-roles"),
 					detailRow("rooms", "Planned rooms", `${selected.room_count}`, "tower-detail-rooms"),
 					detailRow("desks", "Planned desks", `${selected.desk_capacity}`, "tower-detail-desks"),
+					detailRow("scene", "Room scene", `${scene?.rooms.length ?? 0} rooms · ${scene?.cells ?? 0} cells · ${scene?.desk_capacity ?? 0} desks`, "tower-detail-scene"),
 					detailRow("expansion", "Expansion", `${selected.expansion_allowed ? "allowed" : "locked"} · ${capText(selected.max_rooms, "rooms")} · ${capText(selected.max_agents, "agents")}`, "tower-detail-expansion")
 				]),
+				scene ? roomScene(scene) : null,
 				R.createElement("p", {
 					key: "note",
 					className: "tower__detailNote",
@@ -194526,7 +195053,7 @@ create: function(game) {
 					key: "honesty",
 					className: "tower__honesty",
 					"data-testid": "tower-honesty"
-				}, "Tower directory — a navigation layer over the real floor templates, not a rendered 3D scene."),
+				}, "Tower directory and room scenes — a navigation layer over the real floor templates, not a rendered 3D scene. Only the selected floor paints rooms; the other 99 stay a directory."),
 				body
 			]);
 		};
@@ -194583,6 +195110,7 @@ create: function(game) {
 			const [selectedId, setSelectedId] = useState(props.sessionId ?? null);
 			const [bundle, setBundle] = useState(null);
 			const [directory, setDirectory] = useState(null);
+			const [world, setWorld] = useState(null);
 			const [title, setTitle] = useState("");
 			const [sourceKind, setSourceKind] = useState("note");
 			const [sourceLocator, setSourceLocator] = useState("");
@@ -194662,6 +195190,27 @@ create: function(game) {
 						const { message, code } = errText(exc);
 						setError(code ? `${code}: ${message}` : message);
 					}
+				})();
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				tab,
+				directory,
+				props.base,
+				props.fetchImpl
+			]);
+			useEffect(() => {
+				if (tab !== "directory" || !directory) return;
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				(async () => {
+					const next = await fetchWorldTower(directory.floors, {
+						...opts,
+						signal: ctl?.signal
+					});
+					if (live) setWorld(next);
 				})();
 				return () => {
 					live = false;
@@ -194817,6 +195366,7 @@ create: function(game) {
 					children.push(section(R, "floors", "Tower directory", [R.createElement(TowerNavigator, {
 						key: "tower",
 						floors: directory.floors,
+						world,
 						"data-testid": "warroom-tower"
 					})]));
 				}
