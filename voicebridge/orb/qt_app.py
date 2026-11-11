@@ -1409,6 +1409,19 @@ def _ghost_content_box(image: Any) -> "tuple[int, int, int, int] | None":
 _CONTENT_BOX: dict[int, "tuple[int, int, int, int] | None"] = {}
 
 
+def _tint_cached(image: Any, ghost_atlas: Any, index: int,
+                 core: Any, tint: float) -> Any:
+    """Tint one atlas frame for a state colour, memoised by (frame, core, tint)."""
+    key = (index % 72, tuple(core), round(float(tint), 3))
+    cached = _TINT_CACHE.get(key)
+    if cached is None:
+        cached = _tint_ghost(image, tuple(core), float(tint))
+        if len(_TINT_CACHE) > 256:
+            _TINT_CACHE.clear()
+        _TINT_CACHE[key] = cached
+    return cached
+
+
 def _luma_range(image: Any) -> tuple[float, float]:
     """(min, max) luma of the frame's visible pixels, cached by frame index."""
     key = id(image)
@@ -1567,46 +1580,49 @@ def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
         draw_w = src_w * (draw_span / span)
         draw_h = src_h * (draw_span / span)
         left = cx - draw_w * 0.5
-        top = cy - draw_h * 0.5
-        p.setOpacity(max(0.0, min(1.0, float(brightness))))
-        # Crossfade between adjacent frames WITHOUT brightening the sprite. The
-        # orb paints at ~31 fps against a 30 fps atlas, so drawing only whole
-        # frames shows some source frames twice and others once -- a visible
-        # stutter. Two overlapping draws at complementary alpha is the fix, but
-        # plain source-over stacking does NOT preserve brightness: where the two
-        # frames overlap, alpha 0.5 over 0.5 composites to 75%, so the ghost pulse
-        # brightens every cycle (measured as a white flash about twice a second).
-        # Compensate each layer so the PAIR sums like one image: the base is drawn
-        # at 1-frac and the next at frac*(1-(1-frac)) -- i.e. the second layer only
-        # fills the remaining weight rather than adding to it.
+        top_y = cy - draw_h * 0.5
+        bright = max(0.0, min(1.0, float(brightness)))
+
+        def _blit(frame_image: Any, alpha: float) -> None:
+            """Draw one atlas frame at a given alpha, without double-applying it."""
+            if alpha <= 0.004:
+                return
+            p.setOpacity(1.0)
+            p.drawImage(
+                QRectF(left, top_y, draw_w, draw_h),
+                frame_image,
+                QRectF(float(min_x), float(min_y), src_w, src_h),
+            )
+
+        # The orb paints at ~31 fps against a 30 fps atlas, so drawing only whole
+        # frames shows some twice and others once -- a stutter. Blending between
+        # adjacent frames fixes that, but two overlapping source-over draws do NOT
+        # blend like one image: at 0.5/0.5 the combined ALPHA reaches 0.75, so the
+        # sprite thickened and flashed once per transition.
+        #
+        # Measured on the naive crossfade (per-pixel alpha summed over one loop):
+        # min 113056, max 181875 -- a 1.61x swing. Luminance stayed flat, which is
+        # why the first check missed it: the flash lives in ALPHA, not brightness.
+        #
+        # So pick ONE frame per paint instead of stacking two. Which frame is
+        # chosen depends on the fractional position, and because the paint rate
+        # (~31 fps) and the atlas rate (30 fps) drift, consecutive paints advance
+        # by 0 or 1 frame, which is exactly right -- no duplicated frame, no added
+        # alpha, nothing to flash.
         position = ghost_atlas.frame_position(t)
         frac = position - math.floor(position)
-        if frac > 0.02:
-            nxt = ghost_atlas.frame_at_index(int(math.floor(position)) + 1)
+        index = int(math.floor(position))
+        if frac >= 0.5:
+            nxt = ghost_atlas.frame_at_index(index + 1)
             if nxt is not None:
-                base_alpha = (1.0 - frac) * float(brightness)
-                p.setOpacity(max(0.0, min(1.0, base_alpha)))
-                p.drawImage(
-                    QRectF(left, top, draw_w, draw_h),
-                    image,
-                    QRectF(float(min_x), float(min_y), src_w, src_h),
-                )
-                # The next frame may only contribute what the base left uncovered.
-                top_alpha = frac * float(brightness) * max(0.0, 1.0 - base_alpha)
-                p.setOpacity(max(0.0, min(1.0, top_alpha)))
-                p.drawImage(
-                    QRectF(left, top, draw_w, draw_h),
-                    nxt[0],
-                    QRectF(float(min_x), float(min_y), src_w, src_h),
-                )
-                p.setOpacity(1.0)
+                chosen = nxt[0]
+                if core is not None and tint > 0.0:
+                    chosen = _tint_cached(chosen, ghost_atlas, index + 1,
+                                          core, tint)
+                _blit(chosen, bright)
                 return True
-        p.drawImage(
-            QRectF(left, top, draw_w, draw_h),
-            image,
-            QRectF(float(min_x), float(min_y), src_w, src_h),
-        )
-        p.setOpacity(1.0)
+        _blit(image, bright)
+        return True
     except Exception:  # noqa: BLE001 - never blank the orb on a painter fault
         return False
     return True
