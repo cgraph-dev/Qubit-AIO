@@ -39,6 +39,10 @@ class OrbOptions:
     show_tray: bool = True
     #: state -> "#RRGGBB" override (empty = built-in palette).
     colors: Dict[str, str] = field(default_factory=dict)
+    #: Which mark to draw: "atom" (rings + particles + nucleus) or "ghost"
+    #: (the drifting sheet ghost ported from pixelfx). Both read the same
+    #: clock and honour reduced-motion; they are alternative marks, not layers.
+    style: str = "atom"
 
 
 def state_dir() -> Path:

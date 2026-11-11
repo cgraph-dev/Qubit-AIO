@@ -532,9 +532,14 @@ _GOLDEN = 0.6180339887498949
 
 
 def _orb_style() -> str:
-    """Orb look: ``mark`` (the dashboard logo, default) or ``ember``."""
+    """Orb look: ``mark`` (the dashboard logo, default), ``ember``, or ``ghost``.
+
+    ``ghost`` is the pixelfx-derived sprite mark (see :mod:`voicebridge.orb.ghost`);
+    an unknown value falls back to ``mark`` so the orb can never paint nothing.
+    """
     import os as _os
-    return str(_os.environ.get("QUBIT_ORB_STYLE", "mark") or "mark").strip().lower()
+    value = str(_os.environ.get("QUBIT_ORB_STYLE", "mark") or "mark").strip().lower()
+    return value if value in ("mark", "ember", "ghost") else "mark"
 
 
 def _fract(x: float) -> float:
@@ -1331,6 +1336,104 @@ def _color(r: Any, g: Any, b: Any, alpha_unit: Any) -> Any:
 #: constructing the colour.
 _COLOR_CACHE: Dict[Any, Any] = {}
 _COLOR_CACHE_MAX = 2048
+
+
+def _ghost_content_box(image: Any) -> tuple[int, int, int, int] | None:
+    """Bounding box of the non-transparent pixels in one atlas frame.
+
+    The atlas canvas is larger than the artwork and the artwork is not centred in
+    it, so placing by the declared origin or by the bitmap centre both land the
+    ghost off-mark. Measuring the frame's own alpha extent is exact and costs one
+    scan per frame (cached by the caller).
+    """
+    try:
+        w, h = image.width(), image.height()
+        min_x, min_y, max_x, max_y = w, h, -1, -1
+        for y in range(h):
+            for x in range(w):
+                if image.pixelColor(x, y).alpha() > 8:
+                    if x < min_x:
+                        min_x = x
+                    if x > max_x:
+                        max_x = x
+                    if y < min_y:
+                        min_y = y
+                    if y > max_y:
+                        max_y = y
+    except Exception:  # noqa: BLE001 - a probe failure must not break the paint
+        return None
+    if max_x < min_x or max_y < min_y:
+        return None
+    return min_x, min_y, max_x, max_y
+
+
+_CONTENT_BOX: dict[int, "tuple[int, int, int, int] | None"] = {}
+
+
+def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
+                 brightness: float) -> bool:
+    """Paint the pixelfx sheet ghost. Returns True when it drew.
+
+    The ghost is a SPRITE, not a field: it comes from a pre-rendered frame atlas
+    exported from the upstream effect (see ``qubit_runtime/vendor/pixelfx/
+    export_ghost.mjs`` and :mod:`voicebridge.orb.ghost_atlas`). Drawing it as an
+    image is what keeps it pixel-identical to the original instead of an
+    approximation redrawn with vector primitives.
+
+    Returns False when the atlas is unavailable so the caller can fall back to
+    the vector mark rather than painting an empty orb.
+    """
+    try:
+        from . import ghost_atlas
+        frame = ghost_atlas.frame_at(t)
+    except Exception:  # noqa: BLE001 - a missing atlas must not blank the orb
+        return False
+    if frame is None:
+        return False
+    image, origin = frame
+    try:
+        from PySide6.QtCore import QPointF, QRectF, Qt
+
+        # The atlas is authored at its own pixel size; scale it so ART_SPAN maps
+        # onto the orb diameter. The sprite's ORIGIN is the ghost's HEM, so the
+        # bitmap is placed from its own extent (the origin offset is large -- 48,90
+        # of a 96x100 sprite -- so a hand-picked nudge pushes it off the widget).
+        #
+        # The scaling is done by the PAINTER, not by QImage.scaled: pre-scaling a
+        # 96x100 RGBA sprite to orb size first produced a null draw here (measured:
+        # a 524x545 pre-scaled image painted zero pixels while the same image at
+        # 131x137 painted 467), and drawImage(rect, image) is the optimised path.
+        scale = (R * 2.0) / float(ghost_atlas.ART_SPAN)
+        index = ghost_atlas.frame_index(t)
+        if index not in _CONTENT_BOX:
+            _CONTENT_BOX[index] = _ghost_content_box(image)
+        box = _CONTENT_BOX[index]
+        if box is None:
+            return False
+        min_x, min_y, max_x, max_y = box
+        # Draw only the frame's own artwork, scaled to the mark, centred on the
+        # orb. The atlas canvas is bigger than the ghost and the ghost is not
+        # centred in it, so both the bitmap centre and the declared origin place
+        # it visibly off-mark (measured: bbox centre 84,154 against a 168,168
+        # target); the alpha extent is the honest box.
+        src_w = float(max_x - min_x + 1)
+        src_h = float(max_y - min_y + 1)
+        span = max(src_w, src_h)
+        draw_span = R * 2.0
+        draw_w = src_w * (draw_span / span)
+        draw_h = src_h * (draw_span / span)
+        left = cx - draw_w * 0.5
+        top = cy - draw_h * 0.5
+        p.setOpacity(max(0.0, min(1.0, float(brightness))))
+        p.drawImage(
+            QRectF(left, top, draw_w, draw_h),
+            image,
+            QRectF(float(min_x), float(min_y), src_w, src_h),
+        )
+        p.setOpacity(1.0)
+    except Exception:  # noqa: BLE001 - never blank the orb on a painter fault
+        return False
+    return True
 
 
 def _paint_mark(p: Any, cx: float, cy: float, R: float, t: float,
@@ -4135,8 +4238,17 @@ if QWidget is not None:
                     float(_bscale) if _bscale is not None else 1.0)
 
                 # Default look: the product mark (dashboard sidebar logo).
-                # QUBIT_ORB_STYLE=ember restores the ember glow; a bad value
-                # falls back to ember so the orb can never paint nothing.
+                # QUBIT_ORB_STYLE=ember restores the ember glow; QUBIT_ORB_STYLE=ghost
+                # draws the pixelfx sheet ghost. A bad value falls back to mark so the
+                # orb can never paint nothing, and a missing ghost atlas falls back the
+                # same way.
+                if _orb_style() == "ghost":
+                    if not _paint_ghost(p, cx, cy, R, t, _bright_eff):
+                        try:
+                            _paint_mark(p, cx, cy, R, t, self.orb_state,
+                                        _bright_eff, fam)
+                        except Exception:  # noqa: BLE001 - never blank the orb
+                            pass
                 if _orb_style() == "mark":
                     try:
                         _paint_mark(p, cx, cy, R, t, self.orb_state,

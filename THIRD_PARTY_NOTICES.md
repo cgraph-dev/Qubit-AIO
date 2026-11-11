@@ -1096,3 +1096,29 @@ Character Generator archive is the body-side build input; the full Modern
 Interiors archive is recorded here for provenance but is not read by the v1
 build. The build slices, positions and composites pixels; it does not train or
 generate art, and no art is minted as an NFT.
+
+## pixelfx — Qubit voice orb (`ghost` theme)
+
+**Upstream:** https://github.com/patch-gg/pixelfx
+**Pin:** `044e12a45dc9cc312cec50ee606dfc98afe5adc2`
+**Licence:** MIT — Copyright (c) 2026 Patch; Copyright (c) 2026 Hugo Duprez
+
+The Qubit voice orb's `ghost` theme (`QUBIT_ORB_STYLE=ghost`) renders the upstream
+sheet-ghost effect. The vendored source lives at `qubit_runtime/vendor/pixelfx/`
+(`src/core/`, `src/fx/critters/ghost.js` and the helpers it imports) and is
+**unmodified**. Nothing was reimplemented: `qubit_runtime/vendor/pixelfx/export_ghost.mjs`
+runs the real effect through the repo's own `Painter`/`composite` pipeline and
+serialises every frame of its loop to `ghost_atlas.bin`, which
+`voicebridge/orb/ghost_atlas.py` loads and blits.
+
+Upstream notices carried forward unchanged:
+
+- `src/core/sim.js` and the effects that say so at the top of their file adapt
+  Sprite Fusion's open-source pixel art VFX
+  (https://www.spritefusion.com/pixel-art-vfx), Copyright (c) 2026 Hugo Duprez,
+  MIT License.
+- `src/core/act.js` adapts how Hollow Crown plays its skills, from
+  https://github.com/rehan-remade/hollow-crown, Copyright (c) 2026 rehan-remade,
+  MIT License.
+- The Patch Pixel font in upstream `gallery/fonts` is NOT covered by the MIT
+  licence and is **not vendored** into Qubit.
