@@ -185,7 +185,10 @@ adapter's typed `adapter_unavailable`/`adapter_not_configured` refusal), passes
 the request's idempotency key and derived approval token, and returns an
 `ExecutorResult`. A dry-run adapter result is recorded as `dry_run`, never as an
 execution; a money-moving directive (`_ledger`) is appended once by this gateway
-and re-asserted idempotently on replay.
+and re-asserted idempotently on replay. `voicebridge/business/etsy_workflow.py`
+is the small durable pilot path (draft → owner approval → dry-run publish) built
+on `jobs`, `approvals` and this gateway; it refuses publish without a matching,
+unexpired approval.
 
 ## 7. What is real vs deferred
 
@@ -198,7 +201,7 @@ and re-asserted idempotently on replay.
 | Job state machine + leases + unknown recovery | real |
 | Approval pause/resume/reject/expire | real |
 | Tool validation, approval gate, budget, dry-run, redaction | real |
-| Dry-run Etsy/social/CRM/email executor wiring | real |
+| Dry-run Etsy/social/CRM/email executor wiring + Etsy pilot workflow | real |
 | Real provider transports/OAuth/credentials, Stripe, accounting | **deferred** |
 | Multi-host queue, Temporal, dead-letter, timers | **deferred** |
 | Postgres, replication, backup/restore drill | **deferred** |
@@ -215,8 +218,9 @@ and re-asserted idempotently on replay.
    provider transport plus credential store and a provider idempotency key
    (Stripe idempotency key, CRM external ref, SMTP Message-ID), plus a
    reconciliation read for `unknown` jobs.
-3. Add a workflow runner that calls `jobs.claim` → tool gateway → `jobs.finish`
-   and heartbeats its lease; wire `jobs.recover()` at process boot.
+3. The Etsy pilot workflow calls `jobs.claim` → tool gateway → `jobs.finish`
+   (`voicebridge/business/etsy_workflow.py`). Lease heartbeats and
+   `jobs.recover()` at process boot are still to wire.
 4. Add approval cards and voice commands that call `approvals.request/decide`;
    never let an agent self-approve.
 5. Replace the single-file SQLite store with a Postgres-compatible adapter and
