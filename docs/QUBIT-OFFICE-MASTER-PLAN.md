@@ -1,6 +1,6 @@
 # Qubit Office — Master Plan
 
-**Status:** planning baseline plus wave-1/wave-2/wave-3 and live seat/tower deployment on `:8890` from `integration/qoffice-wave1`. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete. `main` is still unmerged.
+**Status:** planning baseline plus waves 1–5 and live seat/tower/approvals deployment on `:8890` from `integration/qoffice-wave1`. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete. `main` is still unmerged.
 **Execution mode:** live deployment performed with the owner's explicit `do it` (2026-11-11); main merge and release gates remain separate.
 **Scope:** Qubit Office (the campus/office product) + Qubit Business OS (the durable business-operations layer).
 **Rule:** the world is complete from day one; only active businesses/rooms are simulated. Business truth lives in systems of record, never in the renderer.
@@ -1011,3 +1011,26 @@ Deployed from `integration/qoffice-wave1` to the installed live package. This is
 - **Redaction fix:** credential redaction no longer hides non-secret token limits (`max_tokens`, `prompt_tokens`, etc.); real tokens/keys remain redacted.
 - **Live:** bridge pid `4078662`; `/qubit-office` 200; bundle `16e16fe3…` (7,619,244 bytes); backup `/home/trick/.cache/qubit-deploy-backup-qoffice-seats-20261111-085003`; verified with 319 Python tests, 198 office Vitest tests, and live browser CDP.
 - **Still not done:** the 100-floor view is not the rendered world; the live scene remains the existing 4 rooms / 10 agents. No real Etsy/social accounts, no model turns from the controls yet, no `main` merge, no full matrix/`VERIFIED`.
+
+
+---
+
+## 41. Wave-5: world rooms, editable controls, research, approvals (2026-11-11)
+
+**Landed and deployed**
+- **World projection:** deterministic 100-floor/5-wing plan with 300 rooms, 575 fixed 16×12 cells, 3,075 desks, zero staffed agents; `/api/office/world/tower` full room-scene read and `/api/office/world/tower-plan` bounded summary.
+- **Tower room scene:** War Room → Roles & floors renders room cells and empty desk slots for the selected floor; the other 99 floors stay a directory. No fake agents.
+- **Editable agent controls:** model/provider/reasoning/fallback, tokens, budgets, rate, autonomy, schedule/timezone, explicit permission scopes; real update API, dirty/cancel/reset, validation, audit refresh. Approvals stay enforced.
+- **War Room research + Etsy pilot:** deterministic local research provider with labelled evidence, disabled-by-default remote seam, and an idempotent owner-pending `Etsy digital shop pilot` session. Live pilot session created: `wrs_01M75C2PFR1FQ0GWTZVQ04M8DR` (state `owner_decision`, no decision/tasks/spend).
+- **Approvals panel:** office dock + menu icon + pending badge, list/approve/reject through the shared journal, typed errors, named empty state. Live: 0 pending.
+
+**Verification / live**
+- 356 Python tests and 234 office Vitest tests passed before deploy; ruff/diff clean.
+- Live bridge pid `637319`; `/qubit-office` 200; served bundle `02b2d34c…` (7,680,582 bytes), identical to integration.
+- Backup: `/home/trick/.cache/qubit-deploy-backup-qoffice-wave4-20261111-151455`.
+- Browser-verified: 100-floor tower with room cells/desks, agent edit form, approvals dock (0 pending), Qubit Office brand.
+
+**Still not done**
+- The rendered office scene remains the existing 4 rooms / 10 agents; the 100-floor room scene is a selected-floor directory view, not a 3D world.
+- No real Etsy OAuth/shop/listing, no social/CRM accounts, no model turns from the control panel.
+- `main` is unmerged; no full matrix / `VERIFIED`.
