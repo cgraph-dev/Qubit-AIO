@@ -196387,17 +196387,17 @@ create: function(game) {
 			this.status = status;
 		}
 	};
-	function rebase(base, path) {
+	function rebase$1(base, path) {
 		const raw = base === void 0 ? hostBasePath$1() : base;
 		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX$1}${path}`;
 	}
 	/** The pending-approvals URL, rebased onto the dashboard's base path. */
 	function approvalsUrl(base) {
-		return rebase(base, APPROVALS_PATH);
+		return rebase$1(base, APPROVALS_PATH);
 	}
 	/** The settle URL for one decision. */
 	function approvalActionUrl(decision, base) {
-		return rebase(base, decision === "approve" ? APPROVAL_CONFIRM_PATH : APPROVAL_CANCEL_PATH);
+		return rebase$1(base, decision === "approve" ? APPROVAL_CONFIRM_PATH : APPROVAL_CANCEL_PATH);
 	}
 	function authHeaders(token) {
 		const headers = { Accept: "application/json" };
@@ -196743,6 +196743,482 @@ create: function(game) {
 				role: "region",
 				"aria-label": "Office approvals",
 				"aria-busy": state.kind === "loading" ? "true" : "false"
+			}, children);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/etsy-connection.ts
+	var ETSY_PATH = "/api/office/business/etsy";
+	var ETSY_STATUS_PATH = `${ETSY_PATH}/status`;
+	var ETSY_AUTHORIZE_PATH = `${ETSY_PATH}/authorize`;
+	var ETSY_COMPLETE_PATH = `${ETSY_PATH}/complete`;
+	var ETSY_DISCONNECT_PATH = `${ETSY_PATH}/disconnect`;
+	var EtsyApiError = class extends Error {
+		code;
+		status;
+		constructor(message, code, status) {
+			super(message);
+			this.name = "EtsyApiError";
+			this.code = code;
+			this.status = status;
+		}
+	};
+	function rebase(base, path) {
+		const raw = base === void 0 ? hostBasePath$1() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX$1}${path}`;
+	}
+	/** The status URL, rebased onto the dashboard's base path. */
+	function etsyStatusUrl(base) {
+		return rebase(base, ETSY_STATUS_PATH);
+	}
+	function headers(win) {
+		const token = readToken(win);
+		const out = { Accept: "application/json" };
+		if (token) out["X-Qubit-Session-Token"] = token;
+		return out;
+	}
+	/** True only for the server's own connected status. */
+	function isConnected(status) {
+		return Boolean(status && status.state === "connected" && status.connected);
+	}
+	/** A short, honest label for the status pill. */
+	function statusLabel(status) {
+		switch (status.state) {
+			case "connected": return isConnected(status) ? "Connected" : "Not connected";
+			case "authorization_required": return "Not connected";
+			case "expired": return "Expired";
+			case "not_configured": return "Not configured";
+			case "error": return "Error";
+			default: return "Unknown";
+		}
+	}
+	/** What is missing, in plain words. An empty list is a real answer. */
+	function missingText(status) {
+		if (status.state === "not_configured") return `Set ${(status.missing.length ? status.missing : ["client settings"]).join(", ")} in the Etsy OAuth configuration.`;
+		if (status.state === "authorization_required") return "Etsy settings are present; authorize an account to connect it.";
+		if (status.state === "expired") return status.has_refresh ? "The access token expired; reconnect or refresh the account." : "The access token expired; reconnect the account.";
+		if (status.state === "error") return status.detail || status.code || "Etsy status could not be read.";
+		return "";
+	}
+	/**
+	* Read the typed status. Never throws: a transport/HTTP/refusal failure is a
+	* named error state so the panel cannot render "connected" by default.
+	*/
+	async function fetchEtsyStatus(opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		try {
+			const res = await f(etsyStatusUrl(opts.base), {
+				headers: headers(opts.win),
+				credentials: "same-origin",
+				signal: opts.signal
+			});
+			if (res.status === 401) return {
+				kind: "error",
+				message: "Etsy status was refused (HTTP 401); the office session token was not accepted. Reload the page to refresh it.",
+				code: "UNAUTHORIZED"
+			};
+			const body = await res.json().catch(() => null);
+			if (!body || typeof body !== "object") return {
+				kind: "error",
+				message: `Etsy status answered HTTP ${res.status} with no JSON body.`
+			};
+			if (body.ok !== true || !body.etsy) return {
+				kind: "error",
+				message: body.detail || body.code ? `Etsy status could not be read: ${body.detail || body.code}` : `Etsy status answered not-ok (HTTP ${res.status}).`,
+				code: body.code
+			};
+			return {
+				kind: "ready",
+				status: body.etsy
+			};
+		} catch (exc) {
+			return {
+				kind: "error",
+				message: `Etsy status could not be reached: ${exc instanceof Error ? exc.message : String(exc)}`
+			};
+		}
+	}
+	async function post(path, body, opts) {
+		const f = opts.fetchImpl ?? fetch;
+		const requestHeaders = headers(opts.win);
+		requestHeaders["Content-Type"] = "application/json";
+		let res;
+		try {
+			res = await f(rebase(opts.base, path), {
+				method: "POST",
+				headers: requestHeaders,
+				credentials: "same-origin",
+				body: JSON.stringify({
+					owner: true,
+					...body
+				}),
+				signal: opts.signal
+			});
+		} catch (exc) {
+			throw new EtsyApiError(`The Etsy connection could not be reached: ${exc instanceof Error ? exc.message : String(exc)}`, "ETSY_UNREACHABLE", 0);
+		}
+		const parsed = await res.json().catch(() => null);
+		if (!parsed || typeof parsed !== "object") throw new EtsyApiError(`The Etsy connection answered HTTP ${res.status} with no JSON body.`, "ETSY_BAD_RESPONSE", res.status);
+		if (!res.ok || parsed.ok !== true) {
+			const code = String(parsed.code || `ETSY_HTTP_${res.status}`);
+			throw new EtsyApiError(String(parsed.detail || parsed.explanation || `HTTP ${res.status}`), code, res.status);
+		}
+		return parsed;
+	}
+	/** Start the OAuth flow: returns the URL to open and the pending state. */
+	async function startEtsyAuthorization(opts = {}) {
+		const started = (await post(ETSY_AUTHORIZE_PATH, {}, opts)).etsy;
+		if (!started || typeof started.url !== "string" || !started.url) throw new EtsyApiError("The Etsy authorization route did not return a URL.", "ETSY_NO_URL", 502);
+		return started;
+	}
+	/** Exchange the redirected code. The response is the real resulting status. */
+	async function completeEtsyAuthorization(code, state, opts = {}) {
+		const cleanCode = String(code ?? "").trim();
+		const cleanState = String(state ?? "").trim();
+		if (!cleanCode || !cleanState) throw new EtsyApiError("Both the authorization code and state are required.", "ETSY_BAD_INPUT", 400);
+		const payload = await post(ETSY_COMPLETE_PATH, {
+			code: cleanCode,
+			state: cleanState
+		}, opts);
+		if (!payload.etsy) throw new EtsyApiError("The Etsy completion route returned no status.", "ETSY_NO_STATUS", 502);
+		return payload.etsy;
+	}
+	/** Remove the local Etsy token (does not call Etsy or touch a listing). */
+	async function disconnectEtsy(opts = {}) {
+		const payload = await post(ETSY_DISCONNECT_PATH, {}, opts);
+		if (!payload.etsy) throw new EtsyApiError("The Etsy disconnect route returned no status.", "ETSY_NO_STATUS", 502);
+		return payload.etsy;
+	}
+	/**
+	* Extract the ``code`` from a pasted Etsy redirect URL.
+	*
+	* A full URL is parsed; a bare code is returned unchanged (trimmed). An empty
+	* value stays empty so the caller can refuse it rather than send "undefined".
+	*/
+	function parseAuthorizationInput(value) {
+		const raw = String(value ?? "").trim();
+		if (!raw) return "";
+		try {
+			const url = new URL(raw);
+			if (url.searchParams.get("code")) return String(url.searchParams.get("code")).trim();
+		} catch {}
+		return raw;
+	}
+	/** Extract the OAuth ``state`` when the input is a full redirect URL. */
+	function parseStateInput(value) {
+		const raw = String(value ?? "").trim();
+		if (!raw) return "";
+		try {
+			const url = new URL(raw);
+			return String(url.searchParams.get("state") || "").trim();
+		} catch {
+			return "";
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/EtsyConnectPanel.tsx
+	function failureOf(exc) {
+		if (exc instanceof EtsyApiError) return {
+			message: exc.message,
+			code: exc.code
+		};
+		return { message: exc instanceof Error ? exc.message : String(exc) };
+	}
+	function pillClass(status) {
+		return `etsy-connect__pill etsy-connect__pill--${String(status.state || "error")}`;
+	}
+	function createEtsyConnectPanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function EtsyConnectPanel(props) {
+			const [read, setRead] = useState({ kind: "loading" });
+			const [busy, setBusy] = useState(null);
+			const [notice, setNotice] = useState(null);
+			const [failure, setFailure] = useState(null);
+			const [refresh, setRefresh] = useState(0);
+			const [started, setStarted] = useState(null);
+			const [codeInput, setCodeInput] = useState("");
+			const [stateInput, setStateInput] = useState("");
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				fetchEtsyStatus({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then((next) => {
+					if (live) setRead(next);
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				props.base,
+				props.fetchImpl,
+				refresh
+			]);
+			const applyStatus = (status) => {
+				setRead({
+					kind: "ready",
+					status
+				});
+				if (status.state !== "connected" || !status.connected) setNotice(status.detail || `Etsy status: ${statusLabel(status)}.`);
+			};
+			const openAuthorization = (url) => {
+				if (props.openUrl) {
+					props.openUrl(url);
+					return;
+				}
+				if (typeof window !== "undefined" && typeof window.open === "function") window.open(url, "_blank", "noopener,noreferrer");
+			};
+			const onConnect = () => {
+				if (busy) return;
+				setBusy("authorize");
+				setFailure(null);
+				setNotice(null);
+				startEtsyAuthorization({
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				}).then((next) => {
+					setStarted(next);
+					setStateInput(next.state);
+					openAuthorization(next.url);
+					setNotice("Etsy authorization opened. Approve the app, then paste the redirect URL (or its code) below.");
+				}).catch((exc) => {
+					setFailure(failureOf(exc));
+				}).finally(() => {
+					setBusy(null);
+				});
+			};
+			const onComplete = () => {
+				if (busy) return;
+				setBusy("complete");
+				setFailure(null);
+				setNotice(null);
+				let code = parseAuthorizationInput(codeInput);
+				let state = stateInput.trim() || parseStateInput(codeInput);
+				if (!code) {
+					setBusy(null);
+					setFailure({
+						message: "Paste the redirect URL or the authorization code Etsy returned.",
+						code: "ETSY_CODE_REQUIRED"
+					});
+					return;
+				}
+				if (!state) {
+					setBusy(null);
+					setFailure({
+						message: "The OAuth state is required; click Connect Etsy first or paste the complete redirect URL.",
+						code: "ETSY_STATE_REQUIRED"
+					});
+					return;
+				}
+				completeEtsyAuthorization(code, state, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				}).then((status) => {
+					applyStatus(status);
+					if (isConnected(status)) {
+						setNotice("Etsy is connected.");
+						setCodeInput("");
+						setStarted(null);
+					}
+				}).catch((exc) => {
+					setFailure(failureOf(exc));
+				}).finally(() => {
+					setBusy(null);
+				});
+			};
+			const onDisconnect = () => {
+				if (busy) return;
+				setBusy("disconnect");
+				setFailure(null);
+				setNotice(null);
+				disconnectEtsy({
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				}).then((status) => {
+					applyStatus(status);
+					setStarted(null);
+					setCodeInput("");
+					setStateInput("");
+				}).catch((exc) => {
+					setFailure(failureOf(exc));
+				}).finally(() => {
+					setBusy(null);
+				});
+			};
+			const children = [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead office-theme-dock-head"
+			}, [
+				R.createElement("span", {
+					key: "t",
+					className: "office-theme-dock-title"
+				}, "Etsy connection"),
+				R.createElement("button", {
+					key: "refresh",
+					type: "button",
+					className: "office-game__btn office-theme-dock-link",
+					"data-testid": "etsy-connect-refresh",
+					"aria-label": "Refresh the Etsy connection status",
+					disabled: busy !== null || read.kind === "loading",
+					onClick: () => setRefresh((n) => n + 1)
+				}, "Refresh"),
+				R.createElement("button", {
+					key: "x",
+					type: "button",
+					className: "office-game__btn office-theme-dock-close",
+					"data-testid": "etsy-connect-close",
+					"aria-label": "Close Etsy connection",
+					onClick: () => props.onClose?.()
+				}, "Close")
+			])];
+			if (read.kind === "loading") children.push(R.createElement("p", {
+				key: "loading",
+				className: "etsy-connect__state",
+				"data-testid": "etsy-connect-loading",
+				role: "status"
+			}, "Reading the Etsy connection status…"));
+			else if (read.kind === "error") children.push(R.createElement("div", {
+				key: "read-error",
+				className: "etsy-connect__error",
+				"data-testid": "etsy-connect-error",
+				role: "alert",
+				"data-code": read.code || void 0
+			}, read.message));
+			else {
+				const status = read.status;
+				children.push(R.createElement("div", {
+					key: "status",
+					className: "etsy-connect__summary",
+					"data-testid": "etsy-connect-status",
+					"data-state": String(status.state || "error"),
+					"data-connected": isConnected(status) ? "true" : "false"
+				}, [R.createElement("span", {
+					key: "label",
+					className: "etsy-connect__label"
+				}, "Status "), R.createElement("span", {
+					key: "pill",
+					className: pillClass(status),
+					"data-testid": "etsy-connect-pill"
+				}, statusLabel(status))]));
+				const missing = missingText(status);
+				if (missing) children.push(R.createElement("p", {
+					key: "missing",
+					className: "etsy-connect__hint",
+					"data-testid": "etsy-connect-missing"
+				}, missing));
+				if (status.scopes.length) children.push(R.createElement("p", {
+					key: "scopes",
+					className: "etsy-connect__meta",
+					"data-testid": "etsy-connect-scopes"
+				}, `Requested reads: ${status.scopes.join(", ")}`));
+				if (isConnected(status)) {
+					const expiry = status.expires_at ? (/* @__PURE__ */ new Date(status.expires_at * 1e3)).toLocaleString() : "unknown";
+					children.push(R.createElement("div", {
+						key: "connected",
+						className: "etsy-connect__connected",
+						"data-testid": "etsy-connect-connected"
+					}, [R.createElement("p", {
+						key: "exp",
+						className: "etsy-connect__meta"
+					}, `Access expires ${expiry}.`), R.createElement("button", {
+						key: "disconnect",
+						type: "button",
+						className: "office-game__btn etsy-connect__secondary",
+						"data-testid": "etsy-connect-disconnect",
+						disabled: busy !== null,
+						onClick: onDisconnect
+					}, busy === "disconnect" ? "Disconnecting…" : "Disconnect")]));
+				} else if (status.configured) {
+					children.push(R.createElement("div", {
+						key: "connect-row",
+						className: "etsy-connect__actions"
+					}, [R.createElement("button", {
+						key: "connect",
+						type: "button",
+						className: "office-game__btn etsy-connect__primary",
+						"data-testid": "etsy-connect-start",
+						disabled: busy !== null,
+						onClick: onConnect
+					}, busy === "authorize" ? "Opening Etsy…" : "Connect Etsy")]));
+					children.push(R.createElement("form", {
+						key: "complete",
+						className: "etsy-connect__form",
+						"data-testid": "etsy-connect-form",
+						onSubmit: (event) => {
+							event?.preventDefault?.();
+							onComplete();
+						}
+					}, [
+						R.createElement("label", {
+							key: "code-label",
+							className: "etsy-connect__field"
+						}, [R.createElement("span", { key: "l" }, "Redirect URL or code"), R.createElement("input", {
+							key: "code",
+							className: "warroom__input",
+							"data-testid": "etsy-connect-code",
+							autoComplete: "off",
+							value: codeInput,
+							placeholder: "Paste what Etsy redirected you to",
+							onChange: (event) => {
+								const value = event.target.value;
+								setCodeInput(value);
+								const parsedState = parseStateInput(value);
+								if (parsedState) setStateInput(parsedState);
+							}
+						})]),
+						R.createElement("label", {
+							key: "state-label",
+							className: "etsy-connect__field"
+						}, [R.createElement("span", { key: "l" }, "OAuth state"), R.createElement("input", {
+							key: "state",
+							className: "warroom__input",
+							"data-testid": "etsy-connect-state",
+							autoComplete: "off",
+							value: stateInput,
+							placeholder: "Filled by Connect Etsy",
+							onChange: (event) => {
+								setStateInput(event.target.value);
+							}
+						})]),
+						R.createElement("button", {
+							key: "complete",
+							type: "button",
+							className: "office-game__btn etsy-connect__primary",
+							"data-testid": "etsy-connect-complete",
+							disabled: busy !== null,
+							onClick: onComplete
+						}, busy === "complete" ? "Completing…" : "Complete connection")
+					]));
+				}
+				if (started) children.push(R.createElement("p", {
+					key: "manual-link",
+					className: "etsy-connect__meta",
+					"data-testid": "etsy-connect-manual-link"
+				}, [R.createElement("span", { key: "t" }, "Popup blocked? "), R.createElement("a", {
+					key: "a",
+					href: started.url,
+					target: "_blank",
+					rel: "noopener noreferrer"
+				}, "Open the Etsy authorization page")]));
+			}
+			if (notice) children.push(R.createElement("p", {
+				key: "notice",
+				className: "etsy-connect__notice",
+				"data-testid": "etsy-connect-notice",
+				role: "status"
+			}, notice));
+			if (failure) children.push(R.createElement("div", {
+				key: "failure",
+				className: "etsy-connect__error",
+				"data-testid": "etsy-connect-action-error",
+				role: "alert",
+				"data-code": failure.code || void 0
+			}, failure.message));
+			return R.createElement("div", {
+				className: "etsy-connect",
+				"data-testid": "etsy-connect-panel",
+				"data-state": read.kind === "ready" ? String(read.status.state) : read.kind
 			}, children);
 		};
 	}
@@ -201027,6 +201503,7 @@ create: function(game) {
 			AgentControlDrawer: createAgentControlDrawer(R, hooks),
 			WarRoomPanel: createWarRoomPanel(R, hooks),
 			ApprovalsPanel: createApprovalsPanel(R, hooks),
+			EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
 			LoadingScreen: createOfficeLoadingScreen(R, hooks)
 		};
 		byBase.set(cacheKey, built);
@@ -201052,8 +201529,9 @@ create: function(game) {
 			const [controlSeat, setControlSeat] = useState(null);
 			const [approvalsOpen, setApprovalsOpen] = useState(false);
 			const [approvalCount, setApprovalCount] = useState(0);
+			const [etsyOpen, setEtsyOpen] = useState(false);
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
 			useEffect(() => {
@@ -201302,6 +201780,22 @@ create: function(game) {
 					}
 				}, "War Room"),
 				R.createElement("button", {
+					key: "etsy",
+					type: "button",
+					className: "office-game__btn office-theme-dock-link",
+					"data-testid": "office-game-etsy-open",
+					"aria-label": "Open the Etsy connection settings",
+					"data-office-slice": buttonSlice,
+					onClick: () => {
+						setAgentsOpen(false);
+						setApprovalsOpen(false);
+						setControlSeat(null);
+						setWarRoomOpen(false);
+						setHudOpen(false);
+						setEtsyOpen(true);
+					}
+				}, "Etsy"),
+				R.createElement("button", {
 					key: "x",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
@@ -201387,6 +201881,20 @@ create: function(game) {
 				base: props.base,
 				onCountChange: (n) => setApprovalCount(n),
 				onClose: () => setApprovalsOpen(false)
+			})]));
+			if (etsyOpen) children.push(R.createElement("div", {
+				key: "etsy-dock",
+				id: "office-game-etsy-dock",
+				className: "office-game__dock office-game__panel office-theme-dock office-game__etsyDock",
+				"data-testid": "office-game-etsy-dock",
+				"data-office-dock": "etsy",
+				"data-office-slice": dockSlice,
+				role: "region",
+				"aria-label": "Etsy connection"
+			}, [R.createElement(EtsyConnectPanel, {
+				key: "body",
+				base: props.base,
+				onClose: () => setEtsyOpen(false)
 			})]));
 			if (hudOpen) children.push(R.createElement("div", {
 				key: "hud-dock",
@@ -201491,7 +201999,7 @@ create: function(game) {
 			}));
 			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
 			const dualDocks = agentsOpen && hudOpen || warRoomOpen && controlSeat !== null;
-			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null || approvalsOpen;
+			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null || approvalsOpen || etsyOpen;
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				"data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : void 0,

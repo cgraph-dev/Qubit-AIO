@@ -525,4 +525,36 @@ describe("host theme + rerender stability", () => {
       (e) => e.props["data-testid"] === "office-game-hud-dock")).toBeUndefined();
     h.cleanup();
   });
+
+  it("opens the Etsy connection dock from the Agents header", () => {
+    // State order now: ..., approvalsOpen (10), approvalCount (11),
+    // etsyOpen (12). Agents (4) open so its header carries the opener.
+    const h = createStatefulHarness({ 4: true });
+    h.render({});
+    const opener = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-etsy-open");
+    expect(opener).toBeDefined();
+    (opener?.props.onClick as () => void)();
+    h.render({});
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-etsy-dock"))
+      .toBeDefined();
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-agents-dock"))
+      .toBeUndefined();
+    const root = h.tree.find((e) => e.props["data-testid"] === "office-app");
+    expect(root?.props["data-office-dock-top"]).toBe("toolbar");
+    h.cleanup();
+  });
+
+  it("mounts the Etsy panel as a Qubit shell dock", () => {
+    const h = createStatefulHarness({ 12: true });
+    h.render({});
+    const dock = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-etsy-dock");
+    expect(dock).toBeDefined();
+    expect(dock?.props["data-office-dock"]).toBe("etsy");
+    expect(String(dock?.props.className)).toContain("office-game__etsyDock");
+    h.cleanup();
+  });
 });

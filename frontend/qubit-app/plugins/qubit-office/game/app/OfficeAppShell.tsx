@@ -20,6 +20,7 @@ import { createAgentsPanel } from "./AgentsPanel";
 import { createAgentControlDrawer } from "./AgentControlDrawer";
 import { createWarRoomPanel } from "./WarRoomPanel";
 import { createApprovalsPanel } from "./ApprovalsPanel";
+import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
 import type { AgentSeat } from "./agents-panel";
 import {
@@ -123,6 +124,7 @@ type ShellComponents = {
   AgentControlDrawer: ReturnType<typeof createAgentControlDrawer>;
   WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
   ApprovalsPanel: ReturnType<typeof createApprovalsPanel>;
+  EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
 
@@ -162,6 +164,7 @@ function shellComponents(
     AgentControlDrawer: createAgentControlDrawer(R, hooks),
     WarRoomPanel: createWarRoomPanel(R, hooks),
     ApprovalsPanel: createApprovalsPanel(R, hooks),
+    EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
   byBase.set(cacheKey, built);
@@ -219,11 +222,14 @@ export function createOfficeApp(
     // shell's own tests stay stable.
     const [approvalsOpen, setApprovalsOpen] = useState(false);
     const [approvalCount, setApprovalCount] = useState(0);
+    // The Etsy OAuth connection surface. Declared last so every seeded state
+    // index in the shell's own tests stays stable.
+    const [etsyOpen, setEtsyOpen] = useState(false);
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
-      ApprovalsPanel, LoadingScreen,
+      ApprovalsPanel, EtsyConnectPanel, LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
@@ -523,6 +529,21 @@ export function createOfficeApp(
             },
           }, "War Room"),
           R.createElement("button", {
+            key: "etsy", type: "button",
+            className: "office-game__btn office-theme-dock-link",
+            "data-testid": "office-game-etsy-open",
+            "aria-label": "Open the Etsy connection settings",
+            "data-office-slice": buttonSlice,
+            onClick: () => {
+              setAgentsOpen(false);
+              setApprovalsOpen(false);
+              setControlSeat(null);
+              setWarRoomOpen(false);
+              setHudOpen(false);
+              setEtsyOpen(true);
+            },
+          }, "Etsy"),
+          R.createElement("button", {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
             "data-office-slice": buttonSlice,
@@ -618,6 +639,28 @@ export function createOfficeApp(
           key: "body", base: props.base,
           onCountChange: (n: number) => setApprovalCount(n),
           onClose: () => setApprovalsOpen(false),
+        }),
+      ]));
+    }
+
+    // THE ETSY CONNECTION DOCK. Opened from the Agents dock header. It reads
+    // the typed OAuth status from the Business OS bridge, opens the Etsy
+    // authorization URL and completes the redirect code; tokens stay on the
+    // server and no listing/publish/spend action exists here.
+    if (etsyOpen) {
+      children.push(R.createElement("div", {
+        key: "etsy-dock",
+        id: "office-game-etsy-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__etsyDock",
+        "data-testid": "office-game-etsy-dock",
+        "data-office-dock": "etsy",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Etsy connection",
+      }, [
+        R.createElement(EtsyConnectPanel as never, {
+          key: "body", base: props.base,
+          onClose: () => setEtsyOpen(false),
         }),
       ]));
     }
@@ -762,7 +805,7 @@ export function createOfficeApp(
     // injected Panels group that opens them; an offset sheet leaves the group
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
     const dockOpen = agentsOpen || hudOpen || warRoomOpen
-      || controlSeat !== null || approvalsOpen;
+      || controlSeat !== null || approvalsOpen || etsyOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
