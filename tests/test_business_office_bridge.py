@@ -15,6 +15,8 @@ No network, no credentials, no live service, no real business data.
 """
 from __future__ import annotations
 
+import sqlite3
+
 import pytest
 
 from voicebridge import qubit_compat as HC
@@ -32,6 +34,14 @@ class _Cfg:
 
     def state_dir(self):
         return self._state
+
+
+def _count(store: BusinessStore, table: str) -> int:
+    conn = sqlite3.connect(store.path)
+    try:
+        return int(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+    finally:
+        conn.close()
 
 
 @pytest.fixture()
@@ -89,6 +99,7 @@ def test_routes_are_registered_under_the_office_family():
         ("GET", "/api/office/world/tower"),
         ("GET", "/api/office/business/warroom/sessions"),
         ("POST", "/api/office/business/warroom/sessions"),
+        ("POST", "/api/office/business/warroom/etsy-pilot"),
         ("GET", "/api/office/business/agents"),
         ("POST", "/api/office/business/agents/agt_1/pause"),
     ):
@@ -415,3 +426,72 @@ def test_unknown_agent_and_multi_tenant_reads_are_typed(env):
     store.create_tenant("Second")
     code, out = _call(cfg, "GET", "/api/office/business/agents")
     assert code == 400 and out["code"] == "BUSINESS_TENANT_REQUIRED"
+
+
+# ---------------------------------------------------------------------------
+# Etsy digital-shop pilot
+# ---------------------------------------------------------------------------
+def test_etsy_pilot_route_is_registered():
+    route, _params = HC.match(
+        "POST", "/api/office/business/warroom/etsy-pilot")
+    assert route is not None
+    assert route["handler"] == "h_business_warroom_etsy_pilot"
+
+
+def test_etsy_pilot_is_owner_gated_and_idempotent(env):
+    cfg, _store = env
+    path = "/api/office/business/warroom/etsy-pilot"
+
+    code, out = _call(cfg, "POST", path, body={})
+    assert code == 403 and out["code"] == "BUSINESS_OWNER_ONLY"
+    assert _call(cfg, "GET", "/api/office/business/warroom/sessions")[1].get(
+        "sessions") in (None, [])
+
+    code, first = _call(cfg, "POST", path, body={"owner": True})
+    assert code == 200, first
+    assert first["created"] is True
+    assert first["session"]["title"] == "Etsy digital shop pilot"
+    assert first["session"]["state"] == "owner_decision"
+    assert first["source_ids"]
+    assert first["experiment_names"]
+    sid = first["session"]["session_id"]
+
+    code, again = _call(cfg, "POST", path, body={"owner": True})
+    assert code == 200, again
+    assert again["created"] is False
+    assert again["session"]["session_id"] == sid
+
+    code, listed = _call(cfg, "GET", "/api/office/business/warroom/sessions")
+    assert code == 200
+    assert [item["session_id"] for item in listed["sessions"]] == [sid]
+
+
+def test_etsy_pilot_bundle_has_no_decision_or_tasks(env):
+    cfg, store = env
+    path = "/api/office/business/warroom/etsy-pilot"
+    _code, out = _call(cfg, "POST", path, body={"owner": True})
+    sid = out["session"]["session_id"]
+
+    code, bundle = _call(
+        cfg, "GET", f"/api/office/business/warroom/sessions/{sid}")
+    assert code == 200
+    assert bundle["decisions"] == []
+    assert bundle["tasks"] == []
+    assert bundle["session"]["state"] == "owner_decision"
+    labels = {item["label"] for item in bundle["evidence"]}
+    assert labels == {"FACT", "INFERENCE", "ASSUMPTION", "UNKNOWN"}
+    fact = next(item for item in bundle["evidence"] if item["label"] == "FACT")
+    assert fact["source_id"]
+
+    for table in ("bos_task", "bos_approval", "bos_warroom_decision"):
+        assert _count(store, table) == 0
+
+
+def test_etsy_pilot_real_provider_is_typed_and_inert(env):
+    cfg, store = env
+    code, out = _call(
+        cfg, "POST", "/api/office/business/warroom/etsy-pilot",
+        body={"owner": True, "provider": "remote"})
+    assert code == 400
+    assert out["code"] == "BUSINESS_RESEARCH_NOT_CONFIGURED"
+    assert _count(store, "bos_warroom_session") == 0

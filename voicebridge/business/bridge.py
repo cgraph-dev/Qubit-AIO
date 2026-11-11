@@ -33,6 +33,7 @@ from typing import Any, Dict, Mapping, Tuple
 from ..office.world import model as WORLD
 from . import agents as AGENTS
 from . import office_seats as OFFICE_SEATS
+from . import pilot as ETSY_PILOT
 from . import warroom as WARROOM
 from .errors import BusinessError
 from .roles import RoleRegistry, RoleRegistryError
@@ -708,6 +709,40 @@ def h_business_warroom_tasks_create(cfg: Any, q: Dict[str, str],
     return _warroom_mutation(cfg, q, b, p, "creating approved tasks", run)
 
 
+def h_business_warroom_etsy_pilot(cfg: Any, q: Dict[str, str],
+                                  b: Dict[str, Any], p: Dict[str, str]
+                                  ) -> Tuple[int, Dict[str, Any]]:
+    """POST /api/office/business/warroom/etsy-pilot -> one pending pilot.
+
+    Owner-gated and idempotent. It records the shipped Etsy playbook, labelled
+    plan/risk evidence and experiments, and leaves the decision to the owner:
+    no approval, task, publish, spend or external contact happens here.
+    """
+    if not _owner_ok(b):
+        return _owner_refusal("starting the Etsy pilot")
+    try:
+        store = _store(cfg)
+        tenant = _tenant(store, q, b, create_personal=True)
+        business_id = _optional_text(b.get("business_id"))
+        provider = b.get("provider")
+        if provider is not None and not isinstance(provider, str):
+            raise BusinessError(
+                "BUSINESS_BAD_INPUT", "provider must be a string when supplied"
+            )
+        result = ETSY_PILOT.bootstrap_etsy_pilot(
+            store,
+            tenant_id=tenant,
+            business_id=business_id,
+            provider=provider.strip() if provider and provider.strip() else None,
+        )
+        return _ok(
+            schema="qubit-office-business-warroom-etsy-pilot/1",
+            **_asdict(result),
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
 # ---------------------------------------------------------------------------
 # Agent controls
 # ---------------------------------------------------------------------------
@@ -864,6 +899,7 @@ __all__ = [
     "h_business_warroom_argument_add",
     "h_business_warroom_create",
     "h_business_warroom_decide",
+    "h_business_warroom_etsy_pilot",
     "h_business_warroom_evidence_add",
     "h_business_warroom_get",
     "h_business_warroom_list",
