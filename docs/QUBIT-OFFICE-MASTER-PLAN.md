@@ -713,3 +713,129 @@ Owner has authorized a **bounded technical first wave**. No live deploy. Each ag
 6. **Do you want the online World?** Local only, invite-only, or public self-hosted.
 7. **Which room style baseline?** Recommended 16×16 LimeZu world, 32/48 only for portraits.
 8. **Personal only or eventual product?** Personal/private is simpler; selling later reopens licensing/distribution.
+
+
+---
+
+## 27. Decision log — owner answers (2026-11-11)
+
+| # | Decision | Locked choice |
+|---|---|---|
+| D1 | First business | **Etsy digital shop** as the pilot, with niche selected through the War Room. Digital downloads first (no inventory/shipping). |
+| D2 | Legal owner | **Personal** now; later Estonia / Hong Kong / US entities. Build tenancy/entity-ready now, do not mix personal and company books. |
+| D3 | Tool access | Agents may use **all tools/capabilities (A–Z)**, but each agent has a scoped permission profile, budget and approval gates. No unbounded money/legal/irreversible action. |
+| D4 | Agent controls | Clicking an agent opens a real control panel: model/provider, reasoning effort, permissions, tools, budget, autonomy level, schedule, skills, memory, terminal/browser access, stop/pause/takeover, audit. |
+| D5 | Hosting | **Local PC first**; rent a VPS/GPU when 24/7 or load requires it. Local-first, portable, backups, migration path. |
+| D6 | World | **Local/off now**; invite-only later if useful; public World much later. Office/Business OS never depend on World. |
+| D7 | Style | **16×16 LimeZu baseline** for the world; 32/48 only for portraits/close-ups/UI. User supplies loading background; weather effects are optional. |
+| D8 | Distribution | **Personal/private** build. Keep MIT notices and paid-art local-only rules; selling/distributing later reopens licensing review. |
+
+### D6 explanation (what “World” means)
+
+- **Local only:** the office/city runs only on your PC. Nobody else can visit. Simplest and private.
+- **Invite-only:** you host it (PC/VPS); friends/team get accounts/invites. Visits and social possible; you manage access.
+- **Public:** anyone can join/visit; needs accounts, moderation, abuse handling, privacy, scale. Much larger project.
+
+**Recommended:** local/off now, invite-only later if needed, public not now.
+
+### D3 explanation (all tools, but safe)
+
+“All tools A–Z” means agents can be given browser, shell, files, email, Etsy, APIs, CRM, payments, analytics, docs, images, etc. It does **not** mean every agent can spend money or sign/commit without checks. Each agent gets a permission profile:
+
+- read / draft / act / approve
+- tool allowlist
+- file/network/browser/terminal scopes
+- spend and rate limits
+- required human approvals
+- audit and revoke
+
+This gives full capability without letting one mistake drain an account or contact a customer unchecked.
+
+---
+
+## 28. War Room / Idea Lab
+
+### Purpose
+A special room where agents turn raw inputs into tested business ideas and plans.
+
+### Inputs
+YouTube links/transcripts, web links, posts, screenshots, documents, notes, voice notes, existing products, competitor links, customer comments.
+
+### Workflow
+1. **Intake** — normalize links/media into source artifacts (transcript, page text, images, metadata).
+2. **Research** — market, competitors, demand, pricing, keywords, risks.
+3. **Debate** — roles: Moderator, Researcher, Skeptic, Marketer, Operator, Finance, Customer, Legal/Risk, Builder.
+4. **Evidence** — every claim tagged `FACT`, `INFERENCE`, `ASSUMPTION`, `UNKNOWN`; cite source artifact.
+5. **Synthesis** — idea brief, score (demand/effort/cost/risk/fit), experiments, next tasks.
+6. **Decision** — owner approves/edits/rejects; decision log saved.
+7. **Launch** — approved idea becomes a business/project/playbook with budgets and approvals.
+
+### Room design
+War room / creative studio: large table, wall screen, whiteboard, sticky notes, projectors, plants; warm/creative palette; 16×16 LimeZu style; every source/idea shown as an artifact, not fabricated conversation.
+
+### Rules
+- No auto-publish, no auto-spend, no fake customer research.
+- Sources and assumptions visible.
+- Dissent is recorded, not averaged away.
+- The output is a plan/artifact, not a chat transcript.
+- Council-of-high-intelligence lenses can be used for high-stakes decisions.
+
+---
+
+## 29. Etsy pilot playbook
+
+**Pilot:** one personal Etsy shop selling digital downloads (templates/printables/planners). No inventory or shipping.
+
+### War Room decides niche
+Use the War Room to compare niches on demand, competition, price, effort, IP risk and speed to first sale.
+
+### Pipeline
+1. Niche and product brief.
+2. IP/licence check (no copied art/fonts; commercial-use assets only).
+3. Product design/proof (Canva/design tool; human review).
+4. Listing copy, tags, title, price, mockups.
+5. Shop setup/policies (Etsy seller policy; taxes; personal seller).
+6. Publish listings — **human approval initially**.
+7. Customer messages/orders — draft by agents; human approval initially for refunds/commitments.
+8. Etsy Ads/analytics — budget caps; human approval.
+9. Bookkeeping — export/summary; personal books now, entity-ready later.
+10. Review: sales, conversion, messages, refunds; improve listings.
+
+### Integrations
+Official Etsy API/export where allowed; no scraping/ToS violations. Start with **dry-run** adapters and manual approval. Real credentials only after the owner sets them.
+
+### Guardrails
+- No copyright/IP infringement.
+- No fake reviews/claims.
+- No auto-refunds above threshold.
+- No auto-messaging that commits to custom work/price.
+- Personal seller account now; separate entity later.
+
+---
+
+## 30. Agent control panel
+
+When clicking an agent:
+
+- **Identity:** name, role, avatar, business, room, seat, manager.
+- **Brain:** provider, model, reasoning effort, fallback model, context window, temperature/tool settings.
+- **Permissions:** read/draft/act/approve; tools; file/browser/network/terminal/email/Etsy/payments scopes; per-tool allow/deny.
+- **Limits:** daily/monthly spend, per-action cap, rate limits, refund/discount caps.
+- **Autonomy:** L0–L5, required approvals, escalation.
+- **Work:** current task, queue, schedule, subagents, handoffs.
+- **Knowledge:** skills, memory, SOPs, references.
+- **Controls:** pause, stop, takeover, reassign, revoke, rotate credentials.
+- **Audit:** every action, cost, model, tool, approval, artifact.
+
+The panel must write through the Business OS/agent authority, not just localStorage.
+
+---
+
+## 31. Personal-now, entity-later model
+
+- Tenancy supports `personal`, `company`, and multiple legal entities from day one.
+- Every record carries `tenant_id`, `business_id`, `legal_entity_id`, `currency`, `tax_region`.
+- Personal Etsy shop uses the personal tenant.
+- Later Estonia/HK/US entities get separate books, accounts, approvals and credentials.
+- Never mix personal and company money/data; migration/clone path must be explicit.
+- Local PC now; export/backup makes moving to a VPS/entity later possible.
