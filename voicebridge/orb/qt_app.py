@@ -1553,17 +1553,16 @@ def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
         if box is None:
             return False
         min_x, min_y, max_x, max_y = box
-        # Draw only the frame's own artwork, scaled to the mark, centred on the
-        # orb. The atlas canvas is bigger than the ghost and the ghost is not
-        # centred in it, so both the bitmap centre and the declared origin place
-        # it visibly off-mark (measured: bbox centre 84,154 against a 168,168
-        # target); the alpha extent is the honest box.
+        # `scale` above is the single source of size: ART_SPAN (the ghost BODY's
+        # span, not the padded canvas) maps onto the orb diameter, so the halo is
+        # allowed to bleed past the rim exactly as upstream draws it. An earlier
+        # version computed `scale` and then ignored it, deriving the draw size
+        # from max(frame_w, frame_h) / orb_diameter instead -- which pinned the
+        # sprite to the padded canvas and made it look ~22% too small.
         src_w = float(max_x - min_x + 1)
         src_h = float(max_y - min_y + 1)
-        span = max(src_w, src_h)
-        draw_span = R * 2.0
-        draw_w = src_w * (draw_span / span)
-        draw_h = src_h * (draw_span / span)
+        draw_w = src_w * scale
+        draw_h = src_h * scale
         left = cx - draw_w * 0.5
         top_y = cy - draw_h * 0.5
         bright = max(0.0, min(1.0, float(brightness)))

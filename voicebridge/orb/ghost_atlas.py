@@ -29,11 +29,21 @@ from typing import Any, Dict, Optional, Tuple
 #: exact upstream pin and the licence line.
 ATLAS_FILENAME = "ghost_atlas.bin"
 
-#: Upstream art span in its own pixels. The exporter pads the frame by `margin`
-#: (60) so the outer glow fits, so the full frame is 216x220 and this span is the
-#: frame's LONGER side. Deriving it from the atlas keeps it correct if the margin
-#: ever changes, instead of drifting into a hand-tuned constant.
-ART_SPAN = 220.0
+#: Art span the ghost BODY is scaled by, not the padded canvas.
+#:
+#: The exporter pads the frame with `margin` 60 so the outer glow fits: the atlas
+#: is 216x220 while the ghost itself occupies only ~32x45 of that (measured on
+#: frame 18: body bbox x 94..126, y 107..152). Scaling the PADDED canvas to the
+#: orb diameter therefore sized the halo to the orb and left the ghost at ~22% of
+#: it — the "too small" defect.
+#:
+#: 85 is measured, not guessed. On a 336px canvas with the orb at R=120:
+#:   ART_SPAN=70  body 112x156  halo 314x287  CLIPPED at the widget edge
+#:   ART_SPAN=85  body  93x128  halo 264x262  fits
+#:   ART_SPAN=100 body  79x109  halo 224x222  fits, ghost visibly small
+#: 85 is the largest value where the halo still falls off to nothing inside the
+#: widget, so the glow reads as a circle instead of a cut square.
+ART_SPAN = 85.0
 
 _MAGIC = b""
 
