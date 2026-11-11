@@ -1,7 +1,7 @@
 # Qubit Office — Master Plan
 
-**Status:** planning baseline plus wave-1/wave-2 implementation in isolated worktrees. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete or deployed.
-**Execution mode:** implementation is underway in isolated worktrees; main/live deployment still requires explicit owner action. No `VERIFIED` claim.
+**Status:** planning baseline plus wave-1/wave-2/wave-3 deployed to the live `:8890` service from `integration/qoffice-wave1`. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete. `main` is still unmerged.
+**Execution mode:** live deployment performed with the owner's explicit `do it` (2026-11-11); main merge and release gates remain separate.
 **Scope:** Qubit Office (the campus/office product) + Qubit Business OS (the durable business-operations layer).
 **Rule:** the world is complete from day one; only active businesses/rooms are simulated. Business truth lives in systems of record, never in the renderer.
 
@@ -980,3 +980,22 @@ Landed on `integration/qoffice-wave1`; not merged to `main`, not deployed, not l
 **Still not done:** main merge/deploy, real OAuth/platform accounts, pilot niche/product, 100-floor renderer/load test, live browser verification, final full matrix.
 
 **Immediate next:** main is still dirty from another session (generated TUI build file, untracked pixelfx tools, package-lock). Do not merge over it. Once clean: merge `integration/qoffice-wave1`, rebuild the served bundle, deploy, then run the live Etsy/War Room/agent-control journey. Owner decisions needed for the Etsy niche and real platform accounts.
+
+
+---
+
+## 39. Live deployment (2026-11-11)
+
+Deployed from `integration/qoffice-wave1` to the installed live package. This is a **live deploy, not a release**; `main` remains unmerged and `VERIFIED` is not claimed.
+
+- Backup: `/home/trick/.cache/qubit-deploy-backup-qoffice-wave3-20261111-075442`
+- Live bridge: `qubit-voicebridge.service`, active, pid `3892438`
+- Served bundle: `qubit-office.game.js` sha256 `9ab0b9b46a62b57194142bf975170a3abd5ee878551dd1612ba3391d5d9794cb` (7,610,301 bytes), identical to the integration build
+- `/qubit-office` → **200**; `/agent/api/office/business/overview` → **200** with the session token
+- Browser-verified (CDP/Chrome): Agents dock, War Room/Idea Lab, Roles & floors (100 floors), Agent Controls drawer, and the vendored topbar now reads **Qubit Office** instead of Habblaud.
+
+**Honest limits visible in the live UI:**
+- The Agent Controls drawer opens for an office seat but says no Business OS tenant/agent is linked yet; the first War Room session creates the local Personal tenant, and seats must still be linked to managed BOS agents.
+- The 100-floor directory is a list/template view; the rendered office still shows the existing 4 rooms / 10 agents.
+- Etsy/social/CRM remain dry-run; no real shop, OAuth account, or external action was executed.
+- The iframe topbar identity is patched by the Qubit shell on load; the legal MIT attribution remains visible.
