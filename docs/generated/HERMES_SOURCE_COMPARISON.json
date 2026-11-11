@@ -2668,12 +2668,12 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.test.ts",
-    "qubit_sha256": "fb2faaafa145a5952d5927998c130b66db018f6ce1c1045d929746667ca46f21",
+    "qubit_sha256": "c8a65d6540624cbe5cf778461452a523220ff36e0240b51b2bbc6b6bae9de802",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx",
-    "qubit_sha256": "dc3b667fafe8ef386a432c11246e7c77b91067865844f9c4af63e81a54f9c14d",
+    "qubit_sha256": "8f89bd20e19038f5f222913f1ab13d3ce4c9cc5eb53f384297c9c32d32d11cdd",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2708,7 +2708,7 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/app/dock-layout.test.ts",
-    "qubit_sha256": "7228d17f381df94a5ddce7147acbf00d46f7d82a9ff565e1eafe2d2702e4af57",
+    "qubit_sha256": "946537cc62a6c778d9e134270be243a2af6edb86aafd2bbfcd4c53d11408ca0e",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -2803,12 +2803,12 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/styles/game.css",
-    "qubit_sha256": "9063822bfd80402475c0506781008c720ae1eb126e77251c36acf71899e129da",
+    "qubit_sha256": "3692fc12cdf9bbd254b285afc5b46abeedecf46470cb7017d19630f3b3eccb5b",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/game/styles/tokens.css",
-    "qubit_sha256": "12aa60f5bf4fdda6402869d409ecbf03135e1865825015a8818b70f67cf92339",
+    "qubit_sha256": "91100d20034c2c18f0a51f0294ee13687206fe35afc4f5b396f308eba279ebab",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
@@ -3303,12 +3303,12 @@
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/qubit-office.game.css",
-    "qubit_sha256": "fe74bca45bd2d76330bf3101ec7840abfc4e1e5bbf8c1f120bbb47dfc96fb590",
+    "qubit_sha256": "68c74bdc4a1cc846b9d1631a228832cd72a897632f2e415b9cc8e962b3fd7509",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {
     "qubit": "frontend/qubit-app/plugins/qubit-office/qubit-office.game.js",
-    "qubit_sha256": "085063efb935ed02e5121ece8c042894af63aa371e118612cfdc6addf1e2bfa5",
+    "qubit_sha256": "53359c46bf3b64a60d0a0cddcb25573731f06e063dfef58578ba3f0ba262c5a1",
     "role": "Qubit overlay plugin asset (manifest/bundle)."
    },
    {

@@ -55,10 +55,10 @@
   "local_root": "qubit_runtime",
   "counts": {
    "upstream_files": 16078,
-   "local_files": 21122,
+   "local_files": 21176,
    "identical": 7075,
    "missing": 320,
-   "extra": 5364,
+   "extra": 5418,
    "changed": 8683
   },
   "missing": [
@@ -17925,6 +17925,10 @@
     "local_sha256": "d19fb4562dd84fd41c0233d038eb1a13b0950b670142100ab8c08027a8210932"
    },
    {
+    "path": "tests/qubit_cli/test_agent_cgroup_isolation.py",
+    "local_sha256": "35e4c7b6a80b874fdef4619493a96c3adb7b409410a64b98f82f91436f4ccb1c"
+   },
+   {
     "path": "tests/qubit_cli/test_agent_import_left_core.py",
     "local_sha256": "3a64573a709f5f6e89d51a2a1ba993cbcd34b7d7f71f205ca6dd40c598c75b38"
    },
@@ -20415,6 +20419,10 @@
    {
     "path": "tests/qubit_state/test_list_sessions_recency.py",
     "local_sha256": "6a0cd0a88cf7beb65a2d1d17038061e1e396c6bc72687069ed7cd9d4ec959362"
+   },
+   {
+    "path": "tests/qubit_state/test_live_write_tripwire.py",
+    "local_sha256": "19d9d45308edacfedeb9a13861cfe645bedf73dba068f9cea4c39112010de63e"
    },
    {
     "path": "tests/qubit_state/test_local_lineage_cache.py",
@@ -23037,6 +23045,214 @@
     "local_sha256": "32d4f89e01b5484ec4a677bda0f7831ecac0b2a60dec1506f922e127277f97be"
    },
    {
+    "path": "vendor/pixelfx/.gitignore",
+    "local_sha256": "a306b42a3bfb190e3c1beaf4037d89ae576737dca1c83bc360b5e2ef6cf9d96f"
+   },
+   {
+    "path": "vendor/pixelfx/LICENSE",
+    "local_sha256": "0a77565a50c3462831244452f129c38d2adc4fd07897cbeba8adc943f958604e"
+   },
+   {
+    "path": "vendor/pixelfx/NOTICE.md",
+    "local_sha256": "d12932473f98b1a3f0b5820ae23d568b52e39294ba7c2d60c0649a93a808af3b"
+   },
+   {
+    "path": "vendor/pixelfx/README.md",
+    "local_sha256": "1346cf6276937fa0da3474033a499184740dc3ea978b54526bd3ae226747f84f"
+   },
+   {
+    "path": "vendor/pixelfx/export_ghost.mjs",
+    "local_sha256": "1ae626fcce319fc1244781038a27af4971ee6ebdbcb763c78e94b676b657389a"
+   },
+   {
+    "path": "vendor/pixelfx/ghost_atlas.bin",
+    "local_sha256": "cf0b51ad46a4ab0df88086e0800a09b64233fd7865f6417b9879ad952d657919"
+   },
+   {
+    "path": "vendor/pixelfx/package-lock.json",
+    "local_sha256": "4f5c3c5769f5f63cf4775d8c9fe741daa38ce8fd700211f8b645d7eb67fe219d"
+   },
+   {
+    "path": "vendor/pixelfx/package.json",
+    "local_sha256": "a0663052563c9e8cf1c5aceee3f57efd9d3031fd6ea51db4d4816705c1f00264"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/act.js",
+    "local_sha256": "b4fdeaf8af30c709748bb221c3b3854cc0438f2ce6c6d99f0324e3b3701b9f71"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/actor.js",
+    "local_sha256": "5c867a24a88e93520d020b77190f12db265eb8fc357136ce3d92de05e19e63c2"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/chain.js",
+    "local_sha256": "5014a0eae326f1855f5e320308ad370dbc342d2f1051df3665866401956bfef9"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/color.js",
+    "local_sha256": "4e63f3074df7c1e138f721959858d12e4f6ccc2bf4f8e98c576efbae51241e54"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/font.js",
+    "local_sha256": "c094f1d3a9f94478a255f1cc81aa7ccd2c2ba7a97fc1227a29d268acc1f2ec7c"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/fx.js",
+    "local_sha256": "a959c5f7b1c15ba8e07cb26e5b1ccc0bce0aef54ca14cf01f9d6e794cf4e5a0b"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/index.js",
+    "local_sha256": "ef5966a6365dbbe8a990867b6c7f3fc61922428e5f2e61262a3a430c119bf02d"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/math.js",
+    "local_sha256": "da45e1ed43f7d119dd80fbe97c7de2b35b4ea95dea8781671c296ee5942ac0bc"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/painter.js",
+    "local_sha256": "5b8ada6a25cdf1e63ae3684cc56276c61306558dc0a3a827a6a39ab038f74681"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/particles.js",
+    "local_sha256": "867e58baf522278b4aad383c7224c599cff9ba93268b5eac9485a39a3809477b"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/poses.js",
+    "local_sha256": "829f9b59ac883061afb9e952d6b608363ec7678bd00b026c538046685af88139"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/rig.js",
+    "local_sha256": "5af3f455b18f9feb9f060732fb457529c6c76975a309c72171aa4e88b31aa70c"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/scene.js",
+    "local_sha256": "520a465f771829162dde114880224eb30efbab3cff859cb8a24a28e49d8e198c"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/shapes.js",
+    "local_sha256": "3e28f77e25b3083949f083c74304ead6826b7b1da20a658ccb114ab531fc8898"
+   },
+   {
+    "path": "vendor/pixelfx/src/core/sim.js",
+    "local_sha256": "517febe05b72de9d07e3596c019b9bb01e1f97a74089a30fa80e9e98849ba4b0"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/categories.js",
+    "local_sha256": "1f86a5c77311e6866635df5d689972a17c6a26a3233ce30c8e5121cb4a003c6f"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/_lib.js",
+    "local_sha256": "168a5d6d7a9c68a6b5eacec49226e81516b51da145229b0a6d03422cee090dd7"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/bat.js",
+    "local_sha256": "943d6dd606d0f512d950f71a2772a2171794275856825c345f9b63d1910e04dd"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/bird.js",
+    "local_sha256": "e958dcf7e5fc4a8ae25cde84c94ed4ec2494e465ac64e46c4ed892e45f024834"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/butterfly.js",
+    "local_sha256": "41b396b6d6fca5dbca1f77fff6c2bd6748e29206e1e773d54b26369d0dabd2cf"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/eyeball.js",
+    "local_sha256": "85aab3cc7259963b5655efe1e61e88040c97025a58dda4552045532be25f1c5f"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/fish-school.js",
+    "local_sha256": "c9ea13a16d4801cf94b8599b96241e3c3df6a4786f87ff4ac872c9e522358afa"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/flying-skull.js",
+    "local_sha256": "f9723ebaf5c73e5287fdcafc46d0cbfcc04d9bddda044962bdea3340c3183966"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/frog.js",
+    "local_sha256": "57ce8f467990b6cd78c7b2588b2ee3699eccb2af1287b9a2b846999c4755c965"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/ghost.js",
+    "local_sha256": "2db25342b4cefc4a0118ca35209892aa005554f1d3d212e4dd4429964463e614"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/jellyfish.js",
+    "local_sha256": "3c0b982905bc44849ec75387cea37cea8c272e2327d31d06646b391b2b101d14"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/slime.js",
+    "local_sha256": "355ade085030897ac55589cc76a4065951d139a6a9142276f637a6c27225b748"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/snake.js",
+    "local_sha256": "ccda0ff0ec6bf942c7ed0a3bc4acfdf37f09a3a00cf30de01b5c8abcf530700a"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/critters/wisp.js",
+    "local_sha256": "ebda35dc59ca9b47ff5149186ad0721258cb645c9d6d8ce48ba09dde213b2fd6"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/index.js",
+    "local_sha256": "e5490f6dbc41b25fd632adea244627222c3127d1e51d9261aa2446e3b224dd01"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/_lib.js",
+    "local_sha256": "3fc1e30b3e58e714941b11f09f11dfbcfb1207ef892d484f017224475e971e19"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/coin-drop.js",
+    "local_sha256": "98a937f3dce615a891760e2e859de1da099db33e112321596abf7786c26ad624"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/disintegrate.js",
+    "local_sha256": "1e970c4983acef36dc56741f5bb12bf537e3efe31c1f26cab83c5bda8421e650"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/dissolve-burn.js",
+    "local_sha256": "2c3cd4ac6597327a5fce1dfc0ec2213acffc45db18725e40c8b2d19062125d53"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/egg-hatch.js",
+    "local_sha256": "d01d5f88fa7ae46ce06b8ca9afb94b90e1b70b30417411b1a001cd97b1015e79"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/poof.js",
+    "local_sha256": "2c67b046e2062be1503f22637df9214c0577b0373116aa42aca019b75a47122a"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/respawn-beam.js",
+    "local_sha256": "19d0234011d9f783e5f655963eb386554612a9c01241559e3c4e3d92fca8cbf1"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/shatter-death.js",
+    "local_sha256": "86267ef0f3a238b972e11ab455702fd79dfb0504b07e4d9e9937b7305eac6d81"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/soul-rise.js",
+    "local_sha256": "303f8f4f8221ba9227b809570d9cb43badd43825619e7cfab4a408df7a984621"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/spawn-portal.js",
+    "local_sha256": "7fd44a9b60f3b2e7dfee74f90c07b72af62d8bde168c931727387d0e9810052d"
+   },
+   {
+    "path": "vendor/pixelfx/src/fx/spawn/summon-rise.js",
+    "local_sha256": "733440802ec249f07c7681fa63c6e7b7ffe2b255f5d36609ca61edba810fa949"
+   },
+   {
+    "path": "vendor/pixelfx/tools/lib/fxlib.mjs",
+    "local_sha256": "4667773a1b83c9c64498006caa7349f65c9f19ddc61be94e72ba94554faa6431"
+   },
+   {
+    "path": "vendor/pixelfx/tools/lib/png.mjs",
+    "local_sha256": "19da8ce363e7a4722fa49f06dd9066e07e83262c24da14a496b39a793111ed7c"
+   },
+   {
+    "path": "vendor/pixelfx/tools/render.mjs",
+    "local_sha256": "5e7415073e473ba5e4baaeb9ebb0c120357641c657554e3218119546225e9796"
+   },
+   {
     "path": "web/src/components/QubitAmbient.tsx",
     "local_sha256": "02cc373370da2ec8cea8ac4f4c2c5d9153edacffa365fd2b1f1ce5f9cf7787bd"
    },
@@ -23386,7 +23602,7 @@
     "upstream_path": ".gitignore",
     "upstream_blob": "56781d5f0b415a3f2facc7bf6228e69a7ced1a76",
     "upstream_sha256": "d02a7486328b329df0c1bd8a3c6cd2cbf129057643cdb86c48e5e19148e7f737",
-    "local_sha256": "19f325b75ee48b9590b43f3d432e923c24ea1462b662d80617cdc548b00a8087"
+    "local_sha256": "f22b996c19c49025f253f8a1b860934f280110a2c5c1834a5bbfcb538d972ff9"
    },
    {
     "path": ".hadolint.yaml",
@@ -45730,7 +45946,7 @@
     "upstream_path": "hermes_cli/pty_bridge.py",
     "upstream_blob": "9abbe0f78766340c93e335895372048d0709a48d",
     "upstream_sha256": "404469421a13564f64731352fd838ce4094b891714fdb809d4cfe715e88826a4",
-    "local_sha256": "e330a42b3fb7f6061bc9fa40f64520b363bccaed10f6d8b7507a426be048c760"
+    "local_sha256": "b52f147a87e8f87f09f92fabc3124e2c0a1a1f80f5af19efa030e1f5449853c5"
    },
    {
     "path": "qubit_cli/pty_session.py",
@@ -47480,7 +47696,7 @@
     "upstream_path": "hermes_state.py",
     "upstream_blob": "f0a3c55413241d1ea675c3004a0d3035f6dfc59a",
     "upstream_sha256": "e66115733214a43daf6825995094ae366416534783688b191653317ace553e2a",
-    "local_sha256": "f53afbe6ef2e1f2c999a2f70fb9ff0784d9b934e714b8a296ae8008e34416266"
+    "local_sha256": "558cc9adaf3f8fa6c8e63d297d83676f3cf9cfd4ce66c9ef41f19ed8cf7d96d1"
    },
    {
     "path": "qubit_state_common.py",
@@ -47529,7 +47745,7 @@
     "upstream_path": "hermes_state_guard.py",
     "upstream_blob": "2f0444df57ed1d7b4adbfd2e1bdb430673062811",
     "upstream_sha256": "4119cd9839a5028d9527c741f263d4011b3851994db5f8cf46d869885c32c626",
-    "local_sha256": "cb3aba8af632a91cb3adb8bfb4b52f7f16d34a7b471d78557b6ab2b773142ad0"
+    "local_sha256": "8b5fed194b487177cf345031fd5d0e9e18a51aec818652055fc9a11138536f8e"
    },
    {
     "path": "qubit_state_health.py",
@@ -76537,7 +76753,7 @@
     "upstream_path": "tools/environments/base_session_env.py",
     "upstream_blob": "e0c095e484e462ea06ceaa1ca3b9fa6becdd3bde",
     "upstream_sha256": "d235d3162fa5d0267a39c262f3a98c9c222a5770472b8a5177ee2db2f413e430",
-    "local_sha256": "17e293f04c173c401d342069b1c604957315efb287b7be76f9c056ed34df287e"
+    "local_sha256": "ad237d4022a80f1a2ca404f0014f976418d61161d5b645af2e754f5b62658f54"
    },
    {
     "path": "tools/environments/daytona.py",
@@ -77062,7 +77278,7 @@
     "upstream_path": "tools/process_registry.py",
     "upstream_blob": "f02463baf6a2bae4f6c7e30b28fd880183b08eea",
     "upstream_sha256": "dd40bbd900583ccb068beaee1f7f02a987a845f97f4c48c7a066699b0d4b3093",
-    "local_sha256": "4babcf314fa26b4c111d269031e2b1133d7f73f4523d89d4fd82c4c921d129f9"
+    "local_sha256": "d9d8f07f9a8c374bd003bfd7990c254ba0bf9f99070b084c159dbaf292297faf"
    },
    {
     "path": "tools/process_registry_checkpoint.py",
@@ -83916,20 +84132,124 @@
   "hermes": {
    "ledger_rows": 0,
    "inventory_items": 1802,
-   "matched": 1366,
-   "unmatched": 436,
+   "matched": 1368,
+   "unmatched": 434,
    "evidence": 6261
   },
   "openclaw": {
-   "ledger_rows": 0,
+   "ledger_rows": 104,
    "extensions": 138,
    "matched": 138,
    "unmatched": 0
   },
   "qubit": {
-   "ledger_rows": 2037
+   "ledger_rows": 2131
   },
   "ledger_ids": [
+   "OC-01",
+   "OC-02",
+   "OC-03",
+   "OC-04",
+   "OC-05",
+   "OC-06",
+   "OC-07",
+   "OC-08",
+   "OC-09",
+   "OC-10",
+   "OC-11",
+   "OC-12",
+   "OC-13",
+   "OC-14",
+   "OC-15",
+   "OC-16",
+   "OC-17",
+   "OC-18",
+   "OC-19",
+   "OC-20",
+   "OC-21",
+   "OC-22",
+   "OC-23",
+   "OC-24",
+   "OC-25",
+   "OC-26",
+   "OC-27",
+   "OC-28",
+   "OC-29",
+   "OC-30",
+   "OC-31",
+   "OC-32",
+   "OC-33",
+   "OC-34",
+   "OC-35",
+   "OC-36",
+   "OC-37",
+   "OC-38",
+   "OC-39",
+   "OC-40",
+   "OC-41",
+   "OC-42",
+   "OC-43",
+   "OC-44",
+   "OC-45",
+   "OC-46",
+   "OC-47",
+   "OC-48",
+   "OC-49",
+   "OC-50",
+   "OC-51",
+   "OC-52",
+   "OC-53",
+   "OC-54",
+   "OC-55",
+   "OC-56",
+   "OC-57",
+   "OC-58",
+   "OC-59",
+   "OC-60",
+   "OC-61",
+   "OC-62",
+   "OC-63",
+   "OC-64",
+   "OC-65",
+   "OC-66",
+   "OC-67",
+   "OC-68",
+   "OC-69",
+   "OC-70",
+   "OC-71",
+   "OC-72",
+   "OC-D01",
+   "OC-D02",
+   "OC-D03",
+   "OC-D04",
+   "OC-D05",
+   "OC-D06",
+   "OC-D07",
+   "OC-D08",
+   "OC-D09",
+   "OC-D10",
+   "OC-D11",
+   "OC-D12",
+   "OC-D13",
+   "OC-D14",
+   "OC-D15",
+   "OC-D16",
+   "OC-D17",
+   "OC-D18",
+   "OC-D19",
+   "OC-D20",
+   "OC-D21",
+   "OC-D22",
+   "OC-D23",
+   "OC-D24",
+   "OC-D25",
+   "OC-D26",
+   "OC-D27",
+   "OC-D28",
+   "OC-D29",
+   "OC-D30",
+   "OC-D31",
+   "OC-D32",
    "acp",
    "acp_accept_hooks",
    "acp_accept_hooks_refusal",
@@ -84555,13 +84875,20 @@
    "inv:hermes_auth_add_--scope",
    "inv:hermes_auth_add_--timeout",
    "inv:hermes_auth_add_--type",
+   "inv:hermes_auth_add_provider",
    "inv:hermes_auth_list",
+   "inv:hermes_auth_list_provider",
    "inv:hermes_auth_logout",
+   "inv:hermes_auth_logout_provider",
    "inv:hermes_auth_priority",
    "inv:hermes_auth_priority_priority",
+   "inv:hermes_auth_priority_provider",
    "inv:hermes_auth_refresh",
+   "inv:hermes_auth_refresh_provider",
    "inv:hermes_auth_remove",
+   "inv:hermes_auth_remove_provider",
    "inv:hermes_auth_reset",
+   "inv:hermes_auth_reset_provider",
    "inv:hermes_auth_spotify",
    "inv:hermes_auth_spotify_--client-id",
    "inv:hermes_auth_spotify_--no-browser",
@@ -84570,6 +84897,7 @@
    "inv:hermes_auth_spotify_--timeout",
    "inv:hermes_auth_spotify_spotify_action",
    "inv:hermes_auth_status",
+   "inv:hermes_auth_status_provider",
    "inv:hermes_auth_upgrade",
    "inv:hermes_auth_upgrade_--no-browser",
    "inv:hermes_auth_upgrade_--timeout",
@@ -84639,6 +84967,7 @@
    "inv:hermes_codex-runtime_migrate_--dry-run",
    "inv:hermes_codex-runtime_migrate_--json",
    "inv:hermes_completion",
+   "inv:hermes_completion_shell",
    "inv:hermes_computer-use",
    "inv:hermes_computer-use_doctor",
    "inv:hermes_computer-use_doctor_--include",
@@ -84655,12 +84984,15 @@
    "inv:hermes_config_env-path",
    "inv:hermes_config_get",
    "inv:hermes_config_get_--raw",
+   "inv:hermes_config_get_key",
    "inv:hermes_config_migrate",
    "inv:hermes_config_path",
    "inv:hermes_config_set",
    "inv:hermes_config_set_--force",
+   "inv:hermes_config_set_key",
    "inv:hermes_config_show",
    "inv:hermes_config_unset",
+   "inv:hermes_config_unset_key",
    "inv:hermes_console",
    "inv:hermes_cron",
    "inv:hermes_cron_add",
@@ -84680,6 +85012,8 @@
    "inv:hermes_cron_create_--script",
    "inv:hermes_cron_create_--skill",
    "inv:hermes_cron_create_--workdir",
+   "inv:hermes_cron_create_prompt",
+   "inv:hermes_cron_create_schedule",
    "inv:hermes_cron_delete",
    "inv:hermes_cron_doctor",
    "inv:hermes_cron_edit",
@@ -84714,6 +85048,7 @@
    "inv:hermes_cron_list",
    "inv:hermes_cron_notepad",
    "inv:hermes_cron_notepad_job_id",
+   "inv:hermes_cron_notepad_key",
    "inv:hermes_cron_notepad_notepad_action",
    "inv:hermes_cron_pause",
    "inv:hermes_cron_pause_job_id",
@@ -84808,16 +85143,19 @@
    "inv:hermes_hooks_ls",
    "inv:hermes_hooks_remove",
    "inv:hermes_hooks_revoke",
+   "inv:hermes_hooks_revoke_command",
    "inv:hermes_hooks_rm",
    "inv:hermes_hooks_test",
    "inv:hermes_hooks_test_--for-tool",
    "inv:hermes_hooks_test_--payload-file",
+   "inv:hermes_hooks_test_event",
    "inv:hermes_import",
    "inv:hermes_import-agent",
    "inv:hermes_import-agent_--dry-run",
    "inv:hermes_import-agent_--overwrite",
    "inv:hermes_import-agent_--source",
    "inv:hermes_import-agent_--sync",
+   "inv:hermes_import-agent_agent",
    "inv:hermes_import_--force",
    "inv:hermes_import_-f",
    "inv:hermes_import_zipfile",
@@ -84860,30 +85198,37 @@
    "inv:hermes_mcp_add_--env",
    "inv:hermes_mcp_add_--preset",
    "inv:hermes_mcp_add_--url",
+   "inv:hermes_mcp_add_name",
    "inv:hermes_mcp_catalog",
    "inv:hermes_mcp_config",
    "inv:hermes_mcp_configure",
+   "inv:hermes_mcp_configure_name",
    "inv:hermes_mcp_install",
    "inv:hermes_mcp_install_identifier",
    "inv:hermes_mcp_list",
    "inv:hermes_mcp_login",
    "inv:hermes_mcp_login_--flow",
+   "inv:hermes_mcp_login_name",
    "inv:hermes_mcp_ls",
    "inv:hermes_mcp_picker",
    "inv:hermes_mcp_reauth",
    "inv:hermes_mcp_reauth_--all",
+   "inv:hermes_mcp_reauth_name",
    "inv:hermes_mcp_remove",
+   "inv:hermes_mcp_remove_name",
    "inv:hermes_mcp_rm",
    "inv:hermes_mcp_serve",
    "inv:hermes_mcp_serve_--verbose",
    "inv:hermes_mcp_serve_-v",
    "inv:hermes_mcp_test",
+   "inv:hermes_mcp_test_name",
    "inv:hermes_memory",
    "inv:hermes_memory-graph",
    "inv:hermes_memory_off",
    "inv:hermes_memory_reset",
    "inv:hermes_memory_reset_--target",
    "inv:hermes_memory_setup",
+   "inv:hermes_memory_setup_provider",
    "inv:hermes_memory_status",
    "inv:hermes_migrate",
    "inv:hermes_migrate_relay",
@@ -84894,7 +85239,9 @@
    "inv:hermes_moa",
    "inv:hermes_moa_config",
    "inv:hermes_moa_configure",
+   "inv:hermes_moa_configure_name",
    "inv:hermes_moa_delete",
+   "inv:hermes_moa_delete_name",
    "inv:hermes_moa_list",
    "inv:hermes_moa_ls",
    "inv:hermes_moa_rm",
@@ -84912,6 +85259,7 @@
    "inv:hermes_monitoring_status",
    "inv:hermes_pairing",
    "inv:hermes_pairing_approve",
+   "inv:hermes_pairing_approve_code",
    "inv:hermes_pairing_approve_platform",
    "inv:hermes_pairing_clear-pending",
    "inv:hermes_pairing_list",
@@ -84925,27 +85273,34 @@
    "inv:hermes_peer_add_--key",
    "inv:hermes_peer_add_--note",
    "inv:hermes_peer_add_--url",
+   "inv:hermes_peer_add_name",
    "inv:hermes_peer_list",
    "inv:hermes_peer_ls",
    "inv:hermes_peer_remove",
+   "inv:hermes_peer_remove_name",
    "inv:hermes_peer_rm",
    "inv:hermes_peer_set",
    "inv:hermes_pets",
    "inv:hermes_plugins",
    "inv:hermes_plugins_adopt",
+   "inv:hermes_plugins_adopt_name",
    "inv:hermes_plugins_browse",
    "inv:hermes_plugins_capabilities",
+   "inv:hermes_plugins_capabilities_name",
    "inv:hermes_plugins_check",
    "inv:hermes_plugins_check-updates",
    "inv:hermes_plugins_check-updates_--json",
    "inv:hermes_plugins_compat",
    "inv:hermes_plugins_compat_--json",
+   "inv:hermes_plugins_compat_path",
    "inv:hermes_plugins_disable",
+   "inv:hermes_plugins_disable_name",
    "inv:hermes_plugins_doctor",
    "inv:hermes_plugins_doctor_--ci",
    "inv:hermes_plugins_enable",
    "inv:hermes_plugins_enable_--allow-tool-override",
    "inv:hermes_plugins_enable_--no-allow-tool-override",
+   "inv:hermes_plugins_enable_name",
    "inv:hermes_plugins_info",
    "inv:hermes_plugins_install",
    "inv:hermes_plugins_install_--allow-removed",
@@ -84969,17 +85324,24 @@
    "inv:hermes_plugins_pack_install",
    "inv:hermes_plugins_pack_install_--force",
    "inv:hermes_plugins_pack_install_-f",
+   "inv:hermes_plugins_pack_install_source",
    "inv:hermes_plugins_pack_show",
+   "inv:hermes_plugins_pack_show_source",
    "inv:hermes_plugins_remove",
+   "inv:hermes_plugins_remove_name",
    "inv:hermes_plugins_rm",
    "inv:hermes_plugins_search",
    "inv:hermes_plugins_search_term",
    "inv:hermes_plugins_show",
+   "inv:hermes_plugins_show_name",
    "inv:hermes_plugins_trust-update-url",
+   "inv:hermes_plugins_trust-update-url_name",
    "inv:hermes_plugins_uninstall",
    "inv:hermes_plugins_update",
+   "inv:hermes_plugins_update_name",
    "inv:hermes_plugins_validate",
    "inv:hermes_plugins_validate_--install-deps",
+   "inv:hermes_plugins_validate_path",
    "inv:hermes_portal",
    "inv:hermes_profile",
    "inv:hermes_profile_alias",
@@ -85012,6 +85374,7 @@
    "inv:hermes_profile_export_profile_name",
    "inv:hermes_profile_import",
    "inv:hermes_profile_import_--name",
+   "inv:hermes_profile_import_archive",
    "inv:hermes_profile_info",
    "inv:hermes_profile_info_profile_name",
    "inv:hermes_profile_install",
@@ -85020,6 +85383,7 @@
    "inv:hermes_profile_install_--name",
    "inv:hermes_profile_install_--yes",
    "inv:hermes_profile_install_-y",
+   "inv:hermes_profile_install_source",
    "inv:hermes_profile_list",
    "inv:hermes_profile_migrate-identity",
    "inv:hermes_profile_migrate-identity_new_name",
@@ -85045,10 +85409,12 @@
    "inv:hermes_project_create_--slug",
    "inv:hermes_project_create_--use",
    "inv:hermes_project_create_folders",
+   "inv:hermes_project_create_name",
    "inv:hermes_project_list",
    "inv:hermes_project_list_--all",
    "inv:hermes_project_ls",
    "inv:hermes_project_use",
+   "inv:hermes_project_use_project",
    "inv:hermes_prompt-size",
    "inv:hermes_prompt-size_--platform",
    "inv:hermes_proxy",
@@ -85094,8 +85460,10 @@
    "inv:hermes_sessions_export_--lineage",
    "inv:hermes_sessions_export_--only",
    "inv:hermes_sessions_export_--session-id",
+   "inv:hermes_sessions_export_output",
    "inv:hermes_sessions_import",
    "inv:hermes_sessions_import_--from",
+   "inv:hermes_sessions_import_path",
    "inv:hermes_sessions_list",
    "inv:hermes_sessions_list_--limit",
    "inv:hermes_sessions_list_--source",
@@ -85135,13 +85503,16 @@
    "inv:hermes_setup_section",
    "inv:hermes_skills",
    "inv:hermes_skills_audit",
+   "inv:hermes_skills_audit_name",
    "inv:hermes_skills_browse",
    "inv:hermes_skills_browse_--page",
    "inv:hermes_skills_browse_--size",
    "inv:hermes_skills_browse_--source",
    "inv:hermes_skills_check",
+   "inv:hermes_skills_check_name",
    "inv:hermes_skills_config",
    "inv:hermes_skills_diff",
+   "inv:hermes_skills_diff_name",
    "inv:hermes_skills_inspect",
    "inv:hermes_skills_inspect_identifier",
    "inv:hermes_skills_install",
@@ -85158,28 +85529,38 @@
    "inv:hermes_skills_publish_--to",
    "inv:hermes_skills_publish_skill_path",
    "inv:hermes_skills_repair-official",
+   "inv:hermes_skills_repair-official_name",
    "inv:hermes_skills_reset",
+   "inv:hermes_skills_reset_name",
    "inv:hermes_skills_search",
    "inv:hermes_skills_search_--limit",
    "inv:hermes_skills_search_--source",
    "inv:hermes_skills_search_query",
    "inv:hermes_skills_snapshot",
    "inv:hermes_skills_snapshot_export",
+   "inv:hermes_skills_snapshot_export_output",
    "inv:hermes_skills_snapshot_import",
    "inv:hermes_skills_snapshot_import_input",
    "inv:hermes_skills_tap",
    "inv:hermes_skills_tap_add",
    "inv:hermes_skills_tap_list",
    "inv:hermes_skills_tap_remove",
+   "inv:hermes_skills_tap_remove_name",
    "inv:hermes_skills_trust",
+   "inv:hermes_skills_trust_path",
    "inv:hermes_skills_uninstall",
+   "inv:hermes_skills_uninstall_name",
    "inv:hermes_skills_untrust",
+   "inv:hermes_skills_untrust_path",
    "inv:hermes_skills_update",
+   "inv:hermes_skills_update_name",
    "inv:hermes_skin",
    "inv:hermes_skin_list",
    "inv:hermes_skin_set",
    "inv:hermes_skin_set_--skin",
+   "inv:hermes_skin_set_key",
    "inv:hermes_skin_use",
+   "inv:hermes_skin_use_name",
    "inv:hermes_slack",
    "inv:hermes_slack_manifest",
    "inv:hermes_slack_manifest_--agent-view",
@@ -85197,11 +85578,14 @@
    "inv:hermes_sync_device",
    "inv:hermes_sync_device_--name",
    "inv:hermes_sync_disable",
+   "inv:hermes_sync_disable_skill",
    "inv:hermes_sync_enable",
+   "inv:hermes_sync_enable_skill",
    "inv:hermes_sync_now",
    "inv:hermes_sync_propose",
    "inv:hermes_sync_propose_--message",
    "inv:hermes_sync_propose_-m",
+   "inv:hermes_sync_propose_name",
    "inv:hermes_sync_pull",
    "inv:hermes_sync_push",
    "inv:hermes_sync_status",
@@ -85209,8 +85593,10 @@
    "inv:hermes_tools_--summary",
    "inv:hermes_tools_disable",
    "inv:hermes_tools_disable_--platform",
+   "inv:hermes_tools_disable_names",
    "inv:hermes_tools_enable",
    "inv:hermes_tools_enable_--platform",
+   "inv:hermes_tools_enable_names",
    "inv:hermes_tools_list",
    "inv:hermes_tools_list_--platform",
    "inv:hermes_tools_post-setup",
@@ -85252,11 +85638,13 @@
    "inv:hermes_verify_--save",
    "inv:hermes_verify_--skip-start",
    "inv:hermes_verify_--timeout",
+   "inv:hermes_verify_path",
    "inv:hermes_webhook",
    "inv:hermes_webhook_add",
    "inv:hermes_webhook_list",
    "inv:hermes_webhook_ls",
    "inv:hermes_webhook_remove",
+   "inv:hermes_webhook_remove_name",
    "inv:hermes_webhook_rm",
    "inv:hermes_webhook_subscribe",
    "inv:hermes_webhook_subscribe_--cron-job",
@@ -85271,8 +85659,10 @@
    "inv:hermes_webhook_subscribe_--script",
    "inv:hermes_webhook_subscribe_--secret",
    "inv:hermes_webhook_subscribe_--skills",
+   "inv:hermes_webhook_subscribe_name",
    "inv:hermes_webhook_test",
    "inv:hermes_webhook_test_--payload",
+   "inv:hermes_webhook_test_name",
    "inv:hermes_whatsapp",
    "inv:hermes_whatsapp-cloud",
    "inv:hermes_worktree",
@@ -85301,7 +85691,9 @@
    "inv:openclaw-ext:azure-speech",
    "inv:openclaw-ext:bonjour",
    "inv:openclaw-ext:brave",
+   "inv:openclaw-ext:browser",
    "inv:openclaw-ext:byteplus",
+   "inv:openclaw-ext:canvas",
    "inv:openclaw-ext:cerebras",
    "inv:openclaw-ext:chutes",
    "inv:openclaw-ext:clickclack",
@@ -85372,12 +85764,14 @@
    "inv:openclaw-ext:ollama",
    "inv:openclaw-ext:open-prose",
    "inv:openclaw-ext:openai",
+   "inv:openclaw-ext:opencode",
    "inv:openclaw-ext:opencode-go",
    "inv:openclaw-ext:openrouter",
    "inv:openclaw-ext:openshell",
    "inv:openclaw-ext:perplexity",
    "inv:openclaw-ext:phone-control",
    "inv:openclaw-ext:pixverse",
+   "inv:openclaw-ext:policy",
    "inv:openclaw-ext:qa-channel",
    "inv:openclaw-ext:qa-lab",
    "inv:openclaw-ext:qa-matrix",
@@ -85388,6 +85782,7 @@
    "inv:openclaw-ext:searxng",
    "inv:openclaw-ext:senseaudio",
    "inv:openclaw-ext:sglang",
+   "inv:openclaw-ext:slack",
    "inv:openclaw-ext:sms",
    "inv:openclaw-ext:stepfun",
    "inv:openclaw-ext:synology-chat",
@@ -85412,25 +85807,34 @@
    "inv:openclaw-ext:voyage",
    "inv:openclaw-ext:vydra",
    "inv:openclaw-ext:web-readability",
+   "inv:openclaw-ext:webhooks",
+   "inv:openclaw-ext:whatsapp",
    "inv:openclaw-ext:workboard",
    "inv:openclaw-ext:xai",
    "inv:openclaw-ext:xiaomi",
    "inv:openclaw-ext:zai",
    "inv:openclaw-ext:zalo",
    "inv:openclaw-ext:zalouser",
+   "inv:page:FilesPage",
+   "inv:page:SessionsPage",
    "inv:plugin-api:hermes-achievements",
+   "inv:plugin-api:kanban",
    "inv:plugin-asset:hermes-achievements:index.js",
    "inv:plugin-asset:hermes-achievements:style.css",
    "inv:plugin-asset:kanban:index.js",
    "inv:plugin-asset:kanban:style.css",
    "inv:plugin-manifest:hermes-achievements",
+   "inv:plugin-manifest:kanban",
    "inv:plugin-test:hermes-achievements:test_achievement_engine.py",
+   "inv:plugin:browser",
    "inv:plugin:context_engine",
    "inv:plugin:cron_providers",
    "inv:plugin:dashboard_auth",
    "inv:plugin:disk-cleanup",
    "inv:plugin:google_meet",
    "inv:plugin:image_gen",
+   "inv:plugin:kanban",
+   "inv:plugin:memory",
    "inv:plugin:model-providers",
    "inv:plugin:observability",
    "inv:plugin:platforms",
@@ -85439,6 +85843,7 @@
    "inv:plugin:spotify",
    "inv:plugin:teams_pipeline",
    "inv:plugin:video_gen",
+   "inv:plugin:web",
    "inv:skill:optional-skills/autonomous-ai-agents",
    "inv:skill:optional-skills/blockchain",
    "inv:skill:optional-skills/communication",
@@ -85463,11 +85868,13 @@
    "inv:skill:skills/creative",
    "inv:skill:skills/devops",
    "inv:skill:skills/email",
+   "inv:skill:skills/media",
    "inv:skill:skills/note-taking",
    "inv:skill:skills/productivity",
    "inv:skill:skills/research",
    "inv:skill:skills/social-media",
    "inv:skill:skills/software-development",
+   "inv:skill:skills/web",
    "inv:tool:annotate_preview",
    "inv:tool:apply_layout",
    "inv:tool:browser_back",
@@ -85487,6 +85894,7 @@
    "inv:tool:browser_vision",
    "inv:tool:clarify",
    "inv:tool:close_terminal",
+   "inv:tool:computer_use",
    "inv:tool:cronjob_manage",
    "inv:tool:delegate_task",
    "inv:tool:desktop_preview",
@@ -85500,6 +85908,7 @@
    "inv:tool:feishu_drive_list_comment_replies",
    "inv:tool:feishu_drive_list_comments",
    "inv:tool:feishu_drive_reply_comment",
+   "inv:tool:file",
    "inv:tool:focus_pane",
    "inv:tool:gui_tour",
    "inv:tool:ha_call_service",
@@ -85522,6 +85931,8 @@
    "inv:tool:meet_say",
    "inv:tool:meet_status",
    "inv:tool:meet_transcript",
+   "inv:tool:memory",
+   "inv:tool:patch",
    "inv:tool:process_manage",
    "inv:tool:react_to_message",
    "inv:tool:read_file",
@@ -85539,11 +85950,14 @@
    "inv:tool:spotify_playlists",
    "inv:tool:spotify_queue",
    "inv:tool:spotify_search",
+   "inv:tool:terminal",
    "inv:tool:text_to_speech",
    "inv:tool:todo_list",
    "inv:tool:video_analyze",
    "inv:tool:video_generate",
+   "inv:tool:vision",
    "inv:tool:vision_analyze",
+   "inv:tool:web",
    "inv:tool:web_extract",
    "inv:tool:write_file",
    "inv:tool:x_search",
@@ -85972,11 +86386,11 @@
  },
  "parent_mapping": {
   "method": "Mechanical parent mapping: a CLI option/positional belongs to its command family (nearest existing cli: row); a CLI alias to its target; a model/provider entry to model/proxy_providers; a plugin asset/API/test/manifest to its plugin; an OpenClaw extension to the audited OC-* capability of its name or first mapped manifest category; a workflow source file to its area capability; a dashboard component/dialog/form/nav to webui_status.  A surface is covered when it matches its own ledger row or its resolved parent row is IMPLEMENTED in the live ledger, so it must not create a standalone MISSING row.  Parented and distinct uncovered items are counted and listed separately.",
-  "parented_surfaces": 1029,
-  "parented_covered": 1024,
-  "parented_uncovered": 5,
-  "distinct_surfaces": 911,
-  "distinct_covered": 911,
+  "parented_surfaces": 1045,
+  "parented_covered": 1044,
+  "parented_uncovered": 1,
+  "distinct_surfaces": 895,
+  "distinct_covered": 895,
   "distinct_uncovered": 0,
   "by_coverage": {
    "(distinct)": 773,
@@ -85993,6 +86407,21 @@
    "workflow-surface": 132
   },
   "by_parent_covered": {
+   "OC-01": 1,
+   "OC-09": 1,
+   "OC-18": 2,
+   "OC-23": 1,
+   "OC-30": 1,
+   "OC-34": 1,
+   "OC-35": 1,
+   "OC-67": 1,
+   "OC-D03": 1,
+   "OC-D04": 1,
+   "OC-D12": 1,
+   "OC-D13": 1,
+   "OC-D15": 1,
+   "OC-D16": 1,
+   "OC-D17": 1,
    "browser_status": 25,
    "channels_status": 8,
    "cli:acp": 6,
@@ -86176,8 +86605,8 @@
    "memory_search": 32,
    "model": 232,
    "opencode_status": 7,
-   "plugin:kanban": 2,
-   "plugin:qubit-achievements": 3,
+   "plugin:kanban": 4,
+   "plugin:qubit-achievements": 5,
    "proxy_providers": 39,
    "reports_list": 3,
    "runtime_status": 21,
@@ -86185,36 +86614,29 @@
    "webui_status": 48
   },
   "by_parent_uncovered": {
-   "cli:screen install": 1,
-   "plugin:kanban": 2,
-   "plugin:qubit-achievements": 2
+   "cli:screen install": 1
   },
   "uncovered_by_category": {
    "distinct": {},
    "parented": {
-    "hermes_plugin_asset": 4,
     "qubit_cli_option": 1
    }
   }
  },
  "omissions": {
-  "total": 5,
+  "total": 1,
   "distinct_total": 0,
-  "parented_uncovered": 5,
-  "parented_covered": 1024,
+  "parented_uncovered": 1,
+  "parented_covered": 1044,
   "by_category": {
-   "hermes_plugin_asset": 4,
    "qubit_cli_option": 1
   },
   "distinct_by_category": {},
   "parented_by_category": {
-   "hermes_plugin_asset": 4,
    "qubit_cli_option": 1
   },
   "by_parent": {
-   "cli:screen install": 1,
-   "plugin:kanban": 2,
-   "plugin:qubit-achievements": 2
+   "cli:screen install": 1
   },
   "unreproducible_evidence": []
  },
@@ -86661,9 +87083,9 @@
    "name": "Analytics",
    "path": "web/src/App.tsx:196",
    "route": "/analytics",
-   "ledger_match": null,
-   "ledger_source": null,
-   "ledger_status": null,
+   "ledger_match": "OC-50",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
    "parent_resolved": "webui_status",
@@ -86725,9 +87147,9 @@
    "name": "Cron",
    "path": "web/src/App.tsx:209",
    "route": "/cron",
-   "ledger_match": "plugin_qubit-hud",
-   "ledger_source": "qubit",
-   "ledger_status": "UNVERIFIED",
+   "ledger_match": "OC-D22",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
    "parent_resolved": "webui_status",
@@ -86773,9 +87195,9 @@
    "name": "Files",
    "path": "web/src/App.tsx:195",
    "route": "/files",
-   "ledger_match": null,
-   "ledger_source": null,
-   "ledger_status": null,
+   "ledger_match": "OC-61",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
    "parent_resolved": "webui_status",
@@ -86805,8 +87227,8 @@
    "name": "MCP",
    "path": "web/src/App.tsx:212",
    "route": "/mcp",
-   "ledger_match": "mcp",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-D10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
@@ -86837,8 +87259,8 @@
    "name": "Pairing",
    "path": "web/src/App.tsx:215",
    "route": "/pairing",
-   "ledger_match": "pairing_create",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-07",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "webui_status",
    "coverage": "dashboard-surface",
@@ -87109,8 +87531,8 @@
    "category": "hermes_dashboard_page",
    "name": "FilesPage",
    "path": "web/src/pages/FilesPage.tsx",
-   "ledger_match": "page_filespage",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-61",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -87293,8 +87715,8 @@
    "category": "hermes_dashboard_page",
    "name": "SessionsPage",
    "path": "web/src/pages/SessionsPage.tsx",
-   "ledger_match": "page_sessionspage",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-43",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -87392,12 +87814,20 @@
    "api": "plugin_api.py",
    "ledger_match": "inv:plugin-manifest:hermes-achievements",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:qubit-achievements",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'qubit-achievements' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "plugin-manifest:kanban",
@@ -87410,14 +87840,22 @@
    "tab_path": "/kanban",
    "entry": "dist/index.js",
    "api": "plugin_api.py",
-   "ledger_match": "guard_kanban_import",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-30",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:kanban",
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:kanban",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'kanban' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "dashboard-route:/analytics",
@@ -105317,9 +105755,9 @@
    "category": "hermes_model",
    "name": "default",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "actions_execute",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-14",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -106757,9 +107195,9 @@
    "category": "hermes_model",
    "name": "minimax/minimax-m3:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107012,9 +107450,9 @@
    "category": "hermes_model",
    "name": "nvidia/nemotron-3-super-120b-a12b:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107042,9 +107480,9 @@
    "category": "hermes_model",
    "name": "nvidia/nemotron-3-ultra-550b-a55b:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107072,9 +107510,9 @@
    "category": "hermes_model",
    "name": "nvidia/nemotron-3.5-lightning:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107372,9 +107810,9 @@
    "category": "hermes_model",
    "name": "poolside/laguna-s-2.1:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107387,9 +107825,9 @@
    "category": "hermes_model",
    "name": "poolside/laguna-xs-2.1:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107627,9 +108065,9 @@
    "category": "hermes_model",
    "name": "thinkingmachines/inkling-small:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107642,9 +108080,9 @@
    "category": "hermes_model",
    "name": "thinkingmachines/inkling:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -107972,9 +108410,9 @@
    "category": "hermes_model",
    "name": "z-ai/glm-5.2:free",
    "path": "hermes_cli/models_catalog_static.py",
-   "ledger_match": "questions_ask",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "model",
    "coverage": "model-entry",
    "parent_resolved": "model",
@@ -108077,8 +108515,8 @@
    "category": "hermes_plugin",
    "name": "browser",
    "path": "plugins/browser",
-   "ledger_match": "browser_activate",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-09",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108217,7 +108655,7 @@
    "path": "plugins/hermes-achievements",
    "ledger_match": "inv:plugin-manifest:hermes-achievements",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -108261,8 +108699,8 @@
    "category": "hermes_plugin",
    "name": "kanban",
    "path": "plugins/kanban",
-   "ledger_match": "guard_kanban_import",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-30",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108284,8 +108722,8 @@
    "category": "hermes_plugin",
    "name": "memory",
    "path": "plugins/memory",
-   "ledger_match": "brain",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-41",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108307,8 +108745,8 @@
    "category": "hermes_plugin",
    "name": "model-providers",
    "path": "plugins/model-providers",
-   "ledger_match": "inv:plugin:model-providers",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-D28",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108468,8 +108906,8 @@
    "category": "hermes_plugin",
    "name": "web",
    "path": "plugins/web",
-   "ledger_match": "web_fetch",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-43",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -108494,12 +108932,20 @@
    "plugin": "hermes-achievements",
    "ledger_match": "inv:plugin-manifest:hermes-achievements",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:qubit-achievements",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'qubit-achievements' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "plugin-api:kanban",
@@ -108508,14 +108954,22 @@
    "name": "kanban",
    "path": "plugins/kanban/dashboard/plugin_api.py",
    "plugin": "kanban",
-   "ledger_match": "guard_kanban_import",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-30",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:kanban",
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:kanban",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'kanban' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "plugin-asset:hermes-achievements:index.js",
@@ -108531,7 +108985,15 @@
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:qubit-achievements",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'qubit-achievements' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "plugin-asset:hermes-achievements:style.css",
@@ -108547,7 +109009,15 @@
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:qubit-achievements",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'qubit-achievements' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "plugin-asset:kanban:index.js",
@@ -108563,7 +109033,15 @@
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:kanban",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'kanban' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "plugin-asset:kanban:style.css",
@@ -108579,7 +109057,15 @@
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:kanban",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'kanban' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "plugin-test:hermes-achievements:test_achievement_engine.py",
@@ -108590,12 +109076,20 @@
    "plugin": "hermes-achievements",
    "ledger_match": "inv:plugin-test:hermes-achievements:test_achievement_engine.py",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "plugin:hermes-achievements",
    "coverage": "plugin-surface",
    "parent_resolved": "plugin:qubit-achievements",
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "fork_plugin_runtime",
+    "backend": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "proving_test": "tests/test_tool_skill_plugin_coverage_wave5.py::test_all_vendored_plugin_items_have_a_wrapper",
+    "reason": "dashboard surface of vendored plugin 'qubit-achievements' ships under qubit_runtime/plugins/<name>/dashboard/ with the plugin wrapper.",
+    "needs": "none"
+   }
   },
   {
    "id": "provider:ai-gateway",
@@ -109861,9 +110355,9 @@
    "name": "media",
    "path": "skills/media",
    "root": "skills",
-   "ledger_match": "media_gen_catalog",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-56",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -110005,8 +110499,8 @@
    "name": "web",
    "path": "skills/web",
    "root": "skills",
-   "ledger_match": "web_fetch",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-43",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -110534,8 +111028,8 @@
    "category": "hermes_tool",
    "name": "computer_use",
    "path": "tools/*.py",
-   "ledger_match": "computer_doctor",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-13",
+   "ledger_source": "openclaw",
    "ledger_status": "OPERATOR_ONLY",
    "parent_id": null,
    "coverage": "",
@@ -110649,8 +111143,8 @@
    "category": "hermes_tool",
    "name": "discord",
    "path": "tools/*.py",
-   "ledger_match": "inv:tool:discord",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-D12",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -110856,8 +111350,8 @@
    "category": "hermes_tool",
    "name": "file",
    "path": "tools/*.py",
-   "ledger_match": "backup_create",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-62",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -111546,8 +112040,8 @@
    "category": "hermes_tool",
    "name": "memory",
    "path": "tools/*.py",
-   "ledger_match": "brain",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-41",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -111569,8 +112063,8 @@
    "category": "hermes_tool",
    "name": "patch",
    "path": "tools/*.py",
-   "ledger_match": "file_patch_rollback",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-62",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -111638,8 +112132,8 @@
    "category": "hermes_tool",
    "name": "read_file",
    "path": "tools/*.py",
-   "ledger_match": "inv:tool:read_file",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-61",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112006,8 +112500,8 @@
    "category": "hermes_tool",
    "name": "terminal",
    "path": "tools/*.py",
-   "ledger_match": "console_help",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-71",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112121,9 +112615,9 @@
    "category": "hermes_tool",
    "name": "vision",
    "path": "tools/*.py",
-   "ledger_match": "vision_describe",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-51",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
@@ -112167,8 +112661,8 @@
    "category": "hermes_tool",
    "name": "web",
    "path": "tools/*.py",
-   "ledger_match": "web_fetch",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-43",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -112259,8 +112753,8 @@
    "category": "hermes_tool",
    "name": "x_search",
    "path": "tools/*.py",
-   "ledger_match": "inv:tool:x_search",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-63",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
@@ -196896,12 +197390,20 @@
    "route": "/api/cron/jobs/{job_id}",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "DELETE /api/cron/jobs/{job_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:DELETE /api/dashboard/agent-plugins/{name:path}",
@@ -197022,12 +197524,20 @@
    "route": "/api/mcp/oauth/flows/{flow_id}",
    "ledger_match": "inv:api:DELETE_/api/mcp/oauth/flows/{flow_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "DELETE /api/mcp/oauth/flows/{flow_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:DELETE /api/mcp/servers/{name}",
@@ -197039,12 +197549,20 @@
    "route": "/api/mcp/servers/{name}",
    "ledger_match": "inv:api:DELETE_/api/mcp/servers/{name}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "DELETE /api/mcp/servers/{name} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:DELETE /api/messaging/telegram/onboarding/{pairing_id}",
@@ -197156,12 +197674,20 @@
    "route": "/api/providers/custom-endpoints/{endpoint_id}",
    "ledger_match": "inv:api:DELETE_/api/providers/custom-endpoints/{endpoint_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "DELETE /api/providers/custom-endpoints/{endpoint_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:DELETE /api/providers/oauth/sessions/{session_id}",
@@ -197173,12 +197699,20 @@
    "route": "/api/providers/oauth/sessions/{session_id}",
    "ledger_match": "inv:api:DELETE_/api/providers/oauth/sessions/{session_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "DELETE /api/providers/oauth/sessions/{session_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:DELETE /api/providers/oauth/{provider_id}",
@@ -197190,12 +197724,20 @@
    "route": "/api/providers/oauth/{provider_id}",
    "ledger_match": "inv:api:DELETE_/api/providers/oauth/{provider_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "DELETE /api/providers/oauth/{provider_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:DELETE /api/sessions/empty",
@@ -197249,12 +197791,20 @@
    "route": "/api/webhooks/{name}",
    "ledger_match": "inv:api:DELETE_/api/webhooks/{name}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "DELETE /api/webhooks/{name} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/actions/{name}/status",
@@ -197643,12 +198193,20 @@
    "route": "/api/cron/jobs/{job_id}",
    "ledger_match": "inv:api:GET_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/cron/jobs/{job_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/cron/jobs/{job_id}/runs",
@@ -197660,12 +198218,20 @@
    "route": "/api/cron/jobs/{job_id}/runs",
    "ledger_match": "inv:api:GET_/api/cron/jobs/{job_id}/runs",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/cron/jobs/{job_id}/runs is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/curator",
@@ -198622,12 +199188,20 @@
    "route": "/api/local-models/jobs/{job_id}",
    "ledger_match": "inv:api:GET_/api/local-models/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/local-models/jobs/{job_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/local-models/search",
@@ -198769,7 +199343,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/mcp/oauth/callback/{server_name:path} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/mcp/oauth/flows/{flow_id}",
@@ -198781,12 +199363,20 @@
    "route": "/api/mcp/oauth/flows/{flow_id}",
    "ledger_match": "inv:api:GET_/api/mcp/oauth/flows/{flow_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/mcp/oauth/flows/{flow_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/mcp/servers",
@@ -198865,12 +199455,20 @@
    "route": "/api/memory/providers/{name}/config",
    "ledger_match": "inv:api:GET_/api/memory/providers/{name}/config",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/memory/providers/{name}/config is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/messaging/platforms",
@@ -199550,12 +200148,20 @@
    "route": "/api/sessions/{session_id}",
    "ledger_match": "inv:api:GET_/api/sessions/{session_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/sessions/{session_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/sessions/{session_id}/export",
@@ -199567,12 +200173,20 @@
    "route": "/api/sessions/{session_id}/export",
    "ledger_match": "inv:api:GET_/api/sessions/{session_id}/export",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/sessions/{session_id}/export is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/sessions/{session_id}/latest-descendant",
@@ -199584,12 +200198,20 @@
    "route": "/api/sessions/{session_id}/latest-descendant",
    "ledger_match": "inv:api:GET_/api/sessions/{session_id}/latest-descendant",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/sessions/{session_id}/latest-descendant is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/sessions/{session_id}/messages",
@@ -199601,12 +200223,20 @@
    "route": "/api/sessions/{session_id}/messages",
    "ledger_match": "inv:api:GET_/api/sessions/{session_id}/messages",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/sessions/{session_id}/messages is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/sessions/{session_id}/messages/around",
@@ -199618,12 +200248,20 @@
    "route": "/api/sessions/{session_id}/messages/around",
    "ledger_match": "inv:api:GET_/api/sessions/{session_id}/messages/around",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/sessions/{session_id}/messages/around is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/sessions/{session_id}/timeline",
@@ -199635,12 +200273,20 @@
    "route": "/api/sessions/{session_id}/timeline",
    "ledger_match": "inv:api:GET_/api/sessions/{session_id}/timeline",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/sessions/{session_id}/timeline is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/skills",
@@ -199969,12 +200615,20 @@
    "route": "/api/tools/toolsets/{name}/config",
    "ledger_match": "inv:api:GET_/api/tools/toolsets/{name}/config",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/tools/toolsets/{name}/config is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/tools/toolsets/{name}/models",
@@ -199986,12 +200640,20 @@
    "route": "/api/tools/toolsets/{name}/models",
    "ledger_match": "inv:api:GET_/api/tools/toolsets/{name}/models",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /api/tools/toolsets/{name}/models is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/webhooks",
@@ -200125,7 +200787,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "GET /dashboard-plugins/{plugin_name}/{file_path:path} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /login",
@@ -200448,12 +201118,20 @@
    "route": "/api/cron/jobs/{job_id}/pause",
    "ledger_match": "inv:api:POST_/api/cron/jobs/{job_id}/pause",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/cron/jobs/{job_id}/pause is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/cron/jobs/{job_id}/resume",
@@ -200465,12 +201143,20 @@
    "route": "/api/cron/jobs/{job_id}/resume",
    "ledger_match": "inv:api:POST_/api/cron/jobs/{job_id}/resume",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/cron/jobs/{job_id}/resume is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/cron/jobs/{job_id}/trigger",
@@ -200482,12 +201168,20 @@
    "route": "/api/cron/jobs/{job_id}/trigger",
    "ledger_match": "inv:api:POST_/api/cron/jobs/{job_id}/trigger",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/cron/jobs/{job_id}/trigger is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/curator/run",
@@ -200566,12 +201260,20 @@
    "route": "/api/dashboard/agent-plugins/{name:path}/disable",
    "ledger_match": "inv:api:POST_/api/dashboard/agent-plugins/{name:path}/disable",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/dashboard/agent-plugins/{name:path}/disable is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/dashboard/agent-plugins/{name:path}/enable",
@@ -200583,12 +201285,20 @@
    "route": "/api/dashboard/agent-plugins/{name:path}/enable",
    "ledger_match": "inv:api:POST_/api/dashboard/agent-plugins/{name:path}/enable",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/dashboard/agent-plugins/{name:path}/enable is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/dashboard/agent-plugins/{name:path}/update",
@@ -200600,12 +201310,20 @@
    "route": "/api/dashboard/agent-plugins/{name:path}/update",
    "ledger_match": "inv:api:POST_/api/dashboard/agent-plugins/{name:path}/update",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/dashboard/agent-plugins/{name:path}/update is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/dashboard/plugins/{name:path}/visibility",
@@ -201428,12 +202146,20 @@
    "route": "/api/mcp/servers/{name}/auth",
    "ledger_match": "inv:api:POST_/api/mcp/servers/{name}/auth",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/mcp/servers/{name}/auth is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/mcp/servers/{name}/test",
@@ -202117,12 +202843,20 @@
    "route": "/api/providers/custom-endpoints/{endpoint_id}/activate",
    "ledger_match": "inv:api:POST_/api/providers/custom-endpoints/{endpoint_id}/activate",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/providers/custom-endpoints/{endpoint_id}/activate is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:POST /api/providers/oauth/{provider_id}/start",
@@ -202619,12 +203353,20 @@
    "route": "/api/cron/jobs/{job_id}",
    "ledger_match": "inv:api:PUT_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "PUT /api/cron/jobs/{job_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:PUT /api/curator/paused",
@@ -202795,12 +203537,20 @@
    "route": "/api/mcp/servers/{name}/enabled",
    "ledger_match": "inv:api:PUT_/api/mcp/servers/{name}/enabled",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "PUT /api/mcp/servers/{name}/enabled is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:PUT /api/memory/provider",
@@ -202846,12 +203596,20 @@
    "route": "/api/messaging/platforms/{platform_id}",
    "ledger_match": "inv:api:PUT_/api/messaging/platforms/{platform_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "PUT /api/messaging/platforms/{platform_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:PUT /api/model/moa",
@@ -203038,12 +203796,20 @@
    "route": "/api/tools/toolsets/{name}",
    "ledger_match": "inv:api:PUT_/api/tools/toolsets/{name}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "PUT /api/tools/toolsets/{name} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:PUT /api/tools/toolsets/{name}/env",
@@ -203055,12 +203821,20 @@
    "route": "/api/tools/toolsets/{name}/env",
    "ledger_match": "inv:api:PUT_/api/tools/toolsets/{name}/env",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "PUT /api/tools/toolsets/{name}/env is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:PUT /api/tools/toolsets/{name}/model",
@@ -203106,12 +203880,20 @@
    "route": "/api/webhooks/{name}/enabled",
    "ledger_match": "inv:api:PUT_/api/webhooks/{name}/enabled",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": null,
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "PUT /api/webhooks/{name}/enabled is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:WEBSOCKET /api/audio/speak-stream",
@@ -215180,8 +215962,8 @@
    "command": "hermes auth add",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id (for example: anthropic, openai-codex, openrouter)",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth add",
    "coverage": "cli-option",
@@ -215197,8 +215979,8 @@
    "command": "hermes auth list",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Optional provider filter",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth list",
    "coverage": "cli-option",
@@ -215214,8 +215996,8 @@
    "command": "hermes auth logout",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth logout",
    "coverage": "cli-option",
@@ -215248,8 +216030,8 @@
    "command": "hermes auth priority",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth priority",
    "coverage": "cli-option",
@@ -215282,8 +216064,8 @@
    "command": "hermes auth refresh",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth refresh",
    "coverage": "cli-option",
@@ -215316,8 +216098,8 @@
    "command": "hermes auth remove",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth remove",
    "coverage": "cli-option",
@@ -215350,8 +216132,8 @@
    "command": "hermes auth reset",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth reset",
    "coverage": "cli-option",
@@ -215401,8 +216183,8 @@
    "command": "hermes auth status",
    "path": "hermes_cli/subcommands/auth.py",
    "help": "Provider id",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:auth status",
    "coverage": "cli-option",
@@ -215418,8 +216200,8 @@
    "command": "hermes completion",
    "path": "hermes_cli/subcommands/completion.py",
    "help": "Shell type (default: bash)",
-   "ledger_match": "computer_ops",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-29",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:completion",
    "coverage": "cli-option",
@@ -215435,9 +216217,9 @@
    "command": "hermes config get",
    "path": "hermes_cli/subcommands/config.py",
    "help": "Configuration key (e.g., model)",
-   "ledger_match": "create_model_profile",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-14",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "cli:config get",
    "coverage": "cli-option",
    "parent_resolved": "cli:config get",
@@ -215452,9 +216234,9 @@
    "command": "hermes config set",
    "path": "hermes_cli/subcommands/config.py",
    "help": "Configuration key (e.g., model, terminal.backend)",
-   "ledger_match": "create_model_profile",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-14",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "cli:config set",
    "coverage": "cli-option",
    "parent_resolved": "cli:config set",
@@ -215486,9 +216268,9 @@
    "command": "hermes config unset",
    "path": "hermes_cli/subcommands/config.py",
    "help": "Configuration key to remove",
-   "ledger_match": "create_model_profile",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-14",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "cli:config unset",
    "coverage": "cli-option",
    "parent_resolved": "cli:config unset",
@@ -215503,9 +216285,9 @@
    "command": "hermes cron create",
    "path": "hermes_cli/subcommands/cron.py",
    "help": "Optional self-contained prompt or task instruction",
-   "ledger_match": "bot_task_pause",
-   "ledger_source": "qubit",
-   "ledger_status": "UNVERIFIED",
+   "ledger_match": "OC-58",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron create",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron create",
@@ -215520,8 +216302,8 @@
    "command": "hermes cron create",
    "path": "hermes_cli/subcommands/cron.py",
    "help": "Schedule like '30m', 'every 2h', or '0 9 * * *'",
-   "ledger_match": "schedule_dispatch",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-26",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron create",
    "coverage": "cli-option",
@@ -215539,7 +216321,7 @@
    "help": "Job ID to edit",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron edit",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron edit",
@@ -215590,7 +216372,7 @@
    "help": "Job ID the notepad belongs to",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron notepad",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron notepad",
@@ -215605,9 +216387,9 @@
    "command": "hermes cron notepad",
    "path": "hermes_cli/subcommands/cron.py",
    "help": "Notepad key (get/set/delete)",
-   "ledger_match": "create_model_profile",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-14",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "cli:cron notepad",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron notepad",
@@ -215658,7 +216440,7 @@
    "help": "Job ID to pause",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron pause",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron pause",
@@ -215675,7 +216457,7 @@
    "help": "Job ID to remove",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron remove",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron remove",
@@ -215692,7 +216474,7 @@
    "help": "Job ID to resume",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron resume",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron resume",
@@ -215709,7 +216491,7 @@
    "help": "Job ID to trigger",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron run",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron run",
@@ -215726,7 +216508,7 @@
    "help": "Optional job ID filter",
    "ledger_match": "inv:api:DELETE_/api/cron/jobs/{job_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:cron runs",
    "coverage": "cli-option",
    "parent_resolved": "cli:cron runs",
@@ -215758,9 +216540,9 @@
    "command": "hermes hooks revoke",
    "path": "hermes_cli/subcommands/hooks.py",
    "help": "The exact command string to revoke (as declared in config.yaml)",
-   "ledger_match": "browser_close_refusal",
-   "ledger_source": "qubit",
-   "ledger_status": "SAFE_EQUIVALENT",
+   "ledger_match": "OC-68",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:hooks revoke",
    "coverage": "cli-option",
    "parent_resolved": "cli:hooks revoke",
@@ -215775,9 +216557,9 @@
    "command": "hermes hooks test",
    "path": "hermes_cli/subcommands/hooks.py",
    "help": "Hook event name (e.g. pre_tool_call, pre_llm_call, subagent_stop)",
-   "ledger_match": "gateway_supervision",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:hooks test",
    "coverage": "cli-option",
    "parent_resolved": "cli:hooks test",
@@ -215809,8 +216591,8 @@
    "command": "hermes import-agent",
    "path": "hermes_cli/subcommands/import_agent.py",
    "help": "Which agent to import from (default: auto-detect ~/.claude or ~/.codex)",
-   "ledger_match": "import_agent_import",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-41",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:import-agent",
    "coverage": "cli-option",
@@ -215843,8 +216625,8 @@
    "command": "hermes mcp add",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name (used as config key)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp add",
    "coverage": "cli-option",
@@ -215860,8 +216642,8 @@
    "command": "hermes mcp configure",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to configure",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp configure",
    "coverage": "cli-option",
@@ -215894,8 +216676,8 @@
    "command": "hermes mcp login",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to re-authenticate",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp login",
    "coverage": "cli-option",
@@ -215911,8 +216693,8 @@
    "command": "hermes mcp reauth",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to re-authenticate (omit with --all)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp reauth",
    "coverage": "cli-option",
@@ -215928,8 +216710,8 @@
    "command": "hermes mcp remove",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to remove",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp remove",
    "coverage": "cli-option",
@@ -215945,8 +216727,8 @@
    "command": "hermes mcp test",
    "path": "hermes_cli/subcommands/mcp.py",
    "help": "Server name to test",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:mcp test",
    "coverage": "cli-option",
@@ -215962,8 +216744,8 @@
    "command": "hermes memory setup",
    "path": "hermes_cli/subcommands/memory.py",
    "help": "Provider to configure directly (e.g. honcho), skipping the picker",
-   "ledger_match": "auth_verify",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-40",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:memory setup",
    "coverage": "cli-option",
@@ -215979,8 +216761,8 @@
    "command": "hermes moa configure",
    "path": "hermes_cli/subcommands/moa.py",
    "help": "Preset name to create or update",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:moa configure",
    "coverage": "cli-option",
@@ -215996,8 +216778,8 @@
    "command": "hermes moa delete",
    "path": "hermes_cli/subcommands/moa.py",
    "help": "Preset name to delete",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:moa delete",
    "coverage": "cli-option",
@@ -216013,8 +216795,8 @@
    "command": "hermes pairing approve",
    "path": "hermes_cli/subcommands/pairing.py",
    "help": "Request ID from 'pairing list', or the code the bot DM'd the user",
-   "ledger_match": "pairing_accept",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-08",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:pairing approve",
    "coverage": "cli-option",
@@ -216030,9 +216812,9 @@
    "command": "hermes pairing approve",
    "path": "hermes_cli/subcommands/pairing.py",
    "help": "Platform name (telegram, discord, slack, whatsapp)",
-   "ledger_match": "inv:hermes_prompt-size_--platform",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-D16",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "cli:pairing approve",
    "coverage": "cli-option",
    "parent_resolved": "cli:pairing approve",
@@ -216047,9 +216829,9 @@
    "command": "hermes pairing revoke",
    "path": "hermes_cli/subcommands/pairing.py",
    "help": "Platform name",
-   "ledger_match": "inv:hermes_prompt-size_--platform",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-D16",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "cli:pairing revoke",
    "coverage": "cli-option",
    "parent_resolved": "cli:pairing revoke",
@@ -216081,8 +216863,8 @@
    "command": "hermes peer add",
    "path": "hermes_cli/subcommands/peer.py",
    "help": "Peer name (lowercase slug, e.g. spark, homelab)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:peer add",
    "coverage": "cli-option",
@@ -216098,8 +216880,8 @@
    "command": "hermes peer remove",
    "path": "hermes_cli/subcommands/peer.py",
    "help": "Peer name",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:peer remove",
    "coverage": "cli-option",
@@ -216115,8 +216897,8 @@
    "command": "hermes plugins adopt",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Self-cloned plugin directory name",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins adopt",
    "coverage": "cli-option",
@@ -216132,8 +216914,8 @@
    "command": "hermes plugins capabilities",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin id to inspect (omit to list all plugins with capabilities)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins capabilities",
    "coverage": "cli-option",
@@ -216149,9 +216931,9 @@
    "command": "hermes plugins compat",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Scan one plugin directory instead of the installed set (for plugin authors)",
-   "ledger_match": "backup_create",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:plugins compat",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins compat",
@@ -216166,8 +216948,8 @@
    "command": "hermes plugins disable",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name to disable",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins disable",
    "coverage": "cli-option",
@@ -216200,8 +216982,8 @@
    "command": "hermes plugins enable",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name to enable",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins enable",
    "coverage": "cli-option",
@@ -216234,8 +217016,8 @@
    "command": "hermes plugins pack install",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Path to a hermes-pack.yaml file, or an https:// URL",
-   "ledger_match": "clone_model_profile",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-06",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins pack install",
    "coverage": "cli-option",
@@ -216251,8 +217033,8 @@
    "command": "hermes plugins pack show",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Path to a hermes-pack.yaml file, or an https:// URL",
-   "ledger_match": "clone_model_profile",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-06",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins pack show",
    "coverage": "cli-option",
@@ -216268,8 +217050,8 @@
    "command": "hermes plugins remove",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin directory name to remove",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins remove",
    "coverage": "cli-option",
@@ -216302,8 +217084,8 @@
    "command": "hermes plugins show",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name or key to show",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins show",
    "coverage": "cli-option",
@@ -216319,8 +217101,8 @@
    "command": "hermes plugins trust-update-url",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins trust-update-url",
    "coverage": "cli-option",
@@ -216336,8 +217118,8 @@
    "command": "hermes plugins update",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Plugin name to update",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:plugins update",
    "coverage": "cli-option",
@@ -216353,9 +217135,9 @@
    "command": "hermes plugins validate",
    "path": "hermes_cli/subcommands/plugins.py",
    "help": "Path to the plugin directory",
-   "ledger_match": "backup_create",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:plugins validate",
    "coverage": "cli-option",
    "parent_resolved": "cli:plugins validate",
@@ -216455,8 +217237,8 @@
    "command": "hermes profile import",
    "path": "hermes_cli/subcommands/profile.py",
    "help": "Path to .tar.gz archive",
-   "ledger_match": "kanban_archive",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-34",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:profile import",
    "coverage": "cli-option",
@@ -216489,8 +217271,8 @@
    "command": "hermes profile install",
    "path": "hermes_cli/subcommands/profile.py",
    "help": "Distribution source (git URL or local directory)",
-   "ledger_match": "clone_model_profile",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-06",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:profile install",
    "coverage": "cli-option",
@@ -216659,8 +217441,8 @@
    "command": "hermes project create",
    "path": "hermes_cli/projects_cmd.py",
    "help": "Human name, e.g. 'Hermes Agent'",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:project create",
    "coverage": "cli-option",
@@ -216676,8 +217458,8 @@
    "command": "hermes project use",
    "path": "hermes_cli/projects_cmd.py",
    "help": "Project id or slug (omit to clear)",
-   "ledger_match": "browser_download",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-32",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:project use",
    "coverage": "cli-option",
@@ -216695,7 +217477,7 @@
    "help": "Session ID to delete",
    "ledger_match": "inv:api:DELETE_/api/providers/oauth/sessions/{session_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sessions delete",
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions delete",
@@ -216710,8 +217492,8 @@
    "command": "hermes sessions export",
    "path": "hermes_cli/subcommands/sessions.py",
    "help": "Where to write. jsonl/html/trace: a file path, or a directory (existing, or ending in /) to write a default-named file into; - for stdout (jsonl/trace only; jsonl requires OUTPUT). md/qmd: a directory, one file per session (default: <hermes home>/session-exports)",
-   "ledger_match": "reasoning",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-28",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sessions export",
    "coverage": "cli-option",
@@ -216727,9 +217509,9 @@
    "command": "hermes sessions import",
    "path": "hermes_cli/subcommands/sessions.py",
    "help": "Path to a specific session JSONL file (skips the picker)",
-   "ledger_match": "backup_create",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:sessions import",
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions import",
@@ -216763,7 +217545,7 @@
    "help": "Session ID to rename",
    "ledger_match": "inv:api:DELETE_/api/providers/oauth/sessions/{session_id}",
    "ledger_source": "qubit",
-   "ledger_status": "MISSING",
+   "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sessions rename",
    "coverage": "cli-option",
    "parent_resolved": "cli:sessions rename",
@@ -216846,8 +217628,8 @@
    "command": "hermes skills audit",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Specific skill to audit (default: all)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills audit",
    "coverage": "cli-option",
@@ -216863,8 +217645,8 @@
    "command": "hermes skills check",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Specific skill to check (default: all)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills check",
    "coverage": "cli-option",
@@ -216880,8 +217662,8 @@
    "command": "hermes skills diff",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Skill name to diff (e.g. google-workspace)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills diff",
    "coverage": "cli-option",
@@ -216948,8 +217730,8 @@
    "command": "hermes skills repair-official",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Official optional skill folder/frontmatter name, or 'all'",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills repair-official",
    "coverage": "cli-option",
@@ -216965,8 +217747,8 @@
    "command": "hermes skills reset",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Skill name to reset (e.g. google-workspace)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills reset",
    "coverage": "cli-option",
@@ -216999,8 +217781,8 @@
    "command": "hermes skills snapshot export",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Output JSON file path (use - for stdout)",
-   "ledger_match": "reasoning",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-28",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills snapshot export",
    "coverage": "cli-option",
@@ -217050,8 +217832,8 @@
    "command": "hermes skills tap remove",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Tap name to remove",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills tap remove",
    "coverage": "cli-option",
@@ -217067,9 +217849,9 @@
    "command": "hermes skills trust",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Project root to trust (default: enclosing git checkout of cwd)",
-   "ledger_match": "backup_create",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:skills trust",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills trust",
@@ -217084,8 +217866,8 @@
    "command": "hermes skills uninstall",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Skill name to remove",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills uninstall",
    "coverage": "cli-option",
@@ -217101,9 +217883,9 @@
    "command": "hermes skills untrust",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Project root to untrust (default: enclosing git checkout of cwd)",
-   "ledger_match": "backup_create",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:skills untrust",
    "coverage": "cli-option",
    "parent_resolved": "cli:skills untrust",
@@ -217118,8 +217900,8 @@
    "command": "hermes skills update",
    "path": "hermes_cli/subcommands/skills.py",
    "help": "Specific skill to update (default: all outdated skills)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skills update",
    "coverage": "cli-option",
@@ -217135,9 +217917,9 @@
    "command": "hermes skin set",
    "path": "hermes_cli/subcommands/skin.py",
    "help": "Color key (e.g. ui_tool, ui_accent, background)",
-   "ledger_match": "create_model_profile",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-14",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
    "parent_id": "cli:skin set",
    "coverage": "cli-option",
    "parent_resolved": "cli:skin set",
@@ -217169,8 +217951,8 @@
    "command": "hermes skin use",
    "path": "hermes_cli/subcommands/skin.py",
    "help": "Skin name",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:skin use",
    "coverage": "cli-option",
@@ -217186,8 +217968,8 @@
    "command": "hermes sync disable",
    "path": "hermes_cli/subcommands/sync.py",
    "help": "Skill name (frontmatter name / directory name)",
-   "ledger_match": "skills_disable",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-39",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sync disable",
    "coverage": "cli-option",
@@ -217203,8 +217985,8 @@
    "command": "hermes sync enable",
    "path": "hermes_cli/subcommands/sync.py",
    "help": "Skill name (frontmatter name / directory name)",
-   "ledger_match": "skills_disable",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-39",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sync enable",
    "coverage": "cli-option",
@@ -217220,8 +218002,8 @@
    "command": "hermes sync propose",
    "path": "hermes_cli/subcommands/sync.py",
    "help": "Skill name to share",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:sync propose",
    "coverage": "cli-option",
@@ -217237,9 +218019,9 @@
    "command": "hermes tools disable",
    "path": "hermes_cli/subcommands/tools.py",
    "help": "Toolset name (e.g. web) or MCP tool in server:tool form",
-   "ledger_match": "auth_status",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-48",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY_ARCHITECTURE",
    "parent_id": "cli:tools disable",
    "coverage": "cli-option",
    "parent_resolved": "cli:tools disable",
@@ -217254,9 +218036,9 @@
    "command": "hermes tools enable",
    "path": "hermes_cli/subcommands/tools.py",
    "help": "Toolset name or MCP tool in server:tool form",
-   "ledger_match": "auth_status",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-48",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY_ARCHITECTURE",
    "parent_id": "cli:tools enable",
    "coverage": "cli-option",
    "parent_resolved": "cli:tools enable",
@@ -217288,9 +218070,9 @@
    "command": "hermes verify",
    "path": "hermes_cli/subcommands/verify.py",
    "help": "Project root to verify (default: current directory)",
-   "ledger_match": "backup_create",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
    "parent_id": "cli:verify",
    "coverage": "cli-option",
    "parent_resolved": "cli:verify",
@@ -217305,8 +218087,8 @@
    "command": "hermes webhook remove",
    "path": "hermes_cli/subcommands/webhook.py",
    "help": "Subscription name to remove",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:webhook remove",
    "coverage": "cli-option",
@@ -217322,8 +218104,8 @@
    "command": "hermes webhook subscribe",
    "path": "hermes_cli/subcommands/webhook.py",
    "help": "Route name (used in URL: /webhooks/<name>)",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:webhook subscribe",
    "coverage": "cli-option",
@@ -217339,8 +218121,8 @@
    "command": "hermes webhook test",
    "path": "hermes_cli/subcommands/webhook.py",
    "help": "Subscription name to test",
-   "ledger_match": "session_rename",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-10",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
    "parent_id": "cli:webhook test",
    "coverage": "cli-option",
@@ -223548,14 +224330,14 @@
    "enabled_by_default": null,
    "file_count": 6,
    "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:active-memory",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-D04",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-D04",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false,
+   "parent_resolved": "OC-D04",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true,
    "fork_disposition": {
     "status": "IMPLEMENTED",
     "capability": "openclaw extension active-memory",
@@ -223640,7 +224422,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension amazon-bedrock",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'amazon-bedrock' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:amazon-bedrock-mantle",
@@ -223686,7 +224476,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension anthropic",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'anthropic' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:anthropic-vertex",
@@ -223732,7 +224530,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension arcee",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'arcee' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:azure-speech",
@@ -223817,14 +224623,14 @@
    "enabled_by_default": true,
    "file_count": 338,
    "in_audit_docs": false,
-   "ledger_match": "browser_activate",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-09",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-09",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-09",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:byteplus",
@@ -223863,14 +224669,14 @@
    "enabled_by_default": true,
    "file_count": 47,
    "in_audit_docs": false,
-   "ledger_match": "canvas_add",
-   "ledger_source": "qubit",
-   "ledger_status": "UNVERIFIED",
-   "parent_id": null,
+   "ledger_match": "OC-35",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
+   "parent_id": "OC-35",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-35",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:cerebras",
@@ -223893,7 +224699,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension cerebras",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'cerebras' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:chutes",
@@ -223916,7 +224730,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension chutes",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'chutes' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:clickclack",
@@ -223972,7 +224794,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension cloudflare-ai-gateway",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'cloudflare-ai-gateway' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:codex",
@@ -224049,7 +224879,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension cohere",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'cohere' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:comfy",
@@ -224180,7 +225018,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension deepinfra",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'deepinfra' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:deepseek",
@@ -224203,7 +225049,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension deepseek",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'deepseek' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:device-pair",
@@ -224368,14 +225222,14 @@
    "enabled_by_default": null,
    "file_count": 541,
    "in_audit_docs": false,
-   "ledger_match": "inv:tool:discord",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-D12",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-D12",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-D12",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:document-extract",
@@ -224516,14 +225370,14 @@
    "enabled_by_default": null,
    "file_count": 213,
    "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:feishu",
-   "ledger_source": "qubit",
-   "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": null,
+   "ledger_match": "OC-D16",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
+   "parent_id": "OC-D16",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false,
+   "parent_resolved": "OC-D16",
+   "parent_status": "OPERATOR_ONLY",
+   "parent_covered": true,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension feishu",
@@ -224547,14 +225401,14 @@
    "enabled_by_default": true,
    "file_count": 37,
    "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:file-transfer",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-D03",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-D03",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false,
+   "parent_resolved": "OC-D03",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true,
    "fork_disposition": {
     "status": "IMPLEMENTED",
     "capability": "openclaw extension file-transfer",
@@ -224608,7 +225462,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension fireworks",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'fireworks' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:github-copilot",
@@ -224631,7 +225493,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension github-copilot",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'github-copilot' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:gmi",
@@ -224654,7 +225524,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension gmi",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'gmi' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:google",
@@ -224677,7 +225555,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension google",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'google' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:google-meet",
@@ -224779,7 +225665,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension groq",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'groq' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:huggingface",
@@ -224802,7 +225696,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension huggingface",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'huggingface' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:image-generation-core",
@@ -224851,14 +225753,14 @@
    "enabled_by_default": null,
    "file_count": 149,
    "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:imessage",
-   "ledger_source": "qubit",
-   "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": null,
+   "ledger_match": "OC-D15",
+   "ledger_source": "openclaw",
+   "ledger_status": "OPERATOR_ONLY",
+   "parent_id": "OC-D15",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false,
+   "parent_resolved": "OC-D15",
+   "parent_status": "OPERATOR_ONLY",
+   "parent_covered": true,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension imessage",
@@ -224945,7 +225847,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension kilocode",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'kilocode' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:kimi-coding",
@@ -224968,7 +225878,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension kimi-coding",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'kimi-coding' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:line",
@@ -225101,7 +226019,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension lmstudio",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'lmstudio' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:lobster",
@@ -225150,14 +226076,14 @@
    "enabled_by_default": null,
    "file_count": 341,
    "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:matrix",
-   "ledger_source": "qubit",
-   "ledger_status": "MISSING",
-   "parent_id": null,
+   "ledger_match": "OC-D17",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
+   "parent_id": "OC-D17",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-D17",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:mattermost",
@@ -225405,7 +226331,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension minimax",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'minimax' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:mistral",
@@ -225428,7 +226362,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension mistral",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'mistral' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:moonshot",
@@ -225451,7 +226393,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension moonshot",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'moonshot' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:msteams",
@@ -225573,7 +226523,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension novita",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'novita' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:nvidia",
@@ -225596,7 +226554,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension nvidia",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'nvidia' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:oc-path",
@@ -225696,7 +226662,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension openai",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'openai' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:opencode",
@@ -225712,14 +226686,22 @@
    "enabled_by_default": true,
    "file_count": 13,
    "in_audit_docs": false,
-   "ledger_match": "guard_opencode_prepare",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-30",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-30",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-30",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension opencode",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'opencode' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:opencode-go",
@@ -225742,7 +226724,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension opencode-go",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'opencode-go' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:openrouter",
@@ -225765,7 +226755,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension openrouter",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'openrouter' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:openshell",
@@ -225834,7 +226832,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension perplexity",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'perplexity' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:phone-control",
@@ -225896,14 +226902,14 @@
    "enabled_by_default": null,
    "file_count": 27,
    "in_audit_docs": false,
-   "ledger_match": "autonomy_status",
-   "ledger_source": "qubit",
-   "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "ledger_match": "OC-01",
+   "ledger_source": "openclaw",
+   "ledger_status": "SAFE_EQUIVALENT",
+   "parent_id": "OC-01",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-01",
+   "parent_status": "SAFE_EQUIVALENT",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:qa-channel",
@@ -226053,7 +227059,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension qwen",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'qwen' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:runway",
@@ -226188,14 +227202,14 @@
    "enabled_by_default": null,
    "file_count": 282,
    "in_audit_docs": false,
-   "ledger_match": "msg_account_add",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-18",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-18",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-18",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:sms",
@@ -226251,7 +227265,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension stepfun",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'stepfun' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:synology-chat",
@@ -226307,7 +227329,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension synthetic",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'synthetic' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:talk-voice",
@@ -226371,14 +227401,14 @@
    "enabled_by_default": null,
    "file_count": 349,
    "in_audit_docs": false,
-   "ledger_match": "inv:api:DELETE_/api/messaging/telegram/onboarding/{pairing_id}",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-D13",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-D13",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-D13",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:tencent",
@@ -226401,7 +227431,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension tencent",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'tencent' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:test-support",
@@ -226621,7 +227659,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension venice",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'venice' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:vercel-ai-gateway",
@@ -226644,7 +227690,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension vercel-ai-gateway",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'vercel-ai-gateway' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:video-generation-core",
@@ -226706,14 +227760,14 @@
    "enabled_by_default": null,
    "file_count": 124,
    "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:voice-call",
-   "ledger_source": "qubit",
-   "ledger_status": "SAFE_EQUIVALENT",
-   "parent_id": null,
+   "ledger_match": "OC-67",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
+   "parent_id": "OC-67",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false,
+   "parent_resolved": "OC-67",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true,
    "fork_disposition": {
     "status": "GATED",
     "capability": "openclaw extension voice-call",
@@ -226744,7 +227798,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension volcengine",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'volcengine' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:voyage",
@@ -226837,14 +227899,14 @@
    "enabled_by_default": null,
    "file_count": 11,
    "in_audit_docs": false,
-   "ledger_match": "webhook_add",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-23",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-23",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-23",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:whatsapp",
@@ -226862,14 +227924,14 @@
    "enabled_by_default": null,
    "file_count": 270,
    "in_audit_docs": false,
-   "ledger_match": "msg_account_add",
-   "ledger_source": "qubit",
+   "ledger_match": "OC-18",
+   "ledger_source": "openclaw",
    "ledger_status": "IMPLEMENTED",
-   "parent_id": null,
+   "parent_id": "OC-18",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-18",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:workboard",
@@ -226885,14 +227947,14 @@
    "enabled_by_default": false,
    "file_count": 24,
    "in_audit_docs": false,
-   "ledger_match": "inv:openclaw-ext:workboard",
-   "ledger_source": "qubit",
-   "ledger_status": "MISSING",
-   "parent_id": null,
+   "ledger_match": "OC-34",
+   "ledger_source": "openclaw",
+   "ledger_status": "IMPLEMENTED",
+   "parent_id": "OC-34",
    "coverage": "openclaw-capability",
-   "parent_resolved": null,
-   "parent_status": null,
-   "parent_covered": false
+   "parent_resolved": "OC-34",
+   "parent_status": "IMPLEMENTED",
+   "parent_covered": true
   },
   {
    "id": "openclaw-ext:xai",
@@ -226915,7 +227977,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension xai",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'xai' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:xiaomi",
@@ -226938,7 +228008,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension xiaomi",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'xiaomi' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:zai",
@@ -226961,7 +228039,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension zai",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'zai' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:zalo",
