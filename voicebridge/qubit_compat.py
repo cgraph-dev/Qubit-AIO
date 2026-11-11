@@ -12023,7 +12023,7 @@ _r("GET", r"/api/office/tower", "h_office_tower")
 # The deterministic 100-floor/5-wing static world projection. Read-only; it
 # reads the shipped templates, opens no store and writes nothing. Registered
 # before any office catch-all so `/world/tower` is never read as a seat id.
-_r("GET", r"/api/office/world/tower", "h_office_world_tower")
+_r("GET", r"/api/office/world/tower-plan", "h_office_world_tower")
 # --- Business OS (War Room / roles / agent controls) -----------------------
 # The owner-only Business UI bridge. Reads project the durable Business OS
 # rows; mutations require the explicit owner intent and never publish, spend,

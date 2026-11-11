@@ -7,7 +7,7 @@ These tests pin the master-plan §32–§40 contract for the static tower:
   * rooms are cell clusters — every cell stays exactly 16x12;
   * room/cell/desk/seat ids are globally unique and stable;
   * no hard room/agent cap and no fabricated staffed agent;
-  * ``GET /api/office/world/tower`` is a bounded read with typed filters;
+  * ``GET /api/office/world/tower-plan`` is a bounded read with typed filters;
   * the route is registered and sits behind the dashboard token gate.
 """
 from __future__ import annotations
@@ -211,19 +211,19 @@ def test_wing_filter_returns_room_summaries(plan):
 
 # ------------------------------------------------------------- HTTP surface
 def test_route_registered_and_read_authority():
-    route, _params = HC.match("GET", "/api/office/world/tower")
+    route, _params = HC.match("GET", "/api/office/world/tower-plan")
     assert route is not None
     assert route["handler"] == "h_office_world_tower"
     assert route["disposition"] == "implemented"
-    assert W.qubit_read_authority("/api/office/world/tower")
+    assert W.qubit_read_authority("/api/office/world/tower-plan")
     assert W.qubit_read_authority("/api/office/world")
     # It is a read-only route: no other method is registered.
-    assert HC.match("POST", "/api/office/world/tower")[0] is None
+    assert HC.match("POST", "/api/office/world/tower-plan")[0] is None
 
 
 def test_dispatch_serves_the_projection_without_a_store(tmp_path):
     cfg = _Cfg(tmp_path / "state")
-    code, payload = _call(cfg, "GET", "/api/office/world/tower")
+    code, payload = _call(cfg, "GET", "/api/office/world/tower-plan")
     assert code == 200
     assert payload["ok"] is True
     assert payload["tower"]["floors"] == 100
@@ -236,19 +236,19 @@ def test_dispatch_serves_the_projection_without_a_store(tmp_path):
 def test_floor_and_wing_filters_are_typed(tmp_path):
     cfg = _Cfg(tmp_path / "state")
     code, payload = _call(
-        cfg, "GET", "/api/office/world/tower", query={"floor": "floor-999"})
+        cfg, "GET", "/api/office/world/tower-plan", query={"floor": "floor-999"})
     assert code == 404
     assert payload["ok"] is False
     assert payload["code"] == "OFFICE_WORLD_UNKNOWN_FLOOR"
 
     code, payload = _call(
-        cfg, "GET", "/api/office/world/tower", query={"wing": "basement"})
+        cfg, "GET", "/api/office/world/tower-plan", query={"wing": "basement"})
     assert code == 404
     assert payload["ok"] is False
     assert payload["code"] == "OFFICE_WORLD_UNKNOWN_WING"
 
     code, payload = _call(
-        cfg, "GET", "/api/office/world/tower",
+        cfg, "GET", "/api/office/world/tower-plan",
         query={"floor": "floor-001", "wing": "north"})
     assert code == 400
     assert payload["ok"] is False
@@ -257,7 +257,7 @@ def test_floor_and_wing_filters_are_typed(tmp_path):
 
 def test_tokenless_non_loopback_request_fails_the_dashboard_gate():
     handler = object.__new__(W.WebUIHandler)
-    handler.path = "/agent/api/office/world/tower"
+    handler.path = "/agent/api/office/world/tower-plan"
     handler.client_address = ("203.0.113.9", 1234)
     handler.headers = {}
     handler.server = type("S", (), {
@@ -278,6 +278,6 @@ def test_read_needs_no_network(tmp_path, monkeypatch):
     monkeypatch.setattr(socket, "socket", _bomb)
     monkeypatch.setattr(socket, "create_connection", _bomb)
     cfg = _Cfg(tmp_path / "state")
-    code, payload = _call(cfg, "GET", "/api/office/world/tower")
+    code, payload = _call(cfg, "GET", "/api/office/world/tower-plan")
     assert code == 200
     assert payload["tower"]["floors"] == 100
