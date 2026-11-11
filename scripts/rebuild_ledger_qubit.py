@@ -1375,9 +1375,15 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
         match = item.get("ledger_match")
         match_id = match if isinstance(match, str) and match else ""
         match_id = _INVENTORY_ID_RENAMES.get(match_id, match_id)
+        # ``known_ids`` holds LEDGER ids (``inv:api:GET_/x``); ``ledger_match``
+        # arrives in INVENTORY spelling (``api:GET /x``). Comparing the two
+        # directly can never succeed, so every inventory row looked uncovered
+        # and the whole section collapsed to a handful of open rows. Normalise
+        # to the ledger spelling before the membership test.
+        _match_key = _inventory_row_id(match_id) if match_id else ""
         resolved = ""
         parent_status = str(item.get("parent_status") or "")
-        covered = bool((match_id and match_id in known_ids)
+        covered = bool((_match_key and _match_key in known_ids)
                        or item_id in known_ids)
         if is_parented:
             declared = item.get("parent_resolved")

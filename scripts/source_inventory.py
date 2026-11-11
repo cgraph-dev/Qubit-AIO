@@ -2177,6 +2177,13 @@ def _load_ledger(repo: Path, name: str, rev: str | None = None) -> dict:
     ledger under ``docs/generated/`` first, with the frozen
     ``docs/archive/2026-09-21/`` copy as a read-only fallback for a legacy
     checkout. The archive is never written.
+
+    A MISSING section is reported, not silently treated as empty. An empty
+    ledger and an absent one mean opposite things -- "upstream has nothing to
+    cover" versus "this file was never generated" -- and returning ``rows: []``
+    for both made the coverage verdict depend on which generators happened to
+    have run last. That is how the same tree produced "49 missing openclaw
+    extensions" and "60 missing openclaw extensions" on different runs.
     """
     if rev:
         try:
@@ -2184,15 +2191,16 @@ def _load_ledger(repo: Path, name: str, rev: str | None = None) -> dict:
                        f"{rev}:docs/archive/2026-09-21/QUBIT_GAP_LEDGER.{name}.json")
             return json.loads(raw)
         except (subprocess.CalledProcessError, ValueError):
-            return {"rows": []}
-    for path in (repo / "docs" / "generated" / f"QUBIT_GAP_LEDGER.{name}.json",
-                 repo / "docs" / "archive" / "2026-09-21"
-                 / f"QUBIT_GAP_LEDGER.{name}.json"):
+            return {"rows": [], "_absent": True}
+    generated = repo / "docs" / "generated" / f"QUBIT_GAP_LEDGER.{name}.json"
+    archive = (repo / "docs" / "archive" / "2026-09-21"
+               / f"QUBIT_GAP_LEDGER.{name}.json")
+    for path in (generated, archive):
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-    return {"rows": []}
+    return {"rows": [], "_absent": True}
 
 
 def _test_ref_reproducible(repo: Path, proving: str) -> tuple[bool, str]:
@@ -2335,6 +2343,18 @@ def reconcile(repo: Path, hermes_items: list[dict],
     hermes_led = _load_ledger(repo, "hermes", ledger_rev)
     openclaw_led = _load_ledger(repo, "openclaw", ledger_rev)
     qubit_led = _load_ledger(repo, "qubit", ledger_rev)
+    # An absent section is not an empty one. Without the openclaw section every
+    # extension item loses its coverage row and the run reports a larger gap
+    # than the tree actually has; without this warning the difference is
+    # invisible and the number silently depends on generator ordering.
+    _absent_ledgers = [n for n, led in (
+        ("hermes", hermes_led), ("openclaw", openclaw_led), ("qubit", qubit_led))
+        if isinstance(led, dict) and led.get("_absent")]
+    if _absent_ledgers:
+        print(f"  WARNING: ledger section(s) absent: {', '.join(_absent_ledgers)}"
+              " -- coverage for those sources is understated."
+              " Generate them first (rebuild_ledger_openclaw.py,"
+              " rebuild_ledger_hermes.py).", file=sys.stderr)
     all_ids, find_by_name, row_blobs = _ledger_index({
         "hermes": hermes_led, "openclaw": openclaw_led, "qubit": qubit_led})
 

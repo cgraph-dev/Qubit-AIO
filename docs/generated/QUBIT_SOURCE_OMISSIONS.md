@@ -11,18 +11,18 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
 - Inventory items (all categories): **8201**
-- Candidate omissions (uncovered surface items): **24**
-- Distinct capability gaps (no parent row): **24**
+- Candidate omissions (uncovered surface items): **1**
+- Distinct capability gaps (no parent row): **1**
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **0**
-- Parented surfaces covered by an IMPLEMENTED parent: **1045**
-- Distinct capabilities total: **895**; parented surfaces total: **1045**
+- Parented surfaces covered by an IMPLEMENTED parent: **1037**
+- Distinct capabilities total: **903**; parented surfaces total: **1037**
 - Fork-runtime dispositions (tools/skills/plugins): **1379** (IMPLEMENTED 1300, GATED 24)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
 - Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=21176 identical=7075 missing=320 extra=5418 changed=8683
 
 ### Omission counts by category (all uncovered)
 
-- `qubit_backend_route`: 24
+- `qubit_backend_route`: 1
 
 ### Evidence-only surface counts (not candidate rows)
 
@@ -30,65 +30,36 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - `hermes_locale_key`: 370
 - `hermes_upstream_test`: 5145
 
-## Distinct capability gaps (24)
+## Distinct capability gaps (1)
 
 No parent capability row exists; these remain explicit open rows.
 
-### qubit_backend_route (24)
+### qubit_backend_route (1)
 
-- `api:DELETE /api/credentials/pool/{provider}/{index}` — source `hermes_cli/web_routers/ops.py:421`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:421`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/hermes/update/check` — source `hermes_cli/web_routers/actions.py:262`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:262`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/hermes/update/receipt` — source `hermes_cli/web_routers/actions.py:427`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:427`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/profiles/{name}/desktop-overlay` — source `hermes_cli/web_routers/profiles.py:1034`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:1034`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:GET /api/sessions/empty/count` — source `hermes_cli/web_routers/sessions.py:465`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:465`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
 - `api:GET /{full_path:path}` — source `hermes_cli/web_server_dashboard.py:112`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_server_dashboard.py:112`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/dashboard/agent-plugins/activate` — source `hermes_cli/web_routers/dashboard_ui.py:290`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:290`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/hermes/update` — source `hermes_cli/web_routers/actions.py:220`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:220`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/backup` — source `hermes_cli/web_routers/ops.py:566`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:566`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/config-migrate` — source `hermes_cli/web_routers/status.py:780`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:780`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/doctor` — source `hermes_cli/web_routers/ops.py:546`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:546`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/dump` — source `hermes_cli/web_routers/status.py:775`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:775`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/import` — source `hermes_cli/web_routers/ops.py:612`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:612`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/prompt-size` — source `hermes_cli/web_routers/status.py:770`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:770`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/ops/security-audit` — source `hermes_cli/web_routers/ops.py:552`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:552`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/profiles/{name}/open-terminal` — source `hermes_cli/web_routers/profiles.py:828`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:828`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:POST /api/tools/toolsets/{name}/post-setup` — source `hermes_cli/web_routers/tools.py:615`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:615`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/tools/toolsets/{name}/model` — source `hermes_cli/web_routers/tools.py:461`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:461`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:PUT /api/tools/toolsets/{name}/provider` — source `hermes_cli/web_routers/tools.py:493`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:493`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/audio/speak-stream` — source `hermes_cli/web_routers/audio.py:473`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:473`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/console` — source `hermes_cli/web_routers/chat_ws.py:277`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:277`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/events` — source `hermes_cli/web_routers/chat_ws.py:644`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:644`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/pty` — source `hermes_cli/web_routers/chat_ws.py:438`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:438`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
-- `api:WEBSOCKET /api/ws` — source `hermes_cli/web_routers/chat_ws.py:593`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:593`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
 
 ## Parented surfaces needing parent closure (0)
 
 These belong to a parent capability row that is missing or not IMPLEMENTED; close the parent (or wire the surface) to resolve them. They are not distinct capabilities.
 
-## Parented surfaces covered by an IMPLEMENTED parent (1045)
+## Parented surfaces covered by an IMPLEMENTED parent (1037)
 
 These are coverage evidence for their parent, not separate gaps.
 
-- `OC-01`: 1 surface(s) — coverage `openclaw-capability`
-- `OC-09`: 1 surface(s) — coverage `openclaw-capability`
-- `OC-18`: 2 surface(s) — coverage `openclaw-capability`
-- `OC-23`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-30`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-34`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-35`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-67`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-D03`: 1 surface(s) — coverage `openclaw-capability`
-- `OC-D04`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-D12`: 1 surface(s) — coverage `openclaw-capability`
-- `OC-D13`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-D15`: 1 surface(s) — coverage `openclaw-capability`
 - `OC-D16`: 1 surface(s) — coverage `openclaw-capability`
-- `OC-D17`: 1 surface(s) — coverage `openclaw-capability`
 - `browser_status`: 25 surface(s) — coverage `workflow-surface`
 - `channels_status`: 8 surface(s) — coverage `workflow-surface`
 - `cli:acp`: 6 surface(s) — coverage `cli-option`
 - `cli:approvals suggest`: 5 surface(s) — coverage `cli-option`
 - `cli:approvals test`: 2 surface(s) — coverage `cli-option`
+- `cli:auth`: 2 surface(s) — coverage `cli-option`
 - `cli:auth add`: 14 surface(s) — coverage `cli-option`
 - `cli:auth list`: 1 surface(s) — coverage `cli-option`
 - `cli:auth logout`: 1 surface(s) — coverage `cli-option`
@@ -98,7 +69,6 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:auth reset`: 2 surface(s) — coverage `cli-option`
 - `cli:auth spotify`: 6 surface(s) — coverage `cli-option`
 - `cli:auth status`: 1 surface(s) — coverage `cli-option`
-- `cli:auth upgrade`: 2 surface(s) — coverage `cli-option`
 - `cli:backup`: 8 surface(s) — coverage `cli-option`
 - `cli:browser close-profile`: 1 surface(s) — coverage `cli-option`
 - `cli:chat`: 40 surface(s) — coverage `cli-option`
@@ -153,7 +123,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:mcp test`: 1 surface(s) — coverage `cli-option`
 - `cli:memory reset`: 1 surface(s) — coverage `cli-option`
 - `cli:memory setup`: 1 surface(s) — coverage `cli-option`
-- `cli:migrate relay`: 2 surface(s) — coverage `cli-option`
+- `cli:migrate`: 2 surface(s) — coverage `cli-option`
 - `cli:migrate xai`: 2 surface(s) — coverage `cli-option`
 - `cli:moa configure`: 2 surface(s) — coverage `cli-option`
 - `cli:moa delete`: 2 surface(s) — coverage `cli-option`
@@ -165,9 +135,8 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:peer add`: 5 surface(s) — coverage `cli-option`
 - `cli:peer list`: 1 surface(s) — coverage `cli-alias`
 - `cli:peer remove`: 2 surface(s) — coverage `cli-option`
-- `cli:plugins adopt`: 1 surface(s) — coverage `cli-option`
+- `cli:plugins`: 6 surface(s) — coverage `cli-option`
 - `cli:plugins capabilities`: 1 surface(s) — coverage `cli-option`
-- `cli:plugins check-updates`: 2 surface(s) — coverage `cli-option`
 - `cli:plugins compat`: 2 surface(s) — coverage `cli-option`
 - `cli:plugins disable`: 1 surface(s) — coverage `cli-option`
 - `cli:plugins doctor`: 2 surface(s) — coverage `cli-option`
@@ -180,9 +149,8 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:plugins remove`: 3 surface(s) — coverage `cli-option`
 - `cli:plugins search`: 1 surface(s) — coverage `cli-option`
 - `cli:plugins show`: 2 surface(s) — coverage `cli-option`
-- `cli:plugins trust-update-url`: 1 surface(s) — coverage `cli-option`
 - `cli:plugins update`: 1 surface(s) — coverage `cli-option`
-- `cli:plugins validate`: 2 surface(s) — coverage `cli-option`
+- `cli:profile`: 3 surface(s) — coverage `cli-option`
 - `cli:profile alias`: 3 surface(s) — coverage `cli-option`
 - `cli:profile create`: 9 surface(s) — coverage `cli-option`
 - `cli:profile delete`: 3 surface(s) — coverage `cli-option`
@@ -191,8 +159,6 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:profile import`: 2 surface(s) — coverage `cli-option`
 - `cli:profile info`: 1 surface(s) — coverage `cli-option`
 - `cli:profile install`: 6 surface(s) — coverage `cli-option`
-- `cli:profile migrate-identity`: 2 surface(s) — coverage `cli-option`
-- `cli:profile purge-identity`: 1 surface(s) — coverage `cli-option`
 - `cli:profile rename`: 2 surface(s) — coverage `cli-option`
 - `cli:profile show`: 1 surface(s) — coverage `cli-option`
 - `cli:profile update`: 4 surface(s) — coverage `cli-option`
@@ -207,6 +173,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:secrets bitwarden`: 1 surface(s) — coverage `cli-alias`
 - `cli:secrets onepassword`: 2 surface(s) — coverage `cli-alias`
 - `cli:security audit`: 4 surface(s) — coverage `cli-option`
+- `cli:sessions`: 3 surface(s) — coverage `cli-option`
 - `cli:sessions browse`: 2 surface(s) — coverage `cli-option`
 - `cli:sessions delete`: 1 surface(s) — coverage `cli-option`
 - `cli:sessions export`: 5 surface(s) — coverage `cli-option`
@@ -215,10 +182,8 @@ These are coverage evidence for their parent, not separate gaps.
 - `cli:sessions pin`: 1 surface(s) — coverage `cli-option`
 - `cli:sessions recover`: 5 surface(s) — coverage `cli-option`
 - `cli:sessions rename`: 2 surface(s) — coverage `cli-option`
-- `cli:sessions repair-profiles`: 1 surface(s) — coverage `cli-option`
 - `cli:sessions repair-routing`: 1 surface(s) — coverage `cli-option`
 - `cli:sessions retitle-skills`: 1 surface(s) — coverage `cli-option`
-- `cli:sessions set-journal-mode`: 2 surface(s) — coverage `cli-option`
 - `cli:sessions unpin`: 1 surface(s) — coverage `cli-option`
 - `cli:setup`: 6 surface(s) — coverage `cli-option`
 - `cli:skills audit`: 1 surface(s) — coverage `cli-option`
