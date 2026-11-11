@@ -1034,3 +1034,25 @@ Deployed from `integration/qoffice-wave1` to the installed live package. This is
 - The rendered office scene remains the existing 4 rooms / 10 agents; the 100-floor room scene is a selected-floor directory view, not a 3D world.
 - No real Etsy OAuth/shop/listing, no social/CRM accounts, no model turns from the control panel.
 - `main` is unmerged; no full matrix / `VERIFIED`.
+
+
+---
+
+## 42. Wave-6: research, Etsy connection, turn preview, world staffing (2026-11-11)
+
+**Landed**
+- **Perplexity research:** optional `PerplexityResearchProvider` (`sonar-pro`, configured URL/key), citation-backed FACTs only, local provider default, idempotent session research, no decision/tasks/spend. UI “Research with Perplexity”.
+- **Etsy OAuth setup:** PKCE/state authorization, token exchange/refresh, typed `not_configured`/`authorization_required`/`connected`, secure token store, connection dock. Live status is `not_configured` (no app credentials yet); no listing/publish/spend.
+- **Agent turn preview:** owner-gated read-only plan for prompt/tools/spend: validates active state, permissions, autonomy, budgets/rate/turns/tokens, approvals and model readiness. No turn, usage, spend, model or network side effect. UI in Agent Controls.
+- **World occupancy + assignment:** explicit `?staffed=1` projection and owner-gated `POST /agents/world-assign`. Assigned **283/283** agents in ~1.9s to real tower desks; live view is **18 floors / 36 rooms staffed, 283 occupied desks, 0 unplaced**. Explicit links are preserved; no desk is reused.
+
+**Live verification**
+- Bridge pid `1004761`; `/qubit-office` 200.
+- Served bundle `f88db466…` (7,714,631 bytes); backup `/home/trick/.cache/qubit-deploy-backup-qoffice-wave5-20261111-173900`, assignment backup `/home/trick/.cache/qubit-deploy-backup-qoffice-worldassign-20261111-174229`.
+- 267 Python + 269 office Vitest tests passed before deploy; 6 focused assignment tests; ruff/diff clean.
+- Browser-verified: tower room scenes now show **named agents on desk cells**, 283 staffed / 0 unplaced; agent preview returns an allowed plan; approvals empty; Etsy says not configured.
+
+**Still not done**
+- The world is a selected-floor room scene, not a rendered 3D city; only 18 of 100 floors are staffed.
+- Real Etsy OAuth/listing requires operator app credentials; Perplexity research was not run live (no spend).
+- No real agent turn execution yet (preview only); no social/CRM accounts; `main` unmerged; no full matrix/`VERIFIED`.
