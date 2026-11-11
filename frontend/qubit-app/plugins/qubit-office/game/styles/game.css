@@ -999,6 +999,243 @@
   font-size: var(--office-fs-xs);
 }
 
+/* -------------------------------------------------------------------------
+   TOWER DIRECTORY (War Room "Roles & floors" -> 100-floor navigator)
+   A vertical, wing-grouped index over the real floor templates. It is a
+   navigation layer, not a 3D scene: bands are flat rows with a pixel-ish
+   elevator rail, active floors carry the ok accent, dormant floors are
+   dimmed/dashed. The list and detail sit side by side when the dock is wide
+   enough and wrap to a single column when it is not.
+   ------------------------------------------------------------------------- */
+.office-game .tower {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  min-height: 0;
+}
+
+.tower__summary {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__honesty {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__empty {
+  padding: var(--office-s2);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+  align-items: flex-start;
+  min-height: 0;
+}
+
+.tower__scroll {
+  flex: 1 1 18rem;
+  min-width: 0;
+  max-height: 30rem;
+  overflow: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+}
+
+.tower__wing {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tower__wingHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--office-s2);
+  padding: 2px 4px;
+  background: var(--office-void);
+  border-bottom: var(--office-border);
+}
+
+.tower__wingName {
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tower__wingCount {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  white-space: nowrap;
+}
+
+.tower__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tower__floor {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--office-s2);
+  width: 100%;
+  padding: 3px 6px;
+  text-align: left;
+  color: var(--office-ink);
+  cursor: pointer;
+  font: inherit;
+  background: color-mix(in srgb, var(--office-plate) 55%, transparent);
+  border: var(--office-border);
+  border-left: 3px solid var(--office-line-strong);
+  border-radius: 2px;
+}
+
+.tower__floor.is-active {
+  border-left-color: var(--office-ok);
+}
+
+.tower__floor.is-dormant {
+  opacity: 0.72;
+  border-left-style: dashed;
+}
+
+.tower__floor.is-selected,
+.tower__floor:focus-visible {
+  outline: 1px solid var(--office-accent);
+  outline-offset: 1px;
+  background: color-mix(in srgb, var(--office-accent) 16%,
+    var(--office-plate));
+}
+
+.tower__index {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__floorName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--office-fs-sm);
+}
+
+.tower__floorMeta {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  white-space: nowrap;
+}
+
+.tower__floorState {
+  color: var(--office-muted);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__floor.is-active .tower__floorState,
+.tower__detail.is-active .tower__floorState {
+  color: var(--office-ok);
+}
+
+.tower__detail {
+  flex: 1 1 16rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--office-s2);
+  background: color-mix(in srgb, var(--office-ground) 70%, transparent);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+}
+
+.tower__detail--empty {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__detailHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s2);
+}
+
+.tower__detailTitle {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+}
+
+.tower__detailRows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tower__detailRow {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--office-s2);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__detailLabel {
+  color: var(--office-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__detailValue {
+  color: var(--office-ink);
+  overflow-wrap: anywhere;
+}
+
+.tower__detailNote {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+@media (max-width: 520px) {
+  .tower__floor {
+    grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  }
+
+  .tower__floorState {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .tower__detailRow {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
 .agent-control__section {
   border: var(--office-border);
   border-radius: var(--office-radius);
