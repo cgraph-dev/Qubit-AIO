@@ -1056,3 +1056,14 @@ Deployed from `integration/qoffice-wave1` to the installed live package. This is
 - The world is a selected-floor room scene, not a rendered 3D city; only 18 of 100 floors are staffed.
 - Real Etsy OAuth/listing requires operator app credentials; Perplexity research was not run live (no spend).
 - No real agent turn execution yet (preview only); no social/CRM accounts; `main` unmerged; no full matrix/`VERIFIED`.
+
+
+---
+
+## 43. Department/office/interaction design persisted
+
+The owner's department-per-floor model, per-agent sessions/workspaces, department Obsidian
+graphs, OpenViking scopes, interaction/action engine, mature-content policy, builder panel,
+FX/map/Godot guidance and the corrected implementation order are persisted in
+`docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md`. That file is the reference for this
+work; this section only points at it.
