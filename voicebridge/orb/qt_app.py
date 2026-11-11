@@ -1569,23 +1569,38 @@ def _paint_ghost(p: Any, cx: float, cy: float, R: float, t: float,
         left = cx - draw_w * 0.5
         top = cy - draw_h * 0.5
         p.setOpacity(max(0.0, min(1.0, float(brightness))))
-        # Blend across the frame boundary using the fractional position. The orb
-        # paints at ~31 fps against a 30 fps atlas, so drawing only whole frames
-        # shows some source frames twice and others once -- a visible stutter.
-        # Two overlapping draws at complementary alpha is a crossfade and keeps
-        # the motion as smooth as the original's own playback.
+        # Crossfade between adjacent frames WITHOUT brightening the sprite. The
+        # orb paints at ~31 fps against a 30 fps atlas, so drawing only whole
+        # frames shows some source frames twice and others once -- a visible
+        # stutter. Two overlapping draws at complementary alpha is the fix, but
+        # plain source-over stacking does NOT preserve brightness: where the two
+        # frames overlap, alpha 0.5 over 0.5 composites to 75%, so the ghost pulse
+        # brightens every cycle (measured as a white flash about twice a second).
+        # Compensate each layer so the PAIR sums like one image: the base is drawn
+        # at 1-frac and the next at frac*(1-(1-frac)) -- i.e. the second layer only
+        # fills the remaining weight rather than adding to it.
         position = ghost_atlas.frame_position(t)
         frac = position - math.floor(position)
         if frac > 0.02:
             nxt = ghost_atlas.frame_at_index(int(math.floor(position)) + 1)
             if nxt is not None:
-                p.setOpacity(max(0.0, min(1.0, float(brightness) * frac)))
+                base_alpha = (1.0 - frac) * float(brightness)
+                p.setOpacity(max(0.0, min(1.0, base_alpha)))
+                p.drawImage(
+                    QRectF(left, top, draw_w, draw_h),
+                    image,
+                    QRectF(float(min_x), float(min_y), src_w, src_h),
+                )
+                # The next frame may only contribute what the base left uncovered.
+                top_alpha = frac * float(brightness) * max(0.0, 1.0 - base_alpha)
+                p.setOpacity(max(0.0, min(1.0, top_alpha)))
                 p.drawImage(
                     QRectF(left, top, draw_w, draw_h),
                     nxt[0],
                     QRectF(float(min_x), float(min_y), src_w, src_h),
                 )
-                p.setOpacity(max(0.0, min(1.0, float(brightness) * (1.0 - frac))))
+                p.setOpacity(1.0)
+                return True
         p.drawImage(
             QRectF(left, top, draw_w, draw_h),
             image,
