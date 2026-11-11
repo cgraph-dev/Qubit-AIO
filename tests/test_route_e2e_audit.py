@@ -170,3 +170,29 @@ def test_live_audit_is_deterministic_and_nondestructive():
     assert all(m["classification"] in _ALLOWED
                for m in first["mutations"])
     assert first["counts"]["read_total"] > 0
+
+
+# ---------------------------------------------------------------------------
+# Safety: live mutations are opt-in (2026-11-10 profile-delete incident)
+# ---------------------------------------------------------------------------
+def test_run_audit_defaults_to_read_only():
+    import inspect
+
+    assert inspect.signature(R.run_audit).parameters["read_only"].default is True
+
+
+def test_main_requires_allow_live_mutations(monkeypatch, tmp_path):
+    seen = {}
+
+    def fake_run(base, read_only=True, timeout=20.0):
+        seen["read_only"] = read_only
+        return {"counts": {}, "staleness": {}, "stable_digest": "deadbeef"}
+
+    monkeypatch.setattr(R, "run_audit", fake_run)
+    out = tmp_path / "route-e2e.json"
+
+    assert R.main(["--out", str(out)]) == 0
+    assert seen["read_only"] is True, "mutations must be OFF by default"
+
+    assert R.main(["--out", str(out), "--allow-live-mutations"]) == 0
+    assert seen["read_only"] is False, "the explicit flag must enable mutations"
