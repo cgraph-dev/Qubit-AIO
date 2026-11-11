@@ -91,6 +91,7 @@ function backend(overrides: {
   pause?: () => Response | Promise<Response>;
   stop?: () => Response | Promise<Response>;
   revoke?: () => Response | Promise<Response>;
+  preview?: () => Response | Promise<Response>;
 } = {}) {
   let current = agent();
   const { calls, impl } = recordingFetch((call) => {
@@ -118,6 +119,35 @@ function backend(overrides: {
           Object.keys(current.permissions).map((k) => [k, []])),
       };
       return respond(200, { ok: true, agent_id: "agt_1", result: current });
+    }
+    if (path.endsWith("/preview")) {
+      if (overrides.preview) return overrides.preview();
+      return respond(200, {
+        ok: true, schema: "qubit-office-business-agent-preview/1",
+        tenant_id: "ten_1", agent_id: "agt_1", allowed: true,
+        plan: {
+          allowed: true, state: "ALLOWED", tenant_id: "ten_1",
+          agent_id: "agt_1", business_id: "biz_1",
+          provider: "provider-a", model: "model-a",
+          reasoning_effort: "high", autonomy: "L2", max_tokens: 4096,
+          estimated_prompt_tokens: 5, projected_tokens: 4101,
+          requested_tools: ["post"],
+          tool_scopes: { tools: ["post"], social: ["read", "draft"] },
+          approval_actions_required: [],
+          approvals_satisfied: true,
+          limits: current.safety,
+          estimated: {
+            spend_minor: 0, prompt_tokens: 5, output_tokens: 4096,
+            active_turns: 0,
+            remaining: { daily_spend_remaining_minor: 1000,
+                         monthly_spend_remaining_minor: 5000,
+                         turns_remaining_today: 100 },
+          },
+          side_effects: false,
+          reason: "All control-plane checks passed. This is a preview only: no "
+            + "model call, spend, job, turn or tool side effect was made.",
+        },
+      });
     }
     if (path.endsWith("/agents/agt_1")) {
       return respond(200, { ok: true, schema: "x", tenant_id: "ten_1",
@@ -222,6 +252,78 @@ describe("the drawer shows real control data and actions", () => {
     const { h } = await mount(impl, onClose);
     (byTestId(h, "agent-control-close")[0].props.onClick as () => void)();
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("turn preview plans without executing", () => {
+  it("posts the prompt and renders the allowed plan", async () => {
+    const { calls, impl } = backend();
+    const { h } = await mount(impl);
+    typeInto(h, "agent-control-preview-prompt",
+      "Draft a launch note for the newsletter.");
+    typeInto(h, "agent-control-preview-tools", "post, draft_post");
+    typeInto(h, "agent-control-preview-spend", "1.50");
+    await h.settle();
+    (byTestId(h, "agent-control-preview-run")[0].props.onClick as () => void)();
+    await h.settle();
+
+    const post = calls.find((c) => c.method === "POST"
+      && new URL(c.url).pathname.endsWith("/preview"));
+    expect(post?.body.owner).toBe(true);
+    expect(post?.body.prompt).toBe("Draft a launch note for the newsletter.");
+    expect(post?.body.requested_tools).toEqual(["post", "draft_post"]);
+    expect(post?.body.spend_minor).toBe(150);
+
+    expect(byTestId(h, "agent-control-preview-plan")).toHaveLength(1);
+    expect(textOf(byTestId(h, "agent-control-preview-allowed")[0]))
+      .toContain("ALLOWED");
+    expect(textOf(byTestId(h, "agent-control-preview-provider")[0]))
+      .toContain("provider-a");
+    expect(textOf(byTestId(h, "agent-control-preview-model")[0]))
+      .toContain("model-a");
+    expect(textOf(byTestId(h, "agent-control-preview-max-tokens")[0]))
+      .toContain("4096");
+    expect(textOf(byTestId(h, "agent-control-preview-approvals")[0]))
+      .toContain("none");
+    expect(textOf(byTestId(h, "agent-control-preview-reason")[0]))
+      .toContain("no model call");
+    expect(textOf(byTestId(h, "agent-control-preview-note")[0]))
+      .toContain("writes nothing");
+  });
+
+  it("renders a typed refusal and no plan for a paused agent", async () => {
+    const { impl } = backend({
+      preview: () => respond(409, {
+        ok: false, state: "REFUSED", code: "AGENT_PAUSED",
+        detail: "agent is paused; resume it before previewing a turn",
+      }),
+    });
+    const { h } = await mount(impl);
+    typeInto(h, "agent-control-preview-prompt", "Do the thing.");
+    await h.settle();
+    (byTestId(h, "agent-control-preview-run")[0].props.onClick as () => void)();
+    await h.settle();
+
+    const error = byTestId(h, "agent-control-preview-error")[0];
+    expect(error?.props["data-code"]).toBe("AGENT_PAUSED");
+    expect(textOf(error)).toContain("paused");
+    expect(byTestId(h, "agent-control-preview-plan")).toHaveLength(0);
+    expect(byTestId(h, "agent-control-notice")).toHaveLength(0);
+  });
+
+  it("rejects a non-numeric spend before calling the backend", async () => {
+    const { calls, impl } = backend();
+    const { h } = await mount(impl);
+    typeInto(h, "agent-control-preview-prompt", "Do the thing.");
+    typeInto(h, "agent-control-preview-spend", "not money");
+    await h.settle();
+    (byTestId(h, "agent-control-preview-run")[0].props.onClick as () => void)();
+    await h.settle();
+
+    expect(calls.filter(
+      (c) => new URL(c.url).pathname.endsWith("/preview"))).toHaveLength(0);
+    expect(textOf(byTestId(h, "agent-control-preview-error")[0]))
+      .toContain("non-negative");
   });
 });
 
