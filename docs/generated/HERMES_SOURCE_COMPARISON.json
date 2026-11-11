@@ -4511,7 +4511,7 @@
    "upstream_rev": "69948c005791d4d0e51670ca015238c2c7663749",
    "upstream_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
    "qubit": "frontend/qubit-web/src/lib/api.ts",
-   "qubit_sha256": "825c453c770e9e95368474cefafb4b212609a2499eb8887c4a507c106ad2045a",
+   "qubit_sha256": "a3bbfbd24490c432bc9cdc54712390a289d280349d4a72d3f02cafec69bd5f66",
    "patch": "wave2/public-rebrand-api-prefix + Qubit config confirm flag",
    "reason": "Qubit-owned public API prefix (/api/<x> -> /agent/api/<x>) plus a confirm flag on saveConfig so the Settings page can complete the confirm-gated settings write. No vendor business logic changed.",
    "upstream_blob_sha256": "d63db5af8fd826257c820a0e943f96b9fd3b862d9c10ec7bdcfd830a4f67a996",
