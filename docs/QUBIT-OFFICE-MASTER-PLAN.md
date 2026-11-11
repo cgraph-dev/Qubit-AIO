@@ -1077,3 +1077,183 @@ The Character Studio merge (Habblaud + LimeZu Character/Portrait Generators), ou
 campus map, full panel inventory, capability catalog, asset ledger and the coverage-status
 table are persisted in `docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` §15–§20. That file
 is the reference; this is a pointer, not a second authority.
+
+---
+
+## 45. Organized execution plan v6 (canonical)
+
+**Status:** this section is the canonical execution order. Where earlier phase lists, wave reports or
+owner-decision notes conflict, this section wins for *what to build next*. It is still design,
+not evidence of implementation.
+
+### Plan freeze
+
+No more plan rewrites until one department vertical slice works. New ideas go to the idea ledger;
+they do not reorder the build.
+
+### Authority model
+
+| Data | Authority | Projections |
+|---|---|---|
+| Business, department, room, agent, session, task, artifact, message, approval, ledger, capability call, FX event | Business OS event log/SQLite (later Postgres) | Office, tower, maps, panels |
+| Obsidian notes/graph | **Derived projection** | Human graph/search |
+| OpenViking memory | Adapter into Qubit memory API, scoped by tenant/agent | Semantic retrieval |
+| CharacterProfile | Business OS, versioned | Habblaud character state, LimeZu portrait atlas |
+| World/map layout | Versioned map schema | Web renderer, optional Godot |
+| FX | Event consumer over authoritative events | Animations/particles |
+
+Obsidian is **not** a runtime database. OpenViking is **not** written through invented filesystem
+paths; it goes through one adapter with authenticated namespaces, commit boundaries, provenance,
+retention and deletion. Business state must remain rebuildable without the graph.
+
+### Floor decision (resolves the contradiction)
+
+- Qubit Office may have **100 floors**.
+- **Each floor is a department office.**
+- Floors are visual/organisational groupings; business truth stays in the Business OS.
+- Only active businesses/workflows materialise working agents. The current 283 assigned seats are
+  a **seed/demo projection**, not evidence that 283 agents are operational.
+- The first real build is **one department floor**, not the whole tower.
+
+### Execution order
+
+1. **Freeze and inventory**
+   - Asset ledger, idea ledger, repo-dependency ledger, license/provenance.
+   - One authoritative schema document for Business/Department/Room/Agent/Session/Task/
+     Artifact/Message/Memory/Approval/CapabilityCall/FXEvent.
+
+2. **One department floor**
+   - Use the current office image as the first department template.
+   - Reception, work area, meeting/boardroom, focus room, break/kitchen, restrooms, lounge,
+     head office, storage.
+   - Real room IDs, seats, assets, capability manifest, map, memory scope.
+   - 3–5 real agents, not 283 synthetic occupants.
+
+3. **Durable agent sessions and workspaces**
+   - Session/thread, run, checkpoint, workspace, sandbox/worktree, artifact, lease, handoff.
+   - Stop/resume/restart tests; no lost work.
+   - Agent panel showing the real session.
+
+4. **Conversation fabric**
+   - Append-only messages: sender, audience, thread, reply, artifact refs, visibility,
+     classification, delivery state, idempotency, authorization.
+   - Owner↔agent and agent↔agent chat before broad panels.
+
+5. **Capability gateway**
+   - One execution boundary for model turns, tools, terminal, browser, files, messaging,
+     Etsy, memory writes and MCP.
+   - Tenant/agent scopes, approvals, budgets, rate limits, DLP, egress, idempotency,
+     dry-run, audit, kill switch.
+
+6. **Memory**
+   - Event log authoritative.
+   - Department/agent Obsidian projections; OpenViking adapter with authenticated namespaces.
+   - Conflict, retention, deletion, export, rebuild and provenance rules.
+
+7. **First real turn + first business workflow**
+   - One low-risk read/draft capability through the gateway.
+   - Trace prompt, context, tools, approvals, output, artifact, cost, checkpoint, audit.
+   - Then Etsy: draft listing → IP/license evidence → owner approval → official OAuth call →
+     provider receipt → ledger/reconciliation → unknown/rollback state.
+
+8. **Character Studio and room builder**
+   - One canonical CharacterProfile; Habblaud/LimeZu adapters; transactional projections.
+   - Department/floor/room builder with validation, versioning, undo and approval.
+
+9. **World**
+   - Renderer-neutral map/chunk/layer/door/portal schema.
+   - Campus exterior + one department floor in web renderer.
+   - Godot only after parity tests; it is a renderer, not a second backend.
+
+10. **Interactions, FX and scale**
+    - Interaction engine + mature policy + consequences.
+    - Event-to-animation schema; FX replay/cancellation/fallback.
+    - 100-floor budgets, active/dormant scheduler, 100/500/1,000-agent load tests.
+
+11. **Security and release**
+    - Threat model, secret broker, sandbox, egress, filesystem jail, prompt-injection defense,
+      approval anti-confusion, encrypted backups, deletion/export, incident kill switch.
+    - Scenario evidence and negative-security evidence, not only unit counts.
+
+### Hard acceptance for the first slice
+
+A department is not “done” until:
+- 3–5 agents have durable sessions and recover after restart.
+- Owner can chat with an agent; two agents can chat/hand off with artifacts.
+- One agent uses a scoped capability through the gateway.
+- One task produces a real artifact and audit/ledger record.
+- Department memory is visible in Obsidian and queryable in OpenViking, with provenance.
+- One approval gates a real external draft.
+- The floor map, room styles, characters and FX render honestly.
+- No work is lost on restart; failures are typed, not silent.
+
+## 46. Perplexity review — misconfigurations and 15 suggestions
+
+Perplexity reviewed the plan and design doc. Its verdict: strong control-plane foundation and
+honest gap reporting, but internally inconsistent, too broad, and sequenced around records,
+templates and projections rather than one usable department.
+
+### Misconfigurations to fix
+
+1. Floor contradiction: “no more floors” vs 100 floors. **Resolved:** 100 floors allowed, each
+   floor is a department, active-only; first slice is one floor.
+2. 283 assigned seats presented as occupancy while no active business/workflow exists. **Fix:**
+   treat as seed/demo; staff only the active department.
+3. Directory/templates/wave reports treated as world progress. **Fix:** acceptance is a rendered,
+   working department, not a directory.
+4. Agent records precede sessions/workspaces/messages. **Fix:** sessions and conversation fabric
+   before more controls.
+5. Permission data/dry-run adapters are not a capability gateway. **Fix:** one executable gateway.
+6. Etsy integration before the usable agent loop. **Fix:** gateway + one turn + one workflow first.
+7. No authoritative memory write protocol. **Fix:** event log owns truth; Obsidian projection;
+   OpenViking adapter with commit/provenance/retention.
+8. Unsafe OpenViking namespace assumptions. **Fix:** Qubit adapter, authenticated namespaces,
+   no invented direct paths.
+9. Obsidian treated as a runtime database. **Fix:** derived projection only.
+10. No canonical conversation fabric. **Fix:** one message schema, ordering, delivery, auth,
+    retention, artifacts.
+11. Rooms lack capability manifests. **Fix:** room → roles/toolsets/workflows/artifacts/KPIs/
+    memory/privacy/activation.
+12. Interactions have no bounded authority model. **Fix:** separate authoritative HR/legal/
+    business events from simulation-only effects; approvals where real.
+13. Security/privacy controls incomplete for terminal/browser/files/memory/payments/social.
+    **Fix:** threat model, secret broker, sandbox, egress, jail, prompt-injection defenses,
+    kill switch, anti-confusion approvals.
+14. Personal hosting does not remove tenancy/privacy risk. **Fix:** encryption, access control,
+    backup exclusions, deletion/export, personal/business separation, future entity migration.
+15. Character Studio has incompatible save authorities. **Fix:** Business OS CharacterProfile is
+    authoritative; Habblaud/LimeZu are projections; transactional revisions/rollback.
+16. Paid-art safeguards miss runtime/build leakage. **Fix:** ledger, fail-closed builders, scans of
+    bundles/caches/screenshots/backups/exports, local-only installation.
+17. 100-floor scale lacks budgets. **Fix:** frame/memory/event/persistence/pathfinding/cold-start
+    targets and load tests.
+18. Active/dormant can starve operational work. **Fix:** scheduler contract, starvation bound,
+    leases, queue partition, tests.
+19. FX contracts underspecified. **Fix:** event-to-animation schema, cancellation/replay,
+    deterministic seeds, authoritative-vs-visual separation.
+20. Godot has no portability contract. **Fix:** renderer-neutral map/coordinate/animation/input
+    schema and parity tests before any Godot work.
+21. Repo reviews are not an implementation dependency ledger. **Fix:** exact commits, behavior
+    mapping, rejected code, license/security review.
+22. Evidence is too test-centric. **Fix:** scenario, recovery, gateway-enforcement, external
+    reconciliation and negative-security evidence.
+
+### 15 suggestions to do
+
+| # | Suggestion | Why | Do | Phase | Effort | Risk |
+|---|---|---|---|---|---|---|
+| 1 | Ship one capability-bearing department slice | Current work optimizes records/directories, not operations | One floor, 3–5 agents, 4–6 rooms, real tasks/artifacts/workflow | Next | L | Medium |
+| 2 | Define one domain/projection contract | Office/tower/Obsidian/OpenViking/renderer imply overlapping authority | Publish schemas and field ownership for all core records | Next | M | Low |
+| 3 | Build durable per-agent sessions/workspaces | Controls edit entities that cannot do recoverable work | Session, run, checkpoint, sandbox, artifact, lease, handoff; restart tests | Next | L | High |
+| 4 | Build the conversation fabric | Chat/handoff/approval/memory all need one message substrate | Append-only message schema with audience/auth/delivery/artifacts | Next | L | High |
+| 5 | Make ToolGateway the only execution boundary | Capability catalog/dry-run is not a security boundary | Route turns/tools/terminal/browser/files/messaging/Etsy/memory/MCP through it | Next | XL | Critical |
+| 6 | Build a safe memory adapter | Obsidian/OpenViking direct writes risk divergence/namespace failure | Event log authoritative; Obsidian projection; OpenViking adapter with provenance/retention | Next | L | High |
+| 7 | Prove one real agent turn end to end | Preview has no model/network effect; core loop unproven | One low-risk capability, full trace, artifact, cost, approval, checkpoint | Next | L | Critical |
+| 8 | Complete Etsy as a human-gated workflow | OAuth/dry-run stops before business outcome | Draft → IP evidence → approval → official call → receipt → ledger/rollback | After 5–7 | L | High |
+| 9 | Separate active staffing from seat seed | 283 synthetic occupants imply operations that do not exist | Seed records but staff only the active department; dormant rooms empty/template | Next | M | Medium |
+| 10 | Add room capability manifests | Rooms are currently cells/desks only | Roles, toolsets, workflows, artifacts, KPIs, memory, privacy, activation | Next | M | Medium |
+| 11 | Build the first real department floor | Tower scene is a projection, not a working floor | Instantiate one floor from the image with real rooms/assets/paths/seats | After 1–10 | L | Medium |
+| 12 | Deliver one renderer-neutral map schema | Outside world/Godot are premature without a map contract | Map/chunk/layer/door/portal/coordinate/occupancy schema + web exterior | After first slice | L | Medium |
+| 13 | Implement Character Studio transactionally | Habblaud/LimeZu save authorities conflict | Versioned CharacterProfile; validate assets/licenses; publish projections; rollback | After first slice | M | Medium |
+| 14 | Add asset/license ledger before more assets | Paid-art constraints lack build/runtime enforcement | Ledger required; fail-closed builders; scan bundles/caches/screenshots/backups | Next | M | High |
+| 15 | Add security/privacy/recovery gates | Promised surface includes terminal, credentials, payments, personal data | Threat model, secret broker, sandbox, egress, jail, injection defense, kill switch | Next | XL | Critical |
