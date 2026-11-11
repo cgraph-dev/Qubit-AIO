@@ -250,15 +250,32 @@ _FORK_SKILL_TEST = (
 _FORK_PLUGIN_TEST = (
     "tests/test_tool_skill_plugin_coverage_wave5.py"
     "::test_all_vendored_plugin_items_have_a_wrapper")
+_PLUGIN_SURFACE_CATEGORIES = (
+    "hermes_dashboard_plugin", "hermes_plugin_api",
+    "hermes_plugin_asset", "hermes_plugin_test",
+)
 _FORK_CAPABILITY_BY_CATEGORY = {
     "hermes_tool": "fork_tool_runtime",
     "hermes_skill": "fork_skill_runtime",
     "hermes_plugin": "fork_plugin_runtime",
+    # A plugin's dashboard surface (manifest, api, shipped assets, tests) is
+    # part of the same vendored plugin: it lives under
+    # qubit_runtime/plugins/<name>/dashboard/ and ships with the wrapper. Without
+    # these entries the categories fell through to the default MISSING even
+    # though both trees carry the files.
+    "hermes_dashboard_plugin": "fork_plugin_runtime",
+    "hermes_plugin_api": "fork_plugin_runtime",
+    "hermes_plugin_asset": "fork_plugin_runtime",
+    "hermes_plugin_test": "fork_plugin_runtime",
 }
 _FORK_BACKEND_BY_CATEGORY = {
     "hermes_tool": "qubit_runtime.tools.registry:registry",
     "hermes_skill": "qubit_runtime.skills",
     "hermes_plugin": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "hermes_dashboard_plugin": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "hermes_plugin_api": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "hermes_plugin_asset": "voicebridge.qubit_plugins.plugin_fleet_audit",
+    "hermes_plugin_test": "voicebridge.qubit_plugins.plugin_fleet_audit",
 }
 #: Upstream plugin name -> the name it is vendored under after the rebrand.
 #: Mirrors ``voicebridge.qubit_plugins._LEGACY_PLUGIN_ALIASES``; kept local so
@@ -357,6 +374,33 @@ def _fork_disposition(repo: Path, item: dict, fork_tools: set[str],
     # An upstream plugin renamed under the rebrand is vendored under its Qubit
     # name (``hermes-achievements`` -> ``qubit-achievements``), so match the
     # disposition against both the upstream name and its canonical local name.
+    #
+    # The plugin's dashboard surface (manifest / plugin_api.py / dist assets /
+    # tests) is vendored WITH the plugin, so it is proven by the same fleet the
+    # plugin itself is: resolve the owning plugin name first, then run the same
+    # test. ``item["plugin"]`` is set for the surface categories; the manifest
+    # row carries ``name`` from its own manifest, which may already be the local
+    # spelling.
+    if cat in _PLUGIN_SURFACE_CATEGORIES:
+        owner = str(item.get("plugin") or "") or name
+        local = _PLUGIN_RENAMES.get(owner, owner)
+        if local in fork_plugins or owner in fork_plugins:
+            return {
+                "status": "IMPLEMENTED", "capability": capability,
+                "backend": backend, "proving_test": _FORK_PLUGIN_TEST,
+                "reason": (f"dashboard surface of vendored plugin {local!r} "
+                           "ships under qubit_runtime/plugins/<name>/dashboard/ "
+                           "with the plugin wrapper."),
+                "needs": "none",
+            }
+        return {
+            "status": "GATED", "capability": capability, "backend": "",
+            "proving_test": "",
+            "reason": (f"plugin {owner!r} is not in the vendored fork plugin "
+                       "fleet; its dashboard surface has no Qubit wrapper."),
+            "needs": "owner",
+        }
+
     if name in fork_plugins or _PLUGIN_RENAMES.get(name) in fork_plugins:
         return {
             "status": "IMPLEMENTED", "capability": capability,
