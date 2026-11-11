@@ -1,0 +1,606 @@
+# Qubit Office — Master Plan
+
+**Status:** planning baseline. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete.
+**Execution mode:** PLAN ONLY. No implementation agents, code changes, deployments or live-service changes are authorized until the owner signs this plan off.
+**Scope:** Qubit Office (the campus/office product) + Qubit Business OS (the durable business-operations layer).
+**Rule:** the world is complete from day one; only active businesses/rooms are simulated. Business truth lives in systems of record, never in the renderer.
+
+---
+
+## 1. Vision
+
+Qubit Office is the operator's control room for a company of human-directed AI workers.
+
+- Every business, wing, room, desk, agent and task has a real record.
+- The office shows real state; it never invents work.
+- Agents do throughput; humans own thresholds (money, law, contracts, irreversible actions).
+- A business can be created from a playbook, then operated and improved 24/7.
+- The world is fully built; only the active businesses animate.
+- The product is **Qubit Office** to users. Habblaud-derived code is a vendored component, not a product brand.
+
+---
+
+## 2. Product principles
+
+1. **Authoritative state vs presentation state.** Business records, balances, tickets and approvals are authoritative. Animation, walking, lights and effects are presentation.
+2. **Full static world, sparse simulation.** All wings/rooms/suites/desks exist from the start. Unused rooms are furnished and dormant; only active businesses materialize agents.
+3. **Agents propose; systems commit.** The tool gateway, policies, ledgers and systems of record decide what happened.
+4. **Human approval by consequence.** Payments, contracts, legal, hiring, irreversible data changes, customer commitments and credential changes require approval.
+5. **Durable by default.** Work survives browser close, process restart, deploys and delayed approvals.
+6. **No fake success.** No agent "completion" without an artifact, row, transaction, message, ticket or provider receipt.
+7. **Copy/adapt before inventing.** Reuse proven UI/office code and infrastructure; write glue, not a new engine.
+8. **One source of identity.** Stable IDs everywhere; names are display attributes.
+9. **Unique rooms, coherent style.** Rooms differ by archetype, palette, furniture family, seed, signage and lighting, constrained by a shared visual grammar.
+10. **Personal first, but honest.** Private/local use may relax distribution gates; real businesses still require legal/accounting/security discipline.
+
+---
+
+## 3. Two products on one foundation
+
+### Qubit Office (World/control room)
+The campus, rooms, desks, agents, office UI, live status, approvals, terminal, deliveries, timelapse, character editor, room styles and World/city.
+
+### Qubit Business OS
+Durable workflows, business objects, systems-of-record adapters, approvals, budgets, audit, KPIs, playbooks, business creation and maintenance.
+
+**Rule:** the office is an interface to the Business OS. It is not the database.
+
+---
+
+## 4. Naming and white-label policy
+
+### User-visible product
+- Name: **Qubit Office**.
+- Remove every user-visible Habblaud name, logo, title, iframe label, PWA name, loading copy, error copy, About copy, docs and default configuration from product surfaces.
+- Centralize brand strings and asset references; do not hard-code names.
+- Rename the app surface, loading screen, title and accessible labels to Qubit Office.
+
+### Legal/provenance (must stay)
+- Keep the original MIT copyright and permission notice.
+- Keep a `THIRD_PARTY_NOTICES` entry naming the vendored Habblaud component, upstream commit and local changes.
+- Keep provenance/SBOM records. Do not replace a copyright holder with "Qubit Office".
+- Attribution may live in About/legal/THIRD_PARTY_NOTICES rather than the main UI.
+
+### Technical migration
+- Phase 1: inventory every `habblaud` reference; classify UI, public API, private code, tests, assets, provenance.
+- Phase 2: add canonical `/api/office/*` routes and keep `/api/office/habblaud/*` as compatibility aliases until all callers migrate.
+- Phase 3: rename internal directories/packages only where safe; keep aliases documented.
+- Do not do a blind global replacement. A grep that finds a name does not prove which side reads it.
+
+---
+
+## 5. World architecture
+
+### Hierarchy
+```
+Campus
+  Wing / Zone
+    Logical Room
+      Cell (16×12 Habblaud-compatible room primitive)
+        Desk / Seat
+          Agent presence
+    Business / Department
+```
+
+- Existing 3 "floors" become **3 wings**; preserve `legacyFloorId` for compatibility.
+- No new vertical floors. Expand horizontally.
+- Rooms needing more than 6 desks use **cell clusters**: 2 cells = 12 desks, 3 = 18, 4 = 24+; never stretch a 16×12 cell.
+- Each cell keeps original furniture/seat/path geometry; the logical room aggregates cells.
+- Seat IDs are namespaced (`roomId:cellId:localSeatId`).
+- `characterMode: single | multi`: single preserves classic project-room behavior; multi supports Qubit departments.
+
+### Active/dormant model
+Every room has separate layers:
+1. Authoritative business record — always exists.
+2. Static presentation — always exists (walls, furniture, signs, lights off/on state).
+3. Simulation actors — only when active.
+4. Presentation proxy — labels/lights/silhouettes when distant.
+
+States:
+```
+AUTHORED → LOADED_STATIC → OBSERVED → PRESENTATION_ACTIVE
+        → SIMULATION_ACTIVE → DORMANT → REHYDRATING
+```
+
+Tiers:
+- Tier 0 dormant: static room, business advances via events/timers.
+- Tier 1 aggregate: headcount/queue/KPIs, no agents.
+- Tier 2 low-rate: important agents update slowly.
+- Tier 3 proxy: lights/labels/silhouettes.
+- Tier 4 full: visible/nearby agents with full animation/pathfinding.
+
+### Non-negotiable rules
+- Business outcomes never depend on whether a room is visible.
+- Dormant rooms retain state, schedules, approval queues and pending events.
+- Re-entering a room reconstructs visuals from authoritative state.
+- Active set uses camera + interaction + urgent events + deadlines, not camera alone.
+- Static geometry cached per room/wing; active rooms full; neighbors simplified; occluded rooms not drawn; minimap from data.
+
+---
+
+## 6. Room style system (LimeZu)
+
+### Source
+Modern Interiors is a modular library, not one fixed tileset: thousands of furniture variants, theme sorter folders, modular floors/walls/rugs/tables, 16/32/48 sizes, shadowless/black-shadow variants, 100+ animated objects, character/portrait parts.
+
+### Rules
+- Use **16×16 as the world baseline**; do not mix 16/32/48 inside one room. Use 32/48 for portraits/close-ups/UI.
+- Pick one shadow policy per scene (shadowless or black shadow), not mixed.
+- Respect single-direction furniture: place against walls/sockets; do not rotate arbitrarily.
+- Verify asset completeness per size; fall back to 16×16.
+- No paid art committed; local builder only; credit LimeZu.
+
+### Room style recipe
+```json
+{
+  "archetype": "support_hub",
+  "palette": "cool_teal_neutral",
+  "floor": "carpet_dark",
+  "wall": "panel_light",
+  "rug": "teal_accent",
+  "furniture_set": "support_desks_modern",
+  "lighting": "cool_overhead",
+  "shadow": "shadowless",
+  "decor": ["headsets", "queue_board", "plants"],
+  "seed": 184729,
+  "style_version": 1
+}
+```
+
+### Archetypes
+Executive boardroom, open office, reception, support hub, sales floor, finance/accounting, marketing/content studio, engineering/control room, research/library, meeting room, kitchen/break room, wellness/quiet room, showcase/museum, server/ops, legal/compliance, training/classroom, fulfillment, media/TV studio.
+
+### Composition
+1. Functional shell (door, windows, service wall).
+2. Required anchors (desks, reception, table, storage).
+3. Secondary furniture.
+4. Decor, signage, decals.
+5. Lighting.
+6. Validate walkability/capacity/readability.
+
+### Variation
+- Deterministic `room_seed = hash(business, wing, room, style_version)`.
+- Independent streams: shell, furniture, palette, clutter, decals, lighting.
+- Vary secondary props, rug, plants, posters, accent, desk template.
+- Never vary doors, required anchors, main circulation, capacity, collision, only light.
+- Curated palettes (60/30/10); no random sprite soup.
+- Visual goldens per archetype/palette; reject wrong-theme props and clutter.
+
+### Asset catalog
+Every asset declares: theme, category, size, footprint, z-order, wall/floor, orientations, animation, shadow variant, tags, compatibility. Build the catalog from the purchased pack; never commit the art.
+
+---
+
+## 7. Loading screen + weather
+
+### UX
+- Qubit Office branded loading screen.
+- User-supplied background image (placeholder now), with readable overlay.
+- Progress/status, retry/error, tips, accessibility announcements.
+- Smooth cross-fade to the office when the first real state is ready.
+
+### Weather
+- Source: Open-Meteo or configured weather; server/backend normalized snapshot; cache 10–30 min; fallback if unavailable.
+- Never block loading on weather.
+- Normalized states: clear-day, clear-night, partly-cloudy, cloudy, rain, storm, snow, fog, fallback.
+- Map one effect at a time:
+  - clear-day → `weather/god-rays`
+  - partly-cloudy/cloudy → `weather/clouds`
+  - rain → `weather/rain`
+  - storm → `weather/storm`
+  - snow → `weather/snow`
+  - fog → `weather/fog`
+- Do not combine rain+storm; storm already contains rain/lightning.
+- Hysteresis/thresholds to prevent flicker.
+
+### Pixelfx
+- Vendor only the needed weather effects from `patch-gg/pixelfx` (MIT), with commit/provenance.
+- Fixed 320×180 frame, scaled up with pixelated rendering.
+- Layers: background image → tint/vignette → back effects → UI/progress → front effects.
+- `createFrame`, `createFx`, `update`, `draw('back'/'front')`, `composite`, `putImageData`.
+- Performance: VFX compositor ≤4 ms/frame target; loading total ≤8 ms mid-range; no blocking >50 ms startup; weather request timeout 1–2 s.
+- Reduced motion: disable/soften; low-power/mobile fallback.
+- Cleanup on unmount; no effect leaks; no network on every frame.
+
+### Background
+- Placeholder CSS/SVG now; configurable `office.loading.background`; user replaces with final art.
+- Keep text contrast and safe areas.
+
+---
+
+## 8. Business OS
+
+### Core rule
+Agents may reason; systems of record decide, commit and prove what happened.
+
+### Layers
+1. Control plane: businesses, legal entities, playbooks, roles, tools, policies, budgets, approvals, feature flags.
+2. Runtime plane: durable workflows, event bus, timers, queues, leases, retries, dead-letter, human tasks, tool gateway.
+3. Systems of record: CRM, orders, payments, invoices/accounting, support, documents, email, website, analytics.
+4. Agent layer: typed roles with objective, inputs, tools, scopes, spend/customer limits, approvals, escalation, timeout, model fallback, evals, owner.
+5. Human operations: approval cards with evidence, cost, consequences, reversal, expiry; approve/reject/edit/delegate/escalate/stop.
+6. Observability/evals: workflow/run/agent/model/prompt/tool/policy/approval/provider IDs, costs, latency, outcome, human intervention, KPIs.
+
+### Business objects
+Business, legal entity, brand, offer, product, lead, customer, opportunity, order, subscription, invoice, payment, refund, contract, campaign, ticket, task, project, run, artifact, approval, ledger entry, KPI, incident, SOP/playbook, agent, role, shift, review.
+
+### Autonomy
+- L0 read/summarize.
+- L1 draft.
+- L2 recommend.
+- L3 reversible action with caps.
+- L4 money/customer commitment with approval.
+- L5 legal/contracts/hiring/irreversible — human/dual control.
+
+### 24/7 requirements
+- Durable execution (Temporal or equivalent), deterministic orchestration.
+- Idempotency keys, retries, timeouts, dead-letter, reconciliation.
+- Unknown outcomes are a distinct state; never blindly retry money/email/CRM writes.
+- Timers/schedules/heartbeats/dead-man's switch.
+- Provider/model fallback, rate limits, cost caps, budget ledger.
+- Backups, restore drills, migrations, canary/blue-green.
+- Human escalation/on-call and incident runbooks.
+- Audit/reason-of-record.
+
+### Business creation pipeline
+1. Research/validate opportunity.
+2. Business model/unit economics.
+3. Legal entity/tax/bank/payments (human).
+4. Brand/domain/website.
+5. Offer/product.
+6. Marketing/sales.
+7. Onboarding/delivery.
+8. Support.
+9. Bookkeeping.
+10. KPI review/improve.
+11. Clone/scale playbook.
+
+### Business maintenance/improvement
+Weekly business review, anomaly detection, cost/API/schema drift monitors, experiments, pricing/content refresh, support quality, postmortems, SOP updates, maintenance agents, canary changes.
+
+---
+
+## 9. Workstreams
+
+### A. Brand and experience
+Rebrand to Qubit Office; loading screen + weather; design system; accessible states; docs/metadata; legal notices.
+
+### B. World and rendering
+Full static campus; wings/rooms/cells/clusters; active/dormant state; culling/LOD; minimap/camera; wall/door/furniture rendering; room style integration.
+
+### C. Room styles and assets
+LimeZu asset catalog; archetypes; palettes; furniture sets; seeds; validation; goldens; local pack builder; credit/provenance.
+
+### D. Business OS
+Durable workflows; systems of record; CRM/payments/support/accounting/email; approvals; budgets; audit; KPIs; pilot business.
+
+### E. Agent operations and panels
+Roles; task board; context/skills; meetings; analytics; approvals; deliveries; terminal; command palette; export; notifications.
+
+### F. World / self-host
+Self-hosted World: single-user → invite-only → social; city/chunks/visits; auth/privacy/validation; later.
+
+### G. Quality, security, release
+Threat model; sandbox; tenant isolation; idempotency/reconciliation; performance; backups/DR; tests; full matrix once.
+
+---
+
+## 10. Phases and gates
+
+### Phase 0 — Decisions and inventory
+- Pick pilot business, legal owner/entity, jurisdictions.
+- Define systems of record, approval thresholds, budgets, hosting, privacy.
+- Inventory all Habblaud references; license/SBOM; baseline screenshots/tests.
+- Freeze brand policy and legal notice placement.
+**Gate:** signed decisions + inventory + baseline.
+
+### Phase 1 — Brand, loading, foundation
+- Visible Qubit Office rebrand; loading screen with placeholder background.
+- Weather provider + pixelfx weather effects; reduced-motion/fallback.
+- Central brand config; PWA/title/iframe/About/docs.
+- Canonical API route plan + compatibility aliases (no breaking rename yet).
+**Gate:** no visible Habblaud brand; loading works offline/online/reduced-motion; tests.
+
+### Phase 2 — Full static world
+- Full campus: all wings, rooms, suites, desks, cells/clusters.
+- Room style system + catalog + archetypes + goldens.
+- Active/dormant state machine; static caches; culling/LOD; minimap/camera.
+- Multi-agent room mode; no vertical floors.
+**Gate:** full world loads; only active rooms simulate; style QA; performance budgets.
+
+### Phase 3 — Business OS foundation + pilot
+- Postgres + durable workflow engine + queues + secrets + object storage.
+- CRM/payments/support/accounting/email/website adapters.
+- Approvals, budgets, audit, tool gateway, reconciliation.
+- One pilot business with one real workflow end-to-end.
+**Gate:** pilot runs 24/7, survives restart, real artifact/payment/receipt, human approval.
+
+### Phase 4 — Agent workforce and panels
+- 3–5 roles: Sales, Support, Delivery, Finance, Chief of Staff.
+- Task board, meetings, skills, context, analytics, deliveries, terminal.
+- Active/dormant visuals; no fake activity.
+- Maintenance agents, cost/schema monitors.
+**Gate:** real business work visible and actionable in the office.
+
+### Phase 5 — Business Factory
+- Playbooks/templates; create business → suite activates; isolated data/budgets/books.
+- Business lifecycle: launch, operate, maintain, improve, pause, close.
+- Clone/compare; shared services.
+**Gate:** second business created from playbook and operated independently.
+
+### Phase 6 — World, character, FX
+- Self-hosted World: single-user → invite-only → social; city/chunks/visits.
+- Character editor/portraits; LimeZu persona profile; pixelfx VFX; seasonal/day-night.
+**Gate:** optional World works locally; office remains primary; no privacy leaks.
+
+### Phase 7 — Hardening and release
+- Threat model, sandbox, tenant isolation, DR, load/failure tests, evals.
+- One full matrix at the end; live deploy + rollback.
+**Gate:** release evidence; `VERIFIED` only then.
+
+---
+
+## 11. Acceptance criteria
+
+- **Brand:** no user-visible Habblaud; MIT notice/provenance retained.
+- **Loading:** weather-driven pixelfx effects; placeholder background; works offline/cached/reduced motion; no blocking.
+- **World:** all rooms exist from start; only active businesses simulate; dormant state persists; no business outcome depends on visibility.
+- **Rooms:** every room has a style recipe; unique but coherent; 16×16 baseline; catalog/validation/goldens; no paid art committed.
+- **Multi-agent:** room clusters 9/12/18/24+; seat IDs; capacity enforced; pathfinding hierarchical.
+- **Business OS:** durable workflow, idempotency, unknown-outcome handling, approvals, audit, budgets, systems of record.
+- **24/7:** restart/reconnect/failover/backups/on-call; no lost committed work.
+- **Office UI:** real state only; no phantom agents; approvals/messages/terminal/deliveries functional or explicitly gated.
+- **Security:** tool gateway, least privilege, sandboxed terminal if exposed, tenant isolation.
+- **Release:** focused tests per phase; one full matrix at the end; `VERIFIED` only with evidence.
+
+---
+
+## 12. Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Full world feels empty | Furnished dormant rooms, lights/status, business suites, “available” signage; do not fake agents |
+| Rebrand breaks APIs/tests | Inventory; canonical routes + aliases; do rename after parity |
+| MIT notice removal | Keep copyright/license/provenance; hide brand only |
+| Room style becomes random soup | Archetypes, palettes, furniture sets, sockets, validation, goldens |
+| 16/32/48 mixing | 16 for world; 32/48 for portraits/close-ups; one shadow policy |
+| Giant world performance | Static caches, chunks, culling, LOD, active set, low-rate/dormant tiers |
+| Active set pauses business | Durable workflows independent of view; events continue off-screen |
+| Terminal escape | Local-only/sandbox, no secrets, quotas, audit; human approval |
+| Self-hosted World scope | Single-user → invite-only → social; separate phase |
+| Agent errors/hallucination | Artifact grounding, evals, approvals, human review |
+| Money duplication | Idempotency, provider IDs, reconciliation, unknown state |
+| Legal/contracts | Human/dual approval; owner/legal entity; insurance |
+| Cost drift | Budgets, cost auditing, cheaper models, caps |
+| Unlicensed assets | Local-only paid art; notices; no redistribution |
+| “Full from start” scope creep | Full static world/data, one live pilot; don't fake all businesses |
+
+---
+
+## 13. Decisions required
+
+1. Pilot business type and offer.
+2. Legal owner/entity/jurisdiction/tax.
+3. Systems of record (CRM, accounting, payments, support, email, website).
+4. Approval thresholds (money, contracts, refunds, customer commitments, hiring).
+5. Autonomy levels per role at launch.
+6. Budgets (models, APIs, infra) and cost caps.
+7. Hosting model (local/VPS/cloud), backups/DR, on-call.
+8. World: local-only, invite-only, or public self-hosted; official remote?
+9. Room style baseline (16×16) and initial archetype set.
+10. Active-set policy (camera, business events, deadlines, notifications).
+11. Licensing posture (personal/private vs future distribution).
+
+---
+
+## 14. Reporting and evidence
+
+- Each workstream commits in its own worktree; no live deploy without approval.
+- Focused tests per change; no full matrix before implementation freeze.
+- Record evidence in `docs/STATUS.md`; update `docs/OPEN_THREADS.md` for in-flight work.
+- Never claim `VERIFIED`, `M1`, `M2`, `COMPLETE`, or 100% without the final gate.
+
+---
+
+## 15. Current state (reference)
+
+- Existing Qubit Office has a vendored Habblaud 0.11.0 client, Qubit shell fallback, office theme/floor surfaces, agents panel, seat model, HUD, tower/store, and a large test suite.
+- Upstream Habblaud is 1.0.3; re-vendor is a prerequisite for local 1:1.
+- Current Qubit compat has terminal disabled, character save refused, deliveries empty, World absent.
+- LimeZu Modern Interiors full pack is available locally; only recipe/builder may be committed.
+- No implementation of this master plan has started.
+
+---
+
+## 16. Plan review v2 — corrections that must be built into the plan
+
+| # | Risk / correction | Required plan change |
+|---|---|---|
+| 1 | "Full world" confused with "full simulation" | Full static world from day one; only active businesses/rooms get agents. Dormant rooms keep records, schedules, queues and approvals. |
+| 2 | Rebrand treated as search/replace | Inventory 1,000+ references; central brand config; visible surfaces first; canonical API routes + legacy aliases; keep MIT notices. |
+| 3 | Rebrand may break APIs/tests | Add `/api/office/*` canonical routes, keep `/api/office/habblaud/*` aliases; one implementation, no duplicated handlers; migrate tests deliberately. |
+| 4 | Loading screen can block the app | Weather is an enhancement, never a dependency. Render background immediately; fetch weather with timeout; fallback to neutral; retry visible. |
+| 5 | Weather effect flicker | Normalize to a small state set; use hysteresis; one effect at a time; do not combine rain+storm. |
+| 6 | Room styles become random soup | Archetype + palette + furniture set + composition rules + deterministic seed + validation; never random global furniture. |
+| 7 | Mixing asset sizes/shadows | 16×16 world baseline; 32/48 for portraits/close-ups; one shadow policy; single-direction furniture placed by sockets. |
+| 8 | Active set pauses business | Business workflows are durable and event-driven; view state never decides whether work happens. |
+| 9 | Giant world performance | Static caches, wing/room chunking, culling, LOD, active tiers, low-rate/dormant simulation. |
+| 10 | Room clusters change identity | Logical room above 16×12 cells; stable seat IDs; `legacyFloorId`; `single/multi` character mode. |
+| 11 | Business OS becomes a demo | Systems of record, idempotency, unknown outcomes, approvals, budgets, audit, reconciliation. |
+| 12 | "All businesses live" at once | Full world and all suites exist; activate one pilot business first; clone playbooks later. |
+| 13 | Self-hosted World swallows the project | World is a separate phase: single-user → invite-only → social; office/Business OS do not depend on it. |
+| 14 | Terminal is treated as UI | Treat as code execution: local/sandbox, quotas, least privilege, audit, approval. |
+| 15 | Scope creep / overengineering | Reuse offices, rooms, editor, panels and proven infrastructure; write glue, not new engines. |
+| 16 | Empty world feels unfinished | Furnished dormant rooms, lights/status, business suites, signage; never fake agents. |
+| 17 | Content QA explosion | Style catalog + archetype templates + visual goldens + validation; not hand-placed unique rooms. |
+| 18 | Personal use mistaken for no rules | Personal/local relaxes distribution, not legal responsibility, security or paid-art redistribution. |
+
+---
+
+## 17. Work breakdown structure
+
+| WBS | Workstream | Owner | Main outputs | Depends on | Gate |
+|---|---|---|---|---|---|
+| 0 | Product/decisions | Owner + tech lead | pilot business, legal entity, systems of record, approval thresholds, budgets, hosting, World scope, style baseline | — | Signed decision log |
+| 1 | Brand/UI | Frontend + brand | Qubit Office name/logo/title/loading/PWA/About/docs; central brand config; visible-brand guard | 0 | No visible Habblaud; tests |
+| 2 | Loading/weather | Frontend + backend | loading component, placeholder background, weather provider, pixelfx effects, reduced motion, retry/offline | 1 | Weather matrix + perf tests |
+| 3 | Rebrand technical | Full-stack | inventory/classification; canonical API routes + aliases; bundle/manifest rename; provenance | 1 | Alias tests + legal notice |
+| 4 | World/static | Game/World | full campus manifest; wings/rooms/cells/clusters; static caches; culling/LOD; minimap/camera | 0,3 | Full world load + budgets |
+| 5 | Room styles/assets | Art + tools | LimeZu catalog; archetypes; palettes; furniture sets; recipe schema; generator; validation; goldens | 4 | Every archetype styled/validated |
+| 6 | Active/dormant | World + backend | state machine; active-set scheduler; dormant persistence; event-driven business; rehydration | 4,5 | Active vs dormant tests; no view dependency |
+| 7 | Business OS core | Backend + platform | durable workflows, queues, timers, idempotency, reconciliation, approvals, audit, budget ledger | 0 | Durable restart/approval tests |
+| 8 | Systems of record | Integrations | CRM, payments, support, accounting/email/website adapters; tool gateway; credentials | 7 | One real pilot workflow |
+| 9 | Agent workforce | Agent/platform | 3–5 roles; task board; meetings; skills; context; analytics; approvals; deliveries; terminal | 7,8 | Real work visible/actionable |
+| 10 | Business Factory | Product + backend | playbooks/templates; create business; activate suite; isolation; lifecycle; clone | 8,9 | Second business from playbook |
+| 11 | World/self-host | World/backend | single-user city; invite-only; visits/social; auth/privacy/validation | 4,10 | Optional World local; no office dependency |
+| 12 | Character/FX/polish | Frontend/art | character editor, persona profile, pixelfx VFX, seasonal/day-night, mobile | 5,6 | Visual goldens + reduced motion |
+| 13 | QA/security/release | QA/security | threat model, sandbox, tenant isolation, load/failure/DR tests, full matrix, rollback | all | `VERIFIED` evidence |
+
+---
+
+## 18. Detailed specifications
+
+### 18.1 Rebrand migration
+
+1. Export all `habblaud` references; classify: user-visible, public API, private code, tests, assets, provenance, generated.
+2. Baseline: API snapshots, screenshots, PWA install, bundle contents, license scan, e2e.
+3. Central brand module: `name`, `shortName`, `logo`, `support`, `title`, `loading`, `About`.
+4. Visible surfaces: document title, iframe title, loading/error/offline, PWA manifest/icons, OG/Twitter, accessibility labels, empty states, docs, default config.
+5. Canonical routes: `/api/office/*`; legacy `/api/office/habblaud/*` aliases; one implementation; deprecation headers; tests.
+6. Bundle/assets: public chunk names, service worker, manifest, generated paths; rename only after aliasing.
+7. Legal/provenance: keep MIT copyright/licence, `THIRD_PARTY_NOTICES`, upstream commit, local changes, SBOM.
+8. Remove legacy aliases only after all callers/tests migrate and compatibility window closes.
+
+Acceptance:
+- No user-visible Habblaud in the Office UI/bundle/manifest/default config.
+- MIT notice and provenance still present.
+- Old routes still work or are explicitly versioned.
+- No blind global replace; no broken writer/reader pair.
+
+### 18.2 Loading screen / weather
+
+States:
+- boot (background + neutral layer immediately)
+- weather-loading (non-blocking)
+- ready (cross-fade to office)
+- degraded/offline (neutral effect, retry)
+- error/retry.
+
+Visual mapping:
+- clear-day → god rays
+- partly-cloudy/cloudy → clouds
+- rain → rain
+- storm → storm (no rain layered)
+- snow → snow
+- fog → fog
+- unknown → neutral/no effect.
+
+Technical:
+- Background configurable (`office.loading.background`); placeholder CSS/SVG now.
+- Weather source server-side (Open-Meteo/config); normalized; TTL 10–30 min; timeout 1–2 s; fallback.
+- Pixelfx 320×180; back/front passes; `composite`; pixelated upscale; cleanup.
+- Performance: VFX ≤4 ms/frame; loading total ≤8 ms mid-range; no startup block >50 ms.
+- Reduced motion disables/softens; mobile/low-power fallback.
+- Weather never blocks the app.
+
+Tests:
+- mapping/hysteresis/fallback/offline/timeout; reduced motion; no effect leak; background replacement; progress/error/retry; accessibility; performance budget.
+
+### 18.3 Room styles
+
+Catalog fields:
+`id, file, theme, category, size, footprint, z, layer, wall/floor, orientations, animation, shadow_variant, tags, compatibility`.
+
+Recipe:
+`archetype, palette, floor, wall, rug, furniture_set, lighting, shadow, decor, seed, style_version`.
+
+Archetypes: executive, open office, reception, support, sales, finance, creative, control room, research, meeting, kitchen, wellness, showcase, server/ops, legal, training, fulfillment, media.
+
+Rules:
+- 16×16 world; 32/48 for portraits/close-ups.
+- one shadow policy; single-direction furniture by socket.
+- required anchors first; secondary props; decals/lighting last.
+- 60/30/10 palette; one dominant material; one accent.
+- independent seeded streams; vary secondary properties only.
+- validate walkability, capacity, collision, interaction, readability, wrong-theme props.
+- visual goldens per archetype/palette; no paid art committed.
+
+### 18.4 Active/dormant world
+
+Data:
+`Business`, `Wing`, `LogicalRoom`, `Cell`, `Desk`, `AgentPresence`, `RoomState`, `Scheduler`.
+
+Room state:
+`AUTHORED → LOADED_STATIC → OBSERVED → PRESENTATION_ACTIVE → SIMULATION_ACTIVE → DORMANT → REHYDRATING`.
+
+Tiers:
+0 dormant static + event-driven business; 1 aggregate; 2 low-rate agents; 3 proxy; 4 full.
+
+Active-set inputs:
+camera, interaction, urgent event/deadline, notification/approval, business priority, fairness/aging.
+
+Rules:
+- static geometry cache per room/wing; active full; neighbors simplified; occluded no draw.
+- business workflows never depend on view.
+- dormant room retains state/schedules/approvals/pending events.
+- rehydrate visuals from authoritative state.
+- unit tests for activation policies; load tests at 24/64/128/500 agents; no fake activity.
+
+### 18.5 Business OS
+
+Core:
+- Durable workflow engine (Temporal or equivalent), event log, queues, timers, leases, retries, dead-letter.
+- Idempotency keys, provider request IDs, unknown-outcome reconciliation.
+- Systems of record: CRM, orders, payments, accounting, support, documents, email, website, analytics.
+- Tool gateway: auth, tenant checks, schema validation, rate/budget, DLP, approval, idempotency, dry-run, audit, egress.
+- Human approval cards with evidence, payload, cost, side effects, policy, reversal, expiry.
+- Tenant isolation: `tenant_id`, `business_id`, `department_id`, `actor_id`, `purpose`, `classification`, `policy_version` on every record/event/tool call.
+- 24/7: durable restarts, provider fallback, backups/restore, on-call escalation, incident runbooks.
+- Autonomy L0–L5; money/legal/hiring/irreversible human-approved.
+
+Acceptance:
+- One pilot business runs a real workflow end-to-end with artifact/receipt.
+- Restart mid-workflow resumes; approval pauses/resumes; unknown outcome reconciled; duplicate prevented.
+- No direct agent writes to systems of record outside tool gateway.
+
+---
+
+## 19. Test strategy
+
+| Layer | Tests |
+|---|---|
+| Unit | models, state machines, policy, idempotency, weather mapping, style recipes, capacity/validation |
+| Contract | API routes/aliases, event schemas, tool gateway, system-of-record adapters |
+| Visual | room goldens per archetype/palette; loading weather states; reduced motion; 1440/390 |
+| E2E | full world load, active/dormant switch, create business, pilot workflow, approval, restart |
+| Failure | provider outage, timeout, unknown outcome, duplicate delivery, API schema change, dead-letter |
+| Security | tool permissions, tenant isolation, secret handling, prompt injection, sandbox escape, CSRF/auth |
+| Performance | 24/64/128/500 agents; active-set budgets; static cache; loading compositor; memory |
+| DR | backup/restore, restart, database migration, rollback, version skew |
+| Final | one full matrix on a frozen SHA; live deploy/rollback; `VERIFIED` only then |
+
+No full matrix before implementation freeze. Focused checks per change.
+
+---
+
+## 20. Phase gate checklist
+
+- Phase 0: decisions signed; inventory/SBOM; baseline; legal notice placement.
+- Phase 1: no visible Habblaud; loading weather works; offline/reduced-motion; tests.
+- Phase 2: full world load; all rooms styled/validated; active/dormant; budgets.
+- Phase 3: pilot business durable workflow; real artifact/payment/receipt; restart/approval.
+- Phase 4: 3–5 roles; real work actionable; panels honest.
+- Phase 5: second business from playbook; isolation.
+- Phase 6: optional local World; office unaffected; character/FX goldens.
+- Phase 7: security/DR/load/failure; full matrix; live rollback; `VERIFIED`.
+
+---
+
+## 21. What this plan deliberately does not do
+
+- It does not authorize implementation before sign-off.
+- It does not promise 24/7 without a human on-call and legal owner.
+- It does not remove licence/attribution obligations.
+- It does not claim all 283+ agents animate at once.
+- It does not make the office the source of business truth.
+- It does not invent dates, percentages, or completion claims.
