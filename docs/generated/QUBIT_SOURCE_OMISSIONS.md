@@ -11,8 +11,8 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 - Ledger comparison baseline: `working-tree` (verified waves-1-2 revision; the live working-tree ledger is edited by concurrent agents, so the comparison is pinned to a reproducible revision).
 - Inventory items (all categories): **8201**
-- Candidate omissions (uncovered surface items): **0**
-- Distinct capability gaps (no parent row): **0**
+- Candidate omissions (uncovered surface items): **24**
+- Distinct capability gaps (no parent row): **24**
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **0**
 - Parented surfaces covered by an IMPLEMENTED parent: **1045**
 - Distinct capabilities total: **895**; parented surfaces total: **1045**
@@ -22,7 +22,7 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 
 ### Omission counts by category (all uncovered)
 
-- (none)
+- `qubit_backend_route`: 24
 
 ### Evidence-only surface counts (not candidate rows)
 
@@ -30,9 +30,36 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - `hermes_locale_key`: 370
 - `hermes_upstream_test`: 5145
 
-## Distinct capability gaps (0)
+## Distinct capability gaps (24)
 
 No parent capability row exists; these remain explicit open rows.
+
+### qubit_backend_route (24)
+
+- `api:DELETE /api/credentials/pool/{provider}/{index}` — source `hermes_cli/web_routers/ops.py:421`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:421`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:GET /api/hermes/update/check` — source `hermes_cli/web_routers/actions.py:262`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:262`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:GET /api/hermes/update/receipt` — source `hermes_cli/web_routers/actions.py:427`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:427`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:GET /api/profiles/{name}/desktop-overlay` — source `hermes_cli/web_routers/profiles.py:1034`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:1034`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:GET /api/sessions/empty/count` — source `hermes_cli/web_routers/sessions.py:465`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/sessions.py:465`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:GET /{full_path:path}` — source `hermes_cli/web_server_dashboard.py:112`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_server_dashboard.py:112`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/dashboard/agent-plugins/activate` — source `hermes_cli/web_routers/dashboard_ui.py:290`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/dashboard_ui.py:290`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/hermes/update` — source `hermes_cli/web_routers/actions.py:220`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/actions.py:220`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/ops/backup` — source `hermes_cli/web_routers/ops.py:566`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:566`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/ops/config-migrate` — source `hermes_cli/web_routers/status.py:780`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:780`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/ops/doctor` — source `hermes_cli/web_routers/ops.py:546`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:546`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/ops/dump` — source `hermes_cli/web_routers/status.py:775`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:775`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/ops/import` — source `hermes_cli/web_routers/ops.py:612`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:612`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/ops/prompt-size` — source `hermes_cli/web_routers/status.py:770`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/status.py:770`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/ops/security-audit` — source `hermes_cli/web_routers/ops.py:552`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/ops.py:552`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/profiles/{name}/open-terminal` — source `hermes_cli/web_routers/profiles.py:828`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/profiles.py:828`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:POST /api/tools/toolsets/{name}/post-setup` — source `hermes_cli/web_routers/tools.py:615`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:615`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:PUT /api/tools/toolsets/{name}/model` — source `hermes_cli/web_routers/tools.py:461`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:461`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:PUT /api/tools/toolsets/{name}/provider` — source `hermes_cli/web_routers/tools.py:493`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/tools.py:493`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:WEBSOCKET /api/audio/speak-stream` — source `hermes_cli/web_routers/audio.py:473`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/audio.py:473`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:WEBSOCKET /api/console` — source `hermes_cli/web_routers/chat_ws.py:277`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:277`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:WEBSOCKET /api/events` — source `hermes_cli/web_routers/chat_ws.py:644`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:644`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:WEBSOCKET /api/pty` — source `hermes_cli/web_routers/chat_ws.py:438`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:438`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
+- `api:WEBSOCKET /api/ws` — source `hermes_cli/web_routers/chat_ws.py:593`; category `qubit_backend_route`; CLI=none; dashboard=`hermes_cli/web_routers/chat_ws.py:593`; voice=candidate; no parent row and no ledger row. Reason: upstream qubit backend route is a distinct capability with no implementing ledger row.
 
 ## Parented surfaces needing parent closure (0)
 
