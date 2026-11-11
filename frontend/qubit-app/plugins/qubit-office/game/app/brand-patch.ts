@@ -10,7 +10,13 @@ export function installOfficeBrand(win: Window): void {
   const doc = win?.document;
   if (!doc || !doc.body) return;
 
+  const vendorStyle = doc.createElement("style");
+  vendorStyle.setAttribute("data-qubit-vendor-splash", "1");
+  vendorStyle.textContent = ".ui-splash{display:none!important}";
+  doc.head?.appendChild(vendorStyle);
+
   const patch = (): void => {
+    doc.querySelectorAll(".ui-splash").forEach((node) => node.remove());
     const brand = doc.querySelector(".ui-brand");
     if (!brand) return;
     brand.querySelector(".ui-brand__mark")?.remove();

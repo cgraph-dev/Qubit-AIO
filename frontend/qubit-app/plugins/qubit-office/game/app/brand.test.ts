@@ -39,6 +39,7 @@ describe("Qubit Office brand", () => {
 describe("office brand patch", () => {
   it("replaces the vendored topbar identity without removing legal credit", async () => {
     document.body.innerHTML = `
+      <div class="ui-splash"><span class="ui-splash__name">Habblaud</span><p>Connecting to the office…</p></div>
       <div class="ui-brand">
         <span class="ui-brand__mark"><img id="upstream-logo"></span>
         <div class="ui-brand__text">
@@ -48,6 +49,8 @@ describe("office brand patch", () => {
       </div>`;
     const { installOfficeBrand } = await import("./brand-patch");
     installOfficeBrand(window);
+    expect(document.querySelector(".ui-splash")).toBeNull();
+    expect(document.querySelector("[data-qubit-vendor-splash]")).not.toBeNull();
     expect(document.querySelector(".ui-brand__mark")).toBeNull();
     expect(document.querySelector(".ui-wordmark")).toBeNull();
     expect(document.querySelector(".ui-brand__name")?.textContent).toBe("Qubit Office");
