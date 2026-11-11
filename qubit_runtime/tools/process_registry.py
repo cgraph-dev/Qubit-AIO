@@ -28,7 +28,7 @@ _IS_LINUX = platform.system() == "Linux"
 from tools.environments.local import _append_dropped_path_entries, _find_shell, _resolve_safe_cwd, _sanitize_subprocess_env, _terminal_env
 from qubit_cli._subprocess_compat import windows_hide_flags
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, NamedTuple, Optional
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, Sequence
 
 from qubit_cli.config import get_qubit_home
 
@@ -342,6 +342,94 @@ def _build_systemd_scope_argv(shell_argv: list[str], unit_suffix: str) -> list[s
         # Caller should have probed availability; never pass None into Popen anyway.
         return shell_argv
     return _systemd_scope_argv(binary, f"hermes-worker-{unit_suffix}", *shell_argv)
+
+
+# --- agent/dashboard cgroup isolation ---------------------------------------------
+# A dashboard-spawned PTY (``qubit --tui`` behind ``/api/pty``) and every agent tool
+# subprocess beneath it inherited the launching service's cgroup.  On 2026-11-10 a
+# controls-audit script run from a dashboard turn belonged to ``qubit-voicebridge.service``'s
+# cgroup and its profile delete replaced the live ``state.db`` generation, latching the
+# gateway FATAL.  ``KillMode=process`` only changes restart behaviour; it does not move
+# membership.  Running the PTY child as its own transient scope in ``qubit-agents.slice``
+# takes the whole subtree out of the service cgroup without touching the service unit,
+# the PTY protocol, or the direct-spawn path used when systemd is unavailable.
+_AGENT_SCOPE_SLICE = "qubit-agents.slice"
+_AGENT_SCOPE_DISABLED_VALUES = frozenset({"0", "false", "no", "off"})
+
+
+def agent_cgroup_isolation_enabled() -> bool:
+    """Whether dashboard PTY / agent tool children get their own transient scope.
+
+    Default on.  ``QUBIT_AGENT_CGROUP_ISOLATION=0`` (or ``false``/``no``/``off``)
+    restores the pre-isolation direct spawn.
+    """
+    return os.getenv("QUBIT_AGENT_CGROUP_ISOLATION", "1").strip().lower() not in _AGENT_SCOPE_DISABLED_VALUES
+
+
+def _running_in_service_cgroup() -> bool:
+    """True when this process is a member of a systemd *service* cgroup.
+
+    That is the condition the isolation exists for: children inherit a service's
+    cgroup, so a heavy or destructive tool can take the whole control plane down.
+    A process already inside a transient ``.scope`` (a terminal session, a
+    ``systemd-run`` test harness) has no service cgroup to escape and keeps the
+    direct spawn.  Falls back to ``INVOCATION_ID`` when ``/proc`` is unavailable.
+    """
+    try:
+        text = Path("/proc/self/cgroup").read_text(encoding="utf-8")
+    except OSError:
+        return bool(os.environ.get("INVOCATION_ID"))
+    for line in text.splitlines():
+        if line.startswith("0::"):
+            cgroup = line.partition("::")[2].strip().rstrip("/")
+            leaf = cgroup.rsplit("/", 1)[-1]
+            return leaf.endswith(".service")
+    return False
+
+
+def build_agent_scope_argv(argv: Sequence[str], *, unit_suffix: str) -> Optional[list[str]]:
+    """Wrap *argv* in a transient user scope inside ``qubit-agents.slice``.
+
+    Reuses the same availability probe and user-bus derivation as the cron/Kanban
+    scope helper rather than adding a second one.  There is deliberately no
+    ``--pty``: the caller already owns a controlling terminal and the wrapped command
+    must keep using it (``systemd-run --scope`` execs the command, so the PTY PID,
+    process group and stdio are unchanged).
+
+    Returns ``None`` when isolation is disabled, the process is not inside a systemd
+    service cgroup, the platform is not Linux, or ``systemd-run --user --scope`` is
+    unavailable; the caller then keeps today's direct spawn.  The service-cgroup gate
+    mirrors the incident exactly and leaves terminals/CI/containers unchanged.
+    """
+    if not agent_cgroup_isolation_enabled():
+        logger.debug("agent cgroup isolation disabled by QUBIT_AGENT_CGROUP_ISOLATION")
+        return None
+    if not _IS_LINUX:
+        return None
+    if not _running_in_service_cgroup():
+        logger.debug("agent cgroup isolation skipped: not running inside a systemd service cgroup")
+        return None
+    import shutil
+
+    binary = shutil.which("systemd-run")
+    if binary is None:
+        logger.info(
+            "agent cgroup isolation unavailable (systemd-run not on PATH); "
+            "agent PTY children share the launching service cgroup")
+        return None
+    if not _systemd_run_user_scope_available():
+        logger.info(
+            "agent cgroup isolation unavailable (systemd-run --user --scope probe failed, "
+            "usually no reachable user D-Bus session); agent PTY children share the "
+            "launching service cgroup")
+        return None
+    no_expand = ["--expand-environment=no"] if _SYSTEMD_RUN_NO_EXPAND else []
+    return [
+        binary, "--user", "--scope", "--quiet", *no_expand,
+        "--unit", f"qubit-agent-{unit_suffix}",
+        "--collect", f"--slice={_AGENT_SCOPE_SLICE}",
+        "--", *argv,
+    ]
 
 
 _scope_degraded_warned = False

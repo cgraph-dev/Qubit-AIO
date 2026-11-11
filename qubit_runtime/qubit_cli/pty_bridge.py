@@ -20,6 +20,7 @@ import struct
 import sys
 import termios  # windows-footgun: ok — POSIX-only module by design (see docstring)
 import time
+import uuid
 from typing import Optional, Sequence
 
 try:
@@ -57,6 +58,38 @@ def _clamp_dimension(value: int, maximum: int) -> int:
     except (TypeError, ValueError, OverflowError):
         return _MIN_DIMENSION
     return max(_MIN_DIMENSION, min(n, maximum))
+
+
+def _agent_scope_argv(argv: Sequence[str]) -> Optional[list[str]]:
+    """``systemd-run --user --scope`` wrapper for the PTY child, or ``None`` to spawn directly.
+
+    Reuses the gateways' cron/Kanban scope probe (``tools.process_registry``) so the
+    user-bus/linger verdict is shared.  The helper is imported lazily: ``pty_bridge``
+    stays light for the dashboard, and any import or probe failure must never break the
+    chat tab — it degrades to today's direct spawn.
+    """
+    try:
+        from tools.process_registry import build_agent_scope_argv
+
+        return build_agent_scope_argv(argv, unit_suffix=uuid.uuid4().hex[:12])
+    except Exception:
+        logger.debug("agent cgroup isolation: helper unavailable", exc_info=True)
+        return None
+
+
+def _agent_scope_env(env: dict) -> dict:
+    """Add the user-bus variables ``systemd-run --user`` needs on system services.
+
+    A no-op when ``XDG_RUNTIME_DIR``/``DBUS_SESSION_BUS_ADDRESS`` are already present;
+    derived fresh, so linger enabled after boot is picked up.
+    """
+    try:
+        from tools.process_registry import systemd_user_bus_env
+
+        return systemd_user_bus_env(env)
+    except Exception:
+        logger.debug("agent cgroup isolation: user-bus env unavailable", exc_info=True)
+        return env
 
 
 class PtyUnavailableError(RuntimeError):
@@ -169,7 +202,33 @@ class PtyBridge:
         # (xterm.js never drops frames, so under the dashboard that repaint was a visible flash on
         # every OS app-switch).
         spawn_env[PTY_HOST_ENV] = PTY_HOST_DASHBOARD
-        proc = ptyprocess.PtyProcess.spawn(list(argv), cwd=cwd, env=spawn_env, dimensions=(rows, cols))  # type: ignore[union-attr]
+        # Put the child (and every agent tool subprocess beneath it) in its own
+        # transient user scope so it cannot share the launching service's cgroup
+        # (2026-11-10 controls-audit incident).  ``systemd-run --scope`` execs the
+        # command, so the PTY, PID and process group are unchanged.  No systemd / no
+        # user bus / disabled → ``None`` → the direct spawn below, exactly as before.
+        direct_argv = list(argv)
+        scoped_argv = _agent_scope_argv(direct_argv)
+        if scoped_argv is not None:
+            spawn_env = _agent_scope_env(spawn_env)
+
+        def _spawn(use_argv: Sequence[str]):
+            return ptyprocess.PtyProcess.spawn(use_argv, cwd=cwd, env=spawn_env, dimensions=(rows, cols))  # type: ignore[union-attr]
+
+        if scoped_argv is not None:
+            try:
+                proc = _spawn(scoped_argv)
+            except (OSError, FileNotFoundError) as exc:
+                # systemd-run vanished or the scope could not be created: keep the chat
+                # tab working in the launching cgroup rather than failing the spawn.
+                logger.warning(
+                    "agent cgroup isolation: scoped PTY spawn failed (%s); falling back "
+                    "to a direct spawn in the launching service cgroup",
+                    type(exc).__name__,
+                )
+                proc = _spawn(direct_argv)
+        else:
+            proc = _spawn(direct_argv)
         bridge = cls(proc)
         bridge._size = (_clamp_dimension(cols, _MAX_COLS), _clamp_dimension(rows, _MAX_ROWS))
         return bridge
