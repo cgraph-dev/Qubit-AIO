@@ -57,9 +57,9 @@
    "upstream_files": 16078,
    "local_files": 21122,
    "identical": 7075,
-   "missing": 321,
-   "extra": 5365,
-   "changed": 8682
+   "missing": 320,
+   "extra": 5364,
+   "changed": 8683
   },
   "missing": [
    {
@@ -81,11 +81,6 @@
     "path": "SECURITY.es.md",
     "expected_local": "SECURITY.es.md",
     "upstream_blob": "1328c11609de12d0f1fa9fd139e76df731fd49b7"
-   },
-   {
-    "path": "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
-    "expected_local": "qubit_runtime/plugins/kanban/systemd/qubit-kanban-dispatcher.service",
-    "upstream_blob": "299a0f1770038272143fe44d80f7f61030ba4d9d"
    },
    {
     "path": "tests/agent/transports/test_hermes_tools_mcp_server.py",
@@ -8996,10 +8991,6 @@
    {
     "path": "plugins/jev-workflows/tools.py",
     "local_sha256": "4dc26c06402ee4310c4aba382cf0105c92d83322f2a4927dac416d1943f40683"
-   },
-   {
-    "path": "plugins/kanban/systemd/qubit-kanban-dispatcher.service",
-    "local_sha256": "5b5994a49e4621a9a6cb2c2a83e01a60299eca957c95c039f994d2cfa2c3f8e7"
    },
    {
     "path": "plugins/model-providers/lmstudio/__init__.py",
@@ -41512,6 +41503,13 @@
     "upstream_blob": "e4a541f71e663f24e74059694ad1a102c1ae924b",
     "upstream_sha256": "21f571718bea8dedb0add1ce07c0ee8714d455abfd5ef3f2886ee0d0896d6abe",
     "local_sha256": "5c54e0af0728247ceffdcb3ee63956012d7fe3c16b174ef77020394c918b9a5f"
+   },
+   {
+    "path": "plugins/kanban/systemd/qubit-kanban-dispatcher.service",
+    "upstream_path": "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
+    "upstream_blob": "299a0f1770038272143fe44d80f7f61030ba4d9d",
+    "upstream_sha256": "720d133b4a9b67d8ea9b926d7a1ff6e68b8cf43e7dd4df05d25dbd38a5bc960a",
+    "local_sha256": "5b5994a49e4621a9a6cb2c2a83e01a60299eca957c95c039f994d2cfa2c3f8e7"
    },
    {
     "path": "plugins/memory/__init__.py",

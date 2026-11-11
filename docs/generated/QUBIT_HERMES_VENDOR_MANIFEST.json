@@ -1,15 +1,14 @@
 {
- "blockers": [
-  "plugins/kanban/systemd/hermes-kanban-dispatcher.service"
- ],
+ "blockers": [],
  "byte_identical_to_blob": 7056,
  "classification_counts": {
   "EOL_NORMALIZED": 19,
-  "INTENTIONALLY_OMITTED": 320,
-  "MISSING": 1,
+  "INTENTIONALLY_OMITTED": 23,
+  "MISSING": 0,
   "OPENCLAW_OVERLAY": 0,
-  "QUBIT_ADDED": 5365,
-  "QUBIT_PATCHED": 8682,
+  "OWNER_PURGED": 297,
+  "QUBIT_ADDED": 5364,
+  "QUBIT_PATCHED": 8683,
   "UNCHANGED": 7056,
   "UNEXPLAINED": 0
  },
@@ -2039,7 +2038,6 @@
   "plugins/jev-workflows/skills/jev-social-research/SKILL.md",
   "plugins/jev-workflows/skills/jev-video-qa/SKILL.md",
   "plugins/jev-workflows/tools.py",
-  "plugins/kanban/systemd/qubit-kanban-dispatcher.service",
   "plugins/model-providers/lmstudio/__init__.py",
   "plugins/model-providers/lmstudio/plugin.yaml",
   "plugins/model-providers/opencode-free/__init__.py",
@@ -121770,17 +121768,17 @@
    "upstream_sha256": "21f571718bea8dedb0add1ce07c0ee8714d455abfd5ef3f2886ee0d0896d6abe"
   },
   "plugins/kanban/systemd/qubit-kanban-dispatcher.service": {
-   "classification": "QUBIT_ADDED",
+   "classification": "QUBIT_PATCHED",
    "git_tracked": true,
    "local_fs_mode": "100644",
    "local_git_mode": "100644",
-   "patched": false,
+   "patched": true,
    "sha256": "5b5994a49e4621a9a6cb2c2a83e01a60299eca957c95c039f994d2cfa2c3f8e7",
    "symlink": false,
-   "upstream_blob": null,
-   "upstream_blob_sha256": null,
-   "upstream_mode": null,
-   "upstream_sha256": null
+   "upstream_blob": "299a0f1770038272143fe44d80f7f61030ba4d9d",
+   "upstream_blob_sha256": "720d133b4a9b67d8ea9b926d7a1ff6e68b8cf43e7dd4df05d25dbd38a5bc960a",
+   "upstream_mode": "100644",
+   "upstream_sha256": "720d133b4a9b67d8ea9b926d7a1ff6e68b8cf43e7dd4df05d25dbd38a5bc960a"
   },
   "plugins/memory/__init__.py": {
    "classification": "QUBIT_PATCHED",
@@ -280165,10 +280163,6 @@
  "git_index_gaps": [],
  "identical": 7075,
  "intentionally_omitted": [
-  "CONTRIBUTING.es.md",
-  "README.es.md",
-  "README.zh-CN.md",
-  "SECURITY.es.md",
   "tests/agent/transports/test_hermes_tools_mcp_server.py",
   "tests/gateway/test_process_hermes_home_expansion.py",
   "tests/hermes_cli/test_ensure_hermes_home_memo.py",
@@ -280191,7 +280185,27 @@
   "tests/test_hermes_yaml.py",
   "tests/tools/test_code_execution_hermes_home.py",
   "tests/tools/test_hermes_subprocess_env.py",
-  "ui-tui/src/__tests__/agentRoster.test.ts",
+  "ui-tui/src/__tests__/agentRoster.test.ts"
+ ],
+ "local_fs_mode_counts": {
+  "100644": 21011,
+  "100755": 110,
+  "120000": 1
+ },
+ "local_git_file_count": 21122,
+ "local_git_mode_counts": {
+  "100644": 21011,
+  "100755": 110,
+  "120000": 1
+ },
+ "local_root": "qubit_runtime",
+ "missing_from_local": [],
+ "mode_divergences": [],
+ "owner_purged": [
+  "CONTRIBUTING.es.md",
+  "README.es.md",
+  "README.zh-CN.md",
+  "SECURITY.es.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/developer-guide/acp-internals.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/developer-guide/adding-platform-adapters.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/developer-guide/adding-providers.md",
@@ -280486,23 +280500,6 @@
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-guide/windows-wsl-quickstart.md",
   "website/i18n/zh-Hans/docusaurus-plugin-content-docs/current/user-stories.mdx"
  ],
- "local_fs_mode_counts": {
-  "100644": 21011,
-  "100755": 110,
-  "120000": 1
- },
- "local_git_file_count": 21122,
- "local_git_mode_counts": {
-  "100644": 21011,
-  "100755": 110,
-  "120000": 1
- },
- "local_root": "qubit_runtime",
- "missing_from_local": [
-  "plugins/kanban/systemd/hermes-kanban-dispatcher.service"
- ],
- "mode_divergences": [],
- "owner_purged": [],
  "patch_manifest": {
   ".dockerignore": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
@@ -293630,6 +293627,11 @@
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
   },
   "plugins/kanban/dashboard/plugin_api.py": {
+   "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
+   "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
+   "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
+  },
+  "plugins/kanban/systemd/qubit-kanban-dispatcher.service": {
    "affected_regression_test": "tests/test_qubit_runtime_vendor8u.py",
    "patch": "Qubit deep source rebrand: product-facing branding strings, module namespace, and/or path renamed to Qubit in the shipped runtime (owner amendment 2026-09-19 deep rebrand; engine scripts/qubit_rebrand.py + scripts/qubit_debrand.py).",
    "reason": "Owner directive: the shipped runtime is a source-level Qubit rebrand, not a byte-identical mirror. Rename/branding-only change; behavioural/API/CLI/voice parity is proven against the pristine baseline."
@@ -326542,6 +326544,7 @@
   "plugins/kanban/dashboard/dist/index.js",
   "plugins/kanban/dashboard/dist/style.css",
   "plugins/kanban/dashboard/plugin_api.py",
+  "plugins/kanban/systemd/qubit-kanban-dispatcher.service",
   "plugins/memory/__init__.py",
   "plugins/memory/byterover/README.md",
   "plugins/memory/byterover/__init__.py",
@@ -335265,6 +335268,10 @@
    "to": "plugins/qubit-achievements/tests/test_achievement_engine.py"
   },
   {
+   "from": "plugins/kanban/systemd/hermes-kanban-dispatcher.service",
+   "to": "plugins/kanban/systemd/qubit-kanban-dispatcher.service"
+  },
+  {
    "from": "setup-hermes.ps1",
    "to": "setup-qubit.ps1"
   },
@@ -341833,7 +341840,7 @@
    "to": "web/src/components/QubitConsoleModal.tsx"
   }
  ],
- "renamed_count": 2308,
+ "renamed_count": 2309,
  "symlink_count_local": 1,
  "symlink_count_upstream": 0,
  "symlink_divergences": [],
@@ -341841,7 +341848,7 @@
  "upstream_file_count": 16078,
  "upstream_license": "MIT License, Copyright (c) 2025 Nous Research",
  "upstream_mode_counts": {
-  "100644": 15659,
+  "100644": 15660,
   "100755": 98
  },
  "upstream_repo": "https://github.com/NousResearch/hermes-agent",
