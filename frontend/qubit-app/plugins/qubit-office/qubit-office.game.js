@@ -193850,6 +193850,11 @@ create: function(game) {
 		method: "POST",
 		body: {}
 	});
+	var updateAgent = (agentId, changes, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/update`, {
+		...opts,
+		method: "POST",
+		body: { changes }
+	});
 	var pauseAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/pause`, {
 		...opts,
 		method: "POST"
@@ -193877,6 +193882,100 @@ create: function(game) {
 		method: "POST"
 	});
 	// ../qubit-app/plugins/qubit-office/game/app/agent-control.ts
+	var PERMISSION_CATEGORIES = [
+		"tools",
+		"toolsets",
+		"files",
+		"browser",
+		"network",
+		"terminal",
+		"email",
+		"social",
+		"etsy",
+		"payments",
+		"data"
+	];
+	/** Categories whose scopes are a closed action list (not free-form names). */
+	var ACTION_SCOPES = {
+		browser: [
+			"read",
+			"navigate",
+			"click",
+			"type",
+			"download",
+			"upload",
+			"screenshot"
+		],
+		network: [
+			"read",
+			"write",
+			"http",
+			"websocket"
+		],
+		terminal: ["read", "execute"],
+		email: [
+			"read",
+			"draft",
+			"send"
+		],
+		social: [
+			"read",
+			"draft",
+			"publish",
+			"reply"
+		],
+		etsy: [
+			"read",
+			"draft",
+			"publish",
+			"message",
+			"refund"
+		],
+		payments: [
+			"read",
+			"charge",
+			"refund",
+			"payout"
+		],
+		data: [
+			"read",
+			"write",
+			"export",
+			"delete"
+		]
+	};
+	var WILDCARD_SCOPES = [
+		"*",
+		"all",
+		"any",
+		"unrestricted",
+		"everything",
+		"full",
+		"none"
+	];
+	var AUTONOMY_LEVELS = [
+		"L0",
+		"L1",
+		"L2",
+		"L3",
+		"L4",
+		"L5"
+	];
+	var REASONING_EFFORTS = [
+		"none",
+		"minimal",
+		"low",
+		"medium",
+		"high"
+	];
+	var SCOPE_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9_.:/@-]{0,127}$/;
+	var ROOT_PATHS = /* @__PURE__ */ new Set([
+		"/",
+		"~",
+		"~/",
+		"//",
+		"\\"
+	]);
 	function matchAgentToSeat(agents, seat) {
 		if (!seat) return null;
 		const slug = (seat.slug || "").trim();
@@ -193932,6 +194031,214 @@ create: function(game) {
 	function scheduleSummary(agent) {
 		if (!agent) return "";
 		return `${agent.schedule || "manual"} (${agent.timezone || "UTC"})`;
+	}
+	function emptyPermissions() {
+		return Object.fromEntries(PERMISSION_CATEGORIES.map((category) => [category, []]));
+	}
+	function normalizePermissions(source) {
+		const out = emptyPermissions();
+		for (const category of PERMISSION_CATEGORIES) {
+			const raw = source?.[category];
+			if (!Array.isArray(raw)) continue;
+			out[category] = [...new Set(raw.map((value) => String(value ?? "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+		}
+		return out;
+	}
+	/** Validate one scope exactly as the backend does before it is added. */
+	function validatePermissionScope(category, raw) {
+		const token = String(raw ?? "").trim();
+		if (!token) return {
+			ok: false,
+			error: "Name an explicit scope."
+		};
+		if (token.includes("*") || WILDCARD_SCOPES.includes(token.toLowerCase())) return {
+			ok: false,
+			error: `"${token}" is a wildcard; name an explicit scope.`
+		};
+		if (category === "files") {
+			const normalised = token.replace(/\\/g, "/");
+			if (ROOT_PATHS.has(normalised)) return {
+				ok: false,
+				error: `"${token}" is unrestricted; name an explicit path.`
+			};
+			if (!(normalised.startsWith("/") || normalised.startsWith("~/"))) return {
+				ok: false,
+				error: "File scopes must be absolute or start with '~/'."
+			};
+			if (normalised.split("/").some((part) => part === "..")) return {
+				ok: false,
+				error: "File scopes may not traverse '..'."
+			};
+			return {
+				ok: true,
+				value: normalised
+			};
+		}
+		const allowed = ACTION_SCOPES[category];
+		if (allowed) {
+			if (!allowed.includes(token)) return {
+				ok: false,
+				error: `Unknown ${category} scope; expected one of ${allowed.join(", ")}.`
+			};
+			return {
+				ok: true,
+				value: token
+			};
+		}
+		if (!SCOPE_TOKEN_RE.test(token)) return {
+			ok: false,
+			error: `"${token}" is not a valid ${category} scope.`
+		};
+		return {
+			ok: true,
+			value: token
+		};
+	}
+	function addPermissionScope(permissions, category, raw) {
+		const check = validatePermissionScope(category, raw);
+		if (!check.ok) return {
+			permissions,
+			check
+		};
+		const next = normalizePermissions(permissions);
+		next[category] = [.../* @__PURE__ */ new Set([...next[category] ?? [], check.value])].sort((a, b) => a.localeCompare(b));
+		return {
+			permissions: next,
+			check
+		};
+	}
+	function removePermissionScope(permissions, category, scope) {
+		const next = normalizePermissions(permissions);
+		next[category] = (next[category] ?? []).filter((value) => value !== scope);
+		return next;
+	}
+	function minorToMoney(minor) {
+		const value = Number(minor);
+		return Number.isFinite(value) ? (value / 100).toFixed(2) : "0.00";
+	}
+	/** Parse a dollar string into integer minor units, or null when malformed. */
+	function parseMoneyToMinor(raw) {
+		const clean = String(raw ?? "").trim();
+		if (!/^\d+(\.\d{1,2})?$/.test(clean)) return null;
+		return Math.round(Number(clean) * 100);
+	}
+	function draftFromAgent(agent) {
+		return {
+			provider: agent.provider ?? "",
+			model: agent.model ?? "",
+			reasoning_effort: agent.reasoning_effort ?? "medium",
+			fallback_provider: agent.fallback_provider ?? "",
+			fallback_model: agent.fallback_model ?? "",
+			max_tokens: String(agent.max_tokens),
+			autonomy: agent.safety.autonomy,
+			daily_spend: minorToMoney(agent.safety.daily_spend_minor),
+			monthly_spend: minorToMoney(agent.safety.monthly_spend_minor),
+			per_action_limit: minorToMoney(agent.safety.per_action_limit_minor),
+			max_turns_per_day: String(agent.safety.max_turns_per_day),
+			max_tokens_per_turn: String(agent.safety.max_tokens_per_turn),
+			rate_limit_per_minute: String(agent.safety.rate_limit_per_minute),
+			schedule: agent.schedule ?? "",
+			timezone: agent.timezone ?? "",
+			permissions: normalizePermissions(agent.permissions)
+		};
+	}
+	function intField(value, key, minimum, errors) {
+		const clean = String(value ?? "").trim();
+		if (!/^\d+$/.test(clean)) {
+			errors[key] = minimum === 1 ? "Enter a whole number of at least 1." : "Enter a whole number of at least 0.";
+			return null;
+		}
+		const parsed = Number(clean);
+		if (!Number.isSafeInteger(parsed) || parsed < minimum) {
+			errors[key] = minimum === 1 ? "Enter a whole number of at least 1." : "Enter a whole number of at least 0.";
+			return null;
+		}
+		return parsed;
+	}
+	function moneyField(value, key, errors) {
+		const minor = parseMoneyToMinor(value);
+		if (minor === null) {
+			errors[key] = "Enter a dollar amount (0.00) with at most two decimals.";
+			return null;
+		}
+		return minor;
+	}
+	function timezoneValid(value) {
+		if (!value.trim()) return false;
+		try {
+			new Intl.DateTimeFormat("en-US", { timeZone: value });
+			return true;
+		} catch {
+			return false;
+		}
+	}
+	/** Return field-keyed validation errors; an empty object means save-able. */
+	function validateDraft(draft) {
+		const errors = {};
+		if (!draft.provider.trim()) errors.provider = "Provider is required.";
+		if (!draft.model.trim()) errors.model = "Model is required.";
+		if (!REASONING_EFFORTS.includes(draft.reasoning_effort)) errors.reasoning_effort = "Choose a known reasoning effort.";
+		if (!AUTONOMY_LEVELS.includes(draft.autonomy)) errors.autonomy = "Choose an autonomy level from L0 to L5.";
+		intField(draft.max_tokens, "max_tokens", 1, errors);
+		moneyField(draft.daily_spend, "daily_spend", errors);
+		moneyField(draft.monthly_spend, "monthly_spend", errors);
+		moneyField(draft.per_action_limit, "per_action_limit", errors);
+		intField(draft.max_turns_per_day, "max_turns_per_day", 0, errors);
+		intField(draft.max_tokens_per_turn, "max_tokens_per_turn", 1, errors);
+		intField(draft.rate_limit_per_minute, "rate_limit_per_minute", 0, errors);
+		if (!draft.schedule.trim()) errors.schedule = "Schedule is required (use 'manual' for on demand).";
+		else if (draft.schedule.trim().length > 200) errors.schedule = "Schedule must be 200 characters or fewer.";
+		if (!draft.timezone.trim()) errors.timezone = "Timezone is required (for example Europe/Bucharest).";
+		else if (!timezoneValid(draft.timezone.trim())) errors.timezone = "That timezone is not recognised.";
+		for (const category of PERMISSION_CATEGORIES) for (const scope of draft.permissions[category] ?? []) {
+			const check = validatePermissionScope(category, scope);
+			if (!check.ok) {
+				errors[`perm:${category}`] = check.error;
+				break;
+			}
+		}
+		return errors;
+	}
+	function sameList(a, b) {
+		if (a.length !== b.length) return false;
+		return a.every((value, index) => value === b[index]);
+	}
+	function permissionsChanged(draft, agent) {
+		const left = normalizePermissions(draft);
+		const right = normalizePermissions(agent);
+		return PERMISSION_CATEGORIES.some((category) => !sameList(left[category] ?? [], right[category] ?? []));
+	}
+	/** The update payload for exactly the fields the operator changed. */
+	function buildAgentChanges(draft, agent) {
+		const changes = {};
+		if (draft.provider.trim() !== agent.provider) changes.provider = draft.provider.trim();
+		if (draft.model.trim() !== agent.model) changes.model = draft.model.trim();
+		if (draft.reasoning_effort !== agent.reasoning_effort) changes.reasoning_effort = draft.reasoning_effort;
+		const fallbackProvider = draft.fallback_provider.trim() || null;
+		const fallbackModel = draft.fallback_model.trim() || null;
+		if (fallbackProvider !== (agent.fallback_provider ?? null)) changes.fallback_provider = fallbackProvider;
+		if (fallbackModel !== (agent.fallback_model ?? null)) changes.fallback_model = fallbackModel;
+		if (Number(draft.max_tokens) !== agent.max_tokens) changes.max_tokens = Number(draft.max_tokens);
+		if (draft.schedule.trim() !== agent.schedule) changes.schedule = draft.schedule.trim();
+		if (draft.timezone.trim() !== agent.timezone) changes.timezone = draft.timezone.trim();
+		const safety = {};
+		if (draft.autonomy !== agent.safety.autonomy) safety.autonomy = draft.autonomy;
+		const daily = parseMoneyToMinor(draft.daily_spend);
+		const monthly = parseMoneyToMinor(draft.monthly_spend);
+		const perAction = parseMoneyToMinor(draft.per_action_limit);
+		if (daily !== agent.safety.daily_spend_minor) safety.daily_spend_minor = daily;
+		if (monthly !== agent.safety.monthly_spend_minor) safety.monthly_spend_minor = monthly;
+		if (perAction !== agent.safety.per_action_limit_minor) safety.per_action_limit_minor = perAction;
+		if (Number(draft.max_turns_per_day) !== agent.safety.max_turns_per_day) safety.max_turns_per_day = Number(draft.max_turns_per_day);
+		if (Number(draft.max_tokens_per_turn) !== agent.safety.max_tokens_per_turn) safety.max_tokens_per_turn = Number(draft.max_tokens_per_turn);
+		if (Number(draft.rate_limit_per_minute) !== agent.safety.rate_limit_per_minute) safety.rate_limit_per_minute = Number(draft.rate_limit_per_minute);
+		if (Object.keys(safety).length > 0) changes.safety = safety;
+		if (permissionsChanged(draft.permissions, agent.permissions)) changes.permissions = normalizePermissions(draft.permissions);
+		return changes;
+	}
+	function isDraftDirty(draft, agent) {
+		if (!draft || !agent) return false;
+		return Object.keys(buildAgentChanges(draft, agent)).length > 0;
 	}
 	function canPause(agent) {
 		return Boolean(agent && agent.status === "active");
@@ -193999,6 +194306,10 @@ create: function(game) {
 			const [busy, setBusy] = useState(null);
 			const [notice, setNotice] = useState(null);
 			const [actionError, setActionError] = useState(null);
+			const [editing, setEditing] = useState(false);
+			const [draft, setDraft] = useState(null);
+			const [fieldErrors, setFieldErrors] = useState({});
+			const [permInput, setPermInput] = useState({});
 			const seatSlug = props.seat?.slug ?? "";
 			const seatName = props.seat?.name ?? "";
 			const bootstrapped = useRef(false);
@@ -194089,8 +194400,7 @@ create: function(game) {
 						if (live) setDetail(next);
 					} catch (exc) {
 						if (!live) return;
-						const { message, code } = errText$1(exc);
-						setActionError(code ? `${code}: ${message}` : message);
+						setActionError(errText$1(exc));
 					}
 				})();
 				return () => {
@@ -194122,11 +194432,98 @@ create: function(game) {
 					await refresh();
 					setNotice(`${label} recorded by the Business OS.`);
 				} catch (exc) {
-					const { message, code } = errText$1(exc);
-					setActionError(code ? `${code}: ${message}` : message);
+					setActionError(errText$1(exc));
 				} finally {
 					setBusy(null);
 				}
+			};
+			const beginEdit = () => {
+				if (!selected) return;
+				setDraft(draftFromAgent(selected));
+				setFieldErrors({});
+				setPermInput({});
+				setActionError(null);
+				setNotice(null);
+				setEditing(true);
+			};
+			const cancelEdit = () => {
+				setEditing(false);
+				setDraft(null);
+				setFieldErrors({});
+				setPermInput({});
+				setActionError(null);
+				setNotice("Edit cancelled; the stored record is unchanged.");
+			};
+			const resetDraft = () => {
+				if (!selected) return;
+				setDraft(draftFromAgent(selected));
+				setFieldErrors({});
+				setPermInput({});
+				setNotice("Draft reset to the stored record.");
+			};
+			const patchDraft = (patch) => {
+				setDraft((current) => current ? {
+					...current,
+					...patch
+				} : current);
+			};
+			const saveEdit = async () => {
+				if (!selected || !draft) return;
+				const errors = validateDraft(draft);
+				setFieldErrors(errors);
+				setActionError(null);
+				setNotice(null);
+				if (Object.keys(errors).length > 0) {
+					setNotice("Fix the highlighted fields before saving.");
+					return;
+				}
+				const changes = buildAgentChanges(draft, selected);
+				if (Object.keys(changes).length === 0) {
+					setNotice("No changes to save.");
+					return;
+				}
+				setBusy("Save");
+				try {
+					await updateAgent(selected.agent_id, changes, {
+						base: props.base,
+						fetchImpl: props.fetchImpl,
+						query: { tenant_id: load.kind === "ready" ? load.tenantId : void 0 }
+					});
+					await refresh();
+					setEditing(false);
+					setDraft(null);
+					setFieldErrors({});
+					setPermInput({});
+					setNotice("Changes saved and recorded in the audit trail.");
+				} catch (exc) {
+					setActionError(errText$1(exc));
+				} finally {
+					setBusy(null);
+				}
+			};
+			const addScope = (category) => {
+				if (!draft) return;
+				const raw = permInput[category] ?? "";
+				const { permissions, check } = addPermissionScope(draft.permissions, category, raw);
+				if (!check.ok) {
+					setFieldErrors({
+						...fieldErrors,
+						[`perm:${category}`]: check.error
+					});
+					return;
+				}
+				const nextErrors = { ...fieldErrors };
+				delete nextErrors[`perm:${category}`];
+				setFieldErrors(nextErrors);
+				setPermInput({
+					...permInput,
+					[category]: ""
+				});
+				patchDraft({ permissions });
+			};
+			const removeScope = (category, scope) => {
+				if (!draft) return;
+				patchDraft({ permissions: removePermissionScope(draft.permissions, category, scope) });
 			};
 			const close = () => props.onClose?.();
 			const children = [R.createElement("div", {
@@ -194186,6 +194583,55 @@ create: function(game) {
 				}, `${agent.display_name} — ${agent.role_id} (${agent.status})`))])));
 			}
 			if (selected) {
+				const lock = busy !== null;
+				const read = editing ? draft : null;
+				const fieldError = (key) => fieldErrors[key] ? R.createElement("span", {
+					key: `err-${key}`,
+					className: "agent-control__error",
+					"data-testid": `agent-control-field-error-${key.replace(":", "-")}`
+				}, fieldErrors[key]) : null;
+				const textField = (key, label, value, onChange) => R.createElement("label", {
+					key: `field-${key}`,
+					className: "agent-control__field",
+					"data-testid": `agent-control-field-${key}`
+				}, [
+					R.createElement("span", {
+						key: "l",
+						className: "agent-control__k"
+					}, label),
+					R.createElement("input", {
+						key: "i",
+						type: "text",
+						className: "agent-control__input",
+						"data-testid": `agent-control-input-${key}`,
+						value,
+						disabled: lock || !editing,
+						onChange: (event) => onChange(event.target.value)
+					}),
+					fieldError(key)
+				]);
+				const selectField = (key, label, value, options, onChange, render) => R.createElement("label", {
+					key: `field-${key}`,
+					className: "agent-control__field",
+					"data-testid": `agent-control-field-${key}`
+				}, [
+					R.createElement("span", {
+						key: "l",
+						className: "agent-control__k"
+					}, label),
+					R.createElement("select", {
+						key: "s",
+						className: "agent-control__input",
+						"data-testid": `agent-control-input-${key}`,
+						value,
+						disabled: lock || !editing,
+						onChange: (event) => onChange(event.target.value)
+					}, options.map((option) => R.createElement("option", {
+						key: option,
+						value: option
+					}, render ? render(option) : option))),
+					fieldError(key)
+				]);
 				const identity = [
 					kv(R, "Role", `${selected.role_id} · ${selected.department}`, "role"),
 					kv(R, "Room", selected.room || "unassigned", "room"),
@@ -194194,26 +194640,137 @@ create: function(game) {
 					kv(R, "Revision", String(selected.revision), "revision")
 				];
 				children.push(section$1(R, "Identity", "identity", identity));
-				children.push(section$1(R, "Brain", "brain", [
+				children.push(section$1(R, "Brain", "brain", read ? [
+					textField("provider", "Provider", read.provider, (next) => patchDraft({ provider: next })),
+					textField("model", "Model", read.model, (next) => patchDraft({ model: next })),
+					selectField("reasoning", "Reasoning", read.reasoning_effort, REASONING_EFFORTS, (next) => patchDraft({ reasoning_effort: next })),
+					textField("fallback-provider", "Fallback provider", read.fallback_provider, (next) => patchDraft({ fallback_provider: next })),
+					textField("fallback-model", "Fallback model", read.fallback_model, (next) => patchDraft({ fallback_model: next })),
+					textField("max-tokens", "Max tokens", read.max_tokens, (next) => patchDraft({ max_tokens: next }))
+				] : [
 					kv(R, "Provider", selected.provider || "unset", "provider"),
 					kv(R, "Model", selected.model || "unset", "model"),
 					kv(R, "Reasoning", selected.reasoning_effort || "unset", "reasoning"),
 					kv(R, "Fallback", selected.fallback_provider && selected.fallback_model ? `${selected.fallback_provider} / ${selected.fallback_model}` : "none", "fallback"),
 					kv(R, "Max tokens", String(selected.max_tokens), "max-tokens")
 				]));
-				const permRows = permissionRows(selected).map(([category, scopes]) => kv(R, category, scopes.length ? scopes.join(", ") : "deny", `perm-${category}`));
-				children.push(section$1(R, "Permissions", "permissions", [R.createElement("p", {
-					key: "summary",
-					className: "agent-control__muted",
-					"data-testid": "agent-control-permission-summary"
-				}, permissionSummary(selected)), ...permRows]));
-				children.push(section$1(R, "Limits", "limits", [
+				if (read) {
+					const granted = PERMISSION_CATEGORIES.filter((category) => (read.permissions[category] ?? []).length > 0);
+					const draftPermissionSummary = granted.length ? granted.map((category) => `${category}: ${(read.permissions[category] ?? []).length}`).join(" · ") : "deny by default (no scopes granted)";
+					const permEditor = PERMISSION_CATEGORIES.map((category) => {
+						const scopes = read.permissions[category] ?? [];
+						const allowed = ACTION_SCOPES[category];
+						const chips = scopes.length ? scopes.map((scope) => R.createElement("span", {
+							key: `chip-${scope}`,
+							className: "agent-control__chip",
+							"data-testid": `agent-control-perm-chip-${category}`,
+							"data-scope": scope
+						}, [R.createElement("span", { key: "s" }, scope), R.createElement("button", {
+							key: "r",
+							type: "button",
+							"data-testid": "agent-control-perm-remove",
+							"data-category": category,
+							"data-scope": scope,
+							disabled: lock,
+							"aria-label": `Remove ${category} scope ${scope}`,
+							onClick: () => removeScope(category, scope)
+						}, "×")])) : [R.createElement("span", {
+							key: "deny",
+							className: "agent-control__muted",
+							"data-testid": `agent-control-perm-deny-${category}`
+						}, "deny")];
+						return R.createElement("div", {
+							key: `perm-${category}`,
+							className: "agent-control__permRow",
+							"data-testid": `agent-control-perm-row-${category}`
+						}, [
+							R.createElement("span", {
+								key: "c",
+								className: "agent-control__k"
+							}, category),
+							R.createElement("div", {
+								key: "chips",
+								className: "agent-control__chips"
+							}, chips),
+							R.createElement("input", {
+								key: "i",
+								type: "text",
+								className: "agent-control__input",
+								"data-testid": "agent-control-perm-input",
+								"data-category": category,
+								value: permInput[category] ?? "",
+								placeholder: allowed ? allowed.join(", ") : category === "files" ? "/absolute/path or ~/relative" : "scope",
+								disabled: lock,
+								onChange: (event) => setPermInput({
+									...permInput,
+									[category]: event.target.value
+								})
+							}),
+							R.createElement("button", {
+								key: "a",
+								type: "button",
+								className: "office-game__btn",
+								"data-testid": "agent-control-perm-add",
+								"data-category": category,
+								disabled: lock,
+								onClick: () => addScope(category)
+							}, "Add"),
+							allowed ? R.createElement("span", {
+								key: "allowed",
+								className: "agent-control__muted",
+								"data-testid": `agent-control-perm-allowed-${category}`
+							}, `Known scopes: ${allowed.join(", ")}`) : null,
+							fieldError(`perm:${category}`)
+						]);
+					});
+					children.push(section$1(R, "Permissions", "permissions", [
+						R.createElement("p", {
+							key: "summary",
+							className: "agent-control__muted",
+							"data-testid": "agent-control-permission-summary"
+						}, draftPermissionSummary),
+						R.createElement("p", {
+							key: "note",
+							className: "agent-control__muted",
+							"data-testid": "agent-control-permission-note"
+						}, "Permissions stay explicit and deny-by-default: an empty category grants nothing, every scope is named, and a wildcard is refused by the Business OS."),
+						...permEditor
+					]));
+				} else {
+					const permRows = permissionRows(selected).map(([category, scopes]) => kv(R, category, scopes.length ? scopes.join(", ") : "deny", `perm-${category}`));
+					children.push(section$1(R, "Permissions", "permissions", [R.createElement("p", {
+						key: "summary",
+						className: "agent-control__muted",
+						"data-testid": "agent-control-permission-summary"
+					}, permissionSummary(selected)), ...permRows]));
+				}
+				const approvals = selected.safety.approval_required.join(", ") || "none";
+				children.push(section$1(R, "Limits", "limits", read ? [
+					textField("daily-spend", "Daily spend (USD)", read.daily_spend, (next) => patchDraft({ daily_spend: next })),
+					textField("monthly-spend", "Monthly spend (USD)", read.monthly_spend, (next) => patchDraft({ monthly_spend: next })),
+					textField("per-action-limit", "Per-action limit (USD)", read.per_action_limit, (next) => patchDraft({ per_action_limit: next })),
+					textField("max-turns-per-day", "Turns per day", read.max_turns_per_day, (next) => patchDraft({ max_turns_per_day: next })),
+					textField("max-tokens-per-turn", "Tokens per turn", read.max_tokens_per_turn, (next) => patchDraft({ max_tokens_per_turn: next })),
+					textField("rate-limit", "Requests per minute", read.rate_limit_per_minute, (next) => patchDraft({ rate_limit_per_minute: next })),
+					kv(R, "Approvals", approvals, "approvals"),
+					R.createElement("p", {
+						key: "approval-note",
+						className: "agent-control__muted",
+						"data-testid": "agent-control-approval-note"
+					}, "Spend, legal, publish, contact and irreversible actions keep their human approval requirement; this form cannot remove them."),
+					kv(R, "Escalation", selected.safety.escalation_target, "escalation")
+				] : [
 					kv(R, "Spend", budgetSummary(selected), "budget"),
 					kv(R, "Rate", rateSummary(selected), "rate"),
-					kv(R, "Approvals", selected.safety.approval_required.join(", ") || "none", "approvals"),
+					kv(R, "Approvals", approvals, "approvals"),
 					kv(R, "Escalation", selected.safety.escalation_target, "escalation")
 				]));
-				children.push(section$1(R, "Autonomy & schedule", "autonomy", [
+				children.push(section$1(R, "Autonomy & schedule", "autonomy", read ? [
+					selectField("autonomy", "Autonomy", read.autonomy, AUTONOMY_LEVELS, (next) => patchDraft({ autonomy: next }), autonomyLabel),
+					textField("schedule", "Schedule", read.schedule, (next) => patchDraft({ schedule: next })),
+					textField("timezone", "Timezone", read.timezone, (next) => patchDraft({ timezone: next })),
+					kv(R, "Concurrent turns", String(selected.max_concurrent_turns), "concurrency")
+				] : [
 					kv(R, "Autonomy", autonomyLabel(selected.safety.autonomy), "autonomy-level"),
 					kv(R, "Schedule", scheduleSummary(selected), "schedule"),
 					kv(R, "Concurrent turns", String(selected.max_concurrent_turns), "concurrency")
@@ -194224,72 +194781,116 @@ create: function(game) {
 					"data-testid": "agent-control-audit"
 				}, (detail?.audit ?? []).map((event, index) => auditRow(R, event, index)))]));
 				const buttons = [];
-				if (canPause(selected)) buttons.push(R.createElement("button", {
-					key: "pause",
-					type: "button",
-					className: "office-game__btn",
-					"data-testid": "agent-control-pause",
-					disabled: busy !== null,
-					onClick: () => run("Pause", () => pauseAgent(selected.agent_id, {
-						base: props.base,
-						fetchImpl: props.fetchImpl
-					}))
-				}, "Pause"));
-				if (canResume(selected)) buttons.push(R.createElement("button", {
-					key: "resume",
-					type: "button",
-					className: "office-game__btn",
-					"data-testid": "agent-control-resume",
-					disabled: busy !== null,
-					onClick: () => run("Resume", () => resumeAgent(selected.agent_id, {
-						base: props.base,
-						fetchImpl: props.fetchImpl
-					}))
-				}, "Resume"));
-				buttons.push(R.createElement("button", {
-					key: "stop",
-					type: "button",
-					className: "office-game__btn",
-					"data-testid": "agent-control-stop",
-					disabled: busy !== null,
-					onClick: () => run("Stop", () => stopAgent(selected.agent_id, {}, {
-						base: props.base,
-						fetchImpl: props.fetchImpl
-					}))
-				}, "Stop turn"));
-				buttons.push(R.createElement("button", {
-					key: "takeover",
-					type: "button",
-					className: "office-game__btn",
-					"data-testid": "agent-control-takeover",
-					disabled: busy !== null,
-					onClick: () => run("Takeover", () => takeoverAgent(selected.agent_id, {
-						base: props.base,
-						fetchImpl: props.fetchImpl
-					}))
-				}, "Take over"));
-				if (canRevoke(selected)) buttons.push(R.createElement("button", {
-					key: "revoke",
-					type: "button",
-					className: "office-game__btn agent-control__danger",
-					"data-testid": "agent-control-revoke",
-					disabled: busy !== null,
-					onClick: () => run("Revoke", () => revokeAgent(selected.agent_id, void 0, {
-						base: props.base,
-						fetchImpl: props.fetchImpl
-					}))
-				}, "Revoke all scopes"));
-				if (canArchive(selected)) buttons.push(R.createElement("button", {
-					key: "archive",
-					type: "button",
-					className: "office-game__btn agent-control__danger",
-					"data-testid": "agent-control-archive",
-					disabled: busy !== null,
-					onClick: () => run("Archive", () => archiveAgent(selected.agent_id, {
-						base: props.base,
-						fetchImpl: props.fetchImpl
-					}))
-				}, "Archive"));
+				if (editing) {
+					const dirty = isDraftDirty(draft, selected);
+					buttons.push(R.createElement("button", {
+						key: "save",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-save",
+						disabled: lock,
+						onClick: () => {
+							saveEdit();
+						}
+					}, "Save changes"));
+					buttons.push(R.createElement("button", {
+						key: "cancel",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-cancel",
+						disabled: lock,
+						onClick: cancelEdit
+					}, "Cancel"));
+					buttons.push(R.createElement("button", {
+						key: "reset",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-reset",
+						disabled: lock || !dirty,
+						onClick: resetDraft
+					}, "Reset"));
+					if (dirty) buttons.push(R.createElement("span", {
+						key: "dirty",
+						className: "agent-control__dirty",
+						"data-testid": "agent-control-dirty",
+						role: "status"
+					}, "Unsaved changes"));
+				} else {
+					buttons.push(R.createElement("button", {
+						key: "edit",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-edit",
+						disabled: lock,
+						onClick: beginEdit
+					}, "Edit controls"));
+					if (canPause(selected)) buttons.push(R.createElement("button", {
+						key: "pause",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-pause",
+						disabled: lock,
+						onClick: () => run("Pause", () => pauseAgent(selected.agent_id, {
+							base: props.base,
+							fetchImpl: props.fetchImpl
+						}))
+					}, "Pause"));
+					if (canResume(selected)) buttons.push(R.createElement("button", {
+						key: "resume",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-resume",
+						disabled: lock,
+						onClick: () => run("Resume", () => resumeAgent(selected.agent_id, {
+							base: props.base,
+							fetchImpl: props.fetchImpl
+						}))
+					}, "Resume"));
+					buttons.push(R.createElement("button", {
+						key: "stop",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-stop",
+						disabled: lock,
+						onClick: () => run("Stop", () => stopAgent(selected.agent_id, {}, {
+							base: props.base,
+							fetchImpl: props.fetchImpl
+						}))
+					}, "Stop turn"));
+					buttons.push(R.createElement("button", {
+						key: "takeover",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "agent-control-takeover",
+						disabled: lock,
+						onClick: () => run("Takeover", () => takeoverAgent(selected.agent_id, {
+							base: props.base,
+							fetchImpl: props.fetchImpl
+						}))
+					}, "Take over"));
+					if (canRevoke(selected)) buttons.push(R.createElement("button", {
+						key: "revoke",
+						type: "button",
+						className: "office-game__btn agent-control__danger",
+						"data-testid": "agent-control-revoke",
+						disabled: lock,
+						onClick: () => run("Revoke", () => revokeAgent(selected.agent_id, void 0, {
+							base: props.base,
+							fetchImpl: props.fetchImpl
+						}))
+					}, "Revoke all scopes"));
+					if (canArchive(selected)) buttons.push(R.createElement("button", {
+						key: "archive",
+						type: "button",
+						className: "office-game__btn agent-control__danger",
+						"data-testid": "agent-control-archive",
+						disabled: lock,
+						onClick: () => run("Archive", () => archiveAgent(selected.agent_id, {
+							base: props.base,
+							fetchImpl: props.fetchImpl
+						}))
+					}, "Archive"));
+				}
 				children.push(R.createElement("div", {
 					key: "actions",
 					className: "agent-control__actions",
@@ -194306,8 +194907,9 @@ create: function(game) {
 				key: "error",
 				className: "agent-control__state agent-control__state--error",
 				"data-testid": "agent-control-error",
-				role: "alert"
-			}, actionError));
+				role: "alert",
+				"data-code": actionError.code
+			}, actionError.code ? `${actionError.code}: ${actionError.message}` : actionError.message));
 			if (notice) children.push(R.createElement("div", {
 				key: "notice",
 				className: "agent-control__state",
