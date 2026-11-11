@@ -965,3 +965,18 @@ Landed on `integration/qoffice-wave1` from `61cc97bff`; not merged to `main`, no
 **Combined verification:** 274 Python tests passed across BOS, War Room, roles, agent controls, platform policy, Etsy/social/CRM/email, world/room-style, asset catalog, office business and Qubit Office brand. Ruff/compile/diff checks passed. No real credentials, network calls, paid art, live service restart, or main merge.
 
 **Still not done:** UI wiring for War Room/roles/agent controls, ToolGateway executors for adapters, real platform apps/OAuth (Etsy/X/Meta/LinkedIn/TikTok/YouTube), pilot niche/product selection, office floor/room instantiation beyond templates, 100/500/1,000-agent load tests, main merge, deployment, and the final full matrix.
+
+
+---
+
+## 38. Wave-3 implementation results (UI + tool gateway)
+
+Landed on `integration/qoffice-wave1`; not merged to `main`, not deployed, not live-verified.
+
+- **Business UI/API bridge:** `4a365a1dd`, `c12f0d424`, `6d792adbc`; owner-scoped `/api/office/business/*` and `/agent/api/office/business/*`; War Room dock, agent-control drawer opened from the Agents panel, 132-role/100-floor directory. 92 focused Python tests; 21 new Vitest tests; full office app **17 files / 181 tests passed**.
+- **ToolGateway integration:** `6196d4b4a`, `8ace1bd21`, `47337cc71`; dry-run Etsy/social/CRM/email executors, platform policy enforcement, approval/expiry, rate/idempotency, single audit/ledger record, Etsy draft→approval→dry-run publish workflow. 218 focused tests.
+- **Combined verification on integration:** **320 Python tests passed**; **181 office Vitest tests passed**; ruff clean; `git diff --check` clean.
+
+**Still not done:** main merge/deploy, real OAuth/platform accounts, pilot niche/product, 100-floor renderer/load test, live browser verification, final full matrix.
+
+**Immediate next:** main is still dirty from another session (generated TUI build file, untracked pixelfx tools, package-lock). Do not merge over it. Once clean: merge `integration/qoffice-wave1`, rebuild the served bundle, deploy, then run the live Etsy/War Room/agent-control journey. Owner decisions needed for the Etsy niche and real platform accounts.
