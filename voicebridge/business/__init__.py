@@ -57,8 +57,19 @@ from .roles import (
     RoleTemplate,
     RoomTemplate,
 )
+from .integration_tools import (
+    IntegrationTool,
+    IntegrationToolRegistry,
+    integration_tools,
+)
 from .store import BusinessStore
-from .tools import Policy, ToolGateway, ToolOutcome, ToolRequest
+from .tools import (
+    ExecutorResult,
+    Policy,
+    ToolGateway,
+    ToolOutcome,
+    ToolRequest,
+)
 
 __all__ = [
     "Agent",
@@ -73,7 +84,10 @@ __all__ = [
     "BusinessStore",
     "Contact",
     "Department",
+    "ExecutorResult",
     "FloorTemplate",
+    "IntegrationTool",
+    "IntegrationToolRegistry",
     "JobEvent",
     "JobRun",
     "LedgerEntry",
@@ -98,6 +112,7 @@ __all__ = [
     "WarRoomSource",
     "agents",
     "approvals",
+    "integration_tools",
     "jobs",
     "ledger",
     "role_catalog",

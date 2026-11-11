@@ -109,5 +109,55 @@ class EmailAdapter(BaseAdapter):
             approval=approval,
         )
 
+    def create_draft(
+        self,
+        *,
+        to: str,
+        subject: str,
+        body: str,
+        idempotency_key: str,
+        from_address: str | None = None,
+    ) -> AdapterResult:
+        """Create a draft in the ESP; drafts never send and need no approval."""
+        op = "email.draft"
+        recipient = str(to or "").strip()
+        clean_subject = str(subject or "").strip()
+        clean_body = str(body or "").strip()
+        if not recipient or "@" not in recipient:
+            raise AdapterError(
+                ADAPTER_BAD_INPUT_CODE,
+                "Email: a valid recipient address is required",
+                platform=self.platform_id,
+                operation=op,
+            )
+        if not clean_subject:
+            raise AdapterError(
+                ADAPTER_BAD_INPUT_CODE,
+                "Email: subject is required",
+                platform=self.platform_id,
+                operation=op,
+            )
+        if not clean_body:
+            raise AdapterError(
+                ADAPTER_BAD_INPUT_CODE,
+                "Email: body is required",
+                platform=self.platform_id,
+                operation=op,
+            )
+        return self._mutate(
+            op,
+            {
+                "to": recipient,
+                "subject": clean_subject[:998],
+                "body": clean_body,
+                "from_address": str(from_address or "").strip() or None,
+                "state": "draft",
+            },
+            idempotency_key=idempotency_key,
+            path="/email/drafts",
+            method="POST",
+            policy_action="draft",
+        )
+
 
 __all__ = ["APPROVAL_SEND", "EmailAdapter"]

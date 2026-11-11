@@ -178,6 +178,15 @@ Real integrations must be injected as `executor` callables (see
 provider boundary; this gateway prevents duplicate local effects, not duplicate
 provider requests after an `unknown` outcome.
 
+The dry-run integration wiring lives in `voicebridge/business/integration_tools.py`.
+`IntegrationToolRegistry` is the registered executor: it resolves the injected
+adapter for the tool, checks readiness (missing transport/credentials is the
+adapter's typed `adapter_unavailable`/`adapter_not_configured` refusal), passes
+the request's idempotency key and derived approval token, and returns an
+`ExecutorResult`. A dry-run adapter result is recorded as `dry_run`, never as an
+execution; a money-moving directive (`_ledger`) is appended once by this gateway
+and re-asserted idempotently on replay.
+
 ## 7. What is real vs deferred
 
 | Capability | State |
@@ -189,7 +198,8 @@ provider requests after an `unknown` outcome.
 | Job state machine + leases + unknown recovery | real |
 | Approval pause/resume/reject/expire | real |
 | Tool validation, approval gate, budget, dry-run, redaction | real |
-| Tool executor / Stripe / CRM / email / accounting | **deferred** |
+| Dry-run Etsy/social/CRM/email executor wiring | real |
+| Real provider transports/OAuth/credentials, Stripe, accounting | **deferred** |
 | Multi-host queue, Temporal, dead-letter, timers | **deferred** |
 | Postgres, replication, backup/restore drill | **deferred** |
 | UI, voice commands, approval cards | **deferred** |
@@ -200,9 +210,11 @@ provider requests after an `unknown` outcome.
 ## 8. Next integration steps
 
 1. **Pick the pilot business** and its systems of record (owner decision §26).
-2. Implement one executor per system behind `ToolGateway` with a real provider
-   idempotency key (Stripe idempotency key, CRM external ref, SMTP Message-ID),
-   plus a reconciliation read for `unknown` jobs.
+2. The dry-run executor wiring for Etsy/social/CRM/email exists
+   (`voicebridge/business/integration_tools.py`). The remaining work is a real
+   provider transport plus credential store and a provider idempotency key
+   (Stripe idempotency key, CRM external ref, SMTP Message-ID), plus a
+   reconciliation read for `unknown` jobs.
 3. Add a workflow runner that calls `jobs.claim` → tool gateway → `jobs.finish`
    and heartbeats its lease; wire `jobs.recover()` at process boot.
 4. Add approval cards and voice commands that call `approvals.request/decide`;
