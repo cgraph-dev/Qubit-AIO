@@ -229,11 +229,18 @@ def _session_store():
 
     saved = {k: os.environ.get(k) for k in
              ("XDG_CONFIG_HOME", "XDG_STATE_HOME", "XDG_DATA_HOME",
-              "VOICE_BRIDGE_CONFIG")}
+              "VOICE_BRIDGE_CONFIG", "QUBIT_HOME")}
     root = tempfile.mkdtemp(prefix="office-cli-completeness-")
     os.environ["XDG_CONFIG_HOME"] = os.path.join(root, "c")
     os.environ["XDG_STATE_HOME"] = os.path.join(root, "s")
     os.environ["XDG_DATA_HOME"] = os.path.join(root, "d")
+    # ``QUBIT_HOME`` wins over every XDG_* for the resolved state dir
+    # (voicebridge.paths.voice_layout: an existing/chosen QUBIT_HOME is the
+    # "new" layout). Without clearing it, an operator or agent shell that
+    # exports QUBIT_HOME -- which is the normal case here -- points the whole
+    # session at the REAL office store: the seed sees a live CEO and every
+    # hire refuses with OFFICE_EXISTS, so the fixture dies and 171 tests error.
+    os.environ.pop("QUBIT_HOME", None)
     os.environ.pop("VOICE_BRIDGE_CONFIG", None)
     cfgdir = os.path.join(os.environ["XDG_CONFIG_HOME"], "qubit-voicebridge")
     os.makedirs(cfgdir, exist_ok=True)
