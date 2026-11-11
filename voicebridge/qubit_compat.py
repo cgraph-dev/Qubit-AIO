@@ -21754,6 +21754,7 @@ for _name in (
     "h_business_warroom_etsy_pilot",
     "h_business_etsy_status", "h_business_etsy_authorize",
     "h_business_etsy_complete", "h_business_etsy_disconnect",
+    "h_business_agents_assign_world",
     "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
     "h_business_agent_update", "h_business_agent_preview",
     "h_business_agent_pause", "h_business_agent_resume",

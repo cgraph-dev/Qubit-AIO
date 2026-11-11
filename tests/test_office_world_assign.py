@@ -83,3 +83,4 @@ def test_world_assign_route_is_registered_before_the_agent_id_route():
         "POST", "/api/office/business/agents/world-assign")
     assert route is not None
     assert route["handler"] == "h_business_agents_assign_world"
+    assert "h_business_agents_assign_world" in HC.HANDLERS
