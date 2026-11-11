@@ -1,6 +1,6 @@
 # Qubit Office — Master Plan
 
-**Status:** planning baseline plus wave-1/wave-2/wave-3 deployed to the live `:8890` service from `integration/qoffice-wave1`. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete. `main` is still unmerged.
+**Status:** planning baseline plus wave-1/wave-2/wave-3 and live seat/tower deployment on `:8890` from `integration/qoffice-wave1`. Not a release verdict, not `VERIFIED`, and not a claim that any phase is complete. `main` is still unmerged.
 **Execution mode:** live deployment performed with the owner's explicit `do it` (2026-11-11); main merge and release gates remain separate.
 **Scope:** Qubit Office (the campus/office product) + Qubit Business OS (the durable business-operations layer).
 **Rule:** the world is complete from day one; only active businesses/rooms are simulated. Business truth lives in systems of record, never in the renderer.
@@ -999,3 +999,15 @@ Deployed from `integration/qoffice-wave1` to the installed live package. This is
 - The 100-floor directory is a list/template view; the rendered office still shows the existing 4 rooms / 10 agents.
 - Etsy/social/CRM remain dry-run; no real shop, OAuth account, or external action was executed.
 - The iframe topbar identity is patched by the Qubit shell on load; the legal MIT attribution remains visible.
+
+
+---
+
+## 40. Live seat linking and 100-floor tower (2026-11-11)
+
+- **Seat → BOS bootstrap:** `POST /api/office/business/bootstrap` creates the Personal tenant/business and maps all **283 office seats** to BOS agent records with `metadata.office_seat_slug`. First live run: **283 created in ~2.9 s**; repeat is idempotent (~0.05 s, 0 created). Clicking an office agent now opens real identity, brain, permissions, budgets, autonomy, schedule and audit controls.
+- **Safe defaults:** provider `qubit`, model `active`, reasoning `medium`, deny-all permissions, zero spend, autonomy `L0`, approvals for spend/legal/publish/contact/irreversible. No model turn, external call or spend is performed by bootstrap.
+- **100-floor tower:** War Room → Roles & floors now renders a **Tower directory**: 100 floors, 5 wings, 22 active / 78 dormant, room/desk counts, floor selection and detail. It is a navigation layer over real templates, not a rendered 3D scene.
+- **Redaction fix:** credential redaction no longer hides non-secret token limits (`max_tokens`, `prompt_tokens`, etc.); real tokens/keys remain redacted.
+- **Live:** bridge pid `4078662`; `/qubit-office` 200; bundle `16e16fe3…` (7,619,244 bytes); backup `/home/trick/.cache/qubit-deploy-backup-qoffice-seats-20261111-085003`; verified with 319 Python tests, 198 office Vitest tests, and live browser CDP.
+- **Still not done:** the 100-floor view is not the rendered world; the live scene remains the existing 4 rooms / 10 agents. No real Etsy/social accounts, no model turns from the controls yet, no `main` merge, no full matrix/`VERIFIED`.
