@@ -96,6 +96,12 @@ export NODE_ENV=production
 npx tsc -p . --noEmit || build_failed "TypeScript typecheck failed"
 npx vite build --base=/ --outDir "$DIST_DIR" --emptyOutDir \
   || build_failed "vite build failed"
+# Record the source HEAD the bundle came from. `package.json`'s `build` script
+# chains this after `vite build`, but this script invokes vite directly, so the
+# file was never written and `voicebridge.webui.check_qubit_bundle` had nothing
+# to compare — a fresh bundle was reported as "built from <stale sha>", and the
+# staleness check could not distinguish a rebuild from a stale dist.
+node scripts/write-build-info.mjs || build_failed "build-info.json could not be written"
 
 # node_modules is a build-only dependency, but pyproject.toml force-includes
 # the whole frontend/ tree into the wheel; leaving it in place would ship

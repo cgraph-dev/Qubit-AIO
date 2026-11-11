@@ -62,7 +62,15 @@ def _post(port, path, body):
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
-        return json.loads(e.read())
+        # `HTTPError` is also a response object holding an open socket. Returning
+        # from inside `except` without closing it leaves a ResourceWarning for the
+        # GC, and `pytest.ini` promotes warnings to errors, so the file failed on
+        # teardown with "Implicitly cleaning up <HTTPError 409>..." rather than on
+        # any assertion. The body is the typed error payload the page reads.
+        try:
+            return json.loads(e.read())
+        finally:
+            e.close()
 
 
 def _settle(port, op, args):
