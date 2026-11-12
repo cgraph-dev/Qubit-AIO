@@ -168,3 +168,4 @@ done
 | `QUBIT-OFFICE-PHASE-0.md` | Phase 0 — durable engine decision, staging/replay, work items and exit gates |
 
 | `QUBIT-OFFICE-COMPLETE-PLAN.md` | Complete consolidated plan — every phase, gate, artifact and deferred item |
+| `QUBIT-OFFICE-PLAN-REVIEW.md` | Plan review — bugs, misconfigurations, MVP simplification and what to defer |

@@ -1498,3 +1498,13 @@ exit gates in `QUBIT-OFFICE-PHASE-0.md` have evidence.
 authority map, architecture, cross-cutting contracts, Phase 0–9 tasks, exit gates, artifact status,
 research gaps, deferred work and immediate next actions. The detailed contracts and ledgers remain
 authoritative for their areas; this is the navigation and sequencing entry point.
+
+
+---
+
+## 53. Plan review and MVP simplification
+
+The plan set was audited for contradictions, duplicate phase orders and overengineering. The
+review and canonical MVP scope are in `docs/QUBIT-OFFICE-PLAN-REVIEW.md`; `QUBIT-OFFICE-COMPLETE-PLAN.md`
+§11 records the simplified first slice. Until that MVP passes, no tower, character studio, outside
+world, mature interactions, Temporal, SSO, multi-tenant or multi-entity work starts.

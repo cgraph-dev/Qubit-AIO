@@ -5,32 +5,25 @@
 
 ## 1. Decision: durable execution engine
 
-**Decision:** use **Temporal** as the canonical durable workflow engine for consequential
-workflows, with PostgreSQL persistence. Do **not** build a homegrown workflow scheduler and do not
-treat LangGraph checkpoints, Airflow DAGs or a SQLite queue as a transaction boundary for external
-effects.
+**MVP decision:** do **not** install Temporal before the first department works. Use the existing
+Business OS SQLite control plane with an explicit run/task/checkpoint/lease/outbox model for the
+single-user, single-host MVP. This is a deliberate reduction from the earlier Temporal-first plan.
 
-- Model/agent turns, tool calls, provider calls, payments, publishing, email, Etsy, CRM writes and
-  human approvals are **activities** or signals/waits.
-- Workflow code stays deterministic; external effects live in idempotent activities.
-- Each activity has an idempotency key, provider receipt/request ID and reconciliation path.
-- Human approval is a durable workflow wait/signal, not a chat message.
-- Run history is the workflow history; the Business OS stores the business-readable projection.
-- Use PostgreSQL for Temporal persistence and the Business OS; SQLite remains acceptable for a
-  single-user local projection only if it is not the workflow authority.
-- If Temporal/server dependencies are unavailable, consequential workflows **fail closed**; there
-  is no silent fallback to a non-durable loop.
+Rules:
 
-**Why not alternatives now**
+- Runs/tasks have explicit states including `unknown`.
+- Every external effect uses an idempotency key and provider receipt; timeouts reconcile.
+- Checkpoints store pending actions, tool receipts, approvals, workspace revision and a safe resume
+  point.
+- Leases/fencing protect tasks, workspaces and mutable resources.
+- Cancellation revokes leases/tokens, interrupts gateway calls and records unknown outcomes.
+- No exactly-once claim; duplicate effects must be prevented or reconciled.
+- A Temporal adapter is deferred until multi-process/Ha/high-volume needs are measured. It must pass
+  the same recovery/reconciliation tests before replacing the local engine.
 
-- LangGraph/LangSmith: good graph state/tracing, not a complete external-effect transaction
-  boundary.
-- Airflow: scheduled DAGs, not interactive long-lived agent sessions/human waits.
-- Homegrown SQLite scheduler: would reimplement timers, retries, history and replay; high risk.
-- CrewAI/AutoGen/OpenAI Agents SDK: orchestration primitives, not durable business workflow.
-
-**Later option:** a renderer/workflow adapter may support another engine, but Temporal remains the
-reference until a replacement passes the same recovery/reconciliation tests.
+Why: a local personal office with one department does not justify Temporal + PostgreSQL operations
+yet. The existing SQLite control plane and Qubit session/state stores already provide the starting
+substrate. Infrastructure should be earned by measured need, not added first.
 
 ## 2. Staging, test and replay environment
 
@@ -78,13 +71,13 @@ Required before Phase 1 implementation:
 - `docs/QUBIT-OFFICE-THREAT-MODEL.md`: assets, actors, boundaries, threats/controls/tests.
 - Exit: security gates for external actions are accepted.
 
-### P0-06 — Durable engine prototype
+### P0-06 — Local durable substrate prototype
 
-- Bring up Temporal locally with PostgreSQL (Docker Compose or equivalent).
-- Prototype: one workflow with an activity that writes a fake external receipt, one human approval
-  wait, one timer, one retry/timeout and one unknown-outcome reconciliation.
-- Exit: restart during the workflow resumes; duplicate activity is idempotent; approval survives
-  restart; unknown outcome reconciles.
+- Prototype on the existing SQLite Business OS: run/task states, lease/checkpoint, outbox/inbox,
+  idempotency key and fake provider receipt.
+- Include one human approval wait, one timer/retry and one unknown-outcome reconciliation.
+- Exit: restart resumes; duplicate effect is prevented/reconciled; approval survives restart.
+- Temporal remains a later adapter, not a Phase 0 dependency.
 
 ### P0-07 — Test/staging/replay harness
 
@@ -99,7 +92,7 @@ Required before Phase 1 implementation:
 ## 4. Phase 0 exit gates
 
 1. Domain contract, asset/idea/repo ledgers, threat model and phase order are committed.
-2. Temporal decision is recorded with a working local prototype.
+2. Local durable-substrate decision is recorded with a working prototype; Temporal is explicitly deferred.
 3. Staging/replay environment is reproducible from a command.
 4. No real credentials or operator data are used.
 5. Phase 1 tickets are bounded and have failure/recovery tests.
