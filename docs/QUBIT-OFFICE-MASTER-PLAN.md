@@ -1575,3 +1575,14 @@ owner sign-off.
 reuse-first, no MVP, Phase 0–8 with tasks/exit gates, parallel tracks, mandatory gates, corrected
 phase order and bug/misconfiguration fixes. Durable execution uses the existing SQLite control
 plane first; Temporal is a later adapter when measured need justifies it.
+
+
+---
+
+## 60. Trading Department
+
+`docs/QUBIT-OFFICE-TRADING-DEPARTMENT.md` adds a full Trading Department for crypto spot, meme
+coins and forex, plus a research lane for YouTube strategies. It defines roles, floor/rooms, market
+data, strategy/backtest/paper trading, OMS/EMS, risk engine, double-entry ledger, exchange/broker
+adapters, approvals, kill switch, legal/tax obligations and mandatory live gates. The department
+exists from the start; live capital requires owner risk-policy sign-off and all safety tests.

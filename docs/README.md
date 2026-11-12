@@ -166,6 +166,7 @@ done
 | `QUBIT-OFFICE-DOMAIN-CONTRACT.md` | Domain contract — entities, authority, invariants and projections |
 | `QUBIT-OFFICE-THREAT-MODEL.md` | Threat model — assets, actors, boundaries, threats, controls and gates |
 | `QUBIT-OFFICE-MANDATORY-CHECKLIST.md` | Mandatory 100% gate — OWASP, MCP, accessibility, observability, durability, privacy, scale |
+| `QUBIT-OFFICE-TRADING-DEPARTMENT.md` | Trading Department — crypto, meme coins, forex, risk, ledger, integrations and live gates |
 | `QUBIT-OFFICE-PHASE-0.md` | Phase 0 — durable engine decision, staging/replay, work items and exit gates |
 
 | `QUBIT-OFFICE-COMPLETE-PLAN.md` | Complete consolidated plan — every phase, gate, artifact and deferred item |
