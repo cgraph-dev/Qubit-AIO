@@ -1543,3 +1543,14 @@ cuts.
 new-release claims (reported/uncertain), platform improvements, UI/map/room ideas, scale
 problems/mitigations, performance budgets and technical choices. Full scope remains; the review
 adds dependency gates and measurable budgets, not scope cuts.
+
+
+---
+
+## 57. Browser comparison review
+
+`docs/QUBIT-OFFICE-BROWSER-REVIEW.md` compares the plan with current agent-platform, multi-agent
+and office-game builders. It adds an agent registry, A2A, one-writer-per-resource, retry/handoff/
+delegation ceilings, per-tool evals/schema canaries, protected checks, Tiled map pipeline, renderer
+benchmark, context-loss/dirty-render/device gates and active-set rules. Full scope remains; this
+review adds production guardrails and measurable corrections.
