@@ -490,3 +490,14 @@ The browser review in `docs/QUBIT-OFFICE-BROWSER-REVIEW.md` adds mandatory corre
 - Add context-loss recovery, dirty rendering, device tiers and scale fixture.
 - Full data/features from start, but **not all 283 agents continuously simulated**; active-set
   rendering and dormant execution remain.
+
+
+---
+
+## 14. Mandatory 100% checklist
+
+The release/implementation gate is `docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md`. It maps OWASP
+Agentic Top 10 2026, MCP OAuth/tool-schema/output rules, sandbox/RCE, approvals, memory, A2A,
+WCAG 2.2 AA, OpenTelemetry GenAI, Temporal durability, privacy/licensing and performance/device
+budgets to PASS/FAIL evidence. No release or `VERIFIED` claim while an applicable row is FAIL,
+UNTESTED or waived without owner sign-off.
