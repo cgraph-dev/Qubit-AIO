@@ -33,26 +33,28 @@ sequencing authority. Superseded phase lists are historical only.
 
 ## 2. Scope and non-goals
 
-### Scope
+### Scope — full build from the start (owner decision)
 
-Qubit Office is the control room over a durable Business OS:
-- campus/department floors/rooms/desks
-- agents with durable sessions, memory, capabilities and chat
-- businesses with real systems of record, approvals, budgets, audit and reconciliation
-- character/world/UI as projections of authoritative state
-- self-hosted local-first operation, later entities and invite-only World
+No reduced MVP. Build the full system:
 
-### Non-goals for the first slice
+- full campus/department/floor/room/desk data from the start
+- all departments, rooms, facilities, shared floors and outside world
+- all 283+ agent identities and their sessions/workspaces (active set still controls rendering)
+- all businesses/departments, not only Etsy
+- full War Room, Memory Room, approvals, ops, comms, panels and capability catalog
+- Character Studio merging Habblaud + LimeZu generators
+- all room styles, assets, FX, maps, animations
+- social/CRM/support/finance/contracts/HR/procurement/analytics
+- durable execution, identity, security, observability, backup/DR
+- multi-entity-ready from the data model; personal entity first
 
-- Not 100 active floors.
-- Not 283 active agents.
-- Not a rendered 3D city.
-- Not mature interactions/FX.
-- Not social/CRM/finance integrations beyond the first Etsy workflow.
-- Not Godot.
-- Not broad autonomy without security gates.
+### Non-goals
 
----
+- No fake success, phantom agents, renderer-owned business truth, unbounded money/legal/irreversible
+  action, unlicensed code/assets, or silent duplicate side effects.
+- No feature is cut as “MVP”; phases are dependency/merge order only.
+- Full scope does not mean every floor/agent animates at once. It means the data and features exist;
+  active/dormant rendering still applies.
 
 ## 3. Authority and source-of-truth map
 
@@ -409,19 +411,46 @@ workflow.
 
 ---
 
-## 11. MVP simplification (canonical first slice)
+## 11. Full-scope build v9 (owner decision)
 
-The full review is `docs/QUBIT-OFFICE-PLAN-REVIEW.md`. Until the MVP passes, this section
-supersedes the breadth of Phase 0–9:
+**Owner decision:** no MVP, no reduced first slice. The full product scope is committed from the
+start. The plan review remains a bug/risk list, not a scope reduction.
 
-1. One department, 4–6 rooms, 3–5 real agents.
-2. Real agent sessions, owner chat, one task/artifact/checkpoint.
-3. One existing Qubit capability through a deny-by-default gateway.
-4. One approval, one restart/recovery proof.
-5. One Obsidian folder + one OpenViking scope.
-6. One dry-run business workflow.
-7. No 100-floor expansion, Character Studio, outside world, mature interactions, Temporal, SSO,
-   multi-tenant, multi-entity or social integrations until that works.
+All prior “MVP”, “one department”, “3–5 agents”, “defer Temporal/SSO/multi-entity/social”, and
+“defer Character Studio/outside world/interactions” statements in this document are superseded.
 
-This is a scope reduction, not a new architecture. Detailed Phase 0–9 remain the long-term
-reference.
+### Full-scope workstreams
+
+1. **Platform foundation:** identity/tenancy, durable execution, event log, policy/capability
+   gateway, sessions/runs/tasks/workspaces/leases/checkpoints, message fabric, approvals,
+   reconciliation, secrets/sandbox/egress, observability/evals, backups/DR.
+2. **Office/campus:** all departments, floors, rooms, facilities, shared floors, maps, outside world.
+3. **Agent workforce:** all 283+ identities, per-agent sessions/workspaces, chat, handoffs,
+   delegation, full Qubit capability selectors (tools/skills/MCP/models/permissions/memory).
+4. **Memory:** department + office Obsidian graphs, OpenViking scopes, provenance/retention/
+   deletion.
+5. **Businesses:** all departments and business workflows, Etsy first live, then social/CRM/support/
+   finance/contracts/HR/procurement/analytics, multi-entity-ready.
+6. **Visuals:** Character Studio merge, LimeZu room styles, full panels, FX, animations, weather,
+   outside world.
+7. **Interactions:** social/needs/relationships/conflict/romance/career/mature policy and
+   consequences.
+8. **Scale/security/release:** 100/500/1,000-agent load, backup/restore, incident/kill switch,
+   deployment rings, evals, release gates.
+
+### Dependency order (not scope cuts)
+
+- Contracts/ledgers/threat model first.
+- Identity/durable execution/capability gateway before real external actions.
+- Session/chat/memory before agent collaboration.
+- One business workflow before all business systems; then activate the rest.
+- Character/outside world can be built in parallel with backend, but cannot own business truth.
+- Interactions/FX can be built in parallel, but cannot start before action/event schema.
+- Security/recovery gates apply to every workstream.
+
+### Full-scope acceptance
+
+Every department/room/business/agent exists in data; every external action has approval/receipt/
+reconciliation; every page reflects real state; every paid asset/licence is recorded; every
+failure is typed; restart/restore has evidence. `VERIFIED` still requires the owner release gate.
+

@@ -5,25 +5,23 @@
 
 ## 1. Decision: durable execution engine
 
-**MVP decision:** do **not** install Temporal before the first department works. Use the existing
-Business OS SQLite control plane with an explicit run/task/checkpoint/lease/outbox model for the
-single-user, single-host MVP. This is a deliberate reduction from the earlier Temporal-first plan.
+**Full-scope decision:** Temporal (PostgreSQL persistence) is the canonical durable workflow engine.
+Build it from the start; do not substitute a homegrown MVP scheduler.
 
-Rules:
+- Model/agent turns, tool calls, provider calls, payments, publishing, email, Etsy, CRM writes and
+  human approvals are activities or signals/waits.
+- Workflow code stays deterministic; external effects live in idempotent activities.
+- Every activity has an idempotency key, provider receipt/request ID and reconciliation path.
+- Human approval is a durable workflow wait/signal, not a chat message.
+- Run history is workflow history; the Business OS stores the business-readable projection.
+- PostgreSQL is the business/workflow persistence target; SQLite is not the workflow authority.
+- If Temporal/server dependencies are unavailable, consequential workflows fail closed.
 
-- Runs/tasks have explicit states including `unknown`.
-- Every external effect uses an idempotency key and provider receipt; timeouts reconcile.
-- Checkpoints store pending actions, tool receipts, approvals, workspace revision and a safe resume
-  point.
-- Leases/fencing protect tasks, workspaces and mutable resources.
-- Cancellation revokes leases/tokens, interrupts gateway calls and records unknown outcomes.
-- No exactly-once claim; duplicate effects must be prevented or reconciled.
-- A Temporal adapter is deferred until multi-process/Ha/high-volume needs are measured. It must pass
-  the same recovery/reconciliation tests before replacing the local engine.
+Alternatives are references, not the engine: LangGraph checkpoints are not external-effect
+transactions; Airflow is scheduled DAGs, not interactive long-lived agents; a homegrown queue
+reimplements timers/retries/history.
 
-Why: a local personal office with one department does not justify Temporal + PostgreSQL operations
-yet. The existing SQLite control plane and Qubit session/state stores already provide the starting
-substrate. Infrastructure should be earned by measured need, not added first.
+The owner rejected the reduced MVP; Temporal is part of the full build.
 
 ## 2. Staging, test and replay environment
 
@@ -71,13 +69,13 @@ Required before Phase 1 implementation:
 - `docs/QUBIT-OFFICE-THREAT-MODEL.md`: assets, actors, boundaries, threats/controls/tests.
 - Exit: security gates for external actions are accepted.
 
-### P0-06 — Local durable substrate prototype
+### P0-06 — Temporal durable prototype
 
-- Prototype on the existing SQLite Business OS: run/task states, lease/checkpoint, outbox/inbox,
-  idempotency key and fake provider receipt.
-- Include one human approval wait, one timer/retry and one unknown-outcome reconciliation.
-- Exit: restart resumes; duplicate effect is prevented/reconciled; approval survives restart.
-- Temporal remains a later adapter, not a Phase 0 dependency.
+- Bring up Temporal with PostgreSQL (self-hosted local profile).
+- Prototype: activity with fake external receipt, human approval wait, timer, retry/timeout and
+  unknown-outcome reconciliation.
+- Exit: restart resumes; duplicate activity is idempotent; approval survives restart; unknown
+  outcome reconciles.
 
 ### P0-07 — Test/staging/replay harness
 
@@ -92,7 +90,7 @@ Required before Phase 1 implementation:
 ## 4. Phase 0 exit gates
 
 1. Domain contract, asset/idea/repo ledgers, threat model and phase order are committed.
-2. Local durable-substrate decision is recorded with a working prototype; Temporal is explicitly deferred.
+2. Temporal decision is recorded with a working prototype.
 3. Staging/replay environment is reproducible from a command.
 4. No real credentials or operator data are used.
 5. Phase 1 tickets are bounded and have failure/recovery tests.
