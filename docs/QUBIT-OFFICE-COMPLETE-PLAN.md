@@ -472,3 +472,21 @@ The external review in `docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md` adds mandatory p
 - Separate authoritative business events from ephemeral presentation events.
 - Add context-loss/reconnect/restore/fault-injection tests.
 - Keep full scope; use dependency gates, not scope cuts.
+
+
+---
+
+## 13. Browser comparison corrections
+
+The browser review in `docs/QUBIT-OFFICE-BROWSER-REVIEW.md` adds mandatory corrections:
+
+- Add an **agent registry** and **A2A handoff contract**, not only roles/MCP.
+- Enforce **one writer per mutable resource/file**; append-only fragments for shared files.
+- Add **retry/handoff/delegation ceilings**, no-progress detection and circuit breakers.
+- Add **per-tool eval/schema-drift canaries**, an independent verifier and protected checks.
+- Cap parallel agent waves and aggregate budgets.
+- Add Tiled-compatible map import/export, validation and chunked tilemaps.
+- Benchmark **Phaser 4 GPU layers vs Pixi chunking**; web 2D first, Godot later.
+- Add context-loss recovery, dirty rendering, device tiers and scale fixture.
+- Full data/features from start, but **not all 283 agents continuously simulated**; active-set
+  rendering and dormant execution remain.
