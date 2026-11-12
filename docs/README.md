@@ -169,3 +169,4 @@ done
 
 | `QUBIT-OFFICE-COMPLETE-PLAN.md` | Complete consolidated plan — every phase, gate, artifact and deferred item |
 | `QUBIT-OFFICE-PLAN-REVIEW.md` | Plan review — bugs, misconfigurations, MVP simplification and what to defer |
+| `QUBIT-OFFICE-IMPROVEMENTS-2026.md` | 2026 release/UI/map/scale review — improvements, budgets, problems and technical choices |
