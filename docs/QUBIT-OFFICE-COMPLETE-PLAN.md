@@ -186,7 +186,8 @@ Exit gate:
 **Goal:** full structure, not a reduced department.
 
 Tasks:
-- P3-01 all department/floor/room/cell/desk records from templates; full campus data.
+- P3-01 all department/floor/room/cell/desk records from templates; full campus data, including
+  Trading Department floor/rooms.
 - P3-02 per-floor facilities: reception, kitchen, restrooms, lounge, boardroom, focus, desks, head
   office, storage, comms.
 - P3-03 room capability manifests: workflows, tools, roles, artifacts, queues, KPIs, privacy,
@@ -244,7 +245,10 @@ Tasks:
 - P5-08 procurement/vendors.
 - P5-09 analytics/KPI contracts/freshness.
 - P5-10 multi-entity-ready books/entities; personal first.
-- P5-11 business factory: create/clone/operate departments and businesses.
+- P5-11 Trading Department: crypto spot, meme coins, forex; market data, strategy registry,
+  backtester, paper broker, OMS/EMS, risk engine, double-entry portfolio ledger, exchange/broker
+  adapters, approvals, kill switch; YouTube claims treated as hypotheses.
+- P5-12 business factory: create/clone/operate departments and businesses.
 
 Exit gate:
 - Every committed outcome has a system-of-record row or provider receipt.
@@ -264,7 +268,8 @@ Tasks:
 - P6-05 department/floor/room builder: draft/version/preview/undo/approve/rollback.
 - P6-06 outside world/campus exterior, lobby/elevators, weather/day-night, active zones.
 - P6-07 full panel inventory: agents, sessions, chat, terminal, deliveries, timeline, War Room,
-  Memory, Approvals, Ops, ledger, CRM, marketing, Etsy, models/MCP/plugins/skills, budgets, audit.
+  Memory, Approvals, Ops, ledger, CRM, marketing, Etsy, Trading (market wall/strategy/risk/ledger),
+  models/MCP/plugins/skills, budgets, audit.
 - P6-08 accessibility/WCAG 2.2 AA across canvas and DOM.
 - P6-09 licence-aware asset build; no paid art leakage.
 
