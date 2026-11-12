@@ -1,503 +1,379 @@
-# Qubit Office — complete plan and phases
+# Qubit Office — complete execution plan
 
-**Status:** consolidated execution plan v8. Design/contracts only where marked; no implementation
-claim and no `VERIFIED` verdict.
-**Purpose:** one navigable plan that records every phase, workstream, decision, artifact and gate
-so nothing depends on chat memory.
-**Conflict rule:** detailed contracts win over this summary; this file is the single navigation and
-sequencing authority. Superseded phase lists are historical only.
-
----
-
-## 1. Current state (measured, not aspirational)
-
-- Qubit Office UI, rebrand, loading screen/weather, HUD, Agents, War Room, Approvals and Etsy
-  connection surfaces exist in the live build.
-- Live office scene: **4 rooms, 10 agents, 3 departments**.
-- 100-floor projection: **100 floors, 5 wings, 300 rooms, 3,075 desks**.
-- **283 agent records** linked from office seats; **283 assigned desks**; **18 floors / 36 rooms
-  staffed** in the projection.
-- Business OS: **1 tenant, 1 business (`Personal`, draft), 1 War Room session
-  (`Etsy digital shop pilot`)**, 0 tasks, 0 jobs, 1 pending decision, 0 ledger entries, 0 agent
-  turns.
-- **No** durable sessions/workspaces, owner/agent chat, agent/agent chat, capability gateway,
-  memory adapters, real Etsy/social/CRM operations, Character Studio, outside world, or rendered
-  100-floor 3D world.
-- Assets: **1,523 files, 404 MB** under `/home/trick/Desktop/UI Office`.
-- Plan set: master plan, department/interaction design, research gaps, idea ledger, asset ledger,
-  repo ledger, domain contract, threat model, Phase 0 plan.
-- No `main` merge; integration branch carries the implementation.
-- No full matrix; `VERIFIED` is not claimed.
+**Version:** v10 (canonical). **Status:** design/contract plan; implementation evidence is tracked
+separately. Not `VERIFIED`.
+**Owner decisions:** full scope from the start; no reduced MVP; no overengineering; reuse the
+repos/assets already supplied; no renderer-owned business truth.
+**Conflict rule:** detailed contracts/ledgers win for their area. This file wins for phase order.
+All earlier phase lists are historical.
 
 ---
 
-## 2. Scope and non-goals
+## 1. Executive summary
 
-### Scope — full build from the start (owner decision)
+Qubit Office is the control room over a durable Business OS:
+- full campus/department/room/desk data
+- all agents with durable sessions, memory, capabilities and chat
+- all businesses/departments with real systems of record
+- Character Studio, room styles, outside world, maps, FX and interactions
+- local-first, later invite-only World and entities
 
-No reduced MVP. Build the full system:
+The build is **full scope**, but dependencies still determine merge/activation order. A phase is
+not a feature cut; it is the order in which work can be safely integrated and proven.
 
-- full campus/department/floor/room/desk data from the start
-- all departments, rooms, facilities, shared floors and outside world
-- all 283+ agent identities and their sessions/workspaces (active set still controls rendering)
-- all businesses/departments, not only Etsy
-- full War Room, Memory Room, approvals, ops, comms, panels and capability catalog
-- Character Studio merging Habblaud + LimeZu generators
-- all room styles, assets, FX, maps, animations
-- social/CRM/support/finance/contracts/HR/procurement/analytics
-- durable execution, identity, security, observability, backup/DR
-- multi-entity-ready from the data model; personal entity first
+**Reuse-first rule:** if a supplied repo or existing Qubit component already solves a problem, use
+it or adapt it under its license. Do not rebuild an engine, editor, renderer, memory system, office,
+router, terminal, queue or panel system from scratch.
 
-### Non-goals
+---
 
-- No fake success, phantom agents, renderer-owned business truth, unbounded money/legal/irreversible
-  action, unlicensed code/assets, or silent duplicate side effects.
-- No feature is cut as “MVP”; phases are dependency/merge order only.
-- Full scope does not mean every floor/agent animates at once. It means the data and features exist;
-  active/dormant rendering still applies.
+## 2. Current measured state
 
-## 3. Authority and source-of-truth map
+- Live: Qubit Office shell, 4 rooms / 10 agents / 3 departments, loading/weather, HUD, Agents,
+  War Room, Approvals, Etsy connection, rebrand.
+- Business OS: 1 tenant, 1 draft business, 283 agent records, 1 War Room session (`Etsy digital
+  shop pilot`), 0 tasks/jobs/ledger/turns.
+- 100-floor projection: 100 floors, 5 wings, 300 rooms, 3,075 desks; 283 assigned; 18 floors /
+  36 rooms staffed in the projection.
+- Assets: 1,523 files / 404 MB under `/home/trick/Desktop/UI Office`.
+- Plan docs: master, this plan, department/interaction design, research gaps, browser review,
+  improvements, idea/asset/repo ledgers, domain contract, threat model, mandatory checklist,
+  Phase 0.
+- Missing: real sessions/workspaces, chat, capability gateway, memory adapters, actual turns,
+  real business operations, Character Studio, outside world, rendered 3D world, full release
+  evidence.
+- No `main` merge; no full matrix; no `VERIFIED`.
 
-| Concern | Authority | Detail |
+---
+
+## 3. Build principles
+
+1. **Full data, controlled activation.** All departments/rooms/agents/businesses exist in data;
+   only active areas render/simulate. Full scope does not mean all 283 agents animate at once.
+2. **Business OS is truth.** Office/tower/maps/Obsidian are projections.
+3. **One execution boundary.** Every model/tool/MCP/terminal/browser/file/message/memory/external
+   action passes through ToolGateway.
+4. **Reuse before build.** Habblaud/LimeZu/pixelfx/SkyOffice/existing Qubit components first.
+5. **No fake success.** Artifact, receipt, row, message ID or ticket required.
+6. **Deny by default.** No wildcard permissions; no secrets in prompts/workspaces.
+7. **One writer per mutable resource/file.** Others submit patches/fragments.
+8. **Bounded autonomy.** Budgets, retries, handoffs, depth, concurrency, approvals, kill switch.
+9. **Mandatory gates are release blockers**, not suggestions.
+10. **No new plan order.** New ideas go to the idea ledger; phases do not reorder without owner
+    sign-off.
+
+---
+
+## 4. Authority map
+
+| Data | Authority | Projection |
 |---|---|---|
-| Entities, fields, invariants | `docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md` | Business OS event log/SQLite/Postgres |
-| Departments, sessions, memory, interactions | `docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` | design contract |
-| Research gaps/forgotten requirements | `docs/QUBIT-OFFICE-RESEARCH-GAPS.md` | external review |
-| Ideas and status | `docs/QUBIT-OFFICE-IDEA-LEDGER.md` | owner idea ledger |
-| Assets/licences | `docs/QUBIT-OFFICE-ASSET-LEDGER.md` | local inventory |
-| Repos/commits/licences | `docs/QUBIT-OFFICE-REPO-LEDGER.md` | dependency ledger |
-| Threats/controls/tests | `docs/QUBIT-OFFICE-THREAT-MODEL.md` | security baseline |
-| Phase 0 work/gates | `docs/QUBIT-OFFICE-PHASE-0.md` | execution checklist |
-| History/status | `docs/STATUS.md` | evidence ledger, not authority for design |
+| Owner/tenant/entity/business/department/room/agent | Business OS | Office UI, maps, tower |
+| Session/run/task/workspace/checkpoint/handoff | Business OS/event log | Panels, timeline |
+| Message/approval/ledger/receipt | Business OS event log | Inbox, audit |
+| Capability/grant/call | Policy + ToolGateway | Agent panel |
+| CharacterProfile | Business OS | Habblaud character, LimeZu portrait |
+| Map/world | versioned map schema | Web renderer, optional Godot |
+| Obsidian | derived projection | Human graph/search |
+| OpenViking | adapter into memory API | Semantic retrieval |
+| FX | event consumer | Animations |
 
-Obsidian is a derived projection. OpenViking is behind one scoped adapter. The renderer, tower,
-office UI and maps never own business truth.
-
----
-
-## 4. Architecture summary
-
-**Campus → Department Floor → Room → Cell (16×12) → Desk → Agent**
-
-- One floor = one department. Floors merge into a campus.
-- Shared floors/rooms: War Room, Memory Room, Ops/Approvals, Comms, Server/Infra, Studio,
-  Training, Lobby, Cafeteria/Atrium, outside world.
-- Every room has a capability manifest: workflows, roles, toolsets, artifacts, queues, KPIs,
-  memory scope, privacy, activation.
-- Every agent is a security principal with a durable session, workspace, task queue, checkpoint
-  and explicit grants.
-- Every consequential action goes through ToolGateway.
-- Every external outcome has a receipt, unknown-state handling and reconciliation.
-- Every business outcome has a system-of-record record, not just a chat reply.
+Detail: `docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md`.
 
 ---
 
-## 5. Cross-cutting contracts
+## 5. Reuse map (do not rebuild)
 
-### 5.1 Agent configuration
+| Need | Reuse | Notes |
+|---|---|---|
+| Office/room rendering, seats, character state | Habblaud | MIT; don't break current behavior |
+| Room floors/furniture/portraits/UI | LimeZu packs | paid/local-only; licence ledger |
+| Loading/weather/FX | pixelfx | MIT; event-driven |
+| Room/chat/map commands | SkyOffice | MIT; verify commit |
+| Worktree isolation, departments, token handling | claw-empire | Apache-2.0; verify notices |
+| Session/meeting UI patterns | agent-monitor | no LICENSE file → concepts only |
+| Roster/skills/MCP selector concepts | agents-office | PolyForm; concepts only, no copy/bundle |
+| Per-agent sandbox/worktree concepts | Agent Office / JSM HQ | MIT; verify commits |
+| Business/CRM/ERP patterns | Veska/Oryh/AgenticCRM/Autonomous Business OS/FusionClaw/OOSDK | later references; verify licences |
+| Existing Qubit state/session/gateway | Qubit runtime | extend, don't replace |
+| Map pipeline | Tiled | import/export candidate; validate schema |
+| Web renderer | Phaser or Pixi | benchmark before choosing |
 
-Selectors: identity/owner, permissions (RBAC+ABAC), skills, MCP servers/tools, toolsets, model/
-provider/reasoning/fallback, budgets/autonomy, memory scopes, secrets, schedule, appearance,
-session policy.
-
-Rules:
-- deny-by-default; no wildcard
-- skills require capabilities but never grant them
-- MCP allowlist at server and tool level
-- model route/fallback pinned per run
-- capability snapshot frozen per run; revocation interrupts
-- secrets only via vault/gateway
-- UI shows effective grants/inherited vs explicit/leases/budgets/audit
-
-### 5.2 Session/runtime model
-
-Session (durable owner↔agent) → Run (bounded attempt) → Task (durable work) → Workspace
-(task-pinned) → Checkpoint (recovery) → Handoff (explicit transfer). Leases/fencing protect
-concurrency. Unknown outcomes reconcile. Stop revokes leases/tokens and preserves a checkpoint.
-
-### 5.3 Memory
-
-- Event log authoritative.
-- Obsidian: department graph, office-wide graph, agent notes, decisions/artifacts; derived only.
-- OpenViking: adapter over authenticated namespaces; scoped collections; provenance/retention/
-  deletion/conflict rules.
-- No Brain model integration; memory is the requirement.
-
-### 5.4 Multi-agent
-
-Supervisor + bounded delegation; work-queue leases; artifact collaboration; reviewer/council;
-single-writer pairing; department channels; commit-authority conflict resolution.
-
-### 5.5 Security
-
-Identity/SSO/MFA/workload identity, tenant isolation, sandbox, deny egress, secrets manager,
-prompt-injection defenses, MCP/tool allowlists, tamper-evident audit, approvals bound to payload
-hash, kill switch, backups/DR, supply-chain controls.
-
-### 5.6 Business systems
-
-Own the control plane and orchestration; integrate systems of record: CRM, support, marketing/
-social, finance/accounting/payments, contracts/legal, HR, procurement, analytics, multi-entity
-books. Etsy is the first vertical, not the product.
+Full mapping: `docs/QUBIT-OFFICE-REPO-LEDGER.md`.
 
 ---
 
 ## 6. Phases
 
-### Phase 0 — Freeze, contracts and ledgers
+### Phase 0 — Program setup and contracts
 
-**Goal:** stop drift; make the system buildable.
-
-Tasks:
-- P0-01 freeze v8 and authority map
-- P0-02 domain/projection contract
-- P0-03 asset ledger (1,523 files, licences, intended use)
-- P0-04 idea and repo ledgers
-- P0-05 threat model
-- P0-06 local durable-substrate decision + prototype (Temporal deferred)
-- P0-07 staging/replay/fault-injection harness
-- P0-08 Phase 1 tickets with acceptance tests
-
-Exit gates:
-- All Phase 0 artifacts committed.
-- Local run/task/checkpoint/lease prototype resumes after restart; duplicate effect prevented/reconciled; approval survives.
-- Staging/replay reproducible.
-- No real credentials/operator data.
-- Phase 1 tickets bounded and testable.
-
-Not yet: tower, character studio, outside world, mature interactions, real social/Etsy.
-
-### Phase 1 — Foundation: identity, durable state, security, observability
+**Goal:** make the build unambiguous and reusable.
 
 Tasks:
-- P1-01 owner/tenant/business/legal-entity records; local owner auth, future OIDC/SSO.
+- P0-01 freeze v10, owner decisions, no new phase reordering.
+- P0-02 finalize domain/projection contract (`DOMAIN-CONTRACT`).
+- P0-03 asset ledger: per-file sha256/licence/use; paid/local-only rules.
+- P0-04 idea/repo ledgers; exact commits/licences; concept-vs-code status.
+- P0-05 threat model + mandatory checklist accepted.
+- P0-06 reuse audit: map every existing repo/component to the phase where it is used.
+- P0-07 staging/replay environment: throwaway home, synthetic tenant, fake providers/tools,
+  deterministic seeds, fault injection.
+- P0-08 scale fixture: 100 floors, 3,075 desks, 1,000 agents (data, not rendered).
+- P0-09 renderer benchmark: Phaser 4 GPU layers vs Pixi chunking with identical maps/sprites.
+- P0-10 durable execution decision: existing SQLite run/task/checkpoint/lease/outbox now; Temporal
+  adapter when multi-worker/HA is measured. Do not build a homegrown full workflow engine.
+
+Exit gate:
+- All contracts/ledgers/threat/checklist committed.
+- Reuse map and licence status for every repo.
+- Staging/replay and scale fixture runnable.
+- Renderer benchmark recorded.
+- Phase 1 tickets have acceptance/failure tests.
+
+### Phase 1 — Core platform and security
+
+**Goal:** make sessions, actions and recovery safe before real work.
+
+Tasks:
+- P1-01 owner/tenant/business/entity records; local owner auth, OIDC-ready.
 - P1-02 RBAC+ABAC policy engine; deny-by-default; expiry/revocation.
-- P1-03 local durable workflows: states, timers/waits, retries, outbox/inbox, event history; Temporal adapter deferred.
-- P1-04 run state machine incl. unknown; reconciliation/dead-letter ownership.
-- P1-05 append-only event log, audit chain, correlation IDs, traces/metrics/logs.
-- P1-06 secrets manager/vault, sandbox, filesystem jail, egress policy.
-- P1-07 backups/restore, RPO/RTO, tenant restore, restore drills.
-- P1-08 schema/policy/prompt migration framework.
-- P1-09 test/staging/replay and fault injection.
+- P1-03 event log/audit chain; correlation IDs; append-only messages.
+- P1-04 durable run/task/workspace/checkpoint/lease/outbox; unknown state + reconciliation.
+- P1-05 ToolGateway skeleton; capability catalog; policy compiler; capability snapshots.
+- P1-06 message fabric: owner↔agent, agent↔agent, rooms, threads, delivery/replay.
+- P1-07 approvals: payload hash, evidence, risk, cost, expiry, delegate/escalate.
+- P1-08 secrets manager, sandbox, filesystem jail, deny egress, outbound allowlists.
+- P1-09 observability: OpenTelemetry GenAI spans/metrics, content capture off, eval events.
+- P1-10 backups/restore, RPO/RTO, tenant restore, restore drills.
+- P1-11 migration/versioning for schemas/policies/prompts/checkpoints.
+- P1-12 test/staging/replay/fault injection; per-tool eval/schema canary.
 
-Exit gates:
-- One durable workflow survives restart.
-- Unauthorized call refused.
-- Backup restored/verified.
-- Trace explains a complete run.
-- Secret canary absent from prompt/log/memory/workspace.
+Exit gate:
+- Restart resumes a run; duplicate effect prevented/reconciled.
+- Unauthorized capability call denied.
+- Approval survives restart and is payload-bound.
+- Secret canary absent from prompts/logs/memory/workspaces.
+- Restore verified; trace explains a run end-to-end.
 
-### Phase 2 — Agent runtime and capability gateway
+### Phase 2 — Agent runtime and capability integration
 
-Tasks:
-- P2-01 AgentProfile/selectors; effective-policy compiler.
-- P2-02 capability catalog (health/version/risk/scopes).
-- P2-03 ToolGateway mandatory for model/tools/MCP/terminal/browser/files/messages/memory/
-  connectors/payments/Etsy.
-- P2-04 sessions/runs/tasks/workspaces/leases/checkpoints/handoffs.
-- P2-05 capability snapshots; revocation interrupts.
-- P2-06 message fabric: owner↔agent, agent↔agent, rooms, threads, delivery/replay.
-- P2-07 durable approvals: payload hash, evidence, risk, cost, expiry, delegate/escalate.
-- P2-08 memory adapter: event log authority; Obsidian projection; OpenViking scope.
-- P2-09 effective-state UI.
-- P2-10 one real agent lane: task → capability → approval → artifact → checkpoint → restart.
-
-Exit gates:
-- One agent lane works end-to-end.
-- Permissions/skills/MCP selectors are enforced, not decorative.
-- Messages replay; approvals survive restart; revocation stops execution.
-- No duplicate side effect after restart.
-
-### Phase 3 — One department floor vertical slice
+**Goal:** every agent has a real, recoverable lane using Qubit’s actual capabilities.
 
 Tasks:
-- P3-01 department template from current office image
-- P3-02 reception, work area, boardroom, focus, kitchen/break, restrooms, lounge, head office,
-  storage
-- P3-03 real room/seat/capability manifests; 3–5 real agents
-- P3-04 department Obsidian graph + OpenViking scope
-- P3-05 room map, character/portrait basics, status/activity feed
-- P3-06 owner chat, agent-to-agent chat, handoff
-- P3-07 business record, tasks, artifacts, metrics, audit
-- P3-08 restart/recovery tests
+- P2-01 Agent Registry: identity, owner, department, tools, skills, MCP, model policy, grants,
+  health, version.
+- P2-02 Agent configuration selectors: permissions, skills, MCP/tool allowlists, model/provider/
+  reasoning/fallback, budgets, autonomy, memory scopes, secrets, schedule, appearance.
+- P2-03 Framework-neutral agent adapter; model/provider routing pinned per run.
+- P2-04 ToolGateway execution for model/tools/MCP/browser/terminal/files/messages/memory/connectors.
+- P2-05 sessions/workspaces/leases/checkpoints/handoffs; task-pinned workspace; one writer.
+- P2-06 A2A typed/authenticated messages; no privilege inheritance; replay protection.
+- P2-07 memory adapter: event log authoritative; Obsidian projection; OpenViking scoped adapter;
+  provenance/retention/deletion.
+- P2-08 agent chat, owner chat, room channels, handoff.
+- P2-09 actual turn execution: prompt → model → tool → approval → artifact → receipt → checkpoint.
+- P2-10 effective-state UI: grants, model, leases, budgets, approvals, audit.
+- P2-11 independent verifier; agents cannot edit checks/evals/policy; retry/handoff/depth caps.
 
-Exit gates:
-- User can watch real work, talk to agents, see artifacts, recover after restart.
-- Office is a projection; business truth survives with the browser closed.
-- No more than one department; no 100-floor expansion yet.
+Exit gate:
+- One agent completes real recoverable work with one capability and one approval.
+- A second agent can receive a typed handoff with artifacts.
+- Revocation interrupts a live call; restart does not duplicate effects.
+- Memory scope/ACL and A2A spoof tests pass.
 
-### Phase 4 — First business workflow (Etsy)
+### Phase 3 — Full campus and office data
 
-Tasks:
-- P4-01 niche → licensed digital asset
-- P4-02 draft listing (title/description/tags/price/files)
-- P4-03 IP/licence evidence + owner approval
-- P4-04 official OAuth publish + provider receipt
-- P4-05 order/download/support/refund flows
-- P4-06 payout/reconciliation/ledger
-- P4-07 margin report
-- P4-08 unknown-outcome/retry/rollback
-
-Exit gates:
-- One complete Etsy flow with receipts and reconciliation.
-- Digital asset versioning/malware scan/entitlement.
-- No fake success.
-- Spending/publishing/refunds gated.
-
-### Phase 5 — Business systems of record
+**Goal:** full structure, not a reduced department.
 
 Tasks:
-- P5-01 CRM/contacts/leads/consent/pipeline
-- P5-02 support/tickets/SLA/handoff
-- P5-03 marketing/social campaigns/drafts/approvals/publication receipts
-- P5-04 finance/accounting/payments/ledger/reconciliation
-- P5-05 contracts/obligations/renewals
-- P5-06 HR/people/agent lifecycle
-- P5-07 procurement/vendors
-- P5-08 analytics/KPI contracts/freshness
-- P5-09 multi-entity separation
+- P3-01 all department/floor/room/cell/desk records from templates; full campus data.
+- P3-02 per-floor facilities: reception, kitchen, restrooms, lounge, boardroom, focus, desks, head
+  office, storage, comms.
+- P3-03 room capability manifests: workflows, tools, roles, artifacts, queues, KPIs, privacy,
+  memory, approvals, activation.
+- P3-04 all 283+ agent placements with active/dormant policy; no fake occupancy.
+- P3-05 map schema: campus/department/room/cell; Tiled import/export candidate; validation,
+  portals, connectivity, egress, capacity.
+- P3-06 renderer: benchmark-selected web 2D; one active floor, chunked tilemaps/atlases, LRU,
+  context-loss recovery, dirty rendering.
+- P3-07 full panels shell: command center, search, floor navigator, agent/room/task drawers,
+  notifications, accessibility DOM mirror.
+- P3-08 Character Studio shell: Habblaud state + LimeZu character/portrait adapters.
+- P3-09 outside-world data shell and lobby/elevator connection.
 
-Exit gates:
-- Each business action has a system-of-record row and provider receipt.
-- No financial truth from narrative/dashboard totals.
-- Human approvals for money/legal/publish/contact/irreversible.
+Exit gate:
+- Every department/room/desk exists in data; selected floor renders correctly.
+- Active/dormant rendering does not affect business execution.
+- Map validation/accessibility/device budgets pass.
+- Room capabilities resolve to real workflows/tools/memory.
 
-### Phase 6 — Multiply departments and campus
+### Phase 4 — Full agent workforce and collaboration
 
-Tasks:
-- P6-01 clone working department template
-- P6-02 department/floor/room builder with validation/versioning/undo
-- P6-03 department-specific capabilities/memory/roles/business/assets
-- P6-04 campus map/elevators/stairs/shared floors
-- P6-05 active/dormant scheduler with fairness/leases/business continuity
-- P6-06 multi-department permissions/budgets/reporting
-
-Exit gates:
-- New department can be created, staffed, operated, recovered.
-- Dormant department continues business execution.
-- No business depends on camera visibility.
-
-### Phase 7 — Character Studio, UI and world
+**Goal:** all agents work, talk, remember and hand off without losing work.
 
 Tasks:
-- P7-01 CharacterProfile merge (Habblaud + LimeZu Character 2.0 + Portrait 1.5)
-- P7-02 one save authority; transactional projections; rollback
-- P7-03 full panel inventory/effective-state controls
-- P7-04 distinct room styles/furniture/lighting/assets
-- P7-05 outside world/campus exterior
-- P7-06 renderer-neutral map/chunk/layer/door/portal schema
-- P7-07 web renderer first; Godot after parity
-- P7-08 asset/licence enforcement across bundles/caches/screenshots/backups/exports
+- P4-01 all agent sessions/workspaces provisioned; per-agent memory scopes.
+- P4-02 owner↔agent chat; agent↔agent threads; room channels; mentions; handoff acceptance.
+- P4-03 supervisor/delegation patterns with caps, leases and independent verification.
+- P4-04 task queue, worktrees/sandboxes, artifacts, checkpoints, recovery.
+- P4-05 full capability access through ToolGateway; no hardcoded provider.
+- P4-06 department Obsidian graphs + office graph; OpenViking scopes.
+- P4-07 agent-to-agent conflict resolution; one writer per resource; append-only fragments.
+- P4-08 pause/stop/revoke/quarantine/kill switch; behavior baseline/anomaly detection.
+- P4-09 replayable operator UI; run timeline; cost/evidence/unknown states.
 
-Exit gates:
-- Visual office reflects real state.
-- Character edits round-trip between profile and renderer.
-- No paid art in public tree/export.
-- No renderer-invented business truth.
+Exit gate:
+- Multiple agents collaborate on a task without shared-state corruption.
+- Handoff loop/retry/delegation caps work.
+- Chat/memory survive restart; revocation stops active calls.
+- No work lost on crash.
 
-### Phase 8 — Interactions, FX, mature simulation and scale
+### Phase 5 — Business operations and systems of record
+
+**Goal:** all businesses/departments operate on real records.
 
 Tasks:
-- P8-01 needs/traits/relationships/action catalog
-- P8-02 consequences: stress/health/morale/HR/legal/career
-- P8-03 mature-content policy: off by default, non-graphic, consent/HR/legal guards
-- P8-04 event-to-FX schema/replay/cancel/fallback/reduced motion
-- P8-05 outside life/day-night/weather/seasons
-- P8-06 100/500/1,000-agent load tests; frame/memory/event/persistence budgets
-- P8-07 capacity/backpressure/disaster game days/release rings/evals
-- P8-08 optional Godot/2.5D/3D after web parity
+- P5-01 Etsy end-to-end: niche → asset → draft → approval → OAuth publish → receipt → order/
+  download/support/refund → payout → ledger → reconciliation → margin.
+- P5-02 CRM/contacts/leads/consent/pipeline.
+- P5-03 support/tickets/SLA/handoff.
+- P5-04 marketing/social campaigns/drafts/approvals/publication receipts.
+- P5-05 finance/accounting/payments/ledger/reconciliation.
+- P5-06 contracts/obligations/renewals.
+- P5-07 HR/people/agent lifecycle.
+- P5-08 procurement/vendors.
+- P5-09 analytics/KPI contracts/freshness.
+- P5-10 multi-entity-ready books/entities; personal first.
+- P5-11 business factory: create/clone/operate departments and businesses.
 
-Exit gates:
-- Interactions do not weaken durability/security/business truth.
-- Scale meets budgets.
+Exit gate:
+- Every committed outcome has a system-of-record row or provider receipt.
+- Unknown outcomes reconcile; money/legal/publish/contact require approvals.
+- No business depends on the office renderer.
+- One pilot business fully operational; additional businesses can be cloned.
+
+### Phase 6 — Character Studio, room styles, outside world, full UI
+
+**Goal:** full visual identity and customization over working operations.
+
+Tasks:
+- P6-01 Character Studio: merge Habblaud state/editor with LimeZu Character/Portrait generators.
+- P6-02 one CharacterProfile save authority; transactional projections; versioning/rollback.
+- P6-03 per-agent appearance, portraits, voices, animation sets, role presets.
+- P6-04 room styles: archetypes, furniture sets, palettes, lighting, signage, seeds/variants.
+- P6-05 department/floor/room builder: draft/version/preview/undo/approve/rollback.
+- P6-06 outside world/campus exterior, lobby/elevators, weather/day-night, active zones.
+- P6-07 full panel inventory: agents, sessions, chat, terminal, deliveries, timeline, War Room,
+  Memory, Approvals, Ops, ledger, CRM, marketing, Etsy, models/MCP/plugins/skills, budgets, audit.
+- P6-08 accessibility/WCAG 2.2 AA across canvas and DOM.
+- P6-09 licence-aware asset build; no paid art leakage.
+
+Exit gate:
+- Character edits round-trip; room styles validate; map/world reflects real state.
+- Every panel has data authority, permissions, empty/error states and real actions.
+- Keyboard/screen-reader/reduced-motion review passes.
+- Paid/licensed art boundaries pass.
+
+### Phase 7 — Interactions, FX and social simulation
+
+**Goal:** make the world alive without creating fake business truth.
+
+Tasks:
+- P7-01 needs/traits/relationships/action catalog.
+- P7-02 consequences: stress/health/morale/HR/legal/career.
+- P7-03 mature-content policy off by default; non-graphic, consent/HR guards.
+- P7-04 event-to-FX schema; replay/cancel/fallback; reduced motion.
+- P7-05 motion, weather, outside life, day/night/seasons.
+- P7-06 action authority: simulation-only vs authoritative HR/legal/business events.
+- P7-07 social graph visualization and room activity.
+- P7-08 no random business claims or fake completion from simulation.
+
+Exit gate:
+- Interactions alter only declared state; sensitive events require policy.
+- FX are event-driven, reversible/disableable and not business truth.
 - Mature content is opt-in and bounded.
-- FX are event-driven, not random business state.
 
-### Phase 9 — Release and operations
+### Phase 8 — Scale, performance, security and release
+
+**Goal:** prove the full system under load and failure.
 
 Tasks:
-- P9-01 security/privacy review and negative tests
-- P9-02 backup/restore/incident/on-call/kill switch
-- P9-03 feature flags/deployment rings/canary/rollback
-- P9-04 observability/evals/scorecards/synthetic monitoring
-- P9-05 self-hosting contract/setup/migrations/import/export/telemetry
-- P9-06 manual runbooks/exit/shutdown/close
-- P9-07 one final matrix on frozen SHA
+- P8-01 100/500/1,000-agent load; 100-floor scale fixture.
+- P8-02 device tiers: desktop/low-end/mobile; frame/memory/bundle/event budgets.
+- P8-03 WebGL context-loss, reconnect, restore/fault injection.
+- P8-04 OWASP Agentic Top 10 tests; MCP OAuth/schema/audience; prompt injection; sandbox escape;
+  memory poisoning; A2A spoof; rogue-agent/kill switch.
+- P8-05 WCAG 2.2 AA manual and automated review.
+- P8-06 OpenTelemetry GenAI traces/evals; sampling; no content/PII leakage.
+- P8-07 backups/DR/restore drills; incident response; deployment rings/rollback.
+- P8-08 final matrix once on frozen SHA; release gate.
 
-Exit gates:
-- All P0/P1/P2 gates have evidence.
-- Restore drill passes.
-- Unknown-outcome/reconciliation drills pass.
-- Release can be rolled back.
-- `VERIFIED` only if the owner release gate is satisfied.
+Exit gate:
+- Mandatory checklist has PASS evidence for every applicable row.
+- Scale/device/accessibility/security/recovery gates pass.
+- No `VERIFIED` without owner release evidence.
 
 ---
 
-## 7. Phase 0 artifact status
+## 7. Parallel tracks
 
-| Artifact | Status |
+These can run in parallel with the phase owner, but cannot merge ahead of their dependencies:
+
+- **Office/assets/UI:** room styles, panels, Character Studio shell, maps, outside world.
+- **Business systems:** CRM/finance/contracts/HR/analytics adapters.
+- **Security/ops:** threat tests, observability, backups, deployment.
+- **FX/interactions:** event schema, animations, social simulation.
+- **Scale:** synthetic fixtures, renderer benchmark, load/profile.
+
+Parallel work does not reorder truth: ToolGateway, event log, sessions and business records remain
+authoritative.
+
+---
+
+## 8. Mandatory gates by phase
+
+| Phase | Mandatory gate |
 |---|---|
-| `QUBIT-OFFICE-MASTER-PLAN.md` | present |
-| `QUBIT-OFFICE-COMPLETE-PLAN.md` | present (this file) |
-| `QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` | present |
-| `QUBIT-OFFICE-RESEARCH-GAPS.md` | present |
-| `QUBIT-OFFICE-IDEA-LEDGER.md` | present (70 rows) |
-| `QUBIT-OFFICE-ASSET-LEDGER.md` | present (summary; per-file generator pending) |
-| `QUBIT-OFFICE-REPO-LEDGER.md` | present |
-| `QUBIT-OFFICE-DOMAIN-CONTRACT.md` | present |
-| `QUBIT-OFFICE-THREAT-MODEL.md` | present |
-| `QUBIT-OFFICE-PHASE-0.md` | present |
+| 0 | Contracts, ledgers, reuse/licence map, threat model, staging/replay, scale fixture, renderer benchmark |
+| 1 | Identity/policy, durable run, gateway, secrets/sandbox, approval/reconciliation, backup restore, OTel |
+| 2 | Agent registry, sessions/workspaces, MCP/A2A, memory ACL, real turn, revocation |
+| 3 | Full campus data, room capabilities, map validation, active-set renderer, WCAG shell |
+| 4 | Multi-agent collaboration, one-writer, caps, handoff, kill switch, no lost work |
+| 5 | Business receipts/reconciliation, approvals, systems of record, Etsy end-to-end |
+| 6 | Character save authority, room builder, full panels, outside world, accessibility/licence |
+| 7 | Interaction authority, mature policy, event FX, no fake business truth |
+| 8 | OWASP/MCP/WCAG/OTel/scale/recovery/release evidence |
 
-Phase 0 **documentation** is present. Phase 0 **execution** is not:
-- Local durable-substrate prototype: pending
-- staging/replay harness: pending
-- per-file asset ledger generator: pending
-- Phase 1 tickets with tests: pending
-- exit-gate evidence: pending
+Full checklist: `docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md`.
 
 ---
 
-## 8. Research gaps that must not be lost
+## 9. Bugs/misconfigurations corrected
 
-Must-haves: durable execution/reconciliation; identity/tenancy; capability gateway; sessions/
-tasks/workspaces/leases/checkpoints; message fabric; durable approvals; sandbox/secrets/egress;
-tamper-evident audit; observability/evals; backups/DR; cost/backpressure; business systems of
-record; Etsy/digital operations; multi-entity; self-hosting/exit.
-
-Additional must-haves: isolated test/staging/replay; data lineage; schema/policy migrations;
-access recertification; notification/on-call; jurisdiction rules; content moderation/asset use;
-verifiable receipts; feature flags; backup-restore verification.
-
-Nice-to-haves: agent scorecards; synthetic monitoring; trace review; knowledge lifecycle;
-semantic search/dedup; trust center; vendor/model risk registry; deployment rings; disaster game
-days; local-first sync.
-
-Full detail: `docs/QUBIT-OFFICE-RESEARCH-GAPS.md`.
-
----
-
-## 9. What is explicitly deferred
-
-- 100-floor rendered world
-- outside world/terrain
-- Character Studio implementation
-- mature interactions and social simulation
-- real social/CRM/finance integrations
-- Godot
-- 283 active agents
-- broad autonomy
-- final matrix
-
-These remain in the plan but cannot start before Phase 3/4 prove the first department and business
-workflow.
+- Duplicate phase orders removed; this v10 is canonical.
+- Full-scope vs MVP/deferral contradictions removed.
+- Full data vs active rendering clarified.
+- 283 agents ≠ 283 continuously simulated.
+- Temporal not forced before measured need; existing SQLite control plane first, adapter later.
+- Agent registry/A2A/one-writer/retry caps/verifier/protected checks added.
+- OWASP/MCP/WCAG/OTel mandatory gates added.
+- Renderer/map/scale budgets and Tiled/Phaser/Pixi decisions added.
+- Reuse-first mapping added; no rebuilding existing repos/engines.
+- Asset/repo licence gaps remain explicit, not assumed.
 
 ---
 
 ## 10. Immediate next actions
 
-1. Freeze this v8 plan; no more reordering.
-2. Accept/owner-review the domain contract and threat model.
-3. Build the per-file asset ledger generator.
-4. Verify licences/commits for claw-empire, SkyOffice and no-license repos.
-5. Stand up the local durable-substrate prototype + staging/replay harness.
-6. Write Phase 1 tickets with acceptance/failure tests.
-7. Implement identity/tenant/event log.
-8. Implement ToolGateway deny-by-default skeleton.
-9. Build one durable agent lane.
-10. Start the first department floor only after Phase 1/2 gates pass.
+1. Freeze this v10 and stop phase reordering.
+2. Complete per-file asset ledger and exact repo commit/licence mapping.
+3. Approve domain contract/threat model/mandatory checklist.
+4. Build staging/replay + 100-floor/1,000-agent fixture.
+5. Benchmark Phaser 4 GPU layers vs Pixi chunking.
+6. Implement Phase 1 identity/event/gateway/run/approval/recovery.
+7. Build Phase 2 agent registry/one real lane.
+8. Populate full campus data and room capability manifests.
+9. Use Habblaud/LimeZu/pixelfx/SkyOffice first; add other repos only where mapped.
+10. No release/`VERIFIED` until mandatory checklist has evidence.
 
-**Do not build the tower, character editor, outside world or mature interactions first.**
-
-
----
-
-## 11. Full-scope build v9 (owner decision)
-
-**Owner decision:** no MVP, no reduced first slice. The full product scope is committed from the
-start. The plan review remains a bug/risk list, not a scope reduction.
-
-All prior “MVP”, “one department”, “3–5 agents”, “defer Temporal/SSO/multi-entity/social”, and
-“defer Character Studio/outside world/interactions” statements in this document are superseded.
-
-### Full-scope workstreams
-
-1. **Platform foundation:** identity/tenancy, durable execution, event log, policy/capability
-   gateway, sessions/runs/tasks/workspaces/leases/checkpoints, message fabric, approvals,
-   reconciliation, secrets/sandbox/egress, observability/evals, backups/DR.
-2. **Office/campus:** all departments, floors, rooms, facilities, shared floors, maps, outside world.
-3. **Agent workforce:** all 283+ identities, per-agent sessions/workspaces, chat, handoffs,
-   delegation, full Qubit capability selectors (tools/skills/MCP/models/permissions/memory).
-4. **Memory:** department + office Obsidian graphs, OpenViking scopes, provenance/retention/
-   deletion.
-5. **Businesses:** all departments and business workflows, Etsy first live, then social/CRM/support/
-   finance/contracts/HR/procurement/analytics, multi-entity-ready.
-6. **Visuals:** Character Studio merge, LimeZu room styles, full panels, FX, animations, weather,
-   outside world.
-7. **Interactions:** social/needs/relationships/conflict/romance/career/mature policy and
-   consequences.
-8. **Scale/security/release:** 100/500/1,000-agent load, backup/restore, incident/kill switch,
-   deployment rings, evals, release gates.
-
-### Dependency order (not scope cuts)
-
-- Contracts/ledgers/threat model first.
-- Identity/durable execution/capability gateway before real external actions.
-- Session/chat/memory before agent collaboration.
-- One business workflow before all business systems; then activate the rest.
-- Character/outside world can be built in parallel with backend, but cannot own business truth.
-- Interactions/FX can be built in parallel, but cannot start before action/event schema.
-- Security/recovery gates apply to every workstream.
-
-### Full-scope acceptance
-
-Every department/room/business/agent exists in data; every external action has approval/receipt/
-reconciliation; every page reflects real state; every paid asset/licence is recorded; every
-failure is typed; restart/restore has evidence. `VERIFIED` still requires the owner release gate.
-
-
-
----
-
-## 12. 2026 improvement addenda
-
-The external review in `docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md` adds mandatory plan changes:
-
-- Build a 100-floor/3,075-desk/1,000-agent synthetic scale fixture before the tower.
-- Define the projection contract and renderer-neutral map schema before chat/animation.
-- Benchmark Phaser vs Pixi; web renderer first; Godot only after parity.
-- Render one active floor, stream chunks/atlases, use active/dormant tiers.
-- Add command-center shell, accessible dual UI, notification center, search-driven routing,
-  minimap/floor directory and capability-bearing room cards.
-- Add performance budgets and CI/staging gates.
-- Separate authoritative business events from ephemeral presentation events.
-- Add context-loss/reconnect/restore/fault-injection tests.
-- Keep full scope; use dependency gates, not scope cuts.
-
-
----
-
-## 13. Browser comparison corrections
-
-The browser review in `docs/QUBIT-OFFICE-BROWSER-REVIEW.md` adds mandatory corrections:
-
-- Add an **agent registry** and **A2A handoff contract**, not only roles/MCP.
-- Enforce **one writer per mutable resource/file**; append-only fragments for shared files.
-- Add **retry/handoff/delegation ceilings**, no-progress detection and circuit breakers.
-- Add **per-tool eval/schema-drift canaries**, an independent verifier and protected checks.
-- Cap parallel agent waves and aggregate budgets.
-- Add Tiled-compatible map import/export, validation and chunked tilemaps.
-- Benchmark **Phaser 4 GPU layers vs Pixi chunking**; web 2D first, Godot later.
-- Add context-loss recovery, dirty rendering, device tiers and scale fixture.
-- Full data/features from start, but **not all 283 agents continuously simulated**; active-set
-  rendering and dormant execution remain.
-
-
----
-
-## 14. Mandatory 100% checklist
-
-The release/implementation gate is `docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md`. It maps OWASP
-Agentic Top 10 2026, MCP OAuth/tool-schema/output rules, sandbox/RCE, approvals, memory, A2A,
-WCAG 2.2 AA, OpenTelemetry GenAI, Temporal durability, privacy/licensing and performance/device
-budgets to PASS/FAIL evidence. No release or `VERIFIED` claim while an applicable row is FAIL,
-UNTESTED or waived without owner sign-off.
+**Do not build another narrow MVP or another isolated backend slice.**

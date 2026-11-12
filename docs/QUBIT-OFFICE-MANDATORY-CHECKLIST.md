@@ -158,8 +158,8 @@ Gate: one trace explains a real run end-to-end; eval regression blocks release; 
 
 ## 10. Durable execution and recovery
 
-- [ ] Temporal workflows/activities; deterministic workflow code.
-- [ ] One external effect per activity; idempotency key; provider receipt.
+- [ ] Durable workflow engine: existing Business OS SQLite run/task/checkpoint/lease/outbox now; Temporal adapter when multi-worker/HA is measured. No homegrown full workflow scheduler.
+- [ ] One external effect per activity/step; idempotency key; provider receipt.
 - [ ] Explicit timeouts/retry policy; no unlimited retries.
 - [ ] Unknown outcome state + reconciliation queue.
 - [ ] Checkpoint/lease/fencing/heartbeat; restart resumes.
