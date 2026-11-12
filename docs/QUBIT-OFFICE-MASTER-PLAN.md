@@ -1518,3 +1518,18 @@ All external reference repos recorded in §22 are mapped with take/avoid/licence
 `docs/QUBIT-OFFICE-REPO-LEDGER.md` §2. The MVP shortlist is Habblaud, SkyOffice, pixelfx,
 claw-empire, agent-monitor/agents-office concepts and Agent Office/JSM HQ sandbox concepts. The
 ERP/CRM/business repos are later references, not MVP code.
+
+
+---
+
+## 55. Full-scope decision v9 (owner)
+
+The owner rejected the MVP simplification. Full product scope is committed from the start: all
+departments, floors, rooms, facilities, outside world, 283+ agents, businesses, panels, Character
+Studio, FX, interactions, business systems, durable execution, identity/security, observability and
+backup/DR.
+
+`docs/QUBIT-OFFICE-COMPLETE-PLAN.md` §11 is the full-scope execution plan. `docs/QUBIT-OFFICE-PLAN-REVIEW.md`
+remains a bug/risk review; its MVP recommendation is rejected. `docs/QUBIT-OFFICE-PHASE-0.md`
+retains Temporal as the full-scope durable engine. Phases are dependency/merge order, not feature
+cuts.
