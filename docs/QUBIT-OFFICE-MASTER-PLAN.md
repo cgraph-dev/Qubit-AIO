@@ -1471,3 +1471,20 @@ Deliverables:
 **Start point:** Phase 0. The first commits are contracts, ledgers, threat model, durable-workflow
 decision and test/staging environment — not the tower, character editor, outside world or mature
 interactions.
+
+
+---
+
+## 51. Phase 0 artifacts
+
+The missing Phase 0 artifacts are now written:
+
+- `docs/QUBIT-OFFICE-IDEA-LEDGER.md`
+- `docs/QUBIT-OFFICE-ASSET-LEDGER.md`
+- `docs/QUBIT-OFFICE-REPO-LEDGER.md`
+- `docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md`
+- `docs/QUBIT-OFFICE-THREAT-MODEL.md`
+- `docs/QUBIT-OFFICE-PHASE-0.md`
+
+They are design/inventory records, not implementation evidence. Phase 0 is complete only when its
+exit gates in `QUBIT-OFFICE-PHASE-0.md` have evidence.

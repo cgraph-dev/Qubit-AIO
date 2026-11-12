@@ -160,3 +160,9 @@ done
 
 | `QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` | Departments, sessions, memory, interactions, builder, FX and implementation order |
 | `QUBIT-OFFICE-RESEARCH-GAPS.md` | External research — platform/security/business gaps and forgotten requirements |
+| `QUBIT-OFFICE-IDEA-LEDGER.md` | Idea ledger — every owner idea and its status |
+| `QUBIT-OFFICE-ASSET-LEDGER.md` | Asset and license ledger — packs, counts, use, redistribution rules |
+| `QUBIT-OFFICE-REPO-LEDGER.md` | Repository dependency ledger — commits, licenses, take/avoid, status |
+| `QUBIT-OFFICE-DOMAIN-CONTRACT.md` | Domain contract — entities, authority, invariants and projections |
+| `QUBIT-OFFICE-THREAT-MODEL.md` | Threat model — assets, actors, boundaries, threats, controls and gates |
+| `QUBIT-OFFICE-PHASE-0.md` | Phase 0 — durable engine decision, staging/replay, work items and exit gates |
