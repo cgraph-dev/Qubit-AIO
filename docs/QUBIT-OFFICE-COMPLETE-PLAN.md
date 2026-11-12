@@ -454,3 +454,21 @@ Every department/room/business/agent exists in data; every external action has a
 reconciliation; every page reflects real state; every paid asset/licence is recorded; every
 failure is typed; restart/restore has evidence. `VERIFIED` still requires the owner release gate.
 
+
+
+---
+
+## 12. 2026 improvement addenda
+
+The external review in `docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md` adds mandatory plan changes:
+
+- Build a 100-floor/3,075-desk/1,000-agent synthetic scale fixture before the tower.
+- Define the projection contract and renderer-neutral map schema before chat/animation.
+- Benchmark Phaser vs Pixi; web renderer first; Godot only after parity.
+- Render one active floor, stream chunks/atlases, use active/dormant tiers.
+- Add command-center shell, accessible dual UI, notification center, search-driven routing,
+  minimap/floor directory and capability-bearing room cards.
+- Add performance budgets and CI/staging gates.
+- Separate authoritative business events from ephemeral presentation events.
+- Add context-loss/reconnect/restore/fault-injection tests.
+- Keep full scope; use dependency gates, not scope cuts.

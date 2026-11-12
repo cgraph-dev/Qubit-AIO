@@ -1533,3 +1533,13 @@ backup/DR.
 remains a bug/risk review; its MVP recommendation is rejected. `docs/QUBIT-OFFICE-PHASE-0.md`
 retains Temporal as the full-scope durable engine. Phases are dependency/merge order, not feature
 cuts.
+
+
+---
+
+## 56. 2026 improvement review
+
+`docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md` records the 2026 release/UI/map/scale review:
+new-release claims (reported/uncertain), platform improvements, UI/map/room ideas, scale
+problems/mitigations, performance budgets and technical choices. Full scope remains; the review
+adds dependency gates and measurable budgets, not scope cuts.
