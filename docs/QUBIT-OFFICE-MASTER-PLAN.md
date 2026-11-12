@@ -1586,3 +1586,17 @@ coins and forex, plus a research lane for YouTube strategies. It defines roles, 
 data, strategy/backtest/paper trading, OMS/EMS, risk engine, double-entry ledger, exchange/broker
 adapters, approvals, kill switch, legal/tax obligations and mandatory live gates. The department
 exists from the start; live capital requires owner risk-policy sign-off and all safety tests.
+
+
+---
+
+## 60. Executable execution plan v11
+
+`docs/QUBIT-OFFICE-COMPLETE-PLAN.md` is now the executable phase contract: input/output artifacts,
+predecessor DAG, owner/reviewer, exact acceptance commands, failure tests and merge gates. The
+reference vertical lane is mandatory architecture validation, not an MVP. Phase order is now
+explicit: contracts → minimal execution boundary → agent runtime → campus projection → workforce /
+business operations → UI/world → simulation → scale/release. Durable SQLite first; Temporal is a
+later measured-HA adapter. Trading has its own research→backtest→paper→owner-readiness track.
+
+The architecture and low-tier-agent audit is in `docs/QUBIT-OFFICE-PLAN-AUDIT-V10.md`.

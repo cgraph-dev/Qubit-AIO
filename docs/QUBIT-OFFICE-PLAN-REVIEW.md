@@ -1,6 +1,8 @@
 # Qubit Office — plan review and MVP simplification
 
 **Status:** review of the plan set. Not implementation evidence, not `VERIFIED`.
+**Latest audit:** `QUBIT-OFFICE-PLAN-AUDIT-V10.md` and `QUBIT-OFFICE-COMPLETE-PLAN.md` v11 supersede
+this review for implementation order and exact acceptance commands. Risks listed here are retained.
 **Owner decision (later):** the MVP recommendation in §4–§7 is **rejected**. Full scope is committed
 from the start; the bugs/misconfigurations and risk findings in §2–§3 remain valid. Where this file
 says “defer”, read it as “risk to sequence”, not “remove feature”.

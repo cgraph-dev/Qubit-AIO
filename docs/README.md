@@ -168,5 +168,6 @@ done
 
 | `QUBIT-OFFICE-COMPLETE-PLAN.md` | Complete consolidated plan — every phase, gate, artifact and deferred item |
 | `QUBIT-OFFICE-PLAN-REVIEW.md` | Plan review — bugs, misconfigurations, MVP simplification and what to defer |
+| `QUBIT-OFFICE-PLAN-AUDIT-V10.md` | Architecture audit — 26+ bugs and corrections to phase dependencies, acceptance tests and governance |
 | `QUBIT-OFFICE-IMPROVEMENTS-2026.md` | 2026 release/UI/map/scale review — improvements, budgets, problems and technical choices |
 | `QUBIT-OFFICE-BROWSER-REVIEW.md` | Browser comparison — other builders, bad practices, corrections and sources |
