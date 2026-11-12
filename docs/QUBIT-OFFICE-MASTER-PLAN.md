@@ -1488,3 +1488,13 @@ The missing Phase 0 artifacts are now written:
 
 They are design/inventory records, not implementation evidence. Phase 0 is complete only when its
 exit gates in `QUBIT-OFFICE-PHASE-0.md` have evidence.
+
+
+---
+
+## 52. Consolidated complete plan
+
+`docs/QUBIT-OFFICE-COMPLETE-PLAN.md` is the single navigable complete plan: current state, scope,
+authority map, architecture, cross-cutting contracts, Phase 0–9 tasks, exit gates, artifact status,
+research gaps, deferred work and immediate next actions. The detailed contracts and ledgers remain
+authoritative for their areas; this is the navigation and sequencing entry point.
