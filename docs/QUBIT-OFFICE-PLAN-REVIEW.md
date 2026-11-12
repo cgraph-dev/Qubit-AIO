@@ -126,6 +126,10 @@ Character Studio, no mature simulation.**
 
 ## 6. What to reuse from repos/assets
 
+All 18 external repos from master plan §22 are now mapped in `QUBIT-OFFICE-REPO-LEDGER.md` §2. The
+MVP uses only a small shortlist; the ERP/CRM/business repos are later references, not MVP code.
+
+
 - **Habblaud:** room rendering, seats, office UI, character state.
 - **LimeZu:** floors, furniture, portraits, UI; local-only paid art.
 - **pixelfx:** loading/status/FX.

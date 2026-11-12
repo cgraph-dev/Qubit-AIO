@@ -18,14 +18,45 @@ A repository appearing here is not an approval to copy or bundle it.
 | habblaud | `/tmp/office-refs/habblaud` | `faa1a012b5fbf632c66dc6801c5383e53a542406` (1.0.3) | MIT LICENSE file present | room rendering, seats, office UI, character state | do not break current behavior; paid art remains local |
 | pixelfx | `/tmp/office-refs/pixelfx` | `044e12a45dc9cc312cec50ee606dfc98afe5adc2` (0.3.1) | MIT LICENSE file present | weather/ambient/event FX | verify performance/asset licensing before shipping |
 
-## 2. External repos already recorded in the master plan
+## 2. External reference repos (from master plan §22)
 
-These were reviewed conceptually in the plan; no code is imported and no commit is verified here.
-Each needs a commit/license/security row before reuse:
+Exact commits and licenses are **not yet locally verified**. `plan-recorded` means the master plan
+records that license; it is not approval to copy. No repo code is imported by this ledger.
 
-DAACS, Canopy, OctoOffice, Blank Collar, Agent Office, Outworked, BagIdea, PixelDesk, Veska /
-AI Workforce, Oryh, AgenticCRM, Autonomous Business OS, OOSDK, FusionClaw, RevealUI,
-Agent Company AI, JSM HQ, HermitShell.
+| Repo | Source / license | Take | Avoid | MVP? |
+|---|---|---|---|---|
+| DAACS OS | `omnify2026/DAACS`; licence not finalized — concepts only | goal → PM plan → execute → review → verify → approve; approval queue; dynamic sequencer | no code/assets until licence finalized | Concept: approval sequence |
+| Canopy | `kinnerkarmanish/mak`; MIT (plan-recorded) | workspace protocol, 5-layer org, workflow DAG, cron/heartbeats, budgets/governance, cost console | 330-agent roster and full org complexity | Concept: workflow DAG + budgets |
+| OctoOffice | `Chepko932/OctoOffice`; Apache-2.0 | 7 departments, mission control, YAML workflows, Tiled/Pixi office, SQLite, terminal, meetings | copy whole stack; verify license/notices | Candidate: room/department/mission control |
+| Blank Collar | `The-Blank-Collar/blankcollar-agentic-os`; MIT | goal-first orchestration, department abstraction, allow/approve/deny policy, memory, simulation, observability, feedback | Stripe/channels before MVP; full simulation | Candidate: policy engine + memory |
+| Agent Office | `AgentSystemLabs/agent-office`; MIT | floor per project, workers at desks, terminal, voice, GitHub issues/PRs, worktrees, agents managing agents, `/lite` | full product copy; voice/GitHub before one department | Candidate: worktree/agent-delegation patterns |
+| Outworked | public; licence verify | desktop office, assets, scheduled tasks, Slack/iMessage, browser, MCP, approvals, cost dashboard | copy until license verified | Concept |
+| BagIdea Office | public; licence verify | wallpaper office, social simulation, self-extending plugins/proposals, memory/skills, approval center | plugin self-extension before security gates | Concept |
+| PixelDesk | public/open-core; verify | humans + agents as colleagues, shared brain, cost transparency, PWA, proximity | “shared brain” without memory authority | Concept |
+| Veska / AI Workforce | Apache-2.0 | AI-native ERP/CRM: 52 tools, 12 departments, CRM/support/finance/HR/ops | entire ERP in MVP | Later: business modules |
+| Oryh | Apache-2.0 | agent-first ERP/CRM, skills-not-SDK, audit, durable business records | broad ERP before gateway | Later: audit/business records |
+| AgenticCRM | MIT | WhatsApp CRM, tickets/SLA, invoices/payments, 24/7 keepalive, multi-agent workflows | live WhatsApp/payments before approvals | Later: support/CRM reference |
+| Autonomous Business OS | MIT | lead → qualify → onboard → deliver → finance → knowledge; HITL; integrations | all stages at once | Later: business workflow map |
+| OOSDK | MIT | ontology/policy-as-code, deterministic decisions, caged LLM advisors, order-to-cash | ontology scope explosion | Concept: policy-as-code |
+| FusionClaw | MIT | business OS over MCP, CRM/ops/finance, scoped keys, confirmation gates, audit | full business OS in MVP | Later: scoped keys/confirmations |
+| RevealUI | MIT | auth/content/offers/payments/agents runtime, one permission model | payments/auth before identity foundation | Later: permission model |
+| Agent Company AI | MIT | 9 roles, Stripe/Gumroad, invoices, spend caps, autonomous CEO loop | autonomous CEO/spend in MVP | Later: spend-cap/role patterns |
+| JSM HQ | MIT | lead/worker office, per-agent repo clone + Docker sandbox, MCP coordination, PR completion | Docker for every agent before one lane | Candidate: per-agent sandbox/worktree |
+| HermitShell | MIT | per-agent Docker isolation, Telegram, scheduler, dashboard | per-agent isolation before MVP | Later: isolation patterns |
+
+## 2.1 MVP repo shortlist
+
+Only these directly inform MVP v1:
+
+1. **Habblaud** — room/office renderer, seats, character state.
+2. **SkyOffice** — room/player/chat commands (MIT).
+3. **pixelfx** — loading/status FX (MIT).
+4. **claw-empire** — worktree isolation, departments, encrypted token patterns (Apache-2.0; verify notices).
+5. **agent-monitor** — session/meeting UI concepts only (no LICENSE file).
+6. **agents-office** — roster/skills/MCP selector concepts only (PolyForm; no copy/bundle).
+7. **Agent Office / JSM HQ** — per-agent worktree/sandbox concepts (MIT; verify commits).
+
+Everything else is a **later business/ERP/CRM reference**, not MVP code.
 
 ## 3. Rules
 
