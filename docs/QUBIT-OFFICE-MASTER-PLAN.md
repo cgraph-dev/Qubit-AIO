@@ -1554,3 +1554,14 @@ and office-game builders. It adds an agent registry, A2A, one-writer-per-resourc
 delegation ceilings, per-tool evals/schema canaries, protected checks, Tiled map pipeline, renderer
 benchmark, context-loss/dirty-render/device gates and active-set rules. Full scope remains; this
 review adds production guardrails and measurable corrections.
+
+
+---
+
+## 58. Mandatory 100% gate
+
+`docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md` is the obligatory gate: OWASP Agentic Top 10 2026,
+MCP OAuth 2.1/PKCE/resource/audience/tool-schema rules, sandbox/RCE, approvals, memory, A2A,
+WCAG 2.2 AA, OpenTelemetry GenAI, Temporal durability, privacy/licensing and performance/device
+budgets. No release or `VERIFIED` claim while an applicable row is FAIL/UNTESTED/waived without
+owner sign-off.
