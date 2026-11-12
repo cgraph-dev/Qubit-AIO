@@ -152,13 +152,13 @@ Tasks:
 - P0-03 asset ledger (1,523 files, licences, intended use)
 - P0-04 idea and repo ledgers
 - P0-05 threat model
-- P0-06 durable-engine decision + Temporal prototype
+- P0-06 local durable-substrate decision + prototype (Temporal deferred)
 - P0-07 staging/replay/fault-injection harness
 - P0-08 Phase 1 tickets with acceptance tests
 
 Exit gates:
 - All Phase 0 artifacts committed.
-- Temporal prototype resumes after restart; duplicate activity idempotent; approval survives.
+- Local run/task/checkpoint/lease prototype resumes after restart; duplicate effect prevented/reconciled; approval survives.
 - Staging/replay reproducible.
 - No real credentials/operator data.
 - Phase 1 tickets bounded and testable.
@@ -170,7 +170,7 @@ Not yet: tower, character studio, outside world, mature interactions, real socia
 Tasks:
 - P1-01 owner/tenant/business/legal-entity records; local owner auth, future OIDC/SSO.
 - P1-02 RBAC+ABAC policy engine; deny-by-default; expiry/revocation.
-- P1-03 Temporal workflows/activities, timers/signals/waits, retries, event history.
+- P1-03 local durable workflows: states, timers/waits, retries, outbox/inbox, event history; Temporal adapter deferred.
 - P1-04 run state machine incl. unknown; reconciliation/dead-letter ownership.
 - P1-05 append-only event log, audit chain, correlation IDs, traces/metrics/logs.
 - P1-06 secrets manager/vault, sandbox, filesystem jail, egress policy.
@@ -347,7 +347,7 @@ Exit gates:
 | `QUBIT-OFFICE-PHASE-0.md` | present |
 
 Phase 0 **documentation** is present. Phase 0 **execution** is not:
-- Temporal prototype: pending
+- Local durable-substrate prototype: pending
 - staging/replay harness: pending
 - per-file asset ledger generator: pending
 - Phase 1 tickets with tests: pending
@@ -397,7 +397,7 @@ workflow.
 2. Accept/owner-review the domain contract and threat model.
 3. Build the per-file asset ledger generator.
 4. Verify licences/commits for claw-empire, SkyOffice and no-license repos.
-5. Stand up the Temporal prototype + staging/replay harness.
+5. Stand up the local durable-substrate prototype + staging/replay harness.
 6. Write Phase 1 tickets with acceptance/failure tests.
 7. Implement identity/tenant/event log.
 8. Implement ToolGateway deny-by-default skeleton.
@@ -405,3 +405,23 @@ workflow.
 10. Start the first department floor only after Phase 1/2 gates pass.
 
 **Do not build the tower, character editor, outside world or mature interactions first.**
+
+
+---
+
+## 11. MVP simplification (canonical first slice)
+
+The full review is `docs/QUBIT-OFFICE-PLAN-REVIEW.md`. Until the MVP passes, this section
+supersedes the breadth of Phase 0–9:
+
+1. One department, 4–6 rooms, 3–5 real agents.
+2. Real agent sessions, owner chat, one task/artifact/checkpoint.
+3. One existing Qubit capability through a deny-by-default gateway.
+4. One approval, one restart/recovery proof.
+5. One Obsidian folder + one OpenViking scope.
+6. One dry-run business workflow.
+7. No 100-floor expansion, Character Studio, outside world, mature interactions, Temporal, SSO,
+   multi-tenant, multi-entity or social integrations until that works.
+
+This is a scope reduction, not a new architecture. Detailed Phase 0–9 remain the long-term
+reference.
