@@ -376,6 +376,46 @@ def test_normalise_route_erases_placeholder_names():
     assert norm("GET /api/sessions/empty/count") == "GET /api/sessions/empty/count"
 
 
+def test_normalise_route_erases_mid_path_wildcards_and_braced_suffixes():
+    """A ``.*`` wildcard is a PLACEHOLDER wherever it sits, not just at the end.
+
+    ``voicebridge/qubit_compat.py`` registers upstream sub-resource writes as a
+    catch-all in the MIDDLE of the path — the live ``GATED`` table carries
+    ``POST /api/tools/toolsets/.*/post-setup`` — while the upstream tree spells
+    the same route ``/api/tools/toolsets/{name}/post-setup``. Stripping only a
+    TRAILING ``.*`` left the wildcard in place, so the inventory row for that
+    route failed the normalised comparison and read as MISSING for spelling
+    alone. The wildcard stands for exactly one path segment, exactly like
+    ``{name}``, so both spellings must reduce to ``{}``.
+    """
+    import importlib.machinery
+    import importlib.util
+
+    loader = importlib.machinery.SourceFileLoader(
+        "source_inventory_under_test", str(SCRIPT))
+    spec = importlib.util.spec_from_loader(loader.name, loader)
+    assert spec is not None and spec.loader is not None
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    norm = mod._normalise_route
+    # The inventory's braced form and the registry's mid-path wildcard are the
+    # same route shape.
+    assert norm("POST /api/tools/toolsets/{name}/post-setup") == (
+        "POST /api/tools/toolsets/{}/post-setup")
+    assert norm("POST /api/tools/toolsets/.*/post-setup") == (
+        "POST /api/tools/toolsets/{}/post-setup")
+    assert norm("POST /api/tools/toolsets/{name}/post-setup") == norm(
+        "POST /api/tools/toolsets/.*/post-setup")
+    # A trailing wildcard suffix is still stripped to the bare path, with or
+    # without a regex end anchor.
+    assert norm("GET /api/credentials/pool.*") == "GET /api/credentials/pool"
+    assert norm("GET /api/credentials/pool.*$") == "GET /api/credentials/pool"
+    # A trailing ``/.*`` names the collection it hangs off, not a child shape:
+    # one trailing slash must not survive into the comparison key.
+    assert norm("GET /api/actions/.*") == "GET /api/actions"
+    assert norm("GET /api/skills/hub/.*") == norm("GET /api/skills/hub")
+
+
 def test_route_disposition_discriminates_served_from_absent():
     """Positive controls resolve; negative controls stay MISSING.
 

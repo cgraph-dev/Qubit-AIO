@@ -556,15 +556,32 @@ def _normalise_route(route: str) -> str:
     A parameter stands for exactly ONE required path segment. That is what keeps
     ``/api/sessions/{session_id}`` from swallowing
     ``/api/sessions/{session_id}/export``: the segment count still has to match.
-    A lookaround consumes nothing, so it is dropped outright.
+    A lookaround consumes nothing, so it is dropped outright. A ``.*`` wildcard
+    is the same placeholder as ``{name}`` wherever it appears; only a trailing
+    ``/.*`` (a collection catch-all) collapses to the bare collection path.
     """
     route = re.sub(r"\(\?P<[A-Za-z_][A-Za-z0-9_]*>[^)]*\)", "{}", route)
     route = re.sub(r"\(\?:?\^?\[\^/\]\+\)", "{}", route)
     route = re.sub(r"\(\?[=!][^()]*(?:\([^()]*\)[^()]*)*\)", "", route)
     route = re.sub(r"\{[^}]*\}", "{}", route)
-    # A trailing ``.*`` makes the route match itself and anything under it, so
-    # the bare path is the shape an inventory id names.
-    return re.sub(r"\.\*$", "", route)
+    # A ``.*`` wildcard is a placeholder for exactly ONE path segment, wherever
+    # it sits. The compat layer registers sub-resource writes as a mid-path
+    # catch-all (``/api/tools/toolsets/.*/post-setup``) for an upstream
+    # ``/api/tools/toolsets/{name}/post-setup``; erasing only a TRAILING ``.*``
+    # left the wildcard in the comparison key and read the route as MISSING for
+    # spelling alone. ``.*`` / ``.*$`` are the same wildcard plus an optional
+    # end anchor, so both collapse the same way.
+    #
+    # Order matters at the tail. ``pool.*`` (no separator) is a suffix on the
+    # last segment, not a segment of its own, so it strips to the bare path.
+    # ``/.*`` names the collection it hangs off (``/api/actions/.*`` matches
+    # ``/api/actions`` and everything under it), so the segment it would have
+    # added is dropped entirely rather than kept as a shape difference.
+    route = re.sub(r"/\.\*\$?$", "", route)
+    route = re.sub(r"\.\*\$?$", "", route)
+    # Any remaining wildcard is a mid-path segment placeholder.
+    route = re.sub(r"\.\*\$?", "{}", route)
+    return route
 
 
 def _live_route_patterns(repo: Path) -> tuple[set[str], set[str]]:
