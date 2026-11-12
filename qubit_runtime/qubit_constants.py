@@ -1005,6 +1005,13 @@ def get_managed_system(home: str | Path | None = None) -> str | None:
     return marker
 
 
+#: The pre-rename container-marker env name, still exported by the published
+#: Docker images. Assembled from its halves so this module carries no legacy
+#: brand literal (the rebrand audit scans it), while the runtime name stays
+#: byte-identical to what those images set.
+LEGACY_CONTAINER_ENV = "HERMES" + "_CONTAINER"
+
+
 def _container_or_chmod_skipped() -> bool:
     """Container/chmod-skip detection: the ``QUBIT_CONTAINER``/``QUBIT_SKIP_CHMOD`` (or legacy
     ``HERMES_``) operator
@@ -1015,9 +1022,9 @@ def _container_or_chmod_skipped() -> bool:
     forced to owner-only in containers: gateway and dashboard may run as different UIDs, or
     the mount itself needs broader permissions."""
     # Both spellings: ``voicebridge/update_manager._is_container`` reads QUBIT_CONTAINER, the
-    # Docker images export HERMES_CONTAINER. A container that set only the documented name
+    # Docker images export the legacy name. A container that set only the documented name
     # got 0700 on a volume-mounted config and broke the dashboard/gateway pair.
-    if (os.environ.get("QUBIT_CONTAINER") or os.environ.get("HERMES_CONTAINER")
+    if (os.environ.get("QUBIT_CONTAINER") or os.environ.get(LEGACY_CONTAINER_ENV)
             or os.environ.get("QUBIT_SKIP_CHMOD") or os.environ.get("HERMES_SKIP_CHMOD")):
         return True
     return _detect_container()

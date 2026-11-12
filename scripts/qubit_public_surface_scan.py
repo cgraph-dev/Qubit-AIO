@@ -93,6 +93,12 @@ LEGACY_RE = re.compile(
 PROSE_RE = re.compile(
     r"(?<![A-Za-z0-9_\-./@:\\#])(Hermes|Nous|OpenClaw|NousResearch|NousPortal)"
     r"(?![A-Za-z0-9_\-./@:\\#])")
+#: The same words with NO boundaries, for `_is_internal_identifier_name`: it
+#: must see `Hermes` inside `HERMES_CONTAINER`, which PROSE_RE deliberately
+#: refuses to match, and then decide for itself whether the neighbours make it
+#: an identifier or prose.
+_LEGACY_WORD_ANYWHERE_RE = re.compile(
+    r"(Hermes|Nous|OpenClaw|NousResearch|NousPortal)", re.IGNORECASE)
 #: Upstream URLs.
 UPSTREAM_URL_RE = re.compile(
     r"https?://[^\s\"'`<>)\]]*(?:nousresearch\.com|hermes-agent\.)"
@@ -151,9 +157,11 @@ PY_GUARD_PATTERNS: Dict[str, Tuple[str, ...]] = {
     "voicebridge/update_manager.py": (
         r"hermes-dashboard\.service",
         # The legacy container-marker env name, read beside its documented
-        # QUBIT_ spelling (see update_manager.CONTAINER_ENV) and assembled from
-        # its halves so the module carries no legacy brand literal.
-        r"CONTAINER_ENV\s*=\s*\(",
+        # QUBIT_ spelling. The published Docker images export this name while
+        # every doc names QUBIT_CONTAINER, so update-method detection must accept
+        # both or it disagrees with the chmod policy. An internal read only — the
+        # receipt reason names the Qubit spelling.
+        r"os\.environ\.get\(\s*['\"]HERMES_CONTAINER['\"]",
     ),
     "voicebridge/update_channel.py": (
         r"LEGACY_URL_TOKENS\s*=",
@@ -178,6 +186,10 @@ ALLOWLISTED_CATEGORIES: Dict[str, List[str]] = {
     ],
     "wire_identifiers": [
         "HERMES_HOME", "X-Hermes-Session-Token", "HERMES_SUPERVISED_CHILD",
+        "HERMES_CONTAINER (read back from os.environ; QUBIT_CONTAINER is the "
+        "preferred name, the legacy one is still honoured)",
+        "X-Hermes-Gateway-Ticket (the native-grant header the server matches "
+        "via dashboard_auth/native_http.py HEADER)",
         "HERMES_UPDATE_* / HERMES_DESKTOP_* / HERMES_DASHBOARD_* env names",
         "window.__HERMES_* / __HERMES_PLUGINS__ / "
         "__HERMES_PLUGIN_SDK__ globals",
@@ -241,6 +253,60 @@ def _allow(observed: Dict[str, int], surface: str, classification: str,
     observed[key] = observed.get(key, 0) + 1
 
 
+def _is_internal_identifier_name(token: str) -> bool:
+    """True when a legacy word is a SEGMENT of a longer identifier, not prose.
+
+    ``HERMES_CONTAINER``, ``remoteHermesPath``, ``X-Hermes-Gateway-Ticket`` and
+    ``notifications.updateHermes`` are names the product reads back — an env
+    var, a config key, a protocol header, an i18n key. Renaming any of them
+    breaks a contract the other side honours, so they are internal.
+
+    A legacy word that stands alone is product copy and must stay a finding:
+    ``"restart Hermes"``, ``"Hermes couldn't confirm"``. That is the whole point
+    of the check, so this returns False for the bare word and for a word merely
+    wrapped in punctuation/quotes.
+
+    Reuses PROSE_RE's vocabulary but NOT its boundaries: PROSE_RE refuses to
+    match a legacy word with an identifier character beside it, which is
+    exactly the case this function must recognise. The search is therefore
+    boundary-free, and the neighbourhood is judged here.
+    """
+    for m in _LEGACY_WORD_ANYWHERE_RE.finditer(token):
+        before = token[m.start() - 1] if m.start() > 0 else ""
+        after = token[m.end()] if m.end() < len(token) else ""
+        if _is_word_char(before) or _is_word_char(after):
+            return True
+        # A hyphen joins words into one name only when it is hyphenated on BOTH
+        # sides by word characters: `X-Hermes-Gateway-Ticket` is a protocol
+        # header, while `pre-hermes era` is prose. Judge the whole run, so a
+        # single hyphen beside a space does not launder a sentence.
+        if before == "-" and after == "-" and _hyphen_run_is_name(token,
+                                                                 m.start(),
+                                                                 m.end()):
+            return True
+    return False
+
+
+def _hyphen_run_is_name(token: str, start: int, end: int) -> bool:
+    """True when the hyphen-delimited run containing [start:end) is all words.
+
+    Walks out to the neighbouring ``-`` on each side and requires every
+    non-empty segment of that run to start with an identifier character.
+    """
+    a = token.rfind("-", 0, start)
+    b = token.find("-", end)
+    lo = 0 if a < 0 else a + 1
+    hi = len(token) if b < 0 else b
+    for seg in token[lo:hi].split("-"):
+        if seg and not _is_word_char(seg[0]):
+            return False
+    return True
+
+
+def _is_word_char(ch: str) -> bool:
+    return bool(ch) and (ch.isalnum() or ch == "_")
+
+
 def _joined_view(text: str) -> str:
     """``text`` with the string-concatenation syntax blanked, offset-preserving.
 
@@ -289,15 +355,113 @@ def _assembled_hits(text: str) -> List[str]:
         names += [m.group(0) for m in UPSTREAM_DOMAIN_RE.finditer(run)]
         names += [m.group(0) for m in LEGACY_RE.finditer(run)]
         if not is_join:
-            hits += names
+            # The whole-line run. Its hits are names present in the source as
+            # written, so they are ordinary findings — but a bare `LEGACY_RE`
+            # alternation still matches the legacy word INSIDE an identifier
+            # (`boot.steps.startingHermesDesktop`), which is a key name the code
+            # reads back, not product copy. The identifier-aware stages decide
+            # those; this one reports only standalone prose words and URLs.
+            hits += [n for n in names if _name_stands_alone(run, n)]
             continue
         # A completed name swallows its own prefix; a name that only a separate
         # literal completes (glued across quotes) is not a join at all.
         for name in names:
             if any(other != name and other.startswith(name) for other in names):
                 continue
+            # Only a name the JOIN built counts: it must be absent from every
+            # individual literal and appear only once they are concatenated.
+            # `"Hermes" + "_CONTAINER"` qualifies; a name written whole inside
+            # one literal (`X-Hermes-Gateway-Ticket`,
+            # `boot.steps.startingHermesDesktop`) does not — that is a header or
+            # key name the code reads back, not a concealed literal.
+            if not _only_a_join_spells(text, name):
+                continue
             hits.append(name)
     return sorted(set(hits))
+
+
+def _name_stands_alone(run: str, name: str) -> bool:
+    """True when ``name`` is not glued into a longer identifier in ``run``.
+
+    ``hermes`` in ``"hermes-agent"`` or ``Hermes`` in
+    ``boot.steps.startingHermesDesktop`` is part of a name the code reads back;
+    ``Hermes`` in ``"restart Hermes"`` is prose. Judged on the characters
+    immediately around each occurrence: an alphanumeric or ``_`` neighbour means
+    it is glued in, and so does a ``-`` neighbour that is itself joined to a
+    word (``X-Hermes-Gateway-Ticket`` is one header name; a trailing ``-`` used
+    as punctuation is not).
+    """
+    if not name:
+        return False
+    start = 0
+    while True:
+        idx = run.find(name, start)
+        if idx < 0:
+            return False
+        before = run[idx - 1] if idx > 0 else ""
+        after = run[idx + len(name)] if idx + len(name) < len(run) else ""
+        if not _is_word_char(before) and not _is_word_char(after):
+            if not (_hyphen_glued(run, idx - 1) or _hyphen_glued(run,
+                                                                idx + len(name))):
+                return True
+        start = idx + 1
+
+
+def _hyphen_glued(text: str, pos: int) -> bool:
+    """True when ``text[pos]`` is a hyphen with a word character beyond it."""
+    if pos < 0 or pos >= len(text) or text[pos] != "-":
+        return False
+    if pos + 1 < len(text) and _is_word_char(text[pos + 1]):
+        return True
+    return pos - 1 >= 0 and _is_word_char(text[pos - 1])
+
+
+def _only_a_join_spells(text: str, name: str) -> bool:
+    """True when ``name`` exists only because literals were concatenated.
+
+    The rule the check depends on: a concealed literal is one the source never
+    writes in a single piece.
+
+    - ``"Hermes" + "_CONTAINER"`` → pieces ``[Hermes, _CONTAINER]``; the joined
+      value contains ``Hermes`` but no piece *does* on its own once you require
+      it to be the same piece the name sits in — so the join built it. This is a
+      genuine obfuscation and stays a finding.
+    - ``X-Hermes-Gateway-Ticket`` → one piece holding the name whole. The native
+      grant header; the server reads it verbatim. Not a join, not a leak.
+    - ``boot.steps.startingHermesDesktop`` → one piece. An i18n key name.
+
+    Concretely: the name must be a substring of the CONCATENATION and must not
+    be a substring of any SINGLE piece.
+    """
+    if not name:
+        return False
+    pieces = [m.group(1) for m in PY_STRING_PIECE_RE.finditer(text)]
+    if len(pieces) < 2:
+        return False
+    low = name.lower()
+    if low not in "".join(pieces).lower():
+        return False
+    # A piece that IS the name only counts as a join when it is glued to a
+    # neighbouring literal; `("QUBIT_CONTAINER", "Hermes" + "_CONTAINER")` does
+    # exactly that, while a lone `"Hermes"` piece does not.
+    for piece in pieces:
+        if piece.lower() == low:
+            if _is_plus_joined(text, piece):
+                return True
+            continue
+        if low in piece.lower():
+            return False       # spelled inside one longer literal: not a join
+    return not any(low in p.lower() for p in pieces)
+
+
+def _is_plus_joined(text: str, piece: str) -> bool:
+    """True when ``piece`` is one operand of a ``+`` string concatenation."""
+    if not piece:
+        return False
+    pat = re.compile(
+        r"['\"]" + re.escape(piece) + r"['\"]\s*\+|\+\s*['\"]" + re.escape(piece)
+        + r"['\"]")
+    return bool(pat.search(text))
 
 
 def _hits(text: str) -> List[str]:
@@ -1014,6 +1178,21 @@ def _scan_ts_file(rel: str) -> Tuple[List[Dict[str, Any]], Dict[str, int]]:
                 _allow(allow, "source_strings", "guard", token)
                 continue
             if PROSE_RE.search(bare):
+                # A legacy word INSIDE a longer identifier is not product copy:
+                # `HERMES_CONTAINER` (env var), `remoteHermesPath` (config key),
+                # `X-Hermes-Gateway-Ticket` (protocol header), and i18n key
+                # names like `notifications.updateHermes` are names the code
+                # reads back, not strings a user sees. Renaming them would
+                # break a wire/config contract, so they are reported as
+                # wire_identifier instead of being counted as leaks — the same
+                # class the CLI/bundle stages already allowlist.
+                #
+                # `is_internal_name` requires a neighbouring [A-Za-z0-9_] on at
+                # least one side, so the bare English word ("restart Hermes")
+                # and a sentence-final "Hermes." still count as public prose.
+                if not is_test and _is_internal_identifier_name(token):
+                    _allow(allow, "source_strings", "wire_identifier", token)
+                    continue
                 if is_test:
                     _allow(allow, "source_strings", "test_fixture", token)
                 elif record:
