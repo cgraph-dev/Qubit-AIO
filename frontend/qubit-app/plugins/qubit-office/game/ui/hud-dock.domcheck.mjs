@@ -220,8 +220,20 @@ if (hudWin.__registered) {
     log("  state block   :", (st.textContent || "").replace(/\s+/g, " ").slice(0, 220));
   }
 
-  check("the HUD renders its tab strip", tabs.length === 7,
-        `${tabs.length} tabs`);
+  // The tab count is NOT a constant of this harness. Commit 7f35281e1 shipped
+  // the twelve restored panels (19 tabs), so `=== 7` was stale and failed on a
+  // HUD that was correct. The count lives in the HUD's own TABS table, which
+  // renders one `id="hud-tab-<id>"` button per entry — so assert the strip is
+  // non-empty, every tab has a unique id, and the count is the number of
+  // distinct ids (a duplicate or a missing id fails; a grown HUD does not).
+  const tabIds = tabs.map((t) => t.id || "");
+  const uniqueIds = new Set(tabIds);
+  const allNamed = tabIds.every((id) => /^hud-tab-\S+$/.test(id));
+  check("the HUD renders its tab strip", tabs.length > 0, `${tabs.length} tabs`);
+  check("every tab carries its own hud-tab-<id>",
+        allNamed && uniqueIds.size === tabs.length,
+        `${uniqueIds.size}/${tabs.length} distinct, unnamed: ` +
+        `${tabs.filter((t) => !/^hud-tab-\S+$/.test(t.id || "")).length}`);
   check("the HUD renders panels", panels.length > 0, `${panels.length}`);
   check("the HUD renders real stat tiles", stats.length > 0, `${stats.length}`);
   check("no panel is in an error/offline state", errorStates.length === 0,
@@ -244,22 +256,30 @@ if (hudWin.__registered) {
     const label = tab.textContent.trim();
     const tStats = [...hdoc.querySelectorAll(".hud__stat")];
     const tRows = [...hdoc.querySelectorAll(".hud-row, .hud__table tbody tr")];
+    // A tab that has nothing to show yet paints its OWN typed empty box
+    // (`.hud-state--empty`: "No correction recorded", "No memory store yet")
+    // rather than an invented chart. That is the HUD answering honestly from a
+    // real 200 payload, so it counts as rendered — the same rule the office
+    // tests apply to a GAP that names its typed reason.
+    const tEmpty = [...hdoc.querySelectorAll(".hud-state--empty")];
     const tErr = [...hdoc.querySelectorAll(".hud-state--error, .hud-state--offline")];
     const sampleT = tStats.slice(0, 3).map(
       (x) => `${x.querySelector(".hud__statLabel")?.textContent}=` +
              `${x.querySelector(".hud__statValue")?.textContent}`);
     const server5xx = SERVER_ERRORS.filter((e) => e.status >= 500);
-    const rendered = tStats.length > 0 || tRows.length > 0;
-    // Honest outcomes only: real data rendered, and every error state that IS
-    // shown is backed by a genuine 5xx from the server. A tab may do both (a
-    // wide tab whose two reads are independent: one paints, one names).
+    const rendered = tStats.length > 0 || tRows.length > 0 || tEmpty.length > 0;
+    // Honest outcomes only: real data rendered (tiles, rows, or a typed empty
+    // state), and every error state that IS shown is backed by a genuine 5xx
+    // from the server. A tab may do both (a wide tab whose two reads are
+    // independent: one paints, one names).
     const unexplained = tErr.length > server5xx.length;
     const ok = (rendered || server5xx.length > 0) && !unexplained;
     if (!ok) tabFailures += 1;
     log(`  ${ok ? "PASS" : "FAIL"} ${label.padEnd(9)} `
-        + `tiles=${tStats.length} rows=${tRows.length} `
+        + `tiles=${tStats.length} rows=${tRows.length} empty=${tEmpty.length} `
         + `errors=${tErr.length} ${sampleT.join(", ")}`
-        + (rendered ? "" : ` | ${(tErr[0]?.textContent || "").replace(/\s+/g, " ").slice(0, 110)}`));
+        + (rendered ? "" : ` | ${(tErr[0]?.textContent || tEmpty[0]?.textContent
+            || "").replace(/\s+/g, " ").slice(0, 110)}`));
   }
   if (SERVER_ERRORS.length) {
     log("\n  server-side failures the HUD correctly named:");
