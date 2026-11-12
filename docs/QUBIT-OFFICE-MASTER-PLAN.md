@@ -1508,3 +1508,13 @@ The plan set was audited for contradictions, duplicate phase orders and overengi
 review and canonical MVP scope are in `docs/QUBIT-OFFICE-PLAN-REVIEW.md`; `QUBIT-OFFICE-COMPLETE-PLAN.md`
 §11 records the simplified first slice. Until that MVP passes, no tower, character studio, outside
 world, mature interactions, Temporal, SSO, multi-tenant or multi-entity work starts.
+
+
+---
+
+## 54. Full repo mapping
+
+All external reference repos recorded in §22 are mapped with take/avoid/licence/MVP relevance in
+`docs/QUBIT-OFFICE-REPO-LEDGER.md` §2. The MVP shortlist is Habblaud, SkyOffice, pixelfx,
+claw-empire, agent-monitor/agents-office concepts and Agent Office/JSM HQ sandbox concepts. The
+ERP/CRM/business repos are later references, not MVP code.
