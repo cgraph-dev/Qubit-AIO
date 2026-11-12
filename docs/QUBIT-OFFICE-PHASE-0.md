@@ -5,23 +5,22 @@
 
 ## 1. Decision: durable execution engine
 
-**Full-scope decision:** Temporal (PostgreSQL persistence) is the canonical durable workflow engine.
-Build it from the start; do not substitute a homegrown MVP scheduler.
+**Decision:** use the existing Business OS SQLite control plane first: event log + run/task/
+workspace/checkpoint/lease/outbox with explicit recovery and reconciliation. Do **not** build a
+homegrown full workflow scheduler and do **not** force Temporal before it is needed.
 
-- Model/agent turns, tool calls, provider calls, payments, publishing, email, Etsy, CRM writes and
-  human approvals are activities or signals/waits.
-- Workflow code stays deterministic; external effects live in idempotent activities.
-- Every activity has an idempotency key, provider receipt/request ID and reconciliation path.
-- Human approval is a durable workflow wait/signal, not a chat message.
-- Run history is workflow history; the Business OS stores the business-readable projection.
-- PostgreSQL is the business/workflow persistence target; SQLite is not the workflow authority.
-- If Temporal/server dependencies are unavailable, consequential workflows fail closed.
+- Every external effect gets an idempotency key and provider receipt; timeouts reconcile.
+- Runs/tasks have explicit states including `unknown`.
+- Checkpoints carry pending actions, tool receipts, approvals, workspace revision and safe resume.
+- Leases/fencing protect tasks/workspaces; stop revokes leases/credentials and records unknowns.
+- No exactly-once claim; duplicates are prevented or reconciled.
+- A **Temporal adapter** is added when measured multi-worker/HA/scale needs justify the operational
+  weight. It must pass the same crash/duplicate/unknown/restore tests before replacing the local
+  engine.
 
-Alternatives are references, not the engine: LangGraph checkpoints are not external-effect
-transactions; Airflow is scheduled DAGs, not interactive long-lived agents; a homegrown queue
-reimplements timers/retries/history.
-
-The owner rejected the reduced MVP; Temporal is part of the full build.
+Why: the current product already has SQLite Business OS/state/session code. Reusing it avoids
+rebuilding an engine and keeps the first integrated system local and debuggable. Temporal remains a
+proven later adapter, not a prerequisite.
 
 ## 2. Staging, test and replay environment
 
@@ -69,13 +68,13 @@ Required before Phase 1 implementation:
 - `docs/QUBIT-OFFICE-THREAT-MODEL.md`: assets, actors, boundaries, threats/controls/tests.
 - Exit: security gates for external actions are accepted.
 
-### P0-06 — Temporal durable prototype
+### P0-06 — Local durable-substrate prototype
 
-- Bring up Temporal with PostgreSQL (self-hosted local profile).
-- Prototype: activity with fake external receipt, human approval wait, timer, retry/timeout and
-  unknown-outcome reconciliation.
-- Exit: restart resumes; duplicate activity is idempotent; approval survives restart; unknown
-  outcome reconciles.
+- Prototype on the existing SQLite control plane: run/task states, lease/checkpoint, outbox/inbox,
+  idempotency key and fake provider receipt.
+- Include one human approval wait, timer/retry and unknown-outcome reconciliation.
+- Exit: restart resumes; duplicate effect is prevented/reconciled; approval survives restart.
+- Temporal stays a later adapter.
 
 ### P0-07 — Test/staging/replay harness
 
@@ -90,7 +89,7 @@ Required before Phase 1 implementation:
 ## 4. Phase 0 exit gates
 
 1. Domain contract, asset/idea/repo ledgers, threat model and phase order are committed.
-2. Temporal decision is recorded with a working prototype.
+2. Local durable-substrate decision is recorded with a working prototype; Temporal is deferred until measured need.
 3. Staging/replay environment is reproducible from a command.
 4. No real credentials or operator data are used.
 5. Phase 1 tickets are bounded and have failure/recovery tests.

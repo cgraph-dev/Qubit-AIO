@@ -1565,3 +1565,13 @@ MCP OAuth 2.1/PKCE/resource/audience/tool-schema rules, sandbox/RCE, approvals, 
 WCAG 2.2 AA, OpenTelemetry GenAI, Temporal durability, privacy/licensing and performance/device
 budgets. No release or `VERIFIED` claim while an applicable row is FAIL/UNTESTED/waived without
 owner sign-off.
+
+
+---
+
+## 59. Professional execution plan v10
+
+`docs/QUBIT-OFFICE-COMPLETE-PLAN.md` was rewritten as the single professional full-scope plan:
+reuse-first, no MVP, Phase 0–8 with tasks/exit gates, parallel tracks, mandatory gates, corrected
+phase order and bug/misconfiguration fixes. Durable execution uses the existing SQLite control
+plane first; Temporal is a later adapter when measured need justifies it.
