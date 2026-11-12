@@ -1294,3 +1294,180 @@ receipts, feature flags, backup-restore verification) and ten nice-to-haves (age
 synthetic monitoring, trace review, knowledge lifecycle, search/dedup/entity resolution, trust
 center, vendor/model risk registry, deployment rings, disaster game days, local-first sync) are
 recorded in `docs/QUBIT-OFFICE-RESEARCH-GAPS.md` §8.
+
+---
+
+## 50. Canonical phased execution order v7
+
+**This section supersedes §45 and any earlier phase list where they conflict.**
+No more plan rewrites. New ideas go to the idea ledger; they do not reorder this build.
+
+### Phase 0 — Freeze, contracts and ledgers
+
+**Goal:** stop scope drift and make the system buildable.
+
+Deliverables:
+- Frozen execution order and decision log.
+- Canonical domain/projection contract: Owner, Tenant, Business, LegalEntity, Department, Room,
+  Cell, Desk, Agent, Session, Run, Task, Workspace, Checkpoint, Artifact, Message, Approval,
+  LedgerEntry, CapabilityCall, FXEvent.
+- Authority table: Business OS event log is truth; office/tower/Obsidian/maps are projections.
+- Asset ledger: every file, pack, license, paid/local-only flag, intended room/character/UI use.
+- Idea ledger: every owner idea with status (idea/planned/coded/live/missing).
+- Repo dependency ledger: repo, commit, license, pattern taken, code rejected, security notes.
+- Threat model and data-classification baseline.
+- Test/staging/replay environment decision.
+- Durable workflow engine decision (Temporal/equivalent or explicit local alternative).
+
+Exit gate: every proposed feature maps to a phase, owner, data authority and evidence requirement.
+
+**Do not start:** 100 floors, character studio, outside world, mature interactions, social accounts.
+
+### Phase 1 — Foundation: identity, durable state, security, observability
+
+**Goal:** make it safe and recoverable before agents do real work.
+
+Deliverables:
+- Human/agent/service/workflow identities; local owner auth now, OIDC/SSO-ready.
+- RBAC + ABAC policy engine; deny-by-default; tenant/business/department/resource/action/data/
+  expiry; revocation.
+- Durable execution: runs, tasks, timers, signals, retries, waits, event history, replay.
+- Run state machine including `unknown`, reconciliation and dead-letter ownership.
+- Append-only event log, audit chain, correlation IDs, metrics/traces/logs.
+- Secrets manager/vault, sandbox profiles, filesystem jail, network egress policy.
+- Backup/restore, RPO/RTO, tenant-level restore, restore drills.
+- Test/staging/replay environments with synthetic externals and fault injection.
+- Schema/policy/prompt migration framework.
+
+Exit gate: one durable workflow survives restart; one unauthorized call is refused; one backup is
+restored and verified; one trace explains a complete run.
+
+### Phase 2 — Agent runtime and capability gateway
+
+**Goal:** one real agent lane, not 283 records.
+
+Deliverables:
+- AgentProfile and selectors: permissions, skills, MCP/tools, model/provider, budgets, autonomy,
+  memory scopes, secrets, schedule, appearance.
+- Capability catalog with health/version/risk/scopes.
+- ToolGateway as the only execution boundary: model, tools, MCP, terminal, browser, files,
+  messages, memory, connectors, payments, Etsy.
+- Sessions/runs/tasks/workspaces/leases/checkpoints/handoffs.
+- Capability snapshots frozen per run; revocation interrupts active calls.
+- Message fabric: owner↔agent, agent↔agent, room channels, threads, delivery, replay.
+- Durable approvals bound to exact payload/evidence/risk/cost/expiry.
+- Memory adapter: event log authoritative; Obsidian projection; OpenViking scoped adapter;
+  provenance/retention/deletion.
+- Effective-state UI: grants, inherited vs explicit, model, memory, leases, budgets, approvals.
+
+Exit gate: one agent receives a task, uses one capability, gets an approval, produces an artifact,
+checkpoints, restarts and resumes without duplication.
+
+### Phase 3 — One department floor vertical slice
+
+**Goal:** the first real Qubit Office.
+
+Deliverables:
+- One department template from the current office image.
+- Reception, work area, boardroom, focus room, kitchen/break, restrooms, lounge, head office,
+  storage.
+- Real room/seat/capability manifests; 3–5 real agents, not synthetic occupants.
+- Department Obsidian graph + OpenViking scope.
+- Room map, character/portrait basics, status/activity feed.
+- Owner chat with each agent; agent-to-agent chat; handoff.
+- One department business record, tasks, artifacts, metrics and audit.
+- Restart/recovery tests.
+
+Exit gate: a user can watch real work, talk to agents, see artifacts and recover after restart.
+
+### Phase 4 — First business workflow (Etsy)
+
+**Goal:** one real business loop, human-gated.
+
+Deliverables:
+- Etsy pilot: niche → licensed digital asset → draft listing → IP/license evidence → owner approval
+  → official OAuth call → provider receipt → order/download/support/refund → payout → ledger →
+  reconciliation → margin report.
+- Digital asset versioning, malware scan, entitlements and replacement policy.
+- Unknown outcome handling and reconciliation.
+- Approval inbox, payload hash, rollback/retry.
+
+Exit gate: one complete Etsy flow with evidence and reconciliation; no fake success.
+
+### Phase 5 — Business systems of record
+
+**Goal:** make the company operational beyond one shop.
+
+Deliverables:
+- CRM/leads/contacts/consent/pipeline.
+- Support tickets/SLA/handoff.
+- Marketing/social campaigns/drafts/approvals/publication receipts.
+- Finance/accounting/payments/ledger/reconciliation.
+- Contracts/obligations/renewals.
+- HR/people/agent lifecycle.
+- Procurement/vendors.
+- Analytics/KPI contracts and freshness.
+- Multi-entity separation (personal now; future entities).
+
+Exit gate: each business action has a system of record and provider receipt, not just a chat reply.
+
+### Phase 6 — Multiply departments and campus
+
+**Goal:** many businesses/departments without breaking the first one.
+
+Deliverables:
+- Clone the working department template.
+- Department/floor builder: rooms, desks, cells, capacities, paths, validation, versioning, undo.
+- Department-specific capabilities, memory, roles, business and assets.
+- Campus map, elevators/stairs, shared War Room/Memory/Ops/Comms/Server floors.
+- Active/dormant scheduler with fairness, leases and business-continuity guarantees.
+- Multi-department permissions, budgets and reporting.
+
+Exit gate: a new department can be created from template, staffed, operated and recovered.
+
+### Phase 7 — Character Studio, UI and world
+
+**Goal:** the visual/product layer over a working company.
+
+Deliverables:
+- Character Studio merging Habblaud character state/editor/animation with LimeZu Character and
+  Portrait Generators; one canonical CharacterProfile, transactional projections, rollback.
+- Full panel inventory and effective-state controls.
+- Distinct room styles, furniture sets, lighting, assets and outside world/campus exterior.
+- Renderer-neutral map/chunk/layer/door/portal schema.
+- Web renderer first; Godot only after parity tests.
+- Asset/license enforcement across bundles, caches, screenshots, backups and exports.
+
+Exit gate: visual office reflects real state; no renderer invents business truth.
+
+### Phase 8 — Interactions, FX, mature simulation and scale
+
+**Goal:** make the world alive without compromising operations.
+
+Deliverables:
+- Interaction engine: needs, traits, relationships, action catalog, consequences.
+- Mature-content policy off by default; non-graphic, consent/HR/legal guards.
+- Event-to-FX schema, replay/cancellation/fallback, reduced motion.
+- Outside-world life, day/night/weather/seasons.
+- 100/500/1,000-agent load tests, frame/memory/event/persistence budgets.
+- Capacity, backpressure, disaster game days, release rings, evaluations.
+- Optional Godot/2.5D/3D campus after web parity.
+
+Exit gate: interactions and scale do not weaken durability, security or business truth.
+
+### Phase 9 — Release and operations
+
+**Goal:** run it continuously.
+
+Deliverables:
+- Security/privacy review, threat-model tests, negative tests.
+- Backup/restore drills, incident response, on-call, kill switch.
+- Feature flags, deployment rings, canary/rollback.
+- Observability dashboards, evals, scorecards, synthetic monitoring.
+- Self-hosting contract: setup, migrations, health, import/export, telemetry policy.
+- Exit/manual runbooks and shutdown/close procedures.
+- Final matrix once, on a frozen SHA.
+
+**Start point:** Phase 0. The first commits are contracts, ledgers, threat model, durable-workflow
+decision and test/staging environment — not the tower, character editor, outside world or mature
+interactions.
