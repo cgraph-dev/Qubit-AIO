@@ -71,12 +71,22 @@ def test_isolated_paths_have_no_user_home_literal(tmp_path):
     # packaged resources root may point at the installed package (legitimate).
     # The forbidden literal is built from parts so the test source itself never
     # ships a real home path in the sdist.
-    home_user = "/home" + "/trick"
+    #
+    # `tmp_path` legitimately lives under $HOME when a runner pins TMPDIR there
+    # (this checkout's scratch dir is under ~/.local/state), so "the string
+    # /home/<user> never appears" is the wrong bar: it fails for a correct
+    # implementation. The real bar is that no path escapes the isolated root
+    # into the ambient home. Strip the test's own root and check what remains.
     paths = _paths(tmp_path)
     per_user = {k: v for k, v in paths.map.items() if k != "resources"}
     blob = json.dumps(per_user)
-    assert home_user not in blob
-    assert "/home/" not in blob
+    root = str(tmp_path)
+    assert root in blob, "sanity: the isolated root must be what the paths name"
+    outside_root = blob.replace(root, "<tmp>")
+    home_user = "/home" + "/trick"
+    assert home_user not in outside_root
+    assert "/home/" not in outside_root
+    assert str(Path.home()) not in outside_root
 
 
 def test_isolated_paths_under_tmp(tmp_path):
