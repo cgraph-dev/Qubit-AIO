@@ -38,3 +38,8 @@ sheets/
 /.claude-plugin/
 /.github/
 /compare.mjs
+# Upstream's own dev tooling (act/serve/montage/sheets/...): conveniences for
+# browsing the effect gallery, none of which export_ghost.mjs imports — it reads
+# only tools/lib/fxlib.mjs, which IS tracked. Same rationale as above: fetched
+# by `git clone` when regenerating, never read by the product.
+/tools/*.mjs
