@@ -58,3 +58,10 @@
 - `docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md` remains the mandatory security/accessibility/ops test list.
 - `docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md` remains the domain record authority.
 - `docs/QUBIT-OFFICE-RESEARCH-GAPS.md` remains the reference for secondary business ideas.
+
+
+## UI contract added after the review
+
+`docs/QUBIT-OFFICE-UI-CONTRACT.md` closes the uncited-UI gap: it pins exact shell/room/layout,
+pixel sampling/atlas/z-order, floor search and cancellation, agent states, panel authority,
+CharacterProfile save authority, accessibility tests and Phaser/Pixi/Tiled reuse boundaries.
