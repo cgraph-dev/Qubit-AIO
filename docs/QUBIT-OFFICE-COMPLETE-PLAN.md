@@ -140,10 +140,10 @@ rendered without inventing operational agents.
 | P3-01 | all department templates + Trading Department -> all floor/room/cell/desk records | World + integration | generate full campus data; IDs unique; 100 floors, 5 wings, 300 rooms, 3,075 desks; Trading room/manifest present; seed ≠ production |
 | P3-02 | archetypes/capability manifests -> room workflow/role/tool/artifact/queue/KPI/memory/privacy/approval | World + business + QA | every room maps to at least one real workflow; absent capability manifest is a typed error; no decorative room pretending work |
 | P3-03 | map schema + Tiled candidate import/export -> map versions, portals, connectivity | World + QA | IDs, coordinates, doors, paths, egress, capacity and memory-scope checks; invalid map rejected; transactional publish/undo |
-| P3-04 | benchmark-selected 2D renderer: camera floor, chunks, atlas, LRU, dirty rendering, context-loss fallback | Frontend + QA | one active floor renders; no all-floor draw; context-loss recovery; dirty-render; FPS/heap/device budgets pass |
-| P3-05 | command-center shell: global search, roster, floor/agent/task filters, notification inbox, drawers, semantic DOM | Frontend + accessibility | keyboard-only floor/agent/task/artifact navigation; focus visibility; reduced motion; no color-only state; mirror semantics |
+| P3-04 | benchmark-selected 2D renderer: camera floor, chunks, atlas, LRU, dirty rendering, context-loss fallback (mandatory: `QUBIT-OFFICE-UI-CONTRACT.md` §2–§4) | Frontend + QA | one active floor renders; no all-floor draw; context-loss recovery; dirty-render; FPS/heap/device budgets pass |
+| P3-05 | command-center shell: global search, roster, floor/agent/task filters, notification inbox, drawers, semantic DOM (`QUBIT-OFFICE-UI-CONTRACT.md` §1, §6) | Frontend + accessibility | keyboard-only floor/agent/task/artifact navigation; focus visibility; reduced motion; no color-only state; mirror semantics |
 | P3-06 | outside-world data: lobby/elevators/campus exterior/chunks | World + QA | exterior data is chunk-validated; only active zones animate; lobby connects to elevators; no outside resource unbounded loading |
-| P3-07 | Character Studio shell: canonical CharacterProfile with Habblaud state + LimeZu character/portrait projections | Frontend + art + QA | one save authority; versioned revisions and rollback; paid-art guard; no second editor or raw paid asset in public bundle |
+| P3-07 | Character Studio shell: canonical CharacterProfile with Habblaud state + LimeZu character/portrait projections (`QUBIT-OFFICE-UI-CONTRACT.md` §5) | Frontend + art + QA | one save authority; versioned revisions and rollback; paid-art guard; no second editor or raw paid asset in public bundle |
 
 **Phase gate:** full valid data, selected-floor renderer, accessible search/map shell and character
 profile shell. Do not create animated/working departments until a real agent lane exists.
@@ -196,7 +196,7 @@ irreversible require human authorization. Trading readiness is still not live ca
 
 | ID | Inputs → outputs | Owner | Acceptance / negative tests |
 |---|---|---|---|
-| P6-01 | Character Studio merge: Habblaud state/editor + LimeZu Character Generator 2.0 + Portrait 1.5 → one CharacterProfile | Frontend + art + QA | body/eyes/hair/outfit/skin counts valid; preview world+portrait; randomize/lock/undo/presets; version/rollback; paid-art guard |
+| P6-01 | Character Studio merge: Habblaud state/editor + LimeZu Character Generator 2.0 + Portrait 1.5 → one CharacterProfile (`QUBIT-OFFICE-UI-CONTRACT.md` §5) | Frontend + art + QA | body/eyes/hair/outfit/skin counts valid; preview world+portrait; randomize/lock/undo/presets; version/rollback; paid-art guard |
 | P6-02 | room styles/archetypes/furniture/palettes/light/signage/seeds + department/room builder | World + art + QA | draft/version/preview/undo/approve/rollback; path/capacity/egress/collision/assets checks; unique style per department |
 | P6-03 | outside world/campus exterior/lobby/elevators/weather/day-night | Frontend + QA | exterior chunks active-zone only; no unbounded animation; environment event mapping passes |
 | P6-04 | full panel inventory: agents, sessions, chat, terminal, deliveries, timeline, War Room, Memory, Approvals, Ops, CRM, marketing, Etsy, Trading, models/MCP/plugins/skills, budgets, audit, settings | Frontend + QA | every panel data authority/permissions/empty/error/retry/real action or typed refuse; no fabricated state |

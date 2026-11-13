@@ -1600,3 +1600,14 @@ business operations → UI/world → simulation → scale/release. Durable SQLit
 later measured-HA adapter. Trading has its own research→backtest→paper→owner-readiness track.
 
 The architecture and low-tier-agent audit is in `docs/QUBIT-OFFICE-PLAN-AUDIT-V10.md`.
+
+
+---
+
+## 61. Mandatory UI implementation contract
+
+`docs/QUBIT-OFFICE-UI-CONTRACT.md` is the canonical weak-agent UI guide: exact shell/dock layout,
+department/room schema, 16×12 cells and pixel rendering, floor navigation, accessible panels,
+Character Studio merge, live-data boundaries, performance budgets, negative tests and repo-specific
+avoidances. Phase 3 §5 (shell) and §7 (Character Studio) must follow it. No second UI store/editor or
+generic art/state invention is allowed.
