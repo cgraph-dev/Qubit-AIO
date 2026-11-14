@@ -681,6 +681,18 @@ def accessibility_matrix(report: Mapping[str, Any]) -> dict[str, Any]:
         "schema": MATRIX_SCHEMA,
         "kind": "accessibility",
         "ok": all(item["ok"] for item in checks),
+        "source": "scripts/accessibility_audit.py (P6-05 static audit)",
+        "static_scope": [
+            "interactive_name",
+            "shell_structure",
+            "semantic_mirror",
+            "outline_replacement",
+            "reduced_motion",
+            "target_size",
+            "non_color_status",
+            "focus_visible",
+            "skip_link_style",
+        ],
         "axe": {
             "status": axe.get("status"),
             "claimed_run": axe.get("claimed_run"),

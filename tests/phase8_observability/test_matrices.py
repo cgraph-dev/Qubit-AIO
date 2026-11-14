@@ -21,6 +21,9 @@ def test_accessibility_matrix_consumes_the_real_audit(a11y_audit, tensor):
     assert matrix["axe"]["claimed_run"] is False
     assert matrix["axe"]["honest"] is True
     assert matrix["static"]["errors"] == 0
+    assert {"target_size", "semantic_mirror", "reduced_motion"} <= set(
+        matrix["static_scope"]
+    )
     statuses = {item["item"]: item["status"] for item in matrix["reviews"]}
     assert statuses["axe-core automated scan"] == "not_performed"
     assert statuses["NVDA / VoiceOver / TalkBack"] == "not_performed"

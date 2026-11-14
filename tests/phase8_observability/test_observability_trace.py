@@ -199,6 +199,11 @@ def test_clean_run_is_sampled_by_the_baseline_and_errors_are_kept(tensor):
             span.set_status(otel.STATUS_TIMEOUT)
     assert timeout.snapshot()["traces"][0].sampling_reason == "timeout"
 
+    handoff = build(0.0)
+    with handoff.start(ids=IDS) as run:
+        run.mark_handoff(reason="probe")
+    assert handoff.snapshot()["traces"][0].sampling_reason == "handoff"
+
     failed_eval = build(0.0)
     with failed_eval.start(ids=IDS) as run:
         with run.model() as span:

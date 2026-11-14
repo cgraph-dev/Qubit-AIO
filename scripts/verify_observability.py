@@ -403,6 +403,9 @@ def _run_sampling_cases() -> Dict[str, Any]:
     with timeout.start(ids=_PROBE_IDS) as run:
         with run.model() as span:
             span.set_status(otel.STATUS_TIMEOUT)
+    handoff = make()
+    with handoff.start(ids=_PROBE_IDS) as run:
+        run.mark_handoff(reason="probe")
     failed_eval = make()
     with failed_eval.start(ids=_PROBE_IDS) as run:
         with run.model() as model_span:
@@ -424,6 +427,7 @@ def _run_sampling_cases() -> Dict[str, Any]:
     reasons = {
         "error": reason(error),
         "timeout": reason(timeout),
+        "handoff": reason(handoff),
         "failed_eval": reason(failed_eval),
         "outlier": reason(outlier),
         "baseline": reason(baseline),
@@ -439,6 +443,7 @@ def _run_sampling_cases() -> Dict[str, Any]:
             and error_raised
             and reasons["error"] == "error"
             and reasons["timeout"] == "timeout"
+            and reasons["handoff"] == "handoff"
             and reasons["failed_eval"] == "failed_eval"
             and reasons["outlier"] == "outlier"
             and reasons["baseline"] == "baseline"
