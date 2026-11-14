@@ -1,5 +1,16 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office live deploy — 2026-11-14 (`main` `d72d3c611`, owner-approved):** The feature branch
+`feat/qoffice-next` was merged into `main` (`55c512261`), the Office bundle and dashboard were
+rebuilt, the package was reinstalled into `/home/trick/venvs/qubit-0.0.13` as `0.0.15` (code-only),
+the rebuilt assets were synced into `voicebridge/_data`, and the bridge was restarted. Live `:8890`
+now shows the new shell toolbar (**Command Center / Timeline / Studio**); Studio opens **21 panel
+rows**, the **Rooms** builder and **6 outside zones**; `/chat` and `/qubit-office` are 200 with **0
+console errors**. Rollbacks: branch `backup/pre-qoffice-deploy-20261114-201306`, static backup
+`~/.cache/qubit-qoffice-deploy-20261114-201853`, Python package backup
+`~/.cache/qubit-qoffice-py-20261114-202436`. Repo-wide matrix is still FAIL on pre-existing files;
+owner release decision not signed; **no `VERIFIED`**.
+
 **Phase 8 repo-wide matrix ran — release remains BLOCKED (2026-11-14, `feat/qoffice-next`):** The
 canonical root suite (`qubit_runtime/scripts/run_tests_parallel.py`, `tests/`, 6 workers) ran on frozen
 `864891f96` (tree `ba368148b`): **56 failing files + 1 error file**, so **no VERIFIED claim**. Triage:
