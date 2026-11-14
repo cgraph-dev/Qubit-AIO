@@ -1,0 +1,108 @@
+{
+  "docs": [
+    {
+      "bytes": 25210,
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "bytes": 7632,
+      "path": "docs/QUBIT-OFFICE-PLAN-AUDIT-V10.md",
+      "sha256": "fee45b09c3c95636e0f0cbe7d4adcd7f54e172a78903608211010d43992620be"
+    },
+    {
+      "bytes": 16734,
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "bytes": 12216,
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "bytes": 8207,
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "bytes": 9709,
+      "path": "docs/QUBIT-OFFICE-TRADING-DEPARTMENT.md",
+      "sha256": "bb04243609531bb4a67d59621fb4928b6e42cb3d718dfdbf095ec22837dc8614"
+    },
+    {
+      "bytes": 8292,
+      "path": "docs/QUBIT-OFFICE-REPO-LEDGER.md",
+      "sha256": "9967238d4e8a66f48a8bdd07fc35d0fbabd42b3c1b2514c8496325410b7a5157"
+    },
+    {
+      "bytes": 5919,
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "bytes": 5466,
+      "path": "docs/QUBIT-OFFICE-PHASE-0.md",
+      "sha256": "688028db6dfb6d64066735af5d5c9416e11c6db9daaf107c111501d1956661ef"
+    },
+    {
+      "bytes": 7013,
+      "path": "docs/QUBIT-OFFICE-THREAT-MODEL.md",
+      "sha256": "8cb98c73ac6bcf6984eeef2cb38d12219630c85831dcd4f0ab839b9b94cdaa3a"
+    },
+    {
+      "bytes": 30886,
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "bytes": 18344,
+      "path": "docs/QUBIT-OFFICE-RESEARCH-GAPS.md",
+      "sha256": "1de0cb7e9694866d1bb7be9f980b00e15054075584e0389b8e9c00c9e2e5c821"
+    },
+    {
+      "bytes": 8523,
+      "path": "docs/QUBIT-OFFICE-BROWSER-REVIEW.md",
+      "sha256": "91cb49e4cead1c28ed1d93a60f87b538140e8b25c328da9937477257b7794614"
+    },
+    {
+      "bytes": 14066,
+      "path": "docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md",
+      "sha256": "3f823ebf1188ca25898e494339e9ec674b78a39afabf37500a8c032527850a65"
+    },
+    {
+      "bytes": 6009,
+      "path": "docs/QUBIT-OFFICE-IDEA-LEDGER.md",
+      "sha256": "251211adf28a8ec430b8f662b267274d222f19b648e80a53e77e1ce5ab29df85"
+    },
+    {
+      "bytes": 8256,
+      "path": "docs/QUBIT-OFFICE-PLAN-REVIEW.md",
+      "sha256": "601c607e2f415d7948e65d280ecc386392c99f2929c1de0bdd055afcebfb8138"
+    }
+  ],
+  "generated_at": "2026-11-14T02:57:47Z",
+  "non_goals": [
+    "no live external side effects during phase acceptance",
+    "no live capital or live marketplace publish",
+    "no second execution engine before a measured HA need",
+    "no all-100-floor render or all-agent continuous simulation"
+  ],
+  "owner_decisions": [
+    "full-scope-from-start",
+    "reference-lane-validates-architecture-not-a-scope-cut",
+    "no-second-database-session-authority-character-editor-or-business-ledger",
+    "reuse-existing-engines-assets-and-approved-repos",
+    "paid-limezu-art-is-local-only",
+    "agents-office-polyform-and-no-license-repos-are-concepts-only",
+    "habblaud-additive-only-behind-a-flag",
+    "every-capability-must-work-on-the-reference-dashboard-and-by-voice",
+    "no-fake-completion-pending-or-unknown-never-renders-completed",
+    "typed-refusal-is-not-a-working-capability"
+  ],
+  "plan_sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1",
+  "plan_version": 11,
+  "schema": "qubit-office-phase0-contract/1",
+  "status": "FROZEN",
+  "task_id": "P0-01"
+}

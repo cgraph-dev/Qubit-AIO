@@ -1,0 +1,34 @@
+{
+  "commands": [
+    {
+      "cmd": "python scripts/office_phase0_contract.py",
+      "exit_code": 0
+    },
+    {
+      "cmd": "python scripts/office_phase0_contract.py --check",
+      "exit_code": 0
+    },
+    {
+      "cmd": "python scripts/verify_doc_citations.py",
+      "exit_code": 0
+    }
+  ],
+  "generated_at": "2026-11-14T02:57:47Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    }
+  ],
+  "limitations": [
+    "freezes the document authority only; implementation claims remain phase-gated"
+  ],
+  "outputs": [
+    {
+      "path": "evidence/phase-0/contract.json",
+      "sha256": "91c0033b7a75f9a9e154650f71271a857d612b180a89987a0b90610671883e92"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P0-01"
+}

@@ -1,5 +1,21 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 0 accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):** P0-01..P0-09
+are implemented with real evidence and the gate `bash scripts/acceptance/phase-0.sh` exits 0,
+writing `evidence/phase-0/manifest.json` with `status: PASS`. Five disjoint lanes were integrated:
+domain/event/agent/session/run JSON contracts + validator (P0-02); per-file asset ledger re-measured
+at **57,268 files / 904,388,468 bytes** with the stale 1,523/404 MB doc corrected (P0-03); approved
+dependency lock + validator (P0-04); OWASP ASI01–ASI10 + mandatory-gate threat catalog with real
+denial tests (P0-05); hermetic staged replay with a blocked network (P0-06); deterministic campus
+fixture **100 floors / 5 wings / 300 rooms / 575 cells / 3,075 desks / 0 staffed agents** (P0-07);
+honest data-path renderer benchmark selecting the pinned Phaser/Habblaud path (P0-08); and additive
+Business OS schema v3 (`bos_checkpoint`, `bos_outbox`) + recovery/reconciliation tests (P0-09).
+Combined focused set **203 passed**; new scripts ruff/compile clean. **Next:** Phase 1 — identity,
+event log/outbox, capability gateway, runs/leases/checkpoints, A2A, approval execution binding,
+secrets/sandbox/egress, OTel, backup/restore, then the P1-10 reference lane. **Not done:** no live
+service, no real external write, no full matrix, and **no `VERIFIED`/COMPLETE claim**; renderer GPU
+frames and the production pack licences remain unmeasured.
+
 **Controls artifact lane — 2026-11-11 (branch `feat/controls-artifact`, not merged):** `docs/generated/QUBIT_CONTROLS_E2E_2026-09-23.json` regenerated against a throwaway scratch dashboard on `:8892` with `--allow-live-mutations` (96 controls: 77 PASS / 3 GATED / 1 FAIL / 15 SKIP; the one FAIL is the `/skills` category-filter selector timeout, recorded honestly). The artifact test target pin was relaxed to `validate_target(artifact["target"])` so a scratch loopback port is valid (the mutating controls require one). Focused `test_controls_e2e_audit.py` + `test_controls_e2e_audit_gate9v.py` → **19 passed, 1 deselected**. No live service/config touched; no full matrix, no `VERIFIED`.
 
 **Live office theme deploy — 2026-11-10 (merged, live-verified):** All four lanes are merged through `integration/office-theme` and `main` (`0c5c3f79d`, audit guard `15e16f145`): `feat/office-habblaud-assets` (contains the theme shell), `feat/office-db-adopt` (automatic read-old adoption), `feat/office-ui-followup` (iframe dataset marker + non-overlapping dual docks), and `feat/office-classic-gate` (classic rollback proof). Live `:8890` serves `limezu`: marker present, 6 floor surfaces, 4 rooms / 10 agents, 0 tower 503s, dual docks 24 px apart with a clickable Agents Close, classic rollback verified by a live restart (inactive classic payload, no theme marker/style/URLs; provider tests pin procedural fallback) and then reverted to `limezu`. The tower 503 fix is `2f8a8f990`; the full evidence is in `docs/STATUS.md` (2026-11-10). Lifecycle: profile/webhook mutations in `scripts/controls_e2e_audit.py` now require `--allow-live-mutations`; the state.db FATAL was the live audit run, not a DB loss. **Open:** structural cgroup separation for agent PTYs/tests (recommended, not implemented); HUD dock occludes the office top-right Panels icons while open; the generated controls artefact `docs/generated/QUBIT_CONTROLS_E2E_2026-09-23.json` is absent; no full matrix, no `VERIFIED`.

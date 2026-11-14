@@ -1,7 +1,19 @@
 {
-  "task_id": "P0-04",
-  "status": "PASS",
-  "generated_at": "2026-11-14T02:50:05Z",
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/validate_dependency_ledger.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "{\n  \"checked\": 28,\n  \"lock\": \"/home/trick/qubit-worktrees/qoffice-p0-ledgers-threats/docs/QUBIT-OFFICE-DEPENDENCY-LOCK.json\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-dependency-lock/1\",\n  \"violations\": []\n}\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_dependency_ledger.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".............                                                            [100%]\n13 passed in 2.65s\n"
+    }
+  ],
+  "generated_at": "2026-11-14T02:57:41Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-REPO-LEDGER.md",
@@ -13,12 +25,19 @@
     },
     {
       "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
-      "sha256": "496ce96e75b536c9bb15c6c575b10690486869a62335eecc3deb653a958642ac"
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
       "sha256": "dc377d188e6872ae14686dce4b4f55d9616341c6c6862ea2b67ca009815569ef"
     }
+  ],
+  "limitations": [
+    "External repositories recorded as license_status=plan-recorded were not verified against their remotes; the master plan claim is recorded, not promoted to approved.",
+    "Rows whose url is a plan-ledger locator have no exact repository URL in the source ledger; the lock says so instead of inventing one.",
+    "Paid pack SHA-256 values are copied from THIRD_PARTY_NOTICES.md and were not re-hashed from the operator's local archives in this run.",
+    "The validator checks lock invariants; it does not scan the source tree for copied code.",
+    "No network, live service, or full matrix was used."
   ],
   "outputs": [
     {
@@ -34,25 +53,6 @@
       "sha256": "7f35c378c7abf9e6f5903339773c0cfbfd4937f139848205a4a9d6beeffd2566"
     }
   ],
-  "commands": [
-    {
-      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/validate_dependency_ledger.py --json",
-      "exit_code": 0,
-      "stdout_tail": "{\n  \"checked\": 28,\n  \"lock\": \"/home/trick/qubit-worktrees/qoffice-p0-ledgers-threats/docs/QUBIT-OFFICE-DEPENDENCY-LOCK.json\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-dependency-lock/1\",\n  \"violations\": []\n}\n",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_dependency_ledger.py",
-      "exit_code": 0,
-      "stdout_tail": ".............                                                            [100%]\n13 passed in 2.65s\n",
-      "stderr_tail": ""
-    }
-  ],
-  "limitations": [
-    "External repositories recorded as license_status=plan-recorded were not verified against their remotes; the master plan claim is recorded, not promoted to approved.",
-    "Rows whose url is a plan-ledger locator have no exact repository URL in the source ledger; the lock says so instead of inventing one.",
-    "Paid pack SHA-256 values are copied from THIRD_PARTY_NOTICES.md and were not re-hashed from the operator's local archives in this run.",
-    "The validator checks lock invariants; it does not scan the source tree for copied code.",
-    "No network, live service, or full matrix was used."
-  ]
+  "status": "PASS",
+  "task_id": "P0-04"
 }

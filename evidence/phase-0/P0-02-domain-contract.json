@@ -1,7 +1,26 @@
 {
-  "task_id": "P0-02",
-  "status": "PASS",
-  "generated_at": "2026-11-14T02:46:58Z",
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "  \"summary\": {\n    \"failed\": 0,\n    \"passed\": 42,\n    \"total\": 42\n  }\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_domain_contract.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "................                                                         [100%]\n16 passed in 3.07s"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --self-test-negative --json",
+      "exit_code": 1,
+      "expected_exit": 1,
+      "stderr_tail": "",
+      "stdout_tail": "  \"summary\": {\n    \"failed\": 1,\n    \"passed\": 42,\n    \"total\": 43\n  }\n}"
+    }
+  ],
+  "generated_at": "2026-11-14T02:57:41Z",
   "inputs": [
     {
       "path": "voicebridge/business/contracts/domain.schema.json",
@@ -25,7 +44,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "53479be48e956e6002959d74262dfc0e374d1e1a5b267a4eb0061cac3d9e2356"
+      "sha256": "baca993535c79d03972231dd9010864ed8ea2d15d2187878ec32ffd40810edbf"
     },
     {
       "path": "voicebridge/business/models.py",
@@ -48,6 +67,13 @@
       "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
     }
   ],
+  "limitations": [
+    "JSON Schemas are the frozen v1 wire/projection contract; the SQLite schema in voicebridge/business/schema.py remains authoritative for storage.",
+    "Fixtures are built-in synthetic records, not live Business OS rows; no live service, home, state.db or credential was read.",
+    "The contract validates record shape only; cross-record invariants (single writer, lease fencing, approval binding at execution, event replay) are Phase 1 tests.",
+    "No network, no full matrix; only the focused office_contracts tests were run.",
+    "VERIFIED/COMPLETE is not claimed for any phase."
+  ],
   "outputs": [
     {
       "path": "scripts/validate_domain_contract.py",
@@ -58,31 +84,6 @@
       "sha256": "3b773998883b4c0b39280b55e0aa4e814fc71f81d67e9f951ee0761bb3784b3b"
     }
   ],
-  "commands": [
-    {
-      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --json",
-      "exit_code": 0,
-      "stdout_tail": "  \"summary\": {\n    \"failed\": 0,\n    \"passed\": 42,\n    \"total\": 42\n  }\n}",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_domain_contract.py",
-      "exit_code": 0,
-      "stdout_tail": "................                                                         [100%]\n16 passed in 3.07s",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --self-test-negative --json",
-      "exit_code": 1,
-      "stdout_tail": "  \"summary\": {\n    \"failed\": 1,\n    \"passed\": 42,\n    \"total\": 43\n  }\n}",
-      "stderr_tail": ""
-    }
-  ],
-  "limitations": [
-    "JSON Schemas are the frozen v1 wire/projection contract; the SQLite schema in voicebridge/business/schema.py remains authoritative for storage.",
-    "Fixtures are built-in synthetic records, not live Business OS rows; no live service, home, state.db or credential was read.",
-    "The contract validates record shape only; cross-record invariants (single writer, lease fencing, approval binding at execution, event replay) are Phase 1 tests.",
-    "No network, no full matrix; only the focused office_contracts tests were run.",
-    "VERIFIED/COMPLETE is not claimed for any phase."
-  ]
+  "status": "PASS",
+  "task_id": "P0-02"
 }
