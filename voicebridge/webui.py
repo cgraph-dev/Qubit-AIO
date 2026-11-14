@@ -2777,6 +2777,24 @@ class WebUIHandler(BaseHTTPRequestHandler):
         self._send(200, css.encode("utf-8"), "text/css; charset=utf-8",
                    cache_control="public, max-age=3600")
 
+    def _office_floor_scope(self) -> str:
+        """The floor the office document asked to render, if any.
+
+        The iframe carries ``?floor=live:<n>``. EventSource cannot add a query
+        of its own, so the floor is read from the document URL in ``Referer``
+        (with this request's own query as the fallback for direct callers).
+        """
+        from urllib.parse import parse_qs, urlparse
+
+        for query in (
+            urlparse(self.headers.get("Referer") or "").query,
+            urlparse(self.path or "").query,
+        ):
+            values = parse_qs(query).get("floor") or []
+            if values and values[0]:
+                return str(values[0])
+        return ""
+
     def _serve_office_stream(self) -> None:
         """GET /api/stream — the office client's live feed.
 
@@ -2839,11 +2857,12 @@ class WebUIHandler(BaseHTTPRequestHandler):
 
         start = time.time()
         revision = 0
+        scope = self._office_floor_scope()
         deadline = time.monotonic() + OS.STREAM_MAX_SECONDS
         try:
             while time.monotonic() < deadline and self.app._server is not None:
                 try:
-                    tower = TWR.state(cfg)
+                    tower = OS.scope_tower(TWR.state(cfg), scope)
                 except Exception as exc:  # noqa: BLE001 - a read must not 500
                     # Report the failure AS A NOTICE rather than closing: the
                     # client keeps its last good snapshot and shows the reason,
@@ -2889,7 +2908,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         cfg = self.app.orch.cfg
         try:
-            tower = TWR.state(cfg)
+            tower = OS.scope_tower(TWR.state(cfg), self._office_floor_scope())
             snap = OS.to_snapshot(tower, 1, time.time())
         except Exception as exc:  # noqa: BLE001 - a read must not 500
             self._json({"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",

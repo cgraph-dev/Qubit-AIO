@@ -491,6 +491,34 @@
   background: rgba(224, 143, 176, 0.18);
 }
 
+/* Live-floor picker. It selects which real floor the animated renderer draws;
+   it is not a campus-directory control. */
+.office-game__floorPicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--office-s2);
+  border: var(--office-border);
+  background: var(--office-plate);
+  color: var(--office-ink);
+  border-radius: var(--office-radius);
+  padding: var(--office-s1) var(--office-s2);
+  font-size: var(--office-fs-sm);
+}
+
+.office-game__floorPicker select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.office-game__floorPicker:focus-within {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
+}
+
 /* FOCUS IS NEVER REMOVED. A keyboard-driven game with no visible focus ring is
    unplayable without a mouse — the accessibility failure this file exists to
    avoid. */

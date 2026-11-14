@@ -753,3 +753,34 @@ def test_the_translation_does_not_mutate_the_payload():
     b"".join(os.stream_frames(t, 1, 0.0))
     assert json.dumps(t, sort_keys=True) == before, (
         "office_stream mutated the tower payload it was given")
+
+
+# ======================================================================
+# 17 — LIVE FLOOR SCOPE: one floor, only its real rooms and agents
+# ======================================================================
+def test_scope_live_floor_keeps_only_that_floors_rooms_and_characters():
+    """`?floor=live:<n>` narrows the same report; it never moves an agent."""
+    t = tower()
+    scoped = os.scope_tower(t, "live:1")
+    assert [f["number"] for f in scoped["floorplan"]["floors"]] == [1]
+    assert {ch["position"]["floor"] for ch in scoped["characters"]} == {1}
+    snap = os.to_snapshot(scoped, 1, t["now"])
+    assert snap["rooms"], "the scoped floor has no rooms"
+    assert all(r["id"].startswith("f1r") for r in snap["rooms"])
+    assert snap["agents"], "the scoped floor has no agents"
+    assert all(a["roomId"].startswith("f1r") for a in snap["agents"])
+
+
+def test_scope_live_floor_omits_agents_from_other_floors():
+    t = tower()
+    scoped = os.scope_tower(t, "live:2")
+    snap = os.to_snapshot(scoped, 1, t["now"])
+    assert snap["agents"], "floor 2 is empty in the fixture; pick another"
+    assert all(a["roomId"].startswith("f2r") for a in snap["agents"])
+    assert all(a["roomId"] != "f1r1" for a in snap["agents"])
+
+
+def test_scope_unknown_or_invalid_is_the_whole_report_not_an_empty_building():
+    t = tower()
+    for scope in ("", "live:", "live:999", "garbage", "floor-023"):
+        assert os.scope_tower(t, scope) == t

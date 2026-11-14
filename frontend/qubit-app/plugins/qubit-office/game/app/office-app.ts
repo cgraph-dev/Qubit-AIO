@@ -83,6 +83,13 @@ export interface OfficeAppOptions {
    * post-load CSS from here. `classic` is the default and adds no query.
    */
   theme?: string;
+  /**
+   * The live floor to render, as ``live:<number>``. The server reads it from
+   * the document URL (EventSource cannot carry a query), narrows the tower
+   * report to that floor, and the vendored client draws that floor's real
+   * rooms and agents. Empty renders every live floor, as before.
+   */
+  floor?: string;
 }
 
 export function officeAppSrc(opts: OfficeAppOptions = {}): string {
@@ -94,6 +101,8 @@ export function officeAppSrc(opts: OfficeAppOptions = {}): string {
   if (opts.mock) query.set("mock", "1");
   const theme = String(opts.theme ?? "").trim();
   if (theme && theme !== "classic") query.set("theme", theme);
+  const floor = String(opts.floor ?? "").trim();
+  if (floor) query.set("floor", floor);
   const suffix = query.toString();
   return suffix ? `${url}?${suffix}` : url;
 }

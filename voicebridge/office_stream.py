@@ -112,6 +112,41 @@ def room_id_for(room: Dict[str, Any], floor_number: int) -> str:
     return f"f{floor_number}r{room.get('id')}"
 
 
+def scope_tower(tower: Dict[str, Any], scope: str) -> Dict[str, Any]:
+    """Narrow the tower report to one live floor, or return it unchanged.
+
+    ``scope`` is ``live:<number>`` from the office document's ``?floor=``. The
+    renderer flattens every floor into one building, so without this a floor
+    picker could only highlight rooms while all agents stayed on screen. The
+    filter keeps only that floor's rooms and the characters whose real position
+    names it; an unknown floor leaves the report untouched rather than showing
+    an empty building. No room or character is moved: an agent on another floor
+    is omitted, never parked somewhere else.
+    """
+    raw = str(scope or "").strip()
+    if not raw.startswith("live:"):
+        return tower
+    try:
+        number = int(raw.split(":", 1)[1])
+    except (TypeError, ValueError):
+        return tower
+    floorplan = tower.get("floorplan") or {}
+    floors = [
+        floor for floor in (floorplan.get("floors") or [])
+        if int(floor.get("number", -1)) == number
+    ]
+    if not floors:
+        return tower
+    characters = [
+        ch for ch in (tower.get("characters") or [])
+        if int(((ch.get("position") or {}).get("floor", -1))) == number
+    ]
+    scoped = dict(tower)
+    scoped["floorplan"] = {**floorplan, "floors": floors}
+    scoped["characters"] = characters
+    return scoped
+
+
 def to_snapshot(tower: Dict[str, Any], revision: int,
                 start_time: float) -> Dict[str, Any]:
     """Render the tower payload into the client's `OfficeSnapshot`.

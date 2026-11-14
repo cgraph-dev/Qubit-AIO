@@ -270,9 +270,15 @@ export function createOfficeApp(
       "panels");
     const [outsideView, setOutsideView] = useState<OutsideWorldView | null>(
       null);
-    // The 100-floor campus is the primary Office surface. It is a projection
-    // over the real floor templates; the old 4-room scene stays one click away.
-    const [campusOpen, setCampusOpen] = useState(true);
+    // The animated office is the primary surface. The 100-floor campus is a
+    // directory projection, not a renderer, so it must never be presented as
+    // the office until a floor renderer exists.
+    const [campusOpen, setCampusOpen] = useState(false);
+    // Which real floor the animated renderer draws. Empty keeps every live
+    // floor in one building, exactly as before; `live:<n>` narrows the stream
+    // server-side so the chosen floor's rooms and characters are the only ones
+    // on screen.
+    const [floorScope, setFloorScope] = useState("");
     const [campusDirectory, setCampusDirectory] = useState<
       BusinessDirectory | null>(null);
     const [campusWorld, setCampusWorld] = useState<WorldTower | null>(null);
@@ -545,6 +551,7 @@ export function createOfficeApp(
       setLoaded(false);
       const baseSrc = officeAppSrc({
         base: props.base, mock: props.mock, theme: requestedTheme,
+        floor: floorScope,
       });
       frame.src = retryToken
         ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}`
@@ -557,7 +564,7 @@ export function createOfficeApp(
         restoreEscape?.();
         restoreBridge?.();
       };
-    }, [props.base, props.mock, requestedTheme, retryToken]);
+    }, [props.base, props.mock, requestedTheme, floorScope, retryToken]);
 
     // Mirror the dock state onto the injected buttons after every render: the
     // office paints its own active state from `aria-pressed`, and the
@@ -1148,9 +1155,38 @@ export function createOfficeApp(
       "data-testid": "office-campus-toggle",
       "aria-expanded": campusOpen,
       "aria-controls": "office-game-campus",
-      "aria-label": "Open the 100-floor campus",
+      "aria-label": "Open the 100-floor campus directory",
       onClick: () => setCampusOpen((v: boolean) => !v),
     }, "Campus");
+
+    // The animated renderer flattens the live floors into one building. This
+    // picker narrows it to one real floor; the server does the filtering, so a
+    // floor with no agent shows its empty rooms instead of borrowing another
+    // floor's characters.
+    const floorPicker = R.createElement("label", {
+      key: "floor-picker",
+      className: "office-game__floorPicker",
+      "data-testid": "office-floor-picker",
+    }, [
+      R.createElement("span", { key: "label" }, "Floor"),
+      R.createElement("select", {
+        key: "select",
+        value: floorScope,
+        "data-testid": "office-floor-select",
+        "aria-label": "Choose the live office floor",
+        onChange: (ev: { target: { value: string } }) =>
+          setFloorScope(ev.target.value),
+      }, [
+        R.createElement("option", { key: "all", value: "" },
+          "All live floors"),
+        R.createElement("option", { key: "f1", value: "live:1" },
+          "Floor 1 · Executive"),
+        R.createElement("option", { key: "f2", value: "live:2" },
+          "Floor 2 · Operations"),
+        R.createElement("option", { key: "f3", value: "live:3" },
+          "Floor 3 · Review"),
+      ]),
+    ]);
 
     // P6-05 — a real toolbar landmark groups the persistent shell controls.
     // It is also the skip target that gets a keyboard user OUT of the canvas
@@ -1163,7 +1199,8 @@ export function createOfficeApp(
       role: "toolbar",
       "aria-label": "Office panels",
       tabIndex: -1,
-    }, [commandCenterToggle, timelineToggle, studioToggle, campusToggle]));
+    }, [commandCenterToggle, timelineToggle, studioToggle, campusToggle,
+        floorPicker]));
 
     // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
     // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full
@@ -1272,16 +1309,17 @@ export function createOfficeApp(
           key: "head", className: "office-game__campusHead",
         }, [
           R.createElement("div", { key: "title" }, [
-            R.createElement("h2", { key: "h" }, "Qubit Campus"),
+            R.createElement("h2", { key: "h" }, "Qubit Campus Directory"),
             R.createElement("p", {
               key: "counts", "data-testid": "office-campus-counts",
-            }, counts
+            }, (counts
               ? `${counts.floors} floors · ${counts.wings} wings`
                 + (campusWorld?.counts
                   ? ` · ${campusWorld.counts.rooms} rooms · `
                     + `${campusWorld.counts.desks} desks`
                   : "")
-              : "100 floor templates, 5 wings, 3,075 desks"),
+              : "100 floor templates, 5 wings, 3,075 desks")
+              + " · directory only, no characters"),
           ]),
           R.createElement("button", {
             key: "close", type: "button",

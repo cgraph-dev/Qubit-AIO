@@ -192550,6 +192550,8 @@ create: function(game) {
 		if (opts.mock) query.set("mock", "1");
 		const theme = String(opts.theme ?? "").trim();
 		if (theme && theme !== "classic") query.set("theme", theme);
+		const floor = String(opts.floor ?? "").trim();
+		if (floor) query.set("floor", floor);
 		const suffix = query.toString();
 		return suffix ? `${url}?${suffix}` : url;
 	}
@@ -207133,7 +207135,8 @@ create: function(game) {
 			const [studioOpen, setStudioOpen] = useState(false);
 			const [studioTab, setStudioTab] = useState("panels");
 			const [outsideView, setOutsideView] = useState(null);
-			const [campusOpen, setCampusOpen] = useState(true);
+			const [campusOpen, setCampusOpen] = useState(false);
+			const [floorScope, setFloorScope] = useState("");
 			const [campusDirectory, setCampusDirectory] = useState(null);
 			const [campusWorld, setCampusWorld] = useState(null);
 			const [campusState, setCampusState] = useState("loading");
@@ -207343,7 +207346,8 @@ create: function(game) {
 				const baseSrc = officeAppSrc({
 					base: props.base,
 					mock: props.mock,
-					theme: requestedTheme
+					theme: requestedTheme,
+					floor: floorScope
 				});
 				frame.src = retryToken ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}` : baseSrc;
 				return () => {
@@ -207358,6 +207362,7 @@ create: function(game) {
 				props.base,
 				props.mock,
 				requestedTheme,
+				floorScope,
 				retryToken
 			]);
 			useEffect(() => {
@@ -207845,9 +207850,37 @@ create: function(game) {
 				"data-testid": "office-campus-toggle",
 				"aria-expanded": campusOpen,
 				"aria-controls": "office-game-campus",
-				"aria-label": "Open the 100-floor campus",
+				"aria-label": "Open the 100-floor campus directory",
 				onClick: () => setCampusOpen((v) => !v)
 			}, "Campus");
+			const floorPicker = R.createElement("label", {
+				key: "floor-picker",
+				className: "office-game__floorPicker",
+				"data-testid": "office-floor-picker"
+			}, [R.createElement("span", { key: "label" }, "Floor"), R.createElement("select", {
+				key: "select",
+				value: floorScope,
+				"data-testid": "office-floor-select",
+				"aria-label": "Choose the live office floor",
+				onChange: (ev) => setFloorScope(ev.target.value)
+			}, [
+				R.createElement("option", {
+					key: "all",
+					value: ""
+				}, "All live floors"),
+				R.createElement("option", {
+					key: "f1",
+					value: "live:1"
+				}, "Floor 1 · Executive"),
+				R.createElement("option", {
+					key: "f2",
+					value: "live:2"
+				}, "Floor 2 · Operations"),
+				R.createElement("option", {
+					key: "f3",
+					value: "live:3"
+				}, "Floor 3 · Review")
+			])]);
 			children.push(R.createElement("div", {
 				key: "toolbar",
 				id: "office-game-controls",
@@ -207860,7 +207893,8 @@ create: function(game) {
 				commandCenterToggle,
 				timelineToggle,
 				studioToggle,
-				campusToggle
+				campusToggle,
+				floorPicker
 			]));
 			if (timelineOpen) children.push(R.createElement("div", {
 				key: "timeline-dock",
@@ -207953,10 +207987,10 @@ create: function(game) {
 				}, [R.createElement("div", {
 					key: "head",
 					className: "office-game__campusHead"
-				}, [R.createElement("div", { key: "title" }, [R.createElement("h2", { key: "h" }, "Qubit Campus"), R.createElement("p", {
+				}, [R.createElement("div", { key: "title" }, [R.createElement("h2", { key: "h" }, "Qubit Campus Directory"), R.createElement("p", {
 					key: "counts",
 					"data-testid": "office-campus-counts"
-				}, counts ? `${counts.floors} floors · ${counts.wings} wings` + (campusWorld?.counts ? ` · ${campusWorld.counts.rooms} rooms · ${campusWorld.counts.desks} desks` : "") : "100 floor templates, 5 wings, 3,075 desks")]), R.createElement("button", {
+				}, (counts ? `${counts.floors} floors · ${counts.wings} wings` + (campusWorld?.counts ? ` · ${campusWorld.counts.rooms} rooms · ${campusWorld.counts.desks} desks` : "") : "100 floor templates, 5 wings, 3,075 desks") + " · directory only, no characters")]), R.createElement("button", {
 					key: "close",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
