@@ -1,0 +1,158 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/security_matrix.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "p\",\n      \"control\": \"Sandbox egress policy + capability runtime validation for the MCP category before the adapter; every redirect hop is re-checked.\",\n      \"expected_denial\": \"Typed sandbox refusal for loopback/private/metadata URLs and for a redirect into them, with zero adapter calls.\",\n      \"id\": \"MCP-SSRF\",\n      \"reason\": \"\",\n      \"status\": \"pass\",\n      \"test\": \"tests/phase8_security/test_mcp_security.py::test_mcp_egress_blocks_loopback_private_and_metadata\",\n      \"threat\": \"MCP egress reaches loopback, private, link-local or cloud-metadata addresses, or a redirect does.\"\n    },\n    {\n      \"category\": \"mcp\",\n      \"control\": \"Bounded tool arguments, truncated/labelled output, and a capability-runtime output cap before the result can reach a prompt.\",\n      \"expected_denial\": \"MCP_PROTOCOL_ERROR for oversized arguments; output truncated and marked redacted; CAPABILITY_RUNTIME_OUTPUT_TOO_LARGE for an oversized adapter result.\",\n      \"id\": \"MCP-OUTPUT\",\n      \"reason\": \"\",\n      \"status\": \"pass\",\n      \"test\": \"tests/phase8_security/test_mcp_security.py::test_mcp_oversized_args_and_output_are_bounded\",\n      \"threat\": \"Oversized or untrusted MCP output floods context or carries unbounded content.\"\n    },\n    {\n      \"category\": \"mcp\",\n      \"control\": \"Per-server allowlist and namespaced catalog identity (mcp:<server>:<tool>); no cross-server tool reuse.\",\n      \"expected_denial\": \"MCP_TOOL_NOT_ALLOWED when server B is asked for server A's tool (and vice versa).\",\n      \"id\": \"MCP-PER-SERVER-SCOPE\",\n      \"reason\": \"\",\n      \"status\": \"pass\",\n      \"test\": \"tests/phase8_security/test_mcp_security.py::test_mcp_tool_and_credential_scope_is_per_server\",\n      \"threat\": \"A tool or credential from one MCP server is used against another server.\"\n    }\n  ],\n  \"schema\": \"qubit-office-security-matrix/1\",\n  \"summary\": {\n    \"applicable\": 21,\n    \"failed\": 0,\n    \"not_applicable\": 0,\n    \"passed\": 21,\n    \"rows\": 21,\n    \"unclassified\": 0\n  },\n  \"task_id\": \"P8-02\"\n}"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_security tests/phase1_gateway tests/phase1_security tests/phase4_runtime_safety",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 52%]\n..................................................................       [100%]\n138 passed in 4.75s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals tests/phase2_memory",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............................................................             [100%]\n60 passed in 4.43s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/security_matrix.py tests/phase8_security",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile scripts/security_matrix.py tests/phase8_security/_p8_helpers.py tests/phase8_security/test_asi_denials.py tests/phase8_security/test_mcp_security.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T15:08:57Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-MODEL.md",
+      "sha256": "8cb98c73ac6bcf6984eeef2cb38d12219630c85831dcd4f0ab839b9b94cdaa3a"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-TESTS.json",
+      "sha256": "a09c092fd538f3950072749e25ecb1b368aa35778a28887b25781ec5bcada55d"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/policy.py",
+      "sha256": "9627e3121929d90b1555b708a946425a738dadab18ad1c17a94c5d6f89379d62"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "aa6722d69fd9a9e15701d7fc25453d66ec599d59e8ce6c7916028b9d0608a10d"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/sandbox.py",
+      "sha256": "c4ec7c591b0daecaf51104e3465357e40aa14065f96007fb84f917f020d479e3"
+    },
+    {
+      "path": "voicebridge/business/secrets.py",
+      "sha256": "0de8f0520b397feb4b3fcfa0f79bc8b0f3a312f2b1cf798dd16c1e59cf2f8f55"
+    },
+    {
+      "path": "voicebridge/business/safety.py",
+      "sha256": "ce2e252737b774588d12f1b8b0a3c4f6f7d98833e49ba009907db88e75951fdd"
+    },
+    {
+      "path": "voicebridge/business/a2a.py",
+      "sha256": "265874aa0dd95baad02f9e1c080eb7cdda7c00a1b91a6f15696d1316e79bbae1"
+    },
+    {
+      "path": "voicebridge/business/memory.py",
+      "sha256": "bb3041e0bc05c57010475a5917663360d69cc0a94f8a9712e9ad91a976d5b4a9"
+    },
+    {
+      "path": "voicebridge/business/capability_runtime.py",
+      "sha256": "8b3a49756924250a7cab8eed99def448830d6c3b56ee0e27aab9f031859f04c0"
+    },
+    {
+      "path": "voicebridge/business/dynamic_catalog.py",
+      "sha256": "34f40e7bb6d6d2ca0a47f316d497c766992a1bcb8c0597e238906966978fca6d"
+    },
+    {
+      "path": "voicebridge/mcp_client.py",
+      "sha256": "878df222059c7deed96cabc63303307fe14622c299f6af255aea481afd6a3ae8"
+    },
+    {
+      "path": "voicebridge/integrations/etsy_auth.py",
+      "sha256": "e78b3e0d45b752299fc86130a5f4df946ca91b50878d45fceffff58f43c35dc8"
+    },
+    {
+      "path": "voicebridge/capabilities.py",
+      "sha256": "461eb9e8fdcb67cec901e3666dcf4a222731a3b53a3cf7edc5d33bc49353c315"
+    },
+    {
+      "path": "qubit_runtime/tools/mcp_oauth.py",
+      "sha256": "cb496973e457721c2810beb85fd1f9366389361639e353af347392b940211317"
+    },
+    {
+      "path": "qubit_runtime/tools/mcp_oauth_provider.py",
+      "sha256": "b8f1dba67f59768a858184658f1583ccb0c650e3619765af1796998475dced86"
+    },
+    {
+      "path": "tests/phase8_security/_p8_helpers.py",
+      "sha256": "f54ce8aa7da851585ec063b1380f2bc355058b34d15d72178b8196c7bc79bb50"
+    },
+    {
+      "path": "tests/phase8_security/test_asi_denials.py",
+      "sha256": "8ec1e74ac8dbd029c5f19b639a39100a2f8eac5a3d38842a255596555a807b48"
+    },
+    {
+      "path": "tests/phase8_security/test_mcp_security.py",
+      "sha256": "14f06f445caeef0b86f1a52d20915f7671332bd1db1933a22deb770487606c82"
+    }
+  ],
+  "limitations": [
+    "Hermetic only: no live MCP server, real identity provider, network, credentials or external side effect; OAuth runs over an injected fake transport and the RFC 8707 resource check uses the pinned mcp SDK.",
+    "The Office MCP surface is the local brokered client; a remote server's own token-audience enforcement is outside this matrix.",
+    "MCP-OAUTH-REDIRECT proves the redirect URI is fixed server-side configuration and is required; it does not simulate a tampered callback redirect because the OAuth lifecycle accepts no client-supplied callback redirect.",
+    "MCP-TOOL-SCHEMA proves the complete input/output/annotation hash and catalog digest change on a schema flip; it does not force a human re-approval workflow, which is a UI/policy surface outside this lane.",
+    "ASI04 covers MCP allowlist/schema/version pinning; the dependency-license lock is covered by the existing office contracts suite and is not re-run here as P8 evidence.",
+    "Tool-chain depth/budget controls beyond the per-call cost cap and fixed-window rate limit are not part of this matrix.",
+    "This is not an OWASP certification and not a full-suite matrix; no live service was restarted and VERIFIED/COMPLETE/100% is not claimed."
+  ],
+  "outputs": [
+    {
+      "path": "scripts/security_matrix.py",
+      "sha256": "b40ea7e40c42621bed32eae31a646e50fb3d825e4bf7eb5090caa4a7baec08b2"
+    },
+    {
+      "path": "tests/phase8_security/_p8_helpers.py",
+      "sha256": "f54ce8aa7da851585ec063b1380f2bc355058b34d15d72178b8196c7bc79bb50"
+    },
+    {
+      "path": "tests/phase8_security/test_asi_denials.py",
+      "sha256": "8ec1e74ac8dbd029c5f19b639a39100a2f8eac5a3d38842a255596555a807b48"
+    },
+    {
+      "path": "tests/phase8_security/test_mcp_security.py",
+      "sha256": "14f06f445caeef0b86f1a52d20915f7671332bd1db1933a22deb770487606c82"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P8-02"
+}
