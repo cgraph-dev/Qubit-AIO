@@ -70,6 +70,9 @@ AGENT_TURN_TASK_MISMATCH = "AGENT_TURN_TASK_MISMATCH"
 AGENT_TURN_RUN_TERMINAL = "AGENT_TURN_RUN_TERMINAL"
 AGENT_TURN_RUN_IN_FLIGHT = "AGENT_TURN_RUN_IN_FLIGHT"
 AGENT_TURN_RECONCILIATION_REQUIRED = "AGENT_TURN_RECONCILIATION_REQUIRED"
+AGENT_TURN_RECONCILIATION_RECEIPT_REQUIRED = (
+    "AGENT_TURN_RECONCILIATION_RECEIPT_REQUIRED"
+)
 AGENT_TURN_CHECKPOINT_REQUIRED = "AGENT_TURN_CHECKPOINT_REQUIRED"
 AGENT_TURN_CHECKPOINT_INVALID = "AGENT_TURN_CHECKPOINT_INVALID"
 AGENT_TURN_CHECKPOINT_UNSAFE = "AGENT_TURN_CHECKPOINT_UNSAFE"
@@ -431,6 +434,26 @@ def _is_read_action(action: Any) -> bool:
     return str(action or "").strip().lower() in _READ_ACTIONS
 
 
+_RECEIPT_KEYS = ("request_id", "receipt_id", "provider_request_id", "status")
+
+
+def _validate_reconciliation_receipt(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping) or not value:
+        raise BusinessError(
+            AGENT_TURN_RECONCILIATION_RECEIPT_REQUIRED,
+            "an ambiguous external outcome needs an explicit provider receipt;"
+            " pass reconciliation_receipt with request_id/status",
+        )
+    receipt = dict(value)
+    if not any(key in receipt and receipt[key] for key in _RECEIPT_KEYS):
+        raise BusinessError(
+            AGENT_TURN_RECONCILIATION_RECEIPT_REQUIRED,
+            "the reconciliation receipt must name a request/receipt id or"
+            " status",
+        )
+    return receipt
+
+
 def _is_cancelled(event: Any, should_stop: Callable[[], bool] | None) -> bool:
     if event is not None and event.is_set():
         return True
@@ -608,8 +631,19 @@ class TurnOrchestrator:
         self._checkpoint("turn_started")
         return self._drive()
 
-    def resume(self, *, reconcile_unknown: bool = False) -> TurnResult:
-        """Resume from the last safe checkpoint of the same run key."""
+    def resume(
+        self,
+        *,
+        reconcile_unknown: bool = False,
+        reconciliation_receipt: Mapping[str, Any] | None = None,
+    ) -> TurnResult:
+        """Resume from the last safe checkpoint of the same run key.
+
+        An ambiguous external outcome (a write whose provider answer never
+        arrived) may only move to ``completed`` when the caller supplies an
+        explicit reconciliation receipt. Resuming an ordinary timeout needs
+        only the explicit reconciliation decision.
+        """
         self._validate_preconditions()
         job = self._lookup_job()
         if job is None:
@@ -636,6 +670,18 @@ class TurnOrchestrator:
         self._validate_resume_checkpoint(last)
         self._load_resume_state(last)
         self.run_id = job.job_id
+        ambiguous = bool(last.state.get("ambiguous"))
+        reconciled_receipt: dict[str, Any] | None = None
+        if ambiguous:
+            if not reconcile_unknown:
+                raise BusinessError(
+                    AGENT_TURN_RECONCILIATION_REQUIRED,
+                    f"run {job.job_id!r} has an ambiguous external outcome;"
+                    " reconcile it with a provider receipt before resuming",
+                )
+            reconciled_receipt = _validate_reconciliation_receipt(
+                reconciliation_receipt
+            )
         if job.status == UNKNOWN:
             if not reconcile_unknown:
                 raise BusinessError(
@@ -696,6 +742,20 @@ class TurnOrchestrator:
             )
         else:
             job = self._claim(job)
+        if reconciled_receipt is not None:
+            self._receipts.append(reconciled_receipt)
+            self._effects = max(self._effects, 1)
+            self._checkpoint(
+                "reconciled",
+                tool_receipts=[reconciled_receipt],
+                state_extra={
+                    "reconciliation_receipt": reconciled_receipt,
+                    "ambiguous": False,
+                },
+            )
+            self._append_event(
+                "reconciled", {"receipt": reconciled_receipt}
+            )
         return self._drive()
 
     @property
@@ -1549,12 +1609,17 @@ class TurnOrchestrator:
         self, trace: otel.RunTrace, code: str, detail: str
     ) -> TurnResult:
         detail = str(detail or "")[:2000]
+        ambiguous = bool(
+            code == AGENT_TURN_TOOL_OUTCOME_UNKNOWN
+            or (self._effects and not self._receipts)
+        )
         self._checkpoint(
             "unknown",
             state_extra={
                 "error_code": code,
                 "error_detail": detail,
                 "safe_resume": True,
+                "ambiguous": ambiguous,
             },
         )
         self._append_event("unknown", {"code": code, "detail": detail})

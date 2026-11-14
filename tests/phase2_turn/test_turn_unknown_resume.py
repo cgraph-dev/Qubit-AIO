@@ -89,3 +89,56 @@ def test_restart_resumes_from_a_validated_checkpoint(tmp_path):
     # The run resumed on the same durable record, with monotonic checkpoints.
     assert first.checkpoints == (1, 2, 3, 4)
     assert resumed.checkpoints == (1, 2, 3, 4, 5)
+
+
+def test_ambiguous_external_outcome_needs_an_explicit_receipt(tmp_path):
+    from voicebridge.business.agent_turn import (
+        AGENT_TURN_RECONCILIATION_RECEIPT_REQUIRED,
+        AGENT_TURN_TOOL_OUTCOME_UNKNOWN,
+    )
+    from voicebridge.business.errors import TOOL_FAILED_CODE, BusinessError as BE
+    from voicebridge.business.tools import ExecutorResult
+
+    from _phase2_helpers import WRITE_TOOL, write_call
+
+    calls: list[str] = []
+
+    def flaky_executor(request):
+        calls.append(request.tool)
+        if request.tool == WRITE_TOOL:
+            raise BE(TOOL_FAILED_CODE, "provider closed the socket")
+        return ExecutorResult(result={}, executed=True)
+
+    scene_ = scene(tmp_path, executor=flaky_executor)
+    first = orchestrator(
+        scene_,
+        ScriptedModel(
+            [reply_tools(write_call("x")), reply_text("unreachable")]
+        ),
+        run_key="ambiguous-run",
+    ).execute()
+    assert first.status == UNKNOWN
+    assert first.error_code == AGENT_TURN_TOOL_OUTCOME_UNKNOWN
+    assert first.receipt is None
+    assert scene_.store.list_artifacts(
+        scene_.tenant.tenant_id, business_id=scene_.business.business_id
+    ) == []
+
+    # A decision alone is not enough: the provider outcome must be evidenced.
+    with pytest.raises(BusinessError) as exc:
+        orchestrator(
+            scene_, ScriptedModel([reply_text("unreachable")]),
+            run_key="ambiguous-run",
+        ).resume(reconcile_unknown=True)
+    assert exc.value.code == AGENT_TURN_RECONCILIATION_RECEIPT_REQUIRED
+
+    receipt = {"request_id": "reconciled-1", "status": "accepted"}
+    resumed = orchestrator(
+        scene_, ScriptedModel([reply_text("Reconciled and finished.")]),
+        run_key="ambiguous-run",
+    ).resume(reconcile_unknown=True, reconciliation_receipt=receipt)
+    assert resumed.status == COMPLETED
+    assert resumed.receipt == receipt
+    assert "agent.turn.reconciled" in resumed.events
+    # The ambiguous write was not executed twice.
+    assert calls == [WRITE_TOOL]
