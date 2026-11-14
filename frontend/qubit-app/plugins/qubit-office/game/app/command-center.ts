@@ -12,6 +12,11 @@ import {
   hostBasePath,
 } from "./business-api";
 
+/** The one office compat route this module reads. */
+export const COMMAND_CENTER_PATH = "/command-center";
+/** The projection schema the backend serves. */
+export const COMMAND_CENTER_SCHEMA = "qubit-office-command-center/1";
+
 export type CommandCenterKind =
   | "floor" | "room" | "desk" | "agent" | "task" | "approval";
 
@@ -195,7 +200,7 @@ export async function fetchCommandCenter(
   opts: CommandCenterFetchOptions = {},
 ): Promise<CommandCenterRead> {
   try {
-    const body = await businessFetch<CommandCenterPayload>("/command-center", {
+    const body = await businessFetch<CommandCenterPayload>(COMMAND_CENTER_PATH, {
       base: opts.base,
       fetchImpl: opts.fetchImpl,
       win: opts.win,

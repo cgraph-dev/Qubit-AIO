@@ -4,6 +4,8 @@ import {
   clampIndex,
   cleanQuery,
   COMMAND_CENTER_KINDS,
+  COMMAND_CENTER_PATH,
+  COMMAND_CENTER_SCHEMA,
   COMMAND_CENTER_SHORTCUTS,
   entryDeepLink,
   entryMatches,
@@ -112,6 +114,8 @@ describe("command-center client", () => {
   });
 
   it("names the contract kinds and labels", () => {
+    expect(COMMAND_CENTER_PATH).toBe("/command-center");
+    expect(COMMAND_CENTER_SCHEMA).toBe("qubit-office-command-center/1");
     expect(COMMAND_CENTER_KINDS).toEqual(
       ["floor", "room", "desk", "agent", "task", "approval"]);
     expect(kindLabel("desk")).toBe("Desk");

@@ -43,7 +43,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T04:45:25Z",
+  "generated_at": "2026-11-14T04:47:13Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -91,11 +91,11 @@
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/command-center.ts",
-      "sha256": "d0a08605b1f85243a007a1eeb8b0555f64dd279d505d27446b958dd355beba21"
+      "sha256": "1a05ed75f3a9237f04cb2ad75421db5ad53cb2afc934d29752cd547c3d9d92ca"
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/command-center.test.ts",
-      "sha256": "5b6011df15cc15f7e3404ed162775f4f17b91887295971e467c6425eced8c383"
+      "sha256": "69aa9891810999a854ad729f3d460df6ffe2d7b95edf7c8fb6b261fffbd217b1"
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/CommandCenter.tsx",
