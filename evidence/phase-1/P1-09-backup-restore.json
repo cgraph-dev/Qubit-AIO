@@ -1,0 +1,98 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_backup tests/durable_substrate tests/test_business_os_foundation.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............................................................             [100%]\n60 passed in 10.11s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/backup.py tests/phase1_backup",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/backup.py tests/phase1_backup/test_snapshot_verify.py tests/phase1_backup/test_restore_scope.py tests/phase1_backup/test_replay_schema_rpo.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T03:13:58Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-PHASE-0.md",
+      "sha256": "688028db6dfb6d64066735af5d5c9416e11c6db9daaf107c111501d1956661ef"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "002925be71f51f249893d1aaba1e2b20c3cd02178ce4fa0af44b30526e087160"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "baca993535c79d03972231dd9010864ed8ea2d15d2187878ec32ffd40810edbf"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/models.py",
+      "sha256": "c2544c04416024d1ad45c4ec2ed8d933c6766d7727ccbd9dd61bef852cac8ddc"
+    }
+  ],
+  "limitations": [
+    "single-host, single-process hermetic tests; no live service, credentials, network or operator state",
+    "snapshot capture uses SQLite's online backup API, but the tests do not hold a concurrent writer open for the whole backup",
+    "the manifest is not signed: hash entries detect a corrupted or truncated snapshot, not an attacker who rewrites both the database file and the manifest",
+    "an ephemeral key stored beside the ciphertext (0600) protects a copied snapshot file, not a whole-directory disclosure; only a caller-supplied key is an out-of-band boundary",
+    "RPO/RTO numbers are wall-clock measurements from this host run; no SLA is claimed and a one-shot snapshot does not bound loss after it",
+    "tenant-scoped restore copies the tenant tables in dependency order but does not re-run domain-level replay projections beyond ledger/job-event/checkpoint/outbox checks",
+    "Windows and non-POSIX file modes (0600) are not exercised"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/backup.py",
+      "sha256": "a51fb0a42d7a31b999a4a3fee5c071439e4231ca205a7196460407abcf474f19"
+    },
+    {
+      "path": "tests/phase1_backup/test_snapshot_verify.py",
+      "sha256": "db130b0f306ec1ec95b40b65c94b728b2d3bf7446913c7a17ad91bef9952488d"
+    },
+    {
+      "path": "tests/phase1_backup/test_restore_scope.py",
+      "sha256": "567f785b48460f1b2c79a1ca7c2be90343012621486eeda38cc4c48718e126b0"
+    },
+    {
+      "path": "tests/phase1_backup/test_replay_schema_rpo.py",
+      "sha256": "31eb994154ef84a5ede656791593521a3f8f7c20d6bb5e46f302b23dfbe00e6f"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P1-09"
+}
