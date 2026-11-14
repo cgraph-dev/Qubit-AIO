@@ -4,36 +4,37 @@
       "cmd": "python scripts/generate_campus_fixture.py --check",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "{\"check\": \"PASS\", \"counts\": {\"active_floors\": 22, \"cells\": 575, \"desks\": 3075, \"dormant_floors\": 78, \"floors\": 100, \"rooms\": 300, \"staffed_agents\": 0, \"wings\": 5}, \"digest\": \"5aeab697402792513db5036d59c73a06aedecb4c27f111a6d9ae6c1d21f655b9\", \"fixture_digest\": \"4bb5aa851878890ab35e6e3d418668a05ec62675edfa4df065e311b1d599e2cc\"}"
+      "stdout_tail": "{\"check\": \"PASS\", \"counts\": {\"active_floors\": 22, \"cells\": 575, \"desks\": 3075, \"dormant_floors\": 78, \"floors\": 100, \"rooms\": 300, \"staffed_agents\": 0, \"wings\": 5}, \"digest\": \"5aeab697402792513db5036d59c73a06aedecb4c27f111a6d9ae6c1d21f655b9\", \"fixture_digest\": \"17a3294813440dfb1ffff93a26993b37062a01b8e44ab7e3ee1142a3c9cac246\"}"
     },
     {
       "cmd": "python scripts/generate_campus_fixture.py --out /tmp/qoffice-assets/campus.json",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "wrote campus fixture to /tmp/qoffice-assets/campus.json\n{\"check\": \"PASS\", \"counts\": {\"active_floors\": 22, \"cells\": 575, \"desks\": 3075, \"dormant_floors\": 78, \"floors\": 100, \"rooms\": 300, \"staffed_agents\": 0, \"wings\": 5}, \"digest\": \"5aeab697402792513db5036d59c73a06aedecb4c27f111a6d9ae6c1d21f655b9\", \"fixture_digest\": \"4c287cb2412d4c80a516399ceb1c6ac0ef00d569ae01c3202384803473baeb4f\"}"
+      "stdout_tail": "wrote campus fixture to /tmp/qoffice-assets/campus.json\n{\"check\": \"PASS\", \"counts\": {\"active_floors\": 22, \"cells\": 575, \"desks\": 3075, \"dormant_floors\": 78, \"floors\": 100, \"rooms\": 300, \"staffed_agents\": 0, \"wings\": 5}, \"digest\": \"5aeab697402792513db5036d59c73a06aedecb4c27f111a6d9ae6c1d21f655b9\", \"fixture_digest\": \"17a3294813440dfb1ffff93a26993b37062a01b8e44ab7e3ee1142a3c9cac246\"}"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp python -m pytest -q tests/office_contracts/test_campus_fixture.py",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "............                                                             [100%]\n12 passed in 5.51s"
+      "stdout_tail": ".............                                                            [100%]\n13 passed in 5.57s"
     }
   ],
-  "generated_at": "2026-11-14T02:45:29Z",
+  "generated_at": "2026-11-14T02:48:15Z",
   "inputs": [
     {
       "path": "scripts/generate_campus_fixture.py",
-      "sha256": "c5db9b18e69422a2cfada5bc71a251956e47afba407e573cecc041979f492296"
+      "sha256": "44259089efc747b61297655cb0661271f7b6bd52541ed77fe8a52b87c446880a"
     },
     {
       "path": "tests/office_contracts/test_campus_fixture.py",
-      "sha256": "1786190d66029919b4a79743c651ac4a31105a596a30371ffee33cc784fbabac"
+      "sha256": "1d74e644a6f76acb29646939364292edc3746d314a617691f7cfd52042d3156d"
     }
   ],
   "limitations": [
     "The fixture is a bounded template projection: counts + digest + per-floor summaries, not the 3,075-desk/575-cell detail.",
     "staffed_agents is 0 by construction; no tenant, business or agent record exists in the fixture.",
-    "The combined pytest command also ran the P0-03 ledger test file; both passed (12 tests)."
+    "fixture_digest is deterministic (excludes generated_at); plant_digest is the tower projection digest.",
+    "The combined pytest command also ran the P0-03 ledger test file; both passed (13 tests)."
   ],
   "measurements": {
     "active_floors": 22,
@@ -48,15 +49,15 @@
   "outputs": [
     {
       "path": "scripts/generate_campus_fixture.py",
-      "sha256": "c5db9b18e69422a2cfada5bc71a251956e47afba407e573cecc041979f492296"
+      "sha256": "44259089efc747b61297655cb0661271f7b6bd52541ed77fe8a52b87c446880a"
     },
     {
       "path": "tests/office_contracts/test_campus_fixture.py",
-      "sha256": "1786190d66029919b4a79743c651ac4a31105a596a30371ffee33cc784fbabac"
+      "sha256": "1d74e644a6f76acb29646939364292edc3746d314a617691f7cfd52042d3156d"
     },
     {
       "path": "/tmp/qoffice-assets/campus.json",
-      "sha256": "ac8d69c8853175baaaed18d561d554a49a94e6aaecadde9cb9f910a20b52f94a"
+      "sha256": "593f38ce05802745ed6e24354c7cd08b6e9ce2cc9da8244d32fcae7a7411a094"
     }
   ],
   "status": "PASS",
