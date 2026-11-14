@@ -3,29 +3,33 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_platform/test_eventlog.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "...........                                                              [100%]\n11 passed in 1.11s"
+      "stdout_tail": "...........                                                              [100%]\n11 passed in 0.89s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/eventlog.py tests/phase1_platform/test_eventlog.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": "All checks passed!"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/eventlog.py tests/phase1_platform/test_eventlog.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_platform tests/durable_substrate tests/test_business_os_foundation.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 7.31s"
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 5.58s"
     }
   ],
-  "generated_at": "2026-11-14T03:09:20Z",
+  "generated_at": "2026-11-14T03:24:03Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -53,7 +57,7 @@
     },
     {
       "path": "voicebridge/business/errors.py",
-      "sha256": "ea2cd7a4c2db89e248450979cc79d8b2f0fb47b839031b88d3cd365a5ef53bff"
+      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
     },
     {
       "path": "voicebridge/business/contracts/event.schema.json",

@@ -1,0 +1,92 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json",
+      "exit_code": 0
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_reference",
+      "exit_code": 0
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/phase1_reference_lane.py tests/phase1_reference",
+      "exit_code": 0
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile scripts/phase1_reference_lane.py tests/phase1_reference/test_reference_lane.py",
+      "exit_code": 0
+    }
+  ],
+  "generated_at": "2026-11-14T03:25:55Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "evidence/phase-0/manifest.json",
+      "sha256": "2c28bf53f2843a61fc55f3a797fb45845961705976b001bc66dd3c006d8cf86e"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "voicebridge/business/policy.py",
+      "sha256": "9627e3121929d90b1555b708a946425a738dadab18ad1c17a94c5d6f89379d62"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "aa6722d69fd9a9e15701d7fc25453d66ec599d59e8ce6c7916028b9d0608a10d"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/a2a.py",
+      "sha256": "c32dc133ecc8fbe05e6505b91c0c66d282777f45f29ad66ffdf861368d651d76"
+    },
+    {
+      "path": "voicebridge/business/otel.py",
+      "sha256": "8111c1674335704bd3764c856f9eb880b35e47a839df9c1b2545ec49bc956d8f"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    }
+  ],
+  "limitations": [
+    "fake provider/tool executor only; no real external side effect",
+    "single-process restart simulation (SQLite reopen), not an OS process kill",
+    "GPU/live-service behaviour not exercised"
+  ],
+  "outputs": [
+    {
+      "path": "scripts/phase1_reference_lane.py",
+      "sha256": "b86fd17cf2942074ef5343cd948d2cb6b7342c3c99f7681f225b757c084e7372"
+    },
+    {
+      "path": "tests/phase1_reference/test_reference_lane.py",
+      "sha256": "5732f178eebb9046018b42e0d05fdfd88a832f1cc5c5684ec4cc6ca53e72e9a4"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P1-10"
+}

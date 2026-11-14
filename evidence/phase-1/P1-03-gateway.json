@@ -1,7 +1,35 @@
 {
-  "task_id": "P1-03",
-  "status": "PASS",
-  "generated_at": "2026-11-14T03:11:54Z",
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_gateway tests/test_integration_tool_gateway.py tests/test_business_os_foundation.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".................................................................        [100%]\n65 passed in 4.69s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/policy.py voicebridge/business/tools.py tests/phase1_gateway/",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/policy.py voicebridge/business/tools.py tests/phase1_gateway/_phase1_helpers.py tests/phase1_gateway/test_policy_snapshot.py tests/phase1_gateway/test_gateway_snapshot.py tests/phase1_gateway/test_gateway_approval_binding.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/test_business_*.py tests/test_integration_tool_gateway.py tests/test_office_business.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 33%]\n........................................................................ [ 66%]\n........................................................................ [ 99%]\n.                                                                        [100%]\n217 passed in 36.39s"
+    }
+  ],
+  "generated_at": "2026-11-14T03:24:46Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -25,11 +53,11 @@
     },
     {
       "path": "voicebridge/business/store.py",
-      "sha256": "002925be71f51f249893d1aaba1e2b20c3cd02178ce4fa0af44b30526e087160"
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
     },
     {
       "path": "voicebridge/business/errors.py",
-      "sha256": "ea2cd7a4c2db89e248450979cc79d8b2f0fb47b839031b88d3cd365a5ef53bff"
+      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
     },
     {
       "path": "voicebridge/business/models.py",
@@ -37,7 +65,7 @@
     },
     {
       "path": "voicebridge/business/approvals.py",
-      "sha256": "3897fc647e602dd188d70d72952f4450fa15c200058909d8ecb5599c23aa0e0a"
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
     },
     {
       "path": "voicebridge/business/contracts/agent.schema.json",
@@ -51,6 +79,14 @@
       "path": "tests/test_business_os_foundation.py",
       "sha256": "fd7f58fb97a996ca275c191ac260764990e218c0514fa1d7e0e2a92a134e2209"
     }
+  ],
+  "limitations": [
+    "P1-06 execution binding is exercised only through the snapshot path; the legacy Policy-only path keeps its historical (weaker) approval check so existing callers stay compatible.",
+    "The existing approvals.request() API hashes the envelope {action, job_id, payload}, so an approval requested through it binds only when its payload is exactly the normalized intent and the envelope hash matches. A row whose request_hash is the intent digest itself (the literal P1-06 shape) is also accepted and covered by a test.",
+    "Identity/authorization (P1-01) is not wired: a deterministic built-in grant matcher ships with an optional identity_evaluator seam; it is not live identity evidence.",
+    "Grants match on exact subject/capability/resource/action/data_class/environment; scopes, rate limits and health are carried in the catalog/snapshot but not enforced by the gateway beyond cost<=budget_minor.",
+    "Pre-existing failure in the broader business regression (216 passed, 1 failed): test_business_agent_controls.py::test_v1_database_migrates_forward_to_the_agent_schema asserts PRAGMA user_version == 2 while Phase 0's durable-substrate commit c3ecb8bfd set SCHEMA_VERSION = 3; untouched by this lane.",
+    "No live services, credentials, network, schema edits, or full matrix were used. VERIFIED/COMPLETE/100% are not claimed."
   ],
   "outputs": [
     {
@@ -78,38 +114,6 @@
       "sha256": "f3aaf6bdf4a7e92cdc1de6d29dd7c35e8d597b6bec129e0a73e6967297bdb96d"
     }
   ],
-  "commands": [
-    {
-      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_gateway tests/test_integration_tool_gateway.py tests/test_business_os_foundation.py",
-      "exit_code": 0,
-      "stdout_tail": ".................................................................        [100%]\n65 passed in 3.36s",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/policy.py voicebridge/business/tools.py tests/phase1_gateway/",
-      "exit_code": 0,
-      "stdout_tail": "All checks passed!",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/policy.py voicebridge/business/tools.py tests/phase1_gateway/_phase1_helpers.py tests/phase1_gateway/test_policy_snapshot.py tests/phase1_gateway/test_gateway_snapshot.py tests/phase1_gateway/test_gateway_approval_binding.py",
-      "exit_code": 0,
-      "stdout_tail": "",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/test_business_*.py tests/test_integration_tool_gateway.py tests/test_office_business.py",
-      "exit_code": 1,
-      "stdout_tail": "E        +  where 3 = _scalar(<voicebridge.business.store.BusinessStore object at 0x78711598c370>, 'PRAGMA user_version')\n\ntests/test_business_agent_controls.py:920: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_business_agent_controls.py::test_v1_database_migrates_forward_to_the_agent_schema\n1 failed, 216 passed in 30.48s",
-      "stderr_tail": ""
-    }
-  ],
-  "limitations": [
-    "P1-06 execution binding is exercised only through the snapshot path; the legacy Policy-only path keeps its historical (weaker) approval check so existing callers stay compatible.",
-    "The existing approvals.request() API hashes the envelope {action, job_id, payload}, so an approval requested through it binds only when its payload is exactly the normalized intent and the envelope hash matches. A row whose request_hash is the intent digest itself (the literal P1-06 shape) is also accepted and covered by a test.",
-    "Identity/authorization (P1-01) is not wired: a deterministic built-in grant matcher ships with an optional identity_evaluator seam; it is not live identity evidence.",
-    "Grants match on exact subject/capability/resource/action/data_class/environment; scopes, rate limits and health are carried in the catalog/snapshot but not enforced by the gateway beyond cost<=budget_minor.",
-    "Pre-existing failure in the broader business regression (216 passed, 1 failed): test_business_agent_controls.py::test_v1_database_migrates_forward_to_the_agent_schema asserts PRAGMA user_version == 2 while Phase 0's durable-substrate commit c3ecb8bfd set SCHEMA_VERSION = 3; untouched by this lane.",
-    "No live services, credentials, network, schema edits, or full matrix were used. VERIFIED/COMPLETE/100% are not claimed."
-  ]
+  "status": "PASS",
+  "task_id": "P1-03"
 }

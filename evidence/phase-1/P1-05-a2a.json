@@ -3,23 +3,26 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals/test_a2a.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "............                                                             [100%]\n12 passed in 0.19s\n"
+      "stdout_tail": "............                                                             [100%]\n12 passed in 0.33s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/a2a.py voicebridge/business/errors.py tests/phase1_a2a_approvals/test_a2a.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "All checks passed!\n"
+      "stdout_tail": "All checks passed!"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/a2a.py tests/phase1_a2a_approvals/test_a2a.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:13:17Z",
+  "generated_at": "2026-11-14T03:24:56Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",

@@ -3,23 +3,26 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_backup tests/durable_substrate tests/test_business_os_foundation.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "............................................................             [100%]\n60 passed in 7.44s"
+      "stdout_tail": "............................................................             [100%]\n60 passed in 8.69s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/backup.py tests/phase1_backup",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": "All checks passed!"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/backup.py tests/phase1_backup/test_snapshot_verify.py tests/phase1_backup/test_restore_scope.py tests/phase1_backup/test_replay_schema_rpo.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:16:37Z",
+  "generated_at": "2026-11-14T03:25:22Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -43,11 +46,11 @@
     },
     {
       "path": "voicebridge/business/store.py",
-      "sha256": "002925be71f51f249893d1aaba1e2b20c3cd02178ce4fa0af44b30526e087160"
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "baca993535c79d03972231dd9010864ed8ea2d15d2187878ec32ffd40810edbf"
+      "sha256": "16719619ecde70d12e20532d6dc114c78d81f9c258d4d1c72e7b7c2364d41b4b"
     },
     {
       "path": "voicebridge/business/jobs.py",

@@ -1,5 +1,26 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 1 execution boundary accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-1.sh` exits 0 and writes `evidence/phase-1/manifest.json` with
+`status: PASS` after checking the accepted Phase 0 manifest/contracts. Five integrated lanes:
+P1-01 identity (principals, RBAC+ABAC, deny-by-default, tenant/audience-bound sessions, step-up,
+immediate revocation) + P1-02 authoritative append-only event log/outbox/projection checkpoints +
+P1-04 task/workspace/lease records with single-writer/fencing/handoff (schema v4, additive); P1-03
+capability catalog + frozen policy snapshot and ToolGateway enforcement incl. execution-time
+approval payload binding; P1-05 typed A2A fabric (ACL, spoof/dup/replay/over-delegation refused)
+and P1-06 durable approvals bound to canonical normalized intent (approve A/execute B fails,
+edit/delegate/expiry); P1-07 secrets vault/sandbox/egress and P1-08 dependency-free OpenTelemetry
+GenAI trace seam (content capture off); P1-09 encrypted snapshot/verify/tenant-restore/replay with
+measured RPO/RTO; P1-10 hermetic reference lane owner → session → scoped context → read tool →
+owner-approved fake provider write → receipt/artifact → checkpoints → restart → `unknown` →
+reconciled `completed`, with one trace and no network. **Measured:** combined Phase 1+0 suite
+**426 passed**; broader business/office regression **306 passed**; phase gate focused suite green.
+**Honest limits:** identity evaluation is not yet wired into the gateway snapshot (a seam exists),
+approval postcondition validation and out-of-process sandbox/KMS/OTel exporters are not implemented,
+A2A defaults to the authoritative event-log adapter only in the reference lane, backup is
+single-process. **Not done:** live service/deploy, real external side effects, full matrix,
+`VERIFIED`. Next: Phase 2 agent runtime/sessions/memory/handoffs behind these contracts.
+
 **Qubit Office Phase 0 accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):** P0-01..P0-09
 are implemented with real evidence and the gate `bash scripts/acceptance/phase-0.sh` exits 0,
 writing `evidence/phase-0/manifest.json` with `status: PASS`. Five disjoint lanes were integrated:
