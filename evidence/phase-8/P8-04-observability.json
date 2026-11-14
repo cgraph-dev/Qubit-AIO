@@ -1,0 +1,95 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_observability.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "ctiveAgents\": 40,\n          \"eventBurst\": 60,\n          \"eventsPerSecond\": 20,\n          \"frameP95Ms\": 33.3,\n          \"heapMb\": 256,\n          \"pathfindingAvgMs\": 2,\n          \"pathfindingP95Ms\": 8,\n          \"visibleAvatars\": 80\n        },\n        \"name\": \"low_cores\",\n        \"reasons\": [\n          \"low_cores\"\n        ],\n        \"tier\": \"low\"\n      },\n      {\n        \"limits\": {\n          \"activeAgents\": 40,\n          \"eventBurst\": 60,\n          \"eventsPerSecond\": 20,\n          \"frameP95Ms\": 16.7,\n          \"heapMb\": 512,\n          \"pathfindingAvgMs\": 2,\n          \"pathfindingP95Ms\": 8,\n          \"visibleAvatars\": 80\n        },\n        \"name\": \"capable\",\n        \"reasons\": [],\n        \"tier\": \"desktop\"\n      }\n    ],\n    \"gpu_not_measured\": [\n      \"frame_p95_ms\",\n      \"heap_mb\"\n    ],\n    \"kind\": \"performance\",\n    \"limitations\": [\n      \"GPU frame time, browser heap and event rates are NOT measured by this hermetic process; they stay not_measured unless --sample supplies a real browser measurement\",\n      \"the measured floor-projection timing is a Python data-path number, not a rendered frame time\",\n      \"the verifier exercises the projection/culling contract, not the vendored Habblaud client, a browser compositor or a GPU\",\n      \"no live service, state, credential or network is touched\"\n    ],\n    \"ok\": true,\n    \"sample_supplied\": false,\n    \"schema\": \"qubit-office-observability-matrix/1\",\n    \"source\": \"scripts/verify_renderer_budget.py\",\n    \"tier\": \"desktop\"\n  },\n  \"schema\": \"qubit-office-observability-verification/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P8-04\"\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_observability tests/phase1_otel tests/phase6_accessibility tests/phase3_renderer",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 7.10s\n"
+    },
+    {
+      "cmd": "ruff check voicebridge/business/observability.py scripts/verify_observability.py tests/phase8_observability",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/observability.py scripts/verify_observability.py tests/phase8_observability/*.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T15:06:21Z",
+  "inputs": [
+    {
+      "path": "voicebridge/business/otel.py",
+      "sha256": "8111c1674335704bd3764c856f9eb880b35e47a839df9c1b2545ec49bc956d8f"
+    },
+    {
+      "path": "scripts/accessibility_audit.py",
+      "sha256": "ab11272cc48c0fad5f7dac821691425843472efb98208b3d21ca1f7d1dccfcc4"
+    },
+    {
+      "path": "scripts/verify_renderer_budget.py",
+      "sha256": "3eb77e068758e0cb7bb09fe15e5cd429c4868c9c018166a5067e1f0a8a979520"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-floor.ts",
+      "sha256": "d9c55d0c590f55d3c1e7f60638ec47be08eb0088b8a4534ede4af06d2649614e"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-budget.ts",
+      "sha256": "c29e417c981f7023f393f29b97971aee1110417cbf5c25005aa80ee28e1f76c8"
+    }
+  ],
+  "limitations": [
+    "PASS covers the P8-04 contract checks only; it is not a VERIFIED release verdict.",
+    "accessibility is a static source/CSS audit: axe-core is not installed, no axe run was performed, and screen-reader (NVDA/VoiceOver/TalkBack), high-contrast, 200% zoom, touch and muted-audio reviews were NOT performed.",
+    "GPU frame time and browser heap are NOT measured; the only timing is the deterministic Python floor-projection data path, and frame/heap stay not_measured.",
+    "device tiers and context-loss/recovery are exercised by executing the shipped TypeScript renderer contract in node; no real WebGL context was lost and no GPU/browser was used.",
+    "evaluation regression is proven with deterministic probe evaluations, not a production eval dataset or judge calibration.",
+    "no live service, state, credential, browser or network was touched; no full matrix was run."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/observability.py",
+      "sha256": "b150bb7df1006800a471c829d439c111b18a695442963c210bdec64ed1c8f6aa"
+    },
+    {
+      "path": "scripts/verify_observability.py",
+      "sha256": "60018fc6a9f0df4d9206b252e5e0d3c00b23a435340ccca938e24a8018953b71"
+    },
+    {
+      "path": "tests/phase8_observability/_p8_helpers.py",
+      "sha256": "9250d62b9ad0e1681b55fe342ceba3215cef9ad5cf81b18c4fc2a185b727f1ef"
+    },
+    {
+      "path": "tests/phase8_observability/conftest.py",
+      "sha256": "b1e9aa5ce7bb4c0cc2450c99e149921c5c8ff14c95fb912f0bbbcf39134956ca"
+    },
+    {
+      "path": "tests/phase8_observability/test_eval_regression.py",
+      "sha256": "9480168c909908e76a430cf5999884f66197fb71b01cae105bb97e264f5682f0"
+    },
+    {
+      "path": "tests/phase8_observability/test_matrices.py",
+      "sha256": "641b74e5ab7ecf6182289d8a0758826b53b826bdca5816c6ec440ca2af48cc04"
+    },
+    {
+      "path": "tests/phase8_observability/test_observability_trace.py",
+      "sha256": "7054195013550863cfe54150868bd22f51a065f00dffcfcc838acfa586bf6d44"
+    },
+    {
+      "path": "tests/phase8_observability/test_verifier_integration.py",
+      "sha256": "4cc55a19ba9afd5f13236b2dbde2da45c1f8fa10a02369b50f5a70ef9008b2ba"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P8-04"
+}
