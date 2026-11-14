@@ -1,13 +1,13 @@
 {
   "evidence_hashes": {
-    "evidence/phase-0/P0-01-contract.json": "9551b07d1aba26a8322ecf497b82ca0ec524921c02ae6ba2457c2908cc78ac78",
+    "evidence/phase-0/P0-01-contract.json": "9438c8e774ee7a72407716906421b48e80a2c5b296266f4d797af64e8a197bff",
     "evidence/phase-0/P0-02-domain-contract.json": "fa89aa83207eb814794787e3273ea2f246ccf6759e63714dac06a2681c3d9d82",
     "evidence/phase-0/P0-03-asset-ledger.json": "58ab308e6eeebbdad63e09b236f18ab0ee7c2faa7694eab9f5dec30482f1f141",
     "evidence/phase-0/P0-04-dependency-ledger.json": "c814f0c40daf8dfbed4e5a48f969401c3bb4170adffc3cf1be1bc0f426a2578e",
     "evidence/phase-0/P0-05-threat-catalog.json": "25ab9c14d4bd69a6f1f9af032bdaf320f02760e87dee703d584524e0c31a58ba",
     "evidence/phase-0/P0-06-stage-replay.json": "7ef53972cbbbad367eb34cd114676f0f0ca74cc844a97609afdb83ff87ee4cf7",
     "evidence/phase-0/P0-07-campus.json": "3973c2b70f5f39980e95bef25fa13c5bc15f5e58f061db8f19e40cf23742eaec",
-    "evidence/phase-0/P0-08-renderer-benchmark.json": "118201a855807cba8c4f4a050fa81d14cb7937e6cb393bd81b55ab7185258a29",
+    "evidence/phase-0/P0-08-renderer-benchmark.json": "48e279704e7ea4b63369187ed1f01ab60fcb8742311144ff97749e4d5f69538f",
     "evidence/phase-0/P0-09-durable-substrate.json": "89305c1865ac6303bc6f811b2eaf9dc42869f2e010c9e44ca613b33bae7ec1dc"
   },
   "evidence_verification": {
@@ -15,8 +15,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T04:22:02Z",
-  "git_head": "52f1dfaeed55a387f363429796741bd46da03d84",
+  "generated_at": "2026-11-14T04:56:45Z",
+  "git_head": "7abac258f9d211675bf2575338fd9644e7e0bdda",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",
@@ -44,7 +44,7 @@
       "task_id": "P0-02"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/office_asset_ledger.py --source /home/trick/Desktop/UI Office --out /tmp/qoffice-acceptance.5hWCqC/asset-manifest.json --check",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/office_asset_ledger.py --source /home/trick/Desktop/UI Office --out /tmp/qoffice-acceptance.Z0i3bs/asset-manifest.json --check",
       "evidence": [
         "evidence/phase-0/P0-03-asset-ledger.json"
       ],
@@ -68,7 +68,7 @@
       "task_id": "P0-05"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/stage_replay.py --fixture synthetic-department --no-network --json --work-root /tmp/qoffice-acceptance.5hWCqC/stage",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/stage_replay.py --fixture synthetic-department --no-network --json --work-root /tmp/qoffice-acceptance.Z0i3bs/stage",
       "evidence": [
         "evidence/phase-0/P0-06-stage-replay.json"
       ],

@@ -71,12 +71,8 @@ def test_every_shipped_room_is_covered(registry, roles):
     assert report.total_rooms == 300
     assert report.covered_rooms == report.total_rooms
     assert report.uncovered_rooms == 0
-    role_manifests = {
-        manifest.manifest_id
-        for manifest in registry.manifests
-        if manifest.departments != (rc.TRADING_DEPARTMENT,)
-    }
-    assert set(report.manifests_used) == role_manifests
+    all_manifests = {manifest.manifest_id for manifest in registry.manifests}
+    assert set(report.manifests_used) == all_manifests
     assert set(report.by_department) == {dept.id for dept in roles.departments}
 
 
@@ -207,7 +203,7 @@ def test_trading_room_capability_manifests_exist(registry):
         "compliance_archive",
         "incident_room",
     } <= kinds
-    assert registry.counts_by_department()[rc.TRADING_DEPARTMENT] == 7
+    assert registry.counts_by_department()[rc.TRADING_DEPARTMENT] == 11
 
 
 def test_trading_execution_cannot_change_risk_limits(registry):
@@ -265,8 +261,11 @@ def test_digests_are_deterministic(roles, catalog):
 def test_counts_by_department_and_kind(registry, roles):
     counts = registry.counts_by_department()
     for department in roles.departments:
-        assert counts[department.id] == 3
-    assert counts[rc.TRADING_DEPARTMENT] == 7
+        if department.id == rc.TRADING_DEPARTMENT:
+            assert counts[department.id] == 11
+        else:
+            assert counts[department.id] == 3
+    assert counts[rc.TRADING_DEPARTMENT] == 11
     assert sum(registry.counts_by_kind().values()) == len(registry.manifests)
 
 
@@ -321,5 +320,6 @@ def test_a_dynamic_capability_catalog_is_accepted(roles):
 
     catalog = dc.DynamicCapabilityCatalog([_Source()])
     composed = rc.build_shipped_registry(roles=roles, capabilities=catalog)
-    assert len(composed) == 73
+    expected = len(rc.build_shipped_manifests(roles)) + len(rc.build_trading_manifests())
+    assert len(composed) == expected
     assert composed.validate_coverage(roles).covered_rooms == 300

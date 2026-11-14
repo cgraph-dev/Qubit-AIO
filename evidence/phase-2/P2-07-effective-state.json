@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".......................................                                  [100%]\n39 passed in 3.17s"
+      "stdout_tail": ".......................................                                  [100%]\n39 passed in 3.87s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_effective_state.py --json",
@@ -33,10 +33,10 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  9 passed (9)\n   Start at  06:19:14\n   Duration  312ms (transform 90ms, setup 0ms, import 141ms, tests 155ms, environment 0ms)"
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  9 passed (9)\n   Start at  06:56:27\n   Duration  400ms (transform 151ms, setup 0ms, import 228ms, tests 170ms, environment 0ms)"
     }
   ],
-  "generated_at": "2026-11-14T04:19:15Z",
+  "generated_at": "2026-11-14T04:56:27Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -64,11 +64,11 @@
     },
     {
       "path": "voicebridge/business/bridge.py",
-      "sha256": "ceaa7fa60e163dc9ffaa670401ce21741b9205c7b483a1595be16bc72d4549a6"
+      "sha256": "863e72b0b48e29edc9802ab96485c2e81777c7ccbe3bd52e0e3a52f7e8fa8aee"
     },
     {
       "path": "voicebridge/qubit_compat.py",
-      "sha256": "93289f1bf8145608c82e3d5066da72b4bff4e04e9e4a3caca28e0f238aa39b16"
+      "sha256": "35ac343c974605e23dd33b2c1bf0a5c6f73af6bddfaeb21bdb1cd5bef891f431"
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/effective-state.ts",
@@ -80,7 +80,7 @@
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/AgentControlDrawer.tsx",
-      "sha256": "863d33378a3ca5aea78b02ef6e11000dd75b7cd881e2817dc7557711cf9b06fb"
+      "sha256": "4499c8f171c10199f6cc7396e35eb91d129b7f77f4ce2bcc5a79b2d223b03cdc"
     }
   ],
   "limitations": [

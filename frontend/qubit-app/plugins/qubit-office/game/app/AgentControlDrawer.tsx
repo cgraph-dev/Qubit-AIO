@@ -9,6 +9,7 @@
  */
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createEffectiveStatePanel } from "./EffectiveStatePanel";
+import { createCharacterStudio } from "./CharacterStudio";
 import type { AgentSeat } from "./agents-panel";
 import {
   type AgentDetail, type AgentRecord, type AgentTurnPlan, type AuditEvent,
@@ -89,6 +90,7 @@ export function createAgentControlDrawer(
 ) {
   const { useState, useEffect, useRef } = hooks;
   const EffectiveStatePanel = createEffectiveStatePanel(R, hooks);
+  const CharacterStudio = createCharacterStudio(R, hooks);
 
   return function AgentControlDrawer(props: AgentControlDrawerProps) {
     const [load, setLoad] = useState<LoadState>({ kind: "loading" });
@@ -902,6 +904,14 @@ export function createAgentControlDrawer(
       }, `${busy}…`));
     }
     if (selectedId) {
+      children.push(section(R, "Character Studio", "character-studio", [
+        R.createElement(CharacterStudio, {
+          key: "studio",
+          initialProfile: { agent_id: selectedId },
+          base: props.base,
+          fetchImpl: props.fetchImpl,
+        }),
+      ]));
       children.push(section(R, "Effective state", "effective", [
         R.createElement(EffectiveStatePanel, {
           key: "effective", agentId: selectedId,

@@ -750,6 +750,15 @@ _CAPABILITY_ROWS = (
     _capability("office.decision.record", "office", "decision", "record"),
     _capability("office.focus.session", "office", "room.focus", "session"),
     _capability("office.task.checkpoint", "office", "task", "checkpoint"),
+    _capability("office.ops.monitor", "office", "room.ops", "monitor"),
+    _capability(
+        "office.incident.respond",
+        "office",
+        "incident",
+        "respond",
+        risk="L3",
+        approval="required",
+    ),
     _capability(
         "trading.market_data.read", "trading", "market_data", "read"
     ),
@@ -857,6 +866,21 @@ _KIND_PROFILES: Mapping[str, Mapping[str, Any]] = {
         "approval": "none",
         "agents": 1,
         "modes": ("focus",),
+    },
+    "ops": {
+        "workflow": "ops",
+        "name": "Operations and incident monitoring",
+        "capabilities": ("office.ops.monitor", "office.incident.respond"),
+        "tools": ("ops.dashboard", "alerting"),
+        "artifacts": ("ops_report", "incident_record"),
+        "queue": "ops_queue",
+        "task": "ops_task",
+        "kpis": ("queue_age", "incident_count"),
+        "memory": "department",
+        "privacy": "department",
+        "approval": "conditional",
+        "agents": 1,
+        "modes": ("work", "incident"),
     },
 }
 
@@ -1132,6 +1156,8 @@ def build_shipped_manifests(
                 )
     manifests: list[RoomCapabilityManifest] = []
     for department_id, room_kind in sorted(grouped):
+        if room_kind in _TRADING_PROFILES:
+            continue
         profile = _KIND_PROFILES.get(room_kind)
         if profile is None:
             _fail(

@@ -1,0 +1,87 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-3/P3-01-campus.json": "3f3feaae8b8dab551169b0f5aa3a957dc9a74849c5bda92e6d6b395203d1ff4c",
+    "evidence/phase-3/P3-02-room-capabilities.json": "c262c18b33b3e2600157b20ba98c777d6d5768d418aec8b378c2dc01c12408bb",
+    "evidence/phase-3/P3-03-map-schema.json": "ab9eee61e1094b5209f20b86bce4915bc9882d13a4368627b7586be49724bd18",
+    "evidence/phase-3/P3-04-renderer.json": "094fe66255a6b9e06f8f84f0a43e7019d3459af77b7c928759bba5ef0caf1c51",
+    "evidence/phase-3/P3-05-command-center.json": "4352c303e48fb061b83a7e7230a7c3c830579b4bc229aa6522deab0dca925b94",
+    "evidence/phase-3/P3-06-exterior.json": "85ff6e0d86099b21d9cc3cd57b131cb78514a32fd6532de05240964915ab7d88",
+    "evidence/phase-3/P3-07-character-studio.json": "f8ed4748e2d7ce731be82a7fb0643e2d3284240105ca145fd3a2a22d97a55017"
+  },
+  "evidence_verification": {
+    "checked": 7,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T04:57:46Z",
+  "git_head": "7abac258f9d211675bf2575338fd9644e7e0bdda",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured",
+    "three shell-CSS assertions in tests/test_office_game_shell.py fail identically on base c95366a3f; they are not caused by Phase 3 and are not part of this gate",
+    "renderer GPU frame/heap and live browser metrics remain not_measured; only the deterministic data path is checked"
+  ],
+  "phase": 3,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/validate_campus_schema.py --json",
+      "evidence": [
+        "evidence/phase-3/P3-01-campus.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P3-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/validate_room_capabilities.py --json",
+      "evidence": [
+        "evidence/phase-3/P3-02-room-capabilities.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P3-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_world/test_map_schema.py",
+      "evidence": [
+        "evidence/phase-3/P3-03-map-schema.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P3-03"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_renderer_budget.py --json",
+      "evidence": [
+        "evidence/phase-3/P3-04-renderer.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P3-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_command_center tests/test_business_office_bridge.py",
+      "evidence": [
+        "evidence/phase-3/P3-05-command-center.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P3-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/validate_exterior.py --json",
+      "evidence": [
+        "evidence/phase-3/P3-06-exterior.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P3-06"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_character_profile.py --json",
+      "evidence": [
+        "evidence/phase-3/P3-07-character-studio.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P3-07"
+    }
+  ]
+}

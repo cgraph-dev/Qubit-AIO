@@ -2792,13 +2792,13 @@ _ROOM_KINDS = ("work", "war_room", "focus", "ops")
 #: ``docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md``). Order matters: the
 #: first ``extra`` rooms absorb the cluster cells when the floor is sized.
 _TRADING_ROOM_SPECS: tuple[tuple[str, str, str], ...] = (
-    ("trading-floor", "Trading Floor (Market Wall)", "ops"),
-    ("strategy-lab", "Strategy Lab", "focus"),
-    ("risk-room", "Risk Room", "ops"),
-    ("data-room", "Data Room", "work"),
-    ("treasury", "Treasury / Accounting", "work"),
-    ("compliance-archive", "Compliance / Archive", "focus"),
-    ("incident-room", "Incident Room", "war_room"),
+    ("trading-floor", "Trading Floor (Market Wall)", "trading_floor"),
+    ("strategy-lab", "Strategy Lab", "strategy_lab"),
+    ("risk-room", "Risk Room", "risk_room"),
+    ("data-room", "Data Room", "data_room"),
+    ("treasury", "Treasury / Accounting", "treasury"),
+    ("compliance-archive", "Compliance / Archive", "compliance_archive"),
+    ("incident-room", "Incident Room", "incident_room"),
     ("reception", "Reception", "work"),
     ("kitchen", "Kitchen / Break", "work"),
     ("restrooms", "Restrooms", "work"),

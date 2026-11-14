@@ -3,29 +3,33 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_room_capabilities.py --json",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "ount\": 6,\n      \"room_kinds\": [\n        \"war_room\"\n      ],\n      \"workflow_id\": \"web_app_ecommerce.war_room\",\n      \"workflow_name\": \"web_app_ecommerce \\u00b7 War Room decision\"\n    },\n    {\n      \"approval_policy\": \"none\",\n      \"archetypes\": [],\n      \"departments\": [\n        \"web_app_ecommerce\"\n      ],\n      \"digest\": \"487b580c3ac555ef6a2381c1456ec7d448b01f8806ce6c0214c97de4292337bd\",\n      \"manifest_id\": \"roomcap:web_app_ecommerce:work\",\n      \"required_agent_count\": 1,\n      \"required_capability_count\": 3,\n      \"required_role_count\": 6,\n      \"room_kinds\": [\n        \"work\"\n      ],\n      \"workflow_id\": \"web_app_ecommerce.work\",\n      \"workflow_name\": \"web_app_ecommerce \\u00b7 Department work execution\"\n    }\n  ],\n  \"schema\": \"qubit.office.room_capabilities/1\",\n  \"status\": \"PASS\"\n}\n"
+      "stdout_tail": "      \"approval_policy\": \"none\",\n      \"archetypes\": [],\n      \"departments\": [\n        \"web_app_ecommerce\"\n      ],\n      \"digest\": \"487b580c3ac555ef6a2381c1456ec7d448b01f8806ce6c0214c97de4292337bd\",\n      \"manifest_id\": \"roomcap:web_app_ecommerce:work\",\n      \"required_agent_count\": 1,\n      \"required_capability_count\": 3,\n      \"required_role_count\": 6,\n      \"room_kinds\": [\n        \"work\"\n      ],\n      \"workflow_id\": \"web_app_ecommerce.work\",\n      \"workflow_name\": \"web_app_ecommerce \\u00b7 Department work execution\"\n    }\n  ],\n  \"schema\": \"qubit.office.room_capabilities/1\",\n  \"status\": \"PASS\"\n}"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_room_caps tests/test_business_role_registry.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".................................................                        [100%]\n49 passed in 0.70s\n"
+      "stdout_tail": ".................................................                        [100%]\n49 passed in 0.60s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/room_capabilities.py scripts/validate_room_capabilities.py tests/phase3_room_caps",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "All checks passed!\n"
+      "stdout_tail": "All checks passed!"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/room_capabilities.py scripts/validate_room_capabilities.py tests/phase3_room_caps/test_room_capabilities.py tests/phase3_room_caps/test_validator_script.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T04:35:33Z",
+  "generated_at": "2026-11-14T04:54:19Z",
   "git_head": "c95366a3f10c69301a3a7c3a0c3d43a824510193",
   "inputs": [
     {
@@ -54,7 +58,7 @@
     },
     {
       "path": "voicebridge/business/role_catalog.py",
-      "sha256": "1226d2058a396459000cb924221f33577d384cfadabafe236fd96e4e6f99516f"
+      "sha256": "19dfdfb8bf4621e79ad608b51f019c806ff2957b72892eaeafd8c7d7bc796a75"
     },
     {
       "path": "voicebridge/business/policy.py",
@@ -75,7 +79,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/room_capabilities.py",
-      "sha256": "c6613f666a984ef465c91378fb172b9ac0fd6118bee0d24fd4b0722ff4b7d147"
+      "sha256": "f399d433a44ecba00aa2af7f50a6b84ed645135b390bf0de476092f31de81686"
     },
     {
       "path": "scripts/validate_room_capabilities.py",
@@ -83,11 +87,11 @@
     },
     {
       "path": "tests/phase3_room_caps/test_room_capabilities.py",
-      "sha256": "0a29b02aedaccdc1f03d430f2662dc0c0df0b6a48a18236c24425ab0824ddf95"
+      "sha256": "6f4db8a2ab73ab57180fb42034692a1fc2c299a7d38d2cf2d2277e971e554373"
     },
     {
       "path": "tests/phase3_room_caps/test_validator_script.py",
-      "sha256": "1a5ce5023282029efb7209b8965c7c90466fedd4515aa611d13c55451d6c7ae7"
+      "sha256": "3dde09b9d3c49e758ea5e47c08a2c99d0ca0cd1e496296ee9a87e7ad885a9253"
     }
   ],
   "status": "PASS",

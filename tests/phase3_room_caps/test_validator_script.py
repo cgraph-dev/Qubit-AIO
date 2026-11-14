@@ -37,7 +37,7 @@ def test_json_report_is_pass_and_covers_every_room(capsys):
     assert coverage["total_rooms"] == 300
     assert coverage["uncovered_rooms"] == 0
     assert coverage["covered_rooms"] == coverage["total_rooms"]
-    assert payload["counts_by_department"]["trading"] == 7
+    assert payload["counts_by_department"]["trading"] == 11
 
 
 def test_unknown_flag_is_a_usage_error():

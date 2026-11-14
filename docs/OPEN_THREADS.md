@@ -1,5 +1,24 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 3 campus/maps/shell accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-3.sh` exits 0 and writes `evidence/phase-3/manifest.json`
+(`status: PASS`) after accepted Phase 0/1/2 manifests. Five lanes: P3-01 full campus data with a
+Trading Department floor (100 floors / 5 wings / 300 rooms / 575 cells / 3,075 desks / 0 staffed;
+Trading `floor-023`, 16 rooms, 13 roles) + P3-03 versioned `qubit-office-map/1` with Tiled
+round-trip, strict validation and a publish/undo/rollback registry; P3-02 room capability manifests
+(77 manifests, 300/300 rooms covered, decorative room refused, Trading execution/risk/approval
+separation); P3-04 renderer-neutral floor/culling/LRU/dirty/context-loss contract + measured
+data-path budget verifier (GPU/heap explicitly `not_measured`); P3-05 command-center shell over a
+real read-only projection (search/roster/filters/inbox/deep links/semantic DOM) mounted in
+`OfficeAppShell` without breaking docks/menu; P3-06 outside-world data (6 zones / 20 chunks / 8
+portals / 15 assets) and P3-07 canonical `CharacterProfile` store (versioned revisions/rollback,
+paid-art guard, Habblaud/LimeZu projections) + Character Studio mounted in the Agent Control
+drawer. **Measured:** gates 0–3 PASS; broad business/office/world regression **677 passed**; Phase 3
+focused Python + UI suites green; Character Studio mount wiring pinned. **Known:** three
+shell-CSS assertions in `tests/test_office_game_shell.py` fail identically on base `c95366a3f` and
+are excluded from the gate; GPU frame/heap/live-browser metrics are not measured. **Not done:** live
+deploy, real browser/Phaser E2E, full matrix, `VERIFIED`. Next: Phase 4 full workforce/collaboration.
+
 **Qubit Office Phase 2 workforce/runtime accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
 `bash scripts/acceptance/phase-2.sh` exits 0 and writes `evidence/phase-2/manifest.json`
 (`status: PASS`) after checking accepted Phase 0/1 manifests. Five lanes: P2-01 agent registry +

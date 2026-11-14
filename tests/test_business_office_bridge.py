@@ -21,7 +21,7 @@ import pytest
 
 from voicebridge import qubit_compat as HC
 from voicebridge import webui as W
-from voicebridge.business import AgentControlService, BusinessStore
+from voicebridge.business import AgentControlService, BusinessStore, RoleRegistry
 
 pytestmark = pytest.mark.unit
 
@@ -148,10 +148,12 @@ def test_directory_reports_the_real_template_catalog(env):
     code, out = _call(cfg, "GET", "/api/office/business/directory")
     assert code == 200
     counts = out["counts"]
-    assert counts["roles"] == 132
+    expected_roles = len(RoleRegistry.default().roles)
+    assert expected_roles >= 145
+    assert counts["roles"] == expected_roles
     assert counts["floors"] == 100
     assert counts["active_floors"] + counts["dormant_floors"] == 100
-    assert len(out["roles"]) == 132
+    assert len(out["roles"]) == expected_roles
     assert all("autonomy" in role and "budget" in role for role in out["roles"])
     assert all("wing" in floor for floor in out["floors"])
 

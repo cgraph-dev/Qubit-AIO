@@ -3,27 +3,30 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_world tests/test_office_world_model.py tests/test_office_world_tower_plan.py tests/test_business_role_registry.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 81%]\n................                                                         [100%]\n88 passed in 2.37s"
+      "stdout_tail": "........................................................................ [ 81%]\n................                                                         [100%]\n88 passed in 2.28s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/generate_campus_fixture.py --check",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "{\"check\": \"PASS\", \"counts\": {\"active_floors\": 23, \"cells\": 575, \"desks\": 3075, \"dormant_floors\": 77, \"floors\": 100, \"rooms\": 300, \"staffed_agents\": 0, \"wings\": 5}, \"digest\": \"d062f15d35e4d9413b3267d1ccd50303798b8201be1efc9b39cb5d30dd0b4fd2\", \"fixture_digest\": \"cf37f3897e513070c5da0f1b94e5115fda6f1a08d97849a9de96d6a501ce562e\"}"
+      "stdout_tail": "{\"check\": \"PASS\", \"counts\": {\"active_floors\": 23, \"cells\": 575, \"desks\": 3075, \"dormant_floors\": 77, \"floors\": 100, \"rooms\": 300, \"staffed_agents\": 0, \"wings\": 5}, \"digest\": \"915bc4eea30c989e1dc2eb48648a9e96be2789e306dd0c6855ae5aaedadcdaaa\", \"fixture_digest\": \"4533c2a2f6341f92b7373849d3471987996eeb17ff2478509051840868c7018a\"}"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_campus_schema.py --json",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "-analyst\",\n      \"trading-incident-responder\",\n      \"trading-market-research\",\n      \"trading-meme-risk\",\n      \"trading-portfolio-accountant\",\n      \"trading-quant-backtest\",\n      \"trading-risk-manager\",\n      \"trading-verifier\"\n    ],\n    \"desks\": 111,\n    \"floor_id\": \"floor-023\",\n    \"missing\": [],\n    \"rooms\": [\n      \"Trading Floor (Market Wall)\",\n      \"Strategy Lab\",\n      \"Risk Room\",\n      \"Data Room\",\n      \"Treasury / Accounting\",\n      \"Compliance / Archive\",\n      \"Incident Room\",\n      \"Reception\",\n      \"Kitchen / Break\",\n      \"Restrooms\",\n      \"Lounge\",\n      \"Boardroom\",\n      \"Focus Rooms\",\n      \"Head Office\",\n      \"Storage / Archive\",\n      \"Comms / Ops\"\n    ]\n  }\n}"
+      "stdout_tail": "    \"rooms\": [\n      \"Trading Floor (Market Wall)\",\n      \"Strategy Lab\",\n      \"Risk Room\",\n      \"Data Room\",\n      \"Treasury / Accounting\",\n      \"Compliance / Archive\",\n      \"Incident Room\",\n      \"Reception\",\n      \"Kitchen / Break\",\n      \"Restrooms\",\n      \"Lounge\",\n      \"Boardroom\",\n      \"Focus Rooms\",\n      \"Head Office\",\n      \"Storage / Archive\",\n      \"Comms / Ops\"\n    ]\n  }\n}"
     }
   ],
-  "generated_at": "2026-11-14T04:43:45Z",
+  "generated_at": "2026-11-14T04:54:18Z",
   "inputs": [
     {
       "path": "voicebridge/business/role_catalog.py",
-      "sha256": "9bd572d88a472f67e7daa80cfeb9f077540f671b4a31039c23c7bb762d7ee5ba"
+      "sha256": "19dfdfb8bf4621e79ad608b51f019c806ff2957b72892eaeafd8c7d7bc796a75"
     },
     {
       "path": "voicebridge/business/roles.py",
@@ -64,7 +67,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/role_catalog.py",
-      "sha256": "9bd572d88a472f67e7daa80cfeb9f077540f671b4a31039c23c7bb762d7ee5ba"
+      "sha256": "19dfdfb8bf4621e79ad608b51f019c806ff2957b72892eaeafd8c7d7bc796a75"
     },
     {
       "path": "voicebridge/office/world/tower_plan.py",

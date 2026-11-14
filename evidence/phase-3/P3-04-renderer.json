@@ -3,41 +3,47 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_renderer_budget.py --json",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "r heap and event rates are NOT measured by this hermetic process; they stay not_measured unless --sample supplies a real browser measurement\",\n    \"the measured floor-projection timing is a Python data-path number, not a rendered frame time\",\n    \"the verifier exercises the projection/culling contract, not the vendored Habblaud client, a browser compositor or a GPU\",\n    \"no live service, state, credential or network is touched\"\n  ],\n  \"no_fabricated_metrics\": true,\n  \"ok\": true,\n  \"schema\": \"qoffice-renderer-budget/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P3-04\",\n  \"tier\": \"desktop\",\n  \"tower\": {\n    \"checks\": {\n      \"desks\": true,\n      \"floors\": true,\n      \"rooms\": true,\n      \"staffed_agents\": true,\n      \"wings\": true\n    },\n    \"counts\": {\n      \"active_floors\": 22,\n      \"cells\": 575,\n      \"desks\": 3075,\n      \"dormant_floors\": 78,\n      \"floors\": 100,\n      \"rooms\": 300,\n      \"staffed_agents\": 0,\n      \"wings\": 5\n    },\n    \"digest\": \"5aeab697402792513db5036d59c73a06aedecb4c27f111a6d9ae6c1d21f655b9\",\n    \"expected\": {\n      \"desks\": 3075,\n      \"floors\": 100,\n      \"rooms\": 300,\n      \"staffed_agents\": 0,\n      \"wings\": 5\n    },\n    \"problems\": [],\n    \"valid\": true\n  }\n}\n"
+      "stdout_tail": "      \"cells\": 575,\n      \"desks\": 3075,\n      \"dormant_floors\": 77,\n      \"floors\": 100,\n      \"rooms\": 300,\n      \"staffed_agents\": 0,\n      \"wings\": 5\n    },\n    \"digest\": \"915bc4eea30c989e1dc2eb48648a9e96be2789e306dd0c6855ae5aaedadcdaaa\",\n    \"expected\": {\n      \"desks\": 3075,\n      \"floors\": 100,\n      \"rooms\": 300,\n      \"staffed_agents\": 0,\n      \"wings\": 5\n    },\n    \"problems\": [],\n    \"valid\": true\n  }\n}"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_renderer",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "............                                                             [100%]\n12 passed in 3.98s\n"
+      "stdout_tail": "............                                                             [100%]\n12 passed in 3.75s"
     },
     {
-      "cmd": "bash -lc 'set -e; cd /home/trick/qubit-worktrees/qoffice-p3-renderer; ln -s /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules; trap \"rm -f /home/trick/qubit-worktrees/qoffice-p3-renderer/frontend/qubit-web/node_modules\" EXIT; cd frontend/qubit-web; npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/renderer-floor.test.ts ../qubit-app/plugins/qubit-office/game/app/renderer-budget.test.ts'",
+      "cmd": "bash -lc 'set -e; ln -s /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules; trap \"rm -f frontend/qubit-web/node_modules\" EXIT; cd frontend/qubit-web; npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/renderer-floor.test.ts ../qubit-app/plugins/qubit-office/game/app/renderer-budget.test.ts'",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p3-renderer/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  28 passed (28)\n   Start at  06:36:40\n   Duration  245ms (transform 107ms, setup 0ms, import 142ms, tests 24ms, environment 0ms)\n\n"
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  28 passed (28)\n   Start at  06:54:27\n   Duration  191ms (transform 53ms, setup 0ms, import 107ms, tests 20ms, environment 0ms)"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/verify_renderer_budget.py tests/phase3_renderer",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "All checks passed!\n"
+      "stdout_tail": "All checks passed!"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile scripts/verify_renderer_budget.py tests/phase3_renderer/test_renderer_budget.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     },
     {
       "cmd": "cd frontend/qubit-app/plugins/qubit-office/game/app && /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules/.bin/tsc --noEmit --strict --target ES2023 --module ESNext --moduleResolution bundler --skipLibCheck --verbatimModuleSyntax --erasableSyntaxOnly renderer-floor.ts renderer-budget.ts",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T04:36:58Z",
+  "generated_at": "2026-11-14T04:54:28Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",

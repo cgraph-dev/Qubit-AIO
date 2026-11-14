@@ -45,6 +45,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--results", required=True,
                         help="JSON list of task result objects")
     parser.add_argument("--out", required=True)
+    parser.add_argument("--limitation", action="append", default=[],
+                        help="additional limitation to record in the manifest")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
 
@@ -101,6 +103,7 @@ def main(argv: list[str] | None = None) -> int:
             "substrate only",
             "no live services, credentials or external side effects",
             "renderer metrics are data-path only; GPU frames are not measured",
+            *args.limitation,
         ],
     }
     out = Path(args.out)
