@@ -12,7 +12,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 12.64s"
+      "stdout_tail": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 12.56s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/finance.py voicebridge/business/business_factory.py scripts/verify_finance_factory.py tests/phase5_finance_factory",
@@ -29,7 +29,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T06:00:07Z",
+  "generated_at": "2026-11-14T06:03:29Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -85,7 +85,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     }
   ],
   "limitations": [

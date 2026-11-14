@@ -279,8 +279,8 @@ def _clauses(value: Any) -> list[dict[str, str]]:
 
 
 def _ensure(conn: sqlite3.Connection) -> None:
-    for statement in _SCHEMA_SQL:
-        conn.execute(statement)
+    """Compatibility no-op: the additive tables migrate in schema.py v6."""
+    return None
 
 
 def ensure_schema(store: "BusinessStore") -> None:

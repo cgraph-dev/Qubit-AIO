@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 6.18s"
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 5.00s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_memory_projection.py --root /tmp/qoffice-memory-projection --check",
@@ -29,7 +29,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T04:23:04Z",
+  "generated_at": "2026-11-14T06:06:29Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -53,7 +53,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     },
     {
       "path": "voicebridge/business/store.py",

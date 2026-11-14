@@ -5,14 +5,14 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".......................                                                  [100%]\n23 passed in 1.89s"
+      "stdout_tail": ".......................                                                  [100%]\n23 passed in 1.70s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/durable_substrate tests/test_business_os_foundation.py tests/test_integration_tool_gateway.py",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "...........................................................              [100%]\n59 passed in 4.40s"
+      "stdout_tail": "...........................................................              [100%]\n59 passed in 4.35s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/durable.py voicebridge/business/schema.py voicebridge/business/errors.py voicebridge/business/__init__.py tests/durable_substrate",
@@ -22,7 +22,7 @@
       "stdout_tail": "All checks passed!"
     }
   ],
-  "generated_at": "2026-11-14T04:20:24Z",
+  "generated_at": "2026-11-14T06:05:32Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -69,7 +69,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     },
     {
       "path": "voicebridge/business/durable.py",

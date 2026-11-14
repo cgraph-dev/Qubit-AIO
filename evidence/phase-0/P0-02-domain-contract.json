@@ -12,7 +12,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "................                                                         [100%]\n16 passed in 1.02s"
+      "stdout_tail": "................                                                         [100%]\n16 passed in 0.87s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --self-test-negative --json",
@@ -22,7 +22,7 @@
       "stdout_tail": "    },\n    {\n      \"detail\": \"rejected at ['status']: 'running' is not one of ['active', 'paused', 'revoked', 'archived']\",\n      \"id\": \"negative:agent_status_invalid\",\n      \"status\": \"pass\"\n    },\n    {\n      \"detail\": \"rejected at ['seat_id']: 'rom_00000000000000000000000000' does not match '^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}:[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}:[0-9]{1,4}$'\",\n      \"id\": \"negative:seat_id_bad_format\",\n      \"status\": \"pass\"\n    }\n  ],\n  \"ok\": false,\n  \"schema_dir\": \"/home/trick/qubit-worktrees/qoffice-next/voicebridge/business/contracts\",\n  \"summary\": {\n    \"failed\": 1,\n    \"passed\": 42,\n    \"total\": 43\n  }\n}"
     }
   ],
-  "generated_at": "2026-11-14T04:20:14Z",
+  "generated_at": "2026-11-14T06:05:26Z",
   "inputs": [
     {
       "path": "voicebridge/business/contracts/domain.schema.json",
@@ -46,7 +46,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     },
     {
       "path": "voicebridge/business/models.py",

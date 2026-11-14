@@ -1,7 +1,35 @@
 {
-  "task_id": "P5-02",
-  "status": "PASS",
-  "generated_at": "2026-11-14T05:58:57Z",
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_trading_readiness.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_KILL_SWITCH_ENGAGED\",\n      \"name\": \"frozen_after_kill\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_STALE_DATA\",\n      \"name\": \"stale_data_refused\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 32,\n  \"live_capital_touched\": false,\n  \"mode\": \"paper\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-trading-readiness/1\"\n}"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase5_trading tests/phase1_gateway",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "......................................................................   [100%]\n70 passed in 1.47s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/trading.py scripts/verify_trading_readiness.py tests/phase5_trading",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/trading.py scripts/verify_trading_readiness.py tests/phase5_trading/conftest.py tests/phase5_trading/test_backtest.py tests/phase5_trading/test_market_risk.py tests/phase5_trading/test_paper_oms.py tests/phase5_trading/test_ledger.py tests/phase5_trading/test_gates.py tests/phase5_trading/test_trading_verifier.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T06:08:52Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -48,6 +76,16 @@
       "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
     }
   ],
+  "limitations": [
+    "paper simulator only: no exchange API, no credentials, no network and no live order or withdrawal",
+    "live mode is a typed refusal without an owner risk-policy sign-off; even with a matching sign-off the only wired broker is the deterministic paper simulator (no live broker adapter exists)",
+    "the backtest fixture is synthetic; no historical survivorship/liquidity dataset is bundled and no returns are promised",
+    "daily-loss tracking uses in-process observed equity snapshots, not a persisted accounting-day boundary",
+    "unknown reconciliation uses an injected resolver; no live venue reconciliation API is exercised",
+    "no dashboard UI or voice wiring is covered; no full matrix was run",
+    "simulated fills are readiness evidence, not live trades, and are not financial advice",
+    "the evidence file itself and the phase manifest are outside this task's owned files"
+  ],
   "outputs": [
     {
       "path": "voicebridge/business/trading.py",
@@ -82,44 +120,10 @@
       "sha256": "ec539a4c5d736f2bcd59044210c68039bc859fb7b97d929d848e4b255a77c7ff"
     },
     {
-      "path": "tests/phase5_trading/test_verifier.py",
+      "path": "tests/phase5_trading/test_trading_verifier.py",
       "sha256": "9e7eeb314522a590fc227b779d8940b445808109caba6ee1419a4ab02602d90c"
     }
   ],
-  "commands": [
-    {
-      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_trading_readiness.py --json",
-      "exit_code": 0,
-      "stdout_tail": "\"withdrawal_key_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"status=partially_filled filled=5.00000000\",\n      \"name\": \"partial_fill\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_RISK_LIMIT_IMMUTABLE\",\n      \"name\": \"execution_cannot_edit_limits\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_ROLE_REFUSED\",\n      \"name\": \"risk_cannot_submit\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_ROLE_REFUSED\",\n      \"name\": \"auditor_cannot_submit\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_ROLE_REFUSED\",\n      \"name\": \"execution_cannot_engage_kill\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"cancelled=1 status=cancelled\",\n      \"name\": \"kill_switch_cancels_all\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"report={'engaged': True, 'already_engaged': False, 'reason': 'readiness drill', 'actor': 'risk-manager', 'at': 1700000000.0, 'cancelled_orders': 1, 'revoked_leases': 3, 'revoked_keys': 1, 'frozen_strategies': 1, 'callback_errors': [], 'event_seq': 7}\",\n      \"name\": \"kill_switch_revokes_injected\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_KILL_SWITCH_ENGAGED\",\n      \"name\": \"frozen_after_kill\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_STALE_DATA\",\n      \"name\": \"stale_data_refused\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 32,\n  \"live_capital_touched\": false,\n  \"mode\": \"paper\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-trading-readiness/1\"\n}\n",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase5_trading tests/phase1_gateway",
-      "exit_code": 0,
-      "stdout_tail": "......................................................................   [100%]\n70 passed in 1.40s\n",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/trading.py scripts/verify_trading_readiness.py tests/phase5_trading",
-      "exit_code": 0,
-      "stdout_tail": "All checks passed!\n",
-      "stderr_tail": ""
-    },
-    {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/trading.py scripts/verify_trading_readiness.py tests/phase5_trading/conftest.py tests/phase5_trading/test_backtest.py tests/phase5_trading/test_market_risk.py tests/phase5_trading/test_paper_oms.py tests/phase5_trading/test_ledger.py tests/phase5_trading/test_gates.py tests/phase5_trading/test_verifier.py",
-      "exit_code": 0,
-      "stdout_tail": "",
-      "stderr_tail": ""
-    }
-  ],
-  "limitations": [
-    "paper simulator only: no exchange API, no credentials, no network and no live order or withdrawal",
-    "live mode is a typed refusal without an owner risk-policy sign-off; even with a matching sign-off the only wired broker is the deterministic paper simulator (no live broker adapter exists)",
-    "the backtest fixture is synthetic; no historical survivorship/liquidity dataset is bundled and no returns are promised",
-    "daily-loss tracking uses in-process observed equity snapshots, not a persisted accounting-day boundary",
-    "unknown reconciliation uses an injected resolver; no live venue reconciliation API is exercised",
-    "no dashboard UI or voice wiring is covered; no full matrix was run",
-    "simulated fills are readiness evidence, not live trades, and are not financial advice",
-    "the evidence file itself and the phase manifest are outside this task's owned files"
-  ]
+  "status": "PASS",
+  "task_id": "P5-02"
 }

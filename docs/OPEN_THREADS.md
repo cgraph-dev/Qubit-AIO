@@ -1,5 +1,28 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 5 business operations accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-5.sh` exits 0 and writes `evidence/phase-5/manifest.json`
+(`status: PASS`) after accepted Phase 0–4 manifests. Five lanes: P5-01 Etsy sandbox operations
+(niche/asset ref → draft → exact-intent approval → injected sandbox publish receipt → order/
+entitlement → support → refund → payout → balanced ledger/reconciliation; 24 verifier checks);
+P5-02 paper/testnet trading readiness (market snapshots, strategy registry, deterministic
+backtest with fees/slippage/no look-ahead, paper broker/OMS, risk veto/kill switch, double-entry
+portfolio; live capital is a typed refusal without owner sign-off; 32/32 checks); P5-03 CRM/consent/
+support (dedupe, suppression, single-owner leases, SLA/handoff, internal vs customer notes) and
+P5-04 marketing (draft → brand/legal check → exact-payload approval → sandbox receipt, rate
+limits, no fake engagement); P5-05 finance (balanced double-entry, provider idempotency, unknown →
+reconcile, refunds/chargebacks/payouts) and P5-08 multi-entity books/business factory (structure-only
+cloning, no inherited authority/budget/keys); P5-06 legal (versioned contracts/clauses, approval-for-
+signing, obligations/renewals, jurisdiction rules) and P5-07 people/procurement/analytics (lifecycle
+with immediate revocation, SoD, KPI drill-through, stale/unknown honesty). **Schema:** the 30
+module-owned legal/people/metric tables were moved into the single `schema.py` v6 migration; the
+modules now verify/no-op instead of owning DDL. A duplicate `test_verifier.py` basename was renamed
+to keep collection deterministic. **Measured:** gates 0–5 PASS; broad business/office/world/workforce
+regression **927 passed**. **Honest limits:** every external provider is injected/fake; no live
+Etsy/social/payment/bank/legal/HR/tax API, signatures or money movement; Trading is paper/testnet
+only; no full matrix. **Not done:** live deploy, `VERIFIED`. Next: Phase 6 Character Studio/styles/
+outside-world panels.
+
 **Qubit Office Phase 4 workforce/collaboration accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
 `bash scripts/acceptance/phase-4.sh` exits 0 and writes `evidence/phase-4/manifest.json`
 (`status: PASS`) after accepted Phase 0/1/2/3 manifests. Five lanes: P4-01 `workforce.py` provisions

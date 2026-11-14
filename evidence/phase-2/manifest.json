@@ -1,10 +1,10 @@
 {
   "evidence_hashes": {
-    "evidence/phase-2/P2-01-registry.json": "680d4eb0144259c01cac859a88eee283050bb896521821b6b1efb34124af881f",
-    "evidence/phase-2/P2-02-sessions.json": "5b9a850680f8246fd0c0f10679ba0f8c72a32891b8042f54b9e1286d28fd0f43",
+    "evidence/phase-2/P2-01-registry.json": "11fa42212a739b69f29886c7a5ac68e96ec51b40ae7b019f9f6e82d8f96d5dec",
+    "evidence/phase-2/P2-02-sessions.json": "b208da09331bbbc9689a5c9c2fb37d7dfc9cd7b60cae2d8d3c6b563a9993c349",
     "evidence/phase-2/P2-03-adapter.json": "42fee7daa491b2394bd173ad7f8b4c0b99692a680de899279af04f18de2efc6f",
-    "evidence/phase-2/P2-04-memory.json": "b4a190083517903f61dc4d4c8f9d6378a1c5aa95fe076160426b286b1852eb6e",
-    "evidence/phase-2/P2-05-handoff.json": "15e00e5fb272e2c480cfb56e0e52af834131316b0d8db55480b02c3e24304b73",
+    "evidence/phase-2/P2-04-memory.json": "9a6fe8413bc78c8ff5cd8847895da96c5dd4f835a210935e277420c01775ba71",
+    "evidence/phase-2/P2-05-handoff.json": "68b0a4f268b6d99cc6e0b7fb9866d69061c16871cf756f48eb6801d6d8f32d1c",
     "evidence/phase-2/P2-06-turn.json": "36bfff5100b6f67f35f0a92c74b7fd987077c1c8d35e78c126c19716f6025bde",
     "evidence/phase-2/P2-07-effective-state.json": "0516c53227fdd3386095ad03043e165a0dbb250d72ecd2a13eabb34e18521e02"
   },
@@ -13,8 +13,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T05:32:25Z",
-  "git_head": "e01c5599752530b59bda6167d5bd533724bc0aff",
+  "generated_at": "2026-11-14T06:07:20Z",
+  "git_head": "7c45526941b3d517a24005f6d96d1673f0e065ac",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",

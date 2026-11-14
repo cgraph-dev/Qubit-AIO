@@ -1,14 +1,14 @@
 {
   "evidence_hashes": {
-    "evidence/phase-1/P1-01-identity.json": "dcf78b457570907d526a5499b53804f3d3db0ffac7ac708bf54f38ac05d1d25b",
-    "evidence/phase-1/P1-02-eventlog.json": "4202a96846b2ee834a9ee12565daec164884e111c1b0d313a35cce4fceda11ef",
+    "evidence/phase-1/P1-01-identity.json": "4236306457884d9383053e33496d8b44fe5695054c06e51ebc52210604475106",
+    "evidence/phase-1/P1-02-eventlog.json": "721a81c224bccb8f73f6dbc9db68911999d32e34540d64e223e8a262ceb57b1b",
     "evidence/phase-1/P1-03-gateway.json": "0a054ad5703f6716b0ca63bf4f7d785662107d09b1f0802f9a3b1f3577113572",
-    "evidence/phase-1/P1-04-runs.json": "9851e8b9426f65409dcd052ffde0f2a9a45ea49a4963ac88ed24eb98faf27fbb",
+    "evidence/phase-1/P1-04-runs.json": "e002297896d5fb623634e6081737114808242246a61f3913c8c81e199463cea4",
     "evidence/phase-1/P1-05-a2a.json": "498267af68e0c8ac5885fe0590c697a7196716e766919c72001e13f1a7b9f690",
-    "evidence/phase-1/P1-06-approvals.json": "3eaf7f568f3a883d9c415fd6863d0ec7761843a3a9d90d9021b378dc60c19976",
+    "evidence/phase-1/P1-06-approvals.json": "ea70750defe2f21c95801d7d88ee35538890cf929b340341083b9fbe063d2bc5",
     "evidence/phase-1/P1-07-security.json": "dcf6a85bef1fc2478d0ba3adfab662a7acf02aa98d53aa020ba01928de739f38",
     "evidence/phase-1/P1-08-otel.json": "12dc906c214f542a05e40be4e2b948f1707791d8af3c6f979c2b6b1858dc2e3c",
-    "evidence/phase-1/P1-09-backup-restore.json": "a1af528819dc46fff3123ac6638d2b35cd0d6ada324957870a60985c0c2773b3",
+    "evidence/phase-1/P1-09-backup-restore.json": "f1c330605499beff7a706826d8ef37faff3ec0a7bbcd56896786ddf5ce99f359",
     "evidence/phase-1/P1-10-reference-lane.json": "3a144b8a2554b0d8901effffbfbd8c404486a543fb2897355f973a5e838e06ec"
   },
   "evidence_verification": {
@@ -16,8 +16,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T05:32:08Z",
-  "git_head": "e01c5599752530b59bda6167d5bd533724bc0aff",
+  "generated_at": "2026-11-14T06:07:02Z",
+  "git_head": "7c45526941b3d517a24005f6d96d1673f0e065ac",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",
@@ -101,7 +101,7 @@
       "task_id": "P1-09"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.vPXTtd/reference",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.uw8TKj/reference",
       "evidence": [
         "evidence/phase-1/P1-10-reference-lane.json"
       ],

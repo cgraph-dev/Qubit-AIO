@@ -39,16 +39,19 @@ def test_v4_database_migrates_to_v5_and_keeps_rows(tmp_path):
         conn.close()
 
     store = BusinessStore(path)
-    assert SCHEMA_VERSION == 5
+    assert SCHEMA_VERSION >= 5
     with store.read() as read_conn:
-        assert read_conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert read_conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
         tables = {
             row[0]
             for row in read_conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table'"
             )
         }
-        assert {"bos_session", "bos_handoff"} <= tables
+        assert {
+            "bos_session", "bos_handoff",
+            "bos_legal_contract", "bos_people_person", "bos_metric_contract",
+        } <= tables
         agent_columns = {
             row[1] for row in read_conn.execute("PRAGMA table_info(bos_agent)")
         }

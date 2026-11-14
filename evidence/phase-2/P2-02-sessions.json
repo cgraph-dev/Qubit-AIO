@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "............                                                             [100%]\n12 passed in 2.52s"
+      "stdout_tail": "............                                                             [100%]\n12 passed in 1.89s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/schema.py voicebridge/business/sessions.py voicebridge/business/__init__.py tests/phase2_registry_sessions/test_sessions.py tests/phase2_registry_sessions/test_schema_v5.py tests/durable_substrate/test_recovery_restore.py",
@@ -26,10 +26,10 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "...................................                                      [100%]\n35 passed in 3.12s"
+      "stdout_tail": "...................................                                      [100%]\n35 passed in 2.64s"
     }
   ],
-  "generated_at": "2026-11-14T04:10:29Z",
+  "generated_at": "2026-11-14T06:06:24Z",
   "git_head": "a0e7dde792185793cf9e2003f226c259239da073",
   "inputs": [
     {
@@ -50,7 +50,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     },
     {
       "path": "voicebridge/business/store.py",
@@ -106,7 +106,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     },
     {
       "path": "voicebridge/business/sessions.py",
@@ -126,7 +126,7 @@
     },
     {
       "path": "tests/phase2_registry_sessions/test_schema_v5.py",
-      "sha256": "fdf42669bb3909eda66d5516230626a141c80769d5ef49b7b0f12fd59ed065f7"
+      "sha256": "0f86a58c4b15114fb8c6dba0b0367f99b511b6e42f2a6dde704f04d0e9bc28c5"
     },
     {
       "path": "tests/durable_substrate/test_recovery_restore.py",

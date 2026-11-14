@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".............                                                            [100%]\n13 passed in 1.23s"
+      "stdout_tail": ".............                                                            [100%]\n13 passed in 1.16s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agents.py tests/phase2_registry_sessions/test_agent_profile.py",
@@ -26,10 +26,10 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 57%]\n.....................................................                    [100%]\n125 passed in 9.81s"
+      "stdout_tail": "........................................................................ [ 57%]\n.....................................................                    [100%]\n125 passed in 8.09s"
     }
   ],
-  "generated_at": "2026-11-14T04:10:29Z",
+  "generated_at": "2026-11-14T06:06:18Z",
   "git_head": "a0e7dde792185793cf9e2003f226c259239da073",
   "inputs": [
     {
@@ -50,7 +50,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     },
     {
       "path": "voicebridge/business/store.py",
@@ -115,7 +115,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
     },
     {
       "path": "voicebridge/business/errors.py",
