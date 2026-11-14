@@ -442,3 +442,127 @@ def test_qt_staged_cancel_falls_back_when_stop_speaking_raises():
     # must still be cancelled rather than left stuck.
     assert cli.calls == [("cancel", "staged-1")], cli.calls
     assert orb._pending_rid is None
+
+
+# --------------------------------------------------------------------------- #
+# click target: the mark (glow included), never the transparent padding
+# --------------------------------------------------------------------------- #
+def test_click_hits_orb_rejects_padding_around_ghost():
+    from voicebridge.orb import qt_app as qa
+
+    orb = 168
+    win = qa.ghost_canvas_px(orb)
+    assert win > orb  # the ghost canvas is padded for the halo
+    centre = win / 2.0
+    assert qa.click_hits_orb(centre, centre, win, orb, "ghost", 0.0) is True
+    for x, y in ((2, 2), (win - 2, 2), (2, win - 2), (win - 2, win - 2),
+                 (centre, 4.0)):
+        assert qa.click_hits_orb(x, y, win, orb, "ghost", 0.0) is False, (x, y)
+
+
+def test_click_hits_orb_follows_ghost_alpha():
+    from voicebridge.orb import ghost_atlas as ga
+    from voicebridge.orb import qt_app as qa
+
+    orb = 168
+    win = qa.ghost_canvas_px(orb)
+    atlas = ga._atlas()
+    assert atlas is not None
+    radius = max(4.0, orb / 2.0 - 2.0)
+    scale = (radius * 2.0) / ga.ART_SPAN
+    bcx, bcy = qa._ghost_body_centre(atlas)
+    centre = win / 2.0
+    left = centre - bcx * scale
+    top = centre - bcy * scale
+
+    def alpha_at(x, y, frame=0):
+        sx = int((x - left) / scale)
+        sy = int((y - top) / scale)
+        if sx < 0 or sy < 0 or sx >= atlas.w or sy >= atlas.h:
+            return None
+        off = ((frame % atlas.frames) * atlas.w * atlas.h + sy * atlas.w + sx) * 4 + 3
+        return atlas.body[off]
+
+    on = off = None
+    for yy in range(0, win, 2):
+        for xx in range(0, win, 2):
+            a = alpha_at(xx, yy)
+            if a is None:
+                continue
+            if a > qa.GHOST_HIT_ALPHA and on is None:
+                on = (xx, yy)
+            elif a == 0 and off is None:
+                off = (xx, yy)
+    assert on is not None and off is not None
+    assert qa.click_hits_orb(on[0], on[1], win, orb, "ghost", 0.0) is True
+    assert qa.click_hits_orb(off[0], off[1], win, orb, "ghost", 0.0) is False
+
+
+def test_click_hits_orb_vector_styles_use_inscribed_circle():
+    from voicebridge.orb import qt_app as qa
+
+    orb = 168
+    assert qa.click_hits_orb(orb / 2, orb / 2, orb, orb, "mark", 0.0) is True
+    assert qa.click_hits_orb(2, 2, orb, orb, "mark", 0.0) is False
+    # collapsed dot: a small square, same rule
+    assert qa.click_hits_orb(8, 8, 16, orb, "ghost", 0.0, collapsed=True) is True
+    assert qa.click_hits_orb(1, 1, 16, orb, "ghost", 0.0, collapsed=True) is False
+
+
+def test_point_hits_orb_geometry_helper():
+    from voicebridge.orb import geometry as G
+
+    saved = G.ORB_PX
+    try:
+        G.ORB_PX = 168
+        assert G.point_hits_orb(84, 84) is True
+        assert G.point_hits_orb(1, 1) is False
+        assert G.point_hits_orb(8, 8, collapsed=True) is True
+        assert G.point_hits_orb(0, 0, collapsed=True) is False
+    finally:
+        G.ORB_PX = saved
+
+
+@pytest.mark.skipif(NO_DISPLAY, reason="needs an X11 display for Qt")
+def test_qt_orb_press_in_padding_is_ignored(monkeypatch):
+    pytest.importorskip("PySide6.QtWidgets", reason="Qt-less env")
+    from PySide6.QtWidgets import QApplication
+    from voicebridge.orb import geometry as G
+    from voicebridge.orb import options as O
+    from voicebridge.orb import qt_app as qa
+
+    saved_px = G.ORB_PX
+    app = QApplication.instance() or QApplication([])
+    w = qa.QtVoiceOrb(poll=False, client_factory=lambda: None,
+                      fullscreen_probe=lambda: False,
+                      options=O.OrbOptions(style="ghost", size_px=168),
+                      enable_tray=False)
+    try:
+        class _P:
+            def __init__(self, x, y):
+                self._x, self._y = x, y
+
+            def x(self):
+                return self._x
+
+            def y(self):
+                return self._y
+
+        class _Ev:
+            def __init__(self, x, y):
+                self._p = _P(x, y)
+
+            def position(self):
+                return self._p
+
+            def globalPosition(self):
+                return self._p
+
+        size = w._window_px()
+        w.mousePressEvent(_Ev(2.0, 2.0))
+        assert w._press is None
+        w.mousePressEvent(_Ev(size / 2.0, size / 2.0))
+        assert w._press is not None
+    finally:
+        w.close()
+        G.ORB_PX = saved_px

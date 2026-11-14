@@ -463,6 +463,12 @@ class VoiceOrb:
 
     def _on_press(self, event: Any) -> None:
         try:
+            # Only the visible disc is a click target; the window's transparent
+            # corners must not start a capture.
+            if not _geo.point_hits_orb(float(event.x), float(event.y),
+                                       self._pos.collapsed):
+                self._press = None
+                return
             self._press = {
                 "x": float(event.x_root), "y": float(event.y_root),
                 "ox": self._pos.x, "oy": self._pos.y,
@@ -517,7 +523,9 @@ class VoiceOrb:
 
     def _on_hover(self, event: Any) -> None:
         try:
-            self.canvas.configure(cursor="hand2")
+            hit = _geo.point_hits_orb(float(event.x), float(event.y),
+                                      self._pos.collapsed)
+            self.canvas.configure(cursor="hand2" if hit else "")
         except Exception:
             pass
 
