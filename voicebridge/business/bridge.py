@@ -50,6 +50,7 @@ from . import agents as AGENTS
 from . import command_center as COMMAND_CENTER
 from . import effective_state as EFFECTIVE
 from . import office_seats as OFFICE_SEATS
+from . import operator_timeline as OPERATOR
 from . import pilot as ETSY_PILOT
 from . import research_run as RESEARCH_RUN
 from . import warroom as WARROOM
@@ -932,6 +933,36 @@ def h_business_command_center(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             limit=q.get("limit"),
         )
         return _ok(schema=COMMAND_CENTER.SCHEMA, projection=projection)
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
+def h_business_operator_timeline(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                                 p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/business/operator/timeline -> causal operator timeline.
+
+    Read-only and owner/tenant-gated by the same ``_tenant`` rule as the other
+    business reads. It projects the durable events/jobs/checkpoints/approvals/
+    artifacts/ledger/tool rows into a causally ordered timeline. Status comes
+    from the durable job row; ``completed`` requires an artifact or receipt and
+    an unverified completion claim stays ``unknown``. ``replay=1`` returns the
+    same ordering labelled as a simulation with effects stubbed — it performs
+    no call, resumes nothing and approves nothing.
+    """
+    try:
+        store = _store(cfg)
+        tenant = _tenant(store, q, b)
+        projection = OPERATOR.operator_timeline(
+            store,
+            tenant,
+            run=q.get("run") or q.get("job") or q.get("job_id"),
+            task=q.get("task") or q.get("task_id"),
+            agent=q.get("agent") or q.get("agent_id"),
+            session=q.get("session") or q.get("session_id"),
+            limit=q.get("limit"),
+            replay=q.get("replay"),
+        )
+        return _ok(schema=OPERATOR.SCHEMA, projection=projection)
     except Exception as exc:  # noqa: BLE001
         return _error(exc)
 

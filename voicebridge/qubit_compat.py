@@ -12078,6 +12078,13 @@ _r("GET", r"/api/office/world/tower-plan", "h_office_world_tower")
 # tasks, sessions and approvals. Search is bounded; counts are derived from
 # rows, and each source degrades to a typed unavailable state.
 _r("GET", r"/api/office/business/command-center", "h_business_command_center")
+# P4-07 operator timeline: a read-only causal projection of the durable
+# events/jobs/checkpoints/approvals/artifacts/ledger/tool rows. Status
+# derives from the job row; completed requires an artifact/receipt and
+# an unverified claim stays unknown. replay=1 is a labelled simulation
+# with effects stubbed; the route never writes or resumes anything.
+_r("GET", r"/api/office/business/operator/timeline",
+   "h_business_operator_timeline")
 _r("GET", r"/api/office/business/overview", "h_business_overview")
 # Owner-gated, idempotent: creates the local Personal scope and imports the
 # office seat roster as Business OS control records on first use. The Office
@@ -21771,6 +21778,7 @@ for _name in (
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
     "h_business_agent_archive", "h_world_tower",
     "h_business_command_center",
+    "h_business_operator_timeline",
 ):
     HANDLERS[_name] = getattr(_business_bridge, _name)
 
