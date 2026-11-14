@@ -10,7 +10,7 @@ and ``BEFORE DELETE`` triggers that raise ``ABORT``. A correction is a new row.
 """
 from __future__ import annotations
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _V1 = [
     """
@@ -485,7 +485,102 @@ for _table in (
         """
     )
 
+# -- v3: local durable substrate -----------------------------------------
+# Additive only. The checkpoint log is append-only (recovery points are never
+# rewritten); the outbox is the one intentionally mutable table because a
+# delivery moves ``pending -> claimed -> sent|unknown|dead``. Every outbox
+# transition is written to the append-only audit log in the same transaction,
+# so the mutable row cannot change without a durable history beside it.
+#
+# Temporal stays a later adapter; this is the same control plane the rest of
+# the runtime already uses, not a second database and not a second executor.
+_V3 = [
+    """
+    CREATE TABLE bos_checkpoint (
+        checkpoint_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        business_id TEXT NOT NULL REFERENCES bos_business(business_id) ON DELETE RESTRICT,
+        run_id TEXT NOT NULL,
+        job_id TEXT,
+        sequence INTEGER NOT NULL CHECK(sequence >= 1),
+        state_json TEXT NOT NULL DEFAULT '{}',
+        pending_actions_json TEXT NOT NULL DEFAULT '[]',
+        tool_receipts_json TEXT NOT NULL DEFAULT '[]',
+        artifact_ids_json TEXT NOT NULL DEFAULT '[]',
+        workspace_revision TEXT,
+        policy_revision TEXT,
+        request_hash TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        UNIQUE(run_id, sequence)
+    )
+    """,
+    """
+    CREATE INDEX bos_checkpoint_run
+        ON bos_checkpoint(tenant_id, run_id, sequence)
+    """,
+    """
+    CREATE INDEX bos_checkpoint_business
+        ON bos_checkpoint(tenant_id, business_id, created_at)
+    """,
+    """
+    CREATE TABLE bos_outbox (
+        outbox_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        business_id TEXT NOT NULL REFERENCES bos_business(business_id) ON DELETE RESTRICT,
+        aggregate_id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        status TEXT NOT NULL DEFAULT 'pending'
+            CHECK(status IN ('pending','claimed','sent','unknown','dead')),
+        attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts >= 0),
+        lease_owner TEXT,
+        lease_expires_at REAL,
+        provider_receipt TEXT,
+        last_error TEXT,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        sent_at TEXT,
+        UNIQUE(tenant_id, idempotency_key)
+    )
+    """,
+    """
+    CREATE INDEX bos_outbox_listing
+        ON bos_outbox(tenant_id, status, created_at)
+    """,
+    """
+    CREATE INDEX bos_outbox_lease
+        ON bos_outbox(tenant_id, status, lease_expires_at)
+    """,
+    """
+    CREATE INDEX bos_outbox_aggregate
+        ON bos_outbox(tenant_id, aggregate_id, created_at)
+    """,
+]
+
+for _table in ("bos_checkpoint",):
+    _V3.append(
+        f"""
+        CREATE TRIGGER {_table}_no_update
+        BEFORE UPDATE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+    _V3.append(
+        f"""
+        CREATE TRIGGER {_table}_no_delete
+        BEFORE DELETE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+
 MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
     (1, tuple(_V1)),
     (2, tuple(_V2)),
+    (3, tuple(_V3)),
 )

@@ -52,6 +52,15 @@ AGENT_TOOL_DENIED_CODE = "AGENT_TOOL_DENIED"
 AGENT_PROVIDER_NOT_READY_CODE = "AGENT_PROVIDER_NOT_READY"
 AGENT_MODEL_NOT_READY_CODE = "AGENT_MODEL_NOT_READY"
 
+# Local durable substrate. A checkpoint is a recovery point, so reusing a
+# ``(run_id, sequence)`` slot is a typed refusal rather than an overwrite. An
+# outbox delivery is only mutable while its lease is held; a lost or expired
+# lease cannot record an effect.
+CHECKPOINT_EXISTS_CODE = "BUSINESS_CHECKPOINT_EXISTS"
+OUTBOX_NOT_FOUND_CODE = "BUSINESS_OUTBOX_NOT_FOUND"
+OUTBOX_BAD_STATE_CODE = "BUSINESS_OUTBOX_BAD_STATE"
+OUTBOX_LEASE_LOST_CODE = "BUSINESS_OUTBOX_LEASE_LOST"
+
 
 class BusinessError(Exception):
     """A typed Business OS refusal.
