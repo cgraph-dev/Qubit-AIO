@@ -1,0 +1,125 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/drill_recovery.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "\n        \"gates\": {\n          \"canary_healthy\": true,\n          \"synthetic_soak\": true\n        },\n        \"owner\": null,\n        \"owner_approved\": false,\n        \"previous_revision\": null,\n        \"revision\": \"rev-1\",\n        \"ring\": \"pilot\"\n      },\n      {\n        \"action\": \"rollout\",\n        \"actor\": \"operator\",\n        \"at\": \"2026-11-14T15:08:47.555Z\",\n        \"owner_approved\": false,\n        \"previous_revision\": \"rev-1\",\n        \"revision\": \"rev-2\",\n        \"ring\": \"pilot\"\n      },\n      {\n        \"action\": \"canary\",\n        \"actor\": \"operator\",\n        \"at\": \"2026-11-14T15:08:47.562Z\",\n        \"healthy\": true,\n        \"percent\": 10,\n        \"revision\": \"rev-2\",\n        \"ring\": \"pilot\"\n      },\n      {\n        \"action\": \"promote\",\n        \"actor\": \"operator\",\n        \"at\": \"2026-11-14T15:08:47.569Z\",\n        \"gates\": {\n          \"dr_drill_passed\": true,\n          \"pilot_soak\": true,\n          \"rollback_rehearsed\": true\n        },\n        \"owner\": \"owner\",\n        \"owner_approved\": true,\n        \"previous_revision\": null,\n        \"revision\": \"rev-2\",\n        \"ring\": \"production\"\n      },\n      {\n        \"action\": \"rollback\",\n        \"actor\": \"operator\",\n        \"at\": \"2026-11-14T15:08:47.576Z\",\n        \"previous_revision\": \"rev-2\",\n        \"reason\": \"drill emergency rollback\",\n        \"revision\": \"rev-1\",\n        \"ring\": \"production\"\n      }\n    ],\n    \"rings\": [\n      \"internal\",\n      \"synthetic\",\n      \"pilot\",\n      \"production\"\n    ],\n    \"schema\": \"qubit-office-deployment-rings/1\"\n  },\n  \"schema\": \"qubit-office-drill/1\",\n  \"workdir\": \"/tmp/qubit-drill-u0d2gu_k\"\n}\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_dr tests/phase1_backup tests/durable_substrate",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [100%]\n72 passed in 13.74s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/disaster_recovery.py scripts/drill_recovery.py tests/phase8_dr/",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/disaster_recovery.py scripts/drill_recovery.py tests/phase8_dr/_dr_helpers.py tests/phase8_dr/test_restore_drill.py tests/phase8_dr/test_tamper_and_recovery.py tests/phase8_dr/test_kill_switch.py tests/phase8_dr/test_deployment_rings.py tests/phase8_dr/test_incidents.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T15:09:01Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/backup.py",
+      "sha256": "9631120bc381bd6cc47065ec3e39b1b06f2b103f0120fa1d1ebd575ec41759e2"
+    },
+    {
+      "path": "voicebridge/business/safety.py",
+      "sha256": "ce2e252737b774588d12f1b8b0a3c4f6f7d98833e49ba009907db88e75951fdd"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    }
+  ],
+  "limitations": [
+    "all state is a throwaway SQLite database under the drill workdir; no live service, credential or operator database is touched",
+    "RPO is the age of the newest committed record when the snapshot started; a one-shot snapshot does not bound loss after it",
+    "RTO is measured on this host for the seeded fixture; it is not an SLA and does not model a cold machine or remote storage",
+    "deployment-ring state is in-memory per controller; the durable record is the audit trail written by the drill",
+    "a tenant-scoped snapshot uses the declared tenant tables in backup.py, which do not include bos_event; the drill reports event-index replay as not applicable for that scope (a whole-database drill replays it)",
+    "the kill-switch scheduler/gateway/egress stoppers are injected drill callables; the leases stopper is the shipped Business OS lease release",
+    "provider cancellation is represented by the injected egress stopper; no real provider, network or credential is contacted",
+    "no full repository matrix was run; this is a focused P8-03 gate"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/disaster_recovery.py",
+      "sha256": "0f477ac2846e457fccbac022c9b3b978c1e198acf206411f4c69f1072410e2f6"
+    },
+    {
+      "path": "scripts/drill_recovery.py",
+      "sha256": "39f00de05360b8938bd80ee73e32f3bd5f32d1c6b9b6e236781fa5b7e3e9b2f6"
+    },
+    {
+      "path": "tests/phase8_dr/_dr_helpers.py",
+      "sha256": "a9f0015db691b503eadc7058dde6f0c5ba6cc50e3bc824c0adccb13ac8f00a86"
+    },
+    {
+      "path": "tests/phase8_dr/test_restore_drill.py",
+      "sha256": "cef3526484d8276bab799bcf9c367c8fd72f3472607a7e87f4332e8f7a524bc0"
+    },
+    {
+      "path": "tests/phase8_dr/test_tamper_and_recovery.py",
+      "sha256": "922aa78845c95844510ac255493f06bf70b6d38bff4500d8d4265349b4680e48"
+    },
+    {
+      "path": "tests/phase8_dr/test_kill_switch.py",
+      "sha256": "ecd6c9441feef2f6c211914891a81d9f16f5438944001ed2037b7aa43f033a6d"
+    },
+    {
+      "path": "tests/phase8_dr/test_deployment_rings.py",
+      "sha256": "d6928025d3da9e7ab4bf9d5f84a0990752331ab7999374312ff0ff93f6f90416"
+    },
+    {
+      "path": "tests/phase8_dr/test_incidents.py",
+      "sha256": "31177f359393b553d2ae9883f4113af2672210b7ba7e0d8a912a2b5aa2f9114a"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P8-03"
+}
