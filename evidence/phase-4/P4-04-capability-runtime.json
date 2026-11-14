@@ -10,7 +10,7 @@
       "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase4_runtime_safety tests/phase1_gateway tests/phase1_security tests/phase2_adapter",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 47%]\n........................................................................ [ 95%]\n.......                                                                  [100%]\n151 passed in 3.58s"
+      "stdout_tail": "........................................................................ [ 47%]\n........................................................................ [ 95%]\n.......                                                                  [100%]\n151 passed in 4.37s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/capability_runtime.py voicebridge/business/safety.py scripts/verify_runtime_safety.py tests/phase4_runtime_safety",
@@ -25,7 +25,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T05:21:57Z",
+  "generated_at": "2026-11-14T05:22:45Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
