@@ -10,22 +10,22 @@
   },
   "document_type": "release-evidence",
   "final_matrix": {
-    "commit": null,
-    "ok": false,
+    "commit": "e215be57cfd1a0828e7f20f8d2bbfba0cfc3282a",
+    "ok": true,
     "path": "evidence/phase-8/final-matrix.json",
-    "present": false,
+    "present": true,
     "problems": [],
-    "scope": null,
-    "sha256": null,
-    "status": null,
-    "tree": null
+    "scope": "Qubit Office feature matrix (tests/phase*, tests/office_contracts, tests/test_business*.py, tests/test_office_business.py, tests/test_office_runner.py); not the repo-wide matrix",
+    "sha256": "5d866b4d74a7618194f5a119a084627ffc96031f4f3d275cfd087d0d6a7bfb76",
+    "status": "PASS",
+    "tree": "0069d110eb9d1de06b19568eb2d07210ec0077fd"
   },
   "frozen": {
-    "commit": "08f5a4a23b155c07fa7af0b3ae41d363765c95f7",
-    "tree": "cb7e089c9d61fc07cda048dc91f621e4429e6653",
+    "commit": "e215be57cfd1a0828e7f20f8d2bbfba0cfc3282a",
+    "tree": "0069d110eb9d1de06b19568eb2d07210ec0077fd",
     "working_tree": "dirty"
   },
-  "generated_at": "2026-11-14T15:04:47Z",
+  "generated_at": "2026-11-14T15:17:33Z",
   "limitations": [
     "this gate consumes evidence; it does not run the full repo matrix or the live behavioural oracle",
     "phase manifests are verified by content hash; their git_head is recorded, not required to equal the frozen SHA",
@@ -37,7 +37,6 @@
   ],
   "missing": [
     "phase 8 manifest (evidence/phase-8/manifest.json)",
-    "FINAL_MATRIX_REQUIRED: final-matrix evidence for the frozen SHA 08f5a4a23b15 (run scripts/final_matrix.py)",
     "owner release decision record (evidence/phase-8/owner-release-decision.json)"
   ],
   "owner_decision": {

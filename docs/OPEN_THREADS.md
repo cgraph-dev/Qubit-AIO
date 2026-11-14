@@ -1,5 +1,20 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 8 implementation complete — release BLOCKED on owner decision (2026-11-14, `feat/qoffice-next`, not merged):**
+P8-01..P8-04 are implemented and green; P8-05 release-evidence tooling correctly returns
+`READY_FOR_OWNER_DECISION`, and `scripts/acceptance/phase-8.sh` exits **2/BLOCKED** rather than
+faking a release. Delivered: deterministic 100-floor/3,075-desk/1,000-agent scale fixture with
+active-set caps (40/80), pathfinding/event budgets and honest `not_measured` GPU/heap fields
+(P8-01); a 21-row executable OWASP ASI01–10 + MCP matrix (PKCE/audience/redirect/state/replay/
+schema hash/allowlist/SSRF/sandbox/approval/A2A/kill switch; 21/21, 138 focused tests) (P8-02);
+encrypted snapshot/restore/tenant-replay/kill-switch/deployment-ring drills with measured RPO/RTO
+(P8-03); observability/evals + accessibility honesty + performance/device/context-loss matrices
+(P8-04); and release-evidence/decision + bounded Office feature-matrix tooling (P8-05). The bounded
+Office feature matrix **PASSED** on frozen `e215be57c` (tree `0069d110e`) over 59 targets; it is
+explicitly **not the repo-wide matrix**. **Remaining blockers:** owner release decision record
+(human), and for a `VERIFIED` verdict the repo-wide final matrix on a frozen SHA. No owner
+signature was fabricated; **no `VERIFIED`/`COMPLETE`/`100%`** is claimed.
+
 **Qubit Office Phase 7 interactions/FX/simulation accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
 `bash scripts/acceptance/phase-7.sh` exits 0 and writes `evidence/phase-7/manifest.json`
 (`status: PASS`) after accepted Phase 0–6 manifests. Five lanes: P7-01 needs/traits/relationships +

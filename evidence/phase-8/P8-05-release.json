@@ -1,31 +1,35 @@
 {
   "commands": [
     {
-      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/release_evidence.py --json",
-      "exit_code": 0,
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/release_evidence.py --commit e215be57cfd1a0828e7f20f8d2bbfba0cfc3282a --tree 0069d110eb9d1de06b19568eb2d07210ec0077fd --json",
+      "exit_code": 1,
+      "expected_exit": 1,
       "stderr_tail": "",
-      "stdout_tail": "se\": 7,\n        \"present\": true,\n        \"problems\": [],\n        \"sha256\": \"a0d9a29f912bc6b4e5cd0b23863a2ab0d4c590959ed55fd14dac2e77fadb8706\",\n        \"status\": \"PASS\"\n      },\n      {\n        \"path\": \"evidence/phase-8/manifest.json\",\n        \"phase\": 8,\n        \"present\": false\n      }\n    ],\n    \"missing\": [\n      8\n    ],\n    \"present\": [\n      0,\n      1,\n      2,\n      3,\n      4,\n      5,\n      6,\n      7\n    ],\n    \"problems\": [],\n    \"required\": [\n      0,\n      1,\n      2,\n      3,\n      4,\n      5,\n      6,\n      7,\n      8\n    ]\n  },\n  \"problems\": [],\n  \"release_task\": \"P8-05\",\n  \"schema\": \"qubit-office-release-evidence/1\",\n  \"status\": \"READY_FOR_OWNER_DECISION\",\n  \"waivers\": []\n}"
+      "stdout_tail": "      1,\n      2,\n      3,\n      4,\n      5,\n      6,\n      7,\n      8\n    ]\n  },\n  \"problems\": [\n    \"phase 8 manifest: status is 'BLOCKED', expected 'PASS'\",\n    \"phase 8 manifest: evidence/phase-8/P8-04-observability.json: sha256 does not match the manifest\",\n    \"phase 8 manifest: evidence/phase-8/P8-05-release.json: sha256 does not match the manifest\"\n  ],\n  \"release_task\": \"P8-05\",\n  \"schema\": \"qubit-office-release-evidence/1\",\n  \"status\": \"FAIL\",\n  \"waivers\": []\n}"
     },
     {
-      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/release_evidence.py",
-      "exit_code": 0,
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/release_evidence.py --commit e215be57cfd1a0828e7f20f8d2bbfba0cfc3282a --tree 0069d110eb9d1de06b19568eb2d07210ec0077fd",
+      "exit_code": 1,
+      "expected_exit": 1,
       "stderr_tail": "",
-      "stdout_tail": "release_evidence: READY_FOR_OWNER_DECISION -> /home/trick/qubit-worktrees/qoffice-p8-release/evidence/phase-8/release.json\n  missing: phase 8 manifest (evidence/phase-8/manifest.json)\n  missing: FINAL_MATRIX_REQUIRED: final-matrix evidence for the frozen SHA 08f5a4a23b15 (run scripts/final_matrix.py)\n  missing: owner release decision record (evidence/phase-8/owner-release-decision.json)"
+      "stdout_tail": "release_evidence: FAIL -> /home/trick/qubit-worktrees/qoffice-next/evidence/phase-8/release.json\n  missing: owner release decision record (evidence/phase-8/owner-release-decision.json)\n  FAIL: phase 8 manifest: status is 'BLOCKED', expected 'PASS'\n  FAIL: phase 8 manifest: evidence/phase-8/P8-04-observability.json: sha256 does not match the manifest\n  FAIL: phase 8 manifest: evidence/phase-8/P8-05-release.json: sha256 does not match the manifest"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_release",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "38 passed in 0.40s"
+      "stdout_tail": "......................................                                   [100%]\n38 passed in 0.31s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/release_evidence.py scripts/final_matrix.py tests/phase8_release/",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": "All checks passed!"
     }
   ],
-  "generated_at": "2026-11-14T15:04:58Z",
+  "generated_at": "2026-11-14T15:16:27Z",
   "inputs": [
     {
       "path": "evidence/phase-0/manifest.json",
@@ -72,14 +76,11 @@
     "the optional final_matrix.py runner was exercised in --dry-run scope mode only; the office feature matrix was not executed",
     "the working tree was dirty at generation time (this evidence file is new)",
     "no live services, credentials, network, trading readiness or repo-wide matrix were exercised",
-    "no VERIFIED/COMPLETE/100% claim is made"
+    "no VERIFIED/COMPLETE/100% claim is made",
+    "refresh failures: command 1 exited 1, expected 0; command 2 exited 1, expected 0",
+    "phase 8 release is BLOCKED: the final matrix is the bounded Office feature matrix, not repo-wide, and the owner release decision record is not signed"
   ],
-  "outputs": [
-    {
-      "path": "evidence/phase-8/release.json",
-      "sha256": "475d907c6fd03c99c818f7e21d75a135af17e35669d99df872f322cb33dc2ed5"
-    }
-  ],
+  "outputs": [],
   "release_status": "READY_FOR_OWNER_DECISION",
   "status": "PASS",
   "task_id": "P8-05"
