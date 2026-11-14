@@ -719,17 +719,16 @@ def add_cell(
     cell_desks: List[MS.MapDesk] = []
     local = 0
     for slot in range(desks):
-        while f"{room_id}:{cell_id}:s{local}" in existing_seat_ids:
+        while f"{cell_id}:s{local}" in existing_seat_ids:
             local += 1
         seat_local = f"s{local}"
-        desk_local = f"d{slot}"
-        desk_id = f"{room_id}:{cell_id}:{desk_local}"
+        desk_id = f"{cell_id}:d{slot}"
         while desk_id in existing_desk_ids:
             desk_id = f"{desk_id}-{local}"
         x, y = CELL_DESK_SLOTS[slot]
         cell_desks.append(MS.MapDesk(
             desk_id=desk_id,
-            seat_id=f"{room_id}:{cell_id}:{seat_local}",
+            seat_id=f"{cell_id}:{seat_local}",
             cell_id=cell_id,
             room_id=room_id,
             x=x,
@@ -834,14 +833,14 @@ def add_desk(
     existing_desk_ids = {d.desk_id for d in document.desks}
     existing_seat_ids = {d.seat_id for d in document.desks}
     local = 0
-    while f"{room_id}:{target.cell_id}:s{local}" in existing_seat_ids:
+    while f"{target.cell_id}:s{local}" in existing_seat_ids:
         local += 1
-    desk_id = f"{room_id}:{target.cell_id}:d{slot}"
+    desk_id = f"{target.cell_id}:d{slot}"
     while desk_id in existing_desk_ids:
         desk_id = f"{desk_id}-{local}"
     desk = MS.MapDesk(
         desk_id=desk_id,
-        seat_id=f"{room_id}:{target.cell_id}:s{local}",
+        seat_id=f"{target.cell_id}:s{local}",
         cell_id=target.cell_id,
         room_id=room_id,
         x=x,

@@ -259,8 +259,8 @@ function buildCells(roomId: string, desks: number, kind: string): BuilderCell[] 
     for (let slot = 0; slot < count; slot += 1) {
       const [x, y] = CELL_DESK_SLOTS[slot];
       rows.push({
-        desk_id: `${roomId}:${cellId}:d${slot}`,
-        seat_id: `${roomId}:${cellId}:s${seatCounter}`,
+        desk_id: `${cellId}:d${slot}`,
+        seat_id: `${cellId}:s${seatCounter}`,
         x,
         y,
         w: 2,
@@ -591,17 +591,21 @@ export function addCell(
   const room = roomOf(state, roomId);
   const index = Math.max(-1, ...room.cells.map((cell) => cell.index)) + 1;
   const cellId = `${roomId}:c${index}`;
+  const cellDesks: BuilderDesk[] = [];
+  for (let slot = 0; slot < desks; slot += 1) {
+    const [x, y] = CELL_DESK_SLOTS[slot];
+    cellDesks.push({
+      desk_id: `${cellId}:d${slot}`,
+      seat_id: `${cellId}:s${slot}`,
+      x, y, w: 2, h: 1,
+    });
+  }
   const cell = {
     cell_id: cellId,
     index,
     cols: CELL_COLS,
     rows: CELL_ROWS,
-    desks: buildCells(`${roomId}-${cellId}`, desks, room.kind)[0].desks
-      .map((desk) => ({
-        ...desk,
-        desk_id: `${roomId}:${cellId}:${desk.desk_id.split(":").pop()}`,
-        seat_id: `${roomId}:${cellId}:${desk.seat_id.split(":").pop()}`,
-      })),
+    desks: cellDesks,
   };
   const rooms = state.rooms.map((row) =>
     row.room_id === roomId
@@ -653,8 +657,8 @@ export function addDesk(
   const [x, y] = CELL_DESK_SLOTS[slot];
   const seatNumber = target.desks.length;
   const desk: BuilderDesk = {
-    desk_id: `${roomId}:${target.cell_id}:d${slot}`,
-    seat_id: `${roomId}:${target.cell_id}:s${seatNumber}`,
+    desk_id: `${target.cell_id}:d${slot}`,
+    seat_id: `${target.cell_id}:s${seatNumber}`,
     x,
     y,
     w: 2,

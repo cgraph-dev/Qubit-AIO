@@ -1,7 +1,7 @@
 {
   "task_id": "P6-02",
   "status": "PASS",
-  "generated_at": "2026-11-14T13:49:47Z",
+  "generated_at": "2026-11-14T13:51:34Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -47,7 +47,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/room_builder.py",
-      "sha256": "e52412aca060916ceb02c56fc010a0905bf4c60a640cff6a42d1278e8ab89dfa"
+      "sha256": "d1ec6b8108ba799f74880d9750b6639caf1c56d45fac18f553953288c6b1ffba"
     },
     {
       "path": "scripts/verify_room_builder.py",
@@ -55,7 +55,7 @@
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/room-builder.ts",
-      "sha256": "695508e23f906b64392e108dc686f01cbd6c8a11183c4fafca1b0c3a92628e73"
+      "sha256": "c22e57fc81aecb7f7b9de8c7e7fc9ccae064c2d7e7c3c3e11687f63e6c3fd4b2"
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/RoomBuilder.tsx",
@@ -63,7 +63,7 @@
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/room-builder.test.ts",
-      "sha256": "aa92f8be35f1b44512606d79a78de47100b6637aa9ca698280dd7a852029941c"
+      "sha256": "b243822a0b7a0dd79a2422b93b4d4ed680e56de0ac76a482f6763155c8adcb04"
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/RoomBuilder.test.ts",
@@ -71,7 +71,7 @@
     },
     {
       "path": "tests/phase6_room_builder/test_room_builder.py",
-      "sha256": "57021f1c2cf53ff23ce1f8ad84cf4c8fec6f9b086fc3108e224a82fc4de33db8"
+      "sha256": "a601a0bd271c5e2711d5d82d191c8567b01135bb3621e0756274f08c0800845c"
     },
     {
       "path": "tests/phase6_room_builder/test_verifier.py",
@@ -82,19 +82,19 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_room_builder.py --json",
       "exit_code": 0,
-      "stdout_tail": " \"room 'rec-1' asset 'art:raw': references a paid art pack\",\n        \"room 'rec-1' asset 'art:raw': paid art file is not a recipe coordinate\",\n        \"room 'rec-1' asset 'art:raw': raw sprite sheets are not embedded\"\n      ],\n      \"id\": \"raw_sprite_sheet_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": [\n        \"STYLE_COLLISION: floors 'floor-001' and 'floor-002' both use 'operations'\"\n      ],\n      \"id\": \"department_style_collision_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"refused\": true,\n        \"versions\": 1\n      },\n      \"id\": \"invalid_publish_refused_atomically\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"asset_refs\": 10,\n        \"hash_digest\": \"037f6b12835761e7f25fd839a1a8eea8e1d85edae311b56712c04566d6999228\",\n        \"kinds\": {\n          \"recipe\": 10\n        },\n        \"paid_refs\": 0\n      },\n      \"id\": \"asset_report_clean\",\n      \"ok\": true\n    }\n  ],\n  \"counts\": {\n    \"cells\": 10,\n    \"desks\": 17,\n    \"floors\": 1,\n    \"portals\": 9,\n    \"rooms\": 10\n  },\n  \"egress\": 9,\n  \"generated_at\": \"2026-11-14T13:49:31Z\",\n  \"problems\": [],\n  \"schema\": \"qubit-office-room-builder-validation/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P6-02\"\n}\n",
+      "stdout_tail": " \"room 'rec-1' asset 'art:raw': references a paid art pack\",\n        \"room 'rec-1' asset 'art:raw': paid art file is not a recipe coordinate\",\n        \"room 'rec-1' asset 'art:raw': raw sprite sheets are not embedded\"\n      ],\n      \"id\": \"raw_sprite_sheet_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": [\n        \"STYLE_COLLISION: floors 'floor-001' and 'floor-002' both use 'operations'\"\n      ],\n      \"id\": \"department_style_collision_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"refused\": true,\n        \"versions\": 1\n      },\n      \"id\": \"invalid_publish_refused_atomically\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"asset_refs\": 10,\n        \"hash_digest\": \"037f6b12835761e7f25fd839a1a8eea8e1d85edae311b56712c04566d6999228\",\n        \"kinds\": {\n          \"recipe\": 10\n        },\n        \"paid_refs\": 0\n      },\n      \"id\": \"asset_report_clean\",\n      \"ok\": true\n    }\n  ],\n  \"counts\": {\n    \"cells\": 10,\n    \"desks\": 17,\n    \"floors\": 1,\n    \"portals\": 9,\n    \"rooms\": 10\n  },\n  \"egress\": 9,\n  \"generated_at\": \"2026-11-14T13:50:50Z\",\n  \"problems\": [],\n  \"schema\": \"qubit-office-room-builder-validation/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P6-02\"\n}\n",
       "stderr_tail": ""
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase6_room_builder tests/phase3_room_caps tests/phase3_world",
       "exit_code": 0,
-      "stdout_tail": "80 passed in 1.41s\n",
+      "stdout_tail": "80 passed in 1.46s\n",
       "stderr_tail": ""
     },
     {
       "cmd": "cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/room-builder.test.ts ../qubit-app/plugins/qubit-office/game/app/RoomBuilder.test.ts",
       "exit_code": 0,
-      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p6-room-builder/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  26 passed (26)\n   Start at  15:48:12\n   Duration  347ms (transform 121ms, setup 0ms, import 152ms, tests 186ms, environment 0ms)\n\n",
+      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p6-room-builder/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  26 passed (26)\n   Start at  15:51:16\n   Duration  352ms (transform 120ms, setup 0ms, import 148ms, tests 192ms, environment 0ms)\n\n",
       "stderr_tail": ""
     },
     {

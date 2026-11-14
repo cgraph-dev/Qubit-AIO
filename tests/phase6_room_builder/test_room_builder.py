@@ -134,6 +134,11 @@ def test_cells_are_always_fixed_16x12(document):
     for cell in builder.document.cells:
         if cell.room_id == "work-1":
             assert (cell.cols, cell.rows) == (16, 12)
+    builder.apply(builder.propose_add_desk("work-1"))
+    work = _room(builder.document, "work-1")
+    for desk in builder.document.desks:
+        if desk.desk_id in work.desk_ids:
+            assert len(desk.seat_id.split(":")) == 3
     builder.apply(builder.propose_remove_cell("work-1", work.cell_ids[-1]))
     work = _room(builder.document, "work-1")
     assert len(work.cell_ids) == 1

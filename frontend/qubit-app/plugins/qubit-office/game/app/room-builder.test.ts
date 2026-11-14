@@ -52,6 +52,9 @@ describe("room-builder model", () => {
     expect(work.cells.length).toBe(before.cells.length + 1);
     for (const cell of work.cells) {
       expect([cell.cols, cell.rows]).toEqual([16, 12]);
+      for (const desk of cell.desks) {
+        expect(desk.seat_id.split(":")).toHaveLength(3);
+      }
     }
     expect(RB.validateState(state)).toEqual([]);
   });
