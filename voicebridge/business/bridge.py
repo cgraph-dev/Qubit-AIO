@@ -47,6 +47,7 @@ from ..office.world import assign as WORLD_ASSIGN
 from ..office.world import model as WORLD
 from ..office.world import occupancy as OCCUPANCY
 from . import agents as AGENTS
+from . import effective_state as EFFECTIVE
 from . import office_seats as OFFICE_SEATS
 from . import pilot as ETSY_PILOT
 from . import research_run as RESEARCH_RUN
@@ -941,6 +942,26 @@ def h_business_agent_get(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return _error(exc)
 
 
+def h_business_agent_effective(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                               p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/business/agents/<id>/effective -> effective state.
+
+    Read-only and owner/tenant-gated by the same ``_tenant`` rule as the other
+    agent reads. It composes the real stores (agent record, identity grants,
+    leases, budget/usage, approvals, audit, links) and never writes a row. A
+    missing agent is the service's typed ``AGENT_NOT_FOUND`` refusal, so a
+    cross-tenant id is indistinguishable from a missing one.
+    """
+    try:
+        store = _store(cfg)
+        tenant = _tenant(store, q, b)
+        agent_id = _text((p or {}).get("id"), "agent id", max_len=80)
+        projection = EFFECTIVE.effective_agent_state(store, tenant, agent_id)
+        return _ok(schema=EFFECTIVE.SCHEMA, projection=projection)
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
 def h_business_agent_audit(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                            p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     try:
@@ -1206,6 +1227,7 @@ __all__ = [
     "SCHEMA",
     "h_business_agent_archive",
     "h_business_agent_audit",
+    "h_business_agent_effective",
     "h_business_agent_get",
     "h_business_agent_pause",
     "h_business_agent_preview",
