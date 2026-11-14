@@ -1,5 +1,26 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 7 interactions/FX/simulation accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-7.sh` exits 0 and writes `evidence/phase-7/manifest.json`
+(`status: PASS`) after accepted Phase 0–6 manifests. Five lanes: P7-01 needs/traits/relationships +
+a 40-action catalog with deterministic utility selection, preconditions/cooldowns/props/rooms,
+consent/mature routing and declared-only effects (18 checks, 25 tests); P7-02 consequence engine
+(effects bounded, simulation effects separated from authoritative HR/legal/business receipts,
+approval/consent for sensitive consequences, recovery paths, audit/dead-letter) and P7-03
+mature-content policy (off by default, owner per-department opt-in, consent/age/privacy/HR checks,
+fade-to-black, no real-world drug instructions, audit) (13 checks, 48 tests); P7-04 event-to-FX
+schema + pure client planner (priority/cancel/replay/dedupe, reduced-motion critical cues,
+disable-nonessential, typed asset fallback, no FX from empty events; 17 Python + 21 UI tests);
+P7-05 outside-life/weather/seasons/social graph projection from source events only (no fake
+activity, active-zone bounds, scoped social ACL; 13 checks, 30 tests); and P7-06 deterministic
+simulation replay/audit with typed divergence incidents, cancel/retention and no external side
+effects (14 checks, 57 tests). Two test-helper name collisions (`conftest` imports across dirs)
+were fixed by moving helpers to uniquely named modules. **Measured:** gates 0–7 PASS; broad
+business/office/world/UI/simulation regression **1164 passed**. **Honest limits:** mature content is
+off/default-gated and was not rendered; no live canvas/FX renderer; replay divergence is digest-based
+and cannot catch a semantic error shared by recorder and replayer; no full matrix, no `VERIFIED`.
+Next: Phase 8 scale/security/release/recovery and final evidence.
+
 **Qubit Office Phase 6 Character Studio/UI/world accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
 `bash scripts/acceptance/phase-6.sh` exits 0 and writes `evidence/phase-6/manifest.json`
 (`status: PASS`) after accepted Phase 0–5 manifests. Five lanes: P6-01 Character Studio adapters

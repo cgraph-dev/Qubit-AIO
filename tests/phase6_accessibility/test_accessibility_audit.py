@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from conftest import APP, GAME_CSS, PLUGIN, SHELL, sha256
+from _a11y_helpers import APP, GAME_CSS, PLUGIN, SHELL, sha256
 
 
 def test_shipped_office_shell_passes_the_audit(audit):

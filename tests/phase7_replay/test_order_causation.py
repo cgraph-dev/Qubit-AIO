@@ -8,7 +8,7 @@ from voicebridge.business.simulation_audit import (
     replay,
 )
 
-from conftest import CLOCK, SEED, TENANT, make_event
+from _replay_helpers import CLOCK, SEED, TENANT, make_event
 
 
 def test_a_cause_sorts_before_its_effect_even_with_a_later_clock():

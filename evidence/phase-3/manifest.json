@@ -13,8 +13,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T14:13:41Z",
-  "git_head": "0ce57207ef8bc9c4d52215fbf1d9dad59273df35",
+  "generated_at": "2026-11-14T14:42:20Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",

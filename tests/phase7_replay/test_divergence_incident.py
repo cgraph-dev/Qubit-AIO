@@ -10,7 +10,7 @@ from voicebridge.business.simulation_audit import (
     replay,
 )
 
-from conftest import CLOCK, SEED, TENANT
+from _replay_helpers import CLOCK, SEED, TENANT
 
 
 def _recorded(history):

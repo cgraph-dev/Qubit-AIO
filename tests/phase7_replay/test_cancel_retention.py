@@ -12,7 +12,7 @@ from voicebridge.business.simulation_audit import (
     replay,
 )
 
-from conftest import CLOCK, SEED, TENANT, interaction_history
+from _replay_helpers import CLOCK, SEED, TENANT, interaction_history
 
 
 class _Counter:

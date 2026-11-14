@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 
-from conftest import A11Y_TS, GAME_CSS, SHELL, STYLES
+from _a11y_helpers import A11Y_TS, GAME_CSS, SHELL, STYLES
 
 
 def test_a11y_module_exports_the_required_helpers():

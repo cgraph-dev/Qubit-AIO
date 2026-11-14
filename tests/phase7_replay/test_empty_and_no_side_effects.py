@@ -5,7 +5,7 @@ import socket
 
 from voicebridge.business import simulation_audit as SA
 
-from conftest import CLOCK, SEED, TENANT, with_claim
+from _replay_helpers import CLOCK, SEED, TENANT, with_claim
 
 
 def test_empty_history_is_empty_not_an_error():

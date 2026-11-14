@@ -13,13 +13,7 @@ from pathlib import Path
 
 import pytest
 
-ROOT = Path(__file__).resolve().parents[2]
-PLUGIN = ROOT / "frontend" / "qubit-app" / "plugins" / "qubit-office"
-APP = PLUGIN / "game" / "app"
-STYLES = PLUGIN / "game" / "styles"
-SHELL = APP / "OfficeAppShell.tsx"
-A11Y_TS = APP / "a11y.ts"
-GAME_CSS = STYLES / "game.css"
+from _a11y_helpers import ROOT
 
 
 def _load_audit():

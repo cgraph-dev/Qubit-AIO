@@ -12,14 +12,14 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".....................                                                    [100%]\n21 passed in 0.41s"
+      "stdout_tail": ".....................                                                    [100%]\n21 passed in 0.49s"
     },
     {
       "cmd": "ln -s /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules && cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts && cd - >/dev/null && rm frontend/qubit-web/node_modules",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  42 passed (42)\n      Tests  485 passed (485)\n   Start at  16:12:23\n   Duration  4.17s (transform 8.18s, setup 0ms, import 11.97s, tests 14.26s, environment 8.11s)"
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  43 passed (43)\n      Tests  506 passed (506)\n   Start at  16:40:25\n   Duration  5.40s (transform 12.49s, setup 0ms, import 18.80s, tests 17.52s, environment 9.04s)"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/accessibility_audit.py tests/phase6_accessibility",
@@ -36,7 +36,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T14:12:27Z",
+  "generated_at": "2026-11-14T14:40:31Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -68,7 +68,8 @@
     "tsc exits 2 with 7 pre-existing errors in PhaserSceneHost.ts / WarRoomPanel.ts / loading CSS; there are zero errors in the owned files (a11y.ts, OfficeAppShell.tsx)",
     "the committed built bundle qubit-office.game.js/.css was NOT rebuilt; the source changes reach the product on the next office bundle build",
     "pre-existing root tests test_office_game_shell.py::test_the_game_css_exists_and_is_scoped_to_the_shell and test_office_assets_vendored.py::test_served_plugin_artifacts_have_no_operator_or_build_paths fail identically at base ec5dd7f98 (scoping rules and a committed-bundle '~/' literal); they are not caused by this lane",
-    "no live service, runtime state, credential or network was touched; no full matrix was run"
+    "no live service, runtime state, credential or network was touched; no full matrix was run",
+    "refresh failures: command 4 exited 1, expected 0"
   ],
   "outputs": [
     {
@@ -97,15 +98,15 @@
     },
     {
       "path": "tests/phase6_accessibility/conftest.py",
-      "sha256": "d187da6a0852b29867a94c490eee5695a05487e3cc300bdedfd1308906e47dc3"
+      "sha256": "202a4281dd4aee0dd504f5a7027d2aaafa57cc1166ab8741c03d7df22a65c4bb"
     },
     {
       "path": "tests/phase6_accessibility/test_accessibility_audit.py",
-      "sha256": "6bb7b50002fbc5b73e74da66f7b30b67b5308941a63405cb12f5610cf38d32ba"
+      "sha256": "03a9b7917170a47aea2a815d15bdccf0224b0b6d390f8e2ad9b7b5a201ea4eaf"
     },
     {
       "path": "tests/phase6_accessibility/test_a11y_ts_contract.py",
-      "sha256": "34ff1d43d67e4c0d6a6ee5543d2b86156714a04231e7eab48fd84b7c36e070c5"
+      "sha256": "7315b4cdd47e098d6f88b64a96e2009f27089da5f8fd1cfae211090972520e2b"
     }
   ],
   "status": "PASS",

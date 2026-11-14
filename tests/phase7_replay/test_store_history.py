@@ -15,7 +15,7 @@ from voicebridge.business.simulation_audit import (
     replay,
 )
 
-from conftest import (
+from _replay_helpers import (
     CLOCK,
     OTHER_TENANT,
     SEED,

@@ -4,7 +4,7 @@
     "evidence/phase-6/P6-02-room-builder.json": "33d95501909e9efb94aeb20d620e5eff41cf323187f9aa02b80fe795bc4904c7",
     "evidence/phase-6/P6-03-outside-world.json": "4d3812fca6b38b183c134c72de2ca402b6d7810919f7894e8704b98ec048f268",
     "evidence/phase-6/P6-04-panel-inventory.json": "cbeac58356c73cd888561b03b311d6256b44301ed645489aee081ed9b59091b8",
-    "evidence/phase-6/P6-05-accessibility.json": "aeef3d4150d34d3bfc395fe868eb9b58b79a2709428376827e18b5c6db223879",
+    "evidence/phase-6/P6-05-accessibility.json": "72e49f1d5b5f6a72c4d36ee80fe5014bbc92d2856ade9a8bb8b05f4f8ee52e8e",
     "evidence/phase-6/P6-06-asset-build.json": "4719fa9db0b5dd7851581476b5ae669e917798a40eb36dcd9e9166dce2cba303"
   },
   "evidence_verification": {
@@ -12,8 +12,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T14:17:25Z",
-  "git_head": "0ce57207ef8bc9c4d52215fbf1d9dad59273df35",
+  "generated_at": "2026-11-14T14:43:32Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",

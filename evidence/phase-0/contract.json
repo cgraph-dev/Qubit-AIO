@@ -81,7 +81,7 @@
       "sha256": "601c607e2f415d7948e65d280ecc386392c99f2929c1de0bdd055afcebfb8138"
     }
   ],
-  "generated_at": "2026-11-14T14:12:32Z",
+  "generated_at": "2026-11-14T14:41:13Z",
   "non_goals": [
     "no live external side effects during phase acceptance",
     "no live capital or live marketplace publish",

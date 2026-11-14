@@ -1,6 +1,6 @@
 {
   "evidence_hashes": {
-    "evidence/phase-0/P0-01-contract.json": "f4eb31799cbb5b29f59507cfafb8a028286a893ad75e7d8833c559ed50698d9c",
+    "evidence/phase-0/P0-01-contract.json": "a7e05199e678b86358824d74b7efe79df80b4a2d669d566a036c804567a24471",
     "evidence/phase-0/P0-02-domain-contract.json": "7bda012f7bc2154c5062fb827a5039c075b3df774c0b665e854f3c49d1a3a024",
     "evidence/phase-0/P0-03-asset-ledger.json": "58ab308e6eeebbdad63e09b236f18ab0ee7c2faa7694eab9f5dec30482f1f141",
     "evidence/phase-0/P0-04-dependency-ledger.json": "c814f0c40daf8dfbed4e5a48f969401c3bb4170adffc3cf1be1bc0f426a2578e",
@@ -15,8 +15,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T14:12:49Z",
-  "git_head": "0ce57207ef8bc9c4d52215fbf1d9dad59273df35",
+  "generated_at": "2026-11-14T14:41:24Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",
@@ -44,7 +44,7 @@
       "task_id": "P0-02"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/office_asset_ledger.py --source /home/trick/Desktop/UI Office --out /tmp/qoffice-acceptance.TGWvof/asset-manifest.json --check",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/office_asset_ledger.py --source /home/trick/Desktop/UI Office --out /tmp/qoffice-acceptance.FB8GYi/asset-manifest.json --check",
       "evidence": [
         "evidence/phase-0/P0-03-asset-ledger.json"
       ],
@@ -68,7 +68,7 @@
       "task_id": "P0-05"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/stage_replay.py --fixture synthetic-department --no-network --json --work-root /tmp/qoffice-acceptance.TGWvof/stage",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/stage_replay.py --fixture synthetic-department --no-network --json --work-root /tmp/qoffice-acceptance.FB8GYi/stage",
       "evidence": [
         "evidence/phase-0/P0-06-stage-replay.json"
       ],
