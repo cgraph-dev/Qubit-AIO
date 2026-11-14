@@ -1,0 +1,64 @@
+{
+  "commands": [
+    {
+      "cmd": "python scripts/office_asset_ledger.py --source \"/home/trick/Desktop/UI Office\" --out /tmp/qoffice-assets/manifest.json --check --summary",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "wrote 57268 rows to /tmp/qoffice-assets/manifest.json"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp python -m pytest -q tests/office_contracts/test_office_asset_ledger.py tests/office_contracts/test_campus_fixture.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............                                                             [100%]\n12 passed in 5.51s"
+    }
+  ],
+  "generated_at": "2026-11-14T02:45:29Z",
+  "inputs": [
+    {
+      "path": "scripts/office_asset_ledger.py",
+      "sha256": "858b7bdc7d91d223a610eba3fb6b3fc74450fc03baec69469cc5d947054d9248"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "tests/office_contracts/test_office_asset_ledger.py",
+      "sha256": "b971a2cc41d27a7381c6333b9765ae381785469662f68a00ad2d5fc6fedd5e3c"
+    }
+  ],
+  "limitations": [
+    "The full 57k-row ledger is at /tmp/qoffice-assets/manifest.json and is intentionally NOT committed (paid-art metadata with operator paths must stay off-tree).",
+    "license_status is name-based only: 'license_file_present' when the pack carries a LICENSE/README file, otherwise 'unknown'; no license text is parsed and no use is approved by this ledger.",
+    "intended_use is a filename/pack heuristic candidate, not an approval.",
+    "Byte count is the sum of file sizes (904,388,468); du reports 1.1 GB on disk."
+  ],
+  "measurements": {
+    "images_with_dimensions": 55739,
+    "packs": 16,
+    "rows": 57268,
+    "source_bytes": 904388468,
+    "source_files": 57268
+  },
+  "outputs": [
+    {
+      "path": "scripts/office_asset_ledger.py",
+      "sha256": "858b7bdc7d91d223a610eba3fb6b3fc74450fc03baec69469cc5d947054d9248"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "tests/office_contracts/test_office_asset_ledger.py",
+      "sha256": "b971a2cc41d27a7381c6333b9765ae381785469662f68a00ad2d5fc6fedd5e3c"
+    },
+    {
+      "path": "/tmp/qoffice-assets/manifest-summary.json",
+      "sha256": "711acff4e9a5616fe0c1331a07719c2e0194de4a583fc8c43d6fc0739948a7f8"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P0-03"
+}
