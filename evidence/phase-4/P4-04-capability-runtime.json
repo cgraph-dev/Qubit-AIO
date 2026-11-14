@@ -1,0 +1,97 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_runtime_safety.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "    \"hermetic: throwaway SQLite store, recording adapters, no network\",\n    \"does not prove a live provider, live scheduler or live service stop\",\n    \"complements, and does not replace, the pytest suites\"\n  ],\n  \"status\": \"PASS\"\n}"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase4_runtime_safety tests/phase1_gateway tests/phase1_security tests/phase2_adapter",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 47%]\n........................................................................ [ 95%]\n.......                                                                  [100%]\n151 passed in 4.37s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/capability_runtime.py voicebridge/business/safety.py scripts/verify_runtime_safety.py tests/phase4_runtime_safety",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/capability_runtime.py voicebridge/business/safety.py scripts/verify_runtime_safety.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T05:22:45Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-MODEL.md",
+      "sha256": "8cb98c73ac6bcf6984eeef2cb38d12219630c85831dcd4f0ab839b9b94cdaa3a"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "aa6722d69fd9a9e15701d7fc25453d66ec599d59e8ce6c7916028b9d0608a10d"
+    },
+    {
+      "path": "voicebridge/business/policy.py",
+      "sha256": "9627e3121929d90b1555b708a946425a738dadab18ad1c17a94c5d6f89379d62"
+    },
+    {
+      "path": "voicebridge/business/sandbox.py",
+      "sha256": "c4ec7c591b0daecaf51104e3465357e40aa14065f96007fb84f917f020d479e3"
+    },
+    {
+      "path": "voicebridge/business/capability_runtime.py",
+      "sha256": "8b3a49756924250a7cab8eed99def448830d6c3b56ee0e27aab9f031859f04c0"
+    }
+  ],
+  "limitations": [
+    "hermetic tests use recording adapters; no live provider, MCP server, browser, terminal, connector or message transport was called",
+    "one gateway path is proven by tests; it does not prove a live office turn used every adapter",
+    "authorization is evaluated against caller-supplied snapshots; snapshot issuance is Phase 1 territory",
+    "no full matrix, no live service restart, VERIFIED not claimed"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/capability_runtime.py",
+      "sha256": "8b3a49756924250a7cab8eed99def448830d6c3b56ee0e27aab9f031859f04c0"
+    },
+    {
+      "path": "voicebridge/business/safety.py",
+      "sha256": "ce2e252737b774588d12f1b8b0a3c4f6f7d98833e49ba009907db88e75951fdd"
+    },
+    {
+      "path": "tests/phase4_runtime_safety/_p4_helpers.py",
+      "sha256": "2cc423c8a7017a1eb4265a2a5e2ed359304e82b62c42864642ab327b3b7f5e1c"
+    },
+    {
+      "path": "tests/phase4_runtime_safety/test_capability_runtime.py",
+      "sha256": "aab34cca86bb47f1a28f7ed758476a186e9d34c9653f7fc8e504ebe31a56b7f2"
+    },
+    {
+      "path": "tests/phase4_runtime_safety/test_safety.py",
+      "sha256": "cf1683e1349cbc6f3c99ad822575917579fb667c5aa5c3226df852e68c6b22be"
+    },
+    {
+      "path": "scripts/verify_runtime_safety.py",
+      "sha256": "f83ac3c66890c27ae301764fbae0ad7e205f9a57a11fb8a5ca4076b0eeb75eb1"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P4-04"
+}
