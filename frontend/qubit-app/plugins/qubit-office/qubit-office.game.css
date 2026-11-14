@@ -2590,4 +2590,30 @@
   animation-duration: 1ms !important;
   animation-iteration-count: 1 !important;
 }
+
+/* The 100-floor campus: the primary Office surface. It overlays the vendored
+   scene (which stays one click away) and scrolls its own directory/scene. */
+.office-game__campus {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: auto;
+  background: #0b1017;
+  color: #e7eef7;
+}
+.office-game__campusHead {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px 10px;
+  background: linear-gradient(180deg, #0b1017 0%, #0b1017f2 70%, #0b101700 100%);
+}
+.office-game__campusHead h2 { margin: 0; font-size: 18px; }
+.office-game__campusHead p { margin: 4px 0 0; opacity: .75; font-size: 12px; }
+.office-game__campusBody { padding: 0 18px 24px; }
+.office-game__campusState { padding: 24px; opacity: .8; }
 /*$vite$:1*/

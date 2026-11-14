@@ -26,6 +26,9 @@ import { createTimeline } from "./Timeline";
 import { createRoomBuilder } from "./RoomBuilder";
 import { createOutsideWorld } from "./OutsideWorld";
 import { createPanelInventoryPanel } from "./PanelInventory";
+import { createTowerNavigator } from "./TowerNavigator";
+import { fetchDirectory, type BusinessDirectory } from "./business-api";
+import { fetchWorldTower, type WorldTower } from "./world-tower";
 import { fetchOutsideWorld, type OutsideWorldView } from "./outside-world";
 import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
@@ -147,6 +150,7 @@ type ShellComponents = {
   RoomBuilder: ReturnType<typeof createRoomBuilder>;
   OutsideWorld: ReturnType<typeof createOutsideWorld>;
   PanelInventory: ReturnType<typeof createPanelInventoryPanel>;
+  TowerNavigator: ReturnType<typeof createTowerNavigator>;
   EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
@@ -192,6 +196,7 @@ function shellComponents(
     RoomBuilder: createRoomBuilder(R, hooks),
     OutsideWorld: createOutsideWorld(R, hooks),
     PanelInventory: createPanelInventoryPanel(R, hooks),
+    TowerNavigator: createTowerNavigator(R, hooks),
     EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
@@ -265,6 +270,15 @@ export function createOfficeApp(
       "panels");
     const [outsideView, setOutsideView] = useState<OutsideWorldView | null>(
       null);
+    // The 100-floor campus is the primary Office surface. It is a projection
+    // over the real floor templates; the old 4-room scene stays one click away.
+    const [campusOpen, setCampusOpen] = useState(true);
+    const [campusDirectory, setCampusDirectory] = useState<
+      BusinessDirectory | null>(null);
+    const [campusWorld, setCampusWorld] = useState<WorldTower | null>(null);
+    const [campusState, setCampusState] = useState<
+      "loading" | "ready" | "error">("loading");
+    const [campusError, setCampusError] = useState<string>("");
     // P6-05 accessibility preferences. Declared AFTER every earlier slot so
     // seeded state indices in the shell's own tests stay stable. The OS
     // preference is honoured by default; an explicit shell setting could win
@@ -278,7 +292,7 @@ export function createOfficeApp(
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
       ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld,
-      PanelInventory, EtsyConnectPanel, LoadingScreen,
+      PanelInventory, TowerNavigator, EtsyConnectPanel, LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     useEffect(() => {
       if (!studioOpen || studioTab !== "outside") return;
@@ -289,6 +303,32 @@ export function createOfficeApp(
         .then((view) => { if (live) setOutsideView(view); });
       return () => { live = false; ctl?.abort(); };
     }, [studioOpen, studioTab, props.base]);
+    useEffect(() => {
+      if (!campusOpen) return;
+      let live = true;
+      const ctl = typeof AbortController === "undefined" ? undefined
+        : new AbortController();
+      setCampusState("loading");
+      setCampusError("");
+      fetchDirectory({ base: props.base, fetchImpl: props.fetchImpl,
+        signal: ctl?.signal })
+        .then(async (directory) => {
+          const world = await fetchWorldTower(directory.floors, {
+            base: props.base, fetchImpl: props.fetchImpl,
+            signal: ctl?.signal,
+          });
+          if (!live) return;
+          setCampusDirectory(directory);
+          setCampusWorld(world);
+          setCampusState("ready");
+        })
+        .catch((exc) => {
+          if (!live) return;
+          setCampusState("error");
+          setCampusError(exc instanceof Error ? exc.message : String(exc));
+        });
+      return () => { live = false; ctl?.abort(); };
+    }, [campusOpen, props.base, props.fetchImpl]);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
@@ -1101,6 +1141,17 @@ export function createOfficeApp(
       },
     }, "Studio");
 
+    const campusToggle = R.createElement("button", {
+      key: "campus-toggle",
+      type: "button",
+      className: "office-game__btn office-theme-menu-btn office-game__campusToggle",
+      "data-testid": "office-campus-toggle",
+      "aria-expanded": campusOpen,
+      "aria-controls": "office-game-campus",
+      "aria-label": "Open the 100-floor campus",
+      onClick: () => setCampusOpen((v: boolean) => !v),
+    }, "Campus");
+
     // P6-05 — a real toolbar landmark groups the persistent shell controls.
     // It is also the skip target that gets a keyboard user OUT of the canvas
     // when the vendored client swallows Tab (and the Escape escape hatch).
@@ -1112,7 +1163,7 @@ export function createOfficeApp(
       role: "toolbar",
       "aria-label": "Office panels",
       tabIndex: -1,
-    }, [commandCenterToggle, timelineToggle, studioToggle]));
+    }, [commandCenterToggle, timelineToggle, studioToggle, campusToggle]));
 
     // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
     // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full
@@ -1186,6 +1237,61 @@ export function createOfficeApp(
         ]),
         R.createElement("div", {
           key: "body", className: "office-game__studioBody",
+        }, body),
+      ]));
+    }
+
+    if (campusOpen) {
+      const counts = campusDirectory?.counts;
+      const body = campusState === "loading"
+        ? R.createElement("div", {
+            key: "loading", className: "office-game__campusState",
+            "data-testid": "office-campus-loading", role: "status",
+          }, "Loading the 100-floor campus…")
+        : campusState === "error"
+        ? R.createElement("div", {
+            key: "error", className: "office-game__campusState",
+            "data-testid": "office-campus-error", role: "alert",
+          }, `Campus unavailable: ${campusError}`)
+        : campusDirectory
+        ? R.createElement(TowerNavigator as never, {
+            key: "tower",
+            floors: campusDirectory.floors,
+            world: campusWorld,
+          })
+        : null;
+      children.push(R.createElement("section", {
+        key: "campus",
+        id: "office-game-campus",
+        className: "office-game__campus",
+        "data-testid": "office-campus",
+        "data-office-slice": dockSlice,
+        "aria-label": "100-floor Qubit campus",
+      }, [
+        R.createElement("div", {
+          key: "head", className: "office-game__campusHead",
+        }, [
+          R.createElement("div", { key: "title" }, [
+            R.createElement("h2", { key: "h" }, "Qubit Campus"),
+            R.createElement("p", {
+              key: "counts", "data-testid": "office-campus-counts",
+            }, counts
+              ? `${counts.floors} floors · ${counts.wings} wings`
+                + (campusWorld?.counts
+                  ? ` · ${campusWorld.counts.rooms} rooms · `
+                    + `${campusWorld.counts.desks} desks`
+                  : "")
+              : "100 floor templates, 5 wings, 3,075 desks"),
+          ]),
+          R.createElement("button", {
+            key: "close", type: "button",
+            className: "office-game__btn office-theme-dock-close",
+            "data-testid": "office-campus-close",
+            onClick: () => setCampusOpen(false),
+          }, "Close campus"),
+        ]),
+        R.createElement("div", {
+          key: "body", className: "office-game__campusBody",
         }, body),
       ]));
     }
