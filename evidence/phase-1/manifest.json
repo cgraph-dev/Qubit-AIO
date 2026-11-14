@@ -9,15 +9,15 @@
     "evidence/phase-1/P1-07-security.json": "dcf6a85bef1fc2478d0ba3adfab662a7acf02aa98d53aa020ba01928de739f38",
     "evidence/phase-1/P1-08-otel.json": "12dc906c214f542a05e40be4e2b948f1707791d8af3c6f979c2b6b1858dc2e3c",
     "evidence/phase-1/P1-09-backup-restore.json": "bff5e7fae18afbe0e51e4225ef6611b2b62fa03fafb0e3b13b3c1432bc1048c8",
-    "evidence/phase-1/P1-10-reference-lane.json": "90ffd44b9448d8fec14f0a09aec2d7391bc7cb890f3c74180389e31119840623"
+    "evidence/phase-1/P1-10-reference-lane.json": "272dbb330533825eb819e085232604a2ffb3a8d41ff6bf7161579fa8d3cad16f"
   },
   "evidence_verification": {
     "checked": 10,
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T03:26:48Z",
-  "git_head": "3964fc35ccdbdaee9f4346d33e845795945574eb",
+  "generated_at": "2026-11-14T03:31:02Z",
+  "git_head": "73d28da24d1505a14b81f6286013b113f7584f8c",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",
@@ -101,7 +101,7 @@
       "task_id": "P1-09"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.ljUTFr/reference",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.jbehRc/reference",
       "evidence": [
         "evidence/phase-1/P1-10-reference-lane.json"
       ],
