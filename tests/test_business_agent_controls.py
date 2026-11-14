@@ -898,7 +898,7 @@ def test_permissions_and_safety_value_objects_normalise(tmp_path):
 
 
 def test_v1_database_migrates_forward_to_the_agent_schema(tmp_path):
-    from voicebridge.business.schema import MIGRATIONS
+    from voicebridge.business.schema import MIGRATIONS, SCHEMA_VERSION
 
     path = tmp_path / "v1.db"
     conn = sqlite3.connect(path)
@@ -917,7 +917,7 @@ def test_v1_database_migrates_forward_to_the_agent_schema(tmp_path):
     assert created is True
     assert agent.status == "active"
     assert _scalar(store, "SELECT COUNT(*) FROM bos_agent") == 1
-    assert _scalar(store, "PRAGMA user_version") == 2
+    assert _scalar(store, "PRAGMA user_version") == SCHEMA_VERSION
 
 
 def test_usage_rows_are_append_only(tmp_path):

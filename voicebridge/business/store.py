@@ -438,8 +438,8 @@ class BusinessStore:
             self._require_business(conn, tenant_id, business_id)
             conn.execute(
                 "INSERT INTO bos_task(task_id, tenant_id, business_id, title,"
-                " status, assigned_to, created_at, updated_at, metadata_json)"
-                " VALUES(?,?,?,?,'open',?,?,?,?)",
+                " status, assigned_to, created_at, updated_at, metadata_json,"
+                " task_class) VALUES(?,?,?,?,'open',?,?,?,?,'business')",
                 (
                     tid,
                     tenant_id,
@@ -460,7 +460,8 @@ class BusinessStore:
     def get_task(self, tenant_id: str, task_id: str) -> models.Task:
         with self.read() as conn:
             row = conn.execute(
-                "SELECT * FROM bos_task WHERE tenant_id=? AND task_id=?",
+                "SELECT * FROM bos_task WHERE tenant_id=? AND task_id=?"
+                " AND task_class='business'",
                 (tenant_id, task_id),
             ).fetchone()
         if row is None:
@@ -476,7 +477,8 @@ class BusinessStore:
         business_id: str | None = None,
         status: str | None = None,
     ) -> list[models.Task]:
-        query = "SELECT * FROM bos_task WHERE tenant_id=?"
+        query = ("SELECT * FROM bos_task WHERE tenant_id=?"
+                 " AND task_class='business'")
         params: list[Any] = [tenant_id]
         if business_id is not None:
             query += " AND business_id=?"
@@ -507,7 +509,8 @@ class BusinessStore:
             )
         with self.transaction() as conn:
             row = conn.execute(
-                "SELECT * FROM bos_task WHERE tenant_id=? AND task_id=?",
+                "SELECT * FROM bos_task WHERE tenant_id=? AND task_id=?"
+                " AND task_class='business'",
                 (tenant_id, task_id),
             ).fetchone()
             if row is None:
