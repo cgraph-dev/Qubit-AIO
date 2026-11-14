@@ -254,8 +254,11 @@ path = "scripts/hatch_build_qubit.py"
 # A clean install ships the runtime subset under
 # ``voicebridge/_data/qubit_runtime`` — the path
 # ``voicebridge.qubit_runtime.runtime_root()`` resolves first, before the
-# checkout. The fork's tests/, apps/, website/, contributors/, evals/,
-# lockfiles and other non-runtime material are intentionally NOT packaged.
+# checkout. The fork's tests/, apps/, website/, contributors/, evals/ and other
+# non-runtime material are intentionally NOT packaged. Lockfiles are the one
+# exception: `uv.lock` ships beside `pyproject.toml` because PM rebuilds the
+# dependency tree from it at runtime (`qubit pm repair`/`install`), and without
+# it a clean wheel can never commit an environment.
 # Hatchling force-include walks each mapped directory recursively but does not
 # support globs, so the runtime dirs are mapped individually and the fork's
 # top-level modules are listed explicitly.
@@ -406,6 +409,15 @@ path = "scripts/hatch_build_qubit.py"
 "qubit_runtime/qubit_state_worker_lifecycle.py" = "voicebridge/_data/qubit_runtime/qubit_state_worker_lifecycle.py"
 "qubit_runtime/LICENSE" = "voicebridge/_data/qubit_runtime/LICENSE"
 "qubit_runtime/pyproject.toml" = "voicebridge/_data/qubit_runtime/pyproject.toml"
+# PM rebuilds dependencies from the lock beside the source
+# (pm/build_operations.py: a frozen export without `uv.lock` raises InstallError),
+# so `qubit pm repair`/`install` on a clean wheel failed with "No such file or
+# directory: .../uv.lock" and could never commit a dependency environment. That
+# left the store Python unloadable (see qubit_cli/_launchers.py: existence is not
+# usability), which made every DETACHED child — the dashboard's gateway restart
+# among them — exit 1 on its first import. pyproject.toml already ships for the
+# same reason; the lock is its required counterpart.
+"qubit_runtime/uv.lock" = "voicebridge/_data/qubit_runtime/uv.lock"
 # ``qubit_runtime.status()`` reads the provenance manifest from the canonical
 # generated location (docs/generated/) with the frozen archive as read-only
 # fallback (see voicebridge/qubit_runtime.manifest_path()); ship the canonical
@@ -647,7 +659,8 @@ exclude = [
   # The whole vendored fork is excluded from the default sdist tree walk; the
   # runtime subset is force-included below at its original qubit_runtime/
   # layout (mirrors the wheel subset) so the sdist still rebuilds the wheel
-  # without shipping the fork's tests/, apps/, website/, lockfiles, etc.
+  # without shipping the fork's tests/, apps/, website/, etc. `uv.lock` is
+  # force-included alongside `pyproject.toml` because PM reads it at runtime.
   "qubit_runtime",
 ]
 
@@ -788,6 +801,7 @@ exclude = [
 "qubit_runtime/qubit_state_worker_lifecycle.py" = "qubit_runtime/qubit_state_worker_lifecycle.py"
 "qubit_runtime/LICENSE" = "qubit_runtime/LICENSE"
 "qubit_runtime/pyproject.toml" = "qubit_runtime/pyproject.toml"
+"qubit_runtime/uv.lock" = "qubit_runtime/uv.lock"
 
 # Sdist mirror of the wheel's dev-tree pruning. Hatchling force-include walks a
 # directory mapping recursively and only skips the names in its own
