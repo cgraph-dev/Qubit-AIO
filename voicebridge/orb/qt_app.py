@@ -567,6 +567,87 @@ def ghost_canvas_px(px: Any) -> int:
         return value
 
 
+#: Atlas alpha (0..255) above which a pixel counts as "on the ghost".
+#: Measured on the live atlas: the solid body reaches r≈49 px, alpha>8 haze
+#: reaches r≈84 px (3% — invisible, yet clickable), and the edge a person
+#: actually sees is r≈63 px. 24 keeps the body plus its visible glow and
+#: drops the invisible padding ring that swallowed clicks.
+GHOST_HIT_ALPHA = 24
+
+
+def ghost_hit_test(x: Any, y: Any, window_px: Any, orb_px: Any,
+                   t: Any) -> "bool | None":
+    """Whether window-local ``(x, y)`` lands on the ghost sprite or its glow.
+
+    Uses the SAME placement as :func:`_paint_ghost` (the ghost body's centre on
+    the orb centre, ``ART_SPAN`` scaled to the orb diameter) and samples the
+    atlas ALPHA, so a click in the transparent padding beside the ghost is
+    rejected while the outer glow still counts.
+
+    Returns ``None`` when the atlas is unavailable (the caller falls back to a
+    circle), otherwise ``True``/``False``. Never raises.
+    """
+    try:
+        from . import ghost_atlas
+        atlas = ghost_atlas._atlas()
+        if atlas is None or atlas.w <= 0 or atlas.h <= 0:
+            return None
+        radius = max(4.0, float(orb_px) / 2.0 - 2.0)
+        scale = (radius * 2.0) / float(ghost_atlas.ART_SPAN)
+        if scale <= 0.0:
+            return None
+        body_cx, body_cy = _ghost_body_centre(atlas)
+        centre = float(window_px) / 2.0
+        left = centre - float(body_cx) * scale
+        top = centre - float(body_cy) * scale
+        sx = int(math.floor((float(x) - left) / scale))
+        sy = int(math.floor((float(y) - top) / scale))
+        if sx < 0 or sy < 0 or sx >= atlas.w or sy >= atlas.h:
+            return False
+        position = ghost_atlas.frame_position(t)
+        index = int(math.floor(position))
+        candidates = [index]
+        if position - math.floor(position) >= 0.5:
+            candidates.append(index + 1)
+        offset = (sy * atlas.w + sx) * 4 + 3
+        frame_size = atlas.w * atlas.h * 4
+        for frame_index in candidates:
+            alpha = atlas.body[((frame_index % atlas.frames) * frame_size)
+                               + offset]
+            if alpha > GHOST_HIT_ALPHA:
+                return True
+        return False
+    except Exception:  # noqa: BLE001 - a hit test must never break a click
+        return None
+
+
+def click_hits_orb(x: Any, y: Any, window_px: Any, orb_px: Any, style: Any,
+                   t: Any, collapsed: bool = False) -> bool:
+    """True when a press at window-local ``(x, y)`` is on the visible orb.
+
+    The window is a square larger than the artwork (the ghost canvas pads it for
+    the halo), so its transparent corners must not swallow clicks: the ghost is
+    hit-tested against its own frame alpha, and the vector marks and the
+    collapsed dot against their inscribed circle. Fail-open on error so a
+    broken atlas can never make the orb unclickable.
+    """
+    try:
+        w = float(window_px)
+        dx = float(x) - w / 2.0
+        dy = float(y) - w / 2.0
+        if collapsed:
+            r = max(1.0, w / 2.0 - 1.0)
+            return dx * dx + dy * dy <= r * r
+        if str(style or "").strip().lower() == "ghost":
+            hit = ghost_hit_test(x, y, window_px, orb_px, t)
+            if hit is not None:
+                return bool(hit)
+        r = max(1.0, float(orb_px) / 2.0)
+        return dx * dx + dy * dy <= r * r
+    except Exception:  # noqa: BLE001
+        return True
+
+
 def _fract(x: float) -> float:
     """Fractional part of ``x`` (frame-reproducible pseudo-randomness)."""
     return float(x) - math.floor(float(x))
@@ -3869,13 +3950,22 @@ if QWidget is not None:
         def mousePressEvent(self, ev: Any) -> None:
             try:
                 size = self._window_px()
+                px = float(ev.position().x())
+                py = float(ev.position().y())
+                # Only the visible mark (its glow included) is a click target:
+                # the transparent padding around it must not start a capture.
+                if not click_hits_orb(
+                        px, py, size, int(_geo.ORB_PX),
+                        _orb_style(getattr(self, "_options", None)),
+                        getattr(self, "_paint_t", 0.0),
+                        self._pos.collapsed):
+                    self._press = None
+                    return
                 self._press = {
                     "x": float(ev.globalPosition().x()),
                     "y": float(ev.globalPosition().y()),
                     "ox": self._pos.x, "oy": self._pos.y,
-                    "zone": zone_at(float(ev.position().x()),
-                                    float(ev.position().y()),
-                                    size, self._pos.collapsed),
+                    "zone": zone_at(px, py, size, self._pos.collapsed),
                     "dragging": False,
                 }
             except Exception:
@@ -3884,9 +3974,18 @@ if QWidget is not None:
         def mouseMoveEvent(self, ev: Any) -> None:
             press = self._press
             if not press:
-                # No chrome: the whole orb is the voice surface.
+                # No chrome: the mark is the voice surface. Point only when the
+                # cursor is actually on it, not on the transparent padding.
                 try:
-                    self.setCursor(Qt.PointingHandCursor)
+                    size = self._window_px()
+                    hit = click_hits_orb(
+                        float(ev.position().x()), float(ev.position().y()),
+                        size, int(_geo.ORB_PX),
+                        _orb_style(getattr(self, "_options", None)),
+                        getattr(self, "_paint_t", 0.0),
+                        self._pos.collapsed)
+                    self.setCursor(Qt.PointingHandCursor if hit
+                                   else Qt.ArrowCursor)
                 except Exception:
                     pass
                 return
