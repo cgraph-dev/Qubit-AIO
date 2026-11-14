@@ -1,0 +1,95 @@
+{
+  "task_id": "P7-05",
+  "status": "PASS",
+  "generated_at": "2026-11-14T14:31:19Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/office/world/exterior.py",
+      "sha256": "8a544fd2f66dfc8a3187720b8375558d936613713ff8faf65a17da13379dd82d"
+    },
+    {
+      "path": "voicebridge/office/world/outside_world.py",
+      "sha256": "8be5fa1bc43f8e8fec546cf4f84858659298d9da9f2614b36ee676d740b72f82"
+    },
+    {
+      "path": "voicebridge/business/memory.py",
+      "sha256": "bb3041e0bc05c57010475a5917663360d69cc0a94f8a9712e9ad91a976d5b4a9"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/office/world/outside_life.py",
+      "sha256": "1cf1ab38e0a32abc090cf3ca36488247ab4a7943cad786fbc08c4d8318029d3f"
+    },
+    {
+      "path": "scripts/verify_outside_life.py",
+      "sha256": "a66960d3cfe9dfcc0913dade5061a8db8fb37c968b1481a5f8c6b3f4aae6b2b9"
+    },
+    {
+      "path": "tests/phase7_outside_life/conftest.py",
+      "sha256": "c5c19e6953773781082834d40b5835f75612b231ead0c363fecbf8ae7daa462f"
+    },
+    {
+      "path": "tests/phase7_outside_life/test_outside_life.py",
+      "sha256": "cdf3cc50303db9980de9776c3d4ea3c0e71371cd44106496127e0ee11a6ff902"
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_outside_life.py --json",
+      "exit_code": 0,
+      "stdout_tail": "\"schema\": \"qubit-office-outside-life-verification/1\",\n  \"summary\": {\n    \"active_zones\": 5,\n    \"ambient\": 2,\n    \"ambient_truncated\": false,\n    \"environment_observed\": true,\n    \"environment_transitions\": 6,\n    \"ignored\": 2,\n    \"observed\": true,\n    \"social_denied\": 0,\n    \"social_edges\": 4,\n    \"social_nodes\": 7,\n    \"social_records\": 4,\n    \"source_events\": 9,\n    \"truncated\": false\n  }\n}",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase7_outside_life tests/phase6_outside",
+      "exit_code": 0,
+      "stdout_tail": "..............................                                           [100%]\n30 passed in 0.36s",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/office/world/outside_life.py scripts/verify_outside_life.py tests/phase7_outside_life",
+      "exit_code": 0,
+      "stdout_tail": "All checks passed!",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/office/world/outside_life.py scripts/verify_outside_life.py tests/phase7_outside_life/conftest.py tests/phase7_outside_life/test_outside_life.py",
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    }
+  ],
+  "limitations": [
+    "The projection consumes caller-supplied authoritative/source events; it does not subscribe to the live event log, and this lane does not persist social rows through MemoryService (wiring/persistence is a later integration step).",
+    "ACL enforcement is the injected SocialACL contract with ScopedSocialACL as the reference implementation; the production caller must inject its tenant/department/agent ACL.",
+    "Ambient sprite positions are deterministic hashes inside active zone bounds, not pathfinding or a movement simulation.",
+    "Expiry filtering only applies when the caller supplies 'now'; without a clock the supplied events are projected as recorded.",
+    "No renderer/UI integration is exercised in this lane; the projection payload is the contract surface.",
+    "No full repository matrix, no live service, no network, and no VERIFIED/COMPLETE claim."
+  ]
+}
