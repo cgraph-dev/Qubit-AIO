@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qubit.office/event.schema.json",
+  "title": "EventEnvelope (frozen v1)",
+  "description": "Append-only event envelope for the Business OS event log. Sequence is per aggregate and starts at 1. payload_hash binds the immutable payload; idempotency_key makes replay safe; correlation/causation make a chain auditable; retention/tombstone make deletion explicit. Mirrors bos_job_event (event_id, tenant_id, seq, kind, actor, created_at) while carrying the richer append-only contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "event_id": { "$ref": "#/$defs/Id" },
+    "aggregate_id": {
+      "$ref": "#/$defs/Id",
+      "description": "The aggregate/root record this event belongs to."
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Monotonic per-aggregate sequence; matches bos_job_event.seq > 0."
+    },
+    "type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.:-]{2,127}$"
+    },
+    "correlation_id": { "$ref": "#/$defs/Id" },
+    "causation_id": {
+      "type": ["string", "null"],
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "The event that caused this one; null for a root event."
+    },
+    "idempotency_key": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.:-]{8,128}$",
+      "description": "Deduplication key. Required: a replay with the same key is a no-op."
+    },
+    "tenant_id": { "$ref": "#/$defs/Id" },
+    "actor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "description": "Principal that produced the event (owner or agent id)."
+    },
+    "occurred_at": { "type": "string", "format": "date-time" },
+    "payload_hash": { "$ref": "#/$defs/Sha256" },
+    "payload_ref": { "type": "string", "maxLength": 1024 },
+    "policy_version": { "type": "string", "pattern": "^v[0-9]+(\\.[0-9]+)*$" },
+    "retention": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "class": { "enum": ["ephemeral", "standard", "extended", "legal-hold"] },
+        "until": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "required": ["class", "until"]
+    },
+    "tombstone": {
+      "type": "boolean",
+      "description": "True when the payload is deleted but the chain entry is retained."
+    }
+  },
+  "required": [
+    "event_id",
+    "aggregate_id",
+    "sequence",
+    "type",
+    "correlation_id",
+    "causation_id",
+    "idempotency_key",
+    "tenant_id",
+    "actor",
+    "occurred_at",
+    "payload_hash",
+    "policy_version",
+    "retention",
+    "tombstone"
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  }
+}

@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qubit.office/run.schema.json",
+  "title": "Run, Task, Workspace, Checkpoint, Lease (frozen v1)",
+  "description": "Durable execution records behind the Office projection. A Run has exactly one terminal state; unknown requires reconciliation. A Workspace has a single writer; a lease loss stops execution; a Checkpoint is a recovery point, not a chat summary.",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "Run": {
+      "type": "object",
+      "description": "One bounded execution of a task inside a session. Status mirrors the canonical run lifecycle; exactly one terminal state.",
+      "additionalProperties": false,
+      "properties": {
+        "run_id": { "$ref": "#/$defs/Id" },
+        "session_id": { "$ref": "#/$defs/Id" },
+        "task_id": { "$ref": "#/$defs/Id" },
+        "initiator": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "enum": ["owner", "agent", "system"] },
+            "id": { "$ref": "#/$defs/Id" }
+          },
+          "required": ["type", "id"]
+        },
+        "parent_run_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "model": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "provider": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "prompt_revision": { "type": "integer", "minimum": 1 },
+        "capability_snapshot_id": { "$ref": "#/$defs/Id" },
+        "budget_snapshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "currency": { "$ref": "#/$defs/Currency" },
+            "limit_minor": { "type": "integer", "minimum": 0 },
+            "spent_minor": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["currency", "limit_minor", "spent_minor"]
+        },
+        "lease_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "checkpoint_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "status": {
+          "enum": ["queued", "leased", "executing", "waiting", "approval", "checkpointed", "completed", "failed", "cancelled", "unknown"]
+        },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "terminal_at": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "required": [
+        "run_id",
+        "session_id",
+        "task_id",
+        "initiator",
+        "parent_run_id",
+        "model",
+        "provider",
+        "prompt_revision",
+        "capability_snapshot_id",
+        "budget_snapshot",
+        "lease_id",
+        "status",
+        "created_at",
+        "updated_at"
+      ]
+    },
+    "Task": {
+      "type": "object",
+      "description": "A durable task objective. Movement is append-only and handoff is explicit. Status mirrors bos_task.",
+      "additionalProperties": false,
+      "properties": {
+        "task_id": { "$ref": "#/$defs/Id" },
+        "objective": { "type": "string", "minLength": 1, "maxLength": 4000 },
+        "acceptance_criteria": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "priority": { "enum": ["low", "normal", "high", "urgent"] },
+        "owner": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "assignee": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "dependencies": { "type": "array", "items": { "$ref": "#/$defs/Id" } },
+        "required_capabilities": { "type": "array", "items": { "$ref": "#/$defs/Id" } },
+        "data_classification": { "enum": ["public", "internal", "confidential", "restricted"] },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "currency": { "$ref": "#/$defs/Currency" },
+            "limit_minor": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["currency", "limit_minor"]
+        },
+        "deadline": { "type": ["string", "null"], "format": "date-time" },
+        "status": { "enum": ["open", "doing", "done", "cancelled"] },
+        "artifact_ids": { "type": "array", "items": { "$ref": "#/$defs/Id" } }
+      },
+      "required": [
+        "task_id",
+        "objective",
+        "acceptance_criteria",
+        "priority",
+        "owner",
+        "assignee",
+        "dependencies",
+        "required_capabilities",
+        "data_classification",
+        "budget",
+        "deadline",
+        "status",
+        "artifact_ids"
+      ]
+    },
+    "Workspace": {
+      "type": "object",
+      "description": "Task-pinned working area with a single writer for mutable worktrees and immutable artifacts.",
+      "additionalProperties": false,
+      "properties": {
+        "workspace_id": { "$ref": "#/$defs/Id" },
+        "owner_scope": { "$ref": "#/$defs/Id" },
+        "task_id": { "$ref": "#/$defs/Id" },
+        "session_id": { "$ref": "#/$defs/Id" },
+        "repository_ref": { "type": ["string", "null"], "maxLength": 1024 },
+        "worktree_ref": { "type": ["string", "null"], "maxLength": 1024 },
+        "storage_class": { "enum": ["ephemeral", "persistent", "archive"] },
+        "access_policy": { "enum": ["owner", "business", "tenant"] },
+        "current_revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "artifact_manifest": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "artifact_id": { "$ref": "#/$defs/Id" },
+              "sha256": { "$ref": "#/$defs/Sha256" }
+            },
+            "required": ["artifact_id", "sha256"]
+          }
+        },
+        "retention_policy": { "type": "string", "minLength": 1, "maxLength": 64 }
+      },
+      "required": [
+        "workspace_id",
+        "owner_scope",
+        "task_id",
+        "session_id",
+        "repository_ref",
+        "worktree_ref",
+        "storage_class",
+        "access_policy",
+        "current_revision",
+        "artifact_manifest",
+        "retention_policy"
+      ]
+    },
+    "Checkpoint": {
+      "type": "object",
+      "description": "A recovery point capturing receipts, workspace and policy so a run can resume safely.",
+      "additionalProperties": false,
+      "properties": {
+        "checkpoint_id": { "$ref": "#/$defs/Id" },
+        "run_id": { "$ref": "#/$defs/Id" },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "state_summary": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "pending_actions": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "tool_receipts": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "artifact_ids": { "type": "array", "items": { "$ref": "#/$defs/Id" } },
+        "memory_writes": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "approvals": { "type": "array", "items": { "$ref": "#/$defs/Id" } },
+        "workspace_revision": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "policy_revision": { "type": "integer", "minimum": 1 },
+        "safe_resume_point": { "type": "boolean" }
+      },
+      "required": [
+        "checkpoint_id",
+        "run_id",
+        "sequence",
+        "state_summary",
+        "pending_actions",
+        "tool_receipts",
+        "artifact_ids",
+        "memory_writes",
+        "approvals",
+        "workspace_revision",
+        "policy_revision",
+        "safe_resume_point"
+      ]
+    },
+    "Lease": {
+      "type": "object",
+      "description": "A single-writer lease with a fencing token. Lease loss stops execution.",
+      "additionalProperties": false,
+      "properties": {
+        "lease_id": { "$ref": "#/$defs/Id" },
+        "resource": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "holder": { "$ref": "#/$defs/Id" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "heartbeat_at": { "type": "string", "format": "date-time" },
+        "fencing_token": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,64}$" }
+      },
+      "required": ["lease_id", "resource", "holder", "expires_at", "heartbeat_at", "fencing_token"]
+    }
+  }
+}

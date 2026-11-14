@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qubit.office/agent.schema.json",
+  "title": "AgentProfile (frozen v1)",
+  "description": "Effective agent profile projected over bos_agent (tenant_id, business_id, role_id, department, display_name, human_owner, room, desk, status, provider, model, ...). Authorization comes from security_principal_id, policy_revision and capability_grants only.",
+  "$comment": "desk_id and room_id are PRESENTATION/ORGANIZATIONAL metadata. They are never authorization inputs: a caller must not grant or deny a capability based on a desk or room. Authorization is security_principal_id + policy_revision + capability_grants (deny-by-default, no wildcard).",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "agent_id": { "$ref": "#/$defs/Id" },
+    "owner_id": { "$ref": "#/$defs/Id" },
+    "tenant_id": { "$ref": "#/$defs/Id" },
+    "business_ids": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
+    "department_id": { "$ref": "#/$defs/Id" },
+    "room_id": {
+      "type": ["string", "null"],
+      "$comment": "Presentation only; never an authorization input.",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "desk_id": {
+      "type": ["string", "null"],
+      "$comment": "Presentation only; never an authorization input.",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "role_id": { "$ref": "#/$defs/Id" },
+    "security_principal_id": { "$ref": "#/$defs/Id" },
+    "display_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "status": {
+      "enum": ["active", "paused", "revoked", "archived"],
+      "description": "Matches voicebridge.business.agents.AGENT_STATUSES."
+    },
+    "policy_revision": { "type": "integer", "minimum": 1 },
+    "autonomy_ceiling": {
+      "enum": ["L0", "L1", "L2", "L3", "L4", "L5"],
+      "description": "Matches voicebridge.business.agents.AUTONOMY_LEVELS."
+    },
+    "model_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "reasoning_effort": { "type": ["string", "null"], "maxLength": 32 },
+        "fallback_provider": { "type": ["string", "null"], "maxLength": 128 },
+        "fallback_model": { "type": ["string", "null"], "maxLength": 256 },
+        "temperature": { "type": ["number", "null"], "minimum": 0, "maximum": 2 },
+        "max_tokens": { "type": "integer", "minimum": 1 }
+      },
+      "required": ["provider", "model"]
+    },
+    "capability_grants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Id" },
+      "description": "Grant ids. Skills and desks cannot grant capabilities; only an explicit Grant can."
+    },
+    "skills": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+    "mcp_servers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "version": { "type": "string", "maxLength": 64 },
+          "schema_hash": { "$ref": "#/$defs/Sha256" },
+          "enabled": { "type": "boolean" }
+        },
+        "required": ["name", "enabled"]
+      }
+    },
+    "memory_scopes": {
+      "type": "array",
+      "items": { "enum": ["agent", "session", "task", "department", "office", "tenant"] }
+    },
+    "secret_refs": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[A-Za-z0-9_.:/-]{1,128}$" },
+      "description": "References to secrets (for example env:NAME), never secret values."
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "currency": { "$ref": "#/$defs/Currency" },
+        "period": { "enum": ["daily", "weekly", "monthly", "quarterly", "yearly"] },
+        "period_limit_minor": { "type": "integer", "minimum": 0 },
+        "per_turn_limit_minor": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["currency", "period", "period_limit_minor"]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "agent_id",
+    "owner_id",
+    "tenant_id",
+    "business_ids",
+    "department_id",
+    "room_id",
+    "desk_id",
+    "role_id",
+    "security_principal_id",
+    "display_name",
+    "status",
+    "policy_revision",
+    "autonomy_ceiling",
+    "model_policy",
+    "capability_grants",
+    "skills",
+    "mcp_servers",
+    "memory_scopes",
+    "secret_refs",
+    "budgets"
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "Sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Currency": {
+      "type": "string",
+      "pattern": "^[A-Z]{3}$"
+    }
+  }
+}
