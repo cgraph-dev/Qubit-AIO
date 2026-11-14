@@ -24,7 +24,7 @@ from voicebridge.capabilities import (
     Tier,
 )
 
-from _p8_helpers import (
+from _p8_security_helpers import (
     NOW,
     READ,
     RATE,
@@ -161,7 +161,7 @@ def test_asi04_unpinned_or_poisoned_mcp_tool_is_refused():
 
 # -- ASI05 unexpected code execution ---------------------------------------
 def test_asi05_sandbox_refuses_escape_and_ipc(tmp_path):
-    from _p8_helpers import sandbox_profile
+    from _p8_security_helpers import sandbox_profile
 
     profile = sandbox_profile(tmp_path, command_allowlist=("git",))
     with pytest.raises(BusinessError):

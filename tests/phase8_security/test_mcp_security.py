@@ -23,7 +23,7 @@ from voicebridge.integrations.etsy_auth import (
 )
 from voicebridge import mcp_client as mc
 
-from _p8_helpers import (
+from _p8_security_helpers import (
     MCP,
     NOW,
     Recorder,

@@ -7,7 +7,7 @@ import subprocess
 import sys
 import pytest
 
-from _p8_helpers import A11Y, ROOT, VERIFIER, _load
+from _p8_observability_helpers import A11Y, ROOT, VERIFIER, _load
 
 
 @pytest.fixture(scope="session")

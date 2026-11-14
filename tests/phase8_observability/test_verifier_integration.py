@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 
-from _p8_helpers import ROOT, VERIFIER
+from _p8_observability_helpers import ROOT, VERIFIER
 
 
 def test_verifier_reports_pass_with_every_check(verifier_report):

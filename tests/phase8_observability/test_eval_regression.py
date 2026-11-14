@@ -1,7 +1,7 @@
 """P8-04 — an eval regression or a missing required eval blocks release."""
 from __future__ import annotations
 
-from _p8_helpers import IDS, make_observability
+from _p8_observability_helpers import IDS, make_observability
 
 
 def _run_eval(tensor, *, name="contains_answer", score=1.0, passed=True):

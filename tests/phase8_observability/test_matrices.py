@@ -9,7 +9,7 @@ from __future__ import annotations
 import copy
 import json
 
-from _p8_helpers import PLUGIN
+from _p8_observability_helpers import PLUGIN
 
 
 def test_accessibility_matrix_consumes_the_real_audit(a11y_audit, tensor):

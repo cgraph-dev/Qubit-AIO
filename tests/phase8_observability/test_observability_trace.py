@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from _p8_helpers import IDS, PROMPT, SECRET, make_observability
+from _p8_observability_helpers import IDS, PROMPT, SECRET, make_observability
 
 
 def test_full_chain_has_every_stage_and_id(tensor):
