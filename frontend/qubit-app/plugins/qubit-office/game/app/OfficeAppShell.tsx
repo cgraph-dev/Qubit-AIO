@@ -23,6 +23,10 @@ import { createWarRoomPanel } from "./WarRoomPanel";
 import { createApprovalsPanel } from "./ApprovalsPanel";
 import { createCommandCenter } from "./CommandCenter";
 import { createTimeline } from "./Timeline";
+import { createRoomBuilder } from "./RoomBuilder";
+import { createOutsideWorld } from "./OutsideWorld";
+import { createPanelInventoryPanel } from "./PanelInventory";
+import { fetchOutsideWorld, type OutsideWorldView } from "./outside-world";
 import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
 import type { AgentSeat } from "./agents-panel";
@@ -140,6 +144,9 @@ type ShellComponents = {
   ApprovalsPanel: ReturnType<typeof createApprovalsPanel>;
   CommandCenter: ReturnType<typeof createCommandCenter>;
   Timeline: ReturnType<typeof createTimeline>;
+  RoomBuilder: ReturnType<typeof createRoomBuilder>;
+  OutsideWorld: ReturnType<typeof createOutsideWorld>;
+  PanelInventory: ReturnType<typeof createPanelInventoryPanel>;
   EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
@@ -182,6 +189,9 @@ function shellComponents(
     ApprovalsPanel: createApprovalsPanel(R, hooks),
     CommandCenter: createCommandCenter(R, hooks),
     Timeline: createTimeline(R, hooks),
+    RoomBuilder: createRoomBuilder(R, hooks),
+    OutsideWorld: createOutsideWorld(R, hooks),
+    PanelInventory: createPanelInventoryPanel(R, hooks),
     EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
@@ -249,6 +259,12 @@ export function createOfficeApp(
     // The operator timeline (P4-07). Declared last so every seeded state
     // index in the shell's own tests stays stable.
     const [timelineOpen, setTimelineOpen] = useState(false);
+    // Phase 6 Studio dock (panel inventory / room builder / outside world).
+    const [studioOpen, setStudioOpen] = useState(false);
+    const [studioTab, setStudioTab] = useState<"panels" | "rooms" | "outside">(
+      "panels");
+    const [outsideView, setOutsideView] = useState<OutsideWorldView | null>(
+      null);
     // P6-05 accessibility preferences. Declared AFTER every earlier slot so
     // seeded state indices in the shell's own tests stay stable. The OS
     // preference is honoured by default; an explicit shell setting could win
@@ -261,8 +277,18 @@ export function createOfficeApp(
     // Stable across renders — see shellComponents().
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
-      ApprovalsPanel, CommandCenter, Timeline, EtsyConnectPanel, LoadingScreen,
+      ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld,
+      PanelInventory, EtsyConnectPanel, LoadingScreen,
     } = shellComponents(R, hooks, props.base);
+    useEffect(() => {
+      if (!studioOpen || studioTab !== "outside") return;
+      let live = true;
+      const ctl = typeof AbortController === "undefined" ? undefined
+        : new AbortController();
+      fetchOutsideWorld({ base: props.base, signal: ctl?.signal })
+        .then((view) => { if (live) setOutsideView(view); });
+      return () => { live = false; ctl?.abort(); };
+    }, [studioOpen, studioTab, props.base]);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
@@ -1054,6 +1080,27 @@ export function createOfficeApp(
       },
     }, "Timeline");
 
+    const studioToggle = R.createElement("button", {
+      key: "studio-toggle",
+      type: "button",
+      className: "office-game__btn office-theme-menu-btn office-game__studioToggle",
+      "data-testid": "office-studio-toggle",
+      "aria-expanded": studioOpen,
+      "aria-controls": "office-game-studio-dock",
+      "aria-label": "Open the office studio",
+      onClick: () => {
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setCommandCenterOpen(false);
+        setTimelineOpen(false);
+        setControlSeat(null);
+        setStudioOpen((v: boolean) => !v);
+      },
+    }, "Studio");
+
     // P6-05 — a real toolbar landmark groups the persistent shell controls.
     // It is also the skip target that gets a keyboard user OUT of the canvas
     // when the vendored client swallows Tab (and the Escape escape hatch).
@@ -1065,7 +1112,7 @@ export function createOfficeApp(
       role: "toolbar",
       "aria-label": "Office panels",
       tabIndex: -1,
-    }, [commandCenterToggle, timelineToggle]));
+    }, [commandCenterToggle, timelineToggle, studioToggle]));
 
     // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
     // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full
@@ -1087,6 +1134,59 @@ export function createOfficeApp(
           base: props.base,
           onClose: () => setTimelineOpen(false),
         }),
+      ]));
+    }
+
+    if (studioOpen) {
+      const tab = (id: "panels" | "rooms" | "outside", label: string) =>
+        R.createElement("button", {
+          key: `studio-tab-${id}`, type: "button",
+          className: "office-game__btn office-game__studioTab",
+          "data-testid": `office-studio-tab-${id}`,
+          "aria-pressed": studioTab === id,
+          onClick: () => setStudioTab(id),
+        }, label);
+      const body = studioTab === "rooms"
+        ? R.createElement(RoomBuilder as never, { key: "rooms" })
+        : studioTab === "outside"
+        ? R.createElement(OutsideWorld as never, {
+            key: "outside",
+            view: outsideView ?? undefined,
+            loading: outsideView === null,
+          })
+        : R.createElement(PanelInventory as never, {
+            key: "panels", base: props.base,
+          });
+      children.push(R.createElement("div", {
+        key: "studio-dock",
+        id: "office-game-studio-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__studioDock",
+        "data-testid": "office-game-studio-dock",
+        "data-office-dock": "studio",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Office studio",
+      }, [
+        R.createElement("div", {
+          key: "head", className: "office-game__dockHead office-theme-dock-head",
+        }, [
+          R.createElement("span", {
+            key: "t", className: "office-theme-dock-title",
+          }, "Studio"),
+          tab("panels", "Panels"),
+          tab("rooms", "Rooms"),
+          tab("outside", "Outside"),
+          R.createElement("button", {
+            key: "x", type: "button",
+            className: "office-game__btn office-theme-dock-close",
+            "data-testid": "office-game-studio-close",
+            "aria-label": "Close studio",
+            onClick: () => setStudioOpen(false),
+          }, "Close"),
+        ]),
+        R.createElement("div", {
+          key: "body", className: "office-game__studioBody",
+        }, body),
       ]));
     }
 
@@ -1126,7 +1226,7 @@ export function createOfficeApp(
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
     const dockOpen = agentsOpen || hudOpen || warRoomOpen
       || controlSeat !== null || approvalsOpen || etsyOpen
-      || commandCenterOpen || timelineOpen;
+      || commandCenterOpen || timelineOpen || studioOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,

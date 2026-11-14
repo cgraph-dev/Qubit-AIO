@@ -13,7 +13,7 @@
       "exit_code": 0
     }
   ],
-  "generated_at": "2026-11-14T06:06:37Z",
+  "generated_at": "2026-11-14T14:12:33Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -26,7 +26,7 @@
   "outputs": [
     {
       "path": "evidence/phase-0/contract.json",
-      "sha256": "24a2faf05d470afb4ccc381827b8384ebbf23f47ef83140f34d36e82c484ec0c"
+      "sha256": "f96c68a87fa6c4a55f16c276406004c5aeb1e0c4bb788100662f1123724ecbb4"
     }
   ],
   "status": "PASS",

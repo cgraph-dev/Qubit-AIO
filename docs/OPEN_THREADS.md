@@ -1,5 +1,22 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 6 Character Studio/UI/world accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-6.sh` exits 0 and writes `evidence/phase-6/manifest.json`
+(`status: PASS`) after accepted Phase 0–5 manifests. Five lanes: P6-01 Character Studio adapters
+(Habblaud/LimeZu character/portrait projections, 23 verifier checks, 35 UI tests); P6-02 room
+builder/styles (draft→preview→validate→approve→publish/undo/rollback, 16×12 cells, paths/egress/
+collision/capacity, unique department style; 29 checks, 26 UI tests); P6-03 outside-world
+presentation (landmarks/lobby/elevators/weather/day-night, active-zone only) and P6-06 licence-aware
+asset build + local-first sync/conflict/export/exit (provenance required, paid-art leak scan, safe
+close); P6-04 a 21-panel inventory with authority/permissions/empty/error/retry/typed refusal/real
+action per panel; P6-05 WCAG 2.2 AA shell wiring (skip links, focus restore, live announcements,
+reduced-motion, 24px targets, reflow) plus a deterministic accessibility audit. The lead mounted a
+**Studio dock** (Panel Inventory / Room Builder / Outside World) in `OfficeAppShell`; the full
+Phase 6 UI suite is **199 passed**. **Measured:** gates 0–6 PASS; broad business/office/world/UI
+regression **1042 passed**. **Honest limits:** axe-core is unavailable offline (no axe run claimed),
+no real screen-reader/zoom/touch session, no live browser E2E; paid art was not read; the committed
+game bundle was not rebuilt; no full matrix, no `VERIFIED`. Next: Phase 7 interactions/FX/simulation.
+
 **Qubit Office Phase 5 business operations accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
 `bash scripts/acceptance/phase-5.sh` exits 0 and writes `evidence/phase-5/manifest.json`
 (`status: PASS`) after accepted Phase 0–4 manifests. Five lanes: P5-01 Etsy sandbox operations

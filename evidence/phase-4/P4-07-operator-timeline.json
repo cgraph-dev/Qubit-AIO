@@ -5,28 +5,28 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "BFQ13PV2DPVB': 'completed', 'job_01M7C8ECRD8QD0CC28BE9829WQ': 'unknown'}\",\n      \"name\": \"run_status_from_durable_row\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"claim job projected 'unknown'\",\n      \"name\": \"claim_without_evidence_is_unknown\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"unknown job projected 'unknown'\",\n      \"name\": \"unknown_stays_unknown\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"artifact job projected 'completed'\",\n      \"name\": \"evidence_job_is_completed\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"receipt job projected 'completed'\",\n      \"name\": \"receipt_job_is_completed\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"offenders=[]\",\n      \"name\": \"no_completed_without_evidence\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"offenders=[]\",\n      \"name\": \"pending_is_never_completed\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"reconciled runs=['job_01M7C8ECRD8QD0CC28BE9829WQ']\",\n      \"name\": \"unknown_has_reconciliation\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"projected debit/credit=1200/5000 sql=1200/5000\",\n      \"name\": \"cost_matches_ledger\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"timestamps are non-decreasing\",\n      \"name\": \"chronological\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"offenders=[]\",\n      \"name\": \"causation_before_effect\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"mode='replay' effects='stubbed'\",\n      \"name\": \"replay_labelled_stubbed\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"audit rows before/after=38/38\",\n      \"name\": \"replay_writes_nothing\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"replay statuses equal the live projection\",\n      \"name\": \"replay_preserves_truth\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"other tenant=ten_01M7C8ECW1JEKYVYRC13WER2W0 leaked=0\",\n      \"name\": \"tenant_isolation\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"audit rows before/after=41/41\",\n      \"name\": \"projection_is_read_only\",\n      \"ok\": true\n    }\n  ],\n  \"generated_at\": \"2026-11-14T05:28:21Z\",\n  \"limitations\": [\n    \"Hermetic seed only: a throwaway SQLite store built through the real services, not live operator data.\",\n    \"The verifier checks the projection's claims against raw SQL; it does not run a browser, the vendored office client, or any live service.\",\n    \"No network, model, provider, credential or real business record is touched. Replay performs no effect; nothing is resumed or approved.\"\n  ],\n  \"problems\": [],\n  \"task_id\": \"P4-07\",\n  \"valid\": true\n}\n"
+      "stdout_tail": "      \"detail\": \"other tenant=ten_01M7D6D5P6C28ZF45P0HHYQ429 leaked=0\",\n      \"name\": \"tenant_isolation\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"audit rows before/after=41/41\",\n      \"name\": \"projection_is_read_only\",\n      \"ok\": true\n    }\n  ],\n  \"generated_at\": \"2026-11-14T14:11:58Z\",\n  \"limitations\": [\n    \"Hermetic seed only: a throwaway SQLite store built through the real services, not live operator data.\",\n    \"The verifier checks the projection's claims against raw SQL; it does not run a browser, the vendored office client, or any live service.\",\n    \"No network, model, provider, credential or real business record is touched. Replay performs no effect; nothing is resumed or approved.\"\n  ],\n  \"problems\": [],\n  \"task_id\": \"P4-07\",\n  \"valid\": true\n}"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase4_operator_ui tests/test_business_office_bridge.py",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".......................................                                  [100%]\n39 passed in 4.07s\n"
+      "stdout_tail": ".......................................                                  [100%]\n39 passed in 4.12s"
     },
     {
       "cmd": "bash -lc 'set -e; created=0; if [ ! -e frontend/qubit-web/node_modules ]; then ln -s /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules; created=1; fi; cd frontend/qubit-web; npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/timeline.test.ts ../qubit-app/plugins/qubit-office/game/app/Timeline.test.ts ../qubit-app/plugins/qubit-office/game/app/Timeline.shell.test.ts ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.test.ts ../qubit-app/plugins/qubit-office/game/app/dock-layout.test.ts; rc=$?; if [ \"$created\" = 1 ]; then rm -f node_modules; fi; exit $rc'",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p4-operator-ui/frontend/qubit-web\n\n\n Test Files  5 passed (5)\n      Tests  62 passed (62)\n   Start at  07:28:26\n   Duration  603ms (transform 925ms, setup 0ms, import 1.20s, tests 417ms, environment 1ms)\n\n"
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  5 passed (5)\n      Tests  62 passed (62)\n   Start at  16:12:03\n   Duration  608ms (transform 960ms, setup 0ms, import 1.24s, tests 409ms, environment 0ms)"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/operator_timeline.py voicebridge/business/bridge.py scripts/verify_operator_timeline.py tests/phase4_operator_ui",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "All checks passed!\n"
+      "stdout_tail": "All checks passed!"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/operator_timeline.py voicebridge/business/bridge.py voicebridge/qubit_compat.py scripts/verify_operator_timeline.py tests/phase4_operator_ui/test_operator_timeline.py",
@@ -34,16 +34,9 @@
       "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
-    },
-    {
-      "cmd": "./node_modules/.bin/tsc --ignoreConfig --noEmit --strict --target ES2023 --module ESNext --moduleResolution bundler --skipLibCheck --verbatimModuleSyntax --jsx react-jsx ../qubit-app/plugins/qubit-office/game/app/timeline.ts ../qubit-app/plugins/qubit-office/game/app/Timeline.tsx ../qubit-app/plugins/qubit-office/game/app/timeline-fixtures.ts",
-      "exit_code": 2,
-      "expected_exit": 2,
-      "stderr_tail": "",
-      "stdout_tail": "../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts(36,20): error TS2307: Cannot find module 'phaser' or its corresponding type declarations.\n../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts(58,22): error TS2339: Property 'textures' does not exist on type 'OfficeScene'.\n../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts(65,12): error TS2339: Property 'add' does not exist on type 'OfficeScene'.\n"
     }
   ],
-  "generated_at": "2026-11-14T05:28:28Z",
+  "generated_at": "2026-11-14T14:12:04Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -73,7 +66,8 @@
     "The UI evidence is unit/component-level (Vitest with the shared test harness), not a live browser run; no service was restarted.",
     "The tsc invocation is expected to exit 2 because it pulls in pre-existing PhaserSceneHost errors (missing 'phaser' types); the new files themselves report no type errors.",
     "voicebridge/qubit_compat.py was excluded from the ruff command: at HEAD it already reports four E402 module-level-import errors (lines 21923-21933), reproduced byte-identically from HEAD; the P4-07 route edit adds none.",
-    "No VERIFIED/COMPLETE/100% claim is made."
+    "No VERIFIED/COMPLETE/100% claim is made.",
+    "refresh failures: command 6 exited 127, expected 2"
   ],
   "outputs": [
     {
@@ -122,7 +116,7 @@
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx",
-      "sha256": "05f0c85393566a934f8527a741f891fc16e02577513a4a3af37218359e986f80"
+      "sha256": "41ffcc3104ce83b5af8e01a9dcdff459c5b7233f40a5caebf8cd6427ad94f92f"
     }
   ],
   "status": "PASS",

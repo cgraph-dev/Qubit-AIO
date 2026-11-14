@@ -16,8 +16,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T06:07:02Z",
-  "git_head": "7c45526941b3d517a24005f6d96d1673f0e065ac",
+  "generated_at": "2026-11-14T14:13:08Z",
+  "git_head": "0ce57207ef8bc9c4d52215fbf1d9dad59273df35",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",
@@ -101,7 +101,7 @@
       "task_id": "P1-09"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.uw8TKj/reference",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.qba9pI/reference",
       "evidence": [
         "evidence/phase-1/P1-10-reference-lane.json"
       ],

@@ -6,15 +6,15 @@
     "evidence/phase-4/P4-04-capability-runtime.json": "b8085dc316664f41d325b7928e72ea5bd454db672b70e91337c41faeb8bd623c",
     "evidence/phase-4/P4-05-memory-projections.json": "a4071da0db735da2ff992bd1b8b24b8f4606f00c70b2c162fe495c75a11f4ffc",
     "evidence/phase-4/P4-06-safety.json": "0d6974b58e6d9b23a592000c7994c0fd9f177fc7d730e11f28a1e65872f56786",
-    "evidence/phase-4/P4-07-operator-timeline.json": "0b9ab59fcf24f8405d586878b4906230488eb88efbf806baa818c5a227361565"
+    "evidence/phase-4/P4-07-operator-timeline.json": "387af49cd5decbc9e9b16fc3daadbbabd35f48523cc0246387acc05126752927"
   },
   "evidence_verification": {
     "checked": 7,
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T06:07:57Z",
-  "git_head": "7c45526941b3d517a24005f6d96d1673f0e065ac",
+  "generated_at": "2026-11-14T14:14:08Z",
+  "git_head": "0ce57207ef8bc9c4d52215fbf1d9dad59273df35",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",

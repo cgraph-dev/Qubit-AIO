@@ -4,17 +4,17 @@
     "evidence/phase-3/P3-02-room-capabilities.json": "c262c18b33b3e2600157b20ba98c777d6d5768d418aec8b378c2dc01c12408bb",
     "evidence/phase-3/P3-03-map-schema.json": "ab9eee61e1094b5209f20b86bce4915bc9882d13a4368627b7586be49724bd18",
     "evidence/phase-3/P3-04-renderer.json": "094fe66255a6b9e06f8f84f0a43e7019d3459af77b7c928759bba5ef0caf1c51",
-    "evidence/phase-3/P3-05-command-center.json": "d2a5f455f2a3ba9393b8ff99ab26203f384a9f8830ba5fadf117bb3d6f81a306",
+    "evidence/phase-3/P3-05-command-center.json": "45b274eaea890cb513ad228ad4839be81dd7b299c58e82e49fc147962a0533e4",
     "evidence/phase-3/P3-06-exterior.json": "85ff6e0d86099b21d9cc3cd57b131cb78514a32fd6532de05240964915ab7d88",
-    "evidence/phase-3/P3-07-character-studio.json": "f8ed4748e2d7ce731be82a7fb0643e2d3284240105ca145fd3a2a22d97a55017"
+    "evidence/phase-3/P3-07-character-studio.json": "c826f97655397bae7797deb98ff9bb8cf74ac3097a4c8671fe1e85e93a71ad29"
   },
   "evidence_verification": {
     "checked": 7,
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T06:07:33Z",
-  "git_head": "7c45526941b3d517a24005f6d96d1673f0e065ac",
+  "generated_at": "2026-11-14T14:13:41Z",
+  "git_head": "0ce57207ef8bc9c4d52215fbf1d9dad59273df35",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",
