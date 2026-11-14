@@ -10,7 +10,7 @@ and ``BEFORE DELETE`` triggers that raise ``ABORT``. A correction is a new row.
 """
 from __future__ import annotations
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 _V1 = [
     """
@@ -579,8 +579,275 @@ for _table in ("bos_checkpoint",):
         """
     )
 
+# -- v4: identity/RBAC, authoritative event log, run/task/workspace/lease --
+# Additive only. v1-v3 are untouched.
+#
+# * Identity: principals are per-tenant; a grant is a *revocable* mutable row
+#   (changing authority must be auditable, so grant/revoke writes an audit
+#   consequence). Policy revisions are append-only: a new revision is a new row.
+# * Event log: ``bos_event`` is append-only by trigger. ``bos_projection_checkpoint``
+#   is intentionally mutable (a checkpoint advances); rebuilds read the log, not
+#   the checkpoint.
+# * ``bos_task`` already exists from v1 with a legacy four-value ``status``
+#   CHECK. SQLite cannot widen a CHECK constraint in place, so the durable
+#   workflow status is added as a new ``workflow_status`` column (with the P1-04
+#   domain) plus the objective/ownership/dependency fields. Legacy
+#   ``status``/``assigned_to`` keep their meaning and rows, and ``task_class``
+#   separates legacy business tasks from durable execution tasks.
+_V4 = [
+    """
+    CREATE TABLE bos_principal (
+        principal_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        kind TEXT NOT NULL CHECK(kind IN ('owner','agent','service','run')),
+        external_ref TEXT,
+        status TEXT NOT NULL DEFAULT 'active'
+            CHECK(status IN ('active','suspended','revoked')),
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, external_ref)
+    )
+    """,
+    """
+    CREATE INDEX bos_principal_listing
+        ON bos_principal(tenant_id, kind, status)
+    """,
+    """
+    CREATE TABLE bos_role (
+        role_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        name TEXT NOT NULL,
+        permissions_json TEXT NOT NULL DEFAULT '[]',
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, name)
+    )
+    """,
+    """
+    CREATE TABLE bos_grant (
+        grant_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        subject_id TEXT NOT NULL REFERENCES bos_principal(principal_id)
+            ON DELETE RESTRICT,
+        role_id TEXT REFERENCES bos_role(role_id) ON DELETE RESTRICT,
+        capability TEXT NOT NULL,
+        resource TEXT NOT NULL,
+        action TEXT NOT NULL,
+        data_class TEXT NOT NULL DEFAULT 'internal',
+        environment TEXT NOT NULL DEFAULT 'production',
+        effect TEXT NOT NULL DEFAULT 'allow' CHECK(effect IN ('allow','deny')),
+        expires_at REAL,
+        approval_required INTEGER NOT NULL DEFAULT 0
+            CHECK(approval_required IN (0,1)),
+        revoked_at TEXT,
+        created_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX bos_grant_subject
+        ON bos_grant(tenant_id, subject_id, capability, resource, action)
+    """,
+    """
+    CREATE INDEX bos_grant_expiry
+        ON bos_grant(tenant_id, expires_at)
+    """,
+    """
+    CREATE TABLE bos_auth_session (
+        auth_session_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        subject_id TEXT NOT NULL REFERENCES bos_principal(principal_id)
+            ON DELETE RESTRICT,
+        audience TEXT NOT NULL,
+        issued_at TEXT NOT NULL,
+        expires_at REAL NOT NULL,
+        revoked_at TEXT,
+        token_hash TEXT NOT NULL UNIQUE
+    )
+    """,
+    """
+    CREATE INDEX bos_auth_session_subject
+        ON bos_auth_session(tenant_id, subject_id, expires_at)
+    """,
+    """
+    CREATE TABLE bos_policy_revision (
+        revision_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        version TEXT NOT NULL,
+        effective_at TEXT NOT NULL,
+        doc_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, version)
+    )
+    """,
+    """
+    CREATE INDEX bos_policy_revision_listing
+        ON bos_policy_revision(tenant_id, effective_at)
+    """,
+    """
+    CREATE TABLE bos_event (
+        event_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        aggregate_id TEXT NOT NULL,
+        seq INTEGER NOT NULL CHECK(seq > 0),
+        type TEXT NOT NULL,
+        actor TEXT NOT NULL,
+        correlation_id TEXT NOT NULL,
+        causation_id TEXT,
+        idempotency_key TEXT NOT NULL,
+        payload_hash TEXT NOT NULL,
+        payload_json TEXT NOT NULL DEFAULT '{}',
+        policy_version TEXT NOT NULL DEFAULT 'v1',
+        occurred_at TEXT NOT NULL,
+        retention_class TEXT NOT NULL DEFAULT 'standard'
+            CHECK(retention_class IN
+                ('ephemeral','standard','extended','legal-hold')),
+        tombstoned_at TEXT,
+        created_at TEXT NOT NULL,
+        UNIQUE(tenant_id, aggregate_id, seq),
+        UNIQUE(tenant_id, idempotency_key)
+    )
+    """,
+    """
+    CREATE INDEX bos_event_aggregate
+        ON bos_event(tenant_id, aggregate_id, seq)
+    """,
+    """
+    CREATE INDEX bos_event_timeline
+        ON bos_event(tenant_id, occurred_at, event_id)
+    """,
+    """
+    CREATE TABLE bos_projection_checkpoint (
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        projection TEXT NOT NULL,
+        aggregate_id TEXT NOT NULL DEFAULT '',
+        last_seq INTEGER NOT NULL DEFAULT 0 CHECK(last_seq >= 0),
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY(tenant_id, projection, aggregate_id)
+    )
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN objective TEXT NOT NULL DEFAULT ''
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN owner_principal TEXT
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN assignee_principal TEXT
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN dependencies_json TEXT NOT NULL DEFAULT '[]'
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN required_capabilities_json
+        TEXT NOT NULL DEFAULT '[]'
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN data_class TEXT NOT NULL DEFAULT 'internal'
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN budget_json TEXT NOT NULL DEFAULT '{}'
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN deadline TEXT
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN acceptance_json TEXT NOT NULL DEFAULT '[]'
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN artifact_ids_json TEXT NOT NULL DEFAULT '[]'
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN task_class TEXT NOT NULL DEFAULT 'business'
+        CHECK(task_class IN ('business','execution'))
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN workflow_status TEXT NOT NULL DEFAULT 'draft'
+        CHECK(workflow_status IN
+            ('draft','assigned','claimed','blocked','handed_off',
+             'completed','rejected','cancelled'))
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN handed_off_from TEXT
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN handed_off_to TEXT
+    """,
+    """
+    ALTER TABLE bos_task ADD COLUMN read_only INTEGER NOT NULL DEFAULT 0
+        CHECK(read_only IN (0,1))
+    """,
+    """
+    CREATE INDEX bos_task_workflow
+        ON bos_task(tenant_id, business_id, workflow_status)
+    """,
+    """
+    CREATE TABLE bos_workspace (
+        workspace_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        task_id TEXT NOT NULL REFERENCES bos_task(task_id) ON DELETE RESTRICT,
+        session_id TEXT NOT NULL,
+        repository_ref TEXT,
+        worktree_ref TEXT,
+        storage_class TEXT NOT NULL DEFAULT 'ephemeral'
+            CHECK(storage_class IN ('ephemeral','persistent','archive')),
+        access_policy_json TEXT NOT NULL DEFAULT '{}',
+        current_revision TEXT NOT NULL,
+        artifact_manifest_json TEXT NOT NULL DEFAULT '[]',
+        retention_policy TEXT NOT NULL DEFAULT 'standard',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+    )
+    """,
+    """
+    CREATE INDEX bos_workspace_task
+        ON bos_workspace(tenant_id, task_id, workspace_id)
+    """,
+    """
+    CREATE TABLE bos_lease (
+        lease_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        resource_type TEXT NOT NULL,
+        resource_id TEXT NOT NULL,
+        holder TEXT NOT NULL,
+        fencing_token TEXT NOT NULL,
+        acquired_at TEXT NOT NULL,
+        expires_at REAL NOT NULL,
+        heartbeat_at TEXT NOT NULL,
+        released_at TEXT
+    )
+    """,
+    """
+    CREATE UNIQUE INDEX bos_lease_active
+        ON bos_lease(tenant_id, resource_type, resource_id)
+        WHERE released_at IS NULL
+    """,
+    """
+    CREATE INDEX bos_lease_holder
+        ON bos_lease(tenant_id, holder, released_at)
+    """,
+]
+
+for _table in ("bos_event", "bos_policy_revision"):
+    _V4.append(
+        f"""
+        CREATE TRIGGER {_table}_no_update
+        BEFORE UPDATE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+    _V4.append(
+        f"""
+        CREATE TRIGGER {_table}_no_delete
+        BEFORE DELETE ON {_table}
+        BEGIN
+            SELECT RAISE(ABORT, '{_table} is append-only');
+        END
+        """
+    )
+
 MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
     (1, tuple(_V1)),
     (2, tuple(_V2)),
     (3, tuple(_V3)),
+    (4, tuple(_V4)),
 )

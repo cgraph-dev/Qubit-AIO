@@ -180,7 +180,7 @@ def test_restore_from_a_copied_file_preserves_every_record(tmp_path):
     ) == 2
 
 
-def test_v1_v2_database_migrates_to_v3_and_keeps_rows(tmp_path):
+def test_v1_v2_database_migrates_to_current_and_keeps_rows(tmp_path):
     path = tmp_path / "legacy.db"
     conn = sqlite3.connect(path)
     try:
@@ -219,8 +219,9 @@ def test_v1_v2_database_migrates_to_v3_and_keeps_rows(tmp_path):
         business_names = [
             row[0] for row in read_conn.execute("SELECT name FROM bos_business")
         ]
-    assert version == SCHEMA_VERSION == 3
+    assert version == SCHEMA_VERSION == 4
     assert {"bos_checkpoint", "bos_outbox"} <= tables
+    assert {"bos_principal", "bos_event", "bos_workspace", "bos_lease"} <= tables
     # The v1/v2 tables and their rows are untouched.
     assert {"bos_job", "bos_agent", "bos_ledger_entry"} <= tables
     assert tenant_names == ["Legacy"]
@@ -232,10 +233,10 @@ def test_v1_v2_database_migrates_to_v3_and_keeps_rows(tmp_path):
         state={"ok": True}, actor="tester",
     )
 
-    # Opening an already-v3 file again is idempotent.
+    # Opening an already-current file again is idempotent.
     again = BusinessStore(path)
     with again.read() as read_conn:
-        assert int(read_conn.execute("PRAGMA user_version").fetchone()[0]) == 3
+        assert int(read_conn.execute("PRAGMA user_version").fetchone()[0]) == SCHEMA_VERSION
         assert read_conn.execute(
             "SELECT COUNT(*) FROM bos_checkpoint"
         ).fetchone()[0] == 1
