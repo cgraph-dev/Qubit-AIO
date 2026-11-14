@@ -1610,6 +1610,38 @@
   font-size: var(--office-fs-xs);
 }
 
+.tower__liveFloors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s1);
+  padding: var(--office-s1) 0;
+}
+
+.tower__liveLabel {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  margin-right: var(--office-s1);
+}
+
+.tower__liveFloor {
+  appearance: none;
+  border: var(--office-border);
+  background: var(--office-plate);
+  color: var(--office-ink);
+  border-radius: var(--office-radius);
+  padding: var(--office-s1) var(--office-s2);
+  font-size: var(--office-fs-xs);
+  cursor: pointer;
+}
+
+.tower__liveFloor:hover,
+.tower__liveFloor:focus-visible {
+  border-color: var(--office-accent);
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
+}
+
 .tower__empty {
   padding: var(--office-s2);
   border: var(--office-border);

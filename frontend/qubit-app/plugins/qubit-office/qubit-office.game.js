@@ -197527,7 +197527,38 @@ create: function(game) {
 					key: "honesty",
 					className: "tower__honesty",
 					"data-testid": "tower-honesty"
-				}, "Tower directory and room scenes — a navigation layer over the real floor templates, not a rendered 3D scene. Only the selected floor paints rooms; the other 99 stay a directory."),
+				}, "Tower directory and room scenes — a navigation layer over the real floor templates, not a rendered 3D scene. Use a live floor to see the animated office with its real characters; template floors have no staff."),
+				props.onOpenLiveFloor ? R.createElement("div", {
+					key: "liveFloors",
+					className: "tower__liveFloors",
+					"data-testid": "tower-live-floors"
+				}, [
+					R.createElement("span", {
+						key: "label",
+						className: "tower__liveLabel"
+					}, "Live office floors"),
+					R.createElement("button", {
+						key: "f1",
+						type: "button",
+						className: "tower__liveFloor",
+						"data-testid": "tower-open-live-1",
+						onClick: () => props.onOpenLiveFloor?.("live:1")
+					}, "1 · Executive"),
+					R.createElement("button", {
+						key: "f2",
+						type: "button",
+						className: "tower__liveFloor",
+						"data-testid": "tower-open-live-2",
+						onClick: () => props.onOpenLiveFloor?.("live:2")
+					}, "2 · Operations"),
+					R.createElement("button", {
+						key: "f3",
+						type: "button",
+						className: "tower__liveFloor",
+						"data-testid": "tower-open-live-3",
+						onClick: () => props.onOpenLiveFloor?.("live:3")
+					}, "3 · Review")
+				]) : null,
 				body
 			]);
 		};
@@ -207975,7 +208006,11 @@ create: function(game) {
 				}, `Campus unavailable: ${campusError}`) : campusDirectory ? R.createElement(TowerNavigator, {
 					key: "tower",
 					floors: campusDirectory.floors,
-					world: campusWorld
+					world: campusWorld,
+					onOpenLiveFloor: (scope) => {
+						setFloorScope(scope);
+						setCampusOpen(false);
+					}
 				}) : null;
 				children.push(R.createElement("section", {
 					key: "campus",

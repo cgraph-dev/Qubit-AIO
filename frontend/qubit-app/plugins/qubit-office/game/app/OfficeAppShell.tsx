@@ -1295,6 +1295,10 @@ export function createOfficeApp(
             key: "tower",
             floors: campusDirectory.floors,
             world: campusWorld,
+            onOpenLiveFloor: (scope: string) => {
+              setFloorScope(scope);
+              setCampusOpen(false);
+            },
           })
         : null;
       children.push(R.createElement("section", {

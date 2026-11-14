@@ -34,6 +34,13 @@ export interface TowerNavigatorProps {
   onSelect?: (floor: FloorTemplate) => void;
   /** Called when the detail is closed. */
   onClose?: () => void;
+  /**
+   * Open one of the real live floors in the animated renderer. The directory
+   * itself only has templates; the real rooms/characters live in the office
+   * store's floors, so this is the bridge from a floor to what is actually
+   * staffed. Scopes are ``live:<number>``.
+   */
+  onOpenLiveFloor?: (scope: string) => void;
 }
 
 function wingTitle(wing: string): string {
@@ -607,8 +614,34 @@ export function createTowerNavigator(
         key: "honesty", className: "tower__honesty",
         "data-testid": "tower-honesty",
       }, "Tower directory and room scenes — a navigation layer over the real "
-        + "floor templates, not a rendered 3D scene. Only the selected floor "
-        + "paints rooms; the other 99 stay a directory."),
+        + "floor templates, not a rendered 3D scene. Use a live floor to see "
+        + "the animated office with its real characters; template floors have "
+        + "no staff."),
+      props.onOpenLiveFloor
+        ? R.createElement("div", {
+            key: "liveFloors", className: "tower__liveFloors",
+            "data-testid": "tower-live-floors",
+          }, [
+            R.createElement("span", {
+              key: "label", className: "tower__liveLabel",
+            }, "Live office floors"),
+            R.createElement("button", {
+              key: "f1", type: "button", className: "tower__liveFloor",
+              "data-testid": "tower-open-live-1",
+              onClick: () => props.onOpenLiveFloor?.("live:1"),
+            }, "1 · Executive"),
+            R.createElement("button", {
+              key: "f2", type: "button", className: "tower__liveFloor",
+              "data-testid": "tower-open-live-2",
+              onClick: () => props.onOpenLiveFloor?.("live:2"),
+            }, "2 · Operations"),
+            R.createElement("button", {
+              key: "f3", type: "button", className: "tower__liveFloor",
+              "data-testid": "tower-open-live-3",
+              onClick: () => props.onOpenLiveFloor?.("live:3"),
+            }, "3 · Review"),
+          ])
+        : null,
       body,
     ]);
   };
