@@ -1,0 +1,88 @@
+{
+  "task_id": "P0-02",
+  "status": "PASS",
+  "generated_at": "2026-11-14T02:46:58Z",
+  "inputs": [
+    {
+      "path": "voicebridge/business/contracts/domain.schema.json",
+      "sha256": "cac90425da47f54e5d162149f4824c2564e0982793a3514149e02cde6874d4d1"
+    },
+    {
+      "path": "voicebridge/business/contracts/event.schema.json",
+      "sha256": "e228c82f6b417c3057c381ea03e00b405789946f6d349936ee7a484374ceb394"
+    },
+    {
+      "path": "voicebridge/business/contracts/agent.schema.json",
+      "sha256": "6e956472cf496f2b3f1a9aa75bf461e55853dc2df35a83ab9ac49826c8a08b67"
+    },
+    {
+      "path": "voicebridge/business/contracts/session.schema.json",
+      "sha256": "15b9415160dcac939fb21d2544458d4a4ef27f2611c6015a7e5c4cc26288c148"
+    },
+    {
+      "path": "voicebridge/business/contracts/run.schema.json",
+      "sha256": "8e58517cacb1f4dd71529936a30331750799a569857eaa2ecdaae2e4a06e3174"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "53479be48e956e6002959d74262dfc0e374d1e1a5b267a4eb0061cac3d9e2356"
+    },
+    {
+      "path": "voicebridge/business/models.py",
+      "sha256": "c2544c04416024d1ad45c4ec2ed8d933c6766d7727ccbd9dd61bef852cac8ddc"
+    },
+    {
+      "path": "voicebridge/business/ids.py",
+      "sha256": "1b60a89793cf78e9f93a351eeb34c979bb5d339a6d29de3fde3c992e70423ecc"
+    },
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "15b4814df84d1371e4885b0ea5b23fdc8227f50ae96b4e36a83fdaf745566b98"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "scripts/validate_domain_contract.py",
+      "sha256": "9d7e0719a74f946a3384b76782a8e05330a8d95e84b913b12d38ede1697c5c0f"
+    },
+    {
+      "path": "tests/office_contracts/test_domain_contract.py",
+      "sha256": "3b773998883b4c0b39280b55e0aa4e814fc71f81d67e9f951ee0761bb3784b3b"
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --json",
+      "exit_code": 0,
+      "stdout_tail": "  \"summary\": {\n    \"failed\": 0,\n    \"passed\": 42,\n    \"total\": 42\n  }\n}",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_domain_contract.py",
+      "exit_code": 0,
+      "stdout_tail": "................                                                         [100%]\n16 passed in 3.07s",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --self-test-negative --json",
+      "exit_code": 1,
+      "stdout_tail": "  \"summary\": {\n    \"failed\": 1,\n    \"passed\": 42,\n    \"total\": 43\n  }\n}",
+      "stderr_tail": ""
+    }
+  ],
+  "limitations": [
+    "JSON Schemas are the frozen v1 wire/projection contract; the SQLite schema in voicebridge/business/schema.py remains authoritative for storage.",
+    "Fixtures are built-in synthetic records, not live Business OS rows; no live service, home, state.db or credential was read.",
+    "The contract validates record shape only; cross-record invariants (single writer, lease fencing, approval binding at execution, event replay) are Phase 1 tests.",
+    "No network, no full matrix; only the focused office_contracts tests were run.",
+    "VERIFIED/COMPLETE is not claimed for any phase."
+  ]
+}
