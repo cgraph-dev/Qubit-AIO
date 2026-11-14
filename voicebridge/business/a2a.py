@@ -29,7 +29,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
 from .errors import (
@@ -663,17 +663,283 @@ def sweep(
     }
 
 
+# -- typed handoff messages (P2-05) ---------------------------------------
+# The handoff rides the same message fabric: no second store, no second log.
+# A capability subset may only narrow what the sender already holds; the
+# recipient still evaluates its own policy, so an accepted handoff never
+# widens authority.
+HANDOFF_KIND = "handoff"
+HANDOFF_FIELDS = (
+    "task_id",
+    "from_principal",
+    "to_principal",
+    "capability_subset",
+    "checkpoint_id",
+    "artifact_ids",
+    "unresolved_questions",
+    "acceptance_deadline",
+    "handoff_id",
+)
+
+
+@dataclass(frozen=True, slots=True)
+class HandoffMessage:
+    """A typed view over an :class:`A2AMessage` of kind ``handoff``."""
+
+    message: A2AMessage
+    task_id: str
+    from_principal: str
+    to_principal: str
+    capability_subset: tuple[str, ...]
+    checkpoint_id: str | None
+    artifact_ids: tuple[str, ...]
+    unresolved_questions: tuple[str, ...]
+    acceptance_deadline: str | None
+    handoff_id: str | None
+
+    def as_payload(self) -> dict[str, Any]:
+        return {
+            "task_id": self.task_id,
+            "from_principal": self.from_principal,
+            "to_principal": self.to_principal,
+            "capability_subset": list(self.capability_subset),
+            "checkpoint_id": self.checkpoint_id,
+            "artifact_ids": list(self.artifact_ids),
+            "unresolved_questions": list(self.unresolved_questions),
+            "acceptance_deadline": self.acceptance_deadline,
+            "handoff_id": self.handoff_id,
+        }
+
+
+def _string_tuple(value: Any, label: str, *, limit: int = 128) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if isinstance(value, (str, bytes, Mapping)) or not isinstance(
+        value, (list, tuple, set, frozenset)
+    ):
+        raise BusinessError(BAD_INPUT_CODE, f"{label} must be a list")
+    items = list(value)
+    if len(items) > limit:
+        raise BusinessError(
+            BAD_INPUT_CODE, f"{label} may hold at most {limit} entries"
+        )
+    cleaned: list[str] = []
+    for item in items:
+        token = _text(item, label, max_len=500)
+        if token not in cleaned:
+            cleaned.append(token)
+    return tuple(cleaned)
+
+
+def parse_handoff(message: A2AMessage) -> HandoffMessage:
+    """Validate the typed payload of a handoff message."""
+    if message.kind != HANDOFF_KIND:
+        raise BusinessError(
+            BAD_INPUT_CODE, f"message {message.message_id!r} is not a handoff"
+        )
+    payload = message.payload
+    if not isinstance(payload, Mapping):
+        raise BusinessError(A2A_BAD_STATE_CODE, "handoff payload must be a mapping")
+    task_id = _text(payload.get("task_id"), "task_id")
+    sender = _text(payload.get("from_principal"), "from_principal")
+    recipient = _text(payload.get("to_principal"), "to_principal")
+    if sender != message.sender_principal or recipient != message.recipient_principal:
+        raise BusinessError(
+            A2A_SPOOF_REFUSED_CODE,
+            "the handoff payload names a different sender or recipient than the"
+            " authenticated envelope",
+        )
+    capabilities = _capabilities(payload.get("capability_subset"))
+    if capabilities != tuple(message.capability_subset):
+        raise BusinessError(
+            A2A_BAD_STATE_CODE,
+            "the payload capability subset does not match the envelope",
+        )
+    deadline = payload.get("acceptance_deadline")
+    if deadline is not None:
+        deadline = _optional_text(deadline, "acceptance_deadline", max_len=64)
+    return HandoffMessage(
+        message=message,
+        task_id=task_id,
+        from_principal=sender,
+        to_principal=recipient,
+        capability_subset=capabilities,
+        checkpoint_id=_optional_text(
+            payload.get("checkpoint_id"), "checkpoint_id"
+        ),
+        artifact_ids=_string_tuple(payload.get("artifact_ids"), "artifact_ids"),
+        unresolved_questions=_string_tuple(
+            payload.get("unresolved_questions"), "unresolved_questions"
+        ),
+        acceptance_deadline=deadline,
+        handoff_id=_optional_text(payload.get("handoff_id"), "handoff_id"),
+    )
+
+
+def send_handoff(
+    log: EventLog,
+    *,
+    tenant_id: str,
+    from_principal: str,
+    to_principal: str,
+    task_id: str,
+    idempotency_key: str,
+    capability_subset: Iterable[str] | None = None,
+    checkpoint_id: str | None = None,
+    artifact_ids: Iterable[str] | None = None,
+    unresolved_questions: Iterable[str] | None = None,
+    acceptance_deadline: Any = None,
+    handoff_id: str | None = None,
+    can_delegate: Callable[[str, str], bool] | None = None,
+    authenticated_principal: str | None = None,
+    verify_sender: Callable[[str], bool] | None = None,
+    replay_nonce: str | None = None,
+    thread_id: str | None = None,
+    correlation_id: str | None = None,
+    sent_at: float | None = None,
+    expires_at: float | None = None,
+    max_payload_bytes: int = DEFAULT_MAX_PAYLOAD_BYTES,
+    now: float | None = None,
+) -> tuple[A2AMessage, bool]:
+    """Send one typed handoff through the shared message fabric."""
+    sender = _text(from_principal, "from_principal")
+    recipient = _text(to_principal, "to_principal")
+    task = _text(task_id, "task_id")
+    capabilities = _capabilities(capability_subset)
+    deadline: str | None
+    if acceptance_deadline is None:
+        deadline = None
+    elif isinstance(acceptance_deadline, (int, float)) and not isinstance(
+        acceptance_deadline, bool
+    ):
+        deadline = now_iso(float(acceptance_deadline))
+    else:
+        deadline = _text(
+            acceptance_deadline, "acceptance_deadline", max_len=64
+        )
+    payload = {
+        "task_id": task,
+        "from_principal": sender,
+        "to_principal": recipient,
+        "capability_subset": list(capabilities),
+        "checkpoint_id": _optional_text(checkpoint_id, "checkpoint_id"),
+        "artifact_ids": list(
+            _string_tuple(artifact_ids, "artifact_ids")
+        ),
+        "unresolved_questions": list(
+            _string_tuple(unresolved_questions, "unresolved_questions")
+        ),
+        "acceptance_deadline": deadline,
+        "handoff_id": _optional_text(handoff_id, "handoff_id"),
+    }
+    message, created = send(
+        log,
+        tenant_id=tenant_id,
+        sender_principal=sender,
+        recipient_principal=recipient,
+        payload=payload,
+        idempotency_key=idempotency_key,
+        kind=HANDOFF_KIND,
+        capability_subset=capabilities,
+        task_id=task,
+        correlation_id=correlation_id,
+        thread_id=thread_id,
+        authenticated_principal=authenticated_principal,
+        verify_sender=verify_sender,
+        can_delegate=can_delegate,
+        replay_nonce=replay_nonce,
+        sent_at=sent_at,
+        expires_at=expires_at,
+        max_payload_bytes=max_payload_bytes,
+        now=now,
+    )
+    return message, created
+
+
+def accept_handoff_message(
+    log: EventLog,
+    *,
+    tenant_id: str,
+    principal: str,
+    message_id: str,
+    on_accept: Callable[[HandoffMessage], Any] | None = None,
+    now: float | None = None,
+) -> HandoffMessage:
+    """Recipient-only acceptance of a handoff message.
+
+    ``on_accept`` is where the caller applies the durable sessions handoff
+    (source read-only + task transfer). It runs before the ack, so a refused
+    application leaves the message unacknowledged and retryable.
+    """
+    actor = _text(principal, "principal")
+    moment = time.time() if now is None else float(now)
+    message = receive(
+        log,
+        tenant_id=tenant_id,
+        principal=actor,
+        message_id=_text(message_id, "message_id"),
+        now=moment,
+    )
+    assert isinstance(message, A2AMessage)
+    if message.recipient_principal != actor:
+        raise BusinessError(
+            A2A_NOT_RECIPIENT_CODE,
+            f"only the recipient may accept message {message.message_id!r}",
+        )
+    if message.delivery_state == "acked":
+        raise BusinessError(
+            A2A_REPLAY_REFUSED_CODE,
+            f"message {message.message_id!r} was already accepted",
+        )
+    handoff = parse_handoff(message)
+    if handoff.acceptance_deadline is not None:
+        try:
+            from datetime import datetime, timezone
+
+            parsed = datetime.fromisoformat(
+                handoff.acceptance_deadline.replace("Z", "+00:00")
+            )
+        except ValueError as exc:
+            raise BusinessError(
+                A2A_BAD_STATE_CODE,
+                "handoff acceptance_deadline is not ISO-8601",
+            ) from exc
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        if parsed.timestamp() <= moment:
+            raise BusinessError(
+                A2A_MESSAGE_EXPIRED_CODE,
+                f"handoff {message.message_id!r} passed its acceptance deadline",
+            )
+    if on_accept is not None:
+        on_accept(handoff)
+    acked = ack(
+        log,
+        tenant_id=tenant_id,
+        principal=actor,
+        message_id=message.message_id,
+        now=moment,
+    )
+    return replace(handoff, message=acked)
+
+
 __all__ = [
     "A2AMessage",
     "DELIVERY_STATES",
     "DEFAULT_MAX_PAYLOAD_BYTES",
     "EventLog",
+    "HANDOFF_FIELDS",
+    "HANDOFF_KIND",
+    "HandoffMessage",
     "InMemoryEventLog",
     "VISIBILITIES",
+    "accept_handoff_message",
     "ack",
     "list_thread",
+    "parse_handoff",
     "receive",
     "replay",
     "send",
+    "send_handoff",
     "sweep",
 ]
