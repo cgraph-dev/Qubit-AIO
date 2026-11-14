@@ -548,6 +548,25 @@ def _orb_style(options: Any = None) -> str:
     return value if value in ("mark", "ember", "ghost") else "mark"
 
 
+#: The ghost atlas includes a soft halo that is wider than the ghost body.
+#: The window must be larger than the nominal orb so the halo falls to
+#: transparent INSIDE the widget; otherwise QPainter clips it at a hard
+#: rectangle. The body size is still derived from the nominal orb radius.
+GHOST_CANVAS_SCALE = 1.40
+
+
+def ghost_canvas_px(px: Any) -> int:
+    """Window edge needed to contain the ghost's full halo. Never raises."""
+    try:
+        value = max(8, int(px))
+    except (TypeError, ValueError):
+        value = 168
+    try:
+        return max(value, int(math.ceil(value * GHOST_CANVAS_SCALE)))
+    except Exception:
+        return value
+
+
 def _fract(x: float) -> float:
     """Fractional part of ``x`` (frame-reproducible pseudo-randomness)."""
     return float(x) - math.floor(float(x))
@@ -3580,6 +3599,8 @@ if QWidget is not None:
         def apply_options(self, opts: Any) -> None:
             """Clamp, persist and apply new options live. Never raises."""
             try:
+                previous_style = getattr(
+                    getattr(self, "_options", None), "style", None)
                 self._options = _options.clamp_options(opts)
                 _options.save_options(self._options)
                 _geo.set_orb_size(self._options.size_px)
@@ -3592,6 +3613,11 @@ if QWidget is not None:
                 except Exception:
                     pass
                 self._apply_geometry()
+                if previous_style != self._options.style:
+                    try:
+                        _persist.save_position(None, self._pos)
+                    except Exception:
+                        pass
                 tray = getattr(self, "_tray", None)
                 if tray is not None:
                     try:
@@ -3709,11 +3735,55 @@ if QWidget is not None:
                 self._pos = resolved
             self._apply_geometry()
 
-        def _apply_geometry(self) -> None:
-            size = _geo.DOT_PX if self._pos.collapsed else _geo.ORB_PX
+        def _window_px(self) -> int:
+            """Actual top-level window edge for the current mark/mode."""
+            if self._pos.collapsed:
+                return _geo.DOT_PX
             try:
+                orb = int(_geo.ORB_PX)
+            except Exception:
+                orb = 168
+            if _orb_style(getattr(self, "_options", None)) == "ghost":
+                return ghost_canvas_px(orb)
+            return orb
+
+        def _clamp_window_pos(self, x: int, y: int, size: int) -> Any:
+            """Keep the whole (possibly padded) window on the target output."""
+            try:
+                rect = self._target_rect()
+                if rect is not None:
+                    w, h = int(rect.w), int(rect.h)
+                    ox, oy = int(rect.x), int(rect.y)
+                else:
+                    geo = self.screen().availableGeometry()
+                    w, h = int(geo.width()), int(geo.height())
+                    ox, oy = int(geo.x()), int(geo.y())
+                if w <= 0 or h <= 0:
+                    return _geo.OrbPosition(x=int(x), y=int(y), collapsed=False)
+                return _geo.OrbPosition(
+                    x=max(ox, min(int(x), ox + w - int(size))),
+                    y=max(oy, min(int(y), oy + h - int(size))),
+                    collapsed=False)
+            except Exception:
+                return _geo.OrbPosition(x=int(x), y=int(y), collapsed=False)
+
+        def _apply_geometry(self) -> None:
+            size = self._window_px()
+            try:
+                orb = _geo.DOT_PX if self._pos.collapsed else int(_geo.ORB_PX)
+                pad = max(0, int(size) - int(orb))
+                # ``_pos`` is always the VISUAL orb top-left, so theme/size
+                # changes grow the transparent ghost canvas symmetrically
+                # around the same body instead of shifting the ghost.
+                win_x = int(self._pos.x) - pad // 2
+                win_y = int(self._pos.y) - pad // 2
+                clamped = self._clamp_window_pos(win_x, win_y, size)
+                self._pos = _geo.OrbPosition(
+                    x=int(clamped.x) + pad // 2,
+                    y=int(clamped.y) + pad // 2,
+                    collapsed=bool(self._pos.collapsed))
                 self.setFixedSize(size, size)
-                self.move(self._pos.x, self._pos.y)
+                self.move(clamped.x, clamped.y)
             except Exception:
                 pass
 
@@ -3753,7 +3823,7 @@ if QWidget is not None:
         # -- input: drag anywhere, click toggles ---------------------------
         def mousePressEvent(self, ev: Any) -> None:
             try:
-                size = _geo.DOT_PX if self._pos.collapsed else _geo.ORB_PX
+                size = self._window_px()
                 self._press = {
                     "x": float(ev.globalPosition().x()),
                     "y": float(ev.globalPosition().y()),
@@ -3813,7 +3883,7 @@ if QWidget is not None:
                     _persist.save_position(None, self._pos)
                 return
             try:
-                size = _geo.DOT_PX if self._pos.collapsed else _geo.ORB_PX
+                size = self._window_px()
                 zone = zone_at(float(ev.position().x()),
                                float(ev.position().y()),
                                size, self._pos.collapsed)
@@ -4433,7 +4503,9 @@ if QWidget is not None:
                         fam = _ember.state_colors(self.orb_state)
                 else:
                     fam = _ember.state_colors(self.orb_state)
-                size = _geo.DOT_PX if self._pos.collapsed else _geo.ORB_PX
+                window_px = max(8, int(self.width() or 0) or self._window_px())
+                orb_px = _geo.DOT_PX if self._pos.collapsed else _geo.ORB_PX
+                size = orb_px if self._pos.collapsed else window_px
                 p = QPainter(self)
                 p.setRenderHint(QPainter.Antialiasing, True)
                 if self._pos.collapsed:
@@ -4444,8 +4516,11 @@ if QWidget is not None:
                     p.end()
                     self.frames += 1
                     return
-                cx = cy = size / 2.0
-                R = max(4.0, size / 2.0 - 2)
+                cx = cy = window_px / 2.0
+                # The body radius follows the nominal orb, not the padded
+                # ghost canvas: the extra canvas is breathing room for the
+                # halo, never a reason to scale the ghost up.
+                R = max(4.0, orb_px / 2.0 - 2)
                 params = _ember.resolve_params(self.orb_state)
                 speed = params["speed"]
                 bright = params["brightness"]
@@ -4511,7 +4586,7 @@ if QWidget is not None:
                     # it around the ghost is exactly the "ghost inside the orb" the
                     # owner rejected. Only the offline/notice dots are kept, since
                     # they are status, not ornament.
-                    s = size / 96.0
+                    s = orb_px / 96.0
                     try:
                         rr_, gg_, bb_ = (int(v) for v in _ember.INDICATOR_RED)
                     except Exception:
@@ -4686,6 +4761,8 @@ __all__ = [
     "QtVoiceOrb",
     "backend_wanted",
     "zone_at",
+    "ghost_canvas_px",
+    "GHOST_CANVAS_SCALE",
     "band_pen",
     "core_stops",
     "ring_pen",
