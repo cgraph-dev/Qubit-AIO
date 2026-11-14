@@ -41,6 +41,8 @@ from .errors import (
     AGENT_NO_ACTIVE_TURN_CODE,
     AGENT_NOT_FOUND_CODE,
     AGENT_PAUSED_CODE,
+    AGENT_PROFILE_INVALID_CODE,
+    AGENT_PROFILE_SCOPE_CODE,
     AGENT_PROVIDER_NOT_READY_CODE,
     AGENT_RATE_LIMITED_CODE,
     AGENT_REVOKED_CODE,
@@ -135,6 +137,49 @@ _UPDATE_FIELDS = frozenset(
         "permissions",
         "safety",
         "metadata",
+        "security_principal_id",
+    }
+)
+
+#: Agent-profile selectors live in ``metadata_json``. They are *declarations*
+#: (what an agent may use), never grants: authority still comes from
+#: ``bos_grant`` only. Each list is bounded so a profile cannot become an
+#: unbounded payload.
+_PROFILE_LIMITS: dict[str, int] = {
+    "skills": 64,
+    "mcp_servers": 32,
+    "memory_scopes": 16,
+    "secret_refs": 64,
+}
+_MEMORY_SCOPES = ("agent", "session", "task", "department", "office", "tenant")
+_BUDGET_PERIODS = ("daily", "weekly", "monthly", "quarterly", "yearly")
+_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+_SECRET_REF_RE = re.compile(
+    r"^(?:env|vault|secret|keychain|file):[A-Za-z0-9_.:/-]{1,120}$"
+    r"|^[A-Z][A-Z0-9_]{1,120}$"
+)
+_APPEARANCE_FIELDS = (
+    "character_profile_id",
+    "portrait",
+    "voice",
+    "animation_preset",
+    "skin",
+    "theme",
+)
+#: Selector values are references/requirements, not credential-shaped values.
+#: They are validated first and intentionally not run through the blanket key
+#: redactor (which would mask the whole ``secret_refs`` list).
+_SELECTOR_KEYS = frozenset(
+    {
+        "skills",
+        "mcp_servers",
+        "memory_scopes",
+        "secret_refs",
+        "budgets",
+        "appearance",
+        "model_policy",
+        "schedule_ref",
+        "policy_revision",
     }
 )
 
@@ -194,12 +239,410 @@ def _timezone(value: Any) -> str:
     return clean
 
 
+def _profile_error(detail: str) -> None:
+    raise BusinessError(AGENT_PROFILE_INVALID_CODE, detail)
+
+
+def _profile_list(value: Any, label: str, *, limit: int) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, (str, bytes, Mapping)) or not isinstance(
+        value, (list, tuple, set, frozenset)
+    ):
+        _profile_error(f"{label} must be a list")
+    items = list(value)
+    if len(items) > limit:
+        _profile_error(f"{label} may hold at most {limit} entries")
+    return items
+
+
+def _profile_token(value: Any, label: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        _profile_error(f"{label} must be a non-empty string")
+    token = value.strip()
+    if "*" in token or "?" in token or token.lower() in _WILDCARD_SCOPES:
+        _profile_error(f"{label} {token!r} is a wildcard; name explicit values")
+    if not _SCOPE_TOKEN_RE.match(token):
+        _profile_error(f"{label} {token!r} is not a valid token")
+    return token
+
+
+def _skill_selectors(value: Any) -> list[dict[str, Any]]:
+    selectors: list[dict[str, Any]] = []
+    for raw in _profile_list(value, "skills", limit=_PROFILE_LIMITS["skills"]):
+        if isinstance(raw, str):
+            skill_id = _profile_token(raw, "skill id")
+            entry: dict[str, Any] = {
+                "skill_id": skill_id,
+                "version": "",
+                "requirements": [],
+            }
+        elif isinstance(raw, Mapping):
+            if (
+                raw.get("grants_capability") is True
+                or raw.get("grants")
+                or raw.get("capabilities")
+            ):
+                _profile_error(
+                    "a skill may require capabilities but may never grant one"
+                )
+            skill_id = _profile_token(
+                raw.get("skill_id") or raw.get("id") or raw.get("name"),
+                "skill id",
+            )
+            version = _optional_text(
+                raw.get("version") or None, "skill version", max_len=64
+            )
+            requirements = [
+                _profile_token(item, "skill requirement")
+                for item in _profile_list(
+                    raw.get("requires_capabilities")
+                    if "requires_capabilities" in raw
+                    else raw.get("requirements"),
+                    "skill requirements",
+                    limit=32,
+                )
+            ]
+            entry = {
+                "skill_id": skill_id,
+                "version": version or "",
+                "requirements": sorted(dict.fromkeys(requirements)),
+            }
+        else:
+            _profile_error("each skill selector must be a string or a mapping")
+        selectors.append(entry)
+    return selectors
+
+
+def _mcp_selectors(value: Any) -> list[dict[str, Any]]:
+    selectors: list[dict[str, Any]] = []
+    for raw in _profile_list(
+        value, "mcp_servers", limit=_PROFILE_LIMITS["mcp_servers"]
+    ):
+        if not isinstance(raw, Mapping):
+            _profile_error("each MCP server selector must be a mapping")
+        name = _profile_token(raw.get("name") or raw.get("server_id"), "MCP server")
+        version = (
+            _optional_text(raw.get("version") or None, "MCP version", max_len=64)
+            or ""
+        )
+        enabled = raw.get("enabled", True)
+        if not isinstance(enabled, bool):
+            _profile_error(f"MCP server {name!r} enabled must be a boolean")
+        schema_hash = raw.get("schema_hash")
+        if schema_hash is not None:
+            if not isinstance(schema_hash, str) or not _SHA256_RE.match(schema_hash):
+                _profile_error(
+                    f"MCP server {name!r} schema_hash must be a 64-character"
+                    " lowercase SHA-256"
+                )
+        elif enabled:
+            _profile_error(
+                f"enabled MCP server {name!r} requires the complete tool-schema"
+                " hash"
+            )
+        allowed = [
+            _profile_token(item, "MCP allowed tool")
+            for item in _profile_list(
+                raw.get("allowed_tools"), "MCP allowed tools", limit=64
+            )
+        ]
+        denied = [
+            _profile_token(item, "MCP denied tool")
+            for item in _profile_list(
+                raw.get("denied_tools"), "MCP denied tools", limit=64
+            )
+        ]
+        overlap = sorted(set(allowed) & set(denied))
+        if overlap:
+            _profile_error(
+                f"MCP server {name!r} both allows and denies {overlap[0]!r}"
+            )
+        selectors.append(
+            {
+                "name": name,
+                "version": version,
+                "schema_hash": schema_hash,
+                "enabled": enabled,
+                "allowed_tools": sorted(dict.fromkeys(allowed)),
+                "denied_tools": sorted(dict.fromkeys(denied)),
+            }
+        )
+    return selectors
+
+
+def _memory_selectors(value: Any) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    for raw in _profile_list(
+        value, "memory_scopes", limit=_PROFILE_LIMITS["memory_scopes"]
+    ):
+        if isinstance(raw, str):
+            scope = raw.strip()
+            flags = {"read": True, "write": False, "append": False}
+        elif isinstance(raw, Mapping):
+            scope = raw.get("scope")
+            if not isinstance(scope, str) or not scope.strip():
+                _profile_error("each memory scope needs a scope name")
+            scope = scope.strip()
+            flags = {}
+            for flag in ("read", "write", "append"):
+                item = raw.get(flag, flag == "read")
+                if not isinstance(item, bool):
+                    _profile_error(
+                        f"memory scope {scope!r} {flag} must be a boolean"
+                    )
+                flags[flag] = item
+        else:
+            _profile_error("each memory scope must be a string or a mapping")
+        if scope not in _MEMORY_SCOPES:
+            raise BusinessError(
+                AGENT_UNKNOWN_SCOPE_CODE,
+                f"unknown memory scope {scope!r}; expected one of"
+                f" {', '.join(_MEMORY_SCOPES)}",
+            )
+        current = merged.get(scope)
+        if current is None:
+            merged[scope] = {"scope": scope, **flags}
+        else:
+            for flag in ("read", "write", "append"):
+                current[flag] = current[flag] or flags[flag]
+    return [merged[scope] for scope in _MEMORY_SCOPES if scope in merged]
+
+
+def _secret_selectors(value: Any) -> list[str]:
+    refs: list[str] = []
+    for raw in _profile_list(
+        value, "secret_refs", limit=_PROFILE_LIMITS["secret_refs"]
+    ):
+        if not isinstance(raw, str) or not raw.strip():
+            _profile_error("each secret ref must be a non-empty string")
+        ref = raw.strip()
+        if len(ref) > 128 or not _SECRET_REF_RE.match(ref):
+            _profile_error(
+                "secret_refs are references only (env:NAME, vault:path or an"
+                " env name); secret values are refused"
+            )
+        refs.append(ref)
+    return sorted(dict.fromkeys(refs))
+
+
+def _budget_selector(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    if not isinstance(value, Mapping):
+        _profile_error("budgets must be a mapping")
+    unknown = sorted(
+        set(map(str, value))
+        - {"currency", "period", "period_limit_minor", "per_turn_limit_minor"}
+    )
+    if unknown:
+        _profile_error(f"unknown budget field {unknown[0]!r}")
+    currency = value.get("currency", "USD")
+    if not isinstance(currency, str) or len(currency.strip()) != 3:
+        _profile_error("budget currency must be a 3-letter code")
+    code = currency.strip().upper()
+    if not code.isalpha():
+        _profile_error("budget currency must be a 3-letter code")
+    period = value.get("period", "monthly")
+    if period not in _BUDGET_PERIODS:
+        _profile_error(
+            f"budget period must be one of {', '.join(_BUDGET_PERIODS)}"
+        )
+    limit = value.get("period_limit_minor", 0)
+    per_turn = value.get("per_turn_limit_minor", 0)
+    for label, item in (
+        ("period_limit_minor", limit),
+        ("per_turn_limit_minor", per_turn),
+    ):
+        if not isinstance(item, int) or isinstance(item, bool) or item < 0:
+            _profile_error(f"budget {label} must be a non-negative integer")
+    if limit and per_turn > limit:
+        _profile_error("budget per_turn_limit_minor cannot exceed period_limit_minor")
+    return {
+        "currency": code,
+        "period": period,
+        "period_limit_minor": limit,
+        "per_turn_limit_minor": per_turn,
+    }
+
+
+def _appearance_selector(value: Any) -> dict[str, str]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        _profile_error("appearance must be a mapping of references")
+    unknown = sorted(set(map(str, value)) - set(_APPEARANCE_FIELDS))
+    if unknown:
+        _profile_error(f"unknown appearance field {unknown[0]!r}")
+    clean: dict[str, str] = {}
+    for field in _APPEARANCE_FIELDS:
+        if field in value:
+            clean[field] = _optional_text(
+                value[field] or None, f"appearance {field}", max_len=200
+            ) or ""
+    return clean
+
+
+def _model_policy_selector(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    if not isinstance(value, Mapping):
+        _profile_error("metadata.model_policy must be a mapping")
+    allowed = {
+        "reasoning_effort",
+        "fallback_chain",
+        "context_window",
+        "latency_class",
+        "data_residency",
+    }
+    unknown = sorted(set(map(str, value)) - allowed)
+    if unknown:
+        _profile_error(f"unknown model policy field {unknown[0]!r}")
+    clean: dict[str, Any] = {}
+    if "reasoning_effort" in value:
+        clean["reasoning_effort"] = _reasoning(value["reasoning_effort"])
+    if "context_window" in value:
+        clean["context_window"] = _int(
+            value["context_window"], "model policy context_window", minimum=256
+        )
+    for field in ("latency_class", "data_residency"):
+        if field in value:
+            clean[field] = _profile_token(value[field], f"model policy {field}")
+    chain: list[dict[str, str]] = []
+    for raw in _profile_list(
+        value.get("fallback_chain"), "model policy fallback_chain", limit=8
+    ):
+        if not isinstance(raw, Mapping):
+            _profile_error("each fallback route must be a mapping")
+        provider = _profile_token(raw.get("provider"), "fallback provider")
+        model = _profile_token(raw.get("model"), "fallback model")
+        if not _configured(provider) or not _configured(model):
+            _profile_error("each fallback route must pin provider and model")
+        chain.append({"provider": provider, "model": model})
+    if chain:
+        clean["fallback_chain"] = chain
+    return clean
+
+
+def normalize_selectors(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate and normalise the profile selectors in ``metadata``.
+
+    Unknown keys are preserved (metadata stays metadata), but every selector
+    the profile reads is validated here so a bad value can never reach an
+    effective grant by accident.
+    """
+    clean = dict(metadata)
+    if "skills" in clean:
+        clean["skills"] = _skill_selectors(clean["skills"])
+    if "mcp_servers" in clean:
+        clean["mcp_servers"] = _mcp_selectors(clean["mcp_servers"])
+    if "memory_scopes" in clean:
+        clean["memory_scopes"] = _memory_selectors(clean["memory_scopes"])
+    if "secret_refs" in clean:
+        clean["secret_refs"] = _secret_selectors(clean["secret_refs"])
+    if "budgets" in clean:
+        clean["budgets"] = _budget_selector(clean["budgets"])
+    if "appearance" in clean:
+        clean["appearance"] = _appearance_selector(clean["appearance"])
+    if "model_policy" in clean:
+        clean["model_policy"] = _model_policy_selector(clean["model_policy"])
+    if "schedule_ref" in clean:
+        clean["schedule_ref"] = _profile_token(
+            clean["schedule_ref"], "schedule ref"
+        )
+    if "policy_revision" in clean:
+        clean["policy_revision"] = _int(
+            clean["policy_revision"], "policy_revision", minimum=1
+        )
+    return clean
+
+
 def _metadata(value: Any) -> dict[str, Any]:
     if value is None:
         return {}
     if not isinstance(value, Mapping):
         raise BusinessError(BAD_INPUT_CODE, "metadata must be a mapping")
-    return redact(dict(value))
+    clean = normalize_selectors(dict(value))
+    return {
+        key: (item if key in _SELECTOR_KEYS else redact(item))
+        for key, item in clean.items()
+    }
+
+
+def _metadata_json(metadata: Mapping[str, Any]) -> str:
+    return json_dumps(
+        {
+            key: (item if key in _SELECTOR_KEYS else redact(item))
+            for key, item in metadata.items()
+        }
+    )
+
+
+def _validate_model_route(
+    provider: str,
+    model: str,
+    fallback_provider: str | None,
+    fallback_model: str | None,
+) -> None:
+    """A fallback route is allowed only when both routes are pinned.
+
+    An unpinned *primary* route is preserved (the existing preview path turns
+    it into a typed ``AGENT_PROVIDER_NOT_READY``/``AGENT_MODEL_NOT_READY``), but
+    a fallback may never be a silent hole where a provider is assumed.
+    """
+    for label, value in (
+        ("provider", provider),
+        ("model", model),
+        ("fallback_provider", fallback_provider),
+        ("fallback_model", fallback_model),
+    ):
+        if value and ("*" in value or "?" in value):
+            _profile_error(f"{label} may not contain a wildcard")
+    if (fallback_provider is None) != (fallback_model is None):
+        _profile_error(
+            "a fallback route must pin both provider and model; a half route"
+            " would silently inherit another provider"
+        )
+    if fallback_provider is not None:
+        if not _configured(provider) or not _configured(model):
+            _profile_error(
+                "a fallback route requires a pinned primary provider and model"
+            )
+        if not _configured(fallback_provider) or not _configured(fallback_model):
+            _profile_error("the fallback route names an unconfigured provider/model")
+
+
+def _require_security_principal(
+    conn: sqlite3.Connection, tenant_id: str, principal_id: str | None
+) -> str | None:
+    """The security principal must exist in *this* tenant and be usable.
+
+    Desk/room/department are never consulted: authorization is the principal.
+    """
+    if principal_id is None:
+        return None
+    row = conn.execute(
+        "SELECT * FROM bos_principal WHERE tenant_id=? AND principal_id=?",
+        (tenant_id, principal_id),
+    ).fetchone()
+    if row is None:
+        raise BusinessError(
+            AGENT_PROFILE_SCOPE_CODE,
+            f"security principal {principal_id!r} does not exist in tenant"
+            f" {tenant_id!r}",
+        )
+    if row["kind"] not in ("agent", "service"):
+        raise BusinessError(
+            AGENT_PROFILE_SCOPE_CODE,
+            f"principal {principal_id!r} is a {row['kind']!r}; an agent needs"
+            " an agent/service principal",
+        )
+    if row["status"] != "active":
+        raise BusinessError(
+            AGENT_PROFILE_SCOPE_CODE,
+            f"security principal {principal_id!r} is {row['status']!r}",
+        )
+    return principal_id
 
 
 def _scope_values(category: str, value: Any) -> tuple[str, ...]:
@@ -515,6 +958,7 @@ class Agent:
     agent_id: str
     tenant_id: str
     business_id: str
+    security_principal_id: str | None
     role_id: str
     department: str
     display_name: str
@@ -553,6 +997,7 @@ class Agent:
             agent_id=data["agent_id"],
             tenant_id=data["tenant_id"],
             business_id=data["business_id"],
+            security_principal_id=data.get("security_principal_id"),
             role_id=data["role_id"],
             department=data["department"],
             display_name=data["display_name"],
@@ -586,6 +1031,7 @@ class Agent:
             "agent_id": self.agent_id,
             "tenant_id": self.tenant_id,
             "business_id": self.business_id,
+            "security_principal_id": self.security_principal_id,
             "role_id": self.role_id,
             "department": self.department,
             "display_name": self.display_name,
@@ -620,6 +1066,11 @@ class Agent:
             agent_id=str(data["agent_id"]),
             tenant_id=str(data["tenant_id"]),
             business_id=str(data["business_id"]),
+            security_principal_id=(
+                str(data["security_principal_id"])
+                if data.get("security_principal_id")
+                else None
+            ),
             role_id=str(data["role_id"]),
             department=str(data["department"]),
             display_name=str(data["display_name"]),
@@ -647,6 +1098,121 @@ class Agent:
             updated_at=str(data["updated_at"]),
             archived_at=data.get("archived_at"),
         )
+
+
+def _resolve_profile_principal(
+    conn: sqlite3.Connection, tenant_id: str, agent: Agent
+) -> sqlite3.Row | None:
+    """The agent's security principal, never a desk/room.
+
+    ``security_principal_id`` is explicit when set. Read-old rows fall back to
+    a principal whose ``external_ref`` is the agent id, which keeps existing
+    installs usable without inventing authority.
+    """
+    if agent.security_principal_id:
+        return conn.execute(
+            "SELECT * FROM bos_principal WHERE tenant_id=? AND principal_id=?",
+            (tenant_id, agent.security_principal_id),
+        ).fetchone()
+    return conn.execute(
+        "SELECT * FROM bos_principal WHERE tenant_id=? AND external_ref=?"
+        " AND kind IN ('agent','service') ORDER BY created_at, principal_id"
+        " LIMIT 1",
+        (tenant_id, agent.agent_id),
+    ).fetchone()
+
+
+def _grant_entry(row: Any, *, source: str) -> dict[str, Any]:
+    return {
+        "grant_id": row["grant_id"],
+        "role_id": row["role_id"],
+        "capability": row["capability"],
+        "resource": row["resource"],
+        "action": row["action"],
+        "data_class": row["data_class"],
+        "environment": row["environment"],
+        "effect": row["effect"],
+        "approval_required": bool(row["approval_required"]),
+        "expires_at": (
+            float(row["expires_at"]) if row["expires_at"] is not None else None
+        ),
+        "source": source,
+    }
+
+
+def _profile_grants(
+    conn: sqlite3.Connection,
+    tenant_id: str,
+    principal_id: str | None,
+    *,
+    now: float,
+) -> list[dict[str, Any]]:
+    """Expand explicit and role-inherited grants for one tenant subject.
+
+    A grant is included only when it belongs to this tenant *and* this subject;
+    a row for another tenant or principal can never become effective here.
+    """
+    if principal_id is None:
+        return []
+    rows = conn.execute(
+        "SELECT * FROM bos_grant WHERE tenant_id=? AND subject_id=?"
+        " ORDER BY created_at, grant_id",
+        (tenant_id, principal_id),
+    ).fetchall()
+    entries: list[dict[str, Any]] = []
+    for row in rows:
+        if row["revoked_at"] is not None:
+            continue
+        if row["expires_at"] is not None and float(row["expires_at"]) <= now:
+            continue
+        if row["role_id"] is None:
+            entries.append(_grant_entry(row, source="explicit"))
+            continue
+        role = conn.execute(
+            "SELECT * FROM bos_role WHERE tenant_id=? AND role_id=?",
+            (tenant_id, row["role_id"]),
+        ).fetchone()
+        expanded = False
+        if role is not None:
+            for item in json_loads(role["permissions_json"], []) or []:
+                if not isinstance(item, Mapping):
+                    continue
+                candidate = {
+                    "grant_id": row["grant_id"],
+                    "role_id": row["role_id"],
+                    "capability": item.get("capability"),
+                    "resource": item.get("resource", row["resource"]),
+                    "action": item.get("action", row["action"]),
+                    "data_class": item.get("data_class", row["data_class"]),
+                    "environment": item.get(
+                        "environment", row["environment"]
+                    ),
+                    "effect": item.get("effect", "allow"),
+                    "approval_required": bool(row["approval_required"]),
+                    "expires_at": (
+                        float(row["expires_at"])
+                        if row["expires_at"] is not None
+                        else None
+                    ),
+                }
+                entries.append({**candidate, "source": "inherited"})
+                expanded = True
+        if not expanded:
+            # A role grant with no readable role definition still carries its
+            # own tuple. Deny-by-default is unchanged: no role row means the
+            # row is the only declared candidate.
+            entries.append(_grant_entry(row, source="inherited"))
+    return entries
+
+
+def _grant_key(entry: Mapping[str, Any]) -> tuple[Any, ...]:
+    return (
+        entry.get("capability"),
+        entry.get("resource"),
+        entry.get("action"),
+        entry.get("data_class"),
+        entry.get("environment"),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -806,6 +1372,143 @@ class AgentControlService:
             tenant_id, "agent", agent_id, limit=limit
         )
 
+    def effective_profile(
+        self,
+        tenant_id: str,
+        agent_id: str,
+        *,
+        catalog: Any = None,
+        now: float | None = None,
+    ) -> dict[str, Any]:
+        """Project the agent's explicit, inherited and effective selectors.
+
+        The agent row supplies presentation and runtime declarations; identity
+        grants supply authority. A skill or desk never becomes a grant. The
+        returned profile keeps the frozen ``agent.schema.json`` core fields and
+        adds the richer selectors P2-01 requires (grant diff, memory
+        read/write/append, MCP tool allowlists).
+        """
+        moment = time.time() if now is None else float(now)
+        with self.store.read() as conn:
+            agent = Agent.from_row(self._require_agent(conn, tenant_id, agent_id))
+            principal = _resolve_profile_principal(conn, tenant_id, agent)
+            principal_id = principal["principal_id"] if principal is not None else None
+            entries = _profile_grants(
+                conn, tenant_id, principal_id, now=moment
+            )
+
+        explicit = [
+            item
+            for item in entries
+            if item["source"] == "explicit" and item["effect"] == "allow"
+        ]
+        inherited = [
+            item
+            for item in entries
+            if item["source"] == "inherited" and item["effect"] == "allow"
+        ]
+        denials = [item for item in entries if item["effect"] == "deny"]
+        denied_keys = {_grant_key(item) for item in denials}
+        effective: list[dict[str, Any]] = []
+        for item in entries:
+            if item["effect"] != "allow":
+                continue
+            if _grant_key(item) in denied_keys:
+                continue
+            if catalog is not None:
+                capability = catalog.get(item["capability"])
+                item = {
+                    **item,
+                    "risk": capability.risk,
+                    "approval_policy": capability.approval_policy,
+                    "capability_version": capability.version,
+                    "capability_health": capability.health,
+                }
+            effective.append(item)
+
+        metadata = normalize_selectors(agent.metadata)
+        skills = metadata.get("skills", [])
+        mcp_servers = metadata.get("mcp_servers", [])
+        memory_access = metadata.get("memory_scopes", [])
+        secret_refs = metadata.get("secret_refs", [])
+        budgets = metadata.get("budgets")
+        if budgets is None:
+            budgets = {
+                "currency": "USD",
+                "period": "daily",
+                "period_limit_minor": agent.safety.daily_spend_minor,
+                "per_turn_limit_minor": agent.safety.per_action_limit_minor,
+            }
+        policy_revision = metadata.get("policy_revision", agent.revision)
+        model_meta = metadata.get("model_policy", {})
+        fallback_chain = list(model_meta.get("fallback_chain", []))
+        if not fallback_chain and (
+            agent.fallback_provider and agent.fallback_model
+        ):
+            fallback_chain = [
+                {
+                    "provider": agent.fallback_provider,
+                    "model": agent.fallback_model,
+                }
+            ]
+        pinned = _configured(agent.provider) and _configured(agent.model)
+        return {
+            "agent_id": agent.agent_id,
+            "owner_id": agent.human_owner,
+            "tenant_id": agent.tenant_id,
+            "business_ids": [agent.business_id],
+            "department_id": agent.department,
+            "room_id": agent.room,
+            "desk_id": agent.desk,
+            "role_id": agent.role_id,
+            "security_principal_id": principal_id,
+            "principal_status": (
+                principal["status"] if principal is not None else None
+            ),
+            "display_name": agent.display_name,
+            "status": agent.status,
+            "policy_revision": policy_revision,
+            "autonomy_ceiling": agent.safety.autonomy,
+            "model_policy": {
+                "provider": agent.provider,
+                "model": agent.model,
+                "reasoning_effort": model_meta.get(
+                    "reasoning_effort", agent.reasoning_effort
+                ),
+                "fallback_provider": agent.fallback_provider,
+                "fallback_model": agent.fallback_model,
+                "fallback_chain": fallback_chain,
+                "temperature": agent.temperature,
+                "max_tokens": agent.max_tokens,
+                "pinned": pinned,
+            },
+            "capability_grants": sorted(
+                {item["grant_id"] for item in effective}
+            ),
+            "grants": {
+                "explicit": explicit,
+                "inherited": inherited,
+                "effective": effective,
+                "denials": denials,
+            },
+            "skills": [item["skill_id"] for item in skills],
+            "skill_requirements": skills,
+            "mcp_servers": mcp_servers,
+            "memory_scopes": [item["scope"] for item in memory_access],
+            "memory_scope_access": memory_access,
+            "secret_refs": secret_refs,
+            "budgets": budgets,
+            "safety": agent.safety.to_dict(),
+            "schedule": {
+                "cron": agent.schedule,
+                "timezone": agent.timezone,
+                "ref": metadata.get("schedule_ref"),
+            },
+            "appearance": metadata.get("appearance", {}),
+            "created_at": agent.created_at,
+            "updated_at": agent.updated_at,
+        }
+
     # -- create / update ----------------------------------------------
     def create(
         self,
@@ -820,6 +1523,7 @@ class AgentControlService:
         model: str,
         idempotency_key: str,
         actor: str = "system",
+        security_principal_id: str | None = None,
         room: str | None = None,
         desk: str | None = None,
         reasoning_effort: str = "medium",
@@ -839,6 +1543,9 @@ class AgentControlService:
             "department": _text(department, "department", max_len=120),
             "display_name": _text(display_name, "display_name", max_len=200),
             "human_owner": _text(human_owner, "human_owner", max_len=200),
+            "security_principal_id": _optional_text(
+                security_principal_id, "security_principal_id", max_len=80
+            ),
             "room": _optional_text(room, "room", max_len=120),
             "desk": _optional_text(desk, "desk", max_len=120),
             "provider": _text(provider, "provider", max_len=120),
@@ -861,6 +1568,12 @@ class AgentControlService:
             "safety": Safety.from_mapping(safety),
             "metadata": _metadata(metadata),
         }
+        _validate_model_route(
+            fields["provider"],
+            fields["model"],
+            fields["fallback_provider"],
+            fields["fallback_model"],
+        )
         key = _text(idempotency_key, "idempotency key", max_len=300)
         request_hash = fingerprint(
             {
@@ -874,6 +1587,9 @@ class AgentControlService:
         created_at = now_iso()
         with self.store.transaction() as conn:
             self.store._require_business(conn, tenant_id, business_id)
+            _require_security_principal(
+                conn, tenant_id, fields["security_principal_id"]
+            )
             existing = conn.execute(
                 "SELECT * FROM bos_agent WHERE tenant_id=? AND idempotency_key=?",
                 (tenant_id, key),
@@ -892,17 +1608,19 @@ class AgentControlService:
             try:
                 conn.execute(
                     "INSERT INTO bos_agent(agent_id, tenant_id, business_id,"
-                    " role_id, department, display_name, human_owner, room, desk,"
+                    " security_principal_id, role_id, department, display_name,"
+                    " human_owner, room, desk,"
                     " status, provider, model, reasoning_effort, fallback_model,"
                     " fallback_provider, temperature, max_tokens, schedule,"
                     " timezone, max_concurrent_turns, permissions_json,"
                     " safety_json, metadata_json, idempotency_key, request_hash,"
                     " created_at, updated_at)"
-                    " VALUES(?,?,?,?,?,?,?,?,?,'active',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    " VALUES(?,?,?,?,?,?,?,?,?,?,'active',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                     (
                         agent_id,
                         tenant_id,
                         business_id,
+                        fields["security_principal_id"],
                         fields["role_id"],
                         fields["department"],
                         fields["display_name"],
@@ -921,7 +1639,7 @@ class AgentControlService:
                         fields["max_concurrent_turns"],
                         json_dumps(fields["permissions"].to_dict()),
                         json_dumps(fields["safety"].to_dict()),
-                        json_dumps(redact(fields["metadata"])),
+                        _metadata_json(fields["metadata"]),
                         key,
                         request_hash,
                         created_at,
@@ -977,9 +1695,13 @@ class AgentControlService:
             replay = self._replay_operation(conn, tenant_id, key, request_hash)
             if replay is not None:
                 return Agent.from_dict(replay["agent"])
+            _require_security_principal(
+                conn, tenant_id, fields["security_principal_id"]
+            )
             updated_at = now_iso()
             conn.execute(
-                "UPDATE bos_agent SET role_id=?, department=?, display_name=?,"
+                "UPDATE bos_agent SET security_principal_id=?, role_id=?,"
+                " department=?, display_name=?,"
                 " human_owner=?, room=?, desk=?, provider=?, model=?,"
                 " reasoning_effort=?, fallback_model=?, fallback_provider=?,"
                 " temperature=?, max_tokens=?, schedule=?, timezone=?,"
@@ -987,6 +1709,7 @@ class AgentControlService:
                 " metadata_json=?, revision=revision+1, updated_at=?"
                 " WHERE tenant_id=? AND agent_id=?",
                 (
+                    fields["security_principal_id"],
                     fields["role_id"],
                     fields["department"],
                     fields["display_name"],
@@ -1005,7 +1728,7 @@ class AgentControlService:
                     fields["max_concurrent_turns"],
                     json_dumps(fields["permissions"].to_dict()),
                     json_dumps(fields["safety"].to_dict()),
-                    json_dumps(redact(fields["metadata"])),
+                    _metadata_json(fields["metadata"]),
                     updated_at,
                     tenant_id,
                     agent_id,
@@ -1913,6 +2636,7 @@ class AgentControlService:
             "permissions": current.permissions,
             "safety": current.safety,
             "metadata": current.metadata,
+            "security_principal_id": current.security_principal_id,
         }
         for field in (
             "role_id",
@@ -1954,6 +2678,18 @@ class AgentControlService:
             )
         if "metadata" in changes:
             fields["metadata"] = _metadata(changes["metadata"])
+        if "security_principal_id" in changes:
+            fields["security_principal_id"] = _optional_text(
+                changes["security_principal_id"],
+                "security_principal_id",
+                max_len=80,
+            )
+        _validate_model_route(
+            fields["provider"],
+            fields["model"],
+            fields["fallback_provider"],
+            fields["fallback_model"],
+        )
         return fields
 
     def _fields_payload(self, fields: Mapping[str, Any]) -> dict[str, Any]:
@@ -1962,6 +2698,7 @@ class AgentControlService:
             "department": fields["department"],
             "display_name": fields["display_name"],
             "human_owner": fields["human_owner"],
+            "security_principal_id": fields["security_principal_id"],
             "room": fields["room"],
             "desk": fields["desk"],
             "provider": fields["provider"],
@@ -1976,7 +2713,7 @@ class AgentControlService:
             "max_concurrent_turns": fields["max_concurrent_turns"],
             "permissions": fields["permissions"].to_dict(),
             "safety": fields["safety"].to_dict(),
-            "metadata": redact(fields["metadata"]),
+            "metadata": _metadata_json(fields["metadata"]),
         }
 
     def _replay_operation(
