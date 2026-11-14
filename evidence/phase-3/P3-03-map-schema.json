@@ -1,0 +1,83 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_campus_schema.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "-analyst\",\n      \"trading-incident-responder\",\n      \"trading-market-research\",\n      \"trading-meme-risk\",\n      \"trading-portfolio-accountant\",\n      \"trading-quant-backtest\",\n      \"trading-risk-manager\",\n      \"trading-verifier\"\n    ],\n    \"desks\": 111,\n    \"floor_id\": \"floor-023\",\n    \"missing\": [],\n    \"rooms\": [\n      \"Trading Floor (Market Wall)\",\n      \"Strategy Lab\",\n      \"Risk Room\",\n      \"Data Room\",\n      \"Treasury / Accounting\",\n      \"Compliance / Archive\",\n      \"Incident Room\",\n      \"Reception\",\n      \"Kitchen / Break\",\n      \"Restrooms\",\n      \"Lounge\",\n      \"Boardroom\",\n      \"Focus Rooms\",\n      \"Head Office\",\n      \"Storage / Archive\",\n      \"Comms / Ops\"\n    ]\n  }\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_world tests/test_office_world_model.py tests/test_office_world_tower_plan.py tests/test_business_role_registry.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 81%]\n................                                                         [100%]\n88 passed in 2.37s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/role_catalog.py voicebridge/office/world/map_schema.py scripts/validate_campus_schema.py tests/phase3_world tests/office_contracts/test_office_benchmark_renderer.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/role_catalog.py voicebridge/office/world/map_schema.py scripts/validate_campus_schema.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "(no output)"
+    }
+  ],
+  "generated_at": "2026-11-14T04:43:45Z",
+  "inputs": [
+    {
+      "path": "voicebridge/office/world/tower_plan.py",
+      "sha256": "5d19979dd77e67e464dd8d0948570bcf62d265461faca93ba43d218f171c1ac9"
+    },
+    {
+      "path": "voicebridge/office/world/model.py",
+      "sha256": "a9c091ca013eb7318e42e6e01876f76ddb8b2a2bdf51726823549049399de39b"
+    },
+    {
+      "path": "voicebridge/business/role_catalog.py",
+      "sha256": "9bd572d88a472f67e7daa80cfeb9f077540f671b4a31039c23c7bb762d7ee5ba"
+    }
+  ],
+  "limitations": [
+    "The map is a data projection only; no renderer was run and layer objects are render hints with no business facts.",
+    "Tiled import requires the canonical qubit:document property; a Tiled file without it is a typed refusal rather than an invented campus.",
+    "The registry is in-memory and append-only with a movable current pointer; no store or database was touched.",
+    "Paid art is refused; asset refs carry metadata hashes only and no image bytes.",
+    "No live service, network or model was touched; no full matrix was run. Not VERIFIED."
+  ],
+  "measurements": {
+    "capacity": 3075,
+    "cells": 575,
+    "desks": 3075,
+    "egress": 299,
+    "floors": 100,
+    "map_digest": "3dffa7427daf2c81cd4a575f048caad318ef045ffbdf8d8a038d73201846f3d5",
+    "map_schema": "qubit-office-map/1",
+    "map_version": 1,
+    "portals": 299,
+    "rooms": 300,
+    "tiled_round_trip": "equal"
+  },
+  "outputs": [
+    {
+      "path": "voicebridge/office/world/map_schema.py",
+      "sha256": "88e7e78c2a3ee806375e23452c9379d758eed357021c082bf5dc7d594564d151"
+    },
+    {
+      "path": "scripts/validate_campus_schema.py",
+      "sha256": "efb39e7f6ea1fae2440651f99c29807494dda3d7215d6bda1bc4cf55ab801b1a"
+    },
+    {
+      "path": "tests/phase3_world/test_map_schema.py",
+      "sha256": "06a51d40052ec76e6b20de7deda2d3e925306bf18894f96796abe26944b853fc"
+    },
+    {
+      "path": "tests/phase3_world/test_validate_campus_schema.py",
+      "sha256": "25c3b5ae6ea757c4731bffca65af0ed2e6c2687eabb25926e350965f47039409"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P3-03"
+}
