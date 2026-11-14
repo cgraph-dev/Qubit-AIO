@@ -219,7 +219,7 @@ def test_v1_v2_database_migrates_to_current_and_keeps_rows(tmp_path):
         business_names = [
             row[0] for row in read_conn.execute("SELECT name FROM bos_business")
         ]
-    assert version == SCHEMA_VERSION == 4
+    assert version == SCHEMA_VERSION
     assert {"bos_checkpoint", "bos_outbox"} <= tables
     assert {"bos_principal", "bos_event", "bos_workspace", "bos_lease"} <= tables
     # The v1/v2 tables and their rows are untouched.

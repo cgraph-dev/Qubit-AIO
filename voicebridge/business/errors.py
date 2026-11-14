@@ -83,6 +83,23 @@ A2A_MESSAGE_EXPIRED_CODE = "A2A_MESSAGE_EXPIRED"
 A2A_PAYLOAD_TOO_LARGE_CODE = "A2A_PAYLOAD_TOO_LARGE"
 A2A_NOT_RECIPIENT_CODE = "A2A_NOT_RECIPIENT"
 
+# Agent profile (P2-01). The profile is a projection, not a second authority:
+# a selector that would grant authority on its own is refused, and a profile
+# that cannot name a concrete model route is not silently completed.
+AGENT_PROFILE_INVALID_CODE = "AGENT_PROFILE_INVALID"
+AGENT_PROFILE_SCOPE_CODE = "AGENT_PROFILE_SCOPE_REFUSED"
+
+# Durable sessions and explicit handoffs (P2-02). A handoff is a durable
+# record; acceptance is the only transfer and rejection leaves ownership alone.
+SESSION_NOT_FOUND_CODE = "BUSINESS_SESSION_NOT_FOUND"
+SESSION_BAD_STATE_CODE = "BUSINESS_SESSION_BAD_STATE"
+SESSION_WORKSPACE_MISMATCH_CODE = "BUSINESS_SESSION_WORKSPACE_MISMATCH"
+HANDOFF_NOT_FOUND_CODE = "BUSINESS_HANDOFF_NOT_FOUND"
+HANDOFF_BAD_STATE_CODE = "BUSINESS_HANDOFF_BAD_STATE"
+HANDOFF_EXISTS_CODE = "BUSINESS_HANDOFF_EXISTS"
+HANDOFF_RECIPIENT_MISMATCH_CODE = "BUSINESS_HANDOFF_RECIPIENT_MISMATCH"
+HANDOFF_EXPIRED_CODE = "BUSINESS_HANDOFF_EXPIRED"
+
 
 class BusinessError(Exception):
     """A typed Business OS refusal.

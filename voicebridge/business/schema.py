@@ -10,7 +10,7 @@ and ``BEFORE DELETE`` triggers that raise ``ABORT``. A correction is a new row.
 """
 from __future__ import annotations
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 _V1 = [
     """
@@ -845,9 +845,109 @@ for _table in ("bos_event", "bos_policy_revision"):
         """
     )
 
+# -- v5: durable sessions and explicit handoffs ---------------------------
+# Additive only. v1-v4 are untouched.
+#
+# * ``bos_session`` is the durable owner<->agent lane. It points at the existing
+#   ``bos_agent`` and its workspace is a real ``bos_workspace`` row (task
+#   pinned), so this table never duplicates run/task/workspace truth.
+# * ``bos_handoff`` is the explicit transfer record. A task may have at most one
+#   *proposed* handoff at a time (partial unique index); accepting is the only
+#   path that transfers the durable task, and rejecting leaves ownership alone.
+# * ``bos_agent.security_principal_id`` makes the authorization subject explicit
+#   instead of inferred from a desk/room. It is nullable for read-old rows; an
+#   agent without a principal simply has no effective grants (deny by default).
+_V5 = [
+    """
+    ALTER TABLE bos_agent ADD COLUMN security_principal_id TEXT
+        REFERENCES bos_principal(principal_id) ON DELETE RESTRICT
+    """,
+    """
+    CREATE TABLE bos_session (
+        session_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        business_id TEXT NOT NULL REFERENCES bos_business(business_id)
+            ON DELETE RESTRICT,
+        agent_id TEXT NOT NULL REFERENCES bos_agent(agent_id) ON DELETE RESTRICT,
+        owner_principal TEXT NOT NULL,
+        participants_json TEXT NOT NULL DEFAULT '[]',
+        visibility TEXT NOT NULL DEFAULT 'private'
+            CHECK(visibility IN ('private','owner','participants',
+                                 'department','office','tenant')),
+        default_memory_scopes_json TEXT NOT NULL DEFAULT '[]',
+        default_workspace_id TEXT
+            REFERENCES bos_workspace(workspace_id) ON DELETE RESTRICT,
+        status TEXT NOT NULL DEFAULT 'active'
+            CHECK(status IN ('active','paused','archived')),
+        last_checkpoint_id TEXT,
+        policy_revision INTEGER NOT NULL DEFAULT 1
+            CHECK(policy_revision >= 1),
+        metadata_json TEXT NOT NULL DEFAULT '{}',
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        archived_at TEXT
+    )
+    """,
+    """
+    CREATE INDEX bos_session_listing
+        ON bos_session(tenant_id, business_id, status)
+    """,
+    """
+    CREATE INDEX bos_session_agent
+        ON bos_session(tenant_id, agent_id, status)
+    """,
+    """
+    CREATE INDEX bos_session_owner
+        ON bos_session(tenant_id, owner_principal)
+    """,
+    """
+    CREATE TABLE bos_handoff (
+        handoff_id TEXT PRIMARY KEY,
+        tenant_id TEXT NOT NULL REFERENCES bos_tenant(tenant_id) ON DELETE RESTRICT,
+        business_id TEXT NOT NULL REFERENCES bos_business(business_id)
+            ON DELETE RESTRICT,
+        task_id TEXT NOT NULL REFERENCES bos_task(task_id) ON DELETE RESTRICT,
+        session_id TEXT NOT NULL REFERENCES bos_session(session_id)
+            ON DELETE RESTRICT,
+        from_principal TEXT NOT NULL,
+        to_principal TEXT NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        checkpoint_id TEXT REFERENCES bos_checkpoint(checkpoint_id)
+            ON DELETE RESTRICT,
+        artifact_ids_json TEXT NOT NULL DEFAULT '[]',
+        unresolved_questions_json TEXT NOT NULL DEFAULT '[]',
+        required_capabilities_json TEXT NOT NULL DEFAULT '[]',
+        acceptance_deadline TEXT,
+        status TEXT NOT NULL DEFAULT 'proposed'
+            CHECK(status IN ('proposed','accepted','rejected','cancelled')),
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        accepted_at TEXT
+    )
+    """,
+    """
+    CREATE INDEX bos_handoff_listing
+        ON bos_handoff(tenant_id, business_id, status, created_at)
+    """,
+    """
+    CREATE INDEX bos_handoff_session
+        ON bos_handoff(tenant_id, session_id, status)
+    """,
+    """
+    CREATE INDEX bos_handoff_task
+        ON bos_handoff(tenant_id, task_id, status)
+    """,
+    """
+    CREATE UNIQUE INDEX bos_handoff_one_proposed
+        ON bos_handoff(tenant_id, task_id)
+        WHERE status='proposed'
+    """,
+]
+
 MIGRATIONS: tuple[tuple[int, tuple[str, ...]], ...] = (
     (1, tuple(_V1)),
     (2, tuple(_V2)),
     (3, tuple(_V3)),
     (4, tuple(_V4)),
+    (5, tuple(_V5)),
 )
