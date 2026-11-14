@@ -12078,6 +12078,7 @@ _r("GET", r"/api/office/world/tower-plan", "h_office_world_tower")
 # tasks, sessions and approvals. Search is bounded; counts are derived from
 # rows, and each source degrades to a typed unavailable state.
 _r("GET", r"/api/office/business/command-center", "h_business_command_center")
+_r("GET", r"/api/office/business/panel-inventory", "h_business_panel_inventory")
 # P4-07 operator timeline: a read-only causal projection of the durable
 # events/jobs/checkpoints/approvals/artifacts/ledger/tool rows. Status
 # derives from the job row; completed requires an artifact/receipt and
@@ -12098,6 +12099,7 @@ _r("GET", r"/api/office/business/org/floors", "h_business_floors")
 # explicitly unstaffed, so the Office scene can render empty desks rather than
 # inventing agents.
 _r("GET", r"/api/office/world/tower", "h_world_tower")
+_r("GET", r"/api/office/world/outside", "h_world_outside")
 _r("GET", r"/api/office/business/warroom/sessions", "h_business_warroom_list")
 _r("POST", r"/api/office/business/warroom/sessions", "h_business_warroom_create")
 # Owner-gated bootstrap of the Etsy digital-shop pilot. Idempotent: one
@@ -21776,8 +21778,8 @@ for _name in (
     "h_business_agent_update", "h_business_agent_preview",
     "h_business_agent_pause", "h_business_agent_resume",
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
-    "h_business_agent_archive", "h_world_tower",
-    "h_business_command_center",
+    "h_business_agent_archive", "h_world_tower", "h_world_outside",
+    "h_business_command_center", "h_business_panel_inventory",
     "h_business_operator_timeline",
 ):
     HANDLERS[_name] = getattr(_business_bridge, _name)

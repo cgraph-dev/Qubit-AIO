@@ -191164,7 +191164,7 @@ create: function(game) {
 		trim: "#453f5e",
 		accent: "#e08fb0"
 	};
-	function text(ctx, s, x, y, size, colour, align = "left", weight = "400") {
+	function text$2(ctx, s, x, y, size, colour, align = "left", weight = "400") {
 		ctx.save();
 		ctx.font = `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
 		ctx.textAlign = align;
@@ -191214,7 +191214,7 @@ create: function(game) {
 		ctx.arc(x, top + h * .13, w * .31, Math.PI * 1.05, Math.PI * 1.95);
 		ctx.fill();
 		ctx.restore();
-		if (c.stalled) text(ctx, "!", x, top - 12 * scale, 12 * scale, "#ff7a6a", "center", "700");
+		if (c.stalled) text$2(ctx, "!", x, top - 12 * scale, 12 * scale, "#ff7a6a", "center", "700");
 	}
 	/** The payload's own animation vocabulary, as base colours. */
 	var ANIM_COLOUR = {
@@ -191312,9 +191312,9 @@ create: function(game) {
 		spill.addColorStop(1, "rgba(111,211,166,0)");
 		ctx.fillStyle = spill;
 		ctx.fillRect(width / 2 - 140, dy - 30, 280, 174);
-		text(ctx, world.building.name, width / 2, by - 24, 17, PALETTE.ink, "center", "600");
-		text(ctx, world.building.floors.length + " floors", width / 2, by - 6, 11, PALETTE.muted, "center");
-		text(ctx, "Enter", width / 2, dy + dh + 20, 12, PALETTE.doorway, "center", "600");
+		text$2(ctx, world.building.name, width / 2, by - 24, 17, PALETTE.ink, "center", "600");
+		text$2(ctx, world.building.floors.length + " floors", width / 2, by - 6, 11, PALETTE.muted, "center");
+		text$2(ctx, "Enter", width / 2, dy + dh + 20, 12, PALETTE.doorway, "center", "600");
 	}
 	function drawEntranceHall(a) {
 		const { ctx, width, height, world } = a;
@@ -191360,11 +191360,11 @@ create: function(game) {
 				ctx.fill();
 			}
 		}
-		text(ctx, world.building.name, width * .04 + 18, fy + 22, 16, PALETTE.ink, "left", "600");
-		text(ctx, "You are inside.", width * .04 + 18, fy + 44, 12, PALETTE.muted);
-		text(ctx, "To reception →", width * .96 - 18, fy + 22, 12, PALETTE.accent, "right", "600");
-		text(ctx, "Back outside", width * .5, dy + dh + 20, 11, PALETTE.doorway, "center");
-		text(ctx, world.building.floors.length + " floors above", width / 2, fy + fh - 14, 11, PALETTE.muted, "center");
+		text$2(ctx, world.building.name, width * .04 + 18, fy + 22, 16, PALETTE.ink, "left", "600");
+		text$2(ctx, "You are inside.", width * .04 + 18, fy + 44, 12, PALETTE.muted);
+		text$2(ctx, "To reception →", width * .96 - 18, fy + 22, 12, PALETTE.accent, "right", "600");
+		text$2(ctx, "Back outside", width * .5, dy + dh + 20, 11, PALETTE.doorway, "center");
+		text$2(ctx, world.building.floors.length + " floors above", width / 2, fy + fh - 14, 11, PALETTE.muted, "center");
 	}
 	function drawLobby(a) {
 		const { ctx, width, height, world } = a;
@@ -191397,8 +191397,8 @@ create: function(game) {
 		plant(f, 13, 1);
 		rug(f, 5, 6, 3, "#7c5f86");
 		chair(f, 5, 8);
-		text(ctx, "Reception", 18, 24, 14, PALETTE.ink, "left", "600");
-		text(ctx, world.building.name + "  ·  " + world.building.floors.length + " floors", 18, 44, 11, PALETTE.muted);
+		text$2(ctx, "Reception", 18, 24, 14, PALETTE.ink, "left", "600");
+		text$2(ctx, world.building.name + "  ·  " + world.building.floors.length + " floors", 18, 44, 11, PALETTE.muted);
 	}
 	/** Who the payload seats on the ground floor — the lobby's own crowd. */
 	function lobbyOccupants(world) {
@@ -191418,13 +191418,13 @@ create: function(game) {
 		paintFloor(ctx, toIsoFloor(floor), width, height, null);
 		for (const room of floor.rooms) {
 			room.occupants.length;
-			text(ctx, room.slug, width / 2, height - 46 + 0, 0, PALETTE.ink);
+			text$2(ctx, room.slug, width / 2, height - 46 + 0, 0, PALETTE.ink);
 			break;
 		}
 		const here = floor.rooms.reduce((n, r) => n + r.occupants.length, 0);
-		text(ctx, floor.name + "  ·  floor " + floor.number, 18, 24, 14, PALETTE.ink, "left", "600");
-		text(ctx, floor.role + "  ·  " + floor.rooms.length + " rooms  ·  " + here + " seated", 18, 44, 11, PALETTE.muted);
-		if (floor.rooms.length === 0) text(ctx, "No rooms on this floor", width / 2, height / 2, 13, PALETTE.muted, "center");
+		text$2(ctx, floor.name + "  ·  floor " + floor.number, 18, 24, 14, PALETTE.ink, "left", "600");
+		text$2(ctx, floor.role + "  ·  " + floor.rooms.length + " rooms  ·  " + here + " seated", 18, 44, 11, PALETTE.muted);
+		if (floor.rooms.length === 0) text$2(ctx, "No rooms on this floor", width / 2, height / 2, 13, PALETTE.muted, "center");
 	}
 	function drawRoom(a, floor) {
 		const { ctx, width, height, world } = a;
@@ -191434,7 +191434,7 @@ create: function(game) {
 		const fh = height * .74;
 		const fy = height * .13;
 		if (!room) {
-			text(ctx, "This room is not in the tower report", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
+			text$2(ctx, "This room is not in the tower report", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
 			return;
 		}
 		const theme = roomTheme(room.id + floor.number * 3);
@@ -191468,12 +191468,12 @@ create: function(game) {
 			ctx.fillStyle = mix$1(anim, "#ffffff", .15);
 			ctx.fillRect(dx + dwid / 2 - 14, dy - 22, 28, 18);
 			if (worldChar) figure(ctx, worldChar, dx + dwid / 2, dy + 24, 1.7, false);
-			text(ctx, c.slug, dx + dwid / 2, dy + dhei + 34, 11, PALETTE.ink, "center", "600");
-			text(ctx, c.animation + (c.stalled ? " · stalled" : ""), dx + dwid / 2, dy + dhei + 48, 10, c.stalled ? "#ff7a6a" : PALETTE.muted, "center");
+			text$2(ctx, c.slug, dx + dwid / 2, dy + dhei + 34, 11, PALETTE.ink, "center", "600");
+			text$2(ctx, c.animation + (c.stalled ? " · stalled" : ""), dx + dwid / 2, dy + dhei + 48, 10, c.stalled ? "#ff7a6a" : PALETTE.muted, "center");
 		});
-		if (occ.length === 0) text(ctx, "Nobody is seated here", width / 2, floorY + 40, 13, PALETTE.muted, "center");
-		text(ctx, room.slug, width * .05 + 18, fy + 22, 14, PALETTE.ink, "left", "600");
-		text(ctx, room.kind + "  ·  " + occ.length + " seated", width * .05 + 18, fy + 42, 11, PALETTE.muted);
+		if (occ.length === 0) text$2(ctx, "Nobody is seated here", width / 2, floorY + 40, 13, PALETTE.muted, "center");
+		text$2(ctx, room.slug, width * .05 + 18, fy + 22, 14, PALETTE.ink, "left", "600");
+		text$2(ctx, room.kind + "  ·  " + occ.length + " seated", width * .05 + 18, fy + 42, 11, PALETTE.muted);
 	}
 	/** Paint the current place. The one entry point the hosts call. */
 	function drawPlace(a) {
@@ -191496,7 +191496,7 @@ create: function(game) {
 				if (!f) {
 					a.ctx.fillStyle = PALETTE.void;
 					a.ctx.fillRect(0, 0, a.width, a.height);
-					text(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+					text$2(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 					return;
 				}
 				return drawFloor(a, f);
@@ -191506,7 +191506,7 @@ create: function(game) {
 				if (!f) {
 					a.ctx.fillStyle = PALETTE.void;
 					a.ctx.fillRect(0, 0, a.width, a.height);
-					text(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+					text$2(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 					return;
 				}
 				return drawRoom(a, f);
@@ -191514,7 +191514,7 @@ create: function(game) {
 			default:
 				a.ctx.fillStyle = PALETTE.void;
 				a.ctx.fillRect(0, 0, a.width, a.height);
-				text(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+				text$2(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 		}
 	}
 	// ../qubit-app/plugins/qubit-office/game/InteractionController.ts
@@ -193208,6 +193208,455 @@ create: function(game) {
 			};
 		}
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/business-api.ts
+	/** The compat family prefix (the SPA reaches it under `/agent`). */
+	var API_PREFIX = "/agent";
+	var BUSINESS_PATH = "/api/office/business";
+	var BusinessApiError = class extends Error {
+		code;
+		status;
+		body;
+		constructor(message, code, status, body = null) {
+			super(message);
+			this.name = "BusinessApiError";
+			this.code = code;
+			this.status = status;
+			this.body = body;
+		}
+	};
+	function hostBasePath() {
+		if (typeof window === "undefined") return "";
+		const raw = window.__QUBIT_BASE_PATH__;
+		if (!raw) return "";
+		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
+	}
+	/** Build a Business OS URL, rebased onto the dashboard's base path. */
+	function businessUrl(path, base, query) {
+		const raw = base === void 0 ? hostBasePath() : base;
+		let url = `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${BUSINESS_PATH}${path.startsWith("/") ? path : `/${path}`}`;
+		const params = new URLSearchParams();
+		for (const [key, value] of Object.entries(query ?? {})) if (value !== void 0 && value !== null && String(value) !== "") params.set(key, String(value));
+		const suffix = params.toString();
+		return suffix ? `${url}?${suffix}` : url;
+	}
+	/** A fresh idempotency key for one user action (double-click safe). */
+	function newIdempotencyKey(action) {
+		return `ui:${action}:${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
+	}
+	/** Fetch one Business OS route and return its `ok:true` payload.
+	*
+	* Throws `BusinessApiError` for an auth failure, a non-JSON body, a typed
+	* refusal, or any HTTP failure. The panel decides what to render; nothing here
+	* converts an error into an empty/successful state.
+	*/
+	async function businessFetch(path, opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		const method = opts.method ?? "GET";
+		const url = businessUrl(path, opts.base, opts.query);
+		const headers = { Accept: "application/json" };
+		const token = readToken(opts.win);
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		const init = {
+			method,
+			headers,
+			credentials: "same-origin",
+			signal: opts.signal
+		};
+		if (method === "POST") {
+			headers["Content-Type"] = "application/json";
+			const body = { ...opts.body ?? {} };
+			if (body.owner === void 0) body.owner = true;
+			init.body = JSON.stringify(body);
+		}
+		let res;
+		try {
+			res = await f(url, init);
+		} catch (err) {
+			throw new BusinessApiError(`The Business OS could not be reached: ${err instanceof Error ? err.message : String(err)}`, "BUSINESS_UNREACHABLE", 0);
+		}
+		const parsed = await res.json().catch(() => null);
+		if (res.status === 401) throw new BusinessApiError("The Business OS refused the request (HTTP 401); the office session token was not accepted. Reload the page to refresh it.", "BUSINESS_UNAUTHORIZED", 401, parsed);
+		if (!parsed || typeof parsed !== "object") throw new BusinessApiError(`The Business OS answered HTTP ${res.status} with no JSON body.`, "BUSINESS_BAD_RESPONSE", res.status);
+		if (!res.ok || parsed.ok !== true) {
+			const code = String(parsed.code || `BUSINESS_HTTP_${res.status}`);
+			throw new BusinessApiError(String(parsed.detail || parsed.explanation || `HTTP ${res.status}`), code, res.status, parsed);
+		}
+		return parsed;
+	}
+	var fetchOverview = (opts = {}) => businessFetch("/overview", opts);
+	/** Create the local Personal scope and import the office seat roster once.
+	*
+	* Idempotent: a repeat creates zero records. Owner intent is added by
+	* `businessFetch`; the backend refuses without it.
+	*/
+	var bootstrapOfficeSeats = (body = {}, opts = {}) => businessFetch("/bootstrap", {
+		...opts,
+		method: "POST",
+		body
+	});
+	var fetchDirectory = (opts = {}) => businessFetch("/directory", opts);
+	var fetchWarRoomSessions = (query = {}, opts = {}) => businessFetch("/warroom/sessions", {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var fetchWarRoomBundle = (sessionId, query = {}, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}`, {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var fetchAgents = (query = {}, opts = {}) => businessFetch("/agents", {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var fetchAgent = (agentId, query = {}, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}`, {
+		...opts,
+		query: {
+			...query,
+			...opts.query
+		}
+	});
+	var createWarRoomSession = (body, opts = {}) => businessFetch("/warroom/sessions", {
+		...opts,
+		method: "POST",
+		body
+	});
+	var addWarRoomSource = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/sources`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var addWarRoomEvidence = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/evidence`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var recordWarRoomDecision = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/decisions`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	/** Bootstrap the owner-reviewable Etsy digital-shop pilot.
+	*
+	* Owner intent is added by `businessFetch`. The backend records the playbook,
+	* labelled evidence and experiments, then leaves the session at
+	* `owner_decision` with no decision, task, publish, spend or contact.
+	*/
+	var startEtsyPilot = (body = {}, opts = {}) => businessFetch("/warroom/etsy-pilot", {
+		...opts,
+		method: "POST",
+		body
+	});
+	/** Run the owner-gated, idempotent research action for one session.
+	*
+	* `businessFetch` adds `owner: true`. The backend only appends cited sources
+	* and labelled evidence; a refusal (missing key, provider failure) arrives as
+	* a typed `BusinessApiError`, never as a fabricated success.
+	*/
+	var researchWarRoomSession = (sessionId, body = {}, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/research`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var createWarRoomTasks = (sessionId, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/tasks`, {
+		...opts,
+		method: "POST",
+		body: {}
+	});
+	/** Validate one prospective turn and return the plan.
+	*
+	* The backend is owner-gated and writes nothing: no turn, usage, audit, ledger,
+	* job, spend, model call or tool side effect. A refusal throws the typed
+	* `BusinessApiError`; the panel renders that reason rather than a fake success.
+	*/
+	var previewAgentTurn = (agentId, body, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/preview`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var updateAgent = (agentId, changes, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/update`, {
+		...opts,
+		method: "POST",
+		body: { changes }
+	});
+	var pauseAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/pause`, {
+		...opts,
+		method: "POST"
+	});
+	var resumeAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/resume`, {
+		...opts,
+		method: "POST"
+	});
+	var stopAgent = (agentId, body = {}, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/stop`, {
+		...opts,
+		method: "POST",
+		body
+	});
+	var takeoverAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/takeover`, {
+		...opts,
+		method: "POST"
+	});
+	var revokeAgent = (agentId, scopes, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/revoke`, {
+		...opts,
+		method: "POST",
+		body: { scopes }
+	});
+	var archiveAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/archive`, {
+		...opts,
+		method: "POST"
+	});
+	// ../qubit-app/plugins/qubit-office/game/app/command-center.ts
+	/** The one office compat route this module reads. */
+	var COMMAND_CENTER_PATH = "/command-center";
+	var COMMAND_CENTER_KINDS = [
+		"floor",
+		"room",
+		"desk",
+		"agent",
+		"task",
+		"approval"
+	];
+	var KIND_LABELS$1 = {
+		floor: "Floor",
+		room: "Room",
+		desk: "Desk",
+		agent: "Agent",
+		task: "Task",
+		approval: "Approval"
+	};
+	/** Only non-empty filters are sent; the backend owns matching and counts. */
+	function cleanQuery$1(query = {}) {
+		const out = {};
+		const text = (value) => String(value ?? "").trim();
+		if (text(query.q)) out.q = text(query.q);
+		const kind = text(query.kind);
+		if (kind && kind !== "all") out.kind = kind;
+		const status = text(query.status);
+		if (status && status !== "all") out.status = status;
+		if (text(query.floor_id)) out.floor_id = text(query.floor_id);
+		if (text(query.room_id)) out.room_id = text(query.room_id);
+		if (text(query.agent_id)) out.agent_id = text(query.agent_id);
+		if (text(query.task_id)) out.task_id = text(query.task_id);
+		if (text(query.approval_id)) out.approval_id = text(query.approval_id);
+		if (query.limit !== void 0 && Number.isFinite(Number(query.limit))) out.limit = String(Math.max(1, Math.trunc(Number(query.limit))));
+		return out;
+	}
+	async function fetchCommandCenter(opts = {}) {
+		try {
+			const body = await businessFetch(COMMAND_CENTER_PATH, {
+				base: opts.base,
+				fetchImpl: opts.fetchImpl,
+				win: opts.win,
+				signal: opts.signal,
+				query: cleanQuery$1(opts)
+			});
+			if (!body || !body.projection) return {
+				kind: "error",
+				message: "the backend returned no projection"
+			};
+			return {
+				kind: "available",
+				projection: body.projection
+			};
+		} catch (exc) {
+			if (exc instanceof BusinessApiError) return {
+				kind: "unavailable",
+				code: exc.code || `HTTP_${exc.status}`,
+				detail: exc.message
+			};
+			return {
+				kind: "error",
+				message: exc instanceof Error ? exc.message : String(exc)
+			};
+		}
+	}
+	var norm$1 = (value) => String(value ?? "").trim().toLowerCase();
+	function entryHaystack(entry) {
+		return [
+			entry.entry_id,
+			entry.kind,
+			entry.title,
+			entry.subtitle,
+			entry.status,
+			entry.floor_id,
+			entry.room_id,
+			entry.desk_id,
+			entry.agent_id,
+			entry.task_id,
+			entry.approval_id
+		].map(norm$1).filter(Boolean).join(" ");
+	}
+	function entryMatches(entry, filter = {}) {
+		const needle = norm$1(filter.q);
+		if (needle && !entryHaystack(entry).includes(needle)) return false;
+		const kind = norm$1(filter.kind);
+		if (kind && kind !== "all" && entry.kind !== kind) return false;
+		if (filter.status && norm$1(entry.status) !== norm$1(filter.status)) return false;
+		if (filter.floor_id && norm$1(entry.floor_id) !== norm$1(filter.floor_id)) return false;
+		if (filter.room_id && norm$1(entry.room_id) !== norm$1(filter.room_id)) return false;
+		if (filter.agent_id && norm$1(entry.agent_id) !== norm$1(filter.agent_id)) return false;
+		if (filter.task_id && norm$1(entry.task_id) !== norm$1(filter.task_id)) return false;
+		if (filter.approval_id && norm$1(entry.approval_id) !== norm$1(filter.approval_id)) return false;
+		return true;
+	}
+	function filterEntries(entries, filter = {}) {
+		return (entries ?? []).filter((entry) => entryMatches(entry, filter));
+	}
+	function statusOptions$1(entries) {
+		const seen = /* @__PURE__ */ new Set();
+		for (const entry of entries ?? []) {
+			const value = String(entry.status ?? "").trim();
+			if (value) seen.add(value);
+		}
+		return Array.from(seen).sort();
+	}
+	function withBase(path, base) {
+		const raw = base === void 0 ? hostBasePath() : base;
+		return `${String(raw ?? "").replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
+	}
+	/** Build the contract deep link: `/qubit-office/floor/<id>?room=&agent=`. */
+	function floorDeepLink(link) {
+		const floorId = String(link.floorId ?? "").trim();
+		if (!floorId) return "";
+		const params = new URLSearchParams();
+		if (link.roomId) params.set("room", String(link.roomId));
+		if (link.agentId) params.set("agent", String(link.agentId));
+		const suffix = params.toString();
+		return withBase(`/qubit-office/floor/${encodeURIComponent(floorId)}` + (suffix ? `?${suffix}` : ""), link.base);
+	}
+	/** The entry's own link when the backend proved one; never a guessed floor. */
+	function entryDeepLink(entry, base) {
+		const path = entry.link?.path ?? null;
+		if (path) return withBase(path, base);
+		if (entry.floor_id) return floorDeepLink({
+			floorId: entry.floor_id,
+			roomId: entry.room_id,
+			agentId: entry.agent_id,
+			base
+		});
+		return null;
+	}
+	function isEditableTarget(target) {
+		const node = target;
+		if (!node) return false;
+		const tag = String(node.tagName ?? "").toUpperCase();
+		if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+		if (node.isContentEditable) return true;
+		const role = node.getAttribute?.("role");
+		return role === "textbox" || role === "searchbox" || role === "combobox";
+	}
+	/** Map a key event to one command-center action, or `null`. */
+	function shortcutAction(event) {
+		if (!event) return null;
+		const key = String(event.key ?? "");
+		const command = Boolean(event.ctrlKey || event.metaKey);
+		if (key === "Escape") return "close";
+		if (command && (key === "k" || key === "K")) return "focus-search";
+		if (key === "/" && !isEditableTarget(event.target)) return "focus-search";
+		if (key === "ArrowDown") return "move-next";
+		if (key === "ArrowUp") return "move-prev";
+		if (key === "Home") return "move-first";
+		if (key === "End") return "move-last";
+		if (key === "Enter") return "jump";
+		return null;
+	}
+	function clampIndex$1(index, length) {
+		if (length <= 0) return -1;
+		const value = Number.isFinite(index) ? Math.trunc(index) : 0;
+		return Math.min(length - 1, Math.max(0, value));
+	}
+	function nextIndex$1(index, length, delta) {
+		if (length <= 0) return -1;
+		if (index < 0) return delta >= 0 ? 0 : length - 1;
+		return (clampIndex$1(index, length) + delta + length) % length;
+	}
+	function kindLabel$1(kind) {
+		return KIND_LABELS$1[kind] ?? String(kind || "Record");
+	}
+	/** A text marker so status is never conveyed by color alone. */
+	function statusMarker$1(status) {
+		switch (norm$1(status)) {
+			case "pending":
+			case "waiting":
+			case "waiting_approval":
+			case "approval": return "!";
+			case "active":
+			case "doing":
+			case "live":
+			case "running": return ">";
+			case "done":
+			case "approved":
+			case "completed": return "v";
+			case "paused": return "||";
+			case "cancelled":
+			case "rejected":
+			case "expired":
+			case "failed": return "x";
+			case "open":
+			case "vacant": return "o";
+			case "dormant":
+			case "archived": return "-";
+			default: return "?";
+		}
+	}
+	function statusLabel$3(status) {
+		return String(status ?? "").trim() || "unknown";
+	}
+	function isAttention(entry) {
+		return entry.attention === true || [
+			"pending",
+			"waiting",
+			"waiting_approval"
+		].includes(norm$1(entry.status));
+	}
+	function unavailableSources$1(projection) {
+		if (!projection?.sources) return [];
+		return Object.entries(projection.sources).filter(([, state]) => state?.state === "unavailable").map(([name, state]) => ({
+			name,
+			code: state?.code ?? null,
+			reason: state?.reason ?? null
+		}));
+	}
+	function resultSummary(projection) {
+		if (!projection) return "No command-center projection.";
+		const matched = Number(projection.matched ?? 0);
+		const returned = Number(projection.counts?.returned ?? projection.entries?.length ?? 0);
+		if (matched === 0) return "No floors, rooms, desks, agents, tasks or approvals match.";
+		if (projection.truncated) return `${matched} matches; showing the first ${returned}.`;
+		return `${matched} match${matched === 1 ? "" : "es"}.`;
+	}
+	function rosterSummaryText(roster) {
+		if (!roster) return "Roster unavailable.";
+		return [
+			`${roster.total} agent${roster.total === 1 ? "" : "s"}`,
+			`${roster.active} active`,
+			`${roster.paused} paused`,
+			`${roster.archived} archived`,
+			`${roster.placed} placed`,
+			`${roster.unplaced} unplaced`
+		].join(" · ");
+	}
+	function inboxCount(projection) {
+		return Number(projection?.inbox?.counts?.approvals_pending ?? 0);
+	}
+	function inboxSummaryText(projection) {
+		const count = inboxCount(projection);
+		if (count === 0) return "No pending approvals.";
+		return `${count} pending approval${count === 1 ? "" : "s"}.`;
+	}
+	function announcement(read, projection) {
+		if (read.kind === "loading") return "Loading the command center…";
+		if (read.kind === "error") return `Command center error: ${read.message}`;
+		if (read.kind === "unavailable") return `Command center unavailable: ${read.code} — ${read.detail}`;
+		return resultSummary(projection ?? read.projection);
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/office-theme.ts
 	function themeAtlasUrls(theme) {
 		return {
@@ -193762,210 +194211,1198 @@ create: function(game) {
 			]);
 		};
 	}
-	// ../qubit-app/plugins/qubit-office/game/app/business-api.ts
-	/** The compat family prefix (the SPA reaches it under `/agent`). */
-	var API_PREFIX = "/agent";
-	var BUSINESS_PATH = "/api/office/business";
-	var BusinessApiError = class extends Error {
-		code;
-		status;
-		body;
-		constructor(message, code, status, body = null) {
-			super(message);
-			this.name = "BusinessApiError";
-			this.code = code;
-			this.status = status;
-			this.body = body;
-		}
-	};
-	function hostBasePath() {
-		if (typeof window === "undefined") return "";
-		const raw = window.__QUBIT_BASE_PATH__;
-		if (!raw) return "";
-		return (raw.startsWith("/") ? raw : `/${raw}`).replace(/\/+$/, "");
-	}
-	/** Build a Business OS URL, rebased onto the dashboard's base path. */
-	function businessUrl(path, base, query) {
-		const raw = base === void 0 ? hostBasePath() : base;
-		let url = `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${BUSINESS_PATH}${path.startsWith("/") ? path : `/${path}`}`;
-		const params = new URLSearchParams();
-		for (const [key, value] of Object.entries(query ?? {})) if (value !== void 0 && value !== null && String(value) !== "") params.set(key, String(value));
-		const suffix = params.toString();
-		return suffix ? `${url}?${suffix}` : url;
-	}
-	/** A fresh idempotency key for one user action (double-click safe). */
-	function newIdempotencyKey(action) {
-		return `ui:${action}:${typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`}`;
-	}
-	/** Fetch one Business OS route and return its `ok:true` payload.
-	*
-	* Throws `BusinessApiError` for an auth failure, a non-JSON body, a typed
-	* refusal, or any HTTP failure. The panel decides what to render; nothing here
-	* converts an error into an empty/successful state.
-	*/
-	async function businessFetch(path, opts = {}) {
-		const f = opts.fetchImpl ?? fetch;
-		const method = opts.method ?? "GET";
-		const url = businessUrl(path, opts.base, opts.query);
-		const headers = { Accept: "application/json" };
-		const token = readToken(opts.win);
-		if (token) headers["X-Qubit-Session-Token"] = token;
-		const init = {
-			method,
-			headers,
-			credentials: "same-origin",
-			signal: opts.signal
+	// ../qubit-app/plugins/qubit-office/game/app/effective-state.ts
+	async function fetchEffectiveState(opts) {
+		const agentId = String(opts.agentId || "").trim();
+		if (!agentId) return {
+			kind: "unavailable",
+			code: "AGENT_ID_REQUIRED",
+			detail: "no agent id was supplied"
 		};
-		if (method === "POST") {
-			headers["Content-Type"] = "application/json";
-			const body = { ...opts.body ?? {} };
-			if (body.owner === void 0) body.owner = true;
-			init.body = JSON.stringify(body);
-		}
-		let res;
 		try {
-			res = await f(url, init);
-		} catch (err) {
-			throw new BusinessApiError(`The Business OS could not be reached: ${err instanceof Error ? err.message : String(err)}`, "BUSINESS_UNREACHABLE", 0);
+			const body = await businessFetch(`/agents/${encodeURIComponent(agentId)}/effective`, {
+				base: opts.base,
+				fetchImpl: opts.fetchImpl,
+				signal: opts.signal,
+				query: opts.tenantId ? { tenant_id: opts.tenantId } : void 0
+			});
+			if (!body || !body.projection) return {
+				kind: "error",
+				message: "the backend returned no projection"
+			};
+			return {
+				kind: "available",
+				projection: body.projection
+			};
+		} catch (exc) {
+			if (exc instanceof BusinessApiError) return {
+				kind: "unavailable",
+				code: exc.code || `HTTP_${exc.status}`,
+				detail: exc.message
+			};
+			return {
+				kind: "error",
+				message: exc instanceof Error ? exc.message : String(exc)
+			};
 		}
-		const parsed = await res.json().catch(() => null);
-		if (res.status === 401) throw new BusinessApiError("The Business OS refused the request (HTTP 401); the office session token was not accepted. Reload the page to refresh it.", "BUSINESS_UNAUTHORIZED", 401, parsed);
-		if (!parsed || typeof parsed !== "object") throw new BusinessApiError(`The Business OS answered HTTP ${res.status} with no JSON body.`, "BUSINESS_BAD_RESPONSE", res.status);
-		if (!res.ok || parsed.ok !== true) {
-			const code = String(parsed.code || `BUSINESS_HTTP_${res.status}`);
-			throw new BusinessApiError(String(parsed.detail || parsed.explanation || `HTTP ${res.status}`), code, res.status, parsed);
-		}
-		return parsed;
 	}
-	var fetchOverview = (opts = {}) => businessFetch("/overview", opts);
-	/** Create the local Personal scope and import the office seat roster once.
-	*
-	* Idempotent: a repeat creates zero records. Owner intent is added by
-	* `businessFetch`; the backend refuses without it.
-	*/
-	var bootstrapOfficeSeats = (body = {}, opts = {}) => businessFetch("/bootstrap", {
-		...opts,
-		method: "POST",
-		body
-	});
-	var fetchDirectory = (opts = {}) => businessFetch("/directory", opts);
-	var fetchWarRoomSessions = (query = {}, opts = {}) => businessFetch("/warroom/sessions", {
-		...opts,
-		query: {
-			...query,
-			...opts.query
+	function statusLabel$2(projection) {
+		return String(projection.status?.label || projection.status?.value || "unknown");
+	}
+	function grantLabel(row) {
+		return `${String(row.capability || "unknown")}${row.resource ? ` ${row.resource}` : ""}${row.action ? `:${row.action}` : ""}`;
+	}
+	function grantState(row, fallback) {
+		return String(row.label || fallback);
+	}
+	function formatMinor$2(value, currency = "USD") {
+		const amount = typeof value === "number" && Number.isFinite(value) ? value : null;
+		if (amount === null) return "unknown";
+		return `${(amount / 100).toFixed(2)} ${currency}`;
+	}
+	function modelRoute(known) {
+		if (!known || !known.present || !known.value) return `unknown${known?.reason ? ` (${known.reason})` : ""}`;
+		return String(known.value.route || "unknown");
+	}
+	function leaseCounts(projection) {
+		return {
+			active: projection.leases?.active?.length ?? 0,
+			expired: projection.leases?.expired?.length ?? 0,
+			released: projection.leases?.released?.length ?? 0
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/EffectiveStatePanel.tsx
+	function createEffectiveStatePanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function EffectiveStatePanel(props) {
+			const [read, setRead] = useState({ kind: "loading" });
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				setRead({ kind: "loading" });
+				fetchEffectiveState({
+					agentId: props.agentId,
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					tenantId: props.tenantId,
+					signal: ctl?.signal
+				}).then((next) => {
+					if (live) setRead(next);
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				props.agentId,
+				props.base,
+				props.fetchImpl,
+				props.tenantId
+			]);
+			if (read.kind === "loading") return R.createElement("div", {
+				className: "agent-control__state",
+				"data-testid": "effective-state",
+				"data-state": "loading",
+				role: "status",
+				"aria-live": "polite"
+			}, "Loading effective state…");
+			if (read.kind === "error" || read.kind === "unavailable") {
+				const code = read.kind === "unavailable" ? read.code : "EFFECTIVE_READ_FAILED";
+				const detail = read.kind === "unavailable" ? read.detail : read.message;
+				return R.createElement("div", {
+					className: "agent-control__state agent-control__state--error",
+					"data-testid": "effective-state",
+					"data-state": read.kind,
+					"data-code": code,
+					role: "alert"
+				}, [R.createElement("strong", { key: "t" }, "Effective state unavailable"), R.createElement("div", {
+					key: "d",
+					className: "agent-control__muted",
+					"data-testid": "effective-error-detail"
+				}, `${code}: ${detail}`)]);
+			}
+			const projection = read.projection;
+			const counts = leaseCounts(projection);
+			const currency = projection.budget?.currency || "USD";
+			const effective = projection.capabilities?.effective ?? [];
+			const denied = projection.capabilities?.denied ?? [];
+			const profileApplied = projection.capabilities?.profile_applied ?? [];
+			const profileDenied = projection.capabilities?.profile_denied ?? [];
+			const grantRow = (row, state, index) => R.createElement("li", {
+				key: `${state}-${index}-${grantLabel(row)}`,
+				className: "agent-control__chip",
+				"data-testid": "effective-grant",
+				"data-state": state,
+				"data-grant": grantLabel(row)
+			}, `${grantLabel(row)} · ${state}`);
+			const known = (id, label, value) => R.createElement("div", {
+				key: id,
+				"data-testid": id,
+				"data-present": String(Boolean(value?.present))
+			}, [R.createElement("span", {
+				key: "k",
+				className: "agent-control__k"
+			}, label), R.createElement("span", { key: "v" }, value?.present ? modelRoute(value) : value?.reason || "unknown")]);
+			return R.createElement("div", {
+				className: "agent-control__effective",
+				"data-testid": "effective-state",
+				"data-state": "available",
+				"data-status": projection.status?.value,
+				"data-agent-id": projection.agent_id,
+				"aria-label": `Effective state for ${projection.agent_id}`
+			}, [
+				R.createElement("div", {
+					key: "status",
+					className: "agent-control__muted",
+					"data-testid": "effective-status",
+					"data-status": projection.status?.value,
+					role: "status"
+				}, `Status: ${statusLabel$2(projection)}` + (projection.status?.reason ? ` — ${projection.status.reason}` : "")),
+				R.createElement("section", {
+					key: "grants",
+					"aria-label": "Capabilities"
+				}, [
+					R.createElement("h4", { key: "h" }, "Effective capabilities"),
+					R.createElement("p", {
+						key: "counts",
+						className: "agent-control__muted",
+						"data-testid": "effective-grant-counts"
+					}, `${effective.length} effective · ${denied.length} denied · ${projection.capabilities?.revoked?.length ?? 0} revoked`),
+					effective.length ? R.createElement("ul", {
+						key: "list",
+						"data-testid": "effective-grants"
+					}, effective.map((row, i) => grantRow(row, grantState(row, "effective"), i))) : R.createElement("p", {
+						key: "none",
+						"data-testid": "effective-grants-empty",
+						className: "agent-control__muted"
+					}, projection.capabilities?.reason || "no effective capabilities"),
+					denied.length ? R.createElement("ul", {
+						key: "denied",
+						"data-testid": "effective-denied"
+					}, denied.map((row, i) => grantRow(row, "denied", i))) : null,
+					profileApplied.length || profileDenied.length ? R.createElement("p", {
+						key: "profile",
+						className: "agent-control__muted",
+						"data-testid": "effective-profile"
+					}, `profile selectors: ${profileApplied.length} applied, ${profileDenied.length} denied`) : null
+				]),
+				R.createElement("section", {
+					key: "identity",
+					"aria-label": "Grant origin"
+				}, [
+					R.createElement("h4", { key: "h" }, "Grant origin"),
+					R.createElement("p", {
+						key: "counts",
+						"data-testid": "effective-grant-origin"
+					}, `${projection.identity?.explicit?.length ?? 0} explicit · ${projection.identity?.inherited?.length ?? 0} inherited · ${projection.identity?.revoked?.length ?? 0} revoked · ${projection.identity?.expired?.length ?? 0} expired`),
+					projection.identity?.inherited?.length ?? 0 ? R.createElement("ul", {
+						key: "inh",
+						"data-testid": "effective-inherited"
+					}, projection.identity.inherited.map((row, i) => grantRow(row, "inherited", i))) : null
+				]),
+				R.createElement("section", {
+					key: "model",
+					"aria-label": "Model route"
+				}, [
+					R.createElement("h4", { key: "h" }, "Model route"),
+					known("effective-model-primary", "primary", projection.model?.primary),
+					known("effective-model-fallback", "fallback", projection.model?.fallback)
+				]),
+				R.createElement("section", {
+					key: "leases",
+					"aria-label": "Leases"
+				}, [R.createElement("h4", { key: "h" }, "Leases"), R.createElement("p", {
+					key: "c",
+					"data-testid": "effective-lease-counts",
+					"data-active": String(counts.active),
+					"data-expired": String(counts.expired),
+					"data-released": String(counts.released)
+				}, `${counts.active} active · ${counts.expired} expired · ${counts.released} released` + (projection.leases?.reason ? ` — ${projection.leases.reason}` : ""))]),
+				R.createElement("section", {
+					key: "budget",
+					"aria-label": "Budget"
+				}, [R.createElement("h4", { key: "h" }, "Budget"), R.createElement("p", {
+					key: "c",
+					"data-testid": "effective-budget",
+					"data-currency": currency
+				}, `day ${formatMinor$2(projection.budget?.day_spend_minor, currency)} · month ${formatMinor$2(projection.budget?.month_spend_minor, currency)} · daily limit ${formatMinor$2(projection.budget?.limits?.daily_spend_minor, currency)}`)]),
+				R.createElement("section", {
+					key: "approvals",
+					"aria-label": "Approvals"
+				}, [R.createElement("h4", { key: "h" }, "Approvals"), R.createElement("p", {
+					key: "c",
+					"data-testid": "effective-approvals",
+					"data-pending": String(projection.approvals?.pending?.length ?? 0),
+					"data-expired": String(projection.approvals?.expired?.length ?? 0)
+				}, `${projection.approvals?.pending?.length ?? 0} pending · ${projection.approvals?.expired?.length ?? 0} expired`)]),
+				R.createElement("section", {
+					key: "memory",
+					"aria-label": "Memory"
+				}, [R.createElement("h4", { key: "h" }, "Memory scopes"), R.createElement("p", {
+					key: "c",
+					"data-testid": "effective-memory",
+					"data-scopes": String(projection.memory?.scopes?.length ?? 0)
+				}, projection.memory?.scopes?.length ?? 0 ? `${projection.memory.scopes.length} scope(s)` : projection.memory?.reason || "no memory scope recorded")]),
+				R.createElement("p", {
+					key: "source",
+					className: "agent-control__muted",
+					"data-testid": "effective-source"
+				}, `projected ${projection.generated_at} from the Business OS stores`)
+			]);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/character-studio.ts
+	var PART_CATEGORIES = [
+		"body",
+		"skin",
+		"eyes",
+		"hair",
+		"outfit"
+	];
+	var PART_COUNTS = {
+		body: 9,
+		skin: 9,
+		eyes: 7,
+		hair: 29,
+		outfit: 33,
+		accessory: 6
+	};
+	var ANIMATIONS = [
+		"idle",
+		"walk",
+		"type",
+		"talk",
+		"think",
+		"break",
+		"celebrate"
+	];
+	var LAYER_ORDER = [
+		"body",
+		"outfit",
+		"skin",
+		"eyes",
+		"hair",
+		"accessory"
+	];
+	var SHADOW_POLICIES = [
+		"none",
+		"sprite",
+		"room"
+	];
+	var PART_CATALOG = buildPartCatalog();
+	var PART_INDEX = new Map(PART_CATALOG.map((part) => [part.part_id, part]));
+	var DEFAULT_PALETTE = [
+		"#1f2933",
+		"#3e4c59",
+		"#f0b429",
+		"#7fb3d5"
+	];
+	function buildPartCatalog() {
+		const parts = [];
+		for (const category of [...PART_CATEGORIES, "accessory"]) {
+			const label = category.charAt(0).toUpperCase() + category.slice(1);
+			for (let index = 0; index < PART_COUNTS[category]; index += 1) parts.push({
+				part_id: `${category}-${String(index).padStart(2, "0")}`,
+				category,
+				index,
+				label: `${label} ${String(index + 1).padStart(2, "0")}`
+			});
 		}
-	});
-	var fetchWarRoomBundle = (sessionId, query = {}, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}`, {
-		...opts,
-		query: {
-			...query,
-			...opts.query
+		return parts;
+	}
+	function partCounts(catalog = PART_CATALOG) {
+		const counts = {};
+		for (const part of catalog) counts[part.category] = (counts[part.category] ?? 0) + 1;
+		return counts;
+	}
+	function partsFor(category, catalog = PART_CATALOG) {
+		return catalog.filter((part) => part.category === category);
+	}
+	function searchParts(category, query, catalog = PART_CATALOG) {
+		const needle = query.trim().toLowerCase();
+		const parts = partsFor(category, catalog);
+		if (!needle) return parts;
+		return parts.filter((part) => part.part_id.toLowerCase().includes(needle) || part.label.toLowerCase().includes(needle));
+	}
+	function isLayerOrder(value) {
+		if (!Array.isArray(value) || value.length !== LAYER_ORDER.length) return false;
+		const set = new Set(value);
+		return set.size === LAYER_ORDER.length && LAYER_ORDER.every((layer) => set.has(layer));
+	}
+	function coerceProfile(input) {
+		const base = input ?? {};
+		return {
+			profile_id: String(base.profile_id ?? "profile-draft"),
+			agent_id: String(base.agent_id ?? "agent-draft"),
+			body_id: String(base.body_id ?? "body-00"),
+			skin_id: String(base.skin_id ?? "skin-00"),
+			eyes_id: String(base.eyes_id ?? "eyes-00"),
+			hair_id: String(base.hair_id ?? "hair-00"),
+			outfit_id: String(base.outfit_id ?? "outfit-00"),
+			accessory_ids: Array.isArray(base.accessory_ids) ? base.accessory_ids.map(String) : [],
+			palette: Array.isArray(base.palette) && base.palette.length ? base.palette.map(String) : [...DEFAULT_PALETTE],
+			layer_order: isLayerOrder(base.layer_order) ? base.layer_order.slice() : [...LAYER_ORDER],
+			shadow_policy: SHADOW_POLICIES.includes(base.shadow_policy) ? base.shadow_policy : "sprite",
+			portrait_cell: String(base.portrait_cell ?? "cell-0"),
+			portrait_size: base.portrait_size === 48 ? 48 : 32,
+			animation_set: Array.isArray(base.animation_set) && base.animation_set.length ? base.animation_set.slice() : [...ANIMATIONS],
+			style_version: Number.isFinite(base.style_version) ? Number(base.style_version) : 1,
+			seed: Number.isFinite(base.seed) ? Number(base.seed) : 0,
+			revision: Number.isFinite(base.revision) ? Number(base.revision) : 0
+		};
+	}
+	/** Fill defaults and report every missing/renamed part substitution. */
+	function resolveProfile(input, catalog = PART_CATALOG) {
+		const index = new Map(catalog.map((part) => [part.part_id, part]));
+		const profile = coerceProfile(input);
+		const fallbacks = [];
+		for (const category of PART_CATEGORIES) {
+			const key = `${category}_id`;
+			const current = String(profile[key]);
+			const part = index.get(current);
+			if (!part || part.category !== category) {
+				const fallback = catalog.find((row) => row.category === category);
+				if (fallback) {
+					profile[key] = fallback.part_id;
+					fallbacks.push({
+						category,
+						from: current,
+						to: fallback.part_id,
+						reason: "missing_part"
+					});
+				}
+			}
 		}
-	});
-	var fetchAgents = (query = {}, opts = {}) => businessFetch("/agents", {
-		...opts,
-		query: {
-			...query,
-			...opts.query
+		profile.accessory_ids = profile.accessory_ids.filter((id) => {
+			const part = index.get(id);
+			if (part && part.category === "accessory") return true;
+			fallbacks.push({
+				category: "accessory",
+				from: id,
+				to: "",
+				reason: "missing_part"
+			});
+			return false;
+		});
+		const animations = profile.animation_set.filter((animation) => ANIMATIONS.includes(animation));
+		if (!animations.length || !animations.includes("idle")) {
+			fallbacks.push({
+				category: "animation_set",
+				from: animations.join(","),
+				to: ANIMATIONS.join(","),
+				reason: "invalid_animation_set"
+			});
+			profile.animation_set = [...ANIMATIONS];
+		} else profile.animation_set = animations;
+		const declaredLayers = profile.layer_order;
+		if (!isLayerOrder(profile.layer_order)) {
+			fallbacks.push({
+				category: "layer_order",
+				from: declaredLayers.join(","),
+				to: LAYER_ORDER.join(","),
+				reason: "invalid_layer_order"
+			});
+			profile.layer_order = [...LAYER_ORDER];
 		}
-	});
-	var fetchAgent = (agentId, query = {}, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}`, {
-		...opts,
-		query: {
-			...query,
-			...opts.query
+		if (profile.portrait_size !== 32 && profile.portrait_size !== 48) {
+			fallbacks.push({
+				category: "portrait_size",
+				from: String(profile.portrait_size),
+				to: "32",
+				reason: "invalid_portrait_size"
+			});
+			profile.portrait_size = 32;
 		}
-	});
-	var createWarRoomSession = (body, opts = {}) => businessFetch("/warroom/sessions", {
-		...opts,
-		method: "POST",
-		body
-	});
-	var addWarRoomSource = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/sources`, {
-		...opts,
-		method: "POST",
-		body
-	});
-	var addWarRoomEvidence = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/evidence`, {
-		...opts,
-		method: "POST",
-		body
-	});
-	var recordWarRoomDecision = (sessionId, body, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/decisions`, {
-		...opts,
-		method: "POST",
-		body
-	});
-	/** Bootstrap the owner-reviewable Etsy digital-shop pilot.
-	*
-	* Owner intent is added by `businessFetch`. The backend records the playbook,
-	* labelled evidence and experiments, then leaves the session at
-	* `owner_decision` with no decision, task, publish, spend or contact.
+		return {
+			profile,
+			fallbacks
+		};
+	}
+	function createStudioState(input, catalog = PART_CATALOG) {
+		const { profile, fallbacks } = resolveProfile(input, catalog);
+		return {
+			draft: profile,
+			history: [],
+			future: [],
+			locks: [],
+			selectedCategory: "body",
+			search: "",
+			previewAnimation: "idle",
+			portraitSize: profile.portrait_size,
+			fallbacks
+		};
+	}
+	function revised(state, draft) {
+		return {
+			...state,
+			draft,
+			history: [...state.history, state.draft].slice(-50),
+			future: []
+		};
+	}
+	function selectCategory(state, category) {
+		return {
+			...state,
+			selectedCategory: category,
+			search: ""
+		};
+	}
+	function setSearch(state, search) {
+		return {
+			...state,
+			search
+		};
+	}
+	function pickPart(state, category, partId) {
+		const part = PART_INDEX.get(partId);
+		if (!part || part.category !== category) return state;
+		if (category === "accessory") {
+			const next = state.draft.accessory_ids.includes(partId) ? state.draft.accessory_ids.filter((id) => id !== partId) : [...state.draft.accessory_ids, partId];
+			return revised(state, {
+				...state.draft,
+				accessory_ids: next
+			});
+		}
+		const key = `${category}_id`;
+		if (state.draft[key] === partId) return state;
+		return revised(state, {
+			...state.draft,
+			[key]: partId
+		});
+	}
+	function toggleLock(state, category) {
+		const locks = state.locks.includes(category) ? state.locks.filter((row) => row !== category) : [...state.locks, category];
+		return {
+			...state,
+			locks
+		};
+	}
+	function seededRandom(seed) {
+		let value = seed >>> 0;
+		return () => {
+			value = Math.imul(1664525, value) + 1013904223 >>> 0;
+			return value / 4294967296;
+		};
+	}
+	function randomize(state, seed, catalog = PART_CATALOG) {
+		const random = seed === void 0 ? Math.random : seededRandom(seed);
+		const draft = {
+			...state.draft,
+			accessory_ids: state.draft.accessory_ids.slice()
+		};
+		for (const category of PART_CATEGORIES) {
+			if (state.locks.includes(category)) continue;
+			const parts = partsFor(category, catalog);
+			if (!parts.length) continue;
+			const part = parts[Math.floor(random() * parts.length)];
+			draft[`${category}_id`] = part.part_id;
+		}
+		if (!state.locks.includes("accessory")) draft.accessory_ids = partsFor("accessory", catalog).filter(() => random() < .2).map((part) => part.part_id);
+		draft.seed = seed === void 0 ? Math.floor(random() * 1e6) : seed;
+		return revised(state, draft);
+	}
+	function undo$1(state) {
+		if (!state.history.length) return state;
+		const previous = state.history[state.history.length - 1];
+		return {
+			...state,
+			draft: previous,
+			history: state.history.slice(0, -1),
+			future: [state.draft, ...state.future]
+		};
+	}
+	function redo$1(state) {
+		if (!state.future.length) return state;
+		const [next, ...rest] = state.future;
+		return {
+			...state,
+			draft: next,
+			history: [...state.history, state.draft],
+			future: rest
+		};
+	}
+	var PRESETS = [
+		{
+			preset_id: "analyst",
+			label: "Analyst",
+			picks: {
+				body_id: "body-01",
+				hair_id: "hair-03",
+				outfit_id: "outfit-04",
+				eyes_id: "eyes-01"
+			}
+		},
+		{
+			preset_id: "engineer",
+			label: "Engineer",
+			picks: {
+				body_id: "body-04",
+				hair_id: "hair-11",
+				outfit_id: "outfit-12",
+				skin_id: "skin-02"
+			}
+		},
+		{
+			preset_id: "studio",
+			label: "Studio",
+			picks: {
+				body_id: "body-07",
+				hair_id: "hair-20",
+				outfit_id: "outfit-25",
+				eyes_id: "eyes-05"
+			},
+			accessory_ids: ["accessory-02"]
+		}
+	];
+	function applyPreset(state, presetId, catalog = PART_CATALOG) {
+		const preset = PRESETS.find((row) => row.preset_id === presetId);
+		if (!preset) return state;
+		const index = new Map(catalog.map((part) => [part.part_id, part]));
+		const draft = { ...state.draft };
+		for (const [key, value] of Object.entries(preset.picks)) {
+			const part = value ? index.get(value) : void 0;
+			if (part) draft[key] = part.part_id;
+		}
+		if (preset.accessory_ids) draft.accessory_ids = preset.accessory_ids.filter((id) => index.get(id)?.category === "accessory");
+		return revised(state, draft);
+	}
+	function setPaletteColor(state, index, colour) {
+		if (!/^#[0-9a-fA-F]{6}$/.test(colour)) return state;
+		if (index < 0 || index >= state.draft.palette.length) return state;
+		const palette = state.draft.palette.slice();
+		palette[index] = colour.toLowerCase();
+		return revised(state, {
+			...state.draft,
+			palette
+		});
+	}
+	function setShadowPolicy(state, policy) {
+		if (!SHADOW_POLICIES.includes(policy)) return state;
+		return revised(state, {
+			...state.draft,
+			shadow_policy: policy
+		});
+	}
+	function moveLayer(state, layer, direction) {
+		const order = state.draft.layer_order.slice();
+		const index = order.indexOf(layer);
+		if (index < 0) return state;
+		const target = direction === "up" ? index - 1 : index + 1;
+		if (target < 0 || target >= order.length) return state;
+		[order[index], order[target]] = [order[target], order[index]];
+		return revised(state, {
+			...state.draft,
+			layer_order: order
+		});
+	}
+	function setPortraitSize(state, size) {
+		return {
+			...state,
+			portraitSize: size,
+			draft: {
+				...state.draft,
+				portrait_size: size
+			}
+		};
+	}
+	function setPreviewAnimation(state, animation) {
+		if (!ANIMATIONS.includes(animation)) return state;
+		return {
+			...state,
+			previewAnimation: animation
+		};
+	}
+	var HABBLAUD_LAYER_SOURCE = {
+		body: "body_id",
+		outfit: "outfit_id",
+		skin: "skin_id",
+		eyes: "eyes_id",
+		hair: "hair_id",
+		accessory: "accessory_ids"
+	};
+	function partIndex(partId) {
+		return PART_INDEX.get(partId)?.index ?? -1;
+	}
+	function partIndices(profile) {
+		const indices = {};
+		for (const category of PART_CATEGORIES) indices[category] = partIndex(String(profile[`${category}_id`]));
+		return indices;
+	}
+	var PORTRAIT_CELL_RE = /^cell-(\d+)$/;
+	function projectHabblaud(profile) {
+		const layers = profile.layer_order.map((layer, z) => {
+			if (layer === "accessory") return {
+				layer,
+				adapter_layer: "accessory",
+				part_ids: profile.accessory_ids.slice(),
+				indices: profile.accessory_ids.map(partIndex),
+				z,
+				visible: profile.accessory_ids.length > 0
+			};
+			const partId = String(profile[HABBLAUD_LAYER_SOURCE[layer]]);
+			return {
+				layer,
+				adapter_layer: layer,
+				part_id: partId,
+				index: partIndex(partId),
+				z,
+				visible: true
+			};
+		});
+		return {
+			adapter: "habblaud",
+			profile_id: profile.profile_id,
+			agent_id: profile.agent_id,
+			revision: profile.revision,
+			style_version: profile.style_version,
+			layer_order: profile.layer_order.slice(),
+			layers,
+			palette: profile.palette.slice(),
+			shadow_policy: profile.shadow_policy,
+			animation_set: profile.animation_set.slice(),
+			seed: profile.seed
+		};
+	}
+	function projectLimezuCharacter(profile) {
+		const part_ids = {};
+		for (const category of PART_CATEGORIES) part_ids[category] = String(profile[`${category}_id`]);
+		return {
+			adapter: "limezu-character-generator-2.0",
+			profile_id: profile.profile_id,
+			revision: profile.revision,
+			style_version: profile.style_version,
+			parts: partIndices(profile),
+			part_ids,
+			accessories: profile.accessory_ids.map((partId) => ({
+				part_id: partId,
+				index: partIndex(partId)
+			})),
+			palette: profile.palette.slice(),
+			shadow_policy: profile.shadow_policy,
+			seed: profile.seed
+		};
+	}
+	function projectLimezuPortrait(profile) {
+		const match = PORTRAIT_CELL_RE.exec(profile.portrait_cell);
+		return {
+			adapter: "limezu-portrait-generator-1.5",
+			profile_id: profile.profile_id,
+			revision: profile.revision,
+			portrait_cell: profile.portrait_cell,
+			cell_index: match ? Number(match[1]) : -1,
+			portrait_size: profile.portrait_size,
+			frame: `${profile.portrait_cell}_${profile.portrait_size}`,
+			part_indices: partIndices(profile),
+			palette: profile.palette.slice(),
+			seed: profile.seed
+		};
+	}
+	function projectProfile(profile) {
+		return {
+			schema: "qubit-office-character-projection/1",
+			profile_id: profile.profile_id,
+			agent_id: profile.agent_id,
+			revision: profile.revision,
+			style_version: profile.style_version,
+			seed: profile.seed,
+			adapters: {
+				habblaud: projectHabblaud(profile),
+				limezu_character: projectLimezuCharacter(profile),
+				limezu_portrait: projectLimezuPortrait(profile)
+			}
+		};
+	}
+	function selectedPartId(state, category = state.selectedCategory) {
+		if (category === "accessory") return "";
+		return String(state.draft[`${category}_id`]);
+	}
+	/**
+	* The ONE save call. It posts the canonical profile to the Business OS and
+	* never writes a local copy. A typed refusal is returned as an error state.
 	*/
-	var startEtsyPilot = (body = {}, opts = {}) => businessFetch("/warroom/etsy-pilot", {
-		...opts,
-		method: "POST",
-		body
-	});
-	/** Run the owner-gated, idempotent research action for one session.
-	*
-	* `businessFetch` adds `owner: true`. The backend only appends cited sources
-	* and labelled evidence; a refusal (missing key, provider failure) arrives as
-	* a typed `BusinessApiError`, never as a fabricated success.
+	async function saveCharacterProfile(profile, opts = {}) {
+		try {
+			const body = await businessFetch("/character-profiles", {
+				method: "POST",
+				body: { profile },
+				base: opts.base,
+				fetchImpl: opts.fetchImpl,
+				signal: opts.signal
+			});
+			return {
+				kind: "saved",
+				profile: body.profile ? resolveProfile({
+					...profile,
+					...body.profile
+				}).profile : profile
+			};
+		} catch (exc) {
+			if (exc instanceof BusinessApiError) return {
+				kind: "error",
+				code: exc.code || `HTTP_${exc.status}`,
+				detail: exc.message
+			};
+			return {
+				kind: "error",
+				code: "CHARACTER_SAVE_FAILED",
+				detail: exc instanceof Error ? exc.message : String(exc)
+			};
+		}
+	}
+	/**
+	* Ask the one save authority to roll a profile back to an earlier revision.
+	* The authority appends a new revision; the studio never rewrites history and
+	* never keeps a local revision list of its own.
 	*/
-	var researchWarRoomSession = (sessionId, body = {}, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/research`, {
-		...opts,
-		method: "POST",
-		body
-	});
-	var createWarRoomTasks = (sessionId, opts = {}) => businessFetch(`/warroom/sessions/${encodeURIComponent(sessionId)}/tasks`, {
-		...opts,
-		method: "POST",
-		body: {}
-	});
-	/** Validate one prospective turn and return the plan.
-	*
-	* The backend is owner-gated and writes nothing: no turn, usage, audit, ledger,
-	* job, spend, model call or tool side effect. A refusal throws the typed
-	* `BusinessApiError`; the panel renders that reason rather than a fake success.
-	*/
-	var previewAgentTurn = (agentId, body, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/preview`, {
-		...opts,
-		method: "POST",
-		body
-	});
-	var updateAgent = (agentId, changes, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/update`, {
-		...opts,
-		method: "POST",
-		body: { changes }
-	});
-	var pauseAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/pause`, {
-		...opts,
-		method: "POST"
-	});
-	var resumeAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/resume`, {
-		...opts,
-		method: "POST"
-	});
-	var stopAgent = (agentId, body = {}, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/stop`, {
-		...opts,
-		method: "POST",
-		body
-	});
-	var takeoverAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/takeover`, {
-		...opts,
-		method: "POST"
-	});
-	var revokeAgent = (agentId, scopes, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/revoke`, {
-		...opts,
-		method: "POST",
-		body: { scopes }
-	});
-	var archiveAgent = (agentId, opts = {}) => businessFetch(`/agents/${encodeURIComponent(agentId)}/archive`, {
-		...opts,
-		method: "POST"
-	});
+	async function rollbackCharacterProfile(profileId, revision, opts = {}) {
+		try {
+			const body = await businessFetch(`/character-profiles/${encodeURIComponent(profileId)}/rollback`, {
+				method: "POST",
+				body: { revision },
+				base: opts.base,
+				fetchImpl: opts.fetchImpl,
+				signal: opts.signal
+			});
+			if (!body.profile) return {
+				kind: "error",
+				code: "CHARACTER_ROLLBACK_FAILED",
+				detail: "the save authority returned no profile"
+			};
+			return {
+				kind: "saved",
+				profile: resolveProfile(body.profile).profile
+			};
+		} catch (exc) {
+			if (exc instanceof BusinessApiError) return {
+				kind: "error",
+				code: exc.code || `HTTP_${exc.status}`,
+				detail: exc.message
+			};
+			return {
+				kind: "error",
+				code: "CHARACTER_ROLLBACK_FAILED",
+				detail: exc instanceof Error ? exc.message : String(exc)
+			};
+		}
+	}
+	function liveText$1(state) {
+		const category = state.selectedCategory;
+		const picked = category === "accessory" ? state.draft.accessory_ids.length ? `${state.draft.accessory_ids.length} accessories selected` : "no accessories selected" : `${PART_INDEX.get(selectedPartId(state))?.label ?? "unknown part"}`;
+		return `Character ${state.draft.profile_id}; category ${category}; ${picked}; ${partCounts()[category] ?? 0} options; portrait ${state.portraitSize}; animation ${state.previewAnimation}`;
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/CharacterStudio.tsx
+	var ALL_CATEGORIES = [...PART_CATEGORIES, "accessory"];
+	function labelOf(category) {
+		return category.charAt(0).toUpperCase() + category.slice(1);
+	}
+	function createCharacterStudio(R, hooks) {
+		const { useState } = hooks;
+		return function CharacterStudio(props) {
+			const catalog = props.catalog ?? PART_CATALOG;
+			const [state, setState] = useState(createStudioState(props.initialProfile, catalog));
+			const [save, setSave] = useState({ kind: "idle" });
+			const update = (fn) => setState((current) => fn(current));
+			const updateDraft = (fn) => {
+				update(fn);
+				setSave({ kind: "idle" });
+			};
+			const counts = partCounts(catalog);
+			const parts = searchParts(state.selectedCategory, state.search, catalog);
+			const palette = state.draft.palette;
+			const projection = projectProfile(state.draft);
+			const revisions = props.revisions ?? [];
+			const swatch = `linear-gradient(135deg, ${palette[0] ?? "#1f2933"}, ${palette[1] ?? palette[0] ?? "#3e4c59"})`;
+			const onSave = () => {
+				setSave({ kind: "saving" });
+				(props.saveProfile ?? ((profile) => saveCharacterProfile(profile, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				})))(state.draft).then((result) => {
+					if (result.kind === "saved") setSave({
+						kind: "saved",
+						revision: result.profile.revision
+					});
+					else setSave({
+						kind: "error",
+						code: result.code,
+						detail: result.detail
+					});
+				}).catch((err) => {
+					setSave({
+						kind: "error",
+						code: "CHARACTER_SAVE_FAILED",
+						detail: err instanceof Error ? err.message : String(err)
+					});
+				});
+			};
+			const onRollback = (revision) => {
+				setSave({ kind: "saving" });
+				(props.rollbackProfile ?? ((profileId, target) => rollbackCharacterProfile(profileId, target, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				})))(state.draft.profile_id, revision).then((result) => {
+					if (result.kind === "saved") {
+						setState((current) => ({
+							...current,
+							draft: result.profile,
+							history: [...current.history, current.draft].slice(-50),
+							future: []
+						}));
+						setSave({
+							kind: "saved",
+							revision: result.profile.revision
+						});
+					} else setSave({
+						kind: "error",
+						code: result.code,
+						detail: result.detail
+					});
+				}).catch((err) => {
+					setSave({
+						kind: "error",
+						code: "CHARACTER_ROLLBACK_FAILED",
+						detail: err instanceof Error ? err.message : String(err)
+					});
+				});
+			};
+			const onKeyDown = (event) => {
+				const key = String(event.key || "").toLowerCase();
+				const modifier = Boolean(event.ctrlKey || event.metaKey);
+				if (modifier && key === "z") {
+					event.preventDefault?.();
+					update(event.shiftKey ? redo$1 : undo$1);
+				} else if (modifier && key === "y") {
+					event.preventDefault?.();
+					update(redo$1);
+				}
+			};
+			const onPartKeyDown = (event) => {
+				const key = event.key;
+				if (![
+					"ArrowLeft",
+					"ArrowRight",
+					"Home",
+					"End"
+				].includes(key)) return;
+				if (!parts.length) return;
+				event.preventDefault?.();
+				const selected = state.selectedCategory === "accessory" ? "" : String(state.draft[`${state.selectedCategory}_id`]);
+				const index = Math.max(0, parts.findIndex((part) => part.part_id === selected));
+				let next = index;
+				if (key === "ArrowLeft") next = Math.max(0, index - 1);
+				if (key === "ArrowRight") next = Math.min(parts.length - 1, index + 1);
+				if (key === "Home") next = 0;
+				if (key === "End") next = parts.length - 1;
+				updateDraft((current) => pickPart(current, current.selectedCategory, parts[next].part_id));
+			};
+			const fallbackNotice = (items) => {
+				if (!items.length) return null;
+				return R.createElement("div", {
+					key: "fallbacks",
+					className: "character-studio__notice",
+					"data-testid": "character-fallback",
+					role: "status",
+					"aria-live": "polite"
+				}, `Missing parts replaced: ${items.map((row) => `${row.category} ${row.from || "none"} → ${row.to || "removed"}`).join("; ")}`);
+			};
+			const saveStatus = () => {
+				if (save.kind === "saving") return R.createElement("div", {
+					key: "save-state",
+					"data-testid": "character-save-status",
+					"data-state": "saving",
+					role: "status",
+					"aria-live": "polite"
+				}, "Saving the canonical profile…");
+				if (save.kind === "saved") return R.createElement("div", {
+					key: "save-state",
+					"data-testid": "character-save-status",
+					"data-state": "saved",
+					role: "status",
+					"aria-live": "polite"
+				}, `Saved revision ${save.revision}.`);
+				return R.createElement("div", {
+					key: "save-state",
+					"data-testid": "character-save-status",
+					"data-state": "idle",
+					role: "status",
+					"aria-live": "polite"
+				}, "Not saved yet.");
+			};
+			const categoryButton = (category) => R.createElement("button", {
+				key: `cat-${category}`,
+				type: "button",
+				className: "character-studio__category",
+				"data-testid": "character-category",
+				"data-category": category,
+				"aria-pressed": state.selectedCategory === category,
+				"aria-label": `${labelOf(category)} parts, ${counts[category] ?? 0}`,
+				onClick: () => update((current) => selectCategory(current, category))
+			}, `${labelOf(category)} (${counts[category] ?? 0})`);
+			const partButton = (part) => {
+				const selected = part.category === "accessory" ? state.draft.accessory_ids.includes(part.part_id) : String(state.draft[`${part.category}_id`]) === part.part_id;
+				return R.createElement("button", {
+					key: part.part_id,
+					type: "button",
+					className: "character-studio__part",
+					"data-testid": "character-part",
+					"data-part": part.part_id,
+					"data-category": part.category,
+					"aria-pressed": selected,
+					"aria-label": `${part.label} (${part.part_id})`,
+					onClick: () => updateDraft((current) => pickPart(current, part.category, part.part_id))
+				}, part.label);
+			};
+			const lockButton = (category) => R.createElement("button", {
+				key: `lock-${category}`,
+				type: "button",
+				"data-testid": "character-lock",
+				"data-category": category,
+				"aria-pressed": state.locks.includes(category),
+				"aria-label": `${state.locks.includes(category) ? "Unlock" : "Lock"} ${category}`,
+				onClick: () => updateDraft((current) => toggleLock(current, category))
+			}, state.locks.includes(category) ? "Locked" : "Lock");
+			const layerRow = (layer, index) => [
+				R.createElement("li", {
+					key: `layer-${layer}`,
+					"data-testid": "character-layer-row",
+					"data-layer": layer
+				}, layer),
+				R.createElement("button", {
+					key: `layer-up-${layer}`,
+					type: "button",
+					"data-testid": "character-layer",
+					"data-layer": layer,
+					"data-action": "up",
+					"aria-label": `Move ${layer} layer up`,
+					disabled: index === 0,
+					onClick: () => updateDraft((current) => moveLayer(current, layer, "up"))
+				}, "↑"),
+				R.createElement("button", {
+					key: `layer-down-${layer}`,
+					type: "button",
+					"data-testid": "character-layer",
+					"data-layer": layer,
+					"data-action": "down",
+					"aria-label": `Move ${layer} layer down`,
+					disabled: index === state.draft.layer_order.length - 1,
+					onClick: () => updateDraft((current) => moveLayer(current, layer, "down"))
+				}, "↓")
+			];
+			const paletteInput = (colour, index) => R.createElement("input", {
+				key: `palette-${index}`,
+				type: "color",
+				"data-testid": "character-palette",
+				"data-index": index,
+				"aria-label": `Palette colour ${index + 1}`,
+				value: colour,
+				onChange: (event) => updateDraft((current) => setPaletteColor(current, index, event.target.value))
+			});
+			const shadowButton = (policy) => R.createElement("button", {
+				key: `shadow-${policy}`,
+				type: "button",
+				"data-testid": "character-shadow",
+				"data-policy": policy,
+				"aria-pressed": state.draft.shadow_policy === policy,
+				"aria-label": `${policy} shadow policy`,
+				onClick: () => updateDraft((current) => setShadowPolicy(current, policy))
+			}, policy);
+			const portraitButton = (size) => R.createElement("button", {
+				key: `portrait-${size}`,
+				type: "button",
+				"data-testid": "character-portrait-size",
+				"data-size": size,
+				"aria-pressed": state.portraitSize === size,
+				"aria-label": `${size} pixel portrait`,
+				onClick: () => updateDraft((current) => setPortraitSize(current, size))
+			}, `${size}px`);
+			const animationButton = (animation) => R.createElement("button", {
+				key: `animation-${animation}`,
+				type: "button",
+				"data-testid": "character-animation",
+				"data-animation": animation,
+				"aria-pressed": state.previewAnimation === animation,
+				"aria-label": `Preview ${animation} animation`,
+				onClick: () => updateDraft((current) => setPreviewAnimation(current, animation))
+			}, animation);
+			const adapterCard = (adapter, label, detail) => R.createElement("div", {
+				key: `adapter-${adapter}`,
+				"data-testid": "character-adapter",
+				"data-adapter": adapter,
+				role: "group",
+				"aria-label": `${label} projection: ${detail}`
+			}, [R.createElement("strong", { key: "label" }, label), R.createElement("span", {
+				key: "detail",
+				"data-testid": "character-adapter-detail"
+			}, detail)]);
+			const revisionRow = (row) => R.createElement("button", {
+				key: `revision-${row.revision}`,
+				type: "button",
+				"data-testid": "character-rollback",
+				"data-revision": row.revision,
+				"aria-label": `Rollback to revision ${row.revision}`,
+				disabled: Boolean(row.current) || save.kind === "saving",
+				onClick: () => onRollback(row.revision)
+			}, `r${row.revision} ${row.kind}`);
+			const preview = (id, size, portrait) => R.createElement("div", {
+				key: id,
+				className: "character-studio__preview",
+				"data-testid": id,
+				"data-animation": state.previewAnimation,
+				"data-portrait-size": portrait ? state.portraitSize : void 0,
+				"data-world-scale": portrait ? void 0 : "1",
+				"aria-label": `${portrait ? "Portrait" : "World-scale"} preview of ${state.draft.profile_id}`,
+				style: {
+					width: size,
+					height: size,
+					background: swatch,
+					imageRendering: "pixelated"
+				}
+			});
+			return R.createElement("section", {
+				className: "character-studio",
+				"data-testid": "character-studio",
+				"aria-label": "Character Studio",
+				onKeyDown
+			}, [
+				R.createElement("header", { key: "head" }, [
+					R.createElement("h2", { key: "title" }, "Character Studio"),
+					R.createElement("p", {
+						key: "live",
+						"data-testid": "character-live",
+						role: "status",
+						"aria-live": "polite"
+					}, liveText$1(state)),
+					fallbackNotice(state.fallbacks)
+				]),
+				R.createElement("div", {
+					key: "toolbar",
+					className: "character-studio__toolbar"
+				}, [
+					R.createElement("input", {
+						key: "search",
+						type: "search",
+						value: state.search,
+						placeholder: "Search parts",
+						"data-testid": "character-search",
+						"aria-label": "Search parts",
+						onChange: (event) => update((current) => setSearch(current, event.target.value))
+					}),
+					R.createElement("button", {
+						key: "randomize",
+						type: "button",
+						"data-testid": "character-randomize",
+						"aria-label": "Randomize unlocked parts",
+						onClick: () => updateDraft((current) => randomize(current))
+					}, "Randomize"),
+					R.createElement("button", {
+						key: "undo",
+						type: "button",
+						"data-testid": "character-undo",
+						"aria-label": "Undo",
+						disabled: state.history.length === 0,
+						onClick: () => updateDraft(undo$1)
+					}, "Undo"),
+					R.createElement("button", {
+						key: "redo",
+						type: "button",
+						"data-testid": "character-redo",
+						"aria-label": "Redo",
+						disabled: state.future.length === 0,
+						onClick: () => updateDraft(redo$1)
+					}, "Redo"),
+					...PRESETS.map((preset) => R.createElement("button", {
+						key: `preset-${preset.preset_id}`,
+						type: "button",
+						"data-testid": "character-preset",
+						"data-preset": preset.preset_id,
+						"aria-label": `Apply ${preset.label} preset`,
+						onClick: () => updateDraft((current) => applyPreset(current, preset.preset_id, catalog))
+					}, preset.label))
+				]),
+				R.createElement("div", {
+					key: "categories",
+					role: "group",
+					"aria-label": "Part categories"
+				}, ALL_CATEGORIES.map(categoryButton)),
+				R.createElement("div", {
+					key: "parts",
+					role: "group",
+					"data-testid": "character-parts",
+					"aria-label": `${labelOf(state.selectedCategory)} parts`,
+					onKeyDown: onPartKeyDown
+				}, parts.map(partButton)),
+				R.createElement("div", {
+					key: "locks",
+					role: "group",
+					"aria-label": "Part locks"
+				}, ALL_CATEGORIES.map(lockButton)),
+				R.createElement("ol", {
+					key: "layers",
+					"data-testid": "character-layers",
+					"aria-label": "Layer order"
+				}, state.draft.layer_order.flatMap((layer, index) => layerRow(layer, index))),
+				R.createElement("div", {
+					key: "palette",
+					role: "group",
+					"aria-label": "Palette"
+				}, palette.map(paletteInput)),
+				R.createElement("div", {
+					key: "shadow",
+					role: "group",
+					"aria-label": "Shadow policy"
+				}, SHADOW_POLICIES.map(shadowButton)),
+				R.createElement("div", {
+					key: "portrait",
+					role: "group",
+					"aria-label": "Portrait size"
+				}, [32, 48].map((size) => portraitButton(size))),
+				R.createElement("div", {
+					key: "animations",
+					role: "group",
+					"aria-label": "Animation preview"
+				}, ANIMATIONS.map(animationButton)),
+				R.createElement("div", {
+					key: "previews",
+					className: "character-studio__previews"
+				}, [preview("character-world-preview", 96, false), preview("character-portrait-preview", state.portraitSize, true)]),
+				R.createElement("div", {
+					key: "adapters",
+					role: "group",
+					"aria-label": "Adapter projections",
+					"data-testid": "character-adapters"
+				}, [
+					adapterCard("habblaud", "Habblaud", `${projection.adapters.habblaud.layers.length} layers; shadow ${projection.adapters.habblaud.shadow_policy}; ${projection.adapters.habblaud.animation_set.length} animations`),
+					adapterCard("limezu_character", "LimeZu Character 2.0", `body ${projection.adapters.limezu_character.parts.body}; eyes ${projection.adapters.limezu_character.parts.eyes}; hair ${projection.adapters.limezu_character.parts.hair}; outfit ${projection.adapters.limezu_character.parts.outfit}; skin ${projection.adapters.limezu_character.parts.skin}`),
+					adapterCard("limezu_portrait", "LimeZu Portrait 1.5", `cell ${projection.adapters.limezu_portrait.cell_index}; ${projection.adapters.limezu_portrait.portrait_size}px; ${projection.adapters.limezu_portrait.frame}`)
+				]),
+				revisions.length ? R.createElement("div", {
+					key: "revisions",
+					"data-testid": "character-revisions",
+					role: "group",
+					"aria-label": "Profile revisions"
+				}, revisions.map(revisionRow)) : null,
+				R.createElement("div", {
+					key: "selection",
+					"data-testid": "character-selection"
+				}, liveText$1(state)),
+				saveStatus(),
+				save.kind === "error" ? R.createElement("div", {
+					key: "save-error",
+					"data-testid": "character-error",
+					className: "character-studio__error",
+					role: "alert"
+				}, `${save.code}: ${save.detail}`) : null,
+				R.createElement("button", {
+					key: "save",
+					type: "button",
+					"data-testid": "character-save",
+					"aria-label": "Save character profile",
+					disabled: save.kind === "saving",
+					onClick: onSave
+				}, save.kind === "saving" ? "Saving…" : "Save profile")
+			]);
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/agent-control.ts
 	var PERMISSION_CATEGORIES = [
 		"tools",
@@ -194078,7 +195515,7 @@ create: function(game) {
 		for (const agent of agents) if (name && (agent.display_name || "").trim().toLowerCase() === name) return agent;
 		return null;
 	}
-	function formatMinor(value) {
+	function formatMinor$1(value) {
 		const minor = Number(value);
 		if (!Number.isFinite(minor)) return "unset";
 		return `$${(minor / 100).toFixed(2)}`;
@@ -194086,7 +195523,7 @@ create: function(game) {
 	function budgetSummary(agent) {
 		if (!agent) return "";
 		const safety = agent.safety;
-		return `${formatMinor(safety.daily_spend_minor)}/day · ${formatMinor(safety.monthly_spend_minor)}/month · ${formatMinor(safety.per_action_limit_minor)}/action`;
+		return `${formatMinor$1(safety.daily_spend_minor)}/day · ${formatMinor$1(safety.monthly_spend_minor)}/month · ${formatMinor$1(safety.per_action_limit_minor)}/action`;
 	}
 	function rateSummary(agent) {
 		if (!agent) return "";
@@ -194384,6 +195821,8 @@ create: function(game) {
 	}
 	function createAgentControlDrawer(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
+		const EffectiveStatePanel = createEffectiveStatePanel(R, hooks);
+		const CharacterStudio = createCharacterStudio(R, hooks);
 		return function AgentControlDrawer(props) {
 			const [load, setLoad] = useState({ kind: "loading" });
 			const [selectedId, setSelectedId] = useState(null);
@@ -194926,8 +196365,8 @@ create: function(game) {
 					kv(R, "Approvals satisfied", previewPlan.approvals_satisfied ? "yes" : "no", "preview-approvals-satisfied"),
 					kv(R, "Requested tools", previewPlan.requested_tools.join(", ") || "none", "preview-tools"),
 					kv(R, "Granted scopes", previewGranted, "preview-scopes"),
-					kv(R, "Estimated spend", formatMinor(previewPlan.estimated.spend_minor), "preview-spend"),
-					kv(R, "Daily spend left", formatMinor(previewPlan.estimated.remaining.daily_spend_remaining_minor), "preview-daily-left"),
+					kv(R, "Estimated spend", formatMinor$1(previewPlan.estimated.spend_minor), "preview-spend"),
+					kv(R, "Daily spend left", formatMinor$1(previewPlan.estimated.remaining.daily_spend_remaining_minor), "preview-daily-left"),
 					kv(R, "Turns left today", String(previewPlan.estimated.remaining.turns_remaining_today), "preview-turns-left"),
 					R.createElement("p", {
 						key: "reason",
@@ -195155,6 +196594,20 @@ create: function(game) {
 				"data-testid": "agent-control-busy",
 				role: "status"
 			}, `${busy}…`));
+			if (selectedId) {
+				children.push(section$1(R, "Character Studio", "character-studio", [R.createElement(CharacterStudio, {
+					key: "studio",
+					initialProfile: { agent_id: selectedId },
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				})]));
+				children.push(section$1(R, "Effective state", "effective", [R.createElement(EffectiveStatePanel, {
+					key: "effective",
+					agentId: selectedId,
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				})]));
+			}
 			if (actionError) children.push(R.createElement("div", {
 				key: "error",
 				className: "agent-control__state agent-control__state--error",
@@ -195202,26 +196655,26 @@ create: function(game) {
 		const raw = base === void 0 ? hostBasePath() : base;
 		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${WORLD_PATH}${path.startsWith("/") ? path : `/${path}`}`;
 	}
-	function int(value, fallback = 0) {
+	function int$1(value, fallback = 0) {
 		const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
 		return Number.isFinite(n) ? Math.trunc(n) : fallback;
 	}
-	function record$1(value) {
+	function record$2(value) {
 		return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
 	}
-	function strings(value) {
+	function strings$1(value) {
 		return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
 	}
 	function tile(value, fallback) {
-		const row = record$1(value);
+		const row = record$2(value);
 		return {
-			x: Math.max(0, Math.min(15, int(row?.x, fallback[0]))),
-			y: Math.max(0, Math.min(11, int(row?.y, fallback[1])))
+			x: Math.max(0, Math.min(15, int$1(row?.x, fallback[0]))),
+			y: Math.max(0, Math.min(11, int$1(row?.y, fallback[1])))
 		};
 	}
 	/** Plan fixed 16x12 cells for an exact desk count. Never stretches a cell. */
 	function planCellCluster(roomId, desks) {
-		const safeDesks = Math.max(0, int(desks));
+		const safeDesks = Math.max(0, int$1(desks));
 		const count = Math.max(1, Math.ceil(safeDesks / 6));
 		const base = Math.floor(safeDesks / count);
 		const extra = safeDesks % count;
@@ -195265,8 +196718,8 @@ create: function(game) {
 	}
 	/** Derive labeled template rooms from a floor's room/desk counts. */
 	function templateRooms(floorId, roomCount, capacity, active, roleIds = []) {
-		const count = Math.max(0, int(roomCount));
-		const desksTotal = Math.max(0, int(capacity));
+		const count = Math.max(0, int$1(roomCount));
+		const desksTotal = Math.max(0, int$1(capacity));
 		const base = count > 0 ? Math.floor(desksTotal / count) : 0;
 		const extra = count > 0 ? desksTotal % count : 0;
 		return Array.from({ length: count }, (_, index) => {
@@ -195308,7 +196761,7 @@ create: function(game) {
 				source: "unknown"
 			};
 		}
-		const row = record$1(value);
+		const row = record$2(value);
 		if (!row) return null;
 		const agentId = typeof row.agent_id === "string" ? row.agent_id : "";
 		const name = typeof row.name === "string" && row.name ? row.name : agentId;
@@ -195325,7 +196778,7 @@ create: function(game) {
 	}
 	function normalizeUnplaced(raw) {
 		return (Array.isArray(raw) ? raw : []).map((item, index) => {
-			const row = record$1(item) ?? {};
+			const row = record$2(item) ?? {};
 			return {
 				agent_id: typeof row.agent_id === "string" ? row.agent_id : `unplaced-${index}`,
 				name: typeof row.name === "string" && row.name ? row.name : typeof row.agent_id === "string" ? row.agent_id : "Unknown agent",
@@ -195337,14 +196790,14 @@ create: function(game) {
 		});
 	}
 	function normalizeOccupancy(raw) {
-		const row = record$1(raw);
+		const row = record$2(raw);
 		if (!row) return null;
-		const counts = record$1(row.counts) ?? {};
-		const truncated = record$1(row.truncated) ?? {};
+		const counts = record$2(row.counts) ?? {};
+		const truncated = record$2(row.truncated) ?? {};
 		return {
 			schema: typeof row.schema === "string" ? row.schema : "",
 			staffed: row.staffed === true,
-			counts: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, int(value, 0)])),
+			counts: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, int$1(value, 0)])),
 			unplaced: normalizeUnplaced(row.unplaced),
 			truncated: {
 				placed: truncated.placed === true,
@@ -195357,9 +196810,9 @@ create: function(game) {
 	}
 	function normalizeSlots(raw) {
 		return (Array.isArray(raw) ? raw : []).map((item, index) => {
-			const row = record$1(item) ?? {};
-			const seat = record$1(row.seat);
-			const footprint = record$1(row.footprint);
+			const row = record$2(item) ?? {};
+			const seat = record$2(row.seat);
+			const footprint = record$2(row.footprint);
 			const fallback = DESK_TILES[index % DESK_TILES.length];
 			const deskId = typeof row.desk_id === "string" && row.desk_id ? row.desk_id : `desk-${index}`;
 			const seatId = typeof row.seat_id === "string" ? row.seat_id : typeof seat?.seat_id === "string" ? seat.seat_id : null;
@@ -195369,8 +196822,8 @@ create: function(game) {
 				seat_id: seatId,
 				tile: tile(row.tile ?? seat?.tile, fallback),
 				footprint: {
-					w: Math.max(1, int(footprint?.w, 2)),
-					h: Math.max(1, int(footprint?.h, 1))
+					w: Math.max(1, int$1(footprint?.w, 2)),
+					h: Math.max(1, int$1(footprint?.h, 1))
 				},
 				occupied_by: occupied
 			};
@@ -195380,17 +196833,17 @@ create: function(game) {
 		const items = Array.isArray(raw) ? raw : [];
 		if (!items.length) return planCellCluster(roomId, capacity);
 		const cells = items.map((item, index) => {
-			const row = record$1(item) ?? {};
+			const row = record$2(item) ?? {};
 			const slots = normalizeSlots(row.desk_slots ?? row.desks);
-			const origin = record$1(row.origin);
+			const origin = record$2(row.origin);
 			return {
 				cell_id: typeof row.cell_id === "string" && row.cell_id ? row.cell_id : `c${index}`,
-				index: int(row.index, index),
-				cols: int(row.cols, 16),
-				rows: int(row.rows, 12),
+				index: int$1(row.index, index),
+				cols: int$1(row.cols, 16),
+				rows: int$1(row.rows, 12),
 				origin: {
-					x: int(origin?.x, index % 2 * 18),
-					y: int(origin?.y, Math.floor(index / 2) * 14)
+					x: int$1(origin?.x, index % 2 * 18),
+					y: int$1(origin?.y, Math.floor(index / 2) * 14)
 				},
 				desk_slots: slots
 			};
@@ -195399,14 +196852,14 @@ create: function(game) {
 		return capacity > 0 && slots === 0 ? planCellCluster(roomId, capacity) : cells;
 	}
 	function normalizeRoom(raw, floorActive, index) {
-		const row = record$1(raw) ?? {};
+		const row = record$2(raw) ?? {};
 		const roomId = typeof row.room_id === "string" && row.room_id ? row.room_id : `room-${index + 1}`;
 		const name = typeof row.name === "string" && row.name ? row.name : `Room ${index + 1}`;
 		const kind = typeof row.kind === "string" && row.kind ? row.kind : "template";
 		const archetype = typeof row.archetype === "string" && row.archetype ? row.archetype : kind;
 		const state = typeof row.state === "string" ? row.state : "template";
 		const active = typeof row.active === "boolean" ? row.active : state.toUpperCase() !== "DORMANT" && floorActive;
-		const declared = int(row.capacity ?? row.desk_count ?? row.desks, 0);
+		const declared = int$1(row.capacity ?? row.desk_count ?? row.desks, 0);
 		const cells = normalizeCells(row.cells, roomId, declared);
 		const slots = cells.reduce((sum, cell) => sum + cell.desk_slots.length, 0);
 		const capacity = slots > 0 ? slots : Math.max(0, declared);
@@ -195415,7 +196868,7 @@ create: function(game) {
 			name,
 			kind,
 			archetype,
-			role_ids: strings(row.role_ids),
+			role_ids: strings$1(row.role_ids),
 			active,
 			state,
 			template: row.template !== false,
@@ -195425,26 +196878,26 @@ create: function(game) {
 		};
 	}
 	function normalizeFloor(raw, index) {
-		const row = record$1(raw) ?? {};
+		const row = record$2(raw) ?? {};
 		const floorId = typeof row.floor_id === "string" && row.floor_id ? row.floor_id : `floor-${String(index + 1).padStart(3, "0")}`;
 		const wing = typeof row.wing === "string" && row.wing ? row.wing : "central";
 		const active = row.active_by_default === true || row.active_by_default === void 0 && row.active === true;
 		const roomsRaw = Array.isArray(row.rooms) ? row.rooms : [];
-		const expectedRooms = int(row.room_count ?? record$1(row.capacity)?.rooms, 0);
-		const expectedDesks = int(row.desk_capacity ?? record$1(row.capacity)?.desks, 0);
-		const rooms = roomsRaw.length ? roomsRaw.map((room, i) => normalizeRoom(room, active, i)) : expectedRooms > 0 ? templateRooms(floorId, expectedRooms, expectedDesks, active, strings(row.role_ids)) : [];
+		const expectedRooms = int$1(row.room_count ?? record$2(row.capacity)?.rooms, 0);
+		const expectedDesks = int$1(row.desk_capacity ?? record$2(row.capacity)?.desks, 0);
+		const rooms = roomsRaw.length ? roomsRaw.map((room, i) => normalizeRoom(room, active, i)) : expectedRooms > 0 ? templateRooms(floorId, expectedRooms, expectedDesks, active, strings$1(row.role_ids)) : [];
 		const cells = rooms.reduce((sum, room) => sum + room.cell_count, 0);
 		const desks = rooms.reduce((sum, room) => sum + room.capacity, 0);
 		return {
 			floor_id: floorId,
-			index: int(row.index, index + 1),
+			index: int$1(row.index, index + 1),
 			wing,
 			wing_name: typeof row.wing_name === "string" && row.wing_name ? row.wing_name : `${wing.charAt(0).toUpperCase()}${wing.slice(1)} Wing`,
 			name: typeof row.name === "string" && row.name ? row.name : `Floor ${String(index + 1).padStart(3, "0")}`,
 			active,
 			active_by_default: active,
-			department_ids: strings(row.department_ids),
-			role_ids: strings(row.role_ids),
+			department_ids: strings$1(row.department_ids),
+			role_ids: strings$1(row.role_ids),
 			room_count: rooms.length,
 			desk_capacity: desks,
 			cells,
@@ -195511,7 +196964,7 @@ create: function(game) {
 		return order.map((wing) => map.get(wing));
 	}
 	function normalizeTower(raw) {
-		const row = record$1(raw);
+		const row = record$2(raw);
 		if (!row || row.ok !== true || !Array.isArray(row.floors)) throw new WorldApiError("The world endpoint returned no usable tower.", "WORLD_BAD_RESPONSE", 200);
 		const floors = row.floors.map((floor, index) => normalizeFloor(floor, index));
 		if (!floors.length) throw new WorldApiError("The world endpoint returned zero floors.", "WORLD_EMPTY", 200);
@@ -195523,7 +196976,7 @@ create: function(game) {
 			source: "endpoint",
 			server_source: typeof row.source === "string" ? row.source : void 0,
 			staffed: occupancy ? occupancy.staffed : counts.agents > 0 || row.staffed === true,
-			campus: record$1(row.campus),
+			campus: record$2(row.campus),
 			counts,
 			wings: wingSummaries(floors),
 			floors,
@@ -197131,6 +198584,3639 @@ create: function(game) {
 				"aria-label": "Office approvals",
 				"aria-busy": state.kind === "loading" ? "true" : "false"
 			}, children);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/CommandCenter.tsx
+	function jumpTo(entry, href, onJump) {
+		onJump?.(entry, href);
+		if (!onJump && href && typeof window !== "undefined") window.location.assign(href);
+	}
+	function createCommandCenter(R, hooks) {
+		const { useState, useEffect, useRef } = hooks;
+		return function CommandCenter(props) {
+			const [query, setQuery] = useState(String(props.initialQuery ?? ""));
+			const [kindFilter, setKindFilter] = useState(String(props.initialKind ?? "all"));
+			const [statusFilter, setStatusFilter] = useState(String(props.initialStatus ?? "all"));
+			const [read, setRead] = useState({ kind: "loading" });
+			const [activeIndex, setActiveIndex] = useState(-1);
+			const searchRef = useRef(null);
+			const restoreRef = useRef(null);
+			const itemRefs = useRef([]);
+			useEffect(() => {
+				const doc = typeof document === "undefined" ? null : document;
+				restoreRef.current = doc?.activeElement ?? null;
+				searchRef.current?.focus?.();
+				return () => {
+					const element = restoreRef.current;
+					if (element && doc?.contains(element)) element.focus?.();
+				};
+			}, []);
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				setRead({ kind: "loading" });
+				fetchCommandCenter({
+					q: query,
+					kind: kindFilter,
+					status: statusFilter === "all" ? "" : statusFilter,
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then((next) => {
+					if (live) {
+						setRead(next);
+						setActiveIndex(next.kind === "available" ? 0 : -1);
+					}
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				query,
+				kindFilter,
+				statusFilter,
+				props.base,
+				props.fetchImpl
+			]);
+			const projection = read.kind === "available" ? read.projection : null;
+			const entries = filterEntries(projection?.entries, {
+				q: query,
+				kind: kindFilter,
+				status: statusFilter === "all" ? "" : statusFilter
+			});
+			const active = clampIndex$1(activeIndex, entries.length);
+			const focusAt = (index) => {
+				if (entries.length === 0) return;
+				const next = clampIndex$1(index, entries.length);
+				setActiveIndex(next);
+				const element = itemRefs.current[next];
+				if (element && typeof element.focus === "function") element.focus();
+			};
+			const onKeyDown = (event) => {
+				const action = shortcutAction(event);
+				if (!action && event.key !== "Tab") return;
+				event.preventDefault?.();
+				if (action === "focus-search") {
+					searchRef.current?.focus?.();
+					return;
+				}
+				if (action === "close") {
+					props.onClose?.();
+					return;
+				}
+				if (action === "move-next") {
+					focusAt(nextIndex$1(active, entries.length, 1));
+					return;
+				}
+				if (action === "move-prev") {
+					focusAt(nextIndex$1(active, entries.length, -1));
+					return;
+				}
+				if (action === "move-first") {
+					focusAt(0);
+					return;
+				}
+				if (action === "move-last") {
+					focusAt(entries.length - 1);
+					return;
+				}
+				if (action === "jump" && entries.length > 0) {
+					const entry = entries[active < 0 ? 0 : active];
+					jumpTo(entry, entryDeepLink(entry, props.base), props.onJump);
+				}
+			};
+			const sources = unavailableSources$1(projection);
+			const statusChoices = statusOptions$1(projection?.entries);
+			const stateAnnouncement = announcement(read, projection);
+			const children = [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead office-theme-dock-head"
+			}, [R.createElement("span", {
+				key: "title",
+				className: "office-theme-dock-title"
+			}, "Command Center"), R.createElement("button", {
+				key: "close",
+				type: "button",
+				className: "office-game__btn office-theme-dock-close",
+				"data-testid": "command-center-close",
+				"aria-label": "Close command center",
+				onClick: () => props.onClose?.()
+			}, "Close")]), R.createElement("div", {
+				key: "search",
+				role: "search",
+				className: "command-center__search",
+				"data-testid": "command-center-search"
+			}, [
+				R.createElement("label", {
+					key: "label",
+					htmlFor: "command-center-query",
+					className: "command-center__label"
+				}, "Search floors, rooms, desks, agents, tasks and approvals"),
+				R.createElement("input", {
+					key: "input",
+					id: "command-center-query",
+					ref: searchRef,
+					type: "search",
+					value: query,
+					autoComplete: "off",
+					"aria-describedby": "command-center-help",
+					"data-testid": "command-center-query",
+					placeholder: "Search by floor, room, desk, agent, task or approval",
+					onChange: (event) => {
+						setQuery(event.target.value);
+						setActiveIndex(0);
+					},
+					onKeyDown
+				}),
+				R.createElement("p", {
+					key: "help",
+					id: "command-center-help",
+					className: "office-game__sr-only"
+				}, "Ctrl or Command K focuses search. Arrow keys move between results. Enter opens the selected result. Escape closes the command center."),
+				R.createElement("div", {
+					key: "filters",
+					className: "command-center__filters"
+				}, [
+					R.createElement("label", {
+						key: "kind-label",
+						htmlFor: "command-center-kind",
+						className: "command-center__filterLabel"
+					}, "Kind"),
+					R.createElement("select", {
+						key: "kind",
+						id: "command-center-kind",
+						value: kindFilter,
+						"data-testid": "command-center-kind",
+						"aria-label": "Filter by kind",
+						onChange: (event) => {
+							setKindFilter(event.target.value);
+							setActiveIndex(0);
+						}
+					}, [R.createElement("option", {
+						key: "all",
+						value: "all"
+					}, "All kinds"), ...COMMAND_CENTER_KINDS.map((kind) => R.createElement("option", {
+						key: kind,
+						value: kind
+					}, kindLabel$1(kind)))]),
+					R.createElement("label", {
+						key: "status-label",
+						htmlFor: "command-center-status",
+						className: "command-center__filterLabel"
+					}, "Status"),
+					R.createElement("select", {
+						key: "status",
+						id: "command-center-status",
+						value: statusFilter,
+						"data-testid": "command-center-status",
+						"aria-label": "Filter by status",
+						onChange: (event) => {
+							setStatusFilter(event.target.value);
+							setActiveIndex(0);
+						}
+					}, [R.createElement("option", {
+						key: "all",
+						value: "all"
+					}, "All statuses"), ...statusChoices.map((status) => R.createElement("option", {
+						key: status,
+						value: status
+					}, statusLabel$3(status)))])
+				])
+			])];
+			if (read.kind === "loading") children.push(R.createElement("div", {
+				key: "state",
+				className: "command-center__state",
+				"data-testid": "command-center-state",
+				"data-state": "loading",
+				role: "status",
+				"aria-live": "polite"
+			}, "Loading the command center…"));
+			else if (read.kind === "error" || read.kind === "unavailable") {
+				const code = read.kind === "unavailable" ? read.code : "COMMAND_CENTER_READ_FAILED";
+				const detail = read.kind === "unavailable" ? read.detail : read.message;
+				children.push(R.createElement("div", {
+					key: "state",
+					className: "command-center__state command-center__state--error",
+					"data-testid": "command-center-state",
+					"data-state": read.kind,
+					"data-code": code,
+					role: "alert"
+				}, [R.createElement("strong", { key: "t" }, "Command center unavailable"), R.createElement("span", {
+					key: "d",
+					"data-testid": "command-center-error-detail"
+				}, `${code}: ${detail}`)]));
+			} else if (projection) {
+				children.push(R.createElement("p", {
+					key: "announce",
+					className: "office-game__sr-only",
+					role: "status",
+					"aria-live": "polite",
+					"data-testid": "command-center-announcement"
+				}, stateAnnouncement));
+				children.push(R.createElement("section", {
+					key: "roster",
+					className: "command-center__summary",
+					"data-testid": "command-center-roster",
+					"aria-label": "Roster summary"
+				}, [
+					R.createElement("h3", { key: "h" }, "Roster"),
+					R.createElement("p", { key: "p" }, rosterSummaryText(projection.roster)),
+					R.createElement("p", {
+						key: "s",
+						"data-testid": "command-center-counts"
+					}, `${projection.counts.floors} floors · ${projection.counts.rooms} rooms · ${projection.counts.desks} desks · ${projection.counts.tasks} tasks · ${projection.counts.sessions} sessions`)
+				]));
+				children.push(R.createElement("section", {
+					key: "inbox",
+					className: "command-center__summary",
+					"data-testid": "command-center-inbox",
+					"aria-label": "Notification inbox"
+				}, [
+					R.createElement("h3", { key: "h" }, "Needs you"),
+					R.createElement("p", {
+						key: "p",
+						"data-testid": "command-center-inbox-count",
+						"data-count": String(projection.inbox?.counts?.approvals_pending ?? 0)
+					}, inboxSummaryText(projection)),
+					...(projection.inbox?.items ?? []).map((item) => R.createElement("p", {
+						key: item.approval_id,
+						className: "command-center__inboxItem",
+						"data-testid": "command-center-inbox-item",
+						"data-status": item.status
+					}, [
+						R.createElement("span", {
+							key: "m",
+							"aria-hidden": "true"
+						}, `${statusMarker$1(item.status)} `),
+						R.createElement("span", { key: "a" }, item.action),
+						R.createElement("span", { key: "r" }, ` · requested by ${item.requested_by || "unknown"}`),
+						R.createElement("span", { key: "s" }, ` · ${item.status}`)
+					]))
+				]));
+				if (sources.length > 0) children.push(R.createElement("p", {
+					key: "sources",
+					className: "command-center__summary command-center__summary--warn",
+					"data-testid": "command-center-sources",
+					role: "status"
+				}, "Some sources are unavailable: " + sources.map((source) => `${source.name}${source.code ? ` (${source.code})` : ""}`).join(", ")));
+				if (entries.length === 0) children.push(R.createElement("div", {
+					key: "empty",
+					className: "command-center__state",
+					"data-testid": "command-center-state",
+					"data-state": "empty",
+					role: "status",
+					"aria-live": "polite"
+				}, `No office records match${query.trim() ? ` “${query.trim()}”` : ""}${kindFilter !== "all" ? ` in ${kindLabel$1(kindFilter)}` : ""}.`));
+				else {
+					children.push(R.createElement("p", {
+						key: "summary",
+						className: "command-center__resultSummary",
+						"data-testid": "command-center-result-summary"
+					}, resultSummary(projection)));
+					children.push(R.createElement("ul", {
+						key: "results",
+						id: "command-center-results",
+						className: "command-center__results",
+						"data-testid": "command-center-results",
+						"aria-label": "Command center results"
+					}, entries.map((entry, index) => {
+						const href = entryDeepLink(entry, props.base);
+						const common = {
+							id: `command-center-entry-${index}`,
+							"data-testid": "command-center-entry",
+							"data-entry-id": entry.entry_id,
+							"data-entry-kind": entry.kind,
+							"data-status": entry.status,
+							"data-attention": String(isAttention(entry)),
+							"aria-current": index === active ? "true" : void 0,
+							className: "command-center__entry",
+							onFocus: () => setActiveIndex(index),
+							onKeyDown,
+							ref: (node) => {
+								itemRefs.current[index] = node;
+							}
+						};
+						const content = [
+							R.createElement("span", {
+								key: "marker",
+								className: "command-center__marker",
+								"aria-hidden": "true"
+							}, statusMarker$1(entry.status)),
+							R.createElement("span", {
+								key: "kind",
+								className: "command-center__kind"
+							}, kindLabel$1(entry.kind)),
+							R.createElement("span", {
+								key: "title",
+								className: "command-center__title"
+							}, entry.title),
+							R.createElement("span", {
+								key: "subtitle",
+								className: "command-center__subtitle"
+							}, entry.subtitle),
+							R.createElement("span", {
+								key: "status",
+								className: "command-center__status"
+							}, statusLabel$3(entry.status)),
+							isAttention(entry) ? R.createElement("span", {
+								key: "attention",
+								className: "command-center__attention"
+							}, "needs attention") : null,
+							R.createElement("span", {
+								key: "jump",
+								className: "command-center__jump"
+							}, href ? "Jump Here" : "Select")
+						];
+						if (href) return R.createElement("li", {
+							key: entry.entry_id,
+							className: "command-center__item"
+						}, R.createElement("a", {
+							...common,
+							href,
+							onClick: (event) => {
+								event.preventDefault?.();
+								jumpTo(entry, href, props.onJump);
+							}
+						}, ...content));
+						return R.createElement("li", {
+							key: entry.entry_id,
+							className: "command-center__item"
+						}, R.createElement("button", {
+							...common,
+							type: "button",
+							onClick: () => jumpTo(entry, null, props.onJump)
+						}, ...content));
+					})));
+				}
+			}
+			return R.createElement("div", {
+				className: "command-center",
+				"data-testid": "command-center",
+				"data-state": read.kind,
+				role: "region",
+				"aria-label": "Office command center",
+				onKeyDown
+			}, children);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/timeline.ts
+	/** The one office compat route this module reads. */
+	var TIMELINE_PATH = "/operator/timeline";
+	var TIMELINE_KINDS = [
+		"run",
+		"task",
+		"tool",
+		"event",
+		"approval",
+		"checkpoint",
+		"artifact",
+		"receipt",
+		"reconciliation"
+	];
+	var KIND_LABELS = {
+		run: "Run",
+		task: "Task",
+		tool: "Tool",
+		event: "Event",
+		approval: "Approval",
+		checkpoint: "Checkpoint",
+		artifact: "Artifact",
+		receipt: "Receipt",
+		reconciliation: "Reconciliation"
+	};
+	/** Causal stage order: run -> task -> tool -> approval -> artifact/receipt. */
+	var STAGE_RANK = {
+		run: 0,
+		task: 1,
+		tool: 2,
+		event: 3,
+		approval: 4,
+		checkpoint: 5,
+		artifact: 6,
+		receipt: 7,
+		reconciliation: 8
+	};
+	/** Only non-empty filters are sent; the backend owns matching and counts. */
+	function cleanQuery(query = {}) {
+		const out = {};
+		const text = (value) => String(value ?? "").trim();
+		if (text(query.run)) out.run = text(query.run);
+		if (text(query.task)) out.task = text(query.task);
+		if (text(query.agent)) out.agent = text(query.agent);
+		if (text(query.session)) out.session = text(query.session);
+		if (query.limit !== void 0 && query.limit !== null && Number.isFinite(Number(query.limit))) out.limit = String(Math.max(1, Math.trunc(Number(query.limit))));
+		if (query.replay) out.replay = "1";
+		return out;
+	}
+	async function fetchTimeline(opts = {}) {
+		try {
+			const body = await businessFetch(TIMELINE_PATH, {
+				base: opts.base,
+				fetchImpl: opts.fetchImpl,
+				win: opts.win,
+				signal: opts.signal,
+				query: cleanQuery(opts)
+			});
+			if (!body || !body.projection) return {
+				kind: "error",
+				message: "the backend returned no projection"
+			};
+			const projection = body.projection;
+			return projection.state === "empty" && projection.items.length === 0 ? {
+				kind: "empty",
+				projection
+			} : {
+				kind: "available",
+				projection
+			};
+		} catch (exc) {
+			if (exc instanceof BusinessApiError) return {
+				kind: "unavailable",
+				code: exc.code || `HTTP_${exc.status}`,
+				detail: exc.message
+			};
+			return {
+				kind: "error",
+				message: exc instanceof Error ? exc.message : String(exc)
+			};
+		}
+	}
+	var stage = (kind) => STAGE_RANK[kind] ?? TIMELINE_KINDS.length;
+	var num = (value) => {
+		const parsed = Number(value ?? 0);
+		return Number.isFinite(parsed) ? parsed : 0;
+	};
+	/**
+	* Sort chronologically, then enforce causation: a caused item never appears
+	* before its cause. A cycle falls back to the chronological order instead of
+	* dropping an item.
+	*/
+	function causalSort(items) {
+		const ordered = [...items].sort((a, b) => {
+			if (a.at !== b.at) return a.at < b.at ? -1 : 1;
+			if (stage(a.kind) !== stage(b.kind)) return stage(a.kind) - stage(b.kind);
+			if (num(a.sequence) !== num(b.sequence)) return num(a.sequence) - num(b.sequence);
+			return a.item_id < b.item_id ? -1 : a.item_id > b.item_id ? 1 : 0;
+		});
+		if (ordered.length < 2) return ordered;
+		const byId = new Map(ordered.map((item) => [item.item_id, item]));
+		const position = new Map(ordered.map((item, index) => [item.item_id, index]));
+		const children = /* @__PURE__ */ new Map();
+		const indegree = /* @__PURE__ */ new Map();
+		for (const item of ordered) indegree.set(item.item_id, 0);
+		for (const item of ordered) {
+			const cause = String(item.causation_id ?? "").trim();
+			if (!cause || cause === item.item_id || !byId.has(cause)) continue;
+			const list = children.get(cause) ?? [];
+			list.push(item.item_id);
+			children.set(cause, list);
+			indegree.set(item.item_id, (indegree.get(item.item_id) ?? 0) + 1);
+		}
+		const ready = ordered.filter((item) => (indegree.get(item.item_id) ?? 0) === 0).map((item) => item.item_id);
+		const result = [];
+		while (ready.length > 0) {
+			ready.sort((a, b) => (position.get(a) ?? 0) - (position.get(b) ?? 0));
+			const next = ready.shift();
+			result.push(byId.get(next));
+			for (const child of children.get(next) ?? []) {
+				indegree.set(child, (indegree.get(child) ?? 1) - 1);
+				if ((indegree.get(child) ?? 0) === 0) ready.push(child);
+			}
+		}
+		return result.length === ordered.length ? result : ordered;
+	}
+	var norm = (value) => String(value ?? "").trim().toLowerCase();
+	function haystack(item) {
+		return [
+			item.item_id,
+			item.kind,
+			item.title,
+			item.summary,
+			item.status,
+			item.actor,
+			item.run_id,
+			item.task_id,
+			item.agent_id,
+			item.session_id,
+			item.approval_id,
+			item.artifact_id,
+			item.ledger_id,
+			item.checkpoint_id
+		].map(norm).filter(Boolean).join(" ");
+	}
+	function itemMatches(item, filter = {}) {
+		const needle = norm(filter.q);
+		if (needle && !haystack(item).includes(needle)) return false;
+		const kind = norm(filter.kind);
+		if (kind && kind !== "all" && item.kind !== kind) return false;
+		if (filter.status && norm(item.status) !== norm(filter.status)) return false;
+		return true;
+	}
+	function filterTimeline(items, filter = {}) {
+		return (items ?? []).filter((item) => itemMatches(item, filter));
+	}
+	function statusOptions(items) {
+		const seen = /* @__PURE__ */ new Set();
+		for (const item of items ?? []) {
+			const value = String(item.status ?? "").trim();
+			if (value) seen.add(value);
+		}
+		return Array.from(seen).sort();
+	}
+	function statusLabel$1(status) {
+		return String(status ?? "").trim() || "unknown";
+	}
+	/** Text marker so status is never conveyed by color alone. */
+	function statusMarker(status) {
+		switch (norm(status)) {
+			case "completed": return "[v]";
+			case "pending":
+			case "queued":
+			case "waiting":
+			case "approval": return "[..]";
+			case "executing":
+			case "running":
+			case "leased": return "[>]";
+			case "checkpointed": return "[#]";
+			case "unknown":
+			case "done-unverified": return "[?]";
+			case "failed": return "[x]";
+			case "cancelled":
+			case "rejected":
+			case "expired": return "[-]";
+			case "committed":
+			case "approved": return "[$]";
+			case "recorded":
+			case "success": return "[.]";
+			case "simulated":
+			case "dry_run": return "[~]";
+			default: return "[?]";
+		}
+	}
+	function kindLabel(kind) {
+		return KIND_LABELS[kind] ?? String(kind || "Record");
+	}
+	/**
+	* The status the operator may trust for this item.
+	*
+	* A `completed` string without an evidence reference is NOT completion: it is
+	* reported as `unknown` so no badge can upgrade it. This mirrors the backend
+	* and is the client half of "no fake completion".
+	*/
+	function effectiveStatus(item) {
+		const status = statusLabel$1(item.status);
+		if (norm(status) === "completed" && !item.evidence) return "unknown";
+		return status;
+	}
+	function isCompleted(item) {
+		return item.completed === true && item.evidence === true && norm(effectiveStatus(item)) === "completed";
+	}
+	function isUnknown(item) {
+		return item.unknown === true || norm(effectiveStatus(item)) === "unknown";
+	}
+	function isPending(item) {
+		return item.pending === true;
+	}
+	function isReplayItem(item) {
+		return item.replay === true || item.effect === "stubbed";
+	}
+	function hasEvidence(item) {
+		return item.evidence === true && (item.evidence_refs?.length ?? 0) > 0;
+	}
+	function evidenceRefs(item) {
+		return Array.isArray(item.evidence_refs) ? item.evidence_refs : [];
+	}
+	/** A stable DOM id for an item id (ids contain `:`). */
+	function domId(value) {
+		return `tl-${String(value).replace(/[^A-Za-z0-9_-]+/g, "-")}`;
+	}
+	/** An in-page anchor to a referenced record when it is on this timeline. */
+	function evidenceHref(ref, items) {
+		const target = ref.item_id || (ref.kind && ref.id ? `${ref.kind}:${ref.id}` : "");
+		if (!target) return null;
+		return items.some((item) => item.item_id === target) ? `#${domId(target)}` : null;
+	}
+	function formatMinor(amountMinor, currency) {
+		const value = Number(amountMinor ?? 0);
+		const amount = Number.isFinite(value) ? value : 0;
+		const code = (currency || "USD").toUpperCase();
+		return `${amount < 0 ? "-" : ""}${Math.floor(Math.abs(amount) / 100)}.${String(Math.abs(amount) % 100).padStart(2, "0")} ${code}`;
+	}
+	function costLabel(cost) {
+		if (!cost) return "cost unknown";
+		return formatMinor(cost.amount_minor, cost.currency);
+	}
+	function tokensLabel(tokens) {
+		if (!tokens) return "tokens unknown";
+		return `${tokens.total} tokens (${tokens.prompt} in / ${tokens.completion} out)`;
+	}
+	function replayLabel(projection) {
+		if (!projection?.replay?.enabled) return null;
+		return projection.replay.label || "Replay (simulated): effects stubbed, no real action performed";
+	}
+	function isReplay(projection) {
+		return projection?.mode === "replay" || projection?.replay?.enabled === true;
+	}
+	function countsSummary(projection) {
+		if (!projection) return "No timeline projection.";
+		const counts = projection.counts;
+		const total = Number(counts?.total ?? projection.items?.length ?? 0);
+		if (total === 0) return "No durable records match this timeline.";
+		return [
+			`${total} item${total === 1 ? "" : "s"}`,
+			`${counts.runs} run${counts.runs === 1 ? "" : "s"}`,
+			`${counts.completed_with_evidence} completed with evidence`,
+			`${counts.pending} pending`,
+			`${counts.unknown} unknown`
+		].join(" · ");
+	}
+	function evidenceSummary(item) {
+		if (isCompleted(item)) {
+			const refs = evidenceRefs(item);
+			return refs.length > 0 ? `evidence: ${refs.map((ref) => `${ref.kind} ${ref.id}`).join(", ")}` : "completed";
+		}
+		if (isUnknown(item)) return item.reason ? `unknown — ${item.reason}` : "unknown; reconciliation required";
+		if (isPending(item)) return "pending; not completed";
+		return "";
+	}
+	function unavailableSources(projection) {
+		if (!projection?.sources) return [];
+		return Object.entries(projection.sources).filter(([, state]) => state?.state === "unavailable").map(([name, state]) => ({
+			name,
+			code: state?.code ?? null,
+			reason: state?.reason ?? null
+		}));
+	}
+	function clampIndex(index, length) {
+		if (length <= 0) return -1;
+		const value = Number.isFinite(index) ? Math.trunc(index) : 0;
+		return Math.min(length - 1, Math.max(0, value));
+	}
+	function nextIndex(index, length, delta) {
+		if (length <= 0) return -1;
+		if (index < 0) return delta >= 0 ? 0 : length - 1;
+		return (clampIndex(index, length) + delta + length) % length;
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/Timeline.tsx
+	function evidenceText(R, item, items) {
+		const refs = evidenceRefs(item);
+		if (refs.length === 0) return null;
+		return R.createElement("span", {
+			key: "evidence",
+			className: "timeline__evidence",
+			"data-testid": "timeline-evidence"
+		}, [R.createElement("span", {
+			key: "label",
+			className: "timeline__muted"
+		}, "Evidence: "), ...refs.map((ref, index) => {
+			const href = evidenceHref(ref, items);
+			const text = `${ref.kind} ${ref.id}`;
+			return href ? R.createElement("a", {
+				key: `${ref.kind}-${ref.id}-${index}`,
+				href,
+				className: "timeline__evidenceLink"
+			}, text) : R.createElement("span", {
+				key: `${ref.kind}-${ref.id}-${index}`,
+				className: "timeline__evidenceLink"
+			}, text);
+		})]);
+	}
+	function createTimeline(R, hooks) {
+		const { useState, useEffect, useRef } = hooks;
+		return function Timeline(props) {
+			const [query, setQuery] = useState("");
+			const [kindFilter, setKindFilter] = useState("all");
+			const [statusFilter, setStatusFilter] = useState("all");
+			const [replayToggle, setReplayToggle] = useState(Boolean(props.replay));
+			const [read, setRead] = useState({ kind: "loading" });
+			const [activeIndex, setActiveIndex] = useState(-1);
+			const [retryToken, setRetryToken] = useState(0);
+			const [reducedMotion, setReducedMotion] = useState(false);
+			const restoreRef = useRef(null);
+			const itemRefs = useRef([]);
+			useEffect(() => {
+				const doc = typeof document === "undefined" ? null : document;
+				restoreRef.current = doc?.activeElement ?? null;
+				return () => {
+					const element = restoreRef.current;
+					if (element && doc?.contains(element)) element.focus?.();
+				};
+			}, []);
+			useEffect(() => {
+				if (typeof window === "undefined" || !window.matchMedia) return;
+				const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+				const update = () => setReducedMotion(Boolean(media.matches));
+				update();
+				if (media.addEventListener) media.addEventListener("change", update);
+				return () => {
+					if (media.removeEventListener) media.removeEventListener("change", update);
+				};
+			}, []);
+			useEffect(() => {
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				setRead({ kind: "loading" });
+				fetchTimeline({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					run: props.run,
+					task: props.task,
+					agent: props.agent,
+					session: props.session,
+					replay: replayToggle,
+					limit: props.initialLimit,
+					signal: ctl?.signal
+				}).then((next) => {
+					if (!live) return;
+					setRead(next);
+					setActiveIndex(next.kind === "available" || next.kind === "empty" ? 0 : -1);
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				props.base,
+				props.fetchImpl,
+				props.run,
+				props.task,
+				props.agent,
+				props.session,
+				props.initialLimit,
+				replayToggle,
+				retryToken
+			]);
+			const projection = read.kind === "available" || read.kind === "empty" ? read.projection : null;
+			const items = causalSort(filterTimeline(projection?.items, {
+				q: query,
+				kind: kindFilter,
+				status: statusFilter === "all" ? "" : statusFilter
+			}));
+			const active = clampIndex(activeIndex, items.length);
+			const replay = isReplay(projection) || replayToggle;
+			const focusAt = (index) => {
+				if (items.length === 0) return;
+				const next = clampIndex(index, items.length);
+				setActiveIndex(next);
+				itemRefs.current[next]?.focus?.();
+			};
+			const onListKeyDown = (event) => {
+				const key = String(event.key ?? "");
+				if (key === "ArrowDown") {
+					event.preventDefault?.();
+					focusAt(nextIndex(active, items.length, 1));
+				} else if (key === "ArrowUp") {
+					event.preventDefault?.();
+					focusAt(nextIndex(active, items.length, -1));
+				} else if (key === "Home") {
+					event.preventDefault?.();
+					focusAt(0);
+				} else if (key === "End") {
+					event.preventDefault?.();
+					focusAt(items.length - 1);
+				} else if (key === "Escape") {
+					event.preventDefault?.();
+					props.onClose?.();
+				}
+			};
+			const children = [R.createElement("div", {
+				key: "head",
+				className: "office-game__dockHead office-theme-dock-head"
+			}, [
+				R.createElement("span", {
+					key: "title",
+					className: "office-theme-dock-title"
+				}, "Operator timeline"),
+				replay ? R.createElement("span", {
+					key: "replay",
+					className: "timeline__replayMarker",
+					"data-testid": "timeline-replay-marker",
+					role: "note",
+					"aria-label": "Replay mode: simulated, effects stubbed"
+				}, "REPLAY · simulated · effects stubbed") : null,
+				props.onClose ? R.createElement("button", {
+					key: "close",
+					type: "button",
+					className: "office-game__btn office-theme-dock-close",
+					"data-testid": "timeline-close",
+					"aria-label": "Close the operator timeline",
+					onClick: () => props.onClose?.()
+				}, "Close") : null
+			]), R.createElement("div", {
+				key: "controls",
+				className: "timeline__controls",
+				role: "group",
+				"aria-label": "Timeline filters"
+			}, [
+				R.createElement("label", { key: "q" }, [R.createElement("span", { key: "l" }, "Search "), R.createElement("input", {
+					key: "i",
+					type: "search",
+					"data-testid": "timeline-search",
+					"aria-label": "Search the operator timeline",
+					value: query,
+					onChange: (event) => setQuery(String(event?.target?.value ?? ""))
+				})]),
+				R.createElement("label", { key: "kind" }, [R.createElement("span", { key: "l" }, "Kind "), R.createElement("select", {
+					key: "s",
+					"data-testid": "timeline-kind",
+					"aria-label": "Filter by record kind",
+					value: kindFilter,
+					onChange: (event) => setKindFilter(String(event?.target?.value ?? "all"))
+				}, [R.createElement("option", {
+					key: "all",
+					value: "all"
+				}, "All"), ...TIMELINE_KINDS.map((kind) => R.createElement("option", {
+					key: kind,
+					value: kind
+				}, kindLabel(kind)))])]),
+				R.createElement("label", { key: "status" }, [R.createElement("span", { key: "l" }, "Status "), R.createElement("select", {
+					key: "s",
+					"data-testid": "timeline-status",
+					"aria-label": "Filter by status",
+					value: statusFilter,
+					onChange: (event) => setStatusFilter(String(event?.target?.value ?? "all"))
+				}, [R.createElement("option", {
+					key: "all",
+					value: "all"
+				}, "All"), ...statusOptions(projection?.items).map((status) => R.createElement("option", {
+					key: status,
+					value: status
+				}, statusLabel$1(status)))])]),
+				R.createElement("button", {
+					key: "replay",
+					type: "button",
+					"data-testid": "timeline-replay-toggle",
+					"aria-pressed": replayToggle ? "true" : "false",
+					onClick: () => setReplayToggle((value) => !value)
+				}, replayToggle ? "Replay on" : "Replay")
+			])];
+			if (read.kind === "loading") children.push(R.createElement("div", {
+				key: "loading",
+				className: "timeline__state",
+				"data-testid": "timeline-loading",
+				role: "status",
+				"aria-live": "polite"
+			}, "Loading the operator timeline…"));
+			else if (read.kind === "error" || read.kind === "unavailable") {
+				const code = read.kind === "unavailable" ? read.code : "TIMELINE_READ_FAILED";
+				const detail = read.kind === "unavailable" ? read.detail : read.message;
+				children.push(R.createElement("div", {
+					key: "error",
+					className: "timeline__state timeline__state--error",
+					"data-testid": "timeline-error",
+					"data-code": code,
+					role: "alert"
+				}, [
+					R.createElement("strong", { key: "t" }, "The operator timeline is unavailable"),
+					R.createElement("div", {
+						key: "d",
+						className: "timeline__muted",
+						"data-testid": "timeline-error-detail"
+					}, `${code}: ${detail}`),
+					R.createElement("button", {
+						key: "r",
+						type: "button",
+						"data-testid": "timeline-retry",
+						onClick: () => setRetryToken((value) => value + 1)
+					}, "Retry")
+				]));
+			} else if (read.kind === "empty" || items.length === 0) children.push(R.createElement("div", {
+				key: "empty",
+				className: "timeline__state",
+				"data-testid": "timeline-empty",
+				role: "status",
+				"aria-live": "polite"
+			}, "No durable records match this timeline."));
+			else {
+				const sources = unavailableSources(projection);
+				if (sources.length > 0) children.push(R.createElement("div", {
+					key: "sources",
+					className: "timeline__state timeline__state--partial",
+					"data-testid": "timeline-partial",
+					role: "alert"
+				}, `Some sources are unavailable (${sources.map((source) => `${source.name}: ${source.code ?? "error"}`).join("; ")}).`));
+				children.push(R.createElement("p", {
+					key: "summary",
+					className: "timeline__summary",
+					"data-testid": "timeline-summary",
+					role: "status",
+					"aria-live": "polite"
+				}, `${countsSummary(projection)}${replayLabel(projection) ? ` · ${replayLabel(projection)}` : ""}`));
+				children.push(R.createElement("ol", {
+					key: "list",
+					className: "timeline__list",
+					"data-testid": "timeline-list",
+					role: "list",
+					"aria-label": "Causal operator timeline",
+					onKeyDown: onListKeyDown
+				}, items.map((item, index) => {
+					const status = effectiveStatus(item);
+					const completed = isCompleted(item);
+					const unknown = isUnknown(item);
+					const pending = isPending(item);
+					const markers = [R.createElement("span", {
+						key: "marker",
+						className: "timeline__marker",
+						"aria-hidden": "true"
+					}, statusMarker(status)), R.createElement("span", {
+						key: "status",
+						className: "timeline__status",
+						"data-status": status
+					}, statusLabel$1(status))];
+					if (unknown) markers.push(R.createElement("span", {
+						key: "unknown",
+						className: "timeline__flag",
+						"data-testid": "timeline-item-unknown"
+					}, "UNKNOWN"));
+					if (pending && !unknown) markers.push(R.createElement("span", {
+						key: "pending",
+						className: "timeline__flag",
+						"data-testid": "timeline-item-pending"
+					}, "PENDING"));
+					if (completed) markers.push(R.createElement("span", {
+						key: "completed",
+						className: "timeline__flag",
+						"data-testid": "timeline-item-completed"
+					}, "EVIDENCED"));
+					if (isReplayItem(item)) markers.push(R.createElement("span", {
+						key: "replay",
+						className: "timeline__flag",
+						"data-testid": "timeline-item-replay"
+					}, "REPLAY"));
+					const evidence = evidenceText(R, item, items);
+					return R.createElement("li", {
+						key: item.item_id,
+						id: domId(item.item_id),
+						ref: (node) => {
+							itemRefs.current[index] = node;
+						},
+						className: "timeline__item",
+						"data-testid": "timeline-item",
+						"data-kind": item.kind,
+						"data-status": status,
+						"data-unknown": String(unknown),
+						"data-pending": String(pending),
+						"data-completed": String(completed),
+						"data-replay": String(isReplayItem(item)),
+						tabIndex: index === active ? 0 : -1,
+						role: "listitem",
+						"aria-label": `${kindLabel(item.kind)} ${item.title}: ${statusLabel$1(status)}${unknown ? ", unknown" : ""}${isReplayItem(item) ? ", replay" : ""}`
+					}, [
+						R.createElement("div", {
+							key: "row",
+							className: "timeline__row"
+						}, markers),
+						R.createElement("div", {
+							key: "title",
+							className: "timeline__title"
+						}, `${kindLabel(item.kind)} · ${item.title}`),
+						R.createElement("div", {
+							key: "summaryText",
+							className: "timeline__muted"
+						}, item.summary),
+						R.createElement("div", {
+							key: "meta",
+							className: "timeline__muted"
+						}, `${item.actor} · ${item.at}`),
+						item.cost ? R.createElement("div", {
+							key: "cost",
+							className: "timeline__cost",
+							"data-testid": "timeline-item-cost"
+						}, `Cost ${costLabel(item.cost)}`) : null,
+						item.tokens ? R.createElement("div", {
+							key: "tokens",
+							className: "timeline__tokens",
+							"data-testid": "timeline-item-tokens"
+						}, tokensLabel(item.tokens)) : null,
+						evidence,
+						hasEvidence(item) || unknown || pending ? R.createElement("div", {
+							key: "evidenceSummary",
+							className: "timeline__muted",
+							"data-testid": "timeline-item-evidence-summary"
+						}, evidenceSummary(item)) : null,
+						item.detail && Object.keys(item.detail).length > 0 ? R.createElement("details", {
+							key: "detail",
+							className: "timeline__detail"
+						}, [R.createElement("summary", { key: "s" }, "Record detail"), R.createElement("pre", {
+							key: "p",
+							className: "timeline__pre"
+						}, JSON.stringify(item.detail, null, 2))]) : null
+					]);
+				})));
+			}
+			return R.createElement("section", {
+				className: "timeline",
+				"data-testid": "operator-timeline",
+				"data-state": read.kind,
+				"data-mode": replay ? "replay" : "live",
+				"data-replay": String(replay),
+				"data-reduced-motion": String(reducedMotion),
+				"data-filtered": String(Boolean(query || kindFilter !== "all" || statusFilter !== "all")),
+				role: "region",
+				"aria-label": "Operator timeline",
+				"aria-live": "polite",
+				style: {
+					display: "flex",
+					flexDirection: "column",
+					gap: "var(--office-s2)",
+					flex: "1 1 auto",
+					minHeight: 0,
+					overflow: "auto",
+					padding: "var(--office-s3)"
+				}
+			}, children);
+		};
+	}
+	var DEPARTMENT_ZONES = [
+		"reception",
+		"work",
+		"meeting",
+		"focus",
+		"head_office",
+		"kitchen",
+		"restroom",
+		"lounge",
+		"storage",
+		"comms"
+	];
+	var ZONE_ALIASES = {
+		reception: ["reception"],
+		work: ["work", "open_office"],
+		meeting: [
+			"meeting",
+			"executive",
+			"boardroom"
+		],
+		focus: ["focus", "wellness"],
+		head_office: ["head_office", "executive"],
+		kitchen: ["kitchen"],
+		restroom: ["restroom", "wellness"],
+		lounge: ["lounge", "wellness"],
+		storage: ["storage", "fulfillment"],
+		comms: [
+			"comms",
+			"ops",
+			"server_ops",
+			"control_room"
+		]
+	};
+	var ARCHETYPES = [
+		"reception",
+		"open_office",
+		"meeting",
+		"wellness",
+		"executive",
+		"kitchen",
+		"fulfillment",
+		"control_room",
+		"finance",
+		"creative",
+		"support",
+		"legal",
+		"research",
+		"sales",
+		"showcase",
+		"training",
+		"media",
+		"server_ops"
+	];
+	var PALETTES = [
+		"cool_teal_neutral",
+		"executive_warm",
+		"finance_navy",
+		"creative_coral",
+		"control_room_amber",
+		"open_office_sand"
+	];
+	var LIGHTING = [
+		"light_cool_overhead",
+		"light_soft_panels",
+		"light_warm_chandelier",
+		"light_focused_task",
+		"light_amber_console",
+		"light_warm_strings"
+	];
+	var FLOOR_SLUGS = [
+		"floor_wood_light",
+		"floor_wood_dark",
+		"floor_carpet_dark",
+		"floor_tile_grey",
+		"floor_concrete_polished",
+		"floor_marble_warm"
+	];
+	var WALL_SLUGS = [
+		"wall_panel_light",
+		"wall_plaster_cool",
+		"wall_glass_partition",
+		"wall_tech_panel",
+		"wall_brick_painted",
+		"wall_panel_walnut"
+	];
+	var CELL_DESK_SLOTS = [
+		[2, 2],
+		[7, 2],
+		[12, 2],
+		[2, 8],
+		[7, 8],
+		[12, 8]
+	];
+	var SLUG_RE = /^[a-z0-9][a-z0-9._-]{0,79}$/;
+	var TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._:/{}@#+-]{0,127}$/;
+	var RAW_ART_SUFFIXES = [
+		".png",
+		".webp",
+		".psd",
+		".aseprite",
+		".ase",
+		".gif"
+	];
+	function emptyAssignment() {
+		return {
+			business_id: "",
+			department_id: "",
+			role_ids: [],
+			agent_ids: [],
+			capability_manifest_id: "",
+			memory_scope: ""
+		};
+	}
+	function hashNumber(text) {
+		let hash = 2166136261;
+		for (let i = 0; i < text.length; i += 1) {
+			hash ^= text.charCodeAt(i);
+			hash = Math.imul(hash, 16777619) >>> 0;
+		}
+		return hash >>> 0;
+	}
+	function pick(options, seed, salt) {
+		return options[(seed + salt * 2654435761) % options.length];
+	}
+	function makeStyle(archetype, seed, departmentStyle, zone) {
+		const base = hashNumber(`${archetype}|${seed}|${departmentStyle}`);
+		return {
+			archetype,
+			palette: pick(PALETTES, base, 1),
+			floor: pick(FLOOR_SLUGS, base, 2),
+			wall: pick(WALL_SLUGS, base, 3),
+			rug: "rug_plain_grey",
+			furniture_set: `${archetype}_desks`,
+			lighting: pick(LIGHTING, base, 4),
+			signage: `sign-${archetype}`,
+			shadow: "shadowless",
+			seed,
+			style_version: 1,
+			department_style: departmentStyle,
+			zone: zone ?? archetype
+		};
+	}
+	function buildCells(roomId, desks, kind) {
+		const cells = [];
+		let remaining = Math.max(0, desks);
+		let index = 0;
+		let seatCounter = 0;
+		while (remaining > 0) {
+			const count = Math.min(6, remaining);
+			const cellId = `${roomId}:c${index}`;
+			const rows = [];
+			for (let slot = 0; slot < count; slot += 1) {
+				const [x, y] = CELL_DESK_SLOTS[slot];
+				rows.push({
+					desk_id: `${cellId}:d${slot}`,
+					seat_id: `${cellId}:s${seatCounter}`,
+					x,
+					y,
+					w: 2,
+					h: 1
+				});
+				seatCounter += 1;
+			}
+			cells.push({
+				cell_id: cellId,
+				index,
+				cols: 16,
+				rows: 12,
+				desks: rows
+			});
+			remaining -= count;
+			index += 1;
+		}
+		if (!cells.length) cells.push({
+			cell_id: `${roomId}:c0`,
+			index: 0,
+			cols: 16,
+			rows: 12,
+			desks: []
+		});
+		return cells;
+	}
+	var SAMPLE_ROOMS = [
+		{
+			room_id: "rec-1",
+			name: "Reception",
+			kind: "reception",
+			archetype: "reception",
+			desks: 2
+		},
+		{
+			room_id: "work-1",
+			name: "Open Office",
+			kind: "work",
+			archetype: "open_office",
+			desks: 6
+		},
+		{
+			room_id: "meet-1",
+			name: "Boardroom",
+			kind: "meeting",
+			archetype: "meeting",
+			desks: 2
+		},
+		{
+			room_id: "focus-1",
+			name: "Focus Room",
+			kind: "focus",
+			archetype: "wellness",
+			desks: 1
+		},
+		{
+			room_id: "head-1",
+			name: "Head Office",
+			kind: "head_office",
+			archetype: "executive",
+			desks: 1
+		},
+		{
+			room_id: "kitchen-1",
+			name: "Kitchen",
+			kind: "kitchen",
+			archetype: "kitchen",
+			desks: 1
+		},
+		{
+			room_id: "rest-1",
+			name: "Restroom",
+			kind: "restroom",
+			archetype: "wellness",
+			desks: 1
+		},
+		{
+			room_id: "lounge-1",
+			name: "Lounge",
+			kind: "lounge",
+			archetype: "wellness",
+			desks: 1
+		},
+		{
+			room_id: "store-1",
+			name: "Storage",
+			kind: "storage",
+			archetype: "fulfillment",
+			desks: 1
+		},
+		{
+			room_id: "comms-1",
+			name: "Comms / Ops",
+			kind: "comms",
+			archetype: "control_room",
+			desks: 1
+		}
+	];
+	function roomFactory(seed, floorId, departmentStyle) {
+		const cells = buildCells(seed.room_id, seed.desks, seed.kind);
+		return {
+			room_id: seed.room_id,
+			floor_id: floorId,
+			name: seed.name,
+			kind: seed.kind,
+			archetype: seed.archetype,
+			capacity: seed.desks,
+			style: makeStyle(seed.archetype, hashNumber(`${floorId}|${seed.room_id}`) % 1e6, departmentStyle, seed.kind),
+			assignment: emptyAssignment(),
+			assets: [{
+				asset_id: `style:${seed.kind}`,
+				kind: "recipe",
+				ref: `recipes/${seed.kind}`,
+				paid: false
+			}],
+			cells
+		};
+	}
+	function rebuildPortals(floors, rooms, _portals) {
+		const portals = [];
+		const ordered = floors.slice().sort((a, b) => a.index - b.index);
+		const entries = [];
+		const newFloors = [];
+		for (const floor of ordered) {
+			const ids = rooms.filter((room) => room.floor_id === floor.floor_id).map((room) => room.room_id);
+			const entry = ids.includes(floor.entry_room_id) ? floor.entry_room_id : ids[0] ?? "";
+			newFloors.push({
+				...floor,
+				room_ids: ids,
+				entry_room_id: entry
+			});
+			if (!ids.length) continue;
+			entries.push({
+				floor_id: floor.floor_id,
+				entry
+			});
+			ids.forEach((roomId, index) => {
+				if (roomId === entry) return;
+				portals.push({
+					portal_id: `p:${floor.floor_id}:${entry}->${roomId}`,
+					floor_id: floor.floor_id,
+					source_room_id: entry,
+					target_room_id: roomId,
+					kind: "door",
+					x: index * 3 % 16,
+					y: 11
+				});
+			});
+		}
+		for (let i = 1; i < entries.length; i += 1) {
+			const current = entries[i];
+			const previous = entries[i - 1];
+			if (!current.entry || !previous.entry) continue;
+			portals.push({
+				portal_id: `p:${current.floor_id}:elevator->${previous.entry}`,
+				floor_id: current.floor_id,
+				source_room_id: current.entry,
+				target_room_id: previous.entry,
+				kind: "elevator",
+				x: 1,
+				y: 1
+			});
+		}
+		return {
+			floors: newFloors,
+			portals
+		};
+	}
+	function createSampleState() {
+		const floorId = "floor-001";
+		const departmentStyle = "operations";
+		const rooms = SAMPLE_ROOMS.map((seed) => roomFactory(seed, floorId, departmentStyle));
+		const { floors: builtFloors, portals } = rebuildPortals([{
+			floor_id: floorId,
+			index: 1,
+			wing: "central",
+			name: "Operations",
+			entry_room_id: "rec-1",
+			room_ids: rooms.map((room) => room.room_id),
+			department_style: departmentStyle,
+			activation_state: "active"
+		}], rooms, []);
+		const state = {
+			map_id: "sample-map",
+			floors: builtFloors,
+			rooms,
+			portals,
+			status: "draft",
+			draft_revision: 0,
+			history: [],
+			future: [],
+			problems: [],
+			approved_by: null,
+			published_version: null,
+			versions: {},
+			last_action: "sample"
+		};
+		state.problems = validateState(state);
+		return state;
+	}
+	function createBuilderState(input) {
+		if (!input || !Array.isArray(input.rooms) || !input.rooms.length) return createSampleState();
+		const state = {
+			map_id: String(input.map_id ?? "sample-map"),
+			floors: (input.floors ?? []).map((floor) => ({
+				floor_id: String(floor.floor_id),
+				index: Number(floor.index ?? 1),
+				wing: String(floor.wing ?? "central"),
+				name: String(floor.name ?? floor.floor_id),
+				entry_room_id: String(floor.entry_room_id ?? ""),
+				room_ids: Array.isArray(floor.room_ids) ? floor.room_ids.slice() : [],
+				department_style: String(floor.department_style ?? "operations"),
+				activation_state: floor.activation_state === "active" ? "active" : "dormant"
+			})),
+			rooms: input.rooms.map(cloneRoom),
+			portals: (input.portals ?? []).map((portal) => ({ ...portal })),
+			status: input.status ?? "draft",
+			draft_revision: Number(input.draft_revision ?? 0),
+			history: [],
+			future: [],
+			problems: [],
+			approved_by: input.approved_by ?? null,
+			published_version: input.published_version ?? null,
+			versions: Object.fromEntries(Object.entries(input.versions ?? {}).map(([version, snap]) => [version, snapshot(snap)])),
+			last_action: String(input.last_action ?? "load")
+		};
+		state.problems = validateState(state);
+		return state;
+	}
+	function cloneRoom(room) {
+		return {
+			...room,
+			style: { ...room.style },
+			assignment: {
+				...room.assignment,
+				role_ids: (room.assignment.role_ids ?? []).slice(),
+				agent_ids: (room.assignment.agent_ids ?? []).slice()
+			},
+			assets: (room.assets ?? []).map((asset) => ({ ...asset })),
+			cells: (room.cells ?? []).map((cell) => ({
+				...cell,
+				desks: (cell.desks ?? []).map((desk) => ({ ...desk }))
+			}))
+		};
+	}
+	function snapshot(source) {
+		return {
+			floors: source.floors.map((floor) => ({
+				...floor,
+				room_ids: floor.room_ids.slice()
+			})),
+			rooms: source.rooms.map(cloneRoom),
+			portals: source.portals.map((portal) => ({ ...portal })),
+			status: source.status
+		};
+	}
+	function commit(previous, next, action) {
+		return finalise({
+			...next,
+			history: [...previous.history, snapshot(previous)].slice(-50),
+			future: [],
+			draft_revision: previous.draft_revision + 1,
+			status: "draft",
+			approved_by: null
+		}, action);
+	}
+	function withPortals(state, rooms) {
+		const rebuilt = rebuildPortals(state.floors, rooms, state.portals);
+		return {
+			...state,
+			floors: rebuilt.floors,
+			rooms,
+			portals: rebuilt.portals
+		};
+	}
+	function floorOf(state, floorId) {
+		const floor = state.floors.find((row) => row.floor_id === floorId);
+		if (!floor) throw new Error(`unknown floor ${floorId}`);
+		return floor;
+	}
+	function roomOf(state, roomId) {
+		const room = state.rooms.find((row) => row.room_id === roomId);
+		if (!room) throw new Error(`unknown room ${roomId}`);
+		return room;
+	}
+	function addRoom(state, input) {
+		floorOf(state, input.floor_id);
+		if (state.rooms.some((room) => room.room_id === input.room_id)) throw new Error(`room ${input.room_id} already exists`);
+		if (!TOKEN_RE.test(input.room_id)) throw new Error(`invalid room id ${input.room_id}`);
+		const desks = Math.max(1, Math.trunc(input.desks ?? 6));
+		const archetype = input.archetype ?? archetypeFor(input.kind);
+		const departmentStyle = floorOf(state, input.floor_id).department_style;
+		const room = {
+			room_id: input.room_id,
+			floor_id: input.floor_id,
+			name: input.name,
+			kind: input.kind,
+			archetype,
+			capacity: desks,
+			style: {
+				...makeStyle(archetype, hashNumber(`${input.floor_id}|${input.room_id}`) % 1e6, departmentStyle, input.kind),
+				...input.style ?? {}
+			},
+			assignment: {
+				...emptyAssignment(),
+				...input.assignment ?? {}
+			},
+			assets: [{
+				asset_id: `style:${input.kind}`,
+				kind: "recipe",
+				ref: `recipes/${input.kind}`,
+				paid: false
+			}],
+			cells: buildCells(input.room_id, desks, input.kind)
+		};
+		return commit(state, withPortals(state, [...state.rooms, room]), "add_room");
+	}
+	function removeRoom(state, roomId) {
+		roomOf(state, roomId);
+		return commit(state, withPortals(state, state.rooms.filter((room) => room.room_id !== roomId)), "remove_room");
+	}
+	function addCell(state, roomId, desks = 6) {
+		if (desks < 0 || desks > 6) throw new Error(`a cell holds 0..6 desks`);
+		const room = roomOf(state, roomId);
+		const index = Math.max(-1, ...room.cells.map((cell) => cell.index)) + 1;
+		const cellId = `${roomId}:c${index}`;
+		const cellDesks = [];
+		for (let slot = 0; slot < desks; slot += 1) {
+			const [x, y] = CELL_DESK_SLOTS[slot];
+			cellDesks.push({
+				desk_id: `${cellId}:d${slot}`,
+				seat_id: `${cellId}:s${slot}`,
+				x,
+				y,
+				w: 2,
+				h: 1
+			});
+		}
+		const cell = {
+			cell_id: cellId,
+			index,
+			cols: 16,
+			rows: 12,
+			desks: cellDesks
+		};
+		const rooms = state.rooms.map((row) => row.room_id === roomId ? {
+			...row,
+			cells: [...row.cells, cell],
+			capacity: row.capacity + cell.desks.length
+		} : row);
+		return commit(state, {
+			...state,
+			rooms
+		}, "add_cell");
+	}
+	function removeCell(state, roomId, cellId) {
+		const cell = roomOf(state, roomId).cells.find((row) => row.cell_id === cellId);
+		if (!cell) throw new Error(`unknown cell ${cellId}`);
+		const removed = cell.desks.length;
+		const rooms = state.rooms.map((row) => row.room_id === roomId ? {
+			...row,
+			cells: row.cells.filter((item) => item.cell_id !== cellId),
+			capacity: row.capacity - removed
+		} : row);
+		return commit(state, {
+			...state,
+			rooms
+		}, "remove_cell");
+	}
+	function addDesk(state, roomId, cellId) {
+		const room = roomOf(state, roomId);
+		let target = cellId ? room.cells.find((cell) => cell.cell_id === cellId) : room.cells.find((cell) => cell.desks.length < 6);
+		if (!target) return finalise(addCell(state, roomId, 1), "add_desk");
+		if (target.desks.length >= 6) throw new Error(`cell ${target.cell_id} is full`);
+		const used = new Set(target.desks.map((desk) => `${desk.x},${desk.y}`));
+		const slot = CELL_DESK_SLOTS.findIndex(([x, y]) => !used.has(`${x},${y}`));
+		if (slot < 0) throw new Error(`cell ${target.cell_id} has no free slot`);
+		const [x, y] = CELL_DESK_SLOTS[slot];
+		const seatNumber = target.desks.length;
+		const desk = {
+			desk_id: `${target.cell_id}:d${slot}`,
+			seat_id: `${target.cell_id}:s${seatNumber}`,
+			x,
+			y,
+			w: 2,
+			h: 1
+		};
+		const rooms = state.rooms.map((row) => {
+			if (row.room_id !== roomId) return row;
+			return {
+				...row,
+				capacity: row.capacity + 1,
+				cells: row.cells.map((cell) => cell.cell_id === target.cell_id ? {
+					...cell,
+					desks: [...cell.desks, desk]
+				} : cell)
+			};
+		});
+		return commit(state, {
+			...state,
+			rooms
+		}, "add_desk");
+	}
+	function removeDesk(state, deskId) {
+		let roomId = "";
+		let cellId = "";
+		for (const room of state.rooms) for (const cell of room.cells) if (cell.desks.some((desk) => desk.desk_id === deskId)) {
+			roomId = room.room_id;
+			cellId = cell.cell_id;
+		}
+		if (!roomId) throw new Error(`unknown desk ${deskId}`);
+		const rooms = state.rooms.map((room) => {
+			if (room.room_id !== roomId) return room;
+			return {
+				...room,
+				capacity: room.capacity - 1,
+				cells: room.cells.map((cell) => cell.cell_id === cellId ? {
+					...cell,
+					desks: cell.desks.filter((desk) => desk.desk_id !== deskId)
+				} : cell)
+			};
+		});
+		return commit(state, {
+			...state,
+			rooms
+		}, "remove_desk");
+	}
+	function setRoomStyle(state, roomId, patch) {
+		const room = roomOf(state, roomId);
+		const style = {
+			...room.style,
+			...patch
+		};
+		if (style.archetype && !ARCHETYPES.includes(style.archetype)) style.archetype = room.style.archetype;
+		if (style.palette && !PALETTES.includes(style.palette)) style.palette = room.style.palette;
+		if (!Number.isFinite(style.seed) || style.seed < 0) style.seed = room.style.seed;
+		const rooms = state.rooms.map((row) => row.room_id === roomId ? {
+			...row,
+			style
+		} : row);
+		return commit(state, {
+			...state,
+			rooms
+		}, "set_room_style");
+	}
+	function setDepartmentStyle(state, floorId, signature) {
+		if (!SLUG_RE.test(signature)) throw new Error(`invalid department style ${signature}`);
+		const floors = state.floors.map((floor) => floor.floor_id === floorId ? {
+			...floor,
+			department_style: signature
+		} : floor);
+		const rooms = state.rooms.map((room) => room.floor_id === floorId ? {
+			...room,
+			style: {
+				...room.style,
+				department_style: signature
+			}
+		} : room);
+		return commit(state, {
+			...state,
+			floors,
+			rooms
+		}, "set_department_style");
+	}
+	function assignRoom(state, roomId, assignment) {
+		const room = roomOf(state, roomId);
+		const merged = {
+			...room.assignment,
+			...assignment,
+			role_ids: assignment.role_ids ?? room.assignment.role_ids,
+			agent_ids: assignment.agent_ids ?? room.assignment.agent_ids
+		};
+		const rooms = state.rooms.map((row) => row.room_id === roomId ? {
+			...row,
+			assignment: merged
+		} : row);
+		return commit(state, {
+			...state,
+			rooms
+		}, "assign_room");
+	}
+	function cloneDepartment(state, sourceFloorId, newFloorId, newName) {
+		if (state.floors.some((floor) => floor.floor_id === newFloorId)) throw new Error(`floor ${newFloorId} already exists`);
+		floorOf(state, sourceFloorId);
+		const floor = {
+			floor_id: newFloorId,
+			index: Math.max(0, ...state.floors.map((floor) => floor.index)) + 1,
+			wing: floorOf(state, sourceFloorId).wing,
+			name: newName ?? `${floorOf(state, sourceFloorId).name} copy`,
+			entry_room_id: "",
+			room_ids: [],
+			department_style: `${floorOf(state, sourceFloorId).department_style}.${newFloorId}`,
+			activation_state: "dormant"
+		};
+		const clones = state.rooms.filter((room) => room.floor_id === sourceFloorId).map((room) => {
+			const newRoomId = `${newFloorId}:${room.room_id}`;
+			return cloneRoom({
+				...room,
+				room_id: newRoomId,
+				floor_id: newFloorId,
+				style: {
+					...room.style,
+					department_style: floor.department_style
+				},
+				cells: buildCells(newRoomId, Math.max(1, room.capacity), room.kind)
+			});
+		});
+		return commit(state, withPortals({
+			...state,
+			floors: [...state.floors, floor]
+		}, [...state.rooms, ...clones]), "clone_department");
+	}
+	function mergeDepartments(state, floorIds, targetFloorId) {
+		if (!floorIds.includes(targetFloorId)) throw new Error("target floor must be one of the merged floors");
+		for (const floorId of floorIds) floorOf(state, floorId);
+		const target = floorOf(state, targetFloorId);
+		const rooms = state.rooms.map((room) => room.floor_id === targetFloorId ? room : floorIds.includes(room.floor_id) ? {
+			...room,
+			floor_id: targetFloorId,
+			style: {
+				...room.style,
+				department_style: target.department_style
+			}
+		} : room);
+		const floors = state.floors.filter((floor) => !floorIds.includes(floor.floor_id) || floor.floor_id === targetFloorId);
+		return commit(state, withPortals({
+			...state,
+			floors,
+			rooms
+		}, rooms), "merge_departments");
+	}
+	function splitDepartment(state, sourceFloorId, newFloorId, roomIds) {
+		if (state.floors.some((floor) => floor.floor_id === newFloorId)) throw new Error(`floor ${newFloorId} already exists`);
+		const source = floorOf(state, sourceFloorId);
+		const sourceIds = state.rooms.filter((room) => room.floor_id === sourceFloorId).map((room) => room.room_id);
+		if (!roomIds.length || !roomIds.every((id) => sourceIds.includes(id))) throw new Error("split rooms must belong to the source floor");
+		if (roomIds.length === sourceIds.length) throw new Error("split would leave the source floor empty");
+		const newFloor = {
+			floor_id: newFloorId,
+			index: Math.max(0, ...state.floors.map((floor) => floor.index)) + 1,
+			wing: source.wing,
+			name: `${source.name} split`,
+			entry_room_id: "",
+			room_ids: [],
+			department_style: `${source.department_style}.${newFloorId}`,
+			activation_state: "dormant"
+		};
+		const rooms = state.rooms.map((room) => roomIds.includes(room.room_id) ? {
+			...room,
+			floor_id: newFloorId,
+			style: {
+				...room.style,
+				department_style: newFloor.department_style
+			}
+		} : room);
+		return commit(state, withPortals({
+			...state,
+			floors: [...state.floors, newFloor]
+		}, rooms), "split_department");
+	}
+	function undo(state) {
+		if (!state.history.length) return state;
+		const history = state.history.slice();
+		const previous = history.pop();
+		return finalise({
+			...state,
+			...snapshot(previous),
+			history,
+			future: [snapshot(state), ...state.future].slice(0, 50),
+			draft_revision: state.draft_revision + 1,
+			approved_by: null,
+			last_action: "undo"
+		}, "undo");
+	}
+	function redo(state) {
+		if (!state.future.length) return state;
+		const [next, ...rest] = state.future;
+		return finalise({
+			...state,
+			...snapshot(next),
+			history: [...state.history, snapshot(state)].slice(-50),
+			future: rest,
+			draft_revision: state.draft_revision + 1,
+			approved_by: null,
+			last_action: "redo"
+		}, "redo");
+	}
+	function approveState(state) {
+		const problems = validateState(state);
+		if (problems.length) return finalise({
+			...state,
+			problems
+		}, "approve_refused");
+		return finalise({
+			...state,
+			status: "approved",
+			approved_by: "owner",
+			last_action: "approve"
+		}, "approve");
+	}
+	async function publishState(state, options = {}) {
+		const problems = validateState(state);
+		if (problems.length) return {
+			state: finalise({
+				...state,
+				problems
+			}, "publish_refused"),
+			result: {
+				kind: "error",
+				problems
+			}
+		};
+		if (options.onPublish) {
+			const answer = await options.onPublish(state);
+			if (!answer.ok) {
+				const detail = answer.problems ?? ["publish refused"];
+				return {
+					state: finalise({
+						...state,
+						problems: detail
+					}, "publish_refused"),
+					result: {
+						kind: "error",
+						problems: detail
+					}
+				};
+			}
+			const version = answer.version ?? (state.published_version ?? 0) + 1;
+			return {
+				state: finalise({
+					...state,
+					status: "published",
+					published_version: version,
+					versions: {
+						...state.versions,
+						[version]: snapshot(state)
+					},
+					approved_by: null,
+					last_action: "publish"
+				}, "publish"),
+				result: {
+					kind: "published",
+					version,
+					digest: digestState(state)
+				}
+			};
+		}
+		const version = (state.published_version ?? 0) + 1;
+		return {
+			state: finalise({
+				...state,
+				status: "published",
+				published_version: version,
+				versions: {
+					...state.versions,
+					[version]: snapshot(state)
+				},
+				approved_by: null,
+				last_action: "publish"
+			}, "publish"),
+			result: {
+				kind: "published",
+				version,
+				digest: digestState(state)
+			}
+		};
+	}
+	function rollbackState(state, version) {
+		const target = state.versions[version];
+		if (!target) return finalise({
+			...state,
+			problems: [`cannot roll back to version ${version}`]
+		}, "rollback_refused");
+		return finalise({
+			...state,
+			...snapshot(target),
+			status: "rolled_back",
+			history: [...state.history, snapshot(state)].slice(-50),
+			future: [],
+			draft_revision: state.draft_revision + 1,
+			approved_by: null,
+			last_action: "rollback"
+		}, "rollback");
+	}
+	function previewState(state) {
+		const problems = validateState(state);
+		const cells = state.rooms.reduce((sum, room) => sum + room.cells.length, 0);
+		const desks = state.rooms.reduce((sum, room) => sum + room.capacity, 0);
+		return {
+			valid: problems.length === 0,
+			problems,
+			counts: {
+				floors: state.floors.length,
+				rooms: state.rooms.length,
+				cells,
+				desks,
+				portals: state.portals.length
+			},
+			capacity: desks,
+			egress: state.portals.length,
+			digest: digestState(state)
+		};
+	}
+	function digestState(state) {
+		const payload = JSON.stringify({
+			floors: state.floors,
+			rooms: state.rooms,
+			portals: state.portals
+		});
+		let hash = 2166136261;
+		for (let i = 0; i < payload.length; i += 1) {
+			hash ^= payload.charCodeAt(i);
+			hash = Math.imul(hash, 16777619) >>> 0;
+		}
+		return hash.toString(16).padStart(8, "0");
+	}
+	function overlaps(a, b) {
+		return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+	}
+	function validateState(state) {
+		const problems = [];
+		if (!state.floors.length) problems.push("SAMPLE: map has no floors");
+		const floorIds = new Set(state.floors.map((floor) => floor.floor_id));
+		const roomIds = /* @__PURE__ */ new Set();
+		for (const room of state.rooms) {
+			if (roomIds.has(room.room_id)) problems.push(`room '${room.room_id}': duplicate id`);
+			roomIds.add(room.room_id);
+			if (!floorIds.has(room.floor_id)) problems.push(`room '${room.room_id}': unknown floor '${room.floor_id}'`);
+			if (room.capacity !== room.cells.reduce((n, c) => n + c.desks.length, 0)) problems.push(`room '${room.room_id}': capacity ${room.capacity} does not match desks`);
+			const styleProblems = validateStyle(room.style);
+			problems.push(...styleProblems.map((item) => `room '${room.room_id}': ${item}`));
+			for (const asset of room.assets) {
+				const ref = String(asset.ref).toLowerCase();
+				if (asset.paid) problems.push(`room '${room.room_id}' asset '${asset.asset_id}': paid art may not be embedded`);
+				if (RAW_ART_SUFFIXES.some((suffix) => ref.endsWith(suffix))) problems.push(`room '${room.room_id}' asset '${asset.asset_id}': raw sprite sheets are not embedded`);
+				if (ref.includes("limezu") && asset.kind !== "recipe") problems.push(`room '${room.room_id}' asset '${asset.asset_id}': references a paid art pack`);
+			}
+			const rects = [];
+			for (const cell of room.cells) {
+				if (cell.cols !== 16 || cell.rows !== 12) problems.push(`cell '${cell.cell_id}': ${cell.cols}x${cell.rows} is not the 16x12 contract`);
+				if (cell.desks.length > 6) problems.push(`cell '${cell.cell_id}': CELL_OVER_CAPACITY (${cell.desks.length} > 6)`);
+				const cellRect = {
+					x: cell.index * 18,
+					y: 0,
+					w: 16,
+					h: 12
+				};
+				if (rects.some((other) => overlaps(cellRect, other))) problems.push(`room '${room.room_id}': CELL_COLLISION at cell '${cell.cell_id}'`);
+				rects.push(cellRect);
+				const deskRects = [];
+				for (const desk of cell.desks) {
+					if (desk.x < 0 || desk.y < 0 || desk.x + desk.w > cell.cols || desk.y + desk.h > cell.rows) problems.push(`cell '${cell.cell_id}': desk '${desk.desk_id}' outside the cell`);
+					if (deskRects.some((other) => overlaps(desk, other))) problems.push(`cell '${cell.cell_id}': DESK_COLLISION at desk '${desk.desk_id}'`);
+					deskRects.push(desk);
+				}
+			}
+			problems.push(...validateAssignment(room));
+		}
+		for (const floor of state.floors) {
+			const floorRooms = state.rooms.filter((room) => room.floor_id === floor.floor_id);
+			if (floorRooms.length && !floorRooms.some((room) => room.room_id === floor.entry_room_id)) problems.push(`floor '${floor.floor_id}': entry room is not on the floor`);
+			const present = /* @__PURE__ */ new Set();
+			for (const room of floorRooms) {
+				present.add(room.kind);
+				present.add(room.style.archetype);
+				present.add(room.style.zone);
+			}
+			for (const zone of DEPARTMENT_ZONES) if (!(ZONE_ALIASES[zone] ?? [zone]).some((alias) => present.has(alias))) problems.push(`floor '${floor.floor_id}': MISSING_REQUIRED_ROOM '${zone}'`);
+		}
+		const entries = /* @__PURE__ */ new Map();
+		for (const floor of state.floors) {
+			const rooms = state.rooms.filter((room) => room.floor_id === floor.floor_id);
+			if (!rooms.length) continue;
+			const entry = rooms.some((room) => room.room_id === floor.entry_room_id) ? floor.entry_room_id : rooms[0].room_id;
+			entries.set(floor.floor_id, entry);
+			const adjacency = /* @__PURE__ */ new Map();
+			for (const room of rooms) adjacency.set(room.room_id, /* @__PURE__ */ new Set());
+			for (const portal of state.portals) {
+				if (portal.floor_id !== floor.floor_id) continue;
+				adjacency.get(portal.source_room_id)?.add(portal.target_room_id);
+				adjacency.get(portal.target_room_id)?.add(portal.source_room_id);
+			}
+			const seen = /* @__PURE__ */ new Set([entry]);
+			const queue = [entry];
+			while (queue.length) {
+				const current = queue.pop();
+				for (const next of adjacency.get(current) ?? []) if (!seen.has(next)) {
+					seen.add(next);
+					queue.push(next);
+				}
+			}
+			for (const room of rooms) {
+				if (room.room_id !== entry && !seen.has(room.room_id)) problems.push(`floor '${floor.floor_id}': unreachable room '${room.room_id}'`);
+				if (!state.portals.filter((portal) => portal.source_room_id === room.room_id || portal.target_room_id === room.room_id).length) problems.push(`room '${room.room_id}': MISSING_DOOR (no door or portal)`);
+			}
+		}
+		const signatures = /* @__PURE__ */ new Map();
+		for (const floor of state.floors) {
+			const floorRooms = state.rooms.filter((room) => room.floor_id === floor.floor_id);
+			if (!floorRooms.length) continue;
+			const styles = new Set(floorRooms.map((room) => room.style.department_style));
+			if (styles.size > 1) {
+				problems.push(`floor '${floor.floor_id}': MIXED_DEPARTMENT_STYLE ${JSON.stringify([...styles].sort())}`);
+				continue;
+			}
+			const signature = [...styles][0];
+			if (signatures.has(signature)) problems.push(`STYLE_COLLISION: floors '${signatures.get(signature)}' and '${floor.floor_id}' both use '${signature}'`);
+			else signatures.set(signature, floor.floor_id);
+		}
+		return [...new Set(problems)];
+	}
+	function validateStyle(style) {
+		const problems = [];
+		if (!ARCHETYPES.includes(style.archetype)) problems.push(`unknown archetype '${style.archetype}'`);
+		if (!PALETTES.includes(style.palette)) problems.push(`unknown palette '${style.palette}'`);
+		for (const [label, value] of [
+			["floor", style.floor],
+			["wall", style.wall],
+			["rug", style.rug],
+			["furniture_set", style.furniture_set],
+			["lighting", style.lighting],
+			["signage", style.signage],
+			["department_style", style.department_style],
+			["zone", style.zone]
+		]) if (!SLUG_RE.test(String(value))) problems.push(`${label} must be a slug, got '${value}'`);
+		if (!Number.isInteger(style.seed) || style.seed < 0) problems.push("seed must be a non-negative int");
+		if (!Number.isInteger(style.style_version) || style.style_version < 1) problems.push("style_version must be >= 1");
+		return problems;
+	}
+	function validateAssignment(room) {
+		const problems = [];
+		const assignment = room.assignment;
+		for (const [label, value] of [
+			["business_id", assignment.business_id],
+			["department_id", assignment.department_id],
+			["capability_manifest_id", assignment.capability_manifest_id],
+			["memory_scope", assignment.memory_scope]
+		]) if (value && !TOKEN_RE.test(value)) problems.push(`room '${room.room_id}': assignment.${label} is not a valid token`);
+		for (const [label, values] of [["role_ids", assignment.role_ids], ["agent_ids", assignment.agent_ids]]) {
+			const seen = /* @__PURE__ */ new Set();
+			for (const value of values) {
+				if (!TOKEN_RE.test(value)) problems.push(`room '${room.room_id}': assignment.${label} has invalid value '${value}'`);
+				if (seen.has(value)) problems.push(`room '${room.room_id}': assignment.${label} repeats '${value}'`);
+				seen.add(value);
+			}
+		}
+		return problems;
+	}
+	function archetypeFor(kind) {
+		return {
+			reception: "reception",
+			work: "open_office",
+			meeting: "meeting",
+			focus: "wellness",
+			head_office: "executive",
+			kitchen: "kitchen",
+			restroom: "wellness",
+			lounge: "wellness",
+			storage: "fulfillment",
+			comms: "control_room",
+			server_ops: "server_ops"
+		}[kind] ?? "open_office";
+	}
+	function finalise(state, action) {
+		const problems = validateState(state);
+		return {
+			...state,
+			problems,
+			last_action: action
+		};
+	}
+	function liveText(state) {
+		const preview = previewState(state);
+		return `Draft revision ${state.draft_revision}; ${state.status}; ${preview.counts.floors} floors, ${preview.counts.rooms} rooms, ${preview.counts.desks} desks; ${preview.problems.length} problems; last action ${state.last_action}`;
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/RoomBuilder.tsx
+	function messageOf(err) {
+		return err instanceof Error ? err.message : String(err);
+	}
+	function createRoomBuilder(R, hooks) {
+		const { useState } = hooks;
+		return function RoomBuilder(props) {
+			const [state, setState] = useState(createBuilderState(props.initialState));
+			const [selectedRoomId, setSelectedRoomId] = useState(state.rooms[0]?.room_id ?? null);
+			const [editError, setEditError] = useState("");
+			const [publish, setPublish] = useState({ kind: "idle" });
+			const [previewOpen, setPreviewOpen] = useState(false);
+			const [newFloorId, setNewFloorId] = useState(state.floors[0]?.floor_id ?? "floor-001");
+			const [newRoomId, setNewRoomId] = useState("extra-1");
+			const [newRoomName, setNewRoomName] = useState("Extra Room");
+			const [newRoomKind, setNewRoomKind] = useState("storage");
+			const [newRoomDesks, setNewRoomDesks] = useState("2");
+			const [assignBusiness, setAssignBusiness] = useState("");
+			const [assignDepartment, setAssignDepartment] = useState("");
+			const [assignRoles, setAssignRoles] = useState("");
+			const [assignAgents, setAssignAgents] = useState("");
+			const [assignCapability, setAssignCapability] = useState("");
+			const [assignMemory, setAssignMemory] = useState("");
+			const [departmentStyle, setDepartmentStyleValue] = useState(state.floors[0]?.department_style ?? "operations");
+			const room = selectedRoomId ? state.rooms.find((row) => row.room_id === selectedRoomId) ?? null : null;
+			const preview = previewState(state);
+			const edit = (fn) => {
+				try {
+					const next = fn(state);
+					setState(next);
+					setEditError("");
+					setPublish({ kind: "idle" });
+				} catch (err) {
+					setEditError(messageOf(err));
+				}
+			};
+			const selectRoom = (roomId) => {
+				setSelectedRoomId(roomId);
+				const found = state.rooms.find((row) => row.room_id === roomId);
+				if (found) {
+					setAssignBusiness(found.assignment.business_id);
+					setAssignDepartment(found.assignment.department_id);
+					setAssignRoles(found.assignment.role_ids.join(", "));
+					setAssignAgents(found.assignment.agent_ids.join(", "));
+					setAssignCapability(found.assignment.capability_manifest_id);
+					setAssignMemory(found.assignment.memory_scope);
+					setDepartmentStyleValue(found.style.department_style);
+				}
+			};
+			const onKeyDown = (event) => {
+				const key = String(event.key || "").toLowerCase();
+				if (!Boolean(event.ctrlKey || event.metaKey)) return;
+				if (key === "z") {
+					event.preventDefault?.();
+					edit(event.shiftKey ? redo : undo);
+				} else if (key === "y") {
+					event.preventDefault?.();
+					edit(redo);
+				}
+			};
+			const onPublishClick = () => {
+				setPublish({ kind: "publishing" });
+				publishState(state, { onPublish: props.onPublish }).then(({ state: next, result }) => {
+					setState(next);
+					if (result.kind === "published") setPublish({
+						kind: "published",
+						version: result.version
+					});
+					else setPublish({
+						kind: "error",
+						problems: result.problems
+					});
+				}).catch((err) => {
+					setPublish({
+						kind: "error",
+						problems: [messageOf(err)]
+					});
+				});
+			};
+			const onRollbackClick = () => {
+				if (state.published_version === null) return;
+				const version = state.published_version;
+				edit((current) => rollbackState(current, version));
+				props.onRollback?.(version);
+			};
+			const styleSelect = (label, value, options, testId, onPick) => R.createElement("label", {
+				key: `label-${testId}`,
+				className: "room-builder__field"
+			}, [R.createElement("span", { key: "text" }, label), R.createElement("select", {
+				key: "select",
+				"data-testid": testId,
+				"aria-label": label,
+				value,
+				onChange: (event) => onPick(event.target.value)
+			}, options.map((option) => R.createElement("option", {
+				key: option,
+				value: option
+			}, option)))]);
+			const field = (label, value, testId, onChange) => R.createElement("label", {
+				key: `label-${testId}`,
+				className: "room-builder__field"
+			}, [R.createElement("span", { key: "text" }, label), R.createElement("input", {
+				key: "input",
+				type: "text",
+				"data-testid": testId,
+				"aria-label": label,
+				value,
+				onChange: (event) => onChange(event.target.value)
+			})]);
+			const roomButton = (row) => R.createElement("button", {
+				key: row.room_id,
+				type: "button",
+				"data-testid": "room-builder-room",
+				"data-room": row.room_id,
+				"aria-pressed": selectedRoomId === row.room_id,
+				"aria-label": `Select room ${row.name} (${row.room_id})`,
+				onClick: () => selectRoom(row.room_id)
+			}, `${row.name} · ${row.kind} · ${row.capacity} desks`);
+			const cellRow = (cell) => R.createElement("li", {
+				key: cell.cell_id,
+				"data-testid": "room-builder-cell",
+				"data-cell": cell.cell_id
+			}, [R.createElement("span", { key: "label" }, `${cell.cell_id} · ${cell.cols}x${cell.rows} · ${cell.desks.length} desks`), R.createElement("button", {
+				key: "remove",
+				type: "button",
+				"data-testid": "room-builder-remove-cell",
+				"data-cell": cell.cell_id,
+				"aria-label": `Remove cell ${cell.cell_id}`,
+				disabled: !room || room.cells.length <= 1,
+				onClick: () => room && edit((current) => removeCell(current, room.room_id, cell.cell_id))
+			}, "Remove cell")]);
+			const deskRow = (cellId, desk) => R.createElement("li", {
+				key: desk.desk_id,
+				"data-testid": "room-builder-desk",
+				"data-desk": desk.desk_id
+			}, [R.createElement("span", { key: "label" }, `${desk.desk_id} (${desk.x},${desk.y}) ${desk.w}x${desk.h}`), R.createElement("button", {
+				key: "remove",
+				type: "button",
+				"data-testid": "room-builder-remove-desk",
+				"data-desk": desk.desk_id,
+				"aria-label": `Remove desk ${desk.desk_id}`,
+				onClick: () => edit((current) => removeDesk(current, desk.desk_id))
+			}, "Remove desk")]);
+			const problems = state.problems.length ? state.problems : preview.problems;
+			const problemsBlock = R.createElement("div", {
+				key: "problems",
+				"data-testid": "room-builder-problems",
+				className: "room-builder__problems",
+				role: problems.length ? "alert" : "status",
+				"aria-live": "polite"
+			}, problems.length ? [R.createElement("strong", { key: "title" }, `${problems.length} validation problem(s)`), R.createElement("ul", { key: "list" }, problems.map((problem, index) => R.createElement("li", {
+				key: `${index}-${problem}`,
+				"data-testid": "room-builder-problem"
+			}, problem)))] : "All room, door, path, capacity and asset checks pass.");
+			const publishStatus = () => {
+				if (publish.kind === "publishing") return R.createElement("div", {
+					key: "publish",
+					"data-testid": "room-builder-publish-status",
+					"data-state": "publishing",
+					role: "status",
+					"aria-live": "polite"
+				}, "Publishing…");
+				if (publish.kind === "published") return R.createElement("div", {
+					key: "publish",
+					"data-testid": "room-builder-publish-status",
+					"data-state": "published",
+					role: "status",
+					"aria-live": "polite"
+				}, `Published version ${publish.version}.`);
+				if (publish.kind === "error") return R.createElement("div", {
+					key: "publish",
+					"data-testid": "room-builder-publish-status",
+					"data-state": "error",
+					role: "alert"
+				}, `Publish refused: ${publish.problems.join("; ")}`);
+				return R.createElement("div", {
+					key: "publish",
+					"data-testid": "room-builder-publish-status",
+					"data-state": "idle",
+					role: "status",
+					"aria-live": "polite"
+				}, state.published_version === null ? "Not published yet." : `Published version ${state.published_version}.`);
+			};
+			return R.createElement("section", {
+				className: "room-builder",
+				"data-testid": "room-builder",
+				"aria-label": "Room Builder",
+				onKeyDown
+			}, [
+				R.createElement("header", { key: "head" }, [R.createElement("h2", { key: "title" }, "Room Builder"), R.createElement("p", {
+					key: "live",
+					"data-testid": "room-builder-live",
+					role: "status",
+					"aria-live": "polite"
+				}, liveText(state))]),
+				R.createElement("div", {
+					key: "toolbar",
+					role: "toolbar",
+					"aria-label": "Draft controls"
+				}, [
+					R.createElement("button", {
+						key: "preview",
+						type: "button",
+						"data-testid": "room-builder-preview",
+						"aria-label": "Preview the draft",
+						"aria-pressed": previewOpen,
+						onClick: () => setPreviewOpen((open) => !open)
+					}, previewOpen ? "Hide preview" : "Preview"),
+					R.createElement("button", {
+						key: "undo",
+						type: "button",
+						"data-testid": "room-builder-undo",
+						"aria-label": "Undo the last edit",
+						disabled: state.history.length === 0,
+						onClick: () => edit(undo)
+					}, "Undo"),
+					R.createElement("button", {
+						key: "redo",
+						type: "button",
+						"data-testid": "room-builder-redo",
+						"aria-label": "Redo the last undone edit",
+						disabled: state.future.length === 0,
+						onClick: () => edit(redo)
+					}, "Redo"),
+					R.createElement("button", {
+						key: "approve",
+						type: "button",
+						"data-testid": "room-builder-approve",
+						"aria-label": "Approve the valid draft",
+						onClick: () => edit(approveState)
+					}, "Approve"),
+					R.createElement("button", {
+						key: "rollback",
+						type: "button",
+						"data-testid": "room-builder-rollback",
+						"aria-label": "Roll back to the last published version",
+						disabled: state.published_version === null,
+						onClick: onRollbackClick
+					}, "Rollback"),
+					R.createElement("button", {
+						key: "publish",
+						type: "button",
+						"data-testid": "room-builder-publish",
+						"aria-label": "Publish the approved draft",
+						disabled: publish.kind === "publishing",
+						onClick: onPublishClick
+					}, "Publish")
+				]),
+				R.createElement("div", {
+					key: "summary",
+					"data-testid": "room-builder-status",
+					"data-status": state.status,
+					"data-problems": problems.length,
+					role: "status",
+					"aria-live": "polite"
+				}, [`status ${state.status}; revision ${state.draft_revision}; ${preview.counts.floors} floors · ${preview.counts.rooms} rooms · ${preview.counts.cells} cells · ${preview.counts.desks} desks · ${preview.counts.portals} portals; digest ${preview.digest}`]),
+				previewOpen ? R.createElement("div", {
+					key: "preview",
+					"data-testid": "room-builder-preview-panel",
+					role: "region",
+					"aria-label": "Draft preview"
+				}, [R.createElement("p", { key: "counts" }, `Valid: ${preview.valid ? "yes" : "no"} · capacity ${preview.capacity} · egress ${preview.egress} · digest ${preview.digest}`)]) : null,
+				problemsBlock,
+				editError ? R.createElement("div", {
+					key: "edit-error",
+					"data-testid": "room-builder-error",
+					role: "alert"
+				}, editError) : null,
+				R.createElement("div", {
+					key: "rooms",
+					role: "group",
+					"aria-label": "Rooms",
+					"data-testid": "room-builder-rooms"
+				}, state.rooms.map(roomButton)),
+				room ? R.createElement("div", {
+					key: "room-panel",
+					"data-testid": "room-builder-room-panel",
+					"data-room": room.room_id,
+					role: "region",
+					"aria-label": `Room ${room.name}`
+				}, [
+					R.createElement("h3", { key: "name" }, `${room.name} · ${room.room_id}`),
+					R.createElement("p", { key: "meta" }, `${room.kind} · ${room.archetype} · capacity ${room.capacity} · cells ${room.cells.length}`),
+					R.createElement("p", {
+						key: "assignment-live",
+						"data-testid": "room-builder-assignment",
+						"aria-live": "polite"
+					}, `business ${room.assignment.business_id || "none"} · roles ${room.assignment.role_ids.join(",") || "none"} · agents ${room.assignment.agent_ids.join(",") || "none"} · memory ${room.assignment.memory_scope || "none"}`),
+					R.createElement("div", {
+						key: "cell-actions",
+						role: "group",
+						"aria-label": "Cell and desk actions"
+					}, [
+						R.createElement("button", {
+							key: "add-cell",
+							type: "button",
+							"data-testid": "room-builder-add-cell",
+							"aria-label": "Add a fixed 16 by 12 cell",
+							onClick: () => edit((current) => addCell(current, room.room_id, 2))
+						}, "Add cell"),
+						R.createElement("button", {
+							key: "add-desk",
+							type: "button",
+							"data-testid": "room-builder-add-desk",
+							"aria-label": "Add a desk",
+							onClick: () => edit((current) => addDesk(current, room.room_id))
+						}, "Add desk"),
+						R.createElement("button", {
+							key: "remove-room",
+							type: "button",
+							"data-testid": "room-builder-remove-room",
+							"aria-label": `Remove room ${room.name}`,
+							onClick: () => edit((current) => {
+								const next = removeRoom(current, room.room_id);
+								setSelectedRoomId(next.rooms[0]?.room_id ?? null);
+								return next;
+							})
+						}, "Remove room")
+					]),
+					R.createElement("div", {
+						key: "styles",
+						role: "group",
+						"aria-label": "Style controls"
+					}, [
+						styleSelect("Archetype", room.style.archetype, ARCHETYPES, "room-builder-archetype", (value) => edit((current) => setRoomStyle(current, room.room_id, { archetype: value }))),
+						styleSelect("Palette", room.style.palette, PALETTES, "room-builder-palette", (value) => edit((current) => setRoomStyle(current, room.room_id, { palette: value }))),
+						styleSelect("Light", room.style.lighting, LIGHTING, "room-builder-light", (value) => edit((current) => setRoomStyle(current, room.room_id, { lighting: value }))),
+						R.createElement("label", {
+							key: "signage-label",
+							className: "room-builder__field"
+						}, [R.createElement("span", { key: "text" }, "Signage"), R.createElement("input", {
+							key: "input",
+							type: "text",
+							"data-testid": "room-builder-signage",
+							"aria-label": "Signage slug",
+							value: room.style.signage,
+							onChange: (event) => edit((current) => setRoomStyle(current, room.room_id, { signage: event.target.value }))
+						})]),
+						R.createElement("label", {
+							key: "seed-label",
+							className: "room-builder__field"
+						}, [R.createElement("span", { key: "text" }, "Seed"), R.createElement("input", {
+							key: "input",
+							type: "number",
+							min: "0",
+							"data-testid": "room-builder-seed",
+							"aria-label": "Style seed",
+							value: String(room.style.seed),
+							onChange: (event) => {
+								const seed = Number(event.target.value);
+								if (Number.isFinite(seed) && seed >= 0) edit((current) => setRoomStyle(current, room.room_id, { seed }));
+							}
+						})]),
+						R.createElement("label", {
+							key: "dept-style-label",
+							className: "room-builder__field"
+						}, [R.createElement("span", { key: "text" }, "Department style"), R.createElement("input", {
+							key: "input",
+							type: "text",
+							"data-testid": "room-builder-department-style",
+							"aria-label": "Department style signature",
+							value: departmentStyle,
+							onChange: (event) => setDepartmentStyleValue(event.target.value),
+							onBlur: () => {
+								try {
+									setState(setDepartmentStyle(state, room.floor_id, departmentStyle));
+									setEditError("");
+								} catch (err) {
+									setEditError(messageOf(err));
+								}
+							}
+						})])
+					]),
+					R.createElement("div", {
+						key: "assignment",
+						role: "group",
+						"aria-label": "Room assignment"
+					}, [
+						field("Business", assignBusiness, "room-builder-business", setAssignBusiness),
+						field("Department", assignDepartment, "room-builder-department", setAssignDepartment),
+						field("Roles (comma separated)", assignRoles, "room-builder-roles", setAssignRoles),
+						field("Agents (comma separated)", assignAgents, "room-builder-agents", setAssignAgents),
+						field("Capability manifest", assignCapability, "room-builder-capability", setAssignCapability),
+						field("Memory scope", assignMemory, "room-builder-memory", setAssignMemory),
+						R.createElement("button", {
+							key: "assign",
+							type: "button",
+							"data-testid": "room-builder-assign",
+							"aria-label": "Apply the room assignment",
+							onClick: () => edit((current) => assignRoom(current, room.room_id, {
+								business_id: assignBusiness,
+								department_id: assignDepartment,
+								role_ids: splitList(assignRoles),
+								agent_ids: splitList(assignAgents),
+								capability_manifest_id: assignCapability,
+								memory_scope: assignMemory
+							}))
+						}, "Assign")
+					]),
+					R.createElement("ul", {
+						key: "cells",
+						"data-testid": "room-builder-cells",
+						"aria-label": "Cells"
+					}, room.cells.map((cell) => [cellRow(cell), R.createElement("ul", {
+						key: `${cell.cell_id}-desks`,
+						"aria-label": `Desks in ${cell.cell_id}`
+					}, cell.desks.map((desk) => deskRow(cell.cell_id, desk)))]))
+				]) : null,
+				R.createElement("div", {
+					key: "add-room",
+					role: "group",
+					"aria-label": "Create a room"
+				}, [
+					styleSelect("Floor", newFloorId, state.floors.map((floor) => floor.floor_id), "room-builder-new-floor", setNewFloorId),
+					field("New room id", newRoomId, "room-builder-new-room-id", setNewRoomId),
+					field("New room name", newRoomName, "room-builder-new-room-name", setNewRoomName),
+					styleSelect("Room kind", newRoomKind, DEPARTMENT_ZONES, "room-builder-new-room-kind", setNewRoomKind),
+					field("Desks", newRoomDesks, "room-builder-new-room-desks", setNewRoomDesks),
+					R.createElement("button", {
+						key: "add",
+						type: "button",
+						"data-testid": "room-builder-add-room",
+						"aria-label": "Create the room",
+						onClick: () => edit((current) => addRoom(current, {
+							floor_id: newFloorId,
+							room_id: newRoomId,
+							name: newRoomName,
+							kind: newRoomKind,
+							desks: Number(newRoomDesks) || 1
+						}))
+					}, "Add room")
+				]),
+				R.createElement("div", {
+					key: "department-actions",
+					role: "group",
+					"aria-label": "Department actions"
+				}, [
+					R.createElement("button", {
+						key: "clone",
+						type: "button",
+						"data-testid": "room-builder-clone",
+						"aria-label": "Clone the selected department",
+						onClick: () => edit((current) => cloneDepartment(current, room?.floor_id ?? current.floors[0].floor_id, `floor-${current.floors.length + 1}`))
+					}, "Clone department"),
+					R.createElement("button", {
+						key: "merge",
+						type: "button",
+						"data-testid": "room-builder-merge",
+						"aria-label": "Merge all departments into the first",
+						disabled: state.floors.length < 2,
+						onClick: () => edit((current) => mergeDepartments(current, current.floors.map((floor) => floor.floor_id), current.floors[0].floor_id))
+					}, "Merge departments"),
+					R.createElement("button", {
+						key: "split",
+						type: "button",
+						"data-testid": "room-builder-split",
+						"aria-label": "Split the selected room onto a new department floor",
+						disabled: !room || state.rooms.filter((row) => row.floor_id === room.floor_id).length < 2,
+						onClick: () => edit((current) => splitDepartment(current, room.floor_id, `floor-${current.floors.length + 1}`, [room.room_id]))
+					}, "Split department")
+				]),
+				publishStatus()
+			]);
+		};
+	}
+	function splitList(value) {
+		return value.split(",").map((item) => item.trim()).filter(Boolean);
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/outside-world.ts
+	var OUTSIDE_SCHEMA = "qubit-office-world-outside/1";
+	var OUTSIDE_PATH = "/api/office/world/outside";
+	/** A typed refusal: a stable code a caller can branch on, never a bare Error. */
+	var OutsideWorldError = class extends Error {
+		code;
+		constructor(code, detail) {
+			super(detail);
+			this.name = "OutsideWorldError";
+			this.code = code;
+		}
+	};
+	var TRUTH_KEYS = /* @__PURE__ */ new Set([
+		"agent",
+		"agents",
+		"agent_id",
+		"occupant",
+		"occupants",
+		"desk",
+		"desks",
+		"desk_id",
+		"seat",
+		"seats",
+		"seat_id",
+		"run",
+		"run_id",
+		"task",
+		"task_id",
+		"working",
+		"completed",
+		"business_id",
+		"tenant_id",
+		"session_id"
+	]);
+	function record$1(value) {
+		return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
+	}
+	function int(value, fallback = 0) {
+		const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+		return Number.isFinite(n) ? Math.trunc(n) : fallback;
+	}
+	function text$1(value, fallback = "") {
+		return typeof value === "string" ? value : fallback;
+	}
+	function strings(value) {
+		return Array.isArray(value) ? value.filter((item) => typeof item === "string") : [];
+	}
+	function bool(value, fallback = false) {
+		return typeof value === "boolean" ? value : fallback;
+	}
+	function bounds(value) {
+		const row = record$1(value) ?? {};
+		return {
+			x: int(row.x),
+			y: int(row.y),
+			width: Math.max(0, int(row.width)),
+			height: Math.max(0, int(row.height))
+		};
+	}
+	/** Walk every object key; used to refuse a payload that grew business truth. */
+	function findTruthKeys(value, found = /* @__PURE__ */ new Set()) {
+		if (Array.isArray(value)) {
+			for (const item of value) findTruthKeys(item, found);
+			return found;
+		}
+		const row = record$1(value);
+		if (!row) return found;
+		for (const [key, item] of Object.entries(row)) {
+			if (TRUTH_KEYS.has(key)) found.add(key);
+			findTruthKeys(item, found);
+		}
+		return found;
+	}
+	/** Normalize the server projection. Throws a typed `OutsideWorldError`. */
+	function parseOutsideWorld(value) {
+		const root = record$1(value);
+		if (!root) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", "The outside world payload is not an object.");
+		if (text$1(root.schema) !== "qubit-office-world-outside/1") throw new OutsideWorldError("OUTSIDE_WORLD_UNSUPPORTED_VERSION", `Expected ${OUTSIDE_SCHEMA}, got ${text$1(root.schema) || "(none)"}.`);
+		if (int(root.version, 0) !== 1) throw new OutsideWorldError("OUTSIDE_WORLD_UNSUPPORTED_VERSION", `Unsupported outside world version ${int(root.version, 0)}.`);
+		if (root.mode !== "presentation" || root.business_truth !== false) throw new OutsideWorldError("OUTSIDE_WORLD_TRUTH_VIOLATION", "The outside world is presentation only; it may not claim business truth.");
+		const truth = findTruthKeys(root);
+		if (truth.size) throw new OutsideWorldError("OUTSIDE_WORLD_TRUTH_VIOLATION", `The outside world carried business-truth keys: ${[...truth].sort().join(", ")}.`);
+		const env = record$1(root.environment) ?? {};
+		const zones = Array.isArray(root.zones) ? root.zones : null;
+		const chunks = Array.isArray(root.chunks) ? root.chunks : null;
+		if (!zones || !chunks) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", "The outside world needs zones and chunks.");
+		const parsedZones = zones.map((item, index) => {
+			const row = record$1(item) ?? {};
+			const zoneId = text$1(row.zone_id);
+			if (!zoneId) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", `Zone ${index} has no zone_id.`);
+			const state = text$1(row.state) === "dormant" ? "dormant" : "active";
+			const counts = record$1(row.counts) ?? {};
+			return {
+				zone_id: zoneId,
+				kind: text$1(row.kind),
+				label: text$1(row.label, zoneId),
+				state,
+				animated: bool(row.animated) && state === "active",
+				entry_chunk: text$1(row.entry_chunk),
+				chunk_ids: strings(row.chunk_ids),
+				bounds: bounds(row.bounds),
+				counts: {
+					chunks: int(counts.chunks),
+					active_chunks: int(counts.active_chunks),
+					animated_chunks: int(counts.animated_chunks),
+					tiles: int(counts.tiles)
+				}
+			};
+		});
+		const parsedChunks = chunks.map((item, index) => {
+			const row = record$1(item) ?? {};
+			const chunkId = text$1(row.chunk_id);
+			if (!chunkId) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", `Chunk ${index} has no chunk_id.`);
+			const state = text$1(row.state) === "dormant" ? "dormant" : "active";
+			return {
+				chunk_id: chunkId,
+				zone_id: text$1(row.zone_id),
+				kind: text$1(row.kind),
+				layer: text$1(row.layer),
+				bounds: bounds(row.bounds),
+				tiles: int(row.tiles),
+				active: bool(row.active) && state === "active",
+				animated: bool(row.animated) && state === "active",
+				state,
+				assets: strings(row.assets),
+				z_index: int(row.z_index)
+			};
+		});
+		const events = (Array.isArray(env.events) ? env.events : []).map((item, index) => {
+			const row = record$1(item) ?? {};
+			return {
+				event_id: text$1(row.event_id, `event-${index}`),
+				kind: text$1(row.kind),
+				value: text$1(row.value),
+				label: text$1(row.label),
+				cue: text$1(row.cue),
+				still_cue: text$1(row.still_cue, text$1(row.cue)),
+				animated: bool(row.animated)
+			};
+		});
+		const places = (Array.isArray(root.places) ? root.places : []).map((item, index) => {
+			const row = record$1(item) ?? {};
+			return {
+				place_id: text$1(row.place_id, `place-${index}`),
+				kind: text$1(row.kind),
+				label: text$1(row.label),
+				zone_id: text$1(row.zone_id),
+				chunk_id: text$1(row.chunk_id),
+				active: bool(row.active),
+				animated: bool(row.animated)
+			};
+		});
+		const portals = (Array.isArray(root.portals) ? root.portals : []).map((item, index) => {
+			const row = record$1(item) ?? {};
+			return {
+				portal_id: text$1(row.portal_id, `portal-${index}`),
+				kind: text$1(row.kind),
+				from_chunk: text$1(row.from_chunk),
+				to_chunk: text$1(row.to_chunk),
+				to_floor: text$1(row.to_floor),
+				label: text$1(row.label),
+				bidirectional: bool(row.bidirectional, true),
+				capacity: int(row.capacity, 1),
+				locked: bool(row.locked)
+			};
+		});
+		const floorLinks = (Array.isArray(root.floor_links) ? root.floor_links : []).map((item, index) => {
+			const row = record$1(item) ?? {};
+			return {
+				kind: text$1(row.kind),
+				floor_id: text$1(row.floor_id),
+				portal_id: text$1(row.portal_id, `portal-${index}`),
+				label: text$1(row.label)
+			};
+		});
+		const assets = (Array.isArray(root.assets) ? root.assets : []).map((item, index) => {
+			const row = record$1(item) ?? {};
+			return {
+				asset_id: text$1(row.asset_id, `asset-${index}`),
+				feature: text$1(row.feature),
+				pack: text$1(row.pack),
+				paid: bool(row.paid),
+				local_only: bool(row.local_only),
+				redistribution_allowed: bool(row.redistribution_allowed),
+				license_status: text$1(row.license_status),
+				credit: text$1(row.credit)
+			};
+		});
+		const summaryRow = record$1(root.summary) ?? {};
+		const summary = {
+			zones: int(summaryRow.zones, parsedZones.length),
+			active_zones: int(summaryRow.active_zones, parsedZones.filter((z) => z.state === "active").length),
+			dormant_zones: int(summaryRow.dormant_zones, parsedZones.filter((z) => z.state === "dormant").length),
+			chunks: int(summaryRow.chunks, parsedChunks.length),
+			active_chunks: int(summaryRow.active_chunks, parsedChunks.filter((c) => c.active).length),
+			dormant_chunks: int(summaryRow.dormant_chunks, parsedChunks.filter((c) => c.state === "dormant").length),
+			animated_chunks: int(summaryRow.animated_chunks, parsedChunks.filter((c) => c.animated).length),
+			portals: int(summaryRow.portals, portals.length),
+			elevator_links: int(summaryRow.elevator_links, floorLinks.filter((f) => f.kind === "elevator").length),
+			stairs_links: int(summaryRow.stairs_links, floorLinks.filter((f) => f.kind === "stairs").length),
+			places: int(summaryRow.places, places.length),
+			assets: int(summaryRow.assets, assets.length)
+		};
+		const constraintRow = record$1(root.constraints) ?? {};
+		const constraints = {
+			presentation_only: bool(constraintRow.presentation_only, true),
+			business_truth: bool(constraintRow.business_truth, false),
+			only_active_zones_animate: bool(constraintRow.only_active_zones_animate, true),
+			max_chunks: int(constraintRow.max_chunks),
+			max_active_chunks: int(constraintRow.max_active_chunks),
+			max_chunk_tiles: int(constraintRow.max_chunk_tiles),
+			lru_capacity: int(constraintRow.lru_capacity),
+			preload_depth: int(constraintRow.preload_depth),
+			lazy_load: bool(constraintRow.lazy_load, true),
+			reduced_motion_supported: bool(constraintRow.reduced_motion_supported, true)
+		};
+		return {
+			schema: OUTSIDE_SCHEMA,
+			version: 1,
+			mode: "presentation",
+			business_truth: false,
+			map_digest: text$1(root.map_digest),
+			digest: text$1(root.digest),
+			credit: text$1(root.credit),
+			environment: {
+				weather: text$1(env.weather),
+				day_night: text$1(env.day_night),
+				season: text$1(env.season),
+				weather_values: strings(env.weather_values),
+				day_night_values: strings(env.day_night_values),
+				season_values: strings(env.season_values),
+				events
+			},
+			zones: parsedZones,
+			chunks: parsedChunks,
+			places,
+			portals,
+			floor_links: floorLinks,
+			assets,
+			summary,
+			constraints
+		};
+	}
+	/** Map loading/error/payload inputs to the single view the panel renders. */
+	function outsideWorldView(input) {
+		if (input.loading) return {
+			status: "loading",
+			world: null,
+			message: "Loading the campus outside world…",
+			code: ""
+		};
+		if (input.error) return {
+			status: "error",
+			world: null,
+			message: input.error,
+			code: input.code || "OUTSIDE_WORLD_MALFORMED"
+		};
+		if (input.payload === null || input.payload === void 0) return {
+			status: "unavailable",
+			world: null,
+			message: "The campus outside world is not available yet.",
+			code: input.code || "OUTSIDE_WORLD_UNAVAILABLE"
+		};
+		try {
+			const world = parseOutsideWorld(input.payload);
+			if (!world.zones.length) return {
+				status: "empty",
+				world,
+				message: "No outside-world zones are configured.",
+				code: ""
+			};
+			return {
+				status: "ready",
+				world,
+				message: `Campus outside world: ${world.summary.active_zones} active of ${world.summary.zones} zones.`,
+				code: ""
+			};
+		} catch (exc) {
+			const code = exc instanceof OutsideWorldError ? exc.code : "OUTSIDE_WORLD_MALFORMED";
+			return {
+				status: "error",
+				world: null,
+				message: exc instanceof Error ? exc.message : "The outside world payload could not be read.",
+				code
+			};
+		}
+	}
+	function outsideWorldUrl(base) {
+		const raw = base === void 0 ? hostBasePath() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${OUTSIDE_PATH}`;
+	}
+	/**
+	* Read-only GET of the outside-world projection. A 404 is `unavailable`, not a
+	* fabricated campus; a malformed payload is a typed `error`.
+	*/
+	async function fetchOutsideWorld(opts = {}) {
+		const f = opts.fetchImpl ?? fetch;
+		const headers = { Accept: "application/json" };
+		const token = readToken(opts.win);
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		try {
+			const res = await f(outsideWorldUrl(opts.base), {
+				method: "GET",
+				headers,
+				credentials: "same-origin",
+				signal: opts.signal
+			});
+			if (res.status === 404) return {
+				status: "unavailable",
+				world: null,
+				message: "The campus outside world is not available yet.",
+				code: "OUTSIDE_WORLD_UNAVAILABLE"
+			};
+			if (!res.ok) return {
+				status: "error",
+				world: null,
+				message: `The outside world endpoint answered HTTP ${res.status}.`,
+				code: `OUTSIDE_WORLD_HTTP_${res.status}`
+			};
+			const body = await res.json().catch(() => null);
+			return outsideWorldView({ payload: body && typeof body === "object" && "world" in body ? body.world : body });
+		} catch (exc) {
+			return {
+				status: "unavailable",
+				world: null,
+				message: "The campus outside world could not be reached.",
+				code: "OUTSIDE_WORLD_UNREACHABLE"
+			};
+		}
+	}
+	/** Semantic ordering: active zones first, then dormant, each by label. */
+	function orderedZones(world) {
+		return [...world.zones].sort((a, b) => {
+			if (a.state !== b.state) return a.state === "active" ? -1 : 1;
+			return a.label.localeCompare(b.label);
+		});
+	}
+	function zoneChunks(world, zoneId) {
+		return world.chunks.filter((chunk) => chunk.zone_id === zoneId);
+	}
+	/** The environment events that describe the current selection. */
+	function currentEnvironment(world) {
+		return [
+			["weather", world.environment.weather],
+			["day_night", world.environment.day_night],
+			["season", world.environment.season]
+		].map(([kind, value]) => world.environment.events.find((event) => event.kind === kind && event.value === value) ?? null).filter((event) => event !== null);
+	}
+	/** The canonical floor route for a lobby link. */
+	function floorHref(floorId) {
+		const safe = String(floorId || "").trim();
+		return `/qubit-office/floor/${encodeURIComponent(safe)}`;
+	}
+	/** Non-color, text-first status label for a zone/chunk state. */
+	function stateLabel(state) {
+		return state === "active" ? "active" : "dormant";
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/OutsideWorld.tsx
+	var TRUTHY_CREDIT_URL = "https://limezu.itch.io";
+	function environmentText(events, reducedMotion) {
+		if (!events.length) return "Environment status unavailable.";
+		return events.map((event) => {
+			const cue = reducedMotion ? event.still_cue : event.cue;
+			return `${event.label}${cue ? ` — ${cue}` : ""}`;
+		}).join(" · ");
+	}
+	function createOutsideWorld(R, hooks) {
+		const { useState, useEffect, useRef } = hooks;
+		return function OutsideWorld(props) {
+			const view = props.view ?? outsideWorldView({
+				payload: props.payload,
+				loading: props.loading,
+				error: props.error,
+				code: props.code
+			});
+			const world = view.world;
+			const zones = world ? orderedZones(world) : [];
+			const [selectedId, setSelectedId] = useState(props.initialZoneId ?? zones[0]?.zone_id ?? null);
+			const [reducedMotion, setReducedMotion] = useState(Boolean(props.reducedMotion));
+			const refs = useRef({});
+			const hadZones = useRef(zones.length > 0);
+			useEffect(() => {
+				const arrived = !hadZones.current && zones.length > 0;
+				hadZones.current = zones.length > 0;
+				if (!zones.length) return;
+				if (!arrived && selectedId === null) return;
+				if (selectedId && zones.some((zone) => zone.zone_id === selectedId)) return;
+				setSelectedId(props.initialZoneId ?? zones[0].zone_id);
+			}, [
+				zones,
+				selectedId,
+				props.initialZoneId
+			]);
+			useEffect(() => {
+				if (typeof props.reducedMotion === "boolean") {
+					setReducedMotion(props.reducedMotion);
+					return;
+				}
+				if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+				const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+				const apply = () => setReducedMotion(Boolean(query.matches));
+				apply();
+				if (typeof query.addEventListener === "function") {
+					query.addEventListener("change", apply);
+					return () => query.removeEventListener("change", apply);
+				}
+			}, [props.reducedMotion]);
+			const select = (zone) => {
+				setSelectedId(zone.zone_id);
+				props.onSelectZone?.(zone);
+			};
+			const focusZone = (zoneId) => {
+				const node = refs.current[zoneId];
+				if (node && typeof node.focus === "function") node.focus();
+			};
+			const onZoneKeyDown = (event, zone) => {
+				const index = zones.findIndex((item) => item.zone_id === zone.zone_id);
+				if (index < 0) return;
+				let nextIndex = index;
+				if (event.key === "ArrowDown" || event.key === "ArrowRight") nextIndex = Math.min(zones.length - 1, index + 1);
+				else if (event.key === "ArrowUp" || event.key === "ArrowLeft") nextIndex = Math.max(0, index - 1);
+				else if (event.key === "Home") nextIndex = 0;
+				else if (event.key === "End") nextIndex = zones.length - 1;
+				else if (event.key === "Enter" || event.key === " ") nextIndex = index;
+				else return;
+				event.preventDefault?.();
+				const next = zones[nextIndex];
+				select(next);
+				if (event.key !== "Enter" && event.key !== " ") focusZone(next.zone_id);
+			};
+			const credit = () => R.createElement("p", {
+				key: "credit",
+				className: "outside-world__credit",
+				"data-testid": "outside-world-credit"
+			}, [R.createElement("span", { key: "text" }, "Office art: LimeZu — "), R.createElement("a", {
+				key: "link",
+				href: TRUTHY_CREDIT_URL,
+				target: "_blank",
+				rel: "noopener noreferrer"
+			}, TRUTHY_CREDIT_URL)]);
+			const statusLine = () => R.createElement("p", {
+				key: "status",
+				className: `outside-world__status is-${view.status}`,
+				"data-testid": "outside-world-status",
+				"data-state": view.status,
+				role: view.status === "error" ? "alert" : "status",
+				"aria-live": view.status === "error" ? "assertive" : "polite"
+			}, view.message);
+			const retryButton = () => {
+				if (!props.onRetry) return null;
+				return R.createElement("button", {
+					key: "retry",
+					type: "button",
+					className: "outside-world__retry",
+					"data-testid": "outside-world-retry",
+					onClick: () => props.onRetry?.()
+				}, "Retry");
+			};
+			const nonReady = () => {
+				const label = view.status === "loading" ? "Loading the outside world" : view.status === "empty" ? "No outside-world zones" : view.status === "unavailable" ? "Outside world unavailable" : "Outside world error";
+				return R.createElement("div", {
+					key: "state",
+					className: `outside-world__state is-${view.status}`,
+					"data-testid": "outside-world-state",
+					"data-state": view.status
+				}, [
+					R.createElement("p", {
+						key: "label",
+						className: "outside-world__stateLabel"
+					}, label),
+					statusLine(),
+					view.code ? R.createElement("p", {
+						key: "code",
+						className: "outside-world__code",
+						"data-testid": "outside-world-code"
+					}, `Code: ${view.code}`) : null,
+					view.status === "error" || view.status === "unavailable" ? retryButton() : null,
+					credit()
+				]);
+			};
+			const environment = () => {
+				if (!world) return null;
+				const events = currentEnvironment(world);
+				return R.createElement("section", {
+					key: "environment",
+					className: "outside-world__environment",
+					"data-testid": "outside-world-environment",
+					"aria-label": "Outside environment"
+				}, [
+					R.createElement("h3", {
+						key: "title",
+						className: "outside-world__subhead"
+					}, "Environment"),
+					R.createElement("p", {
+						key: "text",
+						className: "outside-world__envText",
+						"data-testid": "outside-world-environment-text"
+					}, environmentText(events, reducedMotion)),
+					R.createElement("ul", {
+						key: "events",
+						className: "outside-world__envEvents",
+						"aria-label": "Environment cues"
+					}, events.map((event) => R.createElement("li", {
+						key: event.event_id,
+						className: "outside-world__envEvent",
+						"data-testid": "outside-world-env-event",
+						"data-kind": event.kind,
+						"data-value": event.value,
+						"data-animated": event.animated && !reducedMotion ? "true" : "false"
+					}, `${event.kind}: ${event.label} (${reducedMotion ? event.still_cue : event.cue})`)))
+				]);
+			};
+			const zoneButton = (zone) => {
+				const isSelected = selectedId === zone.zone_id;
+				return R.createElement("button", {
+					key: zone.zone_id,
+					type: "button",
+					ref: (node) => {
+						refs.current[zone.zone_id] = node;
+					},
+					className: `outside-world__zone is-${zone.state}` + (isSelected ? " is-selected" : ""),
+					role: "option",
+					"aria-selected": isSelected ? "true" : "false",
+					"aria-pressed": isSelected ? "true" : "false",
+					tabIndex: isSelected || selectedId === null && zone.zone_id === zones[0]?.zone_id ? 0 : -1,
+					"data-testid": "outside-zone",
+					"data-zone": zone.zone_id,
+					"data-state": zone.state,
+					"data-animated": zone.animated && !reducedMotion ? "true" : "false",
+					"aria-label": `${zone.label}, ${stateLabel(zone.state)}, ${zone.counts.chunks} chunks, ${zone.animated ? "animated" : "still"}`,
+					onClick: () => select(zone),
+					onKeyDown: (event) => onZoneKeyDown(event, zone)
+				}, [
+					R.createElement("span", {
+						key: "label",
+						className: "outside-world__zoneLabel"
+					}, zone.label),
+					R.createElement("span", {
+						key: "state",
+						className: "outside-world__zoneState",
+						"data-testid": "outside-zone-state"
+					}, stateLabel(zone.state)),
+					R.createElement("span", {
+						key: "motion",
+						className: "outside-world__zoneMotion"
+					}, zone.animated ? "animated" : "still"),
+					R.createElement("span", {
+						key: "counts",
+						className: "outside-world__zoneCounts"
+					}, `${zone.counts.chunks} chunks · ${zone.counts.tiles} tiles`)
+				]);
+			};
+			const zoneList = () => R.createElement("section", {
+				key: "zones",
+				className: "outside-world__zoneSection",
+				"aria-label": "Outside zones"
+			}, [R.createElement("h3", {
+				key: "title",
+				className: "outside-world__subhead"
+			}, `Zones (${world?.summary.active_zones ?? 0} active / ${world?.summary.zones ?? 0})`), R.createElement("div", {
+				key: "list",
+				className: "outside-world__zones",
+				role: "listbox",
+				"aria-label": "Outside zones",
+				"data-testid": "outside-world-zones"
+			}, zones.map(zoneButton))]);
+			const chunkRow = (chunk) => R.createElement("li", {
+				key: chunk.chunk_id,
+				className: `outside-world__chunk is-${chunk.state}`,
+				"data-testid": "outside-chunk",
+				"data-chunk": chunk.chunk_id,
+				"data-state": chunk.state,
+				"data-animated": chunk.animated && !reducedMotion ? "true" : "false"
+			}, [
+				R.createElement("span", {
+					key: "kind",
+					className: "outside-world__chunkKind"
+				}, chunk.kind),
+				R.createElement("span", {
+					key: "state",
+					className: "outside-world__chunkState"
+				}, stateLabel(chunk.state)),
+				R.createElement("span", {
+					key: "motion",
+					className: "outside-world__chunkMotion"
+				}, chunk.animated ? "animated" : "still")
+			]);
+			const zoneDetail = () => {
+				if (!world) return null;
+				const zone = zones.find((item) => item.zone_id === selectedId) ?? zones[0] ?? null;
+				if (!zone) return null;
+				const chunks = zoneChunks(world, zone.zone_id);
+				return R.createElement("section", {
+					key: "detail",
+					className: "outside-world__detail",
+					"data-testid": "outside-world-zone-detail",
+					"data-zone": zone.zone_id,
+					"data-state": zone.state,
+					"aria-label": `Selected zone ${zone.label}`
+				}, [
+					R.createElement("h3", {
+						key: "title",
+						className: "outside-world__subhead"
+					}, zone.label),
+					R.createElement("p", {
+						key: "summary",
+						className: "outside-world__zoneSummary",
+						"data-testid": "outside-zone-summary"
+					}, `${stateLabel(zone.state)} · ${zone.counts.chunks} chunks · ${zone.counts.active_chunks} active · ${zone.counts.animated_chunks} animated · ${zone.counts.tiles} tiles`),
+					chunks.length ? R.createElement("ul", {
+						key: "chunks",
+						className: "outside-world__chunks",
+						"aria-label": `${zone.label} chunks`
+					}, chunks.map(chunkRow)) : R.createElement("p", {
+						key: "empty",
+						className: "outside-world__empty",
+						"data-testid": "outside-world-zone-empty"
+					}, "This zone has no chunks.")
+				]);
+			};
+			const floorLinks = () => {
+				if (!world) return null;
+				const links = world.floor_links;
+				return R.createElement("section", {
+					key: "floors",
+					className: "outside-world__floors",
+					"data-testid": "outside-world-floor-links",
+					"aria-label": "Lobby links to tower floors"
+				}, [R.createElement("h3", {
+					key: "title",
+					className: "outside-world__subhead"
+				}, "Elevators and stairs"), links.length ? R.createElement("ul", {
+					key: "list",
+					className: "outside-world__floorList"
+				}, links.map((link) => R.createElement("li", {
+					key: `${link.kind}-${link.floor_id}`,
+					className: "outside-world__floorItem"
+				}, R.createElement("a", {
+					href: floorHref(link.floor_id),
+					className: "outside-world__floorLink",
+					"data-testid": "outside-floor-link",
+					"data-kind": link.kind,
+					"data-floor": link.floor_id,
+					"aria-label": link.label,
+					onClick: (event) => {
+						if (props.onSelectFloor) {
+							event.preventDefault?.();
+							props.onSelectFloor(link);
+						}
+					}
+				}, link.label)))) : R.createElement("p", {
+					key: "empty",
+					className: "outside-world__empty",
+					"data-testid": "outside-world-floors-empty"
+				}, "No elevator or stair links are configured.")]);
+			};
+			const ready = () => R.createElement("div", {
+				key: "ready",
+				className: "outside-world__body"
+			}, [
+				environment(),
+				zoneList(),
+				zoneDetail(),
+				floorLinks()
+			]);
+			return R.createElement("section", {
+				className: "outside-world",
+				role: "region",
+				"aria-label": "Campus outside world",
+				"aria-busy": view.status === "loading" ? "true" : "false",
+				"data-testid": "outside-world",
+				"data-status": view.status,
+				"data-reduced-motion": reducedMotion ? "true" : "false"
+			}, [
+				R.createElement("header", {
+					key: "header",
+					className: "outside-world__header"
+				}, [R.createElement("h2", {
+					key: "title",
+					className: "outside-world__title"
+				}, "Outside world"), R.createElement("p", {
+					key: "sub",
+					className: "outside-world__lede"
+				}, "Campus exterior, lobby and elevators. Presentation only — never business truth.")]),
+				view.status === "ready" ? ready() : nonReady(),
+				view.status === "ready" ? credit() : null
+			]);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/panel-inventory.ts
+	var INVENTORY_SCHEMA = "qubit-office-panel-inventory/1";
+	var PANEL_STATES = [
+		"loading",
+		"empty",
+		"error",
+		"retry",
+		"unavailable",
+		"typed_refusal"
+	];
+	var PanelInventoryError = class extends Error {
+		code;
+		constructor(code, message) {
+			super(message);
+			this.name = "PanelInventoryError";
+			this.code = code;
+		}
+	};
+	var WRITE_SCOPES = /* @__PURE__ */ new Set([
+		"owner",
+		"operator",
+		"tenant",
+		"session",
+		"none"
+	]);
+	function isRecord(value) {
+		return typeof value === "object" && value !== null && !Array.isArray(value);
+	}
+	function text(value) {
+		return typeof value === "string" ? value.trim() : "";
+	}
+	function fail(panelId, detail) {
+		throw new PanelInventoryError("INVENTORY_INVALID", `panel ${panelId || "<unknown>"}: ${detail}`);
+	}
+	function isRenderer(moduleName) {
+		const lowered = moduleName.toLowerCase();
+		return lowered.startsWith("frontend") || lowered.includes(".game.") || lowered.startsWith("game") || lowered.startsWith("qubit_office_renderer");
+	}
+	function parseAuthority(row, panelId) {
+		const raw = row.authority;
+		if (!isRecord(raw)) fail(panelId, "authority is missing");
+		const moduleName = text(raw.module);
+		const symbol = text(raw.symbol);
+		if (!moduleName) fail(panelId, "authority.module is empty");
+		if (isRenderer(moduleName)) fail(panelId, `authority ${moduleName} is a renderer, not data`);
+		if (!moduleName.startsWith("voicebridge.") && !moduleName.startsWith("qubit_runtime.")) fail(panelId, `authority ${moduleName} is outside the backend packages`);
+		if (!symbol) fail(panelId, "authority.symbol is empty");
+		const route = text(raw.route);
+		const routeMethod = text(raw.route_method);
+		if (route && !routeMethod) fail(panelId, "authority.route has no route_method");
+		return {
+			module: moduleName,
+			symbol,
+			route: route || void 0,
+			route_method: routeMethod || void 0
+		};
+	}
+	function parseAction(row, panelId) {
+		const raw = row.action;
+		if (!isRecord(raw)) fail(panelId, "action is missing");
+		const kind = text(raw.kind);
+		const label = text(raw.label);
+		if (!label) fail(panelId, "action.label is empty");
+		if (kind === "real") {
+			const route = text(raw.route);
+			const method = text(raw.method);
+			const moduleName = text(raw.module);
+			const symbol = text(raw.symbol);
+			if (route && !method) fail(panelId, "real route action has no method");
+			if (moduleName && isRenderer(moduleName)) fail(panelId, `action module ${moduleName} is a renderer`);
+			if (!route && !moduleName) fail(panelId, "real action names neither a route nor a module symbol");
+			if (moduleName && !symbol) fail(panelId, "real module action has no symbol");
+			return {
+				kind: "real",
+				label,
+				route: route || void 0,
+				method: method || void 0,
+				module: moduleName || void 0,
+				symbol: symbol || void 0
+			};
+		}
+		if (kind === "typed_refusal") {
+			const code = text(raw.code);
+			const detail = text(raw.detail);
+			if (!code || code !== code.toUpperCase() || code.includes(" ")) fail(panelId, `typed refusal code ${code || "<empty>"} is invalid`);
+			if (!detail) fail(panelId, "typed refusal has no detail");
+			return {
+				kind: "typed_refusal",
+				label,
+				code,
+				detail,
+				route: text(raw.route) || void 0
+			};
+		}
+		return fail(panelId, `action.kind ${kind || "<empty>"} is invalid`);
+	}
+	function parseStates(row, panelId) {
+		const raw = row.states;
+		if (!Array.isArray(raw)) fail(panelId, "states is not an array");
+		const values = raw.map((value) => text(value));
+		if (values.length !== new Set(values).size) fail(panelId, "states contains a duplicate");
+		const unknown = values.filter((value) => !PANEL_STATES.includes(value));
+		if (unknown.length) fail(panelId, `unknown states: ${unknown.join(", ")}`);
+		const missing = PANEL_STATES.filter((state) => !values.includes(state));
+		if (missing.length) fail(panelId, `missing states: ${missing.join(", ")}`);
+		return values;
+	}
+	function parsePanel(value, index) {
+		if (!isRecord(value)) fail(`#${index}`, "row is not an object");
+		const panelId = text(value.panel_id);
+		if (!panelId) fail(`#${index}`, "panel_id is empty");
+		const title = text(value.title);
+		const group = text(value.group);
+		if (!title) fail(panelId, "title is empty");
+		if (!group) fail(panelId, "group is empty");
+		const permissionsRaw = value.permissions;
+		if (!isRecord(permissionsRaw)) fail(panelId, "permissions is missing");
+		const read = text(permissionsRaw.read);
+		const write = text(permissionsRaw.write);
+		if (!read) fail(panelId, "read permission is empty");
+		if (!write) fail(panelId, "write permission is empty");
+		if (!WRITE_SCOPES.has(write)) fail(panelId, `write scope ${write} is not recognised`);
+		const deepLink = text(value.deep_link);
+		if (!deepLink.startsWith("/")) fail(panelId, "deep_link must start with '/'");
+		const layoutRaw = value.layout;
+		if (!isRecord(layoutRaw)) fail(panelId, "layout is missing");
+		const split = text(layoutRaw.split);
+		const stack = text(layoutRaw.stack);
+		if (!split) fail(panelId, "layout.split is empty");
+		if (!stack) fail(panelId, "layout.stack is empty");
+		const sourceCommand = text(value.source_command);
+		if (!sourceCommand) fail(panelId, "source_command is empty");
+		return {
+			panel_id: panelId,
+			title,
+			group,
+			description: text(value.description) || void 0,
+			authority: parseAuthority(value, panelId),
+			permissions: {
+				read,
+				write
+			},
+			states: parseStates(value, panelId),
+			action: parseAction(value, panelId),
+			deep_link: deepLink,
+			layout: {
+				split,
+				stack
+			},
+			source_command: sourceCommand
+		};
+	}
+	/** Parse and validate one inventory document. Throws `PanelInventoryError`. */
+	function parsePanelInventory(value) {
+		if (!isRecord(value)) throw new PanelInventoryError("INVENTORY_INVALID", "inventory is not an object");
+		const schema = text(value.schema);
+		if (schema !== "qubit-office-panel-inventory/1") throw new PanelInventoryError("INVENTORY_SCHEMA_INVALID", `inventory schema ${schema || "<empty>"} is not ${INVENTORY_SCHEMA}`);
+		const rawPanels = value.panels;
+		if (!Array.isArray(rawPanels)) throw new PanelInventoryError("INVENTORY_INVALID", "inventory.panels is not an array");
+		const panels = rawPanels.map((row, index) => parsePanel(row, index));
+		const ids = panels.map((panel) => panel.panel_id);
+		if (ids.length !== new Set(ids).size) throw new PanelInventoryError("INVENTORY_INVALID", "inventory contains a duplicate panel id");
+		const required = Array.isArray(value.required_panels) ? value.required_panels.map((panel) => text(panel)).filter(Boolean) : [];
+		const missing = required.filter((panel) => !ids.includes(panel));
+		if (missing.length) throw new PanelInventoryError("INVENTORY_INVALID", `inventory is missing required panels: ${missing.join(", ")}`);
+		return {
+			schema,
+			required_states: Array.isArray(value.required_states) ? value.required_states.map((state) => text(state)).filter(Boolean) : [...PANEL_STATES],
+			required_panels: required,
+			panels
+		};
+	}
+	/** Fetch the backend inventory and map every failure to a named state. */
+	async function fetchPanelInventory(opts = {}) {
+		let body;
+		try {
+			body = await businessFetch("/panel-inventory", {
+				base: opts.base,
+				fetchImpl: opts.fetchImpl,
+				signal: opts.signal
+			});
+		} catch (err) {
+			if (err instanceof BusinessApiError) return {
+				kind: "unavailable",
+				code: err.code,
+				detail: err.message
+			};
+			return {
+				kind: "error",
+				message: err instanceof Error ? err.message : String(err)
+			};
+		}
+		try {
+			return {
+				kind: "available",
+				inventory: parsePanelInventory(body)
+			};
+		} catch (err) {
+			return {
+				kind: "error",
+				message: err instanceof Error ? err.message : String(err)
+			};
+		}
+	}
+	/** Build an inventory from explicit rows (hermetic tests / host-provided data). */
+	function inventoryFromRows(rows) {
+		return parsePanelInventory({
+			schema: INVENTORY_SCHEMA,
+			panels: rows
+		});
+	}
+	function stateBadgeLabel(state) {
+		switch (state) {
+			case "loading": return "Loading";
+			case "empty": return "Empty";
+			case "error": return "Error";
+			case "retry": return "Retryable";
+			case "unavailable": return "Unavailable";
+			case "typed_refusal": return "Typed refusal";
+			default: return String(state);
+		}
+	}
+	function actionSummary(action) {
+		if (action.kind === "real") {
+			const target = action.route ? `${action.method ?? "GET"} ${action.route}` : `${action.module ?? ""}.${action.symbol ?? ""}`;
+			return `${action.label} — ${target}`;
+		}
+		return `${action.label} — refused: ${action.code}`;
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/PanelInventory.tsx
+	function createPanelInventoryPanel(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function PanelInventoryPanel(props) {
+			const [read, setRead] = useState({ kind: "loading" });
+			const [attempt, setAttempt] = useState(0);
+			useEffect(() => {
+				let live = true;
+				if (props.rows !== void 0) {
+					try {
+						setRead({
+							kind: "available",
+							inventory: inventoryFromRows(props.rows)
+						});
+					} catch (err) {
+						setRead({
+							kind: "error",
+							message: err instanceof Error ? err.message : String(err)
+						});
+					}
+					return () => {
+						live = false;
+					};
+				}
+				const controller = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				setRead({ kind: "loading" });
+				fetchPanelInventory({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: controller?.signal
+				}).then((next) => {
+					if (live) setRead(next);
+				});
+				return () => {
+					live = false;
+					controller?.abort();
+				};
+			}, [
+				props.rows,
+				props.base,
+				props.fetchImpl,
+				attempt
+			]);
+			const retry = () => setAttempt((value) => value + 1);
+			if (read.kind === "loading") return R.createElement("div", {
+				"data-testid": "panel-inventory",
+				"data-state": "loading",
+				role: "status",
+				"aria-live": "polite",
+				className: "panel-inventory panel-inventory--state"
+			}, "Loading panel inventory…");
+			if (read.kind === "error" || read.kind === "unavailable") {
+				const code = read.kind === "unavailable" ? read.code : "INVENTORY_ERROR";
+				const detail = read.kind === "unavailable" ? read.detail : read.message;
+				return R.createElement("div", {
+					"data-testid": "panel-inventory",
+					"data-state": read.kind,
+					"data-code": code,
+					role: "alert",
+					className: "panel-inventory panel-inventory--state"
+				}, [
+					R.createElement("strong", { key: "title" }, "Panel inventory unavailable"),
+					R.createElement("p", {
+						key: "detail",
+						"data-testid": "panel-inventory-error-detail"
+					}, `${code}: ${detail}`),
+					R.createElement("button", {
+						key: "retry",
+						type: "button",
+						"data-testid": "panel-inventory-retry",
+						"aria-label": "Retry loading panel inventory",
+						onClick: retry
+					}, "Retry")
+				]);
+			}
+			const panels = read.inventory.panels;
+			if (!panels.length) return R.createElement("div", {
+				"data-testid": "panel-inventory",
+				"data-state": "empty",
+				role: "status",
+				"aria-live": "polite",
+				className: "panel-inventory panel-inventory--state"
+			}, "No panels are declared.");
+			const renderRow = (panel) => R.createElement("li", {
+				key: panel.panel_id,
+				role: "listitem",
+				"data-testid": "panel-row",
+				"data-panel-id": panel.panel_id,
+				"data-authority": `${panel.authority.module}.${panel.authority.symbol}`,
+				"data-action-kind": panel.action.kind,
+				"aria-label": `${panel.title} panel`,
+				className: "panel-inventory__row"
+			}, [
+				R.createElement("h3", {
+					key: "title",
+					"data-testid": "panel-title"
+				}, panel.title),
+				R.createElement("p", {
+					key: "group",
+					"data-testid": "panel-group",
+					className: "panel-inventory__muted"
+				}, `${panel.group} · ${panel.panel_id}`),
+				panel.description ? R.createElement("p", {
+					key: "description",
+					"data-testid": "panel-description"
+				}, panel.description) : null,
+				R.createElement("p", {
+					key: "authority",
+					"data-testid": "panel-authority"
+				}, `Authority: ${panel.authority.module}.${panel.authority.symbol}` + (panel.authority.route ? ` · ${panel.authority.route_method ?? "GET"} ${panel.authority.route}` : " · module only")),
+				R.createElement("ul", {
+					key: "permissions",
+					"data-testid": "panel-permissions",
+					"aria-label": `${panel.title} permissions`
+				}, [R.createElement("li", {
+					key: "read",
+					"data-testid": "panel-permission",
+					"data-permission": "read"
+				}, `Read: ${panel.permissions.read}`), R.createElement("li", {
+					key: "write",
+					"data-testid": "panel-permission",
+					"data-permission": "write"
+				}, `Write: ${panel.permissions.write}`)]),
+				R.createElement("ul", {
+					key: "states",
+					"data-testid": "panel-states",
+					"aria-label": `${panel.title} required states`
+				}, panel.states.map((state) => R.createElement("li", {
+					key: state,
+					"data-testid": "panel-state-badge",
+					"data-state-badge": state
+				}, stateBadgeLabel(state)))),
+				R.createElement("p", {
+					key: "action",
+					"data-testid": "panel-action",
+					"data-action-kind": panel.action.kind,
+					"data-action-code": panel.action.kind === "typed_refusal" ? panel.action.code : void 0
+				}, `Action: ${actionSummary(panel.action)}`),
+				R.createElement("p", {
+					key: "layout",
+					"data-testid": "panel-layout"
+				}, `Split: ${panel.layout.split} · Stack: ${panel.layout.stack}`),
+				R.createElement("p", {
+					key: "source",
+					"data-testid": "panel-source",
+					className: "panel-inventory__muted"
+				}, `Source: ${panel.source_command}`),
+				R.createElement("a", {
+					key: "link",
+					href: panel.deep_link,
+					"data-testid": "panel-deep-link",
+					"aria-label": `Open ${panel.title}`
+				}, panel.deep_link)
+			]);
+			return R.createElement("section", {
+				"data-testid": "panel-inventory",
+				"data-state": "available",
+				"data-panel-count": String(panels.length),
+				"aria-label": "Panel inventory",
+				className: "panel-inventory"
+			}, [R.createElement("p", {
+				key: "count",
+				role: "status",
+				"aria-live": "polite",
+				"data-testid": "panel-inventory-count"
+			}, `${panels.length} panels declared`), R.createElement("ul", {
+				key: "list",
+				role: "list",
+				"data-testid": "panel-inventory-list",
+				"aria-label": "Panels",
+				className: "panel-inventory__list"
+			}, panels.map(renderRow))]);
 		};
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/etsy-connection.ts
@@ -201825,6 +206911,125 @@ create: function(game) {
 		if (!config.effects || !config.weather) return "none";
 		return effectForCondition(config.weather.condition);
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/a11y.ts
+	var FOCUSABLE_SELECTOR = [
+		"a[href]",
+		"button:not([disabled])",
+		"input:not([disabled]):not([type='hidden'])",
+		"select:not([disabled])",
+		"textarea:not([disabled])",
+		"[tabindex]:not([tabindex='-1'])",
+		"iframe"
+	].join(",");
+	/** The live announcement for the office's current load/connection state. */
+	function officeAnnouncement(input) {
+		const prefix = input.dockLabel ? `Opened ${input.dockLabel}. ` : "";
+		const failed = typeof input.failed === "string" ? input.failed.trim() : "";
+		if (failed) return `${prefix}Office error: ${failed}`;
+		const state = input.state ?? "connecting";
+		const detail = typeof input.error === "string" ? input.error.trim() : "";
+		if (state === "error") return `${prefix}Office backend unavailable${detail ? `: ${detail}` : ""}.`;
+		if (state === "stale") return `${prefix}Office showing its last known state${detail ? `: ${detail}` : ""}.`;
+		if (state === "connected") {
+			const rooms = input.rooms ?? 0;
+			const agents = input.agents ?? 0;
+			if (rooms === 0 && agents === 0) return `${prefix}Office connected, no rooms yet.`;
+			return `${prefix}Office connected, ${rooms} room${rooms === 1 ? "" : "s"}, ${agents} agent${agents === 1 ? "" : "s"}.`;
+		}
+		if (input.loaded) return `${prefix}Office ready.`;
+		return `${prefix}Loading the office.`;
+	}
+	function isVisible(element) {
+		if (!element || typeof element !== "object") return false;
+		if (element.getAttribute?.("aria-hidden") === "true") return false;
+		if (element.hasAttribute?.("hidden")) return false;
+		const style = element.style;
+		if (style && (style.display === "none" || style.visibility === "hidden")) return false;
+		return true;
+	}
+	/** Tabbable descendants in DOM order. Never throws on a missing root. */
+	function focusableElements(root) {
+		if (!root || typeof root.querySelectorAll !== "function") return [];
+		return Array.from(root.querySelectorAll(FOCUSABLE_SELECTOR)).filter(isVisible);
+	}
+	/** Focus the first tabbable descendant, or the root itself as a fallback. */
+	function focusFirst(root) {
+		if (!root) return null;
+		const target = focusableElements(root)[0] ?? root;
+		target.focus?.();
+		return target;
+	}
+	/**
+	* Capture the currently focused element and return a restore closure.
+	* Restoring only succeeds when the element is still attached, so a removed
+	* dock opener cannot steal focus back from a later view.
+	*/
+	function captureFocus(doc) {
+		const documentRef = doc ?? (typeof document === "undefined" ? null : document);
+		const active = documentRef?.activeElement ?? null;
+		const element = active && active !== documentRef?.body ? active : null;
+		return {
+			element,
+			restore: () => restoreFocus(element, documentRef)
+		};
+	}
+	/** Restore focus to a previously captured element when it is still attached. */
+	function restoreFocus(element, doc) {
+		const documentRef = doc ?? (typeof document === "undefined" ? null : document);
+		if (!element || !documentRef || !documentRef.contains(element)) return false;
+		element.focus?.();
+		return documentRef.activeElement === element;
+	}
+	function matchMediaList(query, win) {
+		const windowRef = win ?? (typeof window === "undefined" ? null : window);
+		if (!windowRef || typeof windowRef.matchMedia !== "function") return null;
+		try {
+			return windowRef.matchMedia(query);
+		} catch {
+			return null;
+		}
+	}
+	/** The OS/browser preference; false when it cannot be read (jsdom, tests). */
+	function prefersReducedMotion(win) {
+		return Boolean(matchMediaList("(prefers-reduced-motion: reduce)", win)?.matches);
+	}
+	/** `prefers-contrast: more` (or the older `forced-colors: active`). */
+	function prefersHighContrast(win) {
+		return Boolean(matchMediaList("(prefers-contrast: more)", win)?.matches || matchMediaList("(forced-colors: active)", win)?.matches);
+	}
+	/** Subscribe to a media-query change; returns an unsubscribe function. */
+	function onMediaQueryChange(query, listener, win) {
+		const list = matchMediaList(query, win);
+		if (!list) return () => {};
+		const handler = (event) => listener(Boolean(event.matches));
+		if (typeof list.addEventListener === "function") {
+			list.addEventListener("change", handler);
+			return () => list.removeEventListener("change", handler);
+		}
+		const legacy = list;
+		legacy.addListener?.(handler);
+		return () => legacy.removeListener?.(handler);
+	}
+	function onReducedMotionChange(listener, win) {
+		return onMediaQueryChange("(prefers-reduced-motion: reduce)", listener, win);
+	}
+	/**
+	* Install an Escape-to-shell escape hatch inside the same-origin office frame.
+	*
+	* The vendored client owns its document and can swallow Tab, so the shell
+	* provides a guaranteed way out: Escape returns focus to the shell controls.
+	* No-op when the document is not reachable (tests, sandboxed frames).
+	*/
+	function installEscapeToShell(frameWindow, onEscape) {
+		const doc = frameWindow?.document;
+		if (!doc || typeof doc.addEventListener !== "function") return () => {};
+		const handler = (event) => {
+			if (event.key !== "Escape") return;
+			onEscape();
+		};
+		doc.addEventListener("keydown", handler, true);
+		return () => doc.removeEventListener("keydown", handler, true);
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx
 	/** Always-present art credit; it must not depend on a theme being active. */
 	var OFFICE_ART_CREDIT = OFFICE_BRAND.credit;
@@ -201890,6 +207095,11 @@ create: function(game) {
 			AgentControlDrawer: createAgentControlDrawer(R, hooks),
 			WarRoomPanel: createWarRoomPanel(R, hooks),
 			ApprovalsPanel: createApprovalsPanel(R, hooks),
+			CommandCenter: createCommandCenter(R, hooks),
+			Timeline: createTimeline(R, hooks),
+			RoomBuilder: createRoomBuilder(R, hooks),
+			OutsideWorld: createOutsideWorld(R, hooks),
+			PanelInventory: createPanelInventoryPanel(R, hooks),
 			EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
 			LoadingScreen: createOfficeLoadingScreen(R, hooks)
 		};
@@ -201917,10 +207127,38 @@ create: function(game) {
 			const [approvalsOpen, setApprovalsOpen] = useState(false);
 			const [approvalCount, setApprovalCount] = useState(0);
 			const [etsyOpen, setEtsyOpen] = useState(false);
+			const [commandCenterOpen, setCommandCenterOpen] = useState(false);
+			const [timelineOpen, setTimelineOpen] = useState(false);
+			const [studioOpen, setStudioOpen] = useState(false);
+			const [studioTab, setStudioTab] = useState("panels");
+			const [outsideView, setOutsideView] = useState(null);
+			const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion());
+			const [highContrast, setHighContrast] = useState(prefersHighContrast());
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			useEffect(() => {
+				if (!studioOpen || studioTab !== "outside") return;
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				fetchOutsideWorld({
+					base: props.base,
+					signal: ctl?.signal
+				}).then((view) => {
+					if (live) setOutsideView(view);
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				studioOpen,
+				studioTab,
+				props.base
+			]);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
+			const openDockRef = useRef(null);
+			const focusReturnRef = useRef(null);
 			useEffect(() => {
 				let cancelled = false;
 				const hostWindow = typeof window === "undefined" ? null : window;
@@ -201937,6 +207175,47 @@ create: function(game) {
 				if (typeof document === "undefined") return;
 				return applyHostTheme(document, officeTheme);
 			}, [officeTheme]);
+			const openDockId = agentsOpen ? "office-game-agents-dock" : hudOpen ? "office-game-hud-dock" : warRoomOpen ? "office-game-warroom-dock" : controlSeat ? "office-game-agent-control-dock" : approvalsOpen ? "office-game-approvals-dock" : etsyOpen ? "office-game-etsy-dock" : commandCenterOpen ? "office-game-command-center-dock" : timelineOpen ? "office-game-timeline-dock" : null;
+			const openDockLabel = agentsOpen ? "Agents" : hudOpen ? "HUD" : warRoomOpen ? "War Room" : controlSeat ? "Agent controls" : approvalsOpen ? "Approvals" : etsyOpen ? "Etsy connection" : commandCenterOpen ? "Command Center" : timelineOpen ? "Timeline" : null;
+			useEffect(() => {
+				if (typeof window === "undefined") return;
+				setReducedMotion(prefersReducedMotion());
+				setHighContrast(prefersHighContrast());
+				const offReduced = onReducedMotionChange((next) => setReducedMotion(next));
+				const offContrast = onMediaQueryChange("(prefers-contrast: more)", () => setHighContrast(prefersHighContrast()));
+				return () => {
+					offReduced();
+					offContrast();
+				};
+			}, []);
+			useEffect(() => {
+				const doc = typeof document === "undefined" ? null : document;
+				if (!doc) return;
+				const remember = (event) => {
+					const control = event.target?.closest?.("button, a, [role='button'], input, select, textarea");
+					if (control) focusReturnRef.current = control;
+				};
+				doc.addEventListener("click", remember, true);
+				return () => doc.removeEventListener("click", remember, true);
+			}, []);
+			useEffect(() => {
+				const doc = typeof document === "undefined" ? null : document;
+				if (!doc) return;
+				const previous = openDockRef.current;
+				if (openDockId && openDockId !== previous) {
+					if (!focusReturnRef.current) {
+						const captured = captureFocus(doc);
+						focusReturnRef.current = captured.element;
+					}
+					const dock = doc.getElementById(openDockId);
+					if (dock) focusFirst(dock);
+				} else if (!openDockId && previous) {
+					const target = focusReturnRef.current;
+					if (!restoreFocus(target, doc)) doc.getElementById("office-game-main")?.focus?.();
+					focusReturnRef.current = null;
+				}
+				openDockRef.current = openDockId;
+			}, [openDockId]);
 			useEffect(() => {
 				if (typeof window === "undefined") return;
 				let live = true;
@@ -201967,19 +207246,32 @@ create: function(game) {
 					setFailed("The office API could not be connected from this page.");
 					return;
 				}
+				let restoreEscape;
 				const onLoad = () => {
 					setLoaded(true);
 					setFailed(null);
 					installOfficeBrand(win);
+					restoreEscape?.();
+					const loadedWindow = frame.contentWindow;
+					restoreEscape = installEscapeToShell(loadedWindow, () => {
+						if (typeof document === "undefined") return;
+						const controls = document.getElementById("office-game-controls");
+						const main = document.getElementById("office-game-main");
+						(controls ?? main)?.focus?.();
+					});
 					menuRef.current?.dispose();
 					setMenuFallback(false);
 					menuRef.current = installOfficeMenuButtons(win, {
 						onToggleAgents: () => {
 							setApprovalsOpen(false);
+							setCommandCenterOpen(false);
+							setTimelineOpen(false);
 							setAgentsOpen((v) => !v);
 						},
 						onToggleHud: () => {
 							setApprovalsOpen(false);
+							setCommandCenterOpen(false);
+							setTimelineOpen(false);
 							setControlSeat(null);
 							setHudOpen((v) => !v);
 						},
@@ -201987,6 +207279,8 @@ create: function(game) {
 							setAgentsOpen(false);
 							setHudOpen(false);
 							setWarRoomOpen(false);
+							setCommandCenterOpen(false);
+							setTimelineOpen(false);
 							setControlSeat(null);
 							setApprovalsOpen((v) => !v);
 						},
@@ -202017,6 +207311,7 @@ create: function(game) {
 					frame.removeEventListener("error", onError);
 					menuRef.current?.dispose();
 					menuRef.current = null;
+					restoreEscape?.();
 					restoreBridge?.();
 				};
 			}, [
@@ -202033,10 +207328,47 @@ create: function(game) {
 					pendingApprovals: approvalCount
 				});
 			});
+			useEffect(() => {
+				if (typeof window === "undefined") return;
+				const onKey = (event) => {
+					const command = Boolean(event.ctrlKey || event.metaKey);
+					const key = String(event.key || "");
+					if (!(command && (key === "k" || key === "K") || key === "/" && !isEditableTarget(event.target))) return;
+					event.preventDefault();
+					setAgentsOpen(false);
+					setHudOpen(false);
+					setWarRoomOpen(false);
+					setApprovalsOpen(false);
+					setEtsyOpen(false);
+					setTimelineOpen(false);
+					setControlSeat(null);
+					setCommandCenterOpen(true);
+				};
+				window.addEventListener("keydown", onKey);
+				return () => window.removeEventListener("keydown", onKey);
+			}, []);
 			const dockSlice = officeSliceName(officeTheme, "dock");
 			const buttonSlice = officeSliceName(officeTheme, "button");
 			const children = [
-				R.createElement("iframe", {
+				R.createElement("a", {
+					key: "skip-main",
+					href: "#office-game-main",
+					className: "office-game__skipLink",
+					"data-testid": "office-app-skip-link"
+				}, "Skip to office content"),
+				R.createElement("a", {
+					key: "skip-controls",
+					href: "#office-game-controls",
+					className: "office-game__skipLink office-game__skipLink--controls",
+					"data-testid": "office-app-skip-controls"
+				}, "Skip past the office canvas"),
+				R.createElement("main", {
+					key: "main",
+					id: "office-game-main",
+					className: "office-game__main",
+					tabIndex: -1,
+					"aria-label": `${OFFICE_BRAND.name} workspace`
+				}, [R.createElement("iframe", {
 					key: "frame",
 					ref: frameRef,
 					title: OFFICE_BRAND.title,
@@ -202054,12 +207386,11 @@ create: function(game) {
 						height: "100%",
 						display: "block"
 					}
-				}),
-				R.createElement("p", {
+				}), R.createElement("p", {
 					key: "description",
 					id: "office-app-description",
 					className: "office-game__sr-only"
-				}, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled.`),
+				}, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled. Every critical status is also shown as text, so muting audio never hides it. On touch screens the shell controls are at least 24 by 24 pixels.`)]),
 				R.createElement("div", {
 					key: "credits",
 					className: "office-game__credits",
@@ -202077,6 +207408,22 @@ create: function(game) {
 					title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`
 				}, OFFICE_BRAND.legalLabel))
 			];
+			children.push(R.createElement("div", {
+				key: "announcer",
+				className: "office-game__sr-only",
+				"data-testid": "office-app-announcer",
+				role: "status",
+				"aria-live": "polite",
+				"aria-atomic": "true"
+			}, officeAnnouncement({
+				loaded,
+				failed,
+				state: props.officeState,
+				rooms: props.officeRooms,
+				agents: props.officeAgents,
+				error: props.officeError,
+				dockLabel: openDockLabel
+			})));
 			if (props.officeState) {
 				const state = props.officeState;
 				children.push(R.createElement("div", {
@@ -202162,6 +207509,7 @@ create: function(game) {
 					onClick: () => {
 						setAgentsOpen(false);
 						setApprovalsOpen(false);
+						setTimelineOpen(false);
 						setControlSeat(null);
 						setWarRoomOpen(true);
 					}
@@ -202176,6 +207524,7 @@ create: function(game) {
 					onClick: () => {
 						setAgentsOpen(false);
 						setApprovalsOpen(false);
+						setTimelineOpen(false);
 						setControlSeat(null);
 						setWarRoomOpen(false);
 						setHudOpen(false);
@@ -202327,15 +207676,21 @@ create: function(game) {
 				const pressed = spec.id === "agents" ? agentsOpen : spec.id === "hud" ? hudOpen : approvalsOpen;
 				const onActivate = spec.id === "agents" ? () => {
 					setApprovalsOpen(false);
+					setCommandCenterOpen(false);
+					setTimelineOpen(false);
 					setAgentsOpen((v) => !v);
 				} : spec.id === "hud" ? () => {
 					setApprovalsOpen(false);
+					setCommandCenterOpen(false);
+					setTimelineOpen(false);
 					setControlSeat(null);
 					setHudOpen((v) => !v);
 				} : () => {
 					setAgentsOpen(false);
 					setHudOpen(false);
 					setWarRoomOpen(false);
+					setCommandCenterOpen(false);
+					setTimelineOpen(false);
 					setControlSeat(null);
 					setApprovalsOpen((v) => !v);
 				};
@@ -202372,6 +207727,154 @@ create: function(game) {
 					onClick: onActivate
 				}, ...parts);
 			})));
+			const commandCenterToggle = R.createElement("button", {
+				key: "command-center-toggle",
+				type: "button",
+				className: "office-game__btn office-theme-menu-btn office-game__commandCenterToggle",
+				"data-testid": "office-command-center-toggle",
+				"aria-expanded": commandCenterOpen,
+				"aria-controls": "office-game-command-center-dock",
+				"aria-label": "Open the office command center",
+				onClick: () => {
+					setAgentsOpen(false);
+					setHudOpen(false);
+					setWarRoomOpen(false);
+					setApprovalsOpen(false);
+					setEtsyOpen(false);
+					setControlSeat(null);
+					setCommandCenterOpen((v) => !v);
+				}
+			}, "Command Center");
+			if (commandCenterOpen) children.push(R.createElement("div", {
+				key: "command-center-dock",
+				id: "office-game-command-center-dock",
+				className: "office-game__dock office-game__panel office-theme-dock office-game__commandCenterDock",
+				"data-testid": "office-game-command-center-dock",
+				"data-office-dock": "command-center",
+				"data-office-slice": dockSlice,
+				role: "region",
+				"aria-label": "Command center"
+			}, [R.createElement(CommandCenter, {
+				key: "body",
+				base: props.base,
+				onClose: () => setCommandCenterOpen(false)
+			})]));
+			const timelineToggle = R.createElement("button", {
+				key: "timeline-toggle",
+				type: "button",
+				className: "office-game__btn office-theme-menu-btn office-game__timelineToggle",
+				"data-testid": "office-timeline-toggle",
+				"aria-expanded": timelineOpen,
+				"aria-controls": "office-game-timeline-dock",
+				"aria-label": "Open the operator timeline",
+				onClick: () => {
+					setAgentsOpen(false);
+					setHudOpen(false);
+					setWarRoomOpen(false);
+					setApprovalsOpen(false);
+					setEtsyOpen(false);
+					setCommandCenterOpen(false);
+					setControlSeat(null);
+					setTimelineOpen((v) => !v);
+				}
+			}, "Timeline");
+			const studioToggle = R.createElement("button", {
+				key: "studio-toggle",
+				type: "button",
+				className: "office-game__btn office-theme-menu-btn office-game__studioToggle",
+				"data-testid": "office-studio-toggle",
+				"aria-expanded": studioOpen,
+				"aria-controls": "office-game-studio-dock",
+				"aria-label": "Open the office studio",
+				onClick: () => {
+					setAgentsOpen(false);
+					setHudOpen(false);
+					setWarRoomOpen(false);
+					setApprovalsOpen(false);
+					setEtsyOpen(false);
+					setCommandCenterOpen(false);
+					setTimelineOpen(false);
+					setControlSeat(null);
+					setStudioOpen((v) => !v);
+				}
+			}, "Studio");
+			children.push(R.createElement("div", {
+				key: "toolbar",
+				id: "office-game-controls",
+				className: "office-game__toolbar",
+				"data-testid": "office-app-toolbar",
+				role: "toolbar",
+				"aria-label": "Office panels",
+				tabIndex: -1
+			}, [
+				commandCenterToggle,
+				timelineToggle,
+				studioToggle
+			]));
+			if (timelineOpen) children.push(R.createElement("div", {
+				key: "timeline-dock",
+				id: "office-game-timeline-dock",
+				className: "office-game__dock office-game__panel office-theme-dock office-game__timelineDock",
+				"data-testid": "office-game-timeline-dock",
+				"data-office-dock": "timeline",
+				"data-office-slice": dockSlice,
+				role: "region",
+				"aria-label": "Operator timeline"
+			}, [R.createElement(Timeline, {
+				key: "body",
+				base: props.base,
+				onClose: () => setTimelineOpen(false)
+			})]));
+			if (studioOpen) {
+				const tab = (id, label) => R.createElement("button", {
+					key: `studio-tab-${id}`,
+					type: "button",
+					className: "office-game__btn office-game__studioTab",
+					"data-testid": `office-studio-tab-${id}`,
+					"aria-pressed": studioTab === id,
+					onClick: () => setStudioTab(id)
+				}, label);
+				const body = studioTab === "rooms" ? R.createElement(RoomBuilder, { key: "rooms" }) : studioTab === "outside" ? R.createElement(OutsideWorld, {
+					key: "outside",
+					view: outsideView ?? void 0,
+					loading: outsideView === null
+				}) : R.createElement(PanelInventory, {
+					key: "panels",
+					base: props.base
+				});
+				children.push(R.createElement("div", {
+					key: "studio-dock",
+					id: "office-game-studio-dock",
+					className: "office-game__dock office-game__panel office-theme-dock office-game__studioDock",
+					"data-testid": "office-game-studio-dock",
+					"data-office-dock": "studio",
+					"data-office-slice": dockSlice,
+					role: "region",
+					"aria-label": "Office studio"
+				}, [R.createElement("div", {
+					key: "head",
+					className: "office-game__dockHead office-theme-dock-head"
+				}, [
+					R.createElement("span", {
+						key: "t",
+						className: "office-theme-dock-title"
+					}, "Studio"),
+					tab("panels", "Panels"),
+					tab("rooms", "Rooms"),
+					tab("outside", "Outside"),
+					R.createElement("button", {
+						key: "x",
+						type: "button",
+						className: "office-game__btn office-theme-dock-close",
+						"data-testid": "office-game-studio-close",
+						"aria-label": "Close studio",
+						onClick: () => setStudioOpen(false)
+					}, "Close")
+				]), R.createElement("div", {
+					key: "body",
+					className: "office-game__studioBody"
+				}, body)]));
+			}
 			children.push(R.createElement(LoadingScreen, {
 				key: "loading-screen",
 				phase: failed ? "error" : "loading",
@@ -202386,13 +207889,16 @@ create: function(game) {
 			}));
 			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
 			const dualDocks = agentsOpen && hudOpen || warRoomOpen && controlSeat !== null;
-			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null || approvalsOpen || etsyOpen;
+			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null || approvalsOpen || etsyOpen || commandCenterOpen || timelineOpen || studioOpen;
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				"data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : void 0,
 				"data-office-docks": dualDocks ? "both" : void 0,
 				"data-office-dock-top": dockOpen ? "toolbar" : void 0,
-				className: rootClass
+				"data-office-reduced-motion": reducedMotion ? "1" : void 0,
+				"data-office-contrast": highContrast ? "high" : void 0,
+				className: rootClass,
+				style: { position: "relative" }
 			}, children);
 		};
 	}

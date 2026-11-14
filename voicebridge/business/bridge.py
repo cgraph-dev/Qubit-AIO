@@ -46,11 +46,13 @@ from ..integrations.etsy_auth_transport import EtsyOAuthHttpTransport
 from ..office.world import assign as WORLD_ASSIGN
 from ..office.world import model as WORLD
 from ..office.world import occupancy as OCCUPANCY
+from ..office.world import outside_world as OUTSIDE_WORLD
 from . import agents as AGENTS
 from . import command_center as COMMAND_CENTER
 from . import effective_state as EFFECTIVE
 from . import office_seats as OFFICE_SEATS
 from . import operator_timeline as OPERATOR
+from . import panel_inventory as PANEL_INVENTORY
 from . import pilot as ETSY_PILOT
 from . import research_run as RESEARCH_RUN
 from . import warroom as WARROOM
@@ -963,6 +965,26 @@ def h_business_operator_timeline(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
             replay=q.get("replay"),
         )
         return _ok(schema=OPERATOR.SCHEMA, projection=projection)
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
+def h_business_panel_inventory(cfg: Any, q: Dict[str, str],
+                                b: Dict[str, Any],
+                                p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/business/panel-inventory -> declarative panel catalog."""
+    try:
+        return 200, PANEL_INVENTORY.inventory()
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
+def h_world_outside(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                    p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/world/outside -> presentation-only exterior projection."""
+    try:
+        world = OUTSIDE_WORLD.build_outside_world()
+        return 200, OUTSIDE_WORLD.outside_world_payload(world)
     except Exception as exc:  # noqa: BLE001
         return _error(exc)
 
