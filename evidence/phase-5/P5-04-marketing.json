@@ -1,0 +1,98 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_crm_marketing.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": " \"refusal=BUSINESS_MARKETING_RATE_LIMITED adapter_calls=1\",\n      \"name\": \"rate_limit_refusal\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"refusal=BUSINESS_MARKETING_RECEIPT_REQUIRED\",\n      \"name\": \"receipt_required\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"unknown_refusal=BUSINESS_MARKETING_PUBLICATION_UNKNOWN reconciled=True status=published\",\n      \"name\": \"unknown_then_reconciled\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"record_refusal=BUSINESS_MARKETING_ENGAGEMENT_REFUSED content_refusal=BUSINESS_MARKETING_CONTENT_REFUSED\",\n      \"name\": \"no_fake_engagement\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 17,\n  \"generated_at\": \"2026-11-14T05:53:14Z\",\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-crm-marketing-verification/1\"\n}\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/crm.py voicebridge/business/marketing.py scripts/verify_crm_marketing.py tests/phase5_crm_marketing/test_crm.py tests/phase5_crm_marketing/test_marketing.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/crm.py voicebridge/business/marketing.py scripts/verify_crm_marketing.py tests/phase5_crm_marketing/test_crm.py tests/phase5_crm_marketing/test_marketing.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase5_crm_marketing tests/phase4_threads_delegation",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".........................................                                [100%]\n41 passed in 3.49s\n"
+    }
+  ],
+  "generated_at": "2026-11-14T05:53:14Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "voicebridge/integrations/platform_policy.py",
+      "sha256": "83b1b55aaa39672342140e4fee9caba6093ea368d4f31800a4e9702b12131a02"
+    },
+    {
+      "path": "voicebridge/integrations/base.py",
+      "sha256": "cf2f6e2bc40307e7eb6c9992c453d11ff83c8d26a5289ead5ac95f328efecaca"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/ids.py",
+      "sha256": "1b60a89793cf78e9f93a351eeb34c979bb5d339a6d29de3fde3c992e70423ecc"
+    },
+    {
+      "path": "voicebridge/business/util.py",
+      "sha256": "d07c29e4b413bfa402c7052b532323a6321379581425ad17d61ca58857404933"
+    }
+  ],
+  "limitations": [
+    "publication goes through an injected sandbox adapter; no live social API or credentials exist",
+    "sandbox/fake receipts are the only accepted environments; live publication is out of scope",
+    "rate limits are derived from the durable publication event log per tenant/venue",
+    "engagement metrics are refused rather than fetched; no analytics API is called",
+    "unknown outcomes require an exact receipt before reconciliation; no provider polling is implemented"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/marketing.py",
+      "sha256": "c4c41c928c2250e31fa74f3c958c222e7718dcee412f7b9fa82e0f78c8e9215d"
+    },
+    {
+      "path": "tests/phase5_crm_marketing/test_marketing.py",
+      "sha256": "6eaca9c2aa60dbbaadf54e18cd8dc8b3e54940910e583ef20adb8e12ebde93ad"
+    },
+    {
+      "path": "scripts/verify_crm_marketing.py",
+      "sha256": "74396cf4f4f61dd19ffa6c5591b10e5f6de7c4485d8c2137a1229bc7f0b28df6"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P5-04"
+}
