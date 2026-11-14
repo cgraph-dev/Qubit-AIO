@@ -1,31 +1,31 @@
 {
   "commands": [
     {
-      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/security_matrix.py --json",
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/security_matrix.py --json",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": "p\",\n      \"control\": \"Sandbox egress policy + capability runtime validation for the MCP category before the adapter; every redirect hop is re-checked.\",\n      \"expected_denial\": \"Typed sandbox refusal for loopback/private/metadata URLs and for a redirect into them, with zero adapter calls.\",\n      \"id\": \"MCP-SSRF\",\n      \"reason\": \"\",\n      \"status\": \"pass\",\n      \"test\": \"tests/phase8_security/test_mcp_security.py::test_mcp_egress_blocks_loopback_private_and_metadata\",\n      \"threat\": \"MCP egress reaches loopback, private, link-local or cloud-metadata addresses, or a redirect does.\"\n    },\n    {\n      \"category\": \"mcp\",\n      \"control\": \"Bounded tool arguments, truncated/labelled output, and a capability-runtime output cap before the result can reach a prompt.\",\n      \"expected_denial\": \"MCP_PROTOCOL_ERROR for oversized arguments; output truncated and marked redacted; CAPABILITY_RUNTIME_OUTPUT_TOO_LARGE for an oversized adapter result.\",\n      \"id\": \"MCP-OUTPUT\",\n      \"reason\": \"\",\n      \"status\": \"pass\",\n      \"test\": \"tests/phase8_security/test_mcp_security.py::test_mcp_oversized_args_and_output_are_bounded\",\n      \"threat\": \"Oversized or untrusted MCP output floods context or carries unbounded content.\"\n    },\n    {\n      \"category\": \"mcp\",\n      \"control\": \"Per-server allowlist and namespaced catalog identity (mcp:<server>:<tool>); no cross-server tool reuse.\",\n      \"expected_denial\": \"MCP_TOOL_NOT_ALLOWED when server B is asked for server A's tool (and vice versa).\",\n      \"id\": \"MCP-PER-SERVER-SCOPE\",\n      \"reason\": \"\",\n      \"status\": \"pass\",\n      \"test\": \"tests/phase8_security/test_mcp_security.py::test_mcp_tool_and_credential_scope_is_per_server\",\n      \"threat\": \"A tool or credential from one MCP server is used against another server.\"\n    }\n  ],\n  \"schema\": \"qubit-office-security-matrix/1\",\n  \"summary\": {\n    \"applicable\": 21,\n    \"failed\": 0,\n    \"not_applicable\": 0,\n    \"passed\": 21,\n    \"rows\": 21,\n    \"unclassified\": 0\n  },\n  \"task_id\": \"P8-02\"\n}"
     },
     {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_security tests/phase1_gateway tests/phase1_security tests/phase4_runtime_safety",
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_security tests/phase1_gateway tests/phase1_security tests/phase4_runtime_safety",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": "........................................................................ [ 52%]\n..................................................................       [100%]\n138 passed in 4.75s"
     },
     {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals tests/phase2_memory",
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals tests/phase2_memory",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": "............................................................             [100%]\n60 passed in 4.43s"
     },
     {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/security_matrix.py tests/phase8_security",
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m ruff check scripts/security_matrix.py tests/phase8_security",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": "All checks passed!"
     },
     {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile scripts/security_matrix.py tests/phase8_security/_p8_helpers.py tests/phase8_security/test_asi_denials.py tests/phase8_security/test_mcp_security.py",
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m py_compile scripts/security_matrix.py tests/phase8_security/_p8_helpers.py tests/phase8_security/test_asi_denials.py tests/phase8_security/test_mcp_security.py",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": ""
