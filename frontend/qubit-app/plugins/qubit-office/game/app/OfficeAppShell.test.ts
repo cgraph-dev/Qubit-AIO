@@ -557,4 +557,60 @@ describe("host theme + rerender stability", () => {
     expect(String(dock?.props.className)).toContain("office-game__etsyDock");
     h.cleanup();
   });
+
+  it("mounts the command center without changing the dock/menu contracts", () => {
+    // State order now: ..., etsyOpen (12), commandCenterOpen (13). Seed the
+    // command center open and a harmless fetch so no network is attempted.
+    const previous = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => new Response(
+      JSON.stringify({ ok: false, code: "TEST_REFUSAL", detail: "test" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    )) as unknown as typeof fetch;
+    try {
+      const h = createStatefulHarness({ 13: true });
+      h.render({});
+      const root = h.tree.find((e) => e.props["data-testid"] === "office-app");
+      // The toolbar offset still applies, so the sheet clears Panels/Agents/HUD.
+      expect(root?.props["data-office-dock-top"]).toBe("toolbar");
+      // A single command-center sheet is not a dual-dock split.
+      expect(root?.props["data-office-docks"]).toBeUndefined();
+      const dock = h.tree.find(
+        (e) => e.props["data-testid"] === "office-game-command-center-dock");
+      expect(dock).toBeDefined();
+      expect(dock?.props["data-office-dock"]).toBe("command-center");
+      expect(dock?.props.role).toBe("region");
+      expect(dock?.props["aria-label"]).toBe("Command center");
+      expect(String(dock?.props.className)).toContain("office-game__commandCenterDock");
+      const outer = dock?.props.children as Array<Array<{ type: unknown }>>;
+      const panel = (outer?.[0] ?? [])[0];
+      expect(typeof panel?.type).toBe("function");
+      // The iframe keeps its full frame, and the existing docks are not replaced.
+      const frame = h.tree.find((e) => e.type === "iframe");
+      expect(frame?.props.style).toMatchObject({
+        width: "100%", height: "100%", display: "block" });
+      expect(h.tree.find(
+        (e) => e.props["data-testid"] === "office-game-hud-dock")).toBeUndefined();
+      expect(h.tree.find(
+        (e) => e.props["data-testid"] === "office-game-agents-dock"))
+        .toBeUndefined();
+      // The visible toggle names the dock it controls and reports its state.
+      const toggle = h.tree.find(
+        (e) => e.props["data-testid"] === "office-command-center-toggle");
+      expect(toggle).toBeDefined();
+      expect(toggle?.props["aria-controls"]).toBe("office-game-command-center-dock");
+      expect(toggle?.props["aria-expanded"]).toBe(true);
+      expect(String(toggle?.props.children)).toContain("Command Center");
+      // Closing removes the sheet; the toolbar marker clears with it.
+      (toggle?.props.onClick as () => void)();
+      h.render({});
+      expect(h.tree.find(
+        (e) => e.props["data-testid"] === "office-game-command-center-dock"))
+        .toBeUndefined();
+      const after = h.tree.find((e) => e.props["data-testid"] === "office-app");
+      expect(after?.props["data-office-dock-top"]).toBeUndefined();
+      h.cleanup();
+    } finally {
+      globalThis.fetch = previous;
+    }
+  });
 });
