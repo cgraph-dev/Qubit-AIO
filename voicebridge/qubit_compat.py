@@ -12123,6 +12123,11 @@ _r("POST", r"/api/office/business/agents/world-assign",
 _r("GET", r"/api/office/business/agents", "h_business_agents_list")
 _r("GET", r"/api/office/business/agents/(?P<id>[^/]+)/audit",
    "h_business_agent_audit")
+# Effective-state projection (P2-07): read-only, tenant-gated. It composes the
+# real agent/identity/lease/budget/approval/audit stores; it never writes and
+# never serves a value the stores do not carry.
+_r("GET", r"/api/office/business/agents/(?P<id>[^/]+)/effective",
+   "h_business_agent_effective")
 _r("GET", r"/api/office/business/agents/(?P<id>[^/]+)", "h_business_agent_get")
 _r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/update",
    "h_business_agent_update")
@@ -21756,6 +21761,7 @@ for _name in (
     "h_business_etsy_complete", "h_business_etsy_disconnect",
     "h_business_agents_assign_world",
     "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
+    "h_business_agent_effective",
     "h_business_agent_update", "h_business_agent_preview",
     "h_business_agent_pause", "h_business_agent_resume",
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
