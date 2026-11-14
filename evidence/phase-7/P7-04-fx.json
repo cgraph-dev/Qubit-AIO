@@ -1,0 +1,84 @@
+{
+  "task_id": "P7-04",
+  "status": "PASS",
+  "generated_at": "2026-11-14T14:30:06Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/office/fx.py",
+      "sha256": "941bde32873b6c1db5ffe4e6ecc5691f01648680ac5ae979be3abcaaf2a00aa5"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/fx.ts",
+      "sha256": "2a0c7dd250778f6a3bb021c2ff88df2caa4ca4711513c3fc8468d5a490584cbb"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/fx.test.ts",
+      "sha256": "ab1bf1f3073901dafb1a3dc6d3b5a4269f16ec5f76e49a8279e4103d1a03a24c"
+    },
+    {
+      "path": "tests/phase7_fx/test_fx.py",
+      "sha256": "67540d39f91e51f34e5c55764655daddfd53dee71556b80ba599cc7909fe4cce"
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase7_fx",
+      "exit_code": 0,
+      "stdout_tail": ".................                                                        [100%]\n17 passed in 0.18s\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/office/fx.py tests/phase7_fx",
+      "exit_code": 0,
+      "stdout_tail": "All checks passed!\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/office/fx.py tests/phase7_fx/test_fx.py",
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/fx.test.ts",
+      "exit_code": 0,
+      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p7-fx/frontend/qubit-web\n\n\n Test Files  1 passed (1)\n      Tests  21 passed (21)\n   Start at  16:29:50\n   Duration  242ms (transform 51ms, setup 0ms, import 69ms, tests 17ms, environment 0ms)\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "./node_modules/.bin/tsc --ignoreConfig --noEmit --strict --noUnusedLocals --noUnusedParameters --target ES2023 --lib ES2023 --module ESNext --moduleResolution bundler --skipLibCheck ../qubit-app/plugins/qubit-office/game/app/fx.ts",
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    }
+  ],
+  "limitations": [
+    "No live service, browser, canvas renderer or atlas was exercised; client tests use synthetic cue names.",
+    "The Python rule table and the TypeScript planner are independent implementations pinned by their own tests; no cross-language runtime comparison was run.",
+    "tsc was run on fx.ts only; fx.test.ts is executed by vitest, whose module resolution is not available to a bare tsc invocation outside frontend/qubit-web.",
+    "Bounded replay caps at 256 effects and a queue at a configurable capacity; overflow is counted, not surfaced as a business event.",
+    "This is not a VERIFIED/COMPLETE release claim and does not cover P7-05/P7-06."
+  ]
+}
