@@ -94,6 +94,17 @@ def test_corrupted_staffed_agents_fails_check() -> None:
     assert "staffed_agents" in result.stderr
 
 
+def test_fixture_digest_is_deterministic(tmp_path: Path) -> None:
+    first = tmp_path / "campus-a.json"
+    second = tmp_path / "campus-b.json"
+    assert _run("--out", str(first)).returncode == 0
+    assert _run("--out", str(second)).returncode == 0
+    a = json.loads(first.read_text(encoding="utf-8"))
+    b = json.loads(second.read_text(encoding="utf-8"))
+    assert a["fixture_digest"] == b["fixture_digest"]
+    assert a["plant_digest"] == b["plant_digest"]
+
+
 def test_no_mode_is_usage_error() -> None:
     result = _run()
     assert result.returncode != 0

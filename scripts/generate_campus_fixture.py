@@ -93,7 +93,10 @@ def build_fixture(plan) -> Dict[str, Any]:
         ],
         "floors": floors,
     }
-    body["fixture_digest"] = _digest(body)
+    # The digest is deterministic: it excludes the wall-clock timestamp so two
+    # runs over the same plan produce the same fixture digest.
+    body["fixture_digest"] = _digest(
+        {key: value for key, value in body.items() if key != "generated_at"})
     return body
 
 
