@@ -1,0 +1,48 @@
+{
+  "task_id": "P0-05",
+  "status": "PASS",
+  "generated_at": "2026-11-14T02:50:08Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-MODEL.md",
+      "sha256": "8cb98c73ac6bcf6984eeef2cb38d12219630c85831dcd4f0ab839b9b94cdaa3a"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-TESTS.json",
+      "sha256": "a09c092fd538f3950072749e25ecb1b368aa35778a28887b25781ec5bcada55d"
+    },
+    {
+      "path": "tests/office_contracts/test_threat_catalog.py",
+      "sha256": "47a3533fdeb6c08a79e07f31b1269e8b8f40fb0760497537379dca84825fc3c4"
+    },
+    {
+      "path": "tests/office_contracts/test_threat_denials.py",
+      "sha256": "aa41516470de82f3ec3ce0dba1e728912c46ca2f4c26209f3aa880233aff63b8"
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_threat_catalog.py tests/office_contracts/test_threat_denials.py",
+      "exit_code": 0,
+      "stdout_tail": "........................................................................ [ 79%]\n...................                                                      [100%]\n91 passed in 2.33s\n",
+      "stderr_tail": ""
+    }
+  ],
+  "limitations": [
+    "Planned rows are real gaps, not passes: MCP schema/description hash review, A2A spoof/replay transport authentication, and execution-time approval payload binding have no passing test yet.",
+    "The ToolGateway currently checks approval status, action and expiry at execution time, but does not compare the approval request_hash with the invocation request_hash; that deeper binding is recorded as GATE-APPROVAL-EXECUTION-BINDING (planned).",
+    "The accessibility row cites the static accessibility-primitives gate, not a manual WCAG 2.2 AA keyboard/screen-reader review.",
+    "Several gate rows cite existing repository tests in adjacent subsystems (web fetch SSRF, backup/restore, sandbox lockdown) because no Office-specific denial test exists yet; the catalog says so by naming the real path.",
+    "No live service, network, or full matrix was used."
+  ]
+}
