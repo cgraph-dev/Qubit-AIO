@@ -1179,6 +1179,10 @@ export function createOfficeApp(
       }, [
         R.createElement("option", { key: "all", value: "" },
           "All live floors"),
+        floorScope && !["live:1", "live:2", "live:3"].includes(floorScope)
+          ? R.createElement("option", { key: "campus", value: floorScope },
+              `Campus ${floorScope}`)
+          : null,
         R.createElement("option", { key: "f1", value: "live:1" },
           "Floor 1 · Executive"),
         R.createElement("option", { key: "f2", value: "live:2" },
@@ -1297,6 +1301,10 @@ export function createOfficeApp(
             world: campusWorld,
             onOpenLiveFloor: (scope: string) => {
               setFloorScope(scope);
+              setCampusOpen(false);
+            },
+            onOpenFloor: (floorId: string) => {
+              setFloorScope(floorId);
               setCampusOpen(false);
             },
           })

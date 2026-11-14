@@ -197349,7 +197349,14 @@ create: function(game) {
 							key: "source",
 							className: "tower__sceneSource",
 							"data-testid": "tower-scene-source"
-						}, sceneSource === "endpoint" ? "endpoint rooms" : "template rooms")
+						}, sceneSource === "endpoint" ? "endpoint rooms" : "template rooms"),
+						props.onOpenFloor ? R.createElement("button", {
+							key: "open",
+							type: "button",
+							className: "tower__liveFloor",
+							"data-testid": "tower-open-floor",
+							onClick: () => props.onOpenFloor?.(floor.floor_id)
+						}, "Open floor scene") : null
 					]),
 					floor.rooms.length ? R.createElement("div", {
 						key: "rooms",
@@ -207899,6 +207906,14 @@ create: function(game) {
 					key: "all",
 					value: ""
 				}, "All live floors"),
+				floorScope && ![
+					"live:1",
+					"live:2",
+					"live:3"
+				].includes(floorScope) ? R.createElement("option", {
+					key: "campus",
+					value: floorScope
+				}, `Campus ${floorScope}`) : null,
 				R.createElement("option", {
 					key: "f1",
 					value: "live:1"
@@ -208009,6 +208024,10 @@ create: function(game) {
 					world: campusWorld,
 					onOpenLiveFloor: (scope) => {
 						setFloorScope(scope);
+						setCampusOpen(false);
+					},
+					onOpenFloor: (floorId) => {
+						setFloorScope(floorId);
 						setCampusOpen(false);
 					}
 				}) : null;

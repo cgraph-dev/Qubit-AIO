@@ -2862,7 +2862,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
         try:
             while time.monotonic() < deadline and self.app._server is not None:
                 try:
-                    tower = OS.scope_tower(TWR.state(cfg), scope)
+                    tower = None
+                    if scope.startswith("floor-"):
+                        tower = OS.template_tower(scope)
+                    if tower is None:
+                        tower = OS.scope_tower(TWR.state(cfg), scope)
                 except Exception as exc:  # noqa: BLE001 - a read must not 500
                     # Report the failure AS A NOTICE rather than closing: the
                     # client keeps its last good snapshot and shows the reason,
@@ -2908,7 +2912,11 @@ class WebUIHandler(BaseHTTPRequestHandler):
             return
         cfg = self.app.orch.cfg
         try:
-            tower = OS.scope_tower(TWR.state(cfg), self._office_floor_scope())
+            scope = self._office_floor_scope()
+            tower = (OS.template_tower(scope)
+                     if scope.startswith("floor-") else None)
+            if tower is None:
+                tower = OS.scope_tower(TWR.state(cfg), scope)
             snap = OS.to_snapshot(tower, 1, time.time())
         except Exception as exc:  # noqa: BLE001 - a read must not 500
             self._json({"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",

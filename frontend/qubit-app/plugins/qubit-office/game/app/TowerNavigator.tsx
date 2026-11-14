@@ -41,6 +41,12 @@ export interface TowerNavigatorProps {
    * staffed. Scopes are ``live:<number>``.
    */
   onOpenLiveFloor?: (scope: string) => void;
+  /**
+   * Open the selected TEMPLATE floor in the animated renderer. It renders the
+   * floor's rooms and furniture with no agents, which is the honest state of a
+   * floor that has no Business OS occupants.
+   */
+  onOpenFloor?: (floorId: string) => void;
 }
 
 function wingTitle(wing: string): string {
@@ -401,6 +407,14 @@ export function createTowerNavigator(
             key: "source", className: "tower__sceneSource",
             "data-testid": "tower-scene-source",
           }, sceneSource === "endpoint" ? "endpoint rooms" : "template rooms"),
+          props.onOpenFloor
+            ? R.createElement("button", {
+                key: "open", type: "button",
+                className: "tower__liveFloor",
+                "data-testid": "tower-open-floor",
+                onClick: () => props.onOpenFloor?.(floor.floor_id),
+              }, "Open floor scene")
+            : null,
         ]),
         floor.rooms.length
           ? R.createElement("div", {

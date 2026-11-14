@@ -784,3 +784,18 @@ def test_scope_unknown_or_invalid_is_the_whole_report_not_an_empty_building():
     t = tower()
     for scope in ("", "live:", "live:999", "garbage", "floor-023"):
         assert os.scope_tower(t, scope) == t
+
+
+def test_template_floor_becomes_a_renderable_room_scene_with_no_agents():
+    t = os.template_tower("floor-001")
+    assert t is not None
+    assert t["characters"] == []
+    snap = os.to_snapshot(t, 1, t["now"])
+    assert snap["agents"] == []
+    assert snap["rooms"], "the template floor produced no rooms"
+    assert all(r["name"] for r in snap["rooms"])
+
+
+def test_unknown_template_floor_is_none_not_an_invented_scene():
+    assert os.template_tower("floor-999") is None
+    assert os.template_tower("not-a-floor") is None

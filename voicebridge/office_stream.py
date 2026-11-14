@@ -147,6 +147,50 @@ def scope_tower(tower: Dict[str, Any], scope: str) -> Dict[str, Any]:
     return scoped
 
 
+def template_tower(floor_id: str,
+                   now: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    """Render one shipped template floor as a renderer tower, with no agents.
+
+    The 100-floor directory is a plan, not a drawing. This turns one plan floor
+    into the same shape the vendored renderer consumes, so an unstaffed floor
+    is still a real room scene (rooms and furniture) instead of a text grid.
+    It deliberately emits an empty character list: a template has no occupant,
+    and inventing one to make the floor look busy would be a lie.
+    """
+    try:
+        from .office.world import tower_plan as TP
+        payload = TP.tower_payload(TP.build_tower_plan(), floor=floor_id)
+    except Exception:  # noqa: BLE001 - a bad floor is a fallback, not a 500
+        return None
+    floors = payload.get("floors") or []
+    if not floors:
+        return None
+    floor = floors[0]
+    try:
+        number = int(floor.get("index", 1))
+    except (TypeError, ValueError):
+        number = 1
+    rooms = []
+    for room in floor.get("rooms") or []:
+        rid = room.get("room_id")
+        if not rid:
+            continue
+        rooms.append({
+            "id": rid,
+            "slug": room.get("name") or rid,
+            "kind": room.get("kind") or "work",
+            "seats": [],
+        })
+    if not rooms:
+        return None
+    return {
+        "now": now if now is not None else time.time(),
+        "floorplan": {"floors": [{"number": number, "rooms": rooms}]},
+        "characters": [],
+        "hud": {},
+    }
+
+
 def to_snapshot(tower: Dict[str, Any], revision: int,
                 start_time: float) -> Dict[str, Any]:
     """Render the tower payload into the client's `OfficeSnapshot`.
