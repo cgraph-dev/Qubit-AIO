@@ -9,6 +9,7 @@ from voicebridge.business.errors import BusinessError
 from _phase1_helpers import (
     NOW,
     READ_TOOL,
+    SUBJECT,
     WRITE_ACTION,
     WRITE_RESOURCE,
     WRITE_TOOL,
@@ -68,6 +69,32 @@ def test_unknown_tool_is_denied_even_when_an_executor_exists(tmp_path):
             {},
             snap=snap,
             cat=catalog(),
+        )
+    assert exc.value.code == pol.CAPABILITY_UNKNOWN_CODE
+    assert executor.calls == []
+
+
+def test_empty_catalog_allows_nothing_even_with_a_grant(tmp_path):
+    bos = store(tmp_path)
+    tenant, business = scope(bos)
+    snap = pol.compile_snapshot(
+        tenant_id=tenant.tenant_id,
+        subject_id=SUBJECT,
+        policy_revision="pol-1",
+        grants=(read_grant(),),
+        issued_at=NOW - 1_000,
+        expires_at=NOW + 1_000,
+    )
+    executor = Recorder()
+    with pytest.raises(BusinessError) as exc:
+        invoke(
+            gateway(bos, executor),
+            tenant,
+            business,
+            READ_TOOL,
+            {},
+            snap=snap,
+            cat=pol.CapabilityCatalog(),
         )
     assert exc.value.code == pol.CAPABILITY_UNKNOWN_CODE
     assert executor.calls == []

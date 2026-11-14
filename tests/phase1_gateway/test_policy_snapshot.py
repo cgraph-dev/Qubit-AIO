@@ -44,6 +44,11 @@ def test_compile_snapshot_is_deterministic_and_carries_versions():
     assert first.snapshot_id.startswith("psnap_")
     assert first.tool_versions == {READ_TOOL: "1.2.0", WRITE_TOOL: "3.0.0"}
     assert first.policy_revision == "pol-1"
+    carried = {c.capability_id: (c.health, c.version) for c in catalog().list()}
+    assert carried == {
+        READ_TOOL: ("healthy", "1.2.0"),
+        WRITE_TOOL: ("degraded", "3.0.0"),
+    }
 
     # A different grant set changes the digest; ordering does not.
     reordered = snapshot("ten_1", grants=(read_grant(),))

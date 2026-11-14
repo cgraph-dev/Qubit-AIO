@@ -1,7 +1,7 @@
 {
   "task_id": "P1-03",
   "status": "PASS",
-  "generated_at": "2026-11-14T03:10:25Z",
+  "generated_at": "2026-11-14T03:11:54Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -67,11 +67,11 @@
     },
     {
       "path": "tests/phase1_gateway/test_policy_snapshot.py",
-      "sha256": "f28494ad35fd77afc265f8bf41542fb4fa65914931c75635d31191221c4b1d0c"
+      "sha256": "f6f36d80a143c314f3ab9737135b8949289682ea1ab29f5b8fedd90079c0a883"
     },
     {
       "path": "tests/phase1_gateway/test_gateway_snapshot.py",
-      "sha256": "e51934e8dae301dc4396827b97382f72ae87772d466e24b3026094734e793ab0"
+      "sha256": "2bb649d6188ab2991c0f0859bded93d8ded71636c92f5a2bbb5b4cd45d588f7f"
     },
     {
       "path": "tests/phase1_gateway/test_gateway_approval_binding.py",
@@ -82,7 +82,7 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_gateway tests/test_integration_tool_gateway.py tests/test_business_os_foundation.py",
       "exit_code": 0,
-      "stdout_tail": "................................................................         [100%]\n64 passed in 3.91s",
+      "stdout_tail": ".................................................................        [100%]\n65 passed in 3.36s",
       "stderr_tail": ""
     },
     {
@@ -100,7 +100,7 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/test_business_*.py tests/test_integration_tool_gateway.py tests/test_office_business.py",
       "exit_code": 1,
-      "stdout_tail": "E        +  where 3 = _scalar(<voicebridge.business.store.BusinessStore object at 0x7b93ff31c1e0>, 'PRAGMA user_version')\n\ntests/test_business_agent_controls.py:920: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_business_agent_controls.py::test_v1_database_migrates_forward_to_the_agent_schema\n1 failed, 216 passed in 28.24s",
+      "stdout_tail": "E        +  where 3 = _scalar(<voicebridge.business.store.BusinessStore object at 0x78711598c370>, 'PRAGMA user_version')\n\ntests/test_business_agent_controls.py:920: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_business_agent_controls.py::test_v1_database_migrates_forward_to_the_agent_schema\n1 failed, 216 passed in 30.48s",
       "stderr_tail": ""
     }
   ],
