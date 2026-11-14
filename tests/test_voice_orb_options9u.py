@@ -29,6 +29,7 @@ def test_roundtrip_atomic(tmp_path):
     assert back.speed == 1.5 and back.click_through is True
     assert back.show_tray is False
     assert back.colors == {"listening": "#22D3EE"}
+    assert back.style == "mark"
 
 
 def test_load_missing_and_corrupt_is_default(tmp_path):
@@ -46,6 +47,21 @@ def test_color_overrides_parsed_and_invalid_dropped():
     rgb = O.color_overrides(o)
     assert rgb == {"listening": (34, 211, 238)}
     assert O.color_overrides(O.OrbOptions()) == {}
+
+
+def test_style_roundtrip_and_validation(tmp_path):
+    from voicebridge.orb import options as O
+    assert O.OrbOptions().style == "mark"
+    assert O.normalize_style("ghost") == "ghost"
+    assert O.normalize_style("ORB") == "mark"
+    assert O.normalize_style("atom") == "mark"
+    assert O.normalize_style("bogus") == "mark"
+    assert O.normalize_style(None) == "mark"
+    p = tmp_path / "style.json"
+    O.save_options(O.OrbOptions(style="ghost"), p)
+    assert O.load_options(p).style == "ghost"
+    assert O.updated(O.OrbOptions(), style="ghost").style == "ghost"
+    assert O.updated(O.OrbOptions(), style="nope").style == "mark"
 
 
 def test_updated_clamps():

@@ -4,8 +4,9 @@ The Qt orb (``voicebridge.orb.qt_app``) is a borderless always-on-top
 overlay with no chrome: owner 2026-10-04 removed the close/collapse
 buttons outright, so its only exits were ``--quit`` / ``--toggle`` and
 the service stop. This module gives it a real app surface: a
-``QSystemTrayIcon`` with Show/Hide, Lock position, Settings…, a
-Test-animation submenu (one entry per orb state) and Quit.
+``QSystemTrayIcon`` with Show/Hide, Lock position, a Theme submenu
+(Orb/Ghost), Settings…, a Test-animation submenu (one entry per orb
+state) and Quit.
 
 Design rules (same as the rest of the orb package):
 
@@ -27,9 +28,10 @@ Design rules (same as the rest of the orb package):
   them.
 
 Menu ids are stable and exact: ``toggle`` (Show orb / Hide orb),
-``lock`` (checkable "Lock position"), ``settings`` ("Settings…"),
-``test`` (submenu "Test animation" with one child per state,
-``test:<state>``) and ``quit`` ("Quit orb").
+``lock`` (checkable "Lock position"), ``theme`` (submenu "Theme" with
+``style:mark`` ("Orb") and ``style:ghost`` ("Ghost")), ``settings``
+("Settings…"), ``test`` (submenu "Test animation" with one child per
+state, ``test:<state>``) and ``quit`` ("Quit orb").
 """
 from __future__ import annotations
 
@@ -46,6 +48,8 @@ ORB_STATES: Tuple[str, ...] = tuple(
 TOGGLE_SHOW_LABEL = "Show orb"
 TOGGLE_HIDE_LABEL = "Hide orb"
 LOCK_LABEL = "Lock position"
+THEME_LABEL = "Theme"
+STYLE_ITEMS = (("style:mark", "Orb"), ("style:ghost", "Ghost"))
 SETTINGS_LABEL = "Settings\u2026"  # "Settings…"
 BRAIN_UNLOAD_LABEL = "Unload local brain (free VRAM)"
 BRAIN_WARM_LABEL = "Load local brain"
@@ -72,24 +76,34 @@ def menu_spec(options: Any = None) -> List[Dict[str, Any]]:
          optional "checked": bool, optional "children": [...]}
 
     ``options`` (a ``voicebridge.orb.options.OrbOptions`` or ``None``)
-    only feeds the checkable Lock item's initial state; every other
-    field is static, so the shipped shape is byte-stable and testable
-    without Qt. The ``test`` submenu has one child per ``state_labels()``
-    entry with id ``"test:<state>"``.
+    only feeds the checkable Lock/Theme states; every other field is
+    static, so the shipped shape is byte-stable and testable without Qt.
+    The ``test`` submenu has one child per ``state_labels()`` entry with
+    id ``"test:<state>"``.
     """
     checked = False
+    style = _options.STYLE_DEFAULT
     try:
         checked = bool(getattr(options, "locked", False))
+        style = _options.normalize_style(getattr(
+            options, "style", _options.STYLE_DEFAULT))
     except Exception:
-        checked = False
+        style = _options.STYLE_DEFAULT
     children: List[Dict[str, Any]] = [
         {"id": "test:" + state, "label": state, "kind": "action"}
         for state in state_labels()
+    ]
+    style_children: List[Dict[str, Any]] = [
+        {"id": action_id, "label": label, "kind": "check",
+         "checked": style == action_id.split(":", 1)[1]}
+        for action_id, label in STYLE_ITEMS
     ]
     return [
         {"id": "toggle", "label": TOGGLE_SHOW_LABEL, "kind": "action"},
         {"id": "lock", "label": LOCK_LABEL, "kind": "check",
          "checked": checked},
+        {"id": "theme", "label": THEME_LABEL, "kind": "submenu",
+         "children": style_children},
         {"id": "settings", "label": SETTINGS_LABEL, "kind": "action"},
         {"id": "brain_unload", "label": BRAIN_UNLOAD_LABEL, "kind": "action"},
         {"id": "brain_warm", "label": BRAIN_WARM_LABEL, "kind": "action"},
@@ -146,6 +160,18 @@ def invoke(action_id: Any, callbacks: Any, value: Any = None) -> bool:
         return False
     if not aid:
         return False
+    if aid.startswith("style:"):
+        cb = _callback_for(callbacks, "style")
+        if cb is None:
+            return False
+        style = _options.normalize_style(aid[len("style:"):])
+        try:
+            cb(style)
+            return True
+        except TypeError:
+            return _retry_zero_arg(cb)
+        except Exception:
+            return False
     if aid in ("toggle", "lock", "settings", "brain_unload", "brain_warm", "quit"):
         cb = _callback_for(callbacks, aid)
         if cb is None:
@@ -215,6 +241,7 @@ class OrbTray:
         on_quit: Optional[Callable[..., Any]] = None,
         on_test: Optional[Callable[..., Any]] = None,
         on_lock: Optional[Callable[..., Any]] = None,
+        on_style: Optional[Callable[..., Any]] = None,
         options: Any = None,
         parent: Any = None,
     ) -> None:
@@ -229,12 +256,14 @@ class OrbTray:
             "brain_warm": on_brain_warm,
             "quit": on_quit,
             "test": on_test,
+            "style": on_style,
         }
         self._icon: Any = None
         self._menu: Any = None
         self._actions: Dict[str, Any] = {}
         self._toggle_action: Any = None
         self._lock_action: Any = None
+        self._style_actions: Dict[str, Any] = {}
         self._started = False
 
     # -- lifecycle -----------------------------------------------------
@@ -267,12 +296,19 @@ class OrbTray:
                     submenu = QMenu(str(spec.get("label", "")), menu)
                     for child in spec.get("children", []) or []:
                         child_id = str(child.get("id", ""))
+                        child_kind = str(child.get("kind", "action"))
+                        child_check = child_kind == "check"
                         action = _make_action(
-                            QAction, str(child.get("label", "")), submenu)
+                            QAction, str(child.get("label", "")), submenu,
+                            checkable=child_check,
+                            checked=bool(child.get("checked", False)))
                         action.triggered.connect(
-                            self._make_dispatch(child_id, is_check=False))
+                            self._make_dispatch(child_id,
+                                                is_check=child_check))
                         submenu.addAction(action)
                         self._actions[child_id] = action
+                        if child_id.startswith("style:"):
+                            self._style_actions[child_id] = action
                     menu.addMenu(submenu)
                     continue
                 action_id = str(spec.get("id", ""))
@@ -348,6 +384,7 @@ class OrbTray:
             self._actions = {}
             self._toggle_action = None
             self._lock_action = None
+            self._style_actions = {}
             self._started = False
 
     # -- runtime state -------------------------------------------------
@@ -357,6 +394,15 @@ class OrbTray:
             action = self._lock_action
             if action is not None:
                 action.setChecked(bool(locked))
+        except Exception:
+            pass
+
+    def set_style(self, style: Any) -> None:
+        """Update the checked Theme action; never raises."""
+        try:
+            wanted = _options.normalize_style(style)
+            for action_id, action in self._style_actions.items():
+                action.setChecked(action_id == "style:" + wanted)
         except Exception:
             pass
 
@@ -390,6 +436,8 @@ __all__ = [
     "TOGGLE_SHOW_LABEL",
     "TOGGLE_HIDE_LABEL",
     "LOCK_LABEL",
+    "THEME_LABEL",
+    "STYLE_ITEMS",
     "SETTINGS_LABEL",
     "BRAIN_UNLOAD_LABEL",
     "BRAIN_WARM_LABEL",

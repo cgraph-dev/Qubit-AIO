@@ -28,6 +28,16 @@ SPEED_MIN, SPEED_MAX, SPEED_DEFAULT = 0.25, 2.0, 1.0
 #: built-in palette". Keys are the orb states.
 _COLOR_STATES = ("idle", "listening", "thinking", "working", "speaking", "error")
 
+#: Mark variants the UI may select. ``mark`` is the orb/atom logo; ``ghost``
+#: is the pixelfx sheet ghost. The legacy ember look stays reachable through
+#: ``QUBIT_ORB_STYLE`` but is not a persisted theme choice.
+STYLE_ORB = "mark"
+STYLE_GHOST = "ghost"
+STYLE_DEFAULT = STYLE_ORB
+STYLE_VALUES = (STYLE_ORB, STYLE_GHOST)
+_STYLE_ALIASES = {"atom": STYLE_ORB, "orb": STYLE_ORB, "logo": STYLE_ORB,
+                  "ember": STYLE_ORB}
+
 
 @dataclass(frozen=True)
 class OrbOptions:
@@ -39,10 +49,10 @@ class OrbOptions:
     show_tray: bool = True
     #: state -> "#RRGGBB" override (empty = built-in palette).
     colors: Dict[str, str] = field(default_factory=dict)
-    #: Which mark to draw: "atom" (rings + particles + nucleus) or "ghost"
-    #: (the drifting sheet ghost ported from pixelfx). Both read the same
-    #: clock and honour reduced-motion; they are alternative marks, not layers.
-    style: str = "atom"
+    #: Which mark to draw: "mark" (the orb/atom logo) or "ghost" (the
+    #: drifting sheet ghost ported from pixelfx). Both read the same clock and
+    #: honour reduced-motion; they are alternative marks, not layers.
+    style: str = STYLE_DEFAULT
 
 
 def state_dir() -> Path:
@@ -92,6 +102,16 @@ def _normalize_hex(value: Any) -> Optional[str]:
     return "#" + s.upper()
 
 
+def normalize_style(value: Any) -> str:
+    """Return a supported style id, falling back to the orb mark. Never raises."""
+    try:
+        raw = str(value or "").strip().lower()
+    except Exception:
+        return STYLE_DEFAULT
+    raw = _STYLE_ALIASES.get(raw, raw)
+    return raw if raw in STYLE_VALUES else STYLE_DEFAULT
+
+
 def clamp_options(opts: OrbOptions) -> OrbOptions:
     """Return a validated copy; never raises."""
     try:
@@ -110,6 +130,7 @@ def clamp_options(opts: OrbOptions) -> OrbOptions:
             click_through=bool(opts.click_through),
             show_tray=bool(opts.show_tray),
             colors=colors,
+            style=normalize_style(opts.style),
         )
     except Exception:
         return OrbOptions()
@@ -125,6 +146,7 @@ def to_dict(opts: OrbOptions) -> Dict[str, Any]:
         "click_through": o.click_through,
         "show_tray": o.show_tray,
         "colors": dict(o.colors),
+        "style": o.style,
     }
 
 
@@ -141,6 +163,7 @@ def from_dict(data: Any) -> OrbOptions:
         show_tray=data.get("show_tray", True),
         colors=data.get("colors", {}) if isinstance(
             data.get("colors"), dict) else {},
+        style=data.get("style", STYLE_DEFAULT),
     ))
 
 
@@ -205,9 +228,10 @@ __all__ = [
     "OrbOptions",
     "OPTIONS_FILENAME",
     "SIZE_MIN", "SIZE_MAX", "SIZE_DEFAULT",
+    "STYLE_ORB", "STYLE_GHOST", "STYLE_DEFAULT", "STYLE_VALUES",
     "OPACITY_MIN", "OPACITY_MAX", "OPACITY_DEFAULT",
     "SPEED_MIN", "SPEED_MAX", "SPEED_DEFAULT",
     "state_dir", "options_path",
-    "clamp_options", "to_dict", "from_dict",
+    "clamp_options", "normalize_style", "to_dict", "from_dict",
     "load_options", "save_options", "color_overrides", "updated",
 ]

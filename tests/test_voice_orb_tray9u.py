@@ -25,22 +25,28 @@ def test_menu_spec_ids_labels_kinds_and_lock_check():
     from voicebridge.orb import options as O
     from voicebridge.orb.tray import menu_spec
     spec = menu_spec()
-    assert [i["id"] for i in spec] == ["toggle", "lock", "settings",
+    assert [i["id"] for i in spec] == ["toggle", "lock", "theme", "settings",
                                        "brain_unload", "brain_warm", "test",
                                        "quit"]
     assert [i["label"] for i in spec] == ["Show orb", "Lock position",
-                                          "Settings\u2026",
+                                          "Theme", "Settings\u2026",
                                           "Unload local brain (free VRAM)",
                                           "Load local brain", "Test animation",
                                           "Quit orb"]
-    assert [i["kind"] for i in spec] == ["action", "check", "action",
-                                         "action", "action", "submenu",
-                                         "action"]
+    assert [i["kind"] for i in spec] == ["action", "check", "submenu",
+                                         "action", "action", "action",
+                                         "submenu", "action"]
     assert spec[1]["checked"] is False
     assert menu_spec(O.OrbOptions(locked=True))[1]["checked"] is True
     # None/garbage options fail closed to unchecked, never raise
     assert menu_spec(None)[1]["checked"] is False
     assert menu_spec(object())[1]["checked"] is False
+    theme = spec[2]
+    assert [c["id"] for c in theme["children"]] == ["style:mark", "style:ghost"]
+    assert [c["label"] for c in theme["children"]] == ["Orb", "Ghost"]
+    assert [c["checked"] for c in theme["children"]] == [True, False]
+    assert [c["checked"] for c in menu_spec(
+        O.OrbOptions(style="ghost"))[2]["children"]] == [False, True]
 
 
 def test_menu_spec_test_submenu_covers_all_states():
@@ -64,19 +70,21 @@ def test_invoke_dispatches_each_id():
         return _cb
 
     cbs = {"toggle": rec("toggle"), "lock": rec("lock"),
-           "settings": rec("settings"), "brain_unload": rec("brain_unload"),
-           "brain_warm": rec("brain_warm"), "quit": rec("quit"),
-           "test": rec("test")}
+           "style": rec("style"), "settings": rec("settings"),
+           "brain_unload": rec("brain_unload"), "brain_warm": rec("brain_warm"),
+           "quit": rec("quit"), "test": rec("test")}
     assert invoke("toggle", cbs) is True
     assert invoke("lock", cbs, value=True) is True
+    assert invoke("style:ghost", cbs, value=True) is True
     assert invoke("settings", cbs) is True
     assert invoke("brain_unload", cbs) is True
     assert invoke("brain_warm", cbs) is True
     assert invoke("quit", cbs) is True
     assert invoke("test:speaking", cbs) is True
-    assert calls == [("toggle", None), ("lock", True), ("settings", None),
-                     ("brain_unload", None), ("brain_warm", None),
-                     ("quit", None), ("test", "speaking")]
+    assert calls == [("toggle", None), ("lock", True), ("style", "ghost"),
+                     ("settings", None), ("brain_unload", None),
+                     ("brain_warm", None), ("quit", None),
+                     ("test", "speaking")]
 
 
 def test_invoke_accepts_constructor_callback_names():
@@ -88,7 +96,8 @@ def test_invoke_accepts_constructor_callback_names():
 
     assert invoke("toggle", {"on_toggle": _cb}) is True
     assert invoke("test:idle", {"on_test": _cb}) is True
-    assert calls == [None, "idle"]
+    assert invoke("style:mark", {"on_style": _cb}) is True
+    assert calls == [None, "idle", "mark"]
 
 
 def test_invoke_zero_arg_callbacks_still_dispatch():
@@ -141,6 +150,26 @@ def test_start_does_not_raise_in_this_environment():
         t.stop()
 
 
+def test_set_style_updates_both_checks_without_raising():
+    from voicebridge.orb import tray
+
+    class _Action:
+        def __init__(self):
+            self.checked = None
+
+        def setChecked(self, value):
+            self.checked = bool(value)
+
+    t = tray.OrbTray()
+    t._style_actions = {"style:mark": _Action(), "style:ghost": _Action()}
+    t.set_style("ghost")
+    assert t._style_actions["style:mark"].checked is False
+    assert t._style_actions["style:ghost"].checked is True
+    t.set_style("bogus")
+    assert t._style_actions["style:mark"].checked is True
+    assert t._style_actions["style:ghost"].checked is False
+
+
 def test_mutators_and_stop_never_raise_on_unstarted_tray():
     from voicebridge.orb import tray
     t = tray.OrbTray()
@@ -149,3 +178,4 @@ def test_mutators_and_stop_never_raise_on_unstarted_tray():
     assert t.set_visible_state(False) is None
     assert t.set_visible_state(True) is None
     assert t.set_locked(False) is None
+    assert t.set_style("ghost") is None

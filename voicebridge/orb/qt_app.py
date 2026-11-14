@@ -531,13 +531,19 @@ ALPHA_EPS = 0.004
 _GOLDEN = 0.6180339887498949
 
 
-def _orb_style() -> str:
+def _orb_style(options: Any = None) -> str:
     """Orb look: ``mark`` (the dashboard logo, default), ``ember``, or ``ghost``.
 
-    ``ghost`` is the pixelfx-derived sprite mark (see :mod:`voicebridge.orb.ghost`);
-    an unknown value falls back to ``mark`` so the orb can never paint nothing.
+    A persisted ``OrbOptions.style`` wins for the live orb; ``QUBIT_ORB_STYLE``
+    remains the legacy/headless override when no options object is supplied.
+    An unknown value falls back to ``mark`` so the orb can never paint nothing.
     """
     import os as _os
+    if options is not None:
+        try:
+            return _options.normalize_style(getattr(options, "style", None))
+        except Exception:
+            return _options.STYLE_DEFAULT
     value = str(_os.environ.get("QUBIT_ORB_STYLE", "mark") or "mark").strip().lower()
     return value if value in ("mark", "ember", "ghost") else "mark"
 
@@ -3592,6 +3598,10 @@ if QWidget is not None:
                         tray.set_locked(self._options.locked)
                     except Exception:
                         pass
+                    try:
+                        tray.set_style(self._options.style)
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -3657,6 +3667,8 @@ if QWidget is not None:
                     on_test=self.set_test_state,
                     on_lock=lambda locked: self.apply_options(
                         _options.updated(self._options, locked=bool(locked))),
+                    on_style=lambda style: self.apply_options(
+                        _options.updated(self._options, style=style)),
                     options=self._options,
                     parent=self,
                 )
@@ -4469,7 +4481,7 @@ if QWidget is not None:
                 # draws the pixelfx sheet ghost. A bad value falls back to mark so the
                 # orb can never paint nothing, and a missing ghost atlas falls back the
                 # same way.
-                if _orb_style() == "ghost":
+                if _orb_style(self._options) == "ghost":
                     drew_ghost = False
                     # The ghost wears the same per-state colour the atom mark does
                     # (idle orange, listening cyan, thinking indigo, working amber,
@@ -4514,7 +4526,7 @@ if QWidget is not None:
                     p.end()
                     self.frames += 1
                     return
-                if _orb_style() == "mark":
+                if _orb_style(self._options) == "mark":
                     try:
                         _paint_mark(p, cx, cy, R, t, self.orb_state,
                                     _bright_eff, fam)

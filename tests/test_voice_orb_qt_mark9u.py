@@ -63,6 +63,10 @@ def test_style_defaults_to_mark_and_ember_stays_reachable(monkeypatch):
     assert Q._orb_style() == "mark"
     monkeypatch.setenv("QUBIT_ORB_STYLE", "ember")
     assert Q._orb_style() == "ember"
+    # A persisted theme wins over the legacy environment override.
+    from voicebridge.orb import options as O
+    assert Q._orb_style(O.OrbOptions(style="ghost")) == "ghost"
+    assert Q._orb_style(O.OrbOptions(style="mark")) == "mark"
 
 
 def test_mark_paints_for_every_state():
