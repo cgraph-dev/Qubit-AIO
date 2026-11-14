@@ -12074,6 +12074,10 @@ _r("GET", r"/api/office/world/tower-plan", "h_office_world_tower")
 # contact or call an external platform. The same routes are reachable from the
 # Office shell through its `/agent/api` prefix. Registered before any catch-all
 # office route so a business path is never read as an office seat id.
+# P3-05 command center: a read-only projection over the real tower, roster,
+# tasks, sessions and approvals. Search is bounded; counts are derived from
+# rows, and each source degrades to a typed unavailable state.
+_r("GET", r"/api/office/business/command-center", "h_business_command_center")
 _r("GET", r"/api/office/business/overview", "h_business_overview")
 # Owner-gated, idempotent: creates the local Personal scope and imports the
 # office seat roster as Business OS control records on first use. The Office
@@ -21766,6 +21770,7 @@ for _name in (
     "h_business_agent_pause", "h_business_agent_resume",
     "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
     "h_business_agent_archive", "h_world_tower",
+    "h_business_command_center",
 ):
     HANDLERS[_name] = getattr(_business_bridge, _name)
 

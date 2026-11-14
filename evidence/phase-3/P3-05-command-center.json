@@ -1,0 +1,123 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_command_center tests/test_business_office_bridge.py --no-header",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".................................                                        [100%]\n33 passed in 4.78s"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/test_office_game_shell.py --no-header",
+      "exit_code": 1,
+      "stderr_tail": "",
+      "stdout_tail": "        # are checked above; the prelude itself is not a selector, so drop any\n        # entry that still carries an \"@\".\n        unscoped = [s for s in unscoped if \"@\" not in s and \";\" not in s]\n>       assert not unscoped, (\n            f\"game.css has rules that could leak into the dashboard: {unscoped}\")\nE       AssertionError: game.css has rules that could leak into the dashboard: ['.warroom__tabs', '.warroom__tab', '.warroom__tab.is-active', '.warroom__section', '.warroom__sectionTitle,\\n.agent-control__sectionTitle', '.warroom__row', '.warroom__input', '.warroom__picker', '.warroom__list', '.warroom__list--scroll', '.warroom__list li', '.warroom__chip', '.warroom__muted,\\n.agent-control__muted', '.warroom__state,\\n.agent-control__state', '.warroom__state--error,\\n.agent-control__state--error', '.warroom__sessionHead', '.warroom__dissent', '.warroom__danger,\\n.agent-control__danger', '.warroom__counts', '.tower__summary', '.tower__honesty', '.tower__empty', '.tower__body', '.tower__scroll', '.tower__wing', '.tower__wingHead', '.tower__wingName', '.tower__wingCount', '.tower__stack', '.tower__floor', '.tower__floor.is-active', '.tower__floor.is-dormant', '.tower__floor.is-selected,\\n.tower__floor:focus-visible', '.tower__index', '.tower__floorName', '.tower__floorMeta', '.tower__floorState', '.tower__floor.is-active .tower__floorState,\\n.tower__detail.is-active .tower__floorState', '.tower__detail', '.tower__detail--empty', '.tower__detailHead', '.tower__detailTitle', '.tower__detailRows', '.tower__detailRow', '.tower__detailLabel', '.tower__detailValue', '.tower__detailNote', '.tower__close', '.tower__close:hover,\\n.tower__close:focus-visible', '.tower__scene', '.tower__sceneHead', '.tower__sceneTitle', '.tower__sceneMeta', '.tower__sceneSource', '.tower__rooms', '.tower__room', '.tower__room.is-dormant', '.tower__roomHead', '.tower__roomName', '.tower__roomArchetype', '.tower__roomHead .tower__floorState', '.tower__roomMeta', '.tower__cells', '.tower__cell', '.tower__cellLabel', '.tower__desk', '.tower__desk.is-occupied', '.tower__deskInitial', '.tower__occupants', '.tower__occupant', '.tower__occupantInitial', '.tower__occupantEmoji', '.tower__occupantName', '.tower__occupancy', '.tower__occupancySummary', '.tower__unplaced', '.tower__unplacedTitle', '.tower__unplacedAgent', '.tower__unplacedReason', '.tower__unplacedMore,\\n.tower__unplacedNone', '.tower__room.is-dormant .tower__desk', '.tower__sceneNote', '.tower__emptyRooms', '.agent-control__section', '.agent-control__kv', '.agent-control__field', '.agent-control__field .agent-control__error', '.agent-control__input', '.agent-control__error', '.agent-control__permRow', '.agent-control__chips', '.agent-control__chip', '.agent-control__chip button', '.agent-control__dirty', '.agent-control__k', '.agent-control__v', '.agent-control__audit', '.agent-control__auditRow', '.agent-control__auditAction', '.agent-control__auditMeta', '.agent-control__actions', '.agent-control__picker', '.etsy-connect__state', '.etsy-connect__summary', '.etsy-connect__label', '.etsy-connect__pill', '.etsy-connect__pill--connected', '.etsy-connect__pill--expired,\\n.etsy-connect__pill--error', '.etsy-connect__pill--authorization_required,\\n.etsy-connect__pill--not_configured', '.etsy-connect__hint,\\n.etsy-connect__meta,\\n.etsy-connect__notice', '.etsy-connect__notice', '.etsy-connect__error', '.etsy-connect__actions', '.etsy-connect__primary', '.etsy-connect__secondary', '.etsy-connect__form', '.etsy-connect__field', '.etsy-connect__connected', '.approvals-panel__head', '.approvals-panel__title', '.approvals-panel__count', '.approvals-panel__closeRow', '.approvals-panel__list', '.approvals-panel__row', '.approvals-panel__summary', '.approvals-panel__meta', '.approvals-panel__tool', '.approvals-panel__chip', '.approvals-panel__chipKey', '.approvals-panel__chipValue', '.approvals-panel__chip[data-testid=\"approval-risk\"][data-value=\"high\"],\\n.approvals-panel__chip[data-testid=\"approval-risk\"][data-value=\"critical\"]', '.approvals-panel__idLine', '.approvals-panel__id', '.approvals-panel__actions', '.approvals-panel__approve', '.approvals-panel__reject', '.approvals-panel__empty,\\n.approvals-panel__status', '.approvals-panel__error,\\n.approvals-panel__actionError', '.approvals-panel__error p,\\n.approvals-panel__actionError p', '.approvals-panel__code', '.approvals-panel__notice', '.office-theme-menu-btn', '.office-menu-badge', '.office-menu-badge[hidden]']\nE       assert not ['.warroom__tabs', '.warroom__tab', '.warroom__tab.is-active', '.warroom__section', '.warroom__sectionTitle,\\n.agent-control__sectionTitle', '.warroom__row', ...]\n\ntests/test_office_game_shell.py:578: AssertionError\n=========================== short test summary info ============================\nFAILED tests/test_office_game_shell.py::test_reduced_motion_zeroes_the_durations_rather_than_hiding_content\nFAILED tests/test_office_game_shell.py::test_focus_is_never_removed - Asserti...\nFAILED tests/test_office_game_shell.py::test_the_game_css_exists_and_is_scoped_to_the_shell\n3 failed, 31 passed in 14.53s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/command_center.py voicebridge/business/bridge.py tests/phase3_command_center",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/command_center.py voicebridge/business/bridge.py voicebridge/qubit_compat.py tests/phase3_command_center/test_command_center.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "bash -lc 'cd /home/trick/qubit-worktrees/qoffice-p3-command-center && ln -sfn /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules && cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/command-center.test.ts ../qubit-app/plugins/qubit-office/game/app/CommandCenter.test.ts ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.test.ts; code=$?; cd ../..; rm -f frontend/qubit-web/node_modules; exit $code'",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p3-command-center/frontend/qubit-web\n\n\n Test Files  3 passed (3)\n      Tests  45 passed (45)\n   Start at  06:45:36\n   Duration  743ms (transform 537ms, setup 0ms, import 751ms, tests 483ms, environment 0ms)\n"
+    },
+    {
+      "cmd": "bash -lc 'cd /home/trick/qubit-worktrees/qoffice-p3-command-center && ln -sfn /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules && cd frontend/qubit-web && npx tsc --ignoreConfig --noEmit --skipLibCheck --strict --jsx react-jsx --module esnext --target es2022 --moduleResolution bundler --lib es2022,dom,dom.iterable ../qubit-app/plugins/qubit-office/game/app/command-center.ts ../qubit-app/plugins/qubit-office/game/app/CommandCenter.tsx ../qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx; code=$?; cd ../..; rm -f frontend/qubit-web/node_modules; exit $code'",
+      "exit_code": 2,
+      "stderr_tail": "",
+      "stdout_tail": "../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts(36,20): error TS2307: Cannot find module 'phaser' or its corresponding type declarations.\n../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts(58,22): error TS2339: Property 'textures' does not exist on type 'OfficeScene'.\n../qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts(65,12): error TS2339: Property 'add' does not exist on type 'OfficeScene'.\n../qubit-app/plugins/qubit-office/game/app/WarRoomPanel.tsx(639,23): error TS2322: Type 'Promise<{ ok: true; created: boolean; decision: WarRoomDecision; }>' is not assignable to type 'Promise<string | void>'.\n  Type '{ ok: true; created: boolean; decision: WarRoomDecision; }' is not assignable to type 'string | void'.\n../qubit-app/plugins/qubit-office/game/app/WarRoomPanel.tsx(651,23): error TS2322: Type 'Promise<{ ok: true; created: boolean; decision: WarRoomDecision; }>' is not assignable to type 'Promise<string | void>'.\n  Type '{ ok: true; created: boolean; decision: WarRoomDecision; }' is not assignable to type 'string | void'.\n../qubit-app/plugins/qubit-office/game/app/WarRoomPanel.tsx(665,21): error TS2322: Type 'Promise<{ ok: true; tasks: BusinessTask[]; }>' is not assignable to type 'Promise<string | void>'.\n  Type '{ ok: true; tasks: BusinessTask[]; }' is not assignable to type 'string | void'.\n../qubit-app/plugins/qubit-office/game/loading/OfficeLoadingScreen.tsx(27,8): error TS2882: Cannot find module or type declarations for side-effect import of './loading.css'."
+    },
+    {
+      "cmd": "git diff --name-only c95366a3f -- frontend/qubit-app/plugins/qubit-office/game/styles frontend/qubit-app/plugins/qubit-office/game/app/dock-layout.test.ts",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T04:47:13Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md",
+      "sha256": "3f823ebf1188ca25898e494339e9ec674b78a39afabf37500a8c032527850a65"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    }
+  ],
+  "limitations": [
+    "Read-only projection only: no writes, no model/provider call, no network, no live service, no credentials.",
+    "The acceptance file tests/test_office_game_shell.py still reports three pre-existing CSS/token failures (reduced-motion 'display: none', 'outline: none', and 144 unscoped game.css selectors). They reproduce at base c95366a3f: `git diff --name-only c95366a3f -- .../styles .../dock-layout.test.ts` is empty, so P3-05 changed no CSS and did not introduce them.",
+    "The tsc invocation reports only pre-existing errors in PhaserSceneHost.ts (missing phaser types), WarRoomPanel.tsx (three callback return-type mismatches) and OfficeLoadingScreen.tsx (CSS side-effect import); none are in the P3-05 files.",
+    "The command-center backend composes the Business OS floor/room/desk templates, roster, tasks, sessions and approvals; it does not read the separate ops approval journal (/api/ops/approvals) or live agent sessions beyond the durable Business OS session store.",
+    "Desk occupancy is shown only from an exact roster room/desk match; template desks with no explicit link remain vacant and are never decorated with an invented agent.",
+    "The deep-link builders produce the contract URL /qubit-office/floor/<id>?room=&agent=; this lane does not add a floor-level router page, it only builds the links and the semantic shell region.",
+    "No durable worktree/desktop/browser E2E was run; the UI evidence is unit-level (vitest) plus the semantic DOM contract.",
+    "No VERIFIED/COMPLETE/100% claim is made."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/command_center.py",
+      "sha256": "6ba47e487fc6bfb7db0c4ae816153902ae08162369b4bcaeadf71627641c4c8d"
+    },
+    {
+      "path": "voicebridge/business/bridge.py",
+      "sha256": "863e72b0b48e29edc9802ab96485c2e81777c7ccbe3bd52e0e3a52f7e8fa8aee"
+    },
+    {
+      "path": "voicebridge/qubit_compat.py",
+      "sha256": "35ac343c974605e23dd33b2c1bf0a5c6f73af6bddfaeb21bdb1cd5bef891f431"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/command-center.ts",
+      "sha256": "1a05ed75f3a9237f04cb2ad75421db5ad53cb2afc934d29752cd547c3d9d92ca"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/command-center.test.ts",
+      "sha256": "69aa9891810999a854ad729f3d460df6ffe2d7b95edf7c8fb6b261fffbd217b1"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/CommandCenter.tsx",
+      "sha256": "51d82e9dc62e2942e3c9109067e60ac067c7bcd9ba62d34843bce145f9217e04"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/CommandCenter.test.ts",
+      "sha256": "6ec4670d2c43d21c36ee27bde680c93de3b8bffacaf4af625f0f5cb7553bfb32"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx",
+      "sha256": "6009acd53d869d757a99fb1832ab101d64a959d683ccfda81fc25d2ea16689f6"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.test.ts",
+      "sha256": "5f6d0cab22965a4e47b8e100272d973034d113513e1417b15fa1baa864dd9938"
+    },
+    {
+      "path": "tests/phase3_command_center/test_command_center.py",
+      "sha256": "f9d9e08b52e303cf7c8ebcba84eecca8342e713c5787de7f7de56555ffe670e5"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P3-05"
+}

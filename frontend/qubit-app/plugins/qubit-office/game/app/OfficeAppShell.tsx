@@ -16,10 +16,12 @@ import {
   type MenuButtonSpec, type OfficeMenuController,
 } from "./office-menu";
 import { createSeatModelPanel } from "./SeatModelPanel";
+import { isEditableTarget } from "./command-center";
 import { createAgentsPanel } from "./AgentsPanel";
 import { createAgentControlDrawer } from "./AgentControlDrawer";
 import { createWarRoomPanel } from "./WarRoomPanel";
 import { createApprovalsPanel } from "./ApprovalsPanel";
+import { createCommandCenter } from "./CommandCenter";
 import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
 import type { AgentSeat } from "./agents-panel";
@@ -124,6 +126,7 @@ type ShellComponents = {
   AgentControlDrawer: ReturnType<typeof createAgentControlDrawer>;
   WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
   ApprovalsPanel: ReturnType<typeof createApprovalsPanel>;
+  CommandCenter: ReturnType<typeof createCommandCenter>;
   EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
@@ -164,6 +167,7 @@ function shellComponents(
     AgentControlDrawer: createAgentControlDrawer(R, hooks),
     WarRoomPanel: createWarRoomPanel(R, hooks),
     ApprovalsPanel: createApprovalsPanel(R, hooks),
+    CommandCenter: createCommandCenter(R, hooks),
     EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
@@ -225,11 +229,14 @@ export function createOfficeApp(
     // The Etsy OAuth connection surface. Declared last so every seeded state
     // index in the shell's own tests stays stable.
     const [etsyOpen, setEtsyOpen] = useState(false);
+    // The command-center shell region. Declared last so every seeded state
+    // index in the shell's own tests stays stable.
+    const [commandCenterOpen, setCommandCenterOpen] = useState(false);
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
-      ApprovalsPanel, EtsyConnectPanel, LoadingScreen,
+      ApprovalsPanel, CommandCenter, EtsyConnectPanel, LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
@@ -312,10 +319,12 @@ export function createOfficeApp(
         menuRef.current = installOfficeMenuButtons(win, {
           onToggleAgents: () => {
             setApprovalsOpen(false);
+            setCommandCenterOpen(false);
             setAgentsOpen((v: boolean) => !v);
           },
           onToggleHud: () => {
             setApprovalsOpen(false);
+            setCommandCenterOpen(false);
             setControlSeat(null);
             setHudOpen((v: boolean) => !v);
           },
@@ -323,6 +332,7 @@ export function createOfficeApp(
             setAgentsOpen(false);
             setHudOpen(false);
             setWarRoomOpen(false);
+            setCommandCenterOpen(false);
             setControlSeat(null);
             setApprovalsOpen((v: boolean) => !v);
           },
@@ -364,6 +374,30 @@ export function createOfficeApp(
         approvals: approvalsOpen, pendingApprovals: approvalCount,
       });
     });
+
+    // The office-wide command-center shortcut. It opens the shell region and
+    // starts a fresh search; Escape/close is handled inside the region. Ignore
+    // editable targets so typing "/" in any field is never hijacked.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      const onKey = (event: KeyboardEvent) => {
+        const command = Boolean(event.ctrlKey || event.metaKey);
+        const key = String(event.key || "");
+        const opens = (command && (key === "k" || key === "K"))
+          || (key === "/" && !isEditableTarget(event.target));
+        if (!opens) return;
+        event.preventDefault();
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setControlSeat(null);
+        setCommandCenterOpen(true);
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, []);
 
     // Optional 9-slice: the pack declares which shell roles carry art, and
     // only those elements opt in. The generated host stylesheet targets
@@ -718,11 +752,13 @@ export function createOfficeApp(
         const onActivate = spec.id === "agents"
           ? () => {
               setApprovalsOpen(false);
+              setCommandCenterOpen(false);
               setAgentsOpen((v: boolean) => !v);
             }
           : spec.id === "hud"
           ? () => {
               setApprovalsOpen(false);
+              setCommandCenterOpen(false);
               setControlSeat(null);
               setHudOpen((v: boolean) => !v);
             }
@@ -730,6 +766,7 @@ export function createOfficeApp(
               setAgentsOpen(false);
               setHudOpen(false);
               setWarRoomOpen(false);
+              setCommandCenterOpen(false);
               setControlSeat(null);
               setApprovalsOpen((v: boolean) => !v);
             };
@@ -770,6 +807,56 @@ export function createOfficeApp(
       })));
     }
 
+    // THE COMMAND-CENTER TOGGLE. A visible, labelled shell control (not an
+    // icon-only button) that opens the semantic search region. It is an
+    // overlay so the office iframe keeps its full height and width.
+    children.push(R.createElement("button", {
+      key: "command-center-toggle",
+      type: "button",
+      className: "office-game__btn office-theme-menu-btn office-game__commandCenterToggle",
+      "data-testid": "office-command-center-toggle",
+      "aria-expanded": commandCenterOpen,
+      "aria-controls": "office-game-command-center-dock",
+      "aria-label": "Open the office command center",
+      style: {
+        position: "absolute",
+        left: "var(--office-s3)",
+        bottom: "var(--office-s3)",
+        zIndex: 5,
+      },
+      onClick: () => {
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setControlSeat(null);
+        setCommandCenterOpen((v: boolean) => !v);
+      },
+    }, "Command Center"));
+
+    // THE COMMAND CENTER. A read-only projection over the real tower, roster,
+    // tasks, sessions and approvals. It is an exclusive side sheet, so it can
+    // never cover another dock's close button.
+    if (commandCenterOpen) {
+      children.push(R.createElement("div", {
+        key: "command-center-dock",
+        id: "office-game-command-center-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__commandCenterDock",
+        "data-testid": "office-game-command-center-dock",
+        "data-office-dock": "command-center",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Command center",
+      }, [
+        R.createElement(CommandCenter as never, {
+          key: "body",
+          base: props.base,
+          onClose: () => setCommandCenterOpen(false),
+        }),
+      ]));
+    }
+
     // THE LOADING SCREEN. One import, one render seam: it overlays the iframe,
     // owns the weather/pixelfx layer, and fades itself out on `ready`. It is
     // ALWAYS mounted so a failed frame can show the same screen with a retry;
@@ -805,13 +892,15 @@ export function createOfficeApp(
     // injected Panels group that opens them; an offset sheet leaves the group
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
     const dockOpen = agentsOpen || hudOpen || warRoomOpen
-      || controlSeat !== null || approvalsOpen || etsyOpen;
+      || controlSeat !== null || approvalsOpen || etsyOpen
+      || commandCenterOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
       "data-office-docks": dualDocks ? "both" : undefined,
       "data-office-dock-top": dockOpen ? "toolbar" : undefined,
       className: rootClass,
+      style: { position: "relative" },
     }, children);
   };
 }
