@@ -1,5 +1,27 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 4 workforce/collaboration accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-4.sh` exits 0 and writes `evidence/phase-4/manifest.json`
+(`status: PASS`) after accepted Phase 0/1/2/3 manifests. Five lanes: P4-01 `workforce.py` provisions
+one durable session/workspace/task + explicit grants per agent, reports paused/revoked/archived/
+disconnected/unknown as non-working and seed agents as projection (18/18 verifier checks); P4-02
+`threads.py` (owner↔agent, room, direct; ordering/RYW, dedupe, offline replay, participant ACL,
+mention authorization) and P4-03 `delegation.py` (bounded depth/waves/handoffs/retries, no-progress,
+lease/fence loss stops effects, single-writer worktree/artifact versions); P4-04 `capability_runtime.py`
+routes model/tool/MCP/terminal/browser/files/messages/memory/connectors through the one ToolGateway
+with policy/egress/budget/approval checks, and P4-06 `safety.py` adds baseline/anomaly, quarantine,
+pause/stop/revoke/archive and an out-of-band kill switch over injected stoppers (13/13 verifier
+checks); P4-05 `memory_projection.py` builds department/office Obsidian MOCs, backlinks, ACL-filtered
+views, rebuild/export and `office/global|department|agent` OpenViking scopes; P4-07
+`operator_timeline.py` + `Timeline.tsx` project the causal run/task/tool/approval/artifact/receipt/
+reconciliation timeline with cost/evidence/unknown and replay-stubbed effects, mounted in the shell.
+**Measured:** gates 0–4 PASS; broad business/office/world/workforce regression **783 passed**;
+P4-07 UI Vitest **62 passed**. **Honest limits:** kill-switch stoppers are injected, not wired to
+live services; threads use the injected event-log seam; delegation worktrees are references; replay
+stubs effects; no live browser/PTY/OpenViking. **Not done:** live deploy, full matrix, `VERIFIED`.
+Next: Phase 5 business operations (Etsy, Trading paper/testnet, CRM/support, finance, legal,
+procurement, marketing, research).
+
 **Qubit Office Phase 3 campus/maps/shell accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
 `bash scripts/acceptance/phase-3.sh` exits 0 and writes `evidence/phase-3/manifest.json`
 (`status: PASS`) after accepted Phase 0/1/2 manifests. Five lanes: P3-01 full campus data with a

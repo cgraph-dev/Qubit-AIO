@@ -4,7 +4,7 @@
     "evidence/phase-3/P3-02-room-capabilities.json": "c262c18b33b3e2600157b20ba98c777d6d5768d418aec8b378c2dc01c12408bb",
     "evidence/phase-3/P3-03-map-schema.json": "ab9eee61e1094b5209f20b86bce4915bc9882d13a4368627b7586be49724bd18",
     "evidence/phase-3/P3-04-renderer.json": "094fe66255a6b9e06f8f84f0a43e7019d3459af77b7c928759bba5ef0caf1c51",
-    "evidence/phase-3/P3-05-command-center.json": "4352c303e48fb061b83a7e7230a7c3c830579b4bc229aa6522deab0dca925b94",
+    "evidence/phase-3/P3-05-command-center.json": "d2a5f455f2a3ba9393b8ff99ab26203f384a9f8830ba5fadf117bb3d6f81a306",
     "evidence/phase-3/P3-06-exterior.json": "85ff6e0d86099b21d9cc3cd57b131cb78514a32fd6532de05240964915ab7d88",
     "evidence/phase-3/P3-07-character-studio.json": "f8ed4748e2d7ce731be82a7fb0643e2d3284240105ca145fd3a2a22d97a55017"
   },
@@ -13,8 +13,8 @@
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T04:57:46Z",
-  "git_head": "7abac258f9d211675bf2575338fd9644e7e0bdda",
+  "generated_at": "2026-11-14T05:32:38Z",
+  "git_head": "e01c5599752530b59bda6167d5bd533724bc0aff",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",

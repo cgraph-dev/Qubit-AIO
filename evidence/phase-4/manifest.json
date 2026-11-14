@@ -1,0 +1,74 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-4/P4-01-workforce.json": "bfe933dd24d85e9fe32d806065085fda27fda390ecaa27391338d4576f260555",
+    "evidence/phase-4/P4-02-threads.json": "6f015fe69cfe0ea7563e5dbb1e48d8364b5981683d8a5ca4fb7f832fd631a7a4",
+    "evidence/phase-4/P4-03-delegation.json": "0cbcd80ddf468743e785ed5b05d8366866cd48ac30b760cd53856a36c92393f2",
+    "evidence/phase-4/P4-04-capability-runtime.json": "b8085dc316664f41d325b7928e72ea5bd454db672b70e91337c41faeb8bd623c",
+    "evidence/phase-4/P4-05-memory-projections.json": "a4071da0db735da2ff992bd1b8b24b8f4606f00c70b2c162fe495c75a11f4ffc",
+    "evidence/phase-4/P4-06-safety.json": "0d6974b58e6d9b23a592000c7994c0fd9f177fc7d730e11f28a1e65872f56786",
+    "evidence/phase-4/P4-07-operator-timeline.json": "0b9ab59fcf24f8405d586878b4906230488eb88efbf806baa818c5a227361565"
+  },
+  "evidence_verification": {
+    "checked": 7,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T05:33:02Z",
+  "git_head": "e01c5599752530b59bda6167d5bd533724bc0aff",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured",
+    "kill-switch stoppers are injected in tests and are not wired to live services yet",
+    "threads use the injected A2A event-log seam in tests; delegation worktrees are references, not real git worktrees",
+    "operator timeline/replay is unit/component-verified; no live browser or PTY session is read"
+  ],
+  "phase": 4,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_workforce.py --json",
+      "evidence": [
+        "evidence/phase-4/P4-01-workforce.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P4-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_threads_delegation.py --json",
+      "evidence": [
+        "evidence/phase-4/P4-02-threads.json",
+        "evidence/phase-4/P4-03-delegation.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P4-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_runtime_safety.py --json",
+      "evidence": [
+        "evidence/phase-4/P4-04-capability-runtime.json",
+        "evidence/phase-4/P4-06-safety.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P4-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_memory_projections.py --json",
+      "evidence": [
+        "evidence/phase-4/P4-05-memory-projections.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P4-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_operator_timeline.py --json",
+      "evidence": [
+        "evidence/phase-4/P4-07-operator-timeline.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P4-07"
+    }
+  ]
+}

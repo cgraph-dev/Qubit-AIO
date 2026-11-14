@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".......................................                                  [100%]\n39 passed in 3.87s"
+      "stdout_tail": ".......................................                                  [100%]\n39 passed in 2.89s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_effective_state.py --json",
@@ -33,10 +33,10 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  9 passed (9)\n   Start at  06:56:27\n   Duration  400ms (transform 151ms, setup 0ms, import 228ms, tests 170ms, environment 0ms)"
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  9 passed (9)\n   Start at  07:31:15\n   Duration  282ms (transform 93ms, setup 0ms, import 128ms, tests 139ms, environment 0ms)"
     }
   ],
-  "generated_at": "2026-11-14T04:56:27Z",
+  "generated_at": "2026-11-14T05:31:16Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -64,11 +64,11 @@
     },
     {
       "path": "voicebridge/business/bridge.py",
-      "sha256": "863e72b0b48e29edc9802ab96485c2e81777c7ccbe3bd52e0e3a52f7e8fa8aee"
+      "sha256": "76b7f9475680e9a213ccc51d5ed5e3d0844e6dd3e2bcdf329b5171c77569b8a2"
     },
     {
       "path": "voicebridge/qubit_compat.py",
-      "sha256": "35ac343c974605e23dd33b2c1bf0a5c6f73af6bddfaeb21bdb1cd5bef891f431"
+      "sha256": "a541fad8f194345b8670d982641cca04ddae2c22ae8ab3914901cd75f8f5bede"
     },
     {
       "path": "frontend/qubit-app/plugins/qubit-office/game/app/effective-state.ts",
