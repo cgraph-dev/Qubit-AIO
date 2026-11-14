@@ -4,13 +4,13 @@
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_turn tests/phase1_reference tests/phase1_gateway",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": ".......................................................                  [100%]\n55 passed in 6.90s\n"
+      "stdout_tail": "........................................................                 [100%]\n56 passed in 7.00s\n"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/phase2_agent_turn.py --json",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "9VY\",\n    \"steps\": 3,\n    \"text\": \"Published the listing.\",\n    \"tool_calls\": 2,\n    \"trace_count\": 1,\n    \"trace_spans\": [\n      \"approval\",\n      \"chat\",\n      \"execute_tool\",\n      \"external_receipt\",\n      \"invoke_agent\"\n    ]\n  },\n  \"task\": \"task_01M7C3EJZHWMRESJK6JTDHYKTM\",\n  \"tenant\": \"ten_01M7C3EJWX6PQZ61EACMJ2ZGPQ\",\n  \"timeout\": {\n    \"error_code\": \"AGENT_TURN_MODEL_TIMEOUT\",\n    \"initial_status\": \"unknown\",\n    \"job_status\": \"unknown\",\n    \"resumed_checkpoints\": [\n      1,\n      2,\n      3\n    ],\n    \"resumed_status\": \"completed\",\n    \"run_id\": \"job_01M7C3EKC47N4MWJ3KFQTTCE48\"\n  }\n}\n"
+      "stdout_tail": "_id\": \"fake-request-1\",\n      \"status\": \"accepted\"\n    },\n    \"run_id\": \"job_01M7C3GEAZNFCJCC2DWT1SDZW2\",\n    \"steps\": 3,\n    \"text\": \"Published the listing.\",\n    \"tool_calls\": 2,\n    \"trace_count\": 1,\n    \"trace_spans\": [\n      \"approval\",\n      \"chat\",\n      \"execute_tool\",\n      \"external_receipt\",\n      \"invoke_agent\"\n    ]\n  },\n  \"task\": \"task_01M7C3GEAHHP1TMSY86RQ9TWPK\",\n  \"tenant\": \"ten_01M7C3GE8827KWSSC3KVSHJ1B5\",\n  \"timeout\": {\n    \"error_code\": \"AGENT_TURN_MODEL_TIMEOUT\",\n    \"initial_status\": \"unknown\",\n    \"job_status\": \"unknown\",\n    \"resumed_checkpoints\": [\n      1,\n      2,\n      3\n    ],\n    \"resumed_status\": \"completed\",\n    \"run_id\": \"job_01M7C3GENBHE8V1QG7DAQYW675\"\n  }\n}\n"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn",
@@ -19,13 +19,13 @@
       "stdout_tail": "All checks passed!\n"
     },
     {
-      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn/_phase2_helpers.py tests/phase2_turn/test_turn_success.py tests/phase2_turn/test_turn_denial.py tests/phase2_turn/test_turn_unknown_resume.py tests/phase2_turn/test_turn_snapshot.py tests/phase2_turn/test_turn_limits.py tests/phase2_turn/test_turn_approval_confusion.py tests/phase2_turn/test_turn_isolation.py",
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn/*.py",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T04:01:28Z",
+  "generated_at": "2026-11-14T04:02:21Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -110,10 +110,6 @@
   ],
   "outputs": [
     {
-      "path": "voicebridge/business/agent_turn.py",
-      "sha256": "f267217c5373f89371ca0b547cf030ba0713266541d93b4055101814ea234cfa"
-    },
-    {
       "path": "scripts/phase2_agent_turn.py",
       "sha256": "98c4132e7d05d151de506bbf77e35b32ec2649cce2cbf70e4d8755c333eea8a7"
     },
@@ -122,32 +118,36 @@
       "sha256": "926a81ec21d7a46f21085bda76a7d5e46e42fc118e7b8ee20f3cc9d9088714db"
     },
     {
-      "path": "tests/phase2_turn/test_turn_success.py",
-      "sha256": "0b5f88c347d708bd61f8a8c7d1dd754bc432f5b24eac614537e51322f8383924"
+      "path": "tests/phase2_turn/test_turn_approval_confusion.py",
+      "sha256": "3d8d14ccf90e08aa9d7f8a3e8d22afc5ef6db678d0a9e1487d5c1abd8171e010"
     },
     {
       "path": "tests/phase2_turn/test_turn_denial.py",
       "sha256": "bb2f55720e809e7f5ad34acb3f3ae4142b0685fca816ec0279947818ae3bf364"
     },
     {
-      "path": "tests/phase2_turn/test_turn_unknown_resume.py",
-      "sha256": "9e137015ac48f27ef61b064c6b6ca363c14df0a322d257e47b141d8f4656ed3a"
-    },
-    {
-      "path": "tests/phase2_turn/test_turn_snapshot.py",
-      "sha256": "327499902ce77675f8f2bca58e68a75c080327b3a3d42eddc6658900e4675068"
+      "path": "tests/phase2_turn/test_turn_isolation.py",
+      "sha256": "c6c1d6c55d13b4cab1b3659fc712558727d1447f53ef52522161184ade0dd759"
     },
     {
       "path": "tests/phase2_turn/test_turn_limits.py",
       "sha256": "15d47cfc019dad7af8139b3da823d0689f4c3fe8b2bcbbf3bfaa00da63705616"
     },
     {
-      "path": "tests/phase2_turn/test_turn_approval_confusion.py",
-      "sha256": "3d8d14ccf90e08aa9d7f8a3e8d22afc5ef6db678d0a9e1487d5c1abd8171e010"
+      "path": "tests/phase2_turn/test_turn_snapshot.py",
+      "sha256": "327499902ce77675f8f2bca58e68a75c080327b3a3d42eddc6658900e4675068"
     },
     {
-      "path": "tests/phase2_turn/test_turn_isolation.py",
-      "sha256": "554050dbe810de18db13cb9a3d4d527d33245a9b432b76cecf191b1cfc66459d"
+      "path": "tests/phase2_turn/test_turn_success.py",
+      "sha256": "0b5f88c347d708bd61f8a8c7d1dd754bc432f5b24eac614537e51322f8383924"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_unknown_resume.py",
+      "sha256": "9e137015ac48f27ef61b064c6b6ca363c14df0a322d257e47b141d8f4656ed3a"
+    },
+    {
+      "path": "voicebridge/business/agent_turn.py",
+      "sha256": "f267217c5373f89371ca0b547cf030ba0713266541d93b4055101814ea234cfa"
     }
   ],
   "status": "PASS",
