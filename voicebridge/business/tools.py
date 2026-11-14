@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Mapping
 
 from . import models
+from . import policy as policy_module
 from .errors import (
     APPROVAL_EXPIRED_CODE,
     APPROVAL_REQUIRED_CODE,
@@ -35,7 +36,17 @@ from .errors import (
     BusinessError,
 )
 from .ids import fingerprint, new_id
-from .util import json_dumps, now_iso, redact
+from .policy import (
+    CAPABILITY_ARGS_MISMATCH_CODE,
+    POLICY_SNAPSHOT_EXPIRED_CODE,
+    POLICY_SNAPSHOT_SCOPE_CODE,
+    CapabilityCatalog,
+    CapabilitySnapshot,
+    intent_digest,
+    normalized_intent,
+    same_intent,
+)
+from .util import json_dumps, json_loads, now_iso, redact
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .store import BusinessStore
@@ -94,6 +105,9 @@ class ToolRequest:
     policy: "Policy | None" = None
     rate_limit: int | None = None
     rate_window_seconds: float | None = None
+    policy_snapshot_id: str | None = None
+    policy_snapshot_digest: str | None = None
+    policy_decision: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +185,84 @@ def _currency(value: Any) -> str:
     return clean
 
 
+def _require_bound_approval(
+    row: Any,
+    *,
+    approval_id: str | None,
+    tenant_id: str,
+    business_id: str,
+    tool: str,
+    now: float,
+    intent: Mapping[str, Any] | None,
+) -> None:
+    """Execution-time approval binding for snapshot-backed calls (P1-06).
+
+    The approval is re-authorized here, at execution time, against the exact
+    normalized intent. Nothing about the request is trusted from the draft
+    that asked for the approval: a changed payload, target, action, tenant,
+    business or approval id fails closed, and an expired approval is its own
+    refusal. There is no auto-approval path.
+
+    ``approvals.request`` hashes an envelope ``{action, job_id, payload}``, so
+    the gateway accepts either an approval whose ``request_hash`` is the intent
+    digest itself (a future writer that stores it directly) or one whose
+    envelope hash matches its payload *and* whose payload is exactly the
+    normalized intent. Both cases require the payload to equal the intent.
+    """
+    expected_action = f"tool:{tool}"
+    if row is None:
+        raise BusinessError(
+            APPROVAL_REQUIRED_CODE,
+            f"tool {tool!r} requires an approved approval bound to the exact"
+            " intent; no matching approval was supplied",
+        )
+    if row["tenant_id"] != tenant_id or row["business_id"] != business_id:
+        raise BusinessError(
+            APPROVAL_REQUIRED_CODE,
+            f"approval {approval_id!r} is scoped to a different tenant/business",
+        )
+    if row["status"] != "approved":
+        raise BusinessError(
+            APPROVAL_REQUIRED_CODE,
+            f"approval {approval_id!r} is {row['status']!r}, not 'approved'",
+        )
+    if row["action"] != expected_action:
+        raise BusinessError(
+            APPROVAL_REQUIRED_CODE,
+            f"approval {approval_id!r} action {row['action']!r} does not bind"
+            f" {expected_action!r}",
+        )
+    expires_at = row["expires_at"]
+    if expires_at is not None and float(expires_at) < now:
+        raise BusinessError(
+            APPROVAL_EXPIRED_CODE,
+            f"approval {approval_id!r} expired before tool {tool!r} could run;"
+            " request a fresh approval",
+        )
+    if intent is None:
+        raise BusinessError(
+            APPROVAL_REQUIRED_CODE,
+            "no normalized intent was derived for this call",
+        )
+    if row["request_hash"] == intent_digest(intent):
+        return
+    payload = json_loads(row["payload_json"], {})
+    envelope = {
+        "action": row["action"],
+        "job_id": row["job_id"],
+        "payload": payload,
+    }
+    if fingerprint(envelope) == row["request_hash"] and same_intent(
+        payload, intent
+    ):
+        return
+    raise BusinessError(
+        APPROVAL_REQUIRED_CODE,
+        f"approval {approval_id!r} is bound to a different payload or target;"
+        " approve the exact normalized intent",
+    )
+
+
 class ToolGateway:
     def __init__(self, store: "BusinessStore", executor: Executor | None = None) -> None:
         self._store = store
@@ -192,6 +284,14 @@ class ToolGateway:
         approval_id: str | None = None,
         rate_limit: int | None = None,
         rate_window_seconds: float | None = None,
+        snapshot: CapabilitySnapshot | None = None,
+        catalog: CapabilityCatalog | None = None,
+        subject_id: str | None = None,
+        resource: str | None = None,
+        action: str | None = None,
+        data_class: str = "internal",
+        environment: str = "production",
+        now: float | None = None,
     ) -> ToolOutcome:
         actor_clean = _text(actor, "actor", max_len=200)
         tool_clean = _text(tool, "tool", max_len=120)
@@ -224,19 +324,140 @@ class ToolGateway:
                 "no tool executor is configured; real integrations are not"
                 " shipped in the control-plane skeleton (use dry_run=True)",
             )
-        requires_approval = policy.approval_required or policy.autonomy in APPROVAL_LEVELS
         body = {} if payload is None else payload
-        request_hash = fingerprint(
-            {
-                "tool": tool_clean,
-                "payload": body,
-                "cost_minor": cost_minor,
-                "currency": code,
-                "autonomy": policy.autonomy,
-                "policy_version": policy.policy_version,
-                "approval_id": approval_id,
-            }
+        moment = time.time() if now is None else float(now)
+        subject = _text(
+            subject_id if subject_id is not None else actor_clean,
+            "subject_id",
+            max_len=200,
         )
+        capability = None
+        decision = None
+        snapshot_meta: dict[str, Any] | None = None
+        capability_id = tool_clean
+        call_resource = resource if resource is not None else tool_clean
+        call_action = action if action is not None else "invoke"
+        approval_intent: dict[str, Any] | None = None
+        if snapshot is not None:
+            if not isinstance(snapshot, CapabilitySnapshot):
+                raise BusinessError(
+                    BAD_INPUT_CODE, "snapshot must be a CapabilitySnapshot"
+                )
+            if catalog is not None and not isinstance(catalog, CapabilityCatalog):
+                raise BusinessError(
+                    BAD_INPUT_CODE, "catalog must be a CapabilityCatalog"
+                )
+            if snapshot.tenant_id != tenant_id:
+                raise BusinessError(
+                    POLICY_SNAPSHOT_SCOPE_CODE,
+                    f"policy snapshot {snapshot.snapshot_id!r} belongs to another"
+                    " tenant",
+                )
+            if snapshot.subject_id != subject:
+                raise BusinessError(
+                    POLICY_SNAPSHOT_SCOPE_CODE,
+                    f"policy snapshot {snapshot.snapshot_id!r} belongs to another"
+                    " subject",
+                )
+            if snapshot.is_expired(moment):
+                raise BusinessError(
+                    POLICY_SNAPSHOT_EXPIRED_CODE,
+                    f"policy snapshot {snapshot.snapshot_id!r} expired before"
+                    " this call",
+                )
+            if catalog is not None:
+                capability = catalog.get(tool_clean)
+            if capability is not None:
+                capability_id = capability.capability_id
+                if resource is not None and resource != capability.resource:
+                    raise BusinessError(
+                        CAPABILITY_ARGS_MISMATCH_CODE,
+                        f"resource {resource!r} does not match capability"
+                        f" {capability_id!r} resource {capability.resource!r}",
+                    )
+                if action is not None and action != capability.action:
+                    raise BusinessError(
+                        CAPABILITY_ARGS_MISMATCH_CODE,
+                        f"action {action!r} does not match capability"
+                        f" {capability_id!r} action {capability.action!r}",
+                    )
+                call_resource = capability.resource
+                call_action = capability.action
+                if (
+                    capability.budget_minor is not None
+                    and cost_minor > capability.budget_minor
+                ):
+                    raise BusinessError(
+                        BUDGET_EXCEEDED_CODE,
+                        f"cost {cost_minor} exceeds capability budget"
+                        f" {capability.budget_minor}",
+                    )
+            decision = policy_module.evaluate(
+                snapshot,
+                capability_id,
+                call_resource,
+                call_action,
+                data_class,
+                environment,
+                now=moment,
+            )
+            if not decision.allowed:
+                raise BusinessError(
+                    TOOL_NOT_ALLOWED_CODE,
+                    f"capability {capability_id!r} denied by policy snapshot"
+                    f" {snapshot.snapshot_id!r}: {decision.detail}"
+                    f" [{decision.reason}]",
+                )
+            snapshot_meta = {
+                "policy_snapshot_id": snapshot.snapshot_id,
+                "policy_snapshot_digest": snapshot.digest,
+                "policy_revision": snapshot.policy_revision,
+                "policy_subject": subject,
+                "policy_capability": capability_id,
+                "policy_decision": "allow",
+                "policy_reason": decision.reason,
+                "policy_resource": call_resource,
+                "policy_action": call_action,
+            }
+        requires_approval = (
+            policy.approval_required
+            or policy.autonomy in APPROVAL_LEVELS
+            or (
+                capability is not None
+                and (
+                    capability.risk in APPROVAL_LEVELS
+                    or policy_module.approval_required(capability.approval_policy)
+                )
+            )
+            or bool(decision is not None and decision.approval_required)
+        )
+        if snapshot is not None and requires_approval:
+            approval_intent = normalized_intent(
+                tool=tool_clean,
+                resource=call_resource,
+                action=call_action,
+                parameters=body,
+                currency=code,
+                amount_minor=cost_minor,
+                data_class=data_class,
+                environment=environment,
+            )
+        hash_input: dict[str, Any] = {
+            "tool": tool_clean,
+            "payload": body,
+            "cost_minor": cost_minor,
+            "currency": code,
+            "autonomy": policy.autonomy,
+            "policy_version": policy.policy_version,
+            "approval_id": approval_id,
+        }
+        if snapshot is not None:
+            hash_input["policy_snapshot_digest"] = snapshot.digest
+            hash_input["policy_capability"] = capability_id
+            hash_input["policy_decision"] = (
+                decision.reason if decision is not None else "denied"
+            )
+        request_hash = fingerprint(hash_input)
         try:
             existing, invocation_id = self._reserve(
                 tenant_id=tenant_id,
@@ -253,10 +474,14 @@ class ToolGateway:
                 currency=code,
                 requires_approval=requires_approval,
                 approval_id=approval_id,
+                approval_intent=approval_intent,
+                policy_meta=snapshot_meta,
+                now=moment,
             )
         except BusinessError as exc:
             self._audit_refusal(
-                tenant_id, business_id, actor_clean, tool_clean, key, exc
+                tenant_id, business_id, actor_clean, tool_clean, key, exc,
+                policy_meta=snapshot_meta,
             )
             raise
         if existing is not None:
@@ -283,6 +508,15 @@ class ToolGateway:
             policy=policy,
             rate_limit=rate_limit,
             rate_window_seconds=rate_window_seconds,
+            policy_snapshot_id=(
+                snapshot.snapshot_id if snapshot is not None else None
+            ),
+            policy_snapshot_digest=(
+                snapshot.digest if snapshot is not None else None
+            ),
+            policy_decision=(
+                decision.reason if decision is not None else None
+            ),
         )
         if dry_run:
             preview = {
@@ -294,6 +528,7 @@ class ToolGateway:
             return self._complete(
                 tenant_id, invocation_id, "dry_run", preview,
                 cost_minor=0, error_code=None, dry_run=True,
+                policy_meta=snapshot_meta,
             )
         try:
             raw = self._executor(request)  # type: ignore[misc]
@@ -316,6 +551,7 @@ class ToolGateway:
             self._complete(
                 tenant_id, invocation_id, "failed", None,
                 cost_minor=cost_minor, error_code=exc.code, dry_run=False,
+                policy_meta=snapshot_meta,
             )
             raise
         except Exception as exc:  # noqa: BLE001 - executor is an external seam
@@ -327,6 +563,7 @@ class ToolGateway:
             self._complete(
                 tenant_id, invocation_id, "failed", None,
                 cost_minor=cost_minor, error_code=str(code), dry_run=False,
+                policy_meta=snapshot_meta,
             )
             raise BusinessError(
                 str(code), f"tool {tool_clean!r} failed: {message}"
@@ -339,6 +576,7 @@ class ToolGateway:
             cost_minor=cost_minor if executed else 0,
             error_code=None,
             dry_run=not executed,
+            policy_meta=snapshot_meta,
         )
 
     # -- internals -----------------------------------------------------
@@ -359,6 +597,9 @@ class ToolGateway:
         currency: str,
         requires_approval: bool,
         approval_id: str | None,
+        approval_intent: Mapping[str, Any] | None = None,
+        policy_meta: Mapping[str, Any] | None = None,
+        now: float | None = None,
     ) -> tuple[models.ToolInvocation | None, str | None]:
         with self._store.transaction() as conn:
             self._store._require_business(conn, tenant_id, business_id)
@@ -384,27 +625,51 @@ class ToolGateway:
                     existing["invocation_id"],
                 )
             if requires_approval and not dry_run:
-                approved = None
-                if approval_id is not None:
-                    approved = conn.execute(
-                        "SELECT * FROM bos_approval WHERE tenant_id=?"
-                        " AND business_id=? AND approval_id=? AND status='approved'"
-                        " AND action=?",
-                        (tenant_id, business_id, approval_id, f"tool:{tool}"),
-                    ).fetchone()
-                if approved is None:
-                    raise BusinessError(
-                        APPROVAL_REQUIRED_CODE,
-                        f"tool {tool!r} at autonomy {autonomy!r} needs an approved"
-                        f" approval with action 'tool:{tool}'",
+                moment = time.time() if now is None else float(now)
+                if policy_meta is not None:
+                    row = None
+                    if approval_id is not None:
+                        row = conn.execute(
+                            "SELECT * FROM bos_approval WHERE tenant_id=?"
+                            " AND business_id=? AND approval_id=?",
+                            (tenant_id, business_id, approval_id),
+                        ).fetchone()
+                    _require_bound_approval(
+                        row,
+                        approval_id=approval_id,
+                        tenant_id=tenant_id,
+                        business_id=business_id,
+                        tool=tool,
+                        now=moment,
+                        intent=approval_intent,
                     )
-                expires_at = approved["expires_at"]
-                if expires_at is not None and float(expires_at) < time.time():
-                    raise BusinessError(
-                        APPROVAL_EXPIRED_CODE,
-                        f"approval {approval_id!r} expired before tool {tool!r}"
-                        " could run; request a fresh approval",
-                    )
+                else:
+                    approved = None
+                    if approval_id is not None:
+                        approved = conn.execute(
+                            "SELECT * FROM bos_approval WHERE tenant_id=?"
+                            " AND business_id=? AND approval_id=?"
+                            " AND status='approved' AND action=?",
+                            (
+                                tenant_id,
+                                business_id,
+                                approval_id,
+                                f"tool:{tool}",
+                            ),
+                        ).fetchone()
+                    if approved is None:
+                        raise BusinessError(
+                            APPROVAL_REQUIRED_CODE,
+                            f"tool {tool!r} at autonomy {autonomy!r} needs an"
+                            f" approved approval with action 'tool:{tool}'",
+                        )
+                    expires_at = approved["expires_at"]
+                    if expires_at is not None and float(expires_at) < moment:
+                        raise BusinessError(
+                            APPROVAL_EXPIRED_CODE,
+                            f"approval {approval_id!r} expired before tool"
+                            f" {tool!r} could run; request a fresh approval",
+                        )
             budget = self._store._budget_status_conn(
                 conn,
                 tenant_id,
@@ -448,15 +713,17 @@ class ToolGateway:
                     now_iso(),
                 ),
             )
+            invoke_detail: dict[str, Any] = {
+                "tool": tool,
+                "dry_run": dry_run,
+                "cost_minor": cost_minor,
+                "idempotency_key": idempotency_key,
+            }
+            if policy_meta:
+                invoke_detail.update(policy_meta)
             self._store._audit(
                 conn, tenant_id, business_id, actor, "tool.invoke",
-                "tool_invocation", invocation_id, "ok",
-                {
-                    "tool": tool,
-                    "dry_run": dry_run,
-                    "cost_minor": cost_minor,
-                    "idempotency_key": idempotency_key,
-                },
+                "tool_invocation", invocation_id, "ok", invoke_detail,
             )
         return None, invocation_id
 
@@ -470,6 +737,7 @@ class ToolGateway:
         cost_minor: int,
         error_code: str | None,
         dry_run: bool,
+        policy_meta: Mapping[str, Any] | None = None,
     ) -> ToolOutcome:
         with self._store.transaction() as conn:
             row = conn.execute(
@@ -491,10 +759,17 @@ class ToolGateway:
                     invocation_id,
                 ),
             )
+            result_detail: dict[str, Any] = {
+                "tool": row["tool"],
+                "status": status,
+                "dry_run": dry_run,
+            }
+            if policy_meta:
+                result_detail.update(policy_meta)
             self._store._audit(
                 conn, tenant_id, row["business_id"], row["actor"], "tool.result",
-                "tool_invocation", invocation_id, "ok" if status != "failed" else "error",
-                {"tool": row["tool"], "status": status, "dry_run": dry_run},
+                "tool_invocation", invocation_id,
+                "ok" if status != "failed" else "error", result_detail,
             )
             updated = conn.execute(
                 "SELECT * FROM bos_tool_invocation WHERE tenant_id=?"
@@ -515,18 +790,22 @@ class ToolGateway:
         tool: str,
         key: str,
         exc: BusinessError,
+        *,
+        policy_meta: Mapping[str, Any] | None = None,
     ) -> None:
         try:
             with self._store.transaction() as conn:
                 self._store._require_business(conn, tenant_id, business_id)
+                refusal_detail: dict[str, Any] = {
+                    "code": exc.code,
+                    "detail": exc.detail,
+                    "idempotency_key": key,
+                }
+                if policy_meta:
+                    refusal_detail.update(policy_meta)
                 self._store._audit(
                     conn, tenant_id, business_id, actor, "tool.refused", "tool",
-                    tool, "refused",
-                    {
-                        "code": exc.code,
-                        "detail": exc.detail,
-                        "idempotency_key": key,
-                    },
+                    tool, "refused", refusal_detail,
                 )
         except BusinessError:
             pass
