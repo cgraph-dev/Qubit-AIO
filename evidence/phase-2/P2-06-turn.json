@@ -1,0 +1,155 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_turn tests/phase1_reference tests/phase1_gateway",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................                 [100%]\n56 passed in 7.00s\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/phase2_agent_turn.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "_id\": \"fake-request-1\",\n      \"status\": \"accepted\"\n    },\n    \"run_id\": \"job_01M7C3GEAZNFCJCC2DWT1SDZW2\",\n    \"steps\": 3,\n    \"text\": \"Published the listing.\",\n    \"tool_calls\": 2,\n    \"trace_count\": 1,\n    \"trace_spans\": [\n      \"approval\",\n      \"chat\",\n      \"execute_tool\",\n      \"external_receipt\",\n      \"invoke_agent\"\n    ]\n  },\n  \"task\": \"task_01M7C3GEAHHP1TMSY86RQ9TWPK\",\n  \"tenant\": \"ten_01M7C3GE8827KWSSC3KVSHJ1B5\",\n  \"timeout\": {\n    \"error_code\": \"AGENT_TURN_MODEL_TIMEOUT\",\n    \"initial_status\": \"unknown\",\n    \"job_status\": \"unknown\",\n    \"resumed_checkpoints\": [\n      1,\n      2,\n      3\n    ],\n    \"resumed_status\": \"completed\",\n    \"run_id\": \"job_01M7C3GENBHE8V1QG7DAQYW675\"\n  }\n}\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn/*.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T04:02:21Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/policy.py",
+      "sha256": "9627e3121929d90b1555b708a946425a738dadab18ad1c17a94c5d6f89379d62"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "aa6722d69fd9a9e15701d7fc25453d66ec599d59e8ce6c7916028b9d0608a10d"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "voicebridge/business/otel.py",
+      "sha256": "8111c1674335704bd3764c856f9eb880b35e47a839df9c1b2545ec49bc956d8f"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "scripts/phase1_reference_lane.py",
+      "sha256": "b86fd17cf2942074ef5343cd948d2cb6b7342c3c99f7681f225b757c084e7372"
+    },
+    {
+      "path": "tests/phase1_reference/test_reference_lane.py",
+      "sha256": "5732f178eebb9046018b42e0d05fdfd88a832f1cc5c5684ec4cc6ca53e72e9a4"
+    },
+    {
+      "path": "tests/phase1_gateway/_phase1_helpers.py",
+      "sha256": "941f2d1b1fb4ef8063438e9dc49e3a279fa6019c22ef58c549eb218c70b4c066"
+    }
+  ],
+  "limitations": [
+    "fake provider and fake tool executor only; no real external side effect",
+    "single-process restart simulation via a durable SQLite checkpoint, not an OS process kill",
+    "model timeout and ambiguous provider failure are raised by fakes; no live provider timeout was measured",
+    "a denied turn still writes a failed bos_job run record (the durable run id) but no artifact, receipt, ledger row or completed turn",
+    "no live service, credential, operator home or network was used",
+    "no full matrix or independent verification; VERIFIED is not claimed"
+  ],
+  "outputs": [
+    {
+      "path": "scripts/phase2_agent_turn.py",
+      "sha256": "98c4132e7d05d151de506bbf77e35b32ec2649cce2cbf70e4d8755c333eea8a7"
+    },
+    {
+      "path": "tests/phase2_turn/_phase2_helpers.py",
+      "sha256": "926a81ec21d7a46f21085bda76a7d5e46e42fc118e7b8ee20f3cc9d9088714db"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_approval_confusion.py",
+      "sha256": "3d8d14ccf90e08aa9d7f8a3e8d22afc5ef6db678d0a9e1487d5c1abd8171e010"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_denial.py",
+      "sha256": "bb2f55720e809e7f5ad34acb3f3ae4142b0685fca816ec0279947818ae3bf364"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_isolation.py",
+      "sha256": "c6c1d6c55d13b4cab1b3659fc712558727d1447f53ef52522161184ade0dd759"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_limits.py",
+      "sha256": "15d47cfc019dad7af8139b3da823d0689f4c3fe8b2bcbbf3bfaa00da63705616"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_snapshot.py",
+      "sha256": "327499902ce77675f8f2bca58e68a75c080327b3a3d42eddc6658900e4675068"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_success.py",
+      "sha256": "0b5f88c347d708bd61f8a8c7d1dd754bc432f5b24eac614537e51322f8383924"
+    },
+    {
+      "path": "tests/phase2_turn/test_turn_unknown_resume.py",
+      "sha256": "9e137015ac48f27ef61b064c6b6ca363c14df0a322d257e47b141d8f4656ed3a"
+    },
+    {
+      "path": "voicebridge/business/agent_turn.py",
+      "sha256": "f267217c5373f89371ca0b547cf030ba0713266541d93b4055101814ea234cfa"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P2-06"
+}
