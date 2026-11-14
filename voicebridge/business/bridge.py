@@ -47,6 +47,7 @@ from ..office.world import assign as WORLD_ASSIGN
 from ..office.world import model as WORLD
 from ..office.world import occupancy as OCCUPANCY
 from . import agents as AGENTS
+from . import command_center as COMMAND_CENTER
 from . import effective_state as EFFECTIVE
 from . import office_seats as OFFICE_SEATS
 from . import pilot as ETSY_PILOT
@@ -903,6 +904,38 @@ def h_business_warroom_research(cfg: Any, q: Dict[str, str],
 # ---------------------------------------------------------------------------
 # Agent controls
 # ---------------------------------------------------------------------------
+def h_business_command_center(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                              p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/business/command-center -> searchable office projection.
+
+    Read-only and owner/tenant-gated by the same ``_tenant`` rule as the other
+    business reads. It composes the shipped floor/room/desk templates, the
+    agent roster, tasks, durable sessions and approvals into bounded search
+    results plus real roster/inbox counts and floor links. No write, no model
+    call, no fabricated count: a source that cannot be read is a typed
+    ``unavailable`` state in the payload.
+    """
+    try:
+        store = _store(cfg)
+        tenant = _tenant(store, q, b)
+        projection = COMMAND_CENTER.command_center(
+            store,
+            tenant,
+            query=q.get("q") or q.get("query"),
+            kind=q.get("kind"),
+            status=q.get("status"),
+            floor_id=q.get("floor_id"),
+            room_id=q.get("room_id"),
+            agent_id=q.get("agent_id"),
+            task_id=q.get("task_id"),
+            approval_id=q.get("approval_id"),
+            limit=q.get("limit"),
+        )
+        return _ok(schema=COMMAND_CENTER.SCHEMA, projection=projection)
+    except Exception as exc:  # noqa: BLE001
+        return _error(exc)
+
+
 def _service(cfg: Any) -> Tuple[BusinessStore, AGENTS.AgentControlService]:
     store = _store(cfg)
     return store, AGENTS.AgentControlService(store)
