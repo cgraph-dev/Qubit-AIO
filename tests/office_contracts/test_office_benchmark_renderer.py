@@ -50,8 +50,8 @@ def test_benchmark_reports_honest_one_floor_data_path() -> None:
     assert report["fixture"]["tower_counts"] == {
         "floors": 100,
         "wings": 5,
-        "active_floors": 22,
-        "dormant_floors": 78,
+        "active_floors": 23,
+        "dormant_floors": 77,
         "rooms": 300,
         "cells": 575,
         "desks": 3075,

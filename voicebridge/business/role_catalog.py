@@ -204,6 +204,12 @@ _DEPARTMENTS = (
         "Test planning, automation, regression and release verification.",
         (),
     ),
+    Department(
+        "trading",
+        "Trading",
+        "Trading desk, strategy research, risk, data, treasury and compliance.",
+        ("trading",),
+    ),
 )
 
 _DEPT_SKILLS: dict[str, tuple[str, ...]] = {
@@ -229,6 +235,7 @@ _DEPT_SKILLS: dict[str, tuple[str, ...]] = {
     "analytics": ("data", "statistics", "reporting"),
     "security": ("security", "risk", "incident_response"),
     "qa": ("testing", "verification", "regression"),
+    "trading": ("market_analysis", "risk", "execution"),
 }
 
 _DEPT_TOOLSETS: dict[str, tuple[str, ...]] = {
@@ -254,6 +261,7 @@ _DEPT_TOOLSETS: dict[str, tuple[str, ...]] = {
     "analytics": ("analytics", "research", "docs", "tasks", "reports"),
     "security": ("monitors", "logs", "code", "docs", "tasks"),
     "qa": ("code", "tests", "monitors", "docs", "tasks"),
+    "trading": ("market", "analytics", "docs", "tasks", "reports"),
 }
 
 _OWNER_BY_DEPT = {
@@ -279,6 +287,7 @@ _OWNER_BY_DEPT = {
     "analytics": "human:cto",
     "security": "human:ops-lead",
     "qa": "human:cto",
+    "trading": "human:trading-owner",
 }
 
 _DEPT_KPIS = {
@@ -357,6 +366,10 @@ _DEPT_KPIS = {
     "qa": (
         "defect detection and regression coverage",
         "release verdict evidence",
+    ),
+    "trading": (
+        "strategy evidence and risk-limit compliance",
+        "no unapproved live order or credential",
     ),
 }
 
@@ -2571,11 +2584,260 @@ ROLE_TEMPLATES: tuple[RoleTemplate, ...] = (
         autonomy="L2",
         schedule="daily",
     ),
+    # ------------------------------------------------------------- Trading
+    _r(
+        "trading-cio",
+        "trading",
+        "Chief Investment Officer",
+        "Own strategy allocation, mandate and the owner interface.",
+        (
+            "Approve the research-to-paper pipeline and asset-class scope.",
+            "Track portfolio objectives and drawdown against the mandate.",
+            "Escalate live-readiness decisions to the owner.",
+        ),
+        permissions=("strategy.allocate", "market.read", "risk.read",
+                     "reports.write", "docs.write", "tasks.write"),
+        autonomy="L2",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-market-research",
+        "trading",
+        "Market Research Analyst",
+        "Turn claims and markets into testable, evidence-backed hypotheses.",
+        (
+            "Collect primary and secondary market evidence.",
+            "Label every claim FACT, INFERENCE or ASSUMPTION.",
+            "Hand testable hypotheses to the strategy lab.",
+        ),
+        permissions=("research.read", "market.read", "docs.write",
+                     "reports.write", "tasks.write"),
+        autonomy="L2",
+        schedule="daily",
+    ),
+    _r(
+        "trading-quant-backtest",
+        "trading",
+        "Quant / Backtest Engineer",
+        "Build honest backtests with fees, slippage and no look-ahead.",
+        (
+            "Implement and version strategies from accepted hypotheses.",
+            "Run walk-forward and out-of-sample checks.",
+            "Report survivorship and liquidity caveats.",
+        ),
+        permissions=("backtest.run", "strategy.write", "code.read",
+                     "data.read", "reports.write"),
+        autonomy="L2",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-crypto-analyst",
+        "trading",
+        "Crypto Analyst",
+        "Cover spot and major-pair research without trading live capital.",
+        (
+            "Monitor venues, spreads and liquidity conditions.",
+            "Produce evidence-backed crypto theses.",
+            "Flag stale data and venue health problems.",
+        ),
+        permissions=("market.read", "research.read", "strategy.write",
+                     "reports.write", "tasks.write"),
+        autonomy="L2",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-meme-risk",
+        "trading",
+        "Meme-Coin Risk Analyst",
+        "Score extreme-risk tokens and refuse unsupported exposure.",
+        (
+            "Check contract, liquidity and holder concentration.",
+            "Apply the extreme-risk policy before any paper trade.",
+            "Document why a token is refused.",
+        ),
+        permissions=("market.read", "risk.read", "reports.write",
+                     "docs.write", "tasks.write"),
+        autonomy="L1",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-forex-analyst",
+        "trading",
+        "Forex Analyst",
+        "Research major/minor pairs and broker conditions.",
+        (
+            "Track macro releases and session liquidity.",
+            "Produce evidence-backed forex theses.",
+            "Record broker spreads and execution caveats.",
+        ),
+        permissions=("market.read", "research.read", "strategy.write",
+                     "reports.write", "tasks.write"),
+        autonomy="L2",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-execution",
+        "trading",
+        "Execution Trader",
+        "Execute approved paper or testnet orders without discretion.",
+        (
+            "Place only strategies and sizes approved by risk.",
+            "Record every order, fill, cancel and rejection.",
+            "Reconcile positions after each session.",
+        ),
+        permissions=("orders.read", "orders.paper", "market.read",
+                     "risk.read", "reports.write", "tasks.write"),
+        autonomy="L1",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-risk-manager",
+        "trading",
+        "Risk Manager (Independent)",
+        "Hold the limits and veto that execution cannot override.",
+        (
+            "Enforce pre-trade and post-trade risk limits.",
+            "Operate the kill switch when limits or data fail.",
+            "Report exposure and drawdown independently.",
+        ),
+        permissions=("risk.read", "risk.write", "reports.write",
+                     "docs.write", "tasks.write", "monitors.read"),
+        autonomy="L1",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-portfolio-accountant",
+        "trading",
+        "Portfolio Accountant",
+        "Keep a double-entry portfolio ledger that reconciles.",
+        (
+            "Record positions, cost basis, fees and funding.",
+            "Reconcile broker and ledger balances.",
+            "Report realized and unrealized PnL.",
+        ),
+        permissions=("ledger.read", "ledger.write", "reports.write",
+                     "data.read", "tasks.write"),
+        autonomy="L2",
+        schedule="daily",
+    ),
+    _r(
+        "trading-compliance",
+        "trading",
+        "Compliance / Policy Officer",
+        "Keep orders, approvals and incidents auditable.",
+        (
+            "Verify approvals and receipts before execution.",
+            "Archive incidents and policy decisions.",
+            "Refuse activity outside the approved mandate.",
+        ),
+        permissions=("audit.read", "compliance.write", "docs.write",
+                     "reports.write", "orders.read", "tasks.write"),
+        autonomy="L1",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-data-engineer",
+        "trading",
+        "Data Engineer",
+        "Keep market data feeds complete, fresh and replayable.",
+        (
+            "Monitor feed health and detect stale data.",
+            "Version historical datasets and provider failover.",
+            "Publish data-quality evidence.",
+        ),
+        permissions=("data.read", "data.write", "market.read",
+                     "monitors.read", "reports.write", "tasks.write"),
+        autonomy="L2",
+        schedule="business_hours",
+    ),
+    _r(
+        "trading-incident-responder",
+        "trading",
+        "Incident Responder",
+        "Stop trading on outage, runaway loss or stale data.",
+        (
+            "Trigger the kill switch and freeze strategies.",
+            "Record the incident timeline and evidence.",
+            "Return trading only after the owner approves.",
+        ),
+        permissions=("incidents.write", "risk.read", "logs.read",
+                     "monitors.read", "reports.write", "tasks.write"),
+        autonomy="L1",
+        schedule="on_demand",
+    ),
+    _r(
+        "trading-verifier",
+        "trading",
+        "Independent Verifier / Auditor",
+        "Verify that paper results match the recorded evidence.",
+        (
+            "Re-run backtests and compare receipts.",
+            "Check risk limits, approvals and ledger reconciliation.",
+            "Return a typed verdict with evidence.",
+        ),
+        permissions=("audit.read", "tests.run", "reports.write",
+                     "docs.write", "tasks.write"),
+        autonomy="L2",
+        schedule="on_demand",
+    ),
 )
 
 _WINGS = ("north", "east", "south", "west", "central")
 _DESK_SHAPES = (9, 12, 18, 24)
 _ROOM_KINDS = ("work", "war_room", "focus", "ops")
+
+#: The Trading Department floor's room grammar: the seven trading rooms the
+#: design names plus the shared per-floor facilities (§2 of
+#: ``docs/QUBIT-OFFICE-TRADING-DEPARTMENT.md`` and §2 of
+#: ``docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md``). Order matters: the
+#: first ``extra`` rooms absorb the cluster cells when the floor is sized.
+_TRADING_ROOM_SPECS: tuple[tuple[str, str, str], ...] = (
+    ("trading-floor", "Trading Floor (Market Wall)", "ops"),
+    ("strategy-lab", "Strategy Lab", "focus"),
+    ("risk-room", "Risk Room", "ops"),
+    ("data-room", "Data Room", "work"),
+    ("treasury", "Treasury / Accounting", "work"),
+    ("compliance-archive", "Compliance / Archive", "focus"),
+    ("incident-room", "Incident Room", "war_room"),
+    ("reception", "Reception", "work"),
+    ("kitchen", "Kitchen / Break", "work"),
+    ("restrooms", "Restrooms", "work"),
+    ("lounge", "Lounge", "work"),
+    ("boardroom", "Boardroom", "war_room"),
+    ("focus", "Focus Rooms", "focus"),
+    ("head-office", "Head Office", "war_room"),
+    ("storage", "Storage / Archive", "work"),
+    ("comms", "Comms / Ops", "ops"),
+)
+
+#: Replacing one generic 3-room floor with the 16-room Trading floor frees 13
+#: room slots; the same 13 focus rooms are dropped from dormant expansion
+#: floors so the shipped 100-floor totals stay 300 rooms / 3,075 desks / 575
+#: cells. No floor loses its main desk area or war room.
+_TRADING_COMPENSATION_ROOMS = 13
+
+
+def _trading_desk_split(total: int, *, extra_cells: int) -> list[int]:
+    """Allocate ``total`` desks over the 16 trading rooms.
+
+    ``extra_cells`` rooms carry two cells (7..12 desks); the rest carry one
+    (1..6). The caller derives both numbers from the floor's desk shape so the
+    room/cell totals stay consistent with the rest of the tower.
+    """
+    rooms = len(_TRADING_ROOM_SPECS)
+    desks = [1] * rooms
+    caps = [12 if i < extra_cells else 6 for i in range(rooms)]
+    remaining = total - rooms
+    if remaining < 0:
+        raise ValueError("trading floor needs at least one desk per room")
+    for i in range(rooms):
+        add = min(caps[i] - 1, remaining)
+        desks[i] += add
+        remaining -= add
+    if remaining:
+        raise ValueError(
+            f"trading floor cannot place {total} desks over {rooms} rooms")
+    return desks
 
 
 def build_floor_templates(
@@ -2595,6 +2857,17 @@ def build_floor_templates(
     for role in sorted(roles, key=lambda item: item.id):
         by_dept[role.department].append(role.id)
     dept_ids = [dept.id for dept in departments]
+    trading_floor = (
+        dept_ids.index("trading") + 1 if "trading" in dept_ids else None
+    )
+    compensation = (
+        trading_floor is not None
+        and count >= trading_floor + _TRADING_COMPENSATION_ROOMS
+    )
+    reduced = (
+        set(range(count - _TRADING_COMPENSATION_ROOMS + 1, count + 1))
+        if compensation else set()
+    )
     floors: list[FloorTemplate] = []
     for index in range(1, count + 1):
         dept_id = dept_ids[(index - 1) % len(dept_ids)]
@@ -2603,11 +2876,29 @@ def build_floor_templates(
             wing = _WINGS[-1]
         assigned = tuple(by_dept[dept_id])
         desk_shape = _DESK_SHAPES[(index - 1) % len(_DESK_SHAPES)]
-        room_defs = (
-            ("main", "Main Floor", "work", desk_shape),
-            ("war", "War Room", "war_room", 9),
-            ("focus", "Focus Rooms", "focus", 6),
-        )
+        if index == trading_floor:
+            # Same compensation arithmetic as the dropped focus rooms: the
+            # trading floor carries the dropped focus desks/cells. This keeps
+            # the published 100/300/3,075/575 totals exact.
+            total = desk_shape + 93
+            extra_cells = -(-desk_shape // 6)
+            split = _trading_desk_split(total, extra_cells=extra_cells)
+            room_defs = tuple(
+                (suffix, name, kind, desks)
+                for (suffix, name, kind), desks
+                in zip(_TRADING_ROOM_SPECS, split)
+            )
+        elif index in reduced:
+            room_defs = (
+                ("main", "Main Floor", "work", desk_shape),
+                ("war", "War Room", "war_room", 9),
+            )
+        else:
+            room_defs = (
+                ("main", "Main Floor", "work", desk_shape),
+                ("war", "War Room", "war_room", 9),
+                ("focus", "Focus Rooms", "focus", 6),
+            )
         rooms = tuple(
             RoomTemplate(
                 room_id=f"{_floor_id(index)}-{suffix}",
