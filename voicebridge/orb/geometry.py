@@ -63,6 +63,25 @@ def window_size_px(collapsed: bool = False) -> int:
     return DOT_PX if collapsed else ORB_PX
 
 
+def point_hits_orb(x: Any, y: Any, collapsed: bool = False,
+                   inset: float = 1.0) -> bool:
+    """True when window-local ``(x, y)`` lands on the orb's visible disc.
+
+    The window is square but the orb is round, so the transparent corners must
+    not count as a click on the mark. Uses the module ``ORB_PX`` (so a runtime
+    size change is honoured) and fails open: a bad coordinate must never make
+    the orb unclickable.
+    """
+    try:
+        size = float(DOT_PX if collapsed else ORB_PX)
+        r = max(1.0, size / 2.0 - float(inset))
+        dx = float(x) - size / 2.0
+        dy = float(y) - size / 2.0
+        return dx * dx + dy * dy <= r * r
+    except Exception:
+        return True
+
+
 def set_orb_size(px: Any) -> int:
     """Override the module ``ORB_PX`` at runtime (clamped 48..400).
 
