@@ -91,6 +91,14 @@ def test_served_bundle_matches_tracked_source_bundle(tmp_path):
     port = ui._server.server_address[1]
     try:
         checked = 0
+        # Office theme packs are NOT part of the served SPA bundle: the webui
+        # serves ``plugins/qubit-office/themes/<id>/<asset>`` from
+        # ``$QUBIT_HOME/office/themes/<id>`` via ``voicebridge.office.theme``,
+        # deliberately so an unknown/classic id 404s instead of falling back to
+        # a dist copy (see ``WebUI._serve_theme_static``). The dist copy of a
+        # pack is a build input, not a served asset, so walking it here asserted
+        # a contract the server is designed NOT to honour.
+        theme_prefix = "plugins/qubit-office/themes/"
         for root, _, files in os.walk(DIST):
             for fname in files:
                 if fname == "index.html":
@@ -99,6 +107,8 @@ def test_served_bundle_matches_tracked_source_bundle(tmp_path):
                     continue
                 path = Path(root) / fname
                 rel = path.relative_to(DIST)
+                if rel.as_posix().startswith(theme_prefix):
+                    continue
                 url = f"http://127.0.0.1:{port}/{rel.as_posix()}"
                 with urllib.request.urlopen(url, timeout=15) as _r:
                     served = _r.read()
