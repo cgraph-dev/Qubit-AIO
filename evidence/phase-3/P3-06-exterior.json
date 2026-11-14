@@ -1,0 +1,80 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_exterior.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": " \"14 features represented\",\n      \"name\": \"features_complete\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"paid references are local-only\",\n      \"name\": \"paid_art_local_only\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"max_chunks=256, max_active=96\",\n      \"name\": \"resource_bounds\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"no problems\",\n      \"name\": \"validation_clean\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 13,\n  \"counts\": {\n    \"active_chunks\": 19,\n    \"active_zones\": 5,\n    \"animated_chunks\": 5,\n    \"assets\": 15,\n    \"chunks\": 20,\n    \"dormant_zones\": 1,\n    \"portals\": 8,\n    \"tiles\": 9148,\n    \"zones\": 6\n  },\n  \"digest\": \"e063dfffeab2cb7f91de9923f0e4dbc202a9f7500d542f38257fc61d742c5643\",\n  \"map_schema\": \"qubit-office-world-exterior/1\",\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"problems\": [],\n  \"schema\": \"qubit-office-exterior-validation/1\"\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_exterior",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "20 passed in 0.82s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/office/world/exterior.py scripts/validate_exterior.py tests/phase3_exterior",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/office/world/exterior.py scripts/validate_exterior.py tests/phase3_exterior/test_exterior.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T04:44:42Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/DECISIONS.md",
+      "sha256": "d5e1b8d881c062ef837ea4603d838975ff38e08f58e3fec79c4a3008dad9a863"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    }
+  ],
+  "limitations": [
+    "Data + validator only: no renderer, no live service, no paid art read or committed.",
+    "Asset sha256 values are manifest digests over pack/feature/id, not decoded pixel hashes.",
+    "The map is a deterministic validation fixture; no real operator asset path is required to exist."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/office/world/exterior.py",
+      "sha256": "8a544fd2f66dfc8a3187720b8375558d936613713ff8faf65a17da13379dd82d"
+    },
+    {
+      "path": "scripts/validate_exterior.py",
+      "sha256": "330e10699e7c21f3967fbb99bbd744908f15be6d39ee7d8f2c4e16e4fa2f4b02"
+    },
+    {
+      "path": "tests/phase3_exterior/test_exterior.py",
+      "sha256": "8123f719b7a620d1528622ad624eb0802586d2008787e3f6dbab2225bbce54aa"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P3-06"
+}
