@@ -1,0 +1,139 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_registry_sessions/test_sessions.py tests/phase2_registry_sessions/test_schema_v5.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............                                                             [100%]\n12 passed in 2.77s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/schema.py voicebridge/business/sessions.py voicebridge/business/__init__.py tests/phase2_registry_sessions/test_sessions.py tests/phase2_registry_sessions/test_schema_v5.py tests/durable_substrate/test_recovery_restore.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/schema.py voicebridge/business/sessions.py voicebridge/business/__init__.py tests/phase2_registry_sessions/test_sessions.py tests/phase2_registry_sessions/test_schema_v5.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/durable_substrate tests/phase1_platform/test_runs.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "...................................                                      [100%]\n35 passed in 3.60s"
+    }
+  ],
+  "generated_at": "2026-11-14T04:08:51Z",
+  "git_head": "b8b57fb7379e93329b3bb8878edc48e30141b7b3",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "29ee8214e93ee39cc08cfacc30f6451daa405d0732a44e5e4d0b76ca59f929a0"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/a2a.py",
+      "sha256": "265874aa0dd95baad02f9e1c080eb7cdda7c00a1b91a6f15696d1316e79bbae1"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/sessions.py",
+      "sha256": "5dc5ba6bef8429b015bf24154c2e22b22c7721856aac30c0d17b92fd8c001cbe"
+    },
+    {
+      "path": "voicebridge/business/__init__.py",
+      "sha256": "fcc8a5e50b1a8e4ee16d2b07265b4dfb3472a126990ada4601544bff31368100"
+    },
+    {
+      "path": "tests/durable_substrate/test_recovery_restore.py",
+      "sha256": "1f1c7ea559facfd084fbc37aadb6913879bbe9552ae2cd551e0fe1846627a880"
+    }
+  ],
+  "limitations": [
+    "no live service, daemon or live database is touched; every test uses a throwaway SQLite file",
+    "recover_sessions is descriptive: a lost lease reports may_claim_work=false and never starts a run",
+    "archive does not auto-create a handoff; the domain contract leaves that to an explicit caller policy",
+    "the session status enum is active/paused/archived per the P2-02 task; the frozen session schema also names closed, which is not used here"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+    },
+    {
+      "path": "voicebridge/business/sessions.py",
+      "sha256": "5dc5ba6bef8429b015bf24154c2e22b22c7721856aac30c0d17b92fd8c001cbe"
+    },
+    {
+      "path": "voicebridge/business/__init__.py",
+      "sha256": "fcc8a5e50b1a8e4ee16d2b07265b4dfb3472a126990ada4601544bff31368100"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "tests/phase2_registry_sessions/test_sessions.py",
+      "sha256": "3e4ece49978d3c260e62e828605807270da8190b136ae0e0a3ca76207226af5e"
+    },
+    {
+      "path": "tests/phase2_registry_sessions/test_schema_v5.py",
+      "sha256": "fdf42669bb3909eda66d5516230626a141c80769d5ef49b7b0f12fd59ed065f7"
+    },
+    {
+      "path": "tests/durable_substrate/test_recovery_restore.py",
+      "sha256": "1f1c7ea559facfd084fbc37aadb6913879bbe9552ae2cd551e0fe1846627a880"
+    }
+  ],
+  "python": "3.14.7",
+  "status": "PASS",
+  "task_id": "P2-02-sessions"
+}
