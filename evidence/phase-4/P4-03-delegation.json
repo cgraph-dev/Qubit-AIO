@@ -4,13 +4,13 @@
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_threads_delegation.py --json",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "OST\",\n      \"name\": \"lease_expiry_stops\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=BUSINESS_DELEGATION_NO_PROGRESS status=blocked\",\n      \"name\": \"no_progress_blocks\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=BUSINESS_DELEGATION_ATTEMPTS_EXCEEDED status=blocked\",\n      \"name\": \"retry_cap_blocks\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"v1=art_01M7C81S6T76EG62ZBD45BTSS5 v2=art_01M7C81S82CD1HRCNXTPDHS0ES refusal=BUSINESS_DELEGATION_SINGLE_OWNER\",\n      \"name\": \"single_writer_and_immutable_versions\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"handoff=hnd_01M7C81S8V5DJ4DC15432H74C4 artifacts=('art_01M7C81S82CD1HRCNXTPDHS0ES',)\",\n      \"name\": \"handoff_preserves_artifacts\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"delegate_repeat=False complete_repeat=False events=1\",\n      \"name\": \"idempotent_delegate_and_complete\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=ESCALATED_BLOCKED status=blocked\",\n      \"name\": \"escalation_blocks\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 18,\n  \"generated_at\": \"2026-11-14T05:21:28Z\",\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-threads-delegation-verification/1\"\n}\n"
+      "stdout_tail": "OST\",\n      \"name\": \"lease_expiry_stops\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=BUSINESS_DELEGATION_NO_PROGRESS status=blocked\",\n      \"name\": \"no_progress_blocks\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=BUSINESS_DELEGATION_ATTEMPTS_EXCEEDED status=blocked\",\n      \"name\": \"retry_cap_blocks\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"v1=art_01M7C84BE0TG9TXYSTP9C4PMJ7 v2=art_01M7C84BG34WC4RGHKJSJXRB8F refusal=BUSINESS_DELEGATION_SINGLE_OWNER\",\n      \"name\": \"single_writer_and_immutable_versions\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"handoff=hnd_01M7C84BH5D0BTEYQY4ADCS8N0 artifacts=('art_01M7C84BG34WC4RGHKJSJXRB8F',)\",\n      \"name\": \"handoff_preserves_artifacts\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"delegate_repeat=False complete_repeat=False events=1\",\n      \"name\": \"idempotent_delegate_and_complete\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=ESCALATED_BLOCKED status=blocked\",\n      \"name\": \"escalation_blocks\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 18,\n  \"generated_at\": \"2026-11-14T05:22:52Z\",\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-threads-delegation-verification/1\"\n}\n"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase4_threads_delegation tests/phase1_a2a_approvals tests/phase2_registry_sessions",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 5.63s\n"
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 7.17s\n"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/threads.py voicebridge/business/delegation.py scripts/verify_threads_delegation.py tests/phase4_threads_delegation/test_threads.py tests/phase4_threads_delegation/test_delegation.py",
@@ -25,7 +25,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T05:21:28Z",
+  "generated_at": "2026-11-14T05:22:52Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",

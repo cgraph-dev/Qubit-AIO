@@ -110,10 +110,15 @@ def test_room_thread_and_mention_authorization():
         can_mention=can_mention, idempotency_key="r-1")
     assert message.mentions == (AGENT_B, threads.ROOM_MENTION)
 
-    # Agent A is still a participant and can read the room thread.
-    assert threads.read(
-        log, tenant_id=TENANT, thread_id="thr-1", principal=AGENT_A
-    )[0].message_id == message.message_id
+    # Agent A is still a participant and can read the room thread, even a
+    # message addressed to agent:b (room visibility is per participant).
+    room_to_b, _ = threads.post(
+        log, tenant_id=TENANT, thread_id="thr-1", sender=OWNER,
+        body="for b only", recipient=AGENT_B, idempotency_key="r-1b")
+    agent_a_view = threads.read(
+        log, tenant_id=TENANT, thread_id="thr-1", principal=AGENT_A)
+    assert [item.message_id for item in agent_a_view] == [
+        message.message_id, room_to_b.message_id]
 
     # An unauthorized mention is refused before anything is appended.
     with pytest.raises(BusinessError) as exc:

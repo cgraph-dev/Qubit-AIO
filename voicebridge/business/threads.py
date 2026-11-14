@@ -91,6 +91,10 @@ class Thread:
     created_epoch: float
     last_sequence: int
 
+    @property
+    def tenant(self) -> str:
+        return self.tenant_id
+
     def includes(self, principal: str) -> bool:
         return principal in self.participants
 
@@ -582,6 +586,12 @@ def reply(
     )
 
 
+def _any_observer(_principal: str, _message: A2AMessage) -> bool:
+    # The participant check is the ACL here; the fabric's recipient-only view
+    # would otherwise hide a room message from the other room members.
+    return True
+
+
 def _view(message: A2AMessage) -> ThreadMessage:
     payload = message.payload if isinstance(message.payload, Mapping) else {}
     return ThreadMessage(
@@ -614,6 +624,7 @@ def read(
         principal=who,
         thread_id=thread.thread_id,
         since_sequence=int(since_sequence),
+        observer_check=_any_observer,
         include_expired=include_expired,
         now=now,
     )
@@ -678,6 +689,7 @@ def replay(
         tenant_id=tenant,
         principal=who,
         since_sequence=since_sequence,
+        observer_check=_any_observer,
         include_expired=include_expired,
         now=now,
     )
