@@ -1,0 +1,99 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals tests/test_business_os_foundation.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".....................................                                    [100%]\n37 passed in 1.68s\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_threat_denials.py tests/test_integration_tool_gateway.py tests/test_etsy_listing_workflow.py tests/test_business_warroom.py tests/office_contracts/test_stage_replay.py tests/test_business_office_bridge.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 82%]\n...............                                                          [100%]\n87 passed in 9.01s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/approvals.py voicebridge/business/errors.py tests/phase1_a2a_approvals/",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/approvals.py voicebridge/business/errors.py tests/phase1_a2a_approvals/test_approvals.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T03:13:17Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+    },
+    {
+      "path": "voicebridge/business/models.py",
+      "sha256": "c2544c04416024d1ad45c4ec2ed8d933c6766d7727ccbd9dd61bef852cac8ddc"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "baca993535c79d03972231dd9010864ed8ea2d15d2187878ec32ffd40810edbf"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "002925be71f51f249893d1aaba1e2b20c3cd02178ce4fa0af44b30526e087160"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "tests/test_business_os_foundation.py",
+      "sha256": "fd7f58fb97a996ca275c191ac260764990e218c0514fa1d7e0e2a92a134e2209"
+    }
+  ],
+  "limitations": [
+    "no schema change: the normalized intent hash is stored in the existing bos_approval.request_hash column for normalized intents; legacy ad-hoc payloads keep the historical action/job/payload fingerprint",
+    "delegation has no approver column; the delegate is recorded in the replacement row reason and audit detail, not as a first-class approver-scope field",
+    "the current policy revision is supplied by the caller (execution_authorized policy_version); this lane does not compile policy itself",
+    "edit/delegate open a replacement pending row linked to the same job; no notification or queue assignment is emitted",
+    "postcondition validation after execution is not implemented; only pre-execution authorization is",
+    "a model actor is refused for approved decisions by principal prefix (model:/llm:/ai:); a human principal string is trusted as configured by the identity lane"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+    },
+    {
+      "path": "tests/phase1_a2a_approvals/test_approvals.py",
+      "sha256": "e5f9c933d8a0dd44a758ff5eb1b5fd3ed55ec156fda2952a35a6f927351c097a"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P1-06"
+}
