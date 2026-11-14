@@ -64,3 +64,19 @@ def test_tool_output_is_bounded_and_labelled_untrusted(tmp_path):
     assert first_call[0] == {"role": "system", "content": SYSTEM_PROMPT}
     # No operator home or live state path is involved: the store is tmp_path.
     assert str(scene_.store.path).startswith(str(tmp_path))
+
+
+def test_turn_does_not_touch_the_operator_home(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    home.mkdir()
+    qhome = tmp_path / "qhome"
+    qhome.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("QUBIT_HOME", str(qhome))
+
+    scene_ = scene(tmp_path / "work")
+    model = ScriptedModel([reply_tools(read_call()), reply_text("done")])
+    result = orchestrator(scene_, model).execute()
+    assert result.status == COMPLETED
+    assert list(home.iterdir()) == []
+    assert list(qhome.iterdir()) == []
