@@ -1,0 +1,102 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_asset_build.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "a_only\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"missing_pack=ASSET_PROVENANCE_MISSING missing_license=ASSET_LICENSE_UNVERIFIED missing_hash=ASSET_PROVENANCE_MISSING missing_use=ASSET_PROVENANCE_MISSING bad_hash=ASSET_HASH_INVALID paid=ASSET_PAID_REDISTRIBUTION\",\n      \"name\": \"provenance_required\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"findings=4 kinds=['archive_or_binary', 'paid_asset_hash', 'paid_pack_name', 'paid_path_reference']\",\n      \"name\": \"leak_scan_detects_paid_art\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"checked=1 findings=0\",\n      \"name\": \"leak_scan_clean_bundle\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"conflicts=1 added=['rec-b']\",\n      \"name\": \"conflict_detected\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"unreviewed=SYNC_REVIEW_REQUIRED unresolved=SYNC_CONFLICT_UNRESOLVED applied=['rec-a', 'rec-b']\",\n      \"name\": \"review_before_merge\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"local_kept=['rec-a'] merged_value=99 applied=['rec-a', 'rec-b']\",\n      \"name\": \"review_resolutions\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"path=export.json records=2\",\n      \"name\": \"export_bundle\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"path=records.json records=2\",\n      \"name\": \"safe_close_no_data_loss\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"remote=SYNC_REMOTE_REFUSED\",\n      \"name\": \"no_network_export\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 11,\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-asset-build-verification/1\",\n  \"sync_schema\": \"qubit-office-local-sync/1\"\n}\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase6_assets",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "....................                                                     [100%]\n20 passed in 0.22s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/asset_build.py voicebridge/business/local_sync.py scripts/verify_asset_build.py tests/phase6_assets",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/asset_build.py voicebridge/business/local_sync.py scripts/verify_asset_build.py tests/phase6_assets/test_asset_build.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T13:45:22Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/asset_build.py",
+      "sha256": "e0665fe03f2355c0f90e3418b5327dac014dd5d8ed64fabdd855cd3e77f4a11b"
+    },
+    {
+      "path": "voicebridge/business/local_sync.py",
+      "sha256": "a701c77958b691bfae1ecf440204689dc6c89b2fbb9d367ffb95dc79c866dee8"
+    },
+    {
+      "path": "scripts/verify_asset_build.py",
+      "sha256": "3f2698f47b3ceeff090d3d6c2da3dc1987cf1ae70152841d94f70a3cf987bbdd"
+    },
+    {
+      "path": "tests/phase6_assets/test_asset_build.py",
+      "sha256": "279e28fd03a9086a338edbf6673d444f833a94d2b327cba28c0504a5a8559ddc"
+    }
+  ],
+  "limitations": [
+    "hermetic: throwaway temp directories only; no network, no cloud, no live state, no paid art read or committed",
+    "the leak scan is a local filesystem scan of bundle/cache/screenshots/backups/exports; it is bounded (max files/hash/text bytes) and reports truncation",
+    "asset provenance is validated from ledger rows; no real pack was opened, only synthetic metadata and tiny fixtures",
+    "sync is local-first record comparison with review-before-merge; there is no real store integration or background sync in this lane",
+    "no full matrix and no VERIFIED/COMPLETE/100% claim"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/asset_build.py",
+      "sha256": "e0665fe03f2355c0f90e3418b5327dac014dd5d8ed64fabdd855cd3e77f4a11b"
+    },
+    {
+      "path": "voicebridge/business/local_sync.py",
+      "sha256": "a701c77958b691bfae1ecf440204689dc6c89b2fbb9d367ffb95dc79c866dee8"
+    },
+    {
+      "path": "scripts/verify_asset_build.py",
+      "sha256": "3f2698f47b3ceeff090d3d6c2da3dc1987cf1ae70152841d94f70a3cf987bbdd"
+    },
+    {
+      "path": "tests/phase6_assets/test_asset_build.py",
+      "sha256": "279e28fd03a9086a338edbf6673d444f833a94d2b327cba28c0504a5a8559ddc"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P6-06"
+}

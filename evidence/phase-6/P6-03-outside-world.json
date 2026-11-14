@@ -1,0 +1,142 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_outside_world.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "name\": \"bounded_active_chunks\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"12/12 variant events mapped\",\n      \"name\": \"environment_event_mapping\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"every event carries text + still cue\",\n      \"name\": \"reduced_motion_cues\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"floor_links=4\",\n      \"name\": \"lobby_to_tower_floors\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"10 paid references stay local-only\",\n      \"name\": \"paid_art_local_only\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"projection declares presentation-only\",\n      \"name\": \"presentation_only\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"summary={'zones': 6, 'active_zones': 5, 'dormant_zones': 1, 'chunks': 20, 'active_chunks': 19, 'dormant_chunks': 1, 'animated_chunks': 5, 'portals': 8, 'elevator_links': 3, 'stairs_links': 1, 'places': 20, 'assets': 15}\",\n      \"name\": \"payload_ok\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 14,\n  \"digest\": \"30f2c1ddbba75e121db405b5b645a395635e4e2cd088b5d0aa812984a83a38ca\",\n  \"map_digest\": \"e063dfffeab2cb7f91de9923f0e4dbc202a9f7500d542f38257fc61d742c5643\",\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"problems\": [],\n  \"projection_schema\": \"qubit-office-world-outside/1\",\n  \"schema\": \"qubit-office-outside-world-verification/1\",\n  \"summary\": {\n    \"active_chunks\": 19,\n    \"active_zones\": 5,\n    \"animated_chunks\": 5,\n    \"assets\": 15,\n    \"chunks\": 20,\n    \"dormant_chunks\": 1,\n    \"dormant_zones\": 1,\n    \"elevator_links\": 3,\n    \"places\": 20,\n    \"portals\": 8,\n    \"stairs_links\": 1,\n    \"zones\": 6\n  }\n}\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase6_outside tests/phase3_exterior",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "................................                                         [100%]\n32 passed in 0.41s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/office/world/outside_world.py scripts/verify_outside_world.py tests/phase6_outside",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/office/world/outside_world.py scripts/verify_outside_world.py tests/phase6_outside/test_outside_world.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/outside-world.test.ts ../qubit-app/plugins/qubit-office/game/app/OutsideWorld.test.ts",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p6-outside-assets/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  25 passed (25)\n   Start at  15:45:24\n   Duration  860ms (transform 99ms, setup 0ms, import 178ms, tests 117ms, environment 545ms)\n\n"
+    }
+  ],
+  "generated_at": "2026-11-14T13:45:22Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/office/world/exterior.py",
+      "sha256": "8a544fd2f66dfc8a3187720b8375558d936613713ff8faf65a17da13379dd82d"
+    },
+    {
+      "path": "voicebridge/office/world/outside_world.py",
+      "sha256": "8be5fa1bc43f8e8fec546cf4f84858659298d9da9f2614b36ee676d740b72f82"
+    },
+    {
+      "path": "scripts/verify_outside_world.py",
+      "sha256": "d5c1acaf8297fe795bba9ee8d3c6056f1a4a3bc21a1c4bbab990a3f771ca7384"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/outside-world.ts",
+      "sha256": "4fa0f0c2d9f9ebea737c2e17d4f1c07ac9f0cafdc06d7364ecc324521d3a5bf8"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OutsideWorld.tsx",
+      "sha256": "205283a1c037b3a1ccf7a62b23fe87a2bb856f13cd77ca612512a65fe2b1ca79"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/outside-world.test.ts",
+      "sha256": "e4e8b4d755f55a48a5653119a8e2ae3ac6b3ed8e885aa7f004e4110329d15bee"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OutsideWorld.test.ts",
+      "sha256": "e6579e724ad30356eb48ba13cada2f51d929f78741a3eb70c043a922dbef28ff"
+    },
+    {
+      "path": "tests/phase6_outside/test_outside_world.py",
+      "sha256": "475f488e0c4426c04c4e00765f8c526c73bc96c8afadf71c7e639547171bddaa"
+    }
+  ],
+  "limitations": [
+    "hermetic: no live service, no browser, no GPU frame; the verifier and tests exercise the data/projection path only",
+    "the outside-world panel is not mounted by OfficeAppShell in this lane (the lead mounts it); no live dashboard verification",
+    "vitest ran against a temporary node_modules symlink to the main checkout and was removed afterwards",
+    "the focused tsc check used a throwaway /tmp tsconfig (outside the repo); no full-project tsc was run",
+    "no paid art was opened, copied or committed; asset references are metadata only",
+    "no full matrix and no VERIFIED/COMPLETE/100% claim"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/office/world/exterior.py",
+      "sha256": "8a544fd2f66dfc8a3187720b8375558d936613713ff8faf65a17da13379dd82d"
+    },
+    {
+      "path": "voicebridge/office/world/outside_world.py",
+      "sha256": "8be5fa1bc43f8e8fec546cf4f84858659298d9da9f2614b36ee676d740b72f82"
+    },
+    {
+      "path": "scripts/verify_outside_world.py",
+      "sha256": "d5c1acaf8297fe795bba9ee8d3c6056f1a4a3bc21a1c4bbab990a3f771ca7384"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/outside-world.ts",
+      "sha256": "4fa0f0c2d9f9ebea737c2e17d4f1c07ac9f0cafdc06d7364ecc324521d3a5bf8"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OutsideWorld.tsx",
+      "sha256": "205283a1c037b3a1ccf7a62b23fe87a2bb856f13cd77ca612512a65fe2b1ca79"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/outside-world.test.ts",
+      "sha256": "e4e8b4d755f55a48a5653119a8e2ae3ac6b3ed8e885aa7f004e4110329d15bee"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OutsideWorld.test.ts",
+      "sha256": "e6579e724ad30356eb48ba13cada2f51d929f78741a3eb70c043a922dbef28ff"
+    },
+    {
+      "path": "tests/phase6_outside/test_outside_world.py",
+      "sha256": "475f488e0c4426c04c4e00765f8c526c73bc96c8afadf71c7e639547171bddaa"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P6-03"
+}
