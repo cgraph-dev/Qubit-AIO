@@ -1,0 +1,117 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_character_profile.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "and wrote nothing\",\n      \"name\": \"paid_art_export_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"store_files=['state-a/character_profiles/profile-verify.json'] repo_files=[]\",\n      \"name\": \"writes_stay_inside_target\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"schema=qubit-office-character-profile-export/1\",\n      \"name\": \"export_document_identity\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"qubit-office-character-profile/1\",\n      \"name\": \"profile_schema\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 16,\n  \"counts\": {\n    \"accessory\": 6,\n    \"body\": 9,\n    \"eyes\": 7,\n    \"hair\": 29,\n    \"outfit\": 33,\n    \"skin\": 9\n  },\n  \"export_sha256\": \"be242ac3eee054d3515f1cd367218e0945037f7ecf019574f916d609fd156636\",\n  \"generated_at\": \"2026-11-14T04:44:10Z\",\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-character-profile-verification/1\"\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_character",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "23 passed in 0.44s"
+    },
+    {
+      "cmd": "ln -sfn /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules && cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/character-studio.test.ts ../qubit-app/plugins/qubit-office/game/app/CharacterStudio.test.ts; rm -f node_modules",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p3-exterior-character/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  25 passed (25)\n   Start at  06:44:20\n   Duration  375ms (transform 111ms, setup 0ms, import 266ms, tests 141ms, environment 0ms)\n\n"
+    },
+    {
+      "cmd": "npx tsc -p /tmp/tsconfig.charstudio.json (temporary config scoped to character-studio.ts + CharacterStudio.tsx, jsx react-jsx)",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "(no output)"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/character_profile.py scripts/verify_character_profile.py tests/phase3_character",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/character_profile.py scripts/verify_character_profile.py tests/phase3_character/test_character_profile.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T04:44:42Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/DECISIONS.md",
+      "sha256": "d5e1b8d881c062ef837ea4603d838975ff38e08f58e3fec79c4a3008dad9a863"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "LICENSE-ASSETS",
+      "sha256": "8db09332005bbd63bb47249b0d04b3d9fd10c407b83998838081d529616b9b5f"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "dc377d188e6872ae14686dce4b4f55d9616341c6c6862ea2b67ca009815569ef"
+    }
+  ],
+  "limitations": [
+    "The store is a filesystem JSON authority; no HTTP route is added in this lane (do not edit bridge/qubit_compat). The studio save call targets the documented /character-profiles route and is exercised with an injected fetch/saver.",
+    "No paid art or raw generator asset is read, copied or committed; sha256 values are manifest digests.",
+    "CharacterStudio is not mounted in OfficeAppShell by this lane (the lead mounts it after merge).",
+    "No live service restart, no full matrix, and no VERIFIED/COMPLETE claim."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/character_profile.py",
+      "sha256": "17342f43174ccbbc74c7cdfec8e10f11fd88d483345eb56d34d6028ff127f3a8"
+    },
+    {
+      "path": "scripts/verify_character_profile.py",
+      "sha256": "174cfc102ad47e9381a66e201bfeb1df614f8ed226e8634c5c2d1f435716cdc8"
+    },
+    {
+      "path": "tests/phase3_character/test_character_profile.py",
+      "sha256": "4f6060730e6127d4f8e964b1f0debfa81bf447fac9f1053e512f6fd2c3263554"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/character-studio.ts",
+      "sha256": "4fa545e6acd9af1ea1a4ea30cbedbf088df34f2cf5cc2c69615be290f40e0b97"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/CharacterStudio.tsx",
+      "sha256": "ee21d15caef5aa31876d01f079198a2b0c568703df0c96d9724c74e39d96acd1"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/character-studio.test.ts",
+      "sha256": "8ada72decc92fe100cb2c1c6f9834ffb216e126dc29091baaeb18e89b57c35e6"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/CharacterStudio.test.ts",
+      "sha256": "2ce07c93ee83aa0d8aa448c393dde19adaaeb66cd7064e2007b3c7b7ae0c969a"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P3-07"
+}
