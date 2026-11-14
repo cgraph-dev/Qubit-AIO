@@ -13,7 +13,7 @@
       "stdout_tail": "............                                                             [100%]\n12 passed in 3.98s\n"
     },
     {
-      "cmd": "bash -lc 'ln -s \u2026/frontend/qubit-web/node_modules frontend/qubit-web/node_modules; trap \"rm -f \u2026/node_modules\" EXIT; cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/renderer-floor.test.ts ../qubit-app/plugins/qubit-office/game/app/renderer-budget.test.ts'",
+      "cmd": "bash -lc 'set -e; cd /home/trick/qubit-worktrees/qoffice-p3-renderer; ln -s /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules; trap \"rm -f /home/trick/qubit-worktrees/qoffice-p3-renderer/frontend/qubit-web/node_modules\" EXIT; cd frontend/qubit-web; npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/renderer-floor.test.ts ../qubit-app/plugins/qubit-office/game/app/renderer-budget.test.ts'",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p3-renderer/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  28 passed (28)\n   Start at  06:36:40\n   Duration  245ms (transform 107ms, setup 0ms, import 142ms, tests 24ms, environment 0ms)\n\n"
@@ -31,7 +31,7 @@
       "stdout_tail": ""
     },
     {
-      "cmd": "tsc --noEmit --strict --target ES2023 --module ESNext --moduleResolution bundler --skipLibCheck --verbatimModuleSyntax --erasableSyntaxOnly renderer-floor.ts renderer-budget.ts",
+      "cmd": "cd frontend/qubit-app/plugins/qubit-office/game/app && /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules/.bin/tsc --noEmit --strict --target ES2023 --module ESNext --moduleResolution bundler --skipLibCheck --verbatimModuleSyntax --erasableSyntaxOnly renderer-floor.ts renderer-budget.ts",
       "exit_code": 0,
       "stderr_tail": "",
       "stdout_tail": ""
