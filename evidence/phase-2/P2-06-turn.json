@@ -4,13 +4,13 @@
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_turn tests/phase1_reference tests/phase1_gateway",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "......................................................                   [100%]\n54 passed in 6.68s\n"
+      "stdout_tail": ".......................................................                  [100%]\n55 passed in 6.90s\n"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/phase2_agent_turn.py --json",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "XR0\",\n    \"steps\": 3,\n    \"text\": \"Published the listing.\",\n    \"tool_calls\": 2,\n    \"trace_count\": 1,\n    \"trace_spans\": [\n      \"approval\",\n      \"chat\",\n      \"execute_tool\",\n      \"external_receipt\",\n      \"invoke_agent\"\n    ]\n  },\n  \"task\": \"task_01M7C3AV0BEWNHASRAS1BAG8HX\",\n  \"tenant\": \"ten_01M7C3ATY2A9KE3ZR6MJ7ZAB2A\",\n  \"timeout\": {\n    \"error_code\": \"AGENT_TURN_MODEL_TIMEOUT\",\n    \"initial_status\": \"unknown\",\n    \"job_status\": \"unknown\",\n    \"resumed_checkpoints\": [\n      1,\n      2,\n      3\n    ],\n    \"resumed_status\": \"completed\",\n    \"run_id\": \"job_01M7C3AVCCEKA43J63NZTSH1V2\"\n  }\n}\n"
+      "stdout_tail": "9VY\",\n    \"steps\": 3,\n    \"text\": \"Published the listing.\",\n    \"tool_calls\": 2,\n    \"trace_count\": 1,\n    \"trace_spans\": [\n      \"approval\",\n      \"chat\",\n      \"execute_tool\",\n      \"external_receipt\",\n      \"invoke_agent\"\n    ]\n  },\n  \"task\": \"task_01M7C3EJZHWMRESJK6JTDHYKTM\",\n  \"tenant\": \"ten_01M7C3EJWX6PQZ61EACMJ2ZGPQ\",\n  \"timeout\": {\n    \"error_code\": \"AGENT_TURN_MODEL_TIMEOUT\",\n    \"initial_status\": \"unknown\",\n    \"job_status\": \"unknown\",\n    \"resumed_checkpoints\": [\n      1,\n      2,\n      3\n    ],\n    \"resumed_status\": \"completed\",\n    \"run_id\": \"job_01M7C3EKC47N4MWJ3KFQTTCE48\"\n  }\n}\n"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn",
@@ -25,7 +25,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:59:20Z",
+  "generated_at": "2026-11-14T04:01:28Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -103,7 +103,7 @@
   "limitations": [
     "fake provider and fake tool executor only; no real external side effect",
     "single-process restart simulation via a durable SQLite checkpoint, not an OS process kill",
-    "model timeout is raised by the fake provider; no live provider timeout was measured",
+    "model timeout and ambiguous provider failure are raised by fakes; no live provider timeout was measured",
     "a denied turn still writes a failed bos_job run record (the durable run id) but no artifact, receipt, ledger row or completed turn",
     "no live service, credential, operator home or network was used",
     "no full matrix or independent verification; VERIFIED is not claimed"
@@ -111,7 +111,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/agent_turn.py",
-      "sha256": "44baded44a8dc1eebb24e3d45486ce840d94ce555a09f8c640ebd011684776b0"
+      "sha256": "f267217c5373f89371ca0b547cf030ba0713266541d93b4055101814ea234cfa"
     },
     {
       "path": "scripts/phase2_agent_turn.py",
@@ -131,7 +131,7 @@
     },
     {
       "path": "tests/phase2_turn/test_turn_unknown_resume.py",
-      "sha256": "d5c333a6c7f9e64d785a8e3c6e081eea9cffdd843a793aae9fce9362ab5ae66d"
+      "sha256": "9e137015ac48f27ef61b064c6b6ca363c14df0a322d257e47b141d8f4656ed3a"
     },
     {
       "path": "tests/phase2_turn/test_turn_snapshot.py",
