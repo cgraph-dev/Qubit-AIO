@@ -1,0 +1,111 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_scale.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "pathfinding\": {\n    \"budget_avg_ms\": 2.0,\n    \"budget_p95_ms\": 8.0,\n    \"graph\": {\n      \"adjacency_indexed\": true,\n      \"hierarchy\": [\n        \"campus\",\n        \"wing\",\n        \"floor\",\n        \"room\",\n        \"cell\"\n      ],\n      \"nodes\": 981,\n      \"portals\": 980\n    },\n    \"report\": {\n      \"avg_hops\": 7.5,\n      \"avg_ms\": 0.093369,\n      \"iterations\": 3,\n      \"max_hops\": 8,\n      \"max_ms\": 0.280986,\n      \"measurement\": \"Python data path (adjacency-indexed hierarchical BFS) measured in this process; not a browser or worker frame\",\n      \"min_ms\": 0.019911,\n      \"p95_ms\": 0.160762,\n      \"queries\": 96,\n      \"samples\": 32\n    }\n  },\n  \"schema\": \"qoffice-scale/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P8-01\",\n  \"tenant\": {\n    \"agents\": 1000,\n    \"businesses\": 23,\n    \"isolated\": true,\n    \"seed_is_production\": false,\n    \"tenant_id\": \"tenant:scale-fixture\"\n  },\n  \"tier\": \"desktop\"\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_scale tests/phase3_renderer",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "..................................                                       [100%]\n34 passed in 6.78s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/scale_fixture.py scripts/verify_scale.py tests/phase8_scale",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/scale_fixture.py scripts/verify_scale.py tests/phase8_scale/test_scale_fixture.py tests/phase8_scale/test_verify_scale.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T15:07:48Z",
+  "inputs": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md",
+      "sha256": "3f823ebf1188ca25898e494339e9ec674b78a39afabf37500a8c032527850a65"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "voicebridge/office/world/model.py",
+      "sha256": "a9c091ca013eb7318e42e6e01876f76ddb8b2a2bdf51726823549049399de39b"
+    },
+    {
+      "path": "voicebridge/office/world/tower_plan.py",
+      "sha256": "5d19979dd77e67e464dd8d0948570bcf62d265461faca93ba43d218f171c1ac9"
+    },
+    {
+      "path": "voicebridge/office/world/active.py",
+      "sha256": "cd2488f461ee4d7f58e720644891695e1ce59b6273ee910a4036e5073c7c97d6"
+    },
+    {
+      "path": "voicebridge/business/workforce.py",
+      "sha256": "941f2bb0baa925fb586b9d1527f4b8a4d9c74d69e57057316bd658f5e4ae6ea8"
+    },
+    {
+      "path": "voicebridge/business/room_capabilities.py",
+      "sha256": "f399d433a44ecba00aa2af7f50a6b84ed645135b390bf0de476092f31de81686"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "scripts/verify_renderer_budget.py",
+      "sha256": "3eb77e068758e0cb7bb09fe15e5cd429c4868c9c018166a5067e1f0a8a979520"
+    },
+    {
+      "path": "tests/phase3_renderer/test_renderer_budget.py",
+      "sha256": "dc76d10c05b9d97572f5aed17f6fc07a3c70f8f11337825185286c2faef47438"
+    }
+  ],
+  "limitations": [
+    "GPU frame time, browser heap, decoded texture memory, map/chunk data and bundle transfer are not measured by the hermetic verifier; they are not_measured unless a real browser sample is supplied with --sample",
+    "client event rates are a deterministic budget model with coalescing, not an observed browser rate",
+    "pathfinding timing is measured in this Python process over an adjacency-indexed hierarchical graph; it is not a browser or worker frame",
+    "the 1,000 agents are synthetic tenant/business-scoped seed projection records, not an operational workforce; no agent runs, no model is called, no store is used",
+    "no live service, state, credential or network was touched",
+    "this is a data/device-budget gate, not a real browser or GPU matrix; the final frozen-SHA matrix remains a Phase 8 gate"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/scale_fixture.py",
+      "sha256": "956c893321fd83615483a0db47e59c248209288608f0016e964d8f71b85bf3c3"
+    },
+    {
+      "path": "scripts/verify_scale.py",
+      "sha256": "688de2e2fa318aa818896d3bca7147417bbeebcd2e662c014c99d66a83065023"
+    },
+    {
+      "path": "tests/phase8_scale/test_scale_fixture.py",
+      "sha256": "20d6fcd2a1301061096d767b5d4cd8cbdeead848b6dfc7514429d2e358013d4e"
+    },
+    {
+      "path": "tests/phase8_scale/test_verify_scale.py",
+      "sha256": "b85e4b9824415178224eb2366d2d4361acbed9df03471c3186d7da3c70d02d12"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P8-01"
+}

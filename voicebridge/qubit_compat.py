@@ -42,6 +42,7 @@ from . import resources as _resources  # noqa: E402
 from . import qubit_plugins as _qubit_plugins  # noqa: E402
 from . import qubit_desktop_plugins as _qubit_desktop_plugins  # noqa: E402
 from . import read_cache as _rc  # noqa: E402
+from .business import bridge as _business_bridge  # noqa: E402
 OVERLAY_DIR = _resources.resource_path("frontend/qubit-app")
 
 Handler = Callable[..., Tuple[int, Dict[str, Any]]]
@@ -6010,6 +6011,31 @@ def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return result
 
 
+def h_office_world_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
+                         p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
+    """GET /api/office/world/tower -> deterministic 100-floor projection.
+
+    Read-only: it builds the projection from the shipped in-memory role/floor
+    templates. No store is opened, nothing is written, no model or network call
+    is made. ``?floor=`` returns one floor in full (rooms, 16x12 cells, desks);
+    ``?wing=`` returns that wing's floors with room summaries; the default is a
+    bounded floor summary. Every form carries the full-projection digest.
+    """
+    from .office.world import tower_plan as TP
+
+    floor = (q or {}).get("floor") or None
+    wing = (q or {}).get("wing") or None
+    try:
+        plan = TP.build_tower_plan()
+        return 200, TP.tower_payload(plan, floor=floor, wing=wing)
+    except TP.TowerPlanError as exc:
+        return exc.status, {"ok": False, "code": exc.code, "detail": exc.detail}
+    except Exception as exc:  # noqa: BLE001 - a read surface must not 500
+        return 503, {"ok": False, "code": "OFFICE_WORLD_UNAVAILABLE",
+                     "detail": "the office world projection could not be built: "
+                               f"{str(exc)[:200]}"}
+
+
 # ===========================================================================
 # Habblaud office-client compat surface
 # ===========================================================================
@@ -7655,12 +7681,53 @@ def h_ops_run(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
     return _ops_result(out)
 
 
+_APPROVAL_DISPLAY_FIELDS = ("action", "risk", "requested_by", "session",
+                            "op", "name", "target")
+
+
+def _approval_display_meta(approval: Any) -> Dict[str, str]:
+    """Safe, redacted display metadata for a pending approval row.
+
+    The journal's ``meta`` carries whatever the staging channel needed to
+    settle the record (staged args, sensitive-field NAMES, payloads, digests).
+    None of that belongs on the read surface: it is either secret-bearing or
+    meaningless to a reviewer. Only the bounded, human-meaningful keys are
+    projected, and every value passes the same redaction as the summary.
+    """
+    meta = getattr(approval, "meta", {}) or {}
+    if not isinstance(meta, dict):
+        return {}
+    out: Dict[str, str] = {}
+    for key in _APPROVAL_DISPLAY_FIELDS:
+        value = meta.get(key)
+        if value in (None, "", []):
+            continue
+        out[key] = _redact(str(value))[:64]
+    # ``action`` reads ``op`` on dashboard confirmations; expose one canonical
+    # field so the UI does not have to know each channel's spelling.
+    if "action" not in out and "op" in out:
+        out["action"] = out["op"]
+    # ``requested_by`` falls back to the actor/issuer the channel recorded.
+    if "requested_by" not in out:
+        for alias in ("actor", "issued_by", "requested_by"):
+            value = meta.get(alias)
+            if value not in (None, ""):
+                out["requested_by"] = _redact(str(value))[:64]
+                break
+    return out
+
+
 def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                      p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """Pending confirmations on the SHARED journal (same records CLI
     `qubit approvals`, voice yes/no, and the classic dashboard settle).
     The pending-approvals banner polls this; confirm/cancel below settle
     through the same OPS journal path — one permission/confirmation path.
+
+    Each row additionally carries bounded, redacted DISPLAY metadata (action,
+    risk, requested_by, session) pulled from the journal record's own meta so
+    a reviewer can see what is being asked. Raw staged args/payloads/digests
+    are never projected.
     """
     from .approvals import ApprovalJournal
     journal_path = Path(cfg.state_dir()) / "approvals.jsonl"
@@ -7670,11 +7737,14 @@ def h_approvals_list(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         return cached[0], cached[1]
     try:
         journal = ApprovalJournal(journal_path, default_ttl_s=120.0)
-        items = [{"id": a.id, "capability": str(a.capability or ""),
-                  "summary": _redact(a.summary)[:300],
-                  "created_at": a.created_at, "expires_at": a.expires_at,
-                  "state": a.state}
-                 for a in journal.pending()]
+        items = []
+        for a in journal.pending():
+            row = {"id": a.id, "capability": str(a.capability or ""),
+                   "summary": _redact(a.summary)[:300],
+                   "created_at": a.created_at, "expires_at": a.expires_at,
+                   "state": a.state}
+            row.update(_approval_display_meta(a))
+            items.append(row)
     except Exception as exc:
         return _fail(exc)
     result = _ok(approvals=items, count=len(items))
@@ -11994,6 +12064,100 @@ _r("DELETE", r"/api/providers/oauth/(?P<id>[^/]+)", "h_oauth_disconnect")
 _r("GET", r"/api/curator", "h_curator")
 # M4: the tower. Read-only; the plugin renders it and nothing else.
 _r("GET", r"/api/office/tower", "h_office_tower")
+# The deterministic 100-floor/5-wing static world projection. Read-only; it
+# reads the shipped templates, opens no store and writes nothing. Registered
+# before any office catch-all so `/world/tower` is never read as a seat id.
+_r("GET", r"/api/office/world/tower-plan", "h_office_world_tower")
+# --- Business OS (War Room / roles / agent controls) -----------------------
+# The owner-only Business UI bridge. Reads project the durable Business OS
+# rows; mutations require the explicit owner intent and never publish, spend,
+# contact or call an external platform. The same routes are reachable from the
+# Office shell through its `/agent/api` prefix. Registered before any catch-all
+# office route so a business path is never read as an office seat id.
+# P3-05 command center: a read-only projection over the real tower, roster,
+# tasks, sessions and approvals. Search is bounded; counts are derived from
+# rows, and each source degrades to a typed unavailable state.
+_r("GET", r"/api/office/business/command-center", "h_business_command_center")
+# P4-07 operator timeline: a read-only causal projection of the durable
+# events/jobs/checkpoints/approvals/artifacts/ledger/tool rows. Status
+# derives from the job row; completed requires an artifact/receipt and
+# an unverified claim stays unknown. replay=1 is a labelled simulation
+# with effects stubbed; the route never writes or resumes anything.
+_r("GET", r"/api/office/business/operator/timeline",
+   "h_business_operator_timeline")
+_r("GET", r"/api/office/business/overview", "h_business_overview")
+# Owner-gated, idempotent: creates the local Personal scope and imports the
+# office seat roster as Business OS control records on first use. The Office
+# Agent Controls drawer calls this when a clicked seat has no linked agent.
+_r("POST", r"/api/office/business/bootstrap", "h_business_bootstrap")
+_r("GET", r"/api/office/business/directory", "h_business_directory")
+_r("GET", r"/api/office/business/roles", "h_business_roles")
+_r("GET", r"/api/office/business/org/floors", "h_business_floors")
+# The 100-floor tower as room scenes: a read-only projection over the shipped
+# floor/room templates (fixed 16x12 cells, six desk slots per cell). It is
+# explicitly unstaffed, so the Office scene can render empty desks rather than
+# inventing agents.
+_r("GET", r"/api/office/world/tower", "h_world_tower")
+_r("GET", r"/api/office/business/warroom/sessions", "h_business_warroom_list")
+_r("POST", r"/api/office/business/warroom/sessions", "h_business_warroom_create")
+# Owner-gated bootstrap of the Etsy digital-shop pilot. Idempotent: one
+# pending War Room session; it never approves, creates tasks, publishes or
+# spends. Registered before the parameterized session routes.
+_r("POST", r"/api/office/business/warroom/etsy-pilot",
+   "h_business_warroom_etsy_pilot")
+# Etsy OAuth connection (connection only; never a listing, publish or spend).
+# The status read is safe and non-mutating; authorize/complete/disconnect are
+# owner-gated in the handler and never echo a code, verifier or token.
+_r("GET", r"/api/office/business/etsy/status", "h_business_etsy_status")
+_r("POST", r"/api/office/business/etsy/authorize", "h_business_etsy_authorize")
+_r("POST", r"/api/office/business/etsy/complete", "h_business_etsy_complete")
+_r("POST", r"/api/office/business/etsy/disconnect",
+   "h_business_etsy_disconnect")
+_r("GET", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)",
+   "h_business_warroom_get")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/sources",
+   "h_business_warroom_source_add")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/evidence",
+   "h_business_warroom_evidence_add")
+# Owner-gated, idempotent research run. Appends the provider's source URLs and
+# labelled claims only; no decision, task, approval, publish, spend or contact.
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/research",
+   "h_business_warroom_research")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/arguments",
+   "h_business_warroom_argument_add")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/decisions",
+   "h_business_warroom_decide")
+_r("POST", r"/api/office/business/warroom/sessions/(?P<id>[^/]+)/tasks",
+   "h_business_warroom_tasks_create")
+_r("POST", r"/api/office/business/agents/world-assign",
+   "h_business_agents_assign_world")
+_r("GET", r"/api/office/business/agents", "h_business_agents_list")
+_r("GET", r"/api/office/business/agents/(?P<id>[^/]+)/audit",
+   "h_business_agent_audit")
+# Effective-state projection (P2-07): read-only, tenant-gated. It composes the
+# real agent/identity/lease/budget/approval/audit stores; it never writes and
+# never serves a value the stores do not carry.
+_r("GET", r"/api/office/business/agents/(?P<id>[^/]+)/effective",
+   "h_business_agent_effective")
+_r("GET", r"/api/office/business/agents/(?P<id>[^/]+)", "h_business_agent_get")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/update",
+   "h_business_agent_update")
+# Read-only turn preview: owner-gated, validates the control plane and returns
+# the plan. It never starts a turn, spends, writes usage/audit or calls a model.
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/preview",
+   "h_business_agent_preview")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/pause",
+   "h_business_agent_pause")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/resume",
+   "h_business_agent_resume")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/stop",
+   "h_business_agent_stop")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/takeover",
+   "h_business_agent_takeover")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/revoke",
+   "h_business_agent_revoke")
+_r("POST", r"/api/office/business/agents/(?P<id>[^/]+)/archive",
+   "h_business_agent_archive")
 # The office theme payload (tokens, slice descriptors, local asset base). A
 # read: it never serves the atlas bytes (those come from the pack root through
 # the static handler) and never writes.
@@ -20529,6 +20693,7 @@ HANDLERS: Dict[str, Handler] = {
     "h_oauth_disconnect": h_oauth_disconnect,
     "h_curator": h_curator, "h_curator_paused": h_curator_paused,
     "h_office_tower": h_office_tower,
+    "h_office_world_tower": h_office_world_tower,
     "h_office_theme": h_office_theme,
     "h_office_habblaud_access": h_office_habblaud_access,
     "h_office_habblaud_status": h_office_habblaud_status,
@@ -21591,6 +21756,31 @@ def h_qubit_family_put(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
                        p: Dict[str, str]) -> Tuple[int, Dict[str, Any]]:
     """PUT /api/qubit/<family>/<action> -> direct gateway write (prefs)."""
     return _qubit_family_dispatch(cfg, q, b, p, "PUT")
+
+
+# Business OS bridge handlers (registered by name from the route table).
+for _name in (
+    "h_business_overview", "h_business_bootstrap", "h_business_directory",
+    "h_business_roles",
+    "h_business_floors", "h_business_warroom_list", "h_business_warroom_create",
+    "h_business_warroom_get", "h_business_warroom_source_add",
+    "h_business_warroom_evidence_add", "h_business_warroom_research",
+    "h_business_warroom_argument_add",
+    "h_business_warroom_decide", "h_business_warroom_tasks_create",
+    "h_business_warroom_etsy_pilot",
+    "h_business_etsy_status", "h_business_etsy_authorize",
+    "h_business_etsy_complete", "h_business_etsy_disconnect",
+    "h_business_agents_assign_world",
+    "h_business_agents_list", "h_business_agent_get", "h_business_agent_audit",
+    "h_business_agent_effective",
+    "h_business_agent_update", "h_business_agent_preview",
+    "h_business_agent_pause", "h_business_agent_resume",
+    "h_business_agent_stop", "h_business_agent_takeover", "h_business_agent_revoke",
+    "h_business_agent_archive", "h_world_tower",
+    "h_business_command_center",
+    "h_business_operator_timeline",
+):
+    HANDLERS[_name] = getattr(_business_bridge, _name)
 
 
 HANDLERS["h_qubit_family_get"] = h_qubit_family_get

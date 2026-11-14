@@ -6,6 +6,8 @@
  */
 
 import type { OfficeGameShellProps } from "../OfficeGameShell";
+import { OFFICE_BRAND } from "./brand";
+import { installOfficeBrand } from "./brand-patch";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
@@ -14,7 +16,20 @@ import {
   type MenuButtonSpec, type OfficeMenuController,
 } from "./office-menu";
 import { createSeatModelPanel } from "./SeatModelPanel";
+import { isEditableTarget } from "./command-center";
 import { createAgentsPanel } from "./AgentsPanel";
+import { createAgentControlDrawer } from "./AgentControlDrawer";
+import { createWarRoomPanel } from "./WarRoomPanel";
+import { createApprovalsPanel } from "./ApprovalsPanel";
+import { createCommandCenter } from "./CommandCenter";
+import { createTimeline } from "./Timeline";
+import { createRoomBuilder } from "./RoomBuilder";
+import { createOutsideWorld } from "./OutsideWorld";
+import { createPanelInventoryPanel } from "./PanelInventory";
+import { fetchOutsideWorld, type OutsideWorldView } from "./outside-world";
+import { createEtsyConnectPanel } from "./EtsyConnectPanel";
+import { fetchApprovals } from "./approvals-panel";
+import type { AgentSeat } from "./agents-panel";
 import {
   applyHostTheme, loadOfficeTheme, officeSliceName, officeThemeClass,
   type OfficeTheme,
@@ -23,10 +38,23 @@ import {
   POLL_INTERVAL_MS, SNAPSHOT_ROUTE, STREAM_ROUTE,
   bindingSummary, bindingVerdict,
 } from "./office-api";
+import { createOfficeLoadingScreen } from "../loading/OfficeLoadingScreen";
+import type { OfficeLoadingConfigInput } from "../loading/config";
+import {
+  captureFocus,
+  focusFirst,
+  installEscapeToShell,
+  onMediaQueryChange,
+  onReducedMotionChange,
+  officeAnnouncement,
+  prefersHighContrast,
+  prefersReducedMotion,
+  restoreFocus,
+} from "./a11y";
 
 /** Always-present art credit; it must not depend on a theme being active. */
-export const OFFICE_ART_CREDIT = "Office art: LimeZu — https://limezu.itch.io";
-export const OFFICE_ART_CREDIT_URL = "https://limezu.itch.io";
+export const OFFICE_ART_CREDIT = OFFICE_BRAND.credit;
+export const OFFICE_ART_CREDIT_URL = OFFICE_BRAND.creditUrl;
 
 export interface OfficeAppProps {
   /** The dashboard's base path (empty at the root). */
@@ -65,6 +93,12 @@ export interface OfficeAppProps {
   officeError?: string;
   /** Set once the iframe has loaded, for tests and for a load-failure banner. */
   onReady?: () => void;
+  /**
+   * Owner loading-screen config. Normally supplied by a host global
+   * (`window.__QUBIT_OFFICE_LOADING__` / `office.loading`); this prop is the
+   * explicit/test path. See `../loading/config.ts`.
+   */
+  loading?: OfficeLoadingConfigInput;
 }
 
 /**
@@ -105,6 +139,16 @@ type ShellComponents = {
   HudDock: ReturnType<typeof createHudDock>;
   AgentsPanel: ReturnType<typeof createAgentsPanel>;
   SeatModelPanel: ReturnType<typeof createSeatModelPanel>;
+  AgentControlDrawer: ReturnType<typeof createAgentControlDrawer>;
+  WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
+  ApprovalsPanel: ReturnType<typeof createApprovalsPanel>;
+  CommandCenter: ReturnType<typeof createCommandCenter>;
+  Timeline: ReturnType<typeof createTimeline>;
+  RoomBuilder: ReturnType<typeof createRoomBuilder>;
+  OutsideWorld: ReturnType<typeof createOutsideWorld>;
+  PanelInventory: ReturnType<typeof createPanelInventoryPanel>;
+  EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
+  LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
 
 /**
@@ -140,6 +184,16 @@ function shellComponents(
     HudDock: createHudDock({ React: R, hooks, base }),
     AgentsPanel: createAgentsPanel(R, hooks),
     SeatModelPanel: createSeatModelPanel(R, hooks),
+    AgentControlDrawer: createAgentControlDrawer(R, hooks),
+    WarRoomPanel: createWarRoomPanel(R, hooks),
+    ApprovalsPanel: createApprovalsPanel(R, hooks),
+    CommandCenter: createCommandCenter(R, hooks),
+    Timeline: createTimeline(R, hooks),
+    RoomBuilder: createRoomBuilder(R, hooks),
+    OutsideWorld: createOutsideWorld(R, hooks),
+    PanelInventory: createPanelInventoryPanel(R, hooks),
+    EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
+    LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
   byBase.set(cacheKey, built);
   SHELL_COMPONENT_CACHE.set(key, byBase);
@@ -181,13 +235,68 @@ export function createOfficeApp(
     // traced-icon buttons after a bounded wait. Injection suppresses them the
     // moment it attaches, so the two are never visible at once.
     const [menuFallback, setMenuFallback] = useState(false);
+    // A retry must actually re-navigate the iframe; the token is appended to
+    // the src so assigning the same URL still reloads the document. Declared
+    // LAST so existing state slots/tests keep their indices.
+    const [retryToken, setRetryToken] = useState(0);
+    // The War Room / role directory, and the one office seat whose Business OS
+    // control record is open. Both are Qubit-shell docks; neither mutates the
+    // vendored office document. Declared AFTER ``retryToken`` for the same
+    // state-slot stability reason as the comment above.
+    const [warRoomOpen, setWarRoomOpen] = useState(false);
+    const [controlSeat, setControlSeat] = useState<AgentSeat | null>(null);
+    // The Approvals dock and its real pending count (the injected menu icon's
+    // badge). Declared AFTER every existing slot so seeded state indices in the
+    // shell's own tests stay stable.
+    const [approvalsOpen, setApprovalsOpen] = useState(false);
+    const [approvalCount, setApprovalCount] = useState(0);
+    // The Etsy OAuth connection surface. Declared last so every seeded state
+    // index in the shell's own tests stays stable.
+    const [etsyOpen, setEtsyOpen] = useState(false);
+    // The command-center shell region. Declared last so every seeded state
+    // index in the shell's own tests stays stable.
+    const [commandCenterOpen, setCommandCenterOpen] = useState(false);
+    // The operator timeline (P4-07). Declared last so every seeded state
+    // index in the shell's own tests stays stable.
+    const [timelineOpen, setTimelineOpen] = useState(false);
+    // Phase 6 Studio dock (panel inventory / room builder / outside world).
+    const [studioOpen, setStudioOpen] = useState(false);
+    const [studioTab, setStudioTab] = useState<"panels" | "rooms" | "outside">(
+      "panels");
+    const [outsideView, setOutsideView] = useState<OutsideWorldView | null>(
+      null);
+    // P6-05 accessibility preferences. Declared AFTER every earlier slot so
+    // seeded state indices in the shell's own tests stay stable. The OS
+    // preference is honoured by default; an explicit shell setting could win
+    // later without changing the token contract.
+    const [reducedMotion, setReducedMotion] = useState<boolean>(
+      prefersReducedMotion());
+    const [highContrast, setHighContrast] = useState<boolean>(
+      prefersHighContrast());
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
-    const { HudDock, AgentsPanel, SeatModelPanel } = shellComponents(R, hooks, props.base);
+    const {
+      HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
+      ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld,
+      PanelInventory, EtsyConnectPanel, LoadingScreen,
+    } = shellComponents(R, hooks, props.base);
+    useEffect(() => {
+      if (!studioOpen || studioTab !== "outside") return;
+      let live = true;
+      const ctl = typeof AbortController === "undefined" ? undefined
+        : new AbortController();
+      fetchOutsideWorld({ base: props.base, signal: ctl?.signal })
+        .then((view) => { if (live) setOutsideView(view); });
+      return () => { live = false; ctl?.abort(); };
+    }, [studioOpen, studioTab, props.base]);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
     const menuRef = useRef<OfficeMenuController | null>(null);
+    // P6-05 focus management: which dock is open, and what had focus before it
+    // opened. A ref (not state) so restoring focus never causes a render.
+    const openDockRef = useRef<string | null>(null);
+    const focusReturnRef = useRef<HTMLElement | null>(null);
 
     // Load the host theme ONCE per request/base. The server injects the
     // resolved payload as `window.__QUBIT_OFFICE_THEME__` (config/env included),
@@ -213,6 +322,108 @@ export function createOfficeApp(
       return applyHostTheme(document, officeTheme);
     }, [officeTheme]);
 
+    // P6-05 — the single open dock (sheet) and the label a live region uses.
+    // Order mirrors exclusivity: the later sheets close the earlier ones, so at
+    // most one id is ever non-null.
+    const openDockId = agentsOpen ? "office-game-agents-dock"
+      : hudOpen ? "office-game-hud-dock"
+      : warRoomOpen ? "office-game-warroom-dock"
+      : controlSeat ? "office-game-agent-control-dock"
+      : approvalsOpen ? "office-game-approvals-dock"
+      : etsyOpen ? "office-game-etsy-dock"
+      : commandCenterOpen ? "office-game-command-center-dock"
+      : timelineOpen ? "office-game-timeline-dock"
+      : null;
+    const openDockLabel = agentsOpen ? "Agents"
+      : hudOpen ? "HUD"
+      : warRoomOpen ? "War Room"
+      : controlSeat ? "Agent controls"
+      : approvalsOpen ? "Approvals"
+      : etsyOpen ? "Etsy connection"
+      : commandCenterOpen ? "Command Center"
+      : timelineOpen ? "Timeline"
+      : null;
+
+    // Honour the OS reduced-motion and high-contrast preferences and keep the
+    // root attributes in sync if they change while the page is open. The CSS
+    // tokens already consume both attributes; setting them here is what makes
+    // the shell (not just the vendored frame's own setting) obey the system.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      setReducedMotion(prefersReducedMotion());
+      setHighContrast(prefersHighContrast());
+      const offReduced = onReducedMotionChange((next: boolean) => setReducedMotion(next));
+      const offContrast = onMediaQueryChange(
+        "(prefers-contrast: more)",
+        () => setHighContrast(prefersHighContrast()),
+      );
+      return () => { offReduced(); offContrast(); };
+    }, []);
+
+    // P6-05 — remember the control that opened a sheet. A capture-phase click
+    // listener records it BEFORE React's onClick renders the dock, so a child
+    // panel that focuses its own search field cannot steal the captured opener
+    // (child effects run before the parent's, which made a restore target the
+    // newly mounted input instead of the button the operator pressed).
+    useEffect(() => {
+      const doc = typeof document === "undefined" ? null : document;
+      if (!doc) return;
+      const remember = (event: Event) => {
+        const target = event.target as HTMLElement | null;
+        const control = target?.closest?.(
+          "button, a, [role='button'], input, select, textarea") as HTMLElement | null;
+        if (control) focusReturnRef.current = control;
+      };
+      doc.addEventListener("click", remember, true);
+      return () => doc.removeEventListener("click", remember, true);
+    }, []);
+
+    // P6-05 — focus restoration. When a sheet opens, move focus into it; when
+    // it closes, put focus back (or on the main landmark if the opener is
+    // gone). Side sheets are not traps, so the office canvas stays usable.
+    useEffect(() => {
+      const doc = typeof document === "undefined" ? null : document;
+      if (!doc) return;
+      const previous = openDockRef.current;
+      if (openDockId && openDockId !== previous) {
+        if (!focusReturnRef.current) {
+          const captured = captureFocus(doc);
+          focusReturnRef.current = captured.element;
+        }
+        const dock = doc.getElementById(openDockId);
+        if (dock) focusFirst(dock as HTMLElement);
+      } else if (!openDockId && previous) {
+        const target = focusReturnRef.current;
+        if (!restoreFocus(target, doc)) {
+          const main = doc.getElementById("office-game-main") as HTMLElement | null;
+          main?.focus?.();
+        }
+        focusReturnRef.current = null;
+      }
+      openDockRef.current = openDockId;
+    }, [openDockId]);
+
+    // The pending-approval count for the injected badge. Read-only, on the
+    // existing session-token-gated route, at a slow cadence; the panel itself
+    // re-reads on open and after every action and reports its own count, so
+    // this only keeps the badge honest while the dock is closed. Guarded on
+    // `window` so the node-env shell tests issue no request at all.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      let live = true;
+      const read = () => {
+        fetchApprovals({ base: props.base }).then((next) => {
+          if (live && next.kind === "ready") setApprovalCount(next.items.length);
+        });
+      };
+      read();
+      const handle = window.setInterval(read, 30000);
+      return () => {
+        live = false;
+        window.clearInterval(handle);
+      };
+    }, [props.base]);
+
     useEffect(() => {
       const frame = frameRef.current;
       if (!frame) return;
@@ -232,21 +443,59 @@ export function createOfficeApp(
         setFailed("The office API could not be connected from this page.");
         return;
       }
+      // The vendored client owns its document and may swallow Tab. Give a
+      // keyboard user a guaranteed escape back to the shell controls.
+      let restoreEscape: (() => void) | undefined;
       const onLoad = () => {
         setLoaded(true);
         setFailed(null);
+        installOfficeBrand(win);
+        restoreEscape?.();
+        // Resolve the frame window AT LOAD, not from the pre-navigation
+        // closure: on a navigation the earlier window wrapper can still be
+        // around while the live document belongs to the loaded frame.
+        const loadedWindow = frame.contentWindow as Window | null;
+        restoreEscape = installEscapeToShell(loadedWindow, () => {
+          if (typeof document === "undefined") return;
+          const controls = document.getElementById("office-game-controls");
+          const main = document.getElementById("office-game-main");
+          (controls ?? main)?.focus?.();
+        });
         // Put the Agents and HUD icons where the office keeps its own panel
         // buttons. The document is same-origin, so the shell can append to the
         // group; the buttons drive THIS component's dock state.
         menuRef.current?.dispose();
         setMenuFallback(false);
         menuRef.current = installOfficeMenuButtons(win, {
-          onToggleAgents: () => setAgentsOpen((v: boolean) => !v),
-          onToggleHud: () => setHudOpen((v: boolean) => !v),
+          onToggleAgents: () => {
+            setApprovalsOpen(false);
+            setCommandCenterOpen(false);
+            setTimelineOpen(false);
+            setAgentsOpen((v: boolean) => !v);
+          },
+          onToggleHud: () => {
+            setApprovalsOpen(false);
+            setCommandCenterOpen(false);
+            setTimelineOpen(false);
+            setControlSeat(null);
+            setHudOpen((v: boolean) => !v);
+          },
+          onToggleApprovals: () => {
+            setAgentsOpen(false);
+            setHudOpen(false);
+            setWarRoomOpen(false);
+            setCommandCenterOpen(false);
+            setTimelineOpen(false);
+            setControlSeat(null);
+            setApprovalsOpen((v: boolean) => !v);
+          },
           onFallback: (show: boolean) => setMenuFallback(show),
           onAttach: () => setMenuFallback(false),
         });
-        menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
+        menuRef.current?.update({
+          agents: agentsOpen, hud: hudOpen,
+          approvals: approvalsOpen, pendingApprovals: approvalCount,
+        });
         props.onReady?.();
       };
       const onError = () => setFailed("The office app failed to load.");
@@ -254,23 +503,56 @@ export function createOfficeApp(
       frame.addEventListener("error", onError);
       setFailed(null);
       setLoaded(false);
-      frame.src = officeAppSrc({
+      const baseSrc = officeAppSrc({
         base: props.base, mock: props.mock, theme: requestedTheme,
       });
+      frame.src = retryToken
+        ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}`
+        : baseSrc;
       return () => {
         frame.removeEventListener("load", onLoad);
         frame.removeEventListener("error", onError);
         menuRef.current?.dispose();
         menuRef.current = null;
+        restoreEscape?.();
         restoreBridge?.();
       };
-    }, [props.base, props.mock, requestedTheme]);
+    }, [props.base, props.mock, requestedTheme, retryToken]);
 
     // Mirror the dock state onto the injected buttons after every render: the
-    // office paints its own active state from `aria-pressed`.
+    // office paints its own active state from `aria-pressed`, and the
+    // Approvals icon carries the live pending count badge.
     useEffect(() => {
-      menuRef.current?.update({ agents: agentsOpen, hud: hudOpen });
+      menuRef.current?.update({
+        agents: agentsOpen, hud: hudOpen,
+        approvals: approvalsOpen, pendingApprovals: approvalCount,
+      });
     });
+
+    // The office-wide command-center shortcut. It opens the shell region and
+    // starts a fresh search; Escape/close is handled inside the region. Ignore
+    // editable targets so typing "/" in any field is never hijacked.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      const onKey = (event: KeyboardEvent) => {
+        const command = Boolean(event.ctrlKey || event.metaKey);
+        const key = String(event.key || "");
+        const opens = (command && (key === "k" || key === "K"))
+          || (key === "/" && !isEditableTarget(event.target));
+        if (!opens) return;
+        event.preventDefault();
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setTimelineOpen(false);
+        setControlSeat(null);
+        setCommandCenterOpen(true);
+      };
+      window.addEventListener("keydown", onKey);
+      return () => window.removeEventListener("keydown", onKey);
+    }, []);
 
     // Optional 9-slice: the pack declares which shell roles carry art, and
     // only those elements opt in. The generated host stylesheet targets
@@ -279,29 +561,55 @@ export function createOfficeApp(
     const buttonSlice = officeSliceName(officeTheme, "button");
 
     const children: unknown[] = [
-      R.createElement("iframe", {
-        key: "frame",
-        ref: frameRef,
-        title: "Habblaud virtual office",
-        "data-testid": "office-app-frame",
-        className: "office-game__frame",
-        "aria-label": "Habblaud office game",
-        "aria-describedby": "office-app-description",
-        "aria-busy": !loaded && !failed,
-        "data-state": failed ? "error" : loaded ? "ready" : "loading",
-        // Keep the upstream app in a distinct origin and storage namespace.
-        // allow-scripts + allow-same-origin is still required for its module
-        // worker, canvas and storage APIs; the dashboard host stays separate.
-        // The server injects the session token into the app document itself.
-        sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
-        allow: "clipboard-read; clipboard-write",
-        style: { border: "0", width: "100%", height: "100%", display: "block" },
-      }),
-      R.createElement("p", {
-        key: "description",
-        id: "office-app-description",
-        className: "office-game__sr-only",
-      }, "Interactive Habblaud virtual office. Use the controls within the game; unsupported write actions are disabled."),
+      // P6-05 — the first focusable thing on the page is a skip link, so a
+      // keyboard user is never forced through the canvas to reach the shell.
+      // The second link jumps PAST the canvas to the shell controls, which is
+      // the guaranteed escape from a client that swallows Tab.
+      R.createElement("a", {
+        key: "skip-main",
+        href: "#office-game-main",
+        className: "office-game__skipLink",
+        "data-testid": "office-app-skip-link",
+      }, "Skip to office content"),
+      R.createElement("a", {
+        key: "skip-controls",
+        href: "#office-game-controls",
+        className: "office-game__skipLink office-game__skipLink--controls",
+        "data-testid": "office-app-skip-controls",
+      }, "Skip past the office canvas"),
+      R.createElement("main", {
+        key: "main",
+        id: "office-game-main",
+        className: "office-game__main",
+        tabIndex: -1,
+        "aria-label": `${OFFICE_BRAND.name} workspace`,
+      }, [
+        R.createElement("iframe", {
+          key: "frame",
+          ref: frameRef,
+          title: OFFICE_BRAND.title,
+          "data-testid": "office-app-frame",
+          className: "office-game__frame",
+          "aria-label": OFFICE_BRAND.name,
+          "aria-describedby": "office-app-description",
+          "aria-busy": !loaded && !failed,
+          "data-state": failed ? "error" : loaded ? "ready" : "loading",
+          // Keep the upstream app in a distinct origin and storage namespace.
+          // allow-scripts + allow-same-origin is still required for its module
+          // worker, canvas and storage APIs; the dashboard host stays separate.
+          // The server injects the session token into the app document itself.
+          sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
+          allow: "clipboard-read; clipboard-write",
+          style: { border: "0", width: "100%", height: "100%", display: "block" },
+        }),
+        R.createElement("p", {
+          key: "description",
+          id: "office-app-description",
+          className: "office-game__sr-only",
+        }, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled. `
+          + `Every critical status is also shown as text, so muting audio never hides it. `
+          + `On touch screens the shell controls are at least 24 by 24 pixels.`),
+      ]),
       // The persistent Credits/About surface. It is part of the Qubit shell,
       // not the vendored client and not the theme, so the LimeZu attribution
       // stays visible with `classic` and after a theme is removed.
@@ -316,33 +624,34 @@ export function createOfficeApp(
         href: OFFICE_ART_CREDIT_URL,
         target: "_blank",
         rel: "noopener noreferrer",
-      }, OFFICE_ART_CREDIT)),
+      }, OFFICE_ART_CREDIT),
+      R.createElement("span", { key: "sep" }, " · "),
+      R.createElement("a", {
+        key: "legal",
+        href: OFFICE_BRAND.legalUrl,
+        title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`,
+      }, OFFICE_BRAND.legalLabel)),
     ];
 
-    if (!loaded && !failed) {
-      children.push(R.createElement("div", {
-        key: "loading",
-        className: "office-game__panel office-game__loading",
-        "data-testid": "office-app-loading",
-        role: "status",
-        "aria-live": "polite",
-      }, "Loading the office\u2026"));
-    }
-
-    if (failed) {
-      children.push(R.createElement("div", {
-        key: "failed",
-        className: "office-game__refusal office-game__error",
-        "data-testid": "office-app-failed",
-        role: "alert",
-      }, [
-        R.createElement("div", { key: "m" }, `${failed} Check Qubit's office connection; do not start a separate upstream server.`),
-        // The one thing a reader needs when it fails: WHERE it was looking.
-        R.createElement("div", {
-          key: "p", style: { fontSize: "var(--office-fs-xs)" },
-        }, OFFICE_APP_PATH),
-      ]));
-    }
+    // P6-05 — one polite live region carries loading, connection and dock
+    // changes. It is always mounted (an inserted region is not reliably
+    // announced) and its text is derived from real state, never a spinner.
+    children.push(R.createElement("div", {
+      key: "announcer",
+      className: "office-game__sr-only",
+      "data-testid": "office-app-announcer",
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+    }, officeAnnouncement({
+      loaded,
+      failed,
+      state: props.officeState,
+      rooms: props.officeRooms,
+      agents: props.officeAgents,
+      error: props.officeError,
+      dockLabel: openDockLabel,
+    })));
 
     // The host's tower read is the only connection state this page can prove.
     // Show it, so "Connecting…" is never a permanent lie and a failure is named
@@ -442,6 +751,36 @@ export function createOfficeApp(
         R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
           R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Agents"),
           R.createElement("button", {
+            key: "warroom", type: "button",
+            className: "office-game__btn office-theme-dock-link",
+            "data-testid": "office-game-warroom-open",
+            "aria-label": "Open War Room and role directory",
+            "data-office-slice": buttonSlice,
+            onClick: () => {
+              setAgentsOpen(false);
+              setApprovalsOpen(false);
+              setTimelineOpen(false);
+              setControlSeat(null);
+              setWarRoomOpen(true);
+            },
+          }, "War Room"),
+          R.createElement("button", {
+            key: "etsy", type: "button",
+            className: "office-game__btn office-theme-dock-link",
+            "data-testid": "office-game-etsy-open",
+            "aria-label": "Open the Etsy connection settings",
+            "data-office-slice": buttonSlice,
+            onClick: () => {
+              setAgentsOpen(false);
+              setApprovalsOpen(false);
+              setTimelineOpen(false);
+              setControlSeat(null);
+              setWarRoomOpen(false);
+              setHudOpen(false);
+              setEtsyOpen(true);
+            },
+          }, "Etsy"),
+          R.createElement("button", {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
             "data-office-slice": buttonSlice,
@@ -450,6 +789,115 @@ export function createOfficeApp(
         ]),
         R.createElement(AgentsPanel as never, {
           key: "body", base: props.base, theme: officeTheme,
+          onOpenAgent: (seat: AgentSeat) => {
+            setAgentsOpen(false);
+            setHudOpen(false);
+            setApprovalsOpen(false);
+            setControlSeat(seat);
+          },
+        }),
+      ]));
+    }
+
+    // THE WAR ROOM / IDEA LAB. A Qubit shell dock beside the office, opened
+    // from the Agents dock header. It reads/writes only the durable Business
+    // OS (owner-scoped), never the vendored office document.
+    if (warRoomOpen) {
+      children.push(R.createElement("div", {
+        key: "warroom-dock",
+        id: "office-game-warroom-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__warRoomDock",
+        "data-testid": "office-game-warroom-dock",
+        "data-office-dock": "warroom",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "War Room and role directory",
+      }, [
+        R.createElement(WarRoomPanel as never, {
+          key: "body", base: props.base,
+          onClose: () => setWarRoomOpen(false),
+        }),
+      ]));
+    }
+
+    // THE AGENT CONTROL DRAWER. Opened by clicking a seat in the Agents panel.
+    // It resolves that seat to a Business OS agent by an explicit durable link
+    // and says so when none exists; it never invents a control record.
+    if (controlSeat) {
+      children.push(R.createElement("div", {
+        key: "agent-control-dock",
+        id: "office-game-agent-control-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__agentControlDock",
+        "data-testid": "office-game-agent-control-dock",
+        "data-office-dock": "agent-control",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Agent controls",
+      }, [
+        R.createElement(AgentControlDrawer as never, {
+          key: "body", base: props.base, seat: controlSeat,
+          onClose: () => setControlSeat(null),
+        }),
+      ]));
+    }
+
+    // THE APPROVALS DOCK. The pending records on the SHARED journal, opened
+    // from the Approvals icon injected into the office's own panel group (or
+    // the host fallback). It is an exclusive right-hand sheet: opening it
+    // closes the other docks so two sheets can never cover each other, while
+    // every existing dock remains available and unchanged.
+    if (approvalsOpen) {
+      children.push(R.createElement("div", {
+        key: "approvals-dock",
+        id: "office-game-approvals-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__approvalsDock",
+        "data-testid": "office-game-approvals-dock",
+        "data-office-dock": "approvals",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Office approvals",
+      }, [
+        R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
+          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Approvals"),
+          R.createElement("span", {
+            key: "count",
+            className: "office-game__approvalsCount",
+            "data-testid": "office-game-approvals-count",
+            "data-count": String(approvalCount),
+          }, String(approvalCount)),
+          R.createElement("button", {
+            key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
+            "data-testid": "office-game-approvals-close", "aria-label": "Close approvals",
+            "data-office-slice": buttonSlice,
+            onClick: () => setApprovalsOpen(false),
+          }, "Close"),
+        ]),
+        R.createElement(ApprovalsPanel as never, {
+          key: "body", base: props.base,
+          onCountChange: (n: number) => setApprovalCount(n),
+          onClose: () => setApprovalsOpen(false),
+        }),
+      ]));
+    }
+
+    // THE ETSY CONNECTION DOCK. Opened from the Agents dock header. It reads
+    // the typed OAuth status from the Business OS bridge, opens the Etsy
+    // authorization URL and completes the redirect code; tokens stay on the
+    // server and no listing/publish/spend action exists here.
+    if (etsyOpen) {
+      children.push(R.createElement("div", {
+        key: "etsy-dock",
+        id: "office-game-etsy-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__etsyDock",
+        "data-testid": "office-game-etsy-dock",
+        "data-office-dock": "etsy",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Etsy connection",
+      }, [
+        R.createElement(EtsyConnectPanel as never, {
+          key: "body", base: props.base,
+          onClose: () => setEtsyOpen(false),
         }),
       ]));
     }
@@ -502,21 +950,36 @@ export function createOfficeApp(
         "aria-label": "Office panels",
       }, MENU_BUTTONS.map((spec: MenuButtonSpec) => {
         const geometry = menuIconGeometry(spec);
-        const pressed = spec.id === "agents" ? agentsOpen : hudOpen;
+        const pressed = spec.id === "agents" ? agentsOpen
+          : spec.id === "hud" ? hudOpen : approvalsOpen;
         const onActivate = spec.id === "agents"
-          ? () => setAgentsOpen((v: boolean) => !v)
-          : () => setHudOpen((v: boolean) => !v);
-        return R.createElement("button", {
-          key: spec.id,
-          type: "button",
-          className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
-          "data-testid": `${spec.testId}-fallback`,
-          "aria-label": spec.label,
-          title: spec.title,
-          "aria-pressed": pressed ? "true" : "false",
-          "data-office-slice": buttonSlice,
-          onClick: onActivate,
-        }, R.createElement("svg", {
+          ? () => {
+              setApprovalsOpen(false);
+              setCommandCenterOpen(false);
+              setTimelineOpen(false);
+              setAgentsOpen((v: boolean) => !v);
+            }
+          : spec.id === "hud"
+          ? () => {
+              setApprovalsOpen(false);
+              setCommandCenterOpen(false);
+              setTimelineOpen(false);
+              setControlSeat(null);
+              setHudOpen((v: boolean) => !v);
+            }
+          : () => {
+              setAgentsOpen(false);
+              setHudOpen(false);
+              setWarRoomOpen(false);
+              setCommandCenterOpen(false);
+              setTimelineOpen(false);
+              setControlSeat(null);
+              setApprovalsOpen((v: boolean) => !v);
+            };
+        const label = spec.id === "approvals" && approvalCount > 0
+          ? `${spec.label} (${approvalCount} pending)` : spec.label;
+        const parts: unknown[] = [R.createElement("svg", {
+          key: "icon",
           className: "ui-px-icon",
           width: geometry.width,
           height: geometry.height,
@@ -527,9 +990,224 @@ export function createOfficeApp(
         }, R.createElement("path", {
           fill: "currentColor",
           d: geometry.d,
-        })));
+        }))];
+        if (spec.id === "approvals" && approvalCount > 0) {
+          parts.push(R.createElement("span", {
+            key: "badge", className: "office-menu-badge",
+            "data-testid": "office-menu-approvals-badge-fallback",
+            "aria-hidden": "true",
+          }, String(approvalCount)));
+        }
+        return R.createElement("button", {
+          key: spec.id,
+          type: "button",
+          className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
+          "data-testid": `${spec.testId}-fallback`,
+          "aria-label": label,
+          title: spec.title,
+          "aria-pressed": pressed ? "true" : "false",
+          "data-pending": spec.id === "approvals" ? String(approvalCount) : undefined,
+          "data-office-slice": buttonSlice,
+          onClick: onActivate,
+        }, ...parts);
       })));
     }
+
+    // THE COMMAND-CENTER TOGGLE. A visible, labelled shell control (not an
+    // icon-only button) that opens the semantic search region. It is an
+    // overlay so the office iframe keeps its full height and width.
+    const commandCenterToggle = R.createElement("button", {
+      key: "command-center-toggle",
+      type: "button",
+      className: "office-game__btn office-theme-menu-btn office-game__commandCenterToggle",
+      "data-testid": "office-command-center-toggle",
+      "aria-expanded": commandCenterOpen,
+      "aria-controls": "office-game-command-center-dock",
+      "aria-label": "Open the office command center",
+      onClick: () => {
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setControlSeat(null);
+        setCommandCenterOpen((v: boolean) => !v);
+      },
+    }, "Command Center");
+
+    // THE COMMAND CENTER. A read-only projection over the real tower, roster,
+    // tasks, sessions and approvals. It is an exclusive side sheet, so it can
+    // never cover another dock's close button.
+    if (commandCenterOpen) {
+      children.push(R.createElement("div", {
+        key: "command-center-dock",
+        id: "office-game-command-center-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__commandCenterDock",
+        "data-testid": "office-game-command-center-dock",
+        "data-office-dock": "command-center",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Command center",
+      }, [
+        R.createElement(CommandCenter as never, {
+          key: "body",
+          base: props.base,
+          onClose: () => setCommandCenterOpen(false),
+        }),
+      ]));
+    }
+
+    // THE OPERATOR TIMELINE TOGGLE (P4-07). A visible, labelled shell control
+    // beside the command center. Opening it closes every other sheet so two
+    // side sheets can never overlap the iframe or each other.
+    const timelineToggle = R.createElement("button", {
+      key: "timeline-toggle",
+      type: "button",
+      className: "office-game__btn office-theme-menu-btn office-game__timelineToggle",
+      "data-testid": "office-timeline-toggle",
+      "aria-expanded": timelineOpen,
+      "aria-controls": "office-game-timeline-dock",
+      "aria-label": "Open the operator timeline",
+      onClick: () => {
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setCommandCenterOpen(false);
+        setControlSeat(null);
+        setTimelineOpen((v: boolean) => !v);
+      },
+    }, "Timeline");
+
+    const studioToggle = R.createElement("button", {
+      key: "studio-toggle",
+      type: "button",
+      className: "office-game__btn office-theme-menu-btn office-game__studioToggle",
+      "data-testid": "office-studio-toggle",
+      "aria-expanded": studioOpen,
+      "aria-controls": "office-game-studio-dock",
+      "aria-label": "Open the office studio",
+      onClick: () => {
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setCommandCenterOpen(false);
+        setTimelineOpen(false);
+        setControlSeat(null);
+        setStudioOpen((v: boolean) => !v);
+      },
+    }, "Studio");
+
+    // P6-05 — a real toolbar landmark groups the persistent shell controls.
+    // It is also the skip target that gets a keyboard user OUT of the canvas
+    // when the vendored client swallows Tab (and the Escape escape hatch).
+    children.push(R.createElement("div", {
+      key: "toolbar",
+      id: "office-game-controls",
+      className: "office-game__toolbar",
+      "data-testid": "office-app-toolbar",
+      role: "toolbar",
+      "aria-label": "Office panels",
+      tabIndex: -1,
+    }, [commandCenterToggle, timelineToggle, studioToggle]));
+
+    // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
+    // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full
+    // frame, the toolbar offset applies through the existing root marker, and
+    // replay is labelled inside the panel.
+    if (timelineOpen) {
+      children.push(R.createElement("div", {
+        key: "timeline-dock",
+        id: "office-game-timeline-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__timelineDock",
+        "data-testid": "office-game-timeline-dock",
+        "data-office-dock": "timeline",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Operator timeline",
+      }, [
+        R.createElement(Timeline as never, {
+          key: "body",
+          base: props.base,
+          onClose: () => setTimelineOpen(false),
+        }),
+      ]));
+    }
+
+    if (studioOpen) {
+      const tab = (id: "panels" | "rooms" | "outside", label: string) =>
+        R.createElement("button", {
+          key: `studio-tab-${id}`, type: "button",
+          className: "office-game__btn office-game__studioTab",
+          "data-testid": `office-studio-tab-${id}`,
+          "aria-pressed": studioTab === id,
+          onClick: () => setStudioTab(id),
+        }, label);
+      const body = studioTab === "rooms"
+        ? R.createElement(RoomBuilder as never, { key: "rooms" })
+        : studioTab === "outside"
+        ? R.createElement(OutsideWorld as never, {
+            key: "outside",
+            view: outsideView ?? undefined,
+            loading: outsideView === null,
+          })
+        : R.createElement(PanelInventory as never, {
+            key: "panels", base: props.base,
+          });
+      children.push(R.createElement("div", {
+        key: "studio-dock",
+        id: "office-game-studio-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__studioDock",
+        "data-testid": "office-game-studio-dock",
+        "data-office-dock": "studio",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Office studio",
+      }, [
+        R.createElement("div", {
+          key: "head", className: "office-game__dockHead office-theme-dock-head",
+        }, [
+          R.createElement("span", {
+            key: "t", className: "office-theme-dock-title",
+          }, "Studio"),
+          tab("panels", "Panels"),
+          tab("rooms", "Rooms"),
+          tab("outside", "Outside"),
+          R.createElement("button", {
+            key: "x", type: "button",
+            className: "office-game__btn office-theme-dock-close",
+            "data-testid": "office-game-studio-close",
+            "aria-label": "Close studio",
+            onClick: () => setStudioOpen(false),
+          }, "Close"),
+        ]),
+        R.createElement("div", {
+          key: "body", className: "office-game__studioBody",
+        }, body),
+      ]));
+    }
+
+    // THE LOADING SCREEN. One import, one render seam: it overlays the iframe,
+    // owns the weather/pixelfx layer, and fades itself out on `ready`. It is
+    // ALWAYS mounted so a failed frame can show the same screen with a retry;
+    // when it has faded it returns null and disposes its surfaces.
+    children.push(R.createElement(LoadingScreen as never, {
+      key: "loading-screen",
+      phase: failed ? "error" : "loading",
+      ready: loaded,
+      error: failed
+        ? `${failed} Check Qubit's office connection; do not start a separate upstream server. (${OFFICE_APP_PATH})`
+        : null,
+      config: props.loading,
+      onRetry: () => {
+        setFailed(null);
+        setLoaded(false);
+        setRetryToken((n: number) => n + 1);
+      },
+    }));
 
     const rootClass = ["office-game", officeThemeClass(officeTheme)]
       .filter(Boolean).join(" ");
@@ -540,18 +1218,26 @@ export function createOfficeApp(
     // stylesheet split the row into two non-overlapping halves with a gap;
     // a single sheet keeps its original width because the selector only
     // matches while both are open.
-    const dualDocks = agentsOpen && hudOpen;
+    const dualDocks = (agentsOpen && hudOpen)
+      || (warRoomOpen && controlSeat !== null);
     // Either sheet open means the root is marked so the stylesheet can start
     // the sheets BELOW the vendored app's fixed top bar. That bar hosts the
     // injected Panels group that opens them; an offset sheet leaves the group
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
-    const dockOpen = agentsOpen || hudOpen;
+    const dockOpen = agentsOpen || hudOpen || warRoomOpen
+      || controlSeat !== null || approvalsOpen || etsyOpen
+      || commandCenterOpen || timelineOpen || studioOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
       "data-office-docks": dualDocks ? "both" : undefined,
       "data-office-dock-top": dockOpen ? "toolbar" : undefined,
+      // P6-05 — system preferences become token switches the stylesheet
+      // already understands; critical status cues stay textual either way.
+      "data-office-reduced-motion": reducedMotion ? "1" : undefined,
+      "data-office-contrast": highContrast ? "high" : undefined,
       className: rootClass,
+      style: { position: "relative" },
     }, children);
   };
 }

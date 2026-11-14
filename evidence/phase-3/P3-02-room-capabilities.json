@@ -1,0 +1,99 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_room_capabilities.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "      \"approval_policy\": \"none\",\n      \"archetypes\": [],\n      \"departments\": [\n        \"web_app_ecommerce\"\n      ],\n      \"digest\": \"487b580c3ac555ef6a2381c1456ec7d448b01f8806ce6c0214c97de4292337bd\",\n      \"manifest_id\": \"roomcap:web_app_ecommerce:work\",\n      \"required_agent_count\": 1,\n      \"required_capability_count\": 3,\n      \"required_role_count\": 6,\n      \"room_kinds\": [\n        \"work\"\n      ],\n      \"workflow_id\": \"web_app_ecommerce.work\",\n      \"workflow_name\": \"web_app_ecommerce \\u00b7 Department work execution\"\n    }\n  ],\n  \"schema\": \"qubit.office.room_capabilities/1\",\n  \"status\": \"PASS\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_room_caps tests/test_business_role_registry.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".................................................                        [100%]\n49 passed in 0.60s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/room_capabilities.py scripts/validate_room_capabilities.py tests/phase3_room_caps",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/room_capabilities.py scripts/validate_room_capabilities.py tests/phase3_room_caps/test_room_capabilities.py tests/phase3_room_caps/test_validator_script.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T04:54:19Z",
+  "git_head": "c95366a3f10c69301a3a7c3a0c3d43a824510193",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-TRADING-DEPARTMENT.md",
+      "sha256": "bb04243609531bb4a67d59621fb4928b6e42cb3d718dfdbf095ec22837dc8614"
+    },
+    {
+      "path": "voicebridge/business/roles.py",
+      "sha256": "fbfa9b6c02fd1a00a1ac6e913a39e04e1ccf9566a332d7de6c43365c54536899"
+    },
+    {
+      "path": "voicebridge/business/role_catalog.py",
+      "sha256": "19dfdfb8bf4621e79ad608b51f019c806ff2957b72892eaeafd8c7d7bc796a75"
+    },
+    {
+      "path": "voicebridge/business/policy.py",
+      "sha256": "9627e3121929d90b1555b708a946425a738dadab18ad1c17a94c5d6f89379d62"
+    },
+    {
+      "path": "voicebridge/business/dynamic_catalog.py",
+      "sha256": "34f40e7bb6d6d2ca0a47f316d497c766992a1bcb8c0597e238906966978fca6d"
+    }
+  ],
+  "limitations": [
+    "Manifests are declarative capability contracts; they do not start agents or execute workflows.",
+    "Coverage is validated over the 300 rooms in the shipped RoleRegistry (66 manifests); the 7 Trading Department manifests are declared but not yet reachable from shipped floors (P3-01 owns campus data).",
+    "The capability catalog is the minimal shipped set these workflows require; the full dynamic tool/MCP catalog is composed later through dynamic_catalog (accepted and covered by one test).",
+    "No live service, store, network, credentials or UI rendering is involved.",
+    "Not a release verdict: no full matrix, no VERIFIED claim."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/room_capabilities.py",
+      "sha256": "f399d433a44ecba00aa2af7f50a6b84ed645135b390bf0de476092f31de81686"
+    },
+    {
+      "path": "scripts/validate_room_capabilities.py",
+      "sha256": "3f4d08fa3730d04fa519f7d5c96c34cc55a687a58b22f361446a79660d87c47f"
+    },
+    {
+      "path": "tests/phase3_room_caps/test_room_capabilities.py",
+      "sha256": "6f4db8a2ab73ab57180fb42034692a1fc2c299a7d38d2cf2d2277e971e554373"
+    },
+    {
+      "path": "tests/phase3_room_caps/test_validator_script.py",
+      "sha256": "3dde09b9d3c49e758ea5e47c08a2c99d0ca0cd1e496296ee9a87e7ad885a9253"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P3-02"
+}

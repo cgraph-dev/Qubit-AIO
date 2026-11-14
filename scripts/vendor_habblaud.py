@@ -55,6 +55,12 @@ def sha256(path: Path) -> str:
 #: pinned to `en`.
 DEFAULT_LOCALE = "en"
 
+#: The user-visible product name. The vendored client keeps its own internal
+#: identifiers, storage keys and bundle filenames; only the document/PWA copy
+#: that a Qubit user reads is renamed. Legal/provenance text is never touched.
+BRAND_NAME = "Qubit Office"
+BRAND_SHORT_NAME = "Office"
+
 #: The client's own localStorage key for the chosen locale (upstream source:
 #: `client/src/i18n/index.ts`), visible in the bundle as `` `habblaud:locale` ``.
 LOCALE_STORAGE_KEY = "habblaud:locale"
@@ -213,6 +219,12 @@ def rewrite_manifest(text: str) -> str:
     if data.get("lang") != DEFAULT_LOCALE:
         data["lang"] = DEFAULT_LOCALE
         changed = True
+    if data.get("name") != BRAND_NAME:
+        data["name"] = BRAND_NAME
+        changed = True
+    if data.get("short_name") != BRAND_SHORT_NAME:
+        data["short_name"] = BRAND_SHORT_NAME
+        changed = True
     desc = data.get("description")
     if isinstance(desc, str) and desc in INDEX_META_COPY:
         data["description"] = INDEX_META_COPY[desc]
@@ -247,6 +259,29 @@ INDEX_META_COPY = {
     "que foi entregue.":
         "Your agents' office: who is working, who needs you, and what was "
         "delivered.",
+}
+
+#: Document-title, link-preview and PWA labels baked into the static template.
+#: These are product copy, so they carry the Qubit Office name; the upstream
+#: component is named only in the legal/provenance records.
+INDEX_BRAND_COPY = {
+    "<title>Habblaud</title>": f"<title>{BRAND_NAME}</title>",
+    f'<meta property="og:site_name" content="Habblaud" />':
+        f'<meta property="og:site_name" content="{BRAND_NAME}" />',
+    f'<meta property="og:title" content="Habblaud" />':
+        f'<meta property="og:title" content="{BRAND_NAME}" />',
+    f'<meta name="twitter:title" content="Habblaud" />':
+        f'<meta name="twitter:title" content="{BRAND_NAME}" />',
+    f'<meta name="apple-mobile-web-app-title" content="Habblaud" />':
+        f'<meta name="apple-mobile-web-app-title" content="{BRAND_NAME}" />',
+    '<meta property="og:image:alt" content="The Habblaud office in pixel art, '
+    'with project rooms and agents at work." />':
+        f'<meta property="og:image:alt" content="The {BRAND_NAME} in pixel '
+        f'art, with project rooms and agents at work." />',
+    'Pixel-art virtual office that shows, in real time, what your Claude Code '
+    'agents are doing.':
+        'Pixel-art virtual office that shows, in real time, what your agents '
+        'are doing.',
 }
 
 #: Comment nodes in the template that are Portuguese. Left as-is they ship
@@ -300,6 +335,8 @@ def rewrite_index(html: str) -> str:
                       '<meta property="og:locale" content="en_US" />', 1)
     for pt, en in {**INDEX_META_COPY, **INDEX_COMMENTS}.items():
         out = out.replace(pt, en)
+    for old, new in INDEX_BRAND_COPY.items():
+        out = out.replace(old, new)
     return out
 
 

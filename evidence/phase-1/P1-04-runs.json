@@ -1,0 +1,98 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_platform/test_runs.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............                                                             [100%]\n12 passed in 1.05s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/runs.py tests/phase1_platform/test_runs.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/runs.py tests/phase1_platform/test_runs.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_platform tests/durable_substrate tests/test_business_os_foundation.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 5.20s"
+    }
+  ],
+  "generated_at": "2026-11-14T06:05:52Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-PHASE-0.md",
+      "sha256": "688028db6dfb6d64066735af5d5c9416e11c6db9daaf107c111501d1956661ef"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/contracts/run.schema.json",
+      "sha256": "8e58517cacb1f4dd71529936a30331750799a569857eaa2ecdaae2e4a06e3174"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/__init__.py",
+      "sha256": "fcc8a5e50b1a8e4ee16d2b07265b4dfb3472a126990ada4601544bff31368100"
+    }
+  ],
+  "limitations": [
+    "bos_job remains the executing run/turn record; this lane adds task/workspace/lease records around it and does not create a second executor.",
+    "v1 bos_task already pins a four-value status CHECK that SQLite cannot widen in place, so the durable workflow status is stored in the additive workflow_status column; legacy status/assigned_to are kept in sync and task_class separates legacy business tasks from execution tasks.",
+    "Run states 'leased', 'waiting' and 'checkpointed' are reachable by explicit callers; they are not automatically derived from every job transition.",
+    "Principal revocation does not cascade to existing leases; a revoked principal cannot claim new work, and the caller must release/expire the lease and reconcile.",
+    "Workspace artifact hashes are recorded in the manifest, not verified against blob bytes; no filesystem sandbox is applied here."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "tests/phase1_platform/test_runs.py",
+      "sha256": "ab5fa8fc0a21c1f9777333dea276cb9d5bd68703c0dd9c437b417fe1d0afb0c5"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P1-04"
+}

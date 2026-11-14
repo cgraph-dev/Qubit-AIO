@@ -1,0 +1,118 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_room_builder.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "        \"paid_refs\": 0\n      },\n      \"id\": \"asset_report_clean\",\n      \"ok\": true\n    }\n  ],\n  \"counts\": {\n    \"cells\": 10,\n    \"desks\": 17,\n    \"floors\": 1,\n    \"portals\": 9,\n    \"rooms\": 10\n  },\n  \"egress\": 9,\n  \"generated_at\": \"2026-11-14T14:15:25Z\",\n  \"problems\": [],\n  \"schema\": \"qubit-office-room-builder-validation/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P6-02\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase6_room_builder tests/phase3_room_caps tests/phase3_world",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 90%]\n........                                                                 [100%]\n80 passed in 1.39s"
+    },
+    {
+      "cmd": "bash -lc 'ln -sfn /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules; (cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/room-builder.test.ts ../qubit-app/plugins/qubit-office/game/app/RoomBuilder.test.ts); code=$?; rm -f frontend/qubit-web/node_modules; exit $code'",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  26 passed (26)\n   Start at  16:15:27\n   Duration  335ms (transform 102ms, setup 0ms, import 143ms, tests 186ms, environment 0ms)"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/room_builder.py scripts/verify_room_builder.py tests/phase6_room_builder",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    }
+  ],
+  "generated_at": "2026-11-14T14:15:27Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "voicebridge/office/world/map_schema.py",
+      "sha256": "88e7e78c2a3ee806375e23452c9379d758eed357021c082bf5dc7d594564d151"
+    },
+    {
+      "path": "voicebridge/office/world/model.py",
+      "sha256": "a9c091ca013eb7318e42e6e01876f76ddb8b2a2bdf51726823549049399de39b"
+    },
+    {
+      "path": "voicebridge/office/world/style.py",
+      "sha256": "f6cbc90b97b9644b76f24b84340ca686f4c6b555893a226d3510eb8a46167ca7"
+    },
+    {
+      "path": "voicebridge/business/room_capabilities.py",
+      "sha256": "f399d433a44ecba00aa2af7f50a6b84ed645135b390bf0de476092f31de81686"
+    },
+    {
+      "path": "voicebridge/business/role_catalog.py",
+      "sha256": "19dfdfb8bf4621e79ad608b51f019c806ff2957b72892eaeafd8c7d7bc796a75"
+    }
+  ],
+  "limitations": [
+    "No live service or renderer was restarted; the panel is not mounted by the shell (the lead mounts it).",
+    "Meaningful desktop validation touched the Python style/map authorities via metadata only; no paid art was read, copied or hashed from the operator pack.",
+    "The frontend tests ran with a temporary symlink to the main checkout's node_modules; the symlink is removed before commit.",
+    "tsc was run on the two new frontend files with --ignoreConfig, not the whole qubit-web project.",
+    "No full test matrix and no VERIFIED/COMPLETE claim; this is a focused P6-02 gate."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/room_builder.py",
+      "sha256": "d1ec6b8108ba799f74880d9750b6639caf1c56d45fac18f553953288c6b1ffba"
+    },
+    {
+      "path": "scripts/verify_room_builder.py",
+      "sha256": "9c7a52c5063727bd59ce363a6d50333481d86d09d4dcf738595ce136ee0e5cee"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/room-builder.ts",
+      "sha256": "c22e57fc81aecb7f7b9de8c7e7fc9ccae064c2d7e7c3c3e11687f63e6c3fd4b2"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/RoomBuilder.tsx",
+      "sha256": "7df453c1b638dbf06aa9f394347e9328cc454aabb4dafba76b8d42778e75168a"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/room-builder.test.ts",
+      "sha256": "b243822a0b7a0dd79a2422b93b4d4ed680e56de0ac76a482f6763155c8adcb04"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/RoomBuilder.test.ts",
+      "sha256": "a67eb32266a4c3617b95305f17ec49582a4b95a7016b875f5dadde86876ceead"
+    },
+    {
+      "path": "tests/phase6_room_builder/test_room_builder.py",
+      "sha256": "a601a0bd271c5e2711d5d82d191c8567b01135bb3621e0756274f08c0800845c"
+    },
+    {
+      "path": "tests/phase6_room_builder/test_room_builder_verifier.py",
+      "sha256": "a296a61b46b4d959ed2495e699b8bb51f50e4c45662eb5856251adb6bca57175"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P6-02"
+}

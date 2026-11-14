@@ -1,0 +1,117 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase4_memory_projection tests/phase2_memory",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............................................................             [100%]\n60 passed in 5.46s\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_memory_projections.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "note: checking rebuild equality against /tmp/qoffice-memory-projection-p4/business.db\n",
+      "stdout_tail": "{\n  \"errors\": [],\n  \"ok\": true,\n  \"stats\": {\n    \"artifacts\": 1,\n    \"build_digest\": \"fb53d37d222a02447063b9fffb7216fdcf6382f03b058904a452bc171efc42b2\",\n    \"departments\": 1,\n    \"notes\": 2,\n    \"rebuild_checked\": true,\n    \"root\": \"/tmp/qoffice-memory-projection-p4/projection\",\n    \"special_rooms\": 8,\n    \"viewer\": \"prn_01M7C8380ENTTWNTDZTQ7H6DTR\"\n  }\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/memory_projection.py scripts/verify_memory_projections.py tests/phase4_memory_projection",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/memory_projection.py scripts/verify_memory_projections.py tests/phase4_memory_projection/*.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T05:22:42Z",
+  "git_head": "785c4e08fc43ac8805495093056752346a51b7ba",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "voicebridge/business/memory.py",
+      "sha256": "bb3041e0bc05c57010475a5917663360d69cc0a94f8a9712e9ad91a976d5b4a9"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    }
+  ],
+  "limitations": [
+    "The projection is derived and scoped to one tenant and one viewer; _projection.json is a derived manifest, not a second authority or memory pool.",
+    "OpenViking scoping is verified with the hermetic InMemoryOpenViking double; no live OpenViking server, credentials or network path was contacted.",
+    "ACL correctness depends on the injected MemoryACL being correct; the projection only consults it per record through MemoryService.export and never bypasses it.",
+    "Rebuild equality is byte comparison against a fresh rebuild from the same event log; the bare verifier uses a sibling business.db when present and otherwise builds an ephemeral hermetic fixture.",
+    "Special rooms are the fixed eight from docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md \u00a71; an unknown special-room slug is a typed refusal.",
+    "Semantic retrieval here is MemoryService's deterministic lexical ranking; OpenViking adapter retrieval is scoped by collection through OpenVikingScopeGate, not an embedding call.",
+    "No live services, live state, credentials, network, full matrix or release verification were used; no VERIFIED/COMPLETE/100% claim is made."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/memory_projection.py",
+      "sha256": "bb51718e331a4dbef9a3eb917b6439f07e70e84ec05ae6ca4054e8e5413398de"
+    },
+    {
+      "path": "scripts/verify_memory_projections.py",
+      "sha256": "ae71672acc243c02f5c22af8fd0d22cb2d40e15130eaf8712692b784f9f5eb41"
+    },
+    {
+      "path": "tests/phase4_memory_projection/conftest.py",
+      "sha256": "0047f202ef17b8ebe834a9c318d0b5f17179d4cdccd6944c8d93c5ae6360e35b"
+    },
+    {
+      "path": "tests/phase4_memory_projection/test_acceptance_projection.py",
+      "sha256": "2442a745223f77d27acb0de0c814728d58c1ae54de8c11fedb11724421286997"
+    },
+    {
+      "path": "tests/phase4_memory_projection/test_acl_backlinks.py",
+      "sha256": "08dbae7a6430d43432a93184e3cef29a152d43ccc06d87647ea2a09c527f468b"
+    },
+    {
+      "path": "tests/phase4_memory_projection/test_department_office_moc.py",
+      "sha256": "887c19cd13827e986ae0420370a3baf6987effd7efc76f6aec7b5b6bd293a614"
+    },
+    {
+      "path": "tests/phase4_memory_projection/test_openviking_scopes.py",
+      "sha256": "a41b0906c6a97201b4d2b09c73a69483d1cfcdcb3d25321256dbbd9e5d6e5037"
+    },
+    {
+      "path": "tests/phase4_memory_projection/test_rebuild_deletion.py",
+      "sha256": "118f0f7582f3b126f58a9835e9a67f23ea6f55a53ee4571476a285c7c24462ee"
+    },
+    {
+      "path": "tests/phase4_memory_projection/test_verifier.py",
+      "sha256": "468d225440b062b31bba41f515b757c21e8f9e610a4e53953e694e6b1dc10461"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P4-05"
+}

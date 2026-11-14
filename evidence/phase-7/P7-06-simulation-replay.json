@@ -1,0 +1,123 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_simulation_replay.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "    \"final_digest\": \"03ce6e8c78360812265eb942481f81a69d5b59c6df11c5e32aded87e421dc48f\",\n    \"frames\": 5,\n    \"fx_seeds\": [\n      1001,\n      2002\n    ],\n    \"history_events\": 6,\n    \"run_id\": \"run_969c57b53608203a7a7b8eb4\",\n    \"tenant_id\": \"ten_01M7D82DQE1V5NH7J817HN63S5\"\n  },\n  \"generated_at\": \"2026-11-14T14:41:03.849Z\",\n  \"schema\": \"qubit-office-simulation-replay-verification/1\",\n  \"state\": \"PASS\",\n  \"summary\": {\n    \"checks\": 14,\n    \"failed\": 0,\n    \"passed\": 14\n  },\n  \"task_id\": \"P7-06\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase7_replay tests/phase4_operator_ui",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".........................................................                [100%]\n57 passed in 3.78s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/simulation_audit.py scripts/verify_simulation_replay.py tests/phase7_replay",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/simulation_audit.py scripts/verify_simulation_replay.py tests/phase7_replay/conftest.py tests/phase7_replay/_replay_helpers.py tests/phase7_replay/test_replay_equality.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T14:41:08Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/operator_timeline.py",
+      "sha256": "8b273792cf1bd05c26e6f96e7daa73b9fd90cd577f667e10994e2022180097ad"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "tests/phase4_operator_ui/test_operator_timeline.py",
+      "sha256": "5e37e86fb38e19939cf8f65e4accd5494ff1bc9b9740187e1a301e7449b3afb8"
+    }
+  ],
+  "limitations": [
+    "Audit retention is an in-memory, bounded, tenant-scoped ledger; no durable audit table was added because the store/schema is owned by another lane.",
+    "The office.interaction.* event family is defined here because the P7 interaction-engine lane is not merged; the engine must emit these types and payload keys for replay to cover it.",
+    "Replay proves projection determinism (state/effects/FX/seed/order/final-state digests); it does not prove rendered canvas/FX visuals.",
+    "Divergence detection compares recorded vs replayed digests; a semantic error shared by both recorder and replayer cannot be detected by this audit.",
+    "No live service, no credentials, no network, no full matrix; VERIFIED/COMPLETE are not claimed.",
+    "refresh failures: command 3 exited 1, expected 0"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/simulation_audit.py",
+      "sha256": "66ecde7e4f584093ab9fa1dcb86765b7ac4128deaff3446cc319655b32317e2a"
+    },
+    {
+      "path": "scripts/verify_simulation_replay.py",
+      "sha256": "7ec0531b0524a00a2e657185a948790e7e0cea8effb337207813c8348b3c5b08"
+    },
+    {
+      "path": "tests/phase7_replay/conftest.py",
+      "sha256": "1aea69a4e43b38b6269b35e936094052f2db18f8602529b8e6a8b8b4b653e37a"
+    },
+    {
+      "path": "tests/phase7_replay/test_replay_equality.py",
+      "sha256": "468a0f6d9cc5829e18a042a5c7ee14cb47046ebb834e1124cc96d847ab44eae0"
+    },
+    {
+      "path": "tests/phase7_replay/test_divergence_incident.py",
+      "sha256": "d0adc73d0c5591608f8381e775dc40d67d0df10b8a42b638af993ea624d467e5"
+    },
+    {
+      "path": "tests/phase7_replay/test_order_causation.py",
+      "sha256": "60e2f61e58208c44f3265abe51b253fd1826df820bcf5c256d199973f0ddc0c2"
+    },
+    {
+      "path": "tests/phase7_replay/test_cancel_retention.py",
+      "sha256": "abdf141ede76bb25a5899c5d6a4d819f6117f35aa6311384a650bc0a7fb9f71b"
+    },
+    {
+      "path": "tests/phase7_replay/test_empty_and_no_side_effects.py",
+      "sha256": "6e808c1754aa0e11f2cb749e42842b280403dca9640df98eacdc987b5f64b8f9"
+    },
+    {
+      "path": "tests/phase7_replay/test_store_history.py",
+      "sha256": "f3e6bd1f4107a5ca3356b116a7dd57f30174564e77f7d510f59a22928abc5703"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P7-06"
+}

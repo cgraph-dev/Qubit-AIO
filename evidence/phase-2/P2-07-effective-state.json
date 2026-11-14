@@ -1,0 +1,107 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_effective tests/test_business_agent_controls.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".......................................                                  [100%]\n39 passed in 2.89s"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_effective_state.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "      \"name\": \"absent_is_typed_unknown\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"status=projection\",\n      \"name\": \"status_is_projection_not_live\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"primary={'provider': 'provider-a', 'model': 'model-a', 'reasoning_effort': 'medium', 'route': 'provider-a/model-a'} fallback={'provider': 'provider-b', 'model': 'model-b', 'route': 'provider-b/model-b'}\",\n      \"name\": \"model_route_and_fallback\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 16,\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-effective-state-verification/1\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/effective_state.py scripts/verify_effective_state.py tests/phase2_effective",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/effective_state.py scripts/verify_effective_state.py tests/phase2_effective/test_effective_state.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "bash -lc 'ln -sfn /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules && cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/effective-state.test.ts ../qubit-app/plugins/qubit-office/game/app/EffectiveStatePanel.test.ts; code=$?; rm -f node_modules; exit $code'",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-next/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  9 passed (9)\n   Start at  07:31:15\n   Duration  282ms (transform 93ms, setup 0ms, import 128ms, tests 139ms, environment 0ms)"
+    }
+  ],
+  "generated_at": "2026-11-14T05:31:16Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "voicebridge/business/effective_state.py",
+      "sha256": "090b3fb805160f7f142afa7c71866bf5a40c6b50b10d32598f4a01bfb2130e2f"
+    },
+    {
+      "path": "scripts/verify_effective_state.py",
+      "sha256": "f7a2208c23c09f82eb45a8fc2ad74bab9ddcaf43b41450a168b6536eaf372501"
+    },
+    {
+      "path": "voicebridge/business/bridge.py",
+      "sha256": "76b7f9475680e9a213ccc51d5ed5e3d0844e6dd3e2bcdf329b5171c77569b8a2"
+    },
+    {
+      "path": "voicebridge/qubit_compat.py",
+      "sha256": "a541fad8f194345b8670d982641cca04ddae2c22ae8ab3914901cd75f8f5bede"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/effective-state.ts",
+      "sha256": "cedeed9286360c2d7330a84396602b46650f8fc757365ebc49fd89f8f35e6a29"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/EffectiveStatePanel.tsx",
+      "sha256": "bd228f6cb94bded66706639ea0eadfcdd1db7f1e657006ac8aa420a778a2712c"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/AgentControlDrawer.tsx",
+      "sha256": "4499c8f171c10199f6cc7396e35eb91d129b7f77f4ce2bcc5a79b2d223b03cdc"
+    }
+  ],
+  "limitations": [
+    "tsc over the panel still reports the 3 pre-existing PhaserSceneHost/phaser type errors in untouched files; no error is reported in the new files",
+    "effective-state UI tests use the main checkout node_modules through a temporary symlink that is removed after the run",
+    "fake/seed fixture only; no live service, live state or network"
+  ],
+  "outputs": [
+    {
+      "path": "tests/phase2_effective/test_effective_state.py",
+      "sha256": "63775205b0df7ab59a142d46eab320fa519f1ee47b8d488430a66ee86e6e10be"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/effective-state.test.ts",
+      "sha256": "42d6527c0a65413d0ac5434012e3eba3bc57d915cdb1d0894da9688476e2ed9d"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/EffectiveStatePanel.test.ts",
+      "sha256": "3c5acfba654609488403d3d45515a82c3aacdbfdb5386a7a0b9b743c10b0ac12"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P2-07"
+}

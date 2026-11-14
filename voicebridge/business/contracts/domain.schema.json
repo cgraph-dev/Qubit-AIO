@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qubit.office/domain.schema.json",
+  "title": "Qubit Office domain records (frozen v1)",
+  "description": "Frozen v1 projection contract for Business OS records. The SQLite schema in voicebridge/business/schema.py stays authoritative for storage; this file is the wire/projection contract. Money is integer minor units, timestamps are RFC 3339 date-time strings, and every concrete record rejects unknown properties.",
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "description": "ULID-shaped identifier produced by voicebridge.business.ids.new_id: a short lowercase prefix, underscore, then 26 Crockford base32 characters.",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    },
+    "Sha256": {
+      "type": "string",
+      "description": "Lowercase hexadecimal SHA-256 digest.",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "Currency": {
+      "type": "string",
+      "description": "ISO 4217 alphabetic currency code.",
+      "pattern": "^[A-Z]{3}$"
+    },
+    "Owner": {
+      "type": "object",
+      "description": "A human principal. Owner is never an agent.",
+      "additionalProperties": false,
+      "properties": {
+        "owner_id": { "$ref": "#/$defs/Id" },
+        "auth_subject": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "display_name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "enum": ["active", "retired"] },
+        "created_at": { "type": "string", "format": "date-time" },
+        "retired_at": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "required": ["owner_id", "auth_subject", "display_name", "status", "created_at", "retired_at"]
+    },
+    "Tenant": {
+      "type": "object",
+      "description": "Top-level isolation boundary. Every business record carries tenant_id.",
+      "additionalProperties": false,
+      "properties": {
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "owner_id": { "$ref": "#/$defs/Id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "status": { "enum": ["active", "suspended", "retired"] },
+        "data_residency": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "retention_policy": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["tenant_id", "owner_id", "name", "status", "data_residency", "retention_policy", "created_at"]
+    },
+    "LegalEntity": {
+      "type": "object",
+      "description": "Legal/accounting entity inside a tenant. Personal and company books never mix.",
+      "additionalProperties": false,
+      "properties": {
+        "legal_entity_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "jurisdiction": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "registration_id": { "type": ["string", "null"], "maxLength": 128 },
+        "tax_id": { "type": ["string", "null"], "maxLength": 128 },
+        "currency": { "$ref": "#/$defs/Currency" },
+        "status": { "enum": ["active", "archived"] }
+      },
+      "required": ["legal_entity_id", "tenant_id", "name", "jurisdiction", "registration_id", "tax_id", "currency", "status"]
+    },
+    "Business": {
+      "type": "object",
+      "description": "A business operated by a tenant. Existence is not derived from room or seat presence.",
+      "additionalProperties": false,
+      "properties": {
+        "business_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "legal_entity_id": { "$ref": "#/$defs/Id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+        "status": { "enum": ["draft", "active", "paused", "archived"] },
+        "currency": { "$ref": "#/$defs/Currency" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "metadata": { "type": "object", "additionalProperties": true }
+      },
+      "required": ["business_id", "tenant_id", "legal_entity_id", "name", "slug", "status", "currency", "created_at", "updated_at", "metadata"]
+    },
+    "Department": {
+      "type": "object",
+      "description": "An organizational unit. Department is not a security boundary.",
+      "additionalProperties": false,
+      "properties": {
+        "department_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "business_ids": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "slug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+        "wing": { "type": ["string", "null"], "maxLength": 64 },
+        "floor": { "type": ["integer", "null"], "minimum": 0 },
+        "status": { "enum": ["active", "paused", "archived"] }
+      },
+      "required": ["department_id", "tenant_id", "business_ids", "name", "slug", "status"]
+    },
+    "Room": {
+      "type": "object",
+      "description": "A map room. Every room maps to at least one workflow/capability manifest and memory scope.",
+      "additionalProperties": false,
+      "properties": {
+        "room_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "department_id": { "$ref": "#/$defs/Id" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "archetype": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "capacity": { "type": "integer", "minimum": 0 },
+        "privacy_class": { "enum": ["public", "internal", "confidential", "restricted"] },
+        "status": { "enum": ["active", "dormant", "archived"] },
+        "capability_manifest_id": { "$ref": "#/$defs/Id" },
+        "memory_scope_id": { "$ref": "#/$defs/Id" },
+        "map_cell_ids": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/Id" } }
+      },
+      "required": ["room_id", "tenant_id", "department_id", "name", "archetype", "capacity", "privacy_class", "status", "capability_manifest_id", "memory_scope_id", "map_cell_ids"]
+    },
+    "Cell": {
+      "type": "object",
+      "description": "A fixed 16x12 map cell. A wider room is a cell cluster; a cell is never stretched.",
+      "additionalProperties": false,
+      "properties": {
+        "cell_id": { "$ref": "#/$defs/Id" },
+        "room_id": { "$ref": "#/$defs/Id" },
+        "origin": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "x": { "type": "integer", "minimum": 0 },
+            "y": { "type": "integer", "minimum": 0 }
+          },
+          "required": ["x", "y"]
+        },
+        "cols": { "const": 16 },
+        "rows": { "const": 12 },
+        "desk_ids": { "type": "array", "items": { "$ref": "#/$defs/Id" } }
+      },
+      "required": ["cell_id", "room_id", "origin", "cols", "rows", "desk_ids"]
+    },
+    "Desk": {
+      "type": "object",
+      "description": "A desk inside one cell. seat_id is the composite room:cell:local identifier.",
+      "additionalProperties": false,
+      "properties": {
+        "desk_id": { "$ref": "#/$defs/Id" },
+        "room_id": { "$ref": "#/$defs/Id" },
+        "cell_id": { "$ref": "#/$defs/Id" },
+        "seat_id": {
+          "type": "string",
+          "description": "Composite seat identifier: <room_id>:<cell_id>:<local_seat_id>.",
+          "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}:[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}:[0-9]{1,4}$"
+        },
+        "local_seat_id": { "type": "integer", "minimum": 1, "maximum": 9999 }
+      },
+      "required": ["desk_id", "room_id", "cell_id", "seat_id", "local_seat_id"]
+    },
+    "Seat": {
+      "type": "object",
+      "description": "A seat projection. agent_id is presentation/assignment metadata only, never an authorization source.",
+      "additionalProperties": false,
+      "properties": {
+        "seat_id": {
+          "type": "string",
+          "description": "Composite seat identifier: <room_id>:<cell_id>:<local_seat_id>. A bare or duplicated id is invalid.",
+          "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}:[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}:[0-9]{1,4}$"
+        },
+        "room_id": { "$ref": "#/$defs/Id" },
+        "cell_id": { "$ref": "#/$defs/Id" },
+        "desk_id": { "$ref": "#/$defs/Id" },
+        "local_seat_id": { "type": "integer", "minimum": 1, "maximum": 9999 },
+        "agent_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" }
+      },
+      "required": ["seat_id", "room_id", "cell_id", "desk_id", "local_seat_id", "agent_id"]
+    },
+    "Artifact": {
+      "type": "object",
+      "description": "An immutable output or receipt. Completion without an artifact or provider receipt is not completion.",
+      "additionalProperties": false,
+      "properties": {
+        "artifact_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "business_id": { "$ref": "#/$defs/Id" },
+        "job_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "task_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "run_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "kind": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "name": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "media_type": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "sha256": { "$ref": "#/$defs/Sha256" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "storage_ref": { "type": "string", "maxLength": 1024 },
+        "provenance": { "type": "object", "additionalProperties": true },
+        "access_policy": { "enum": ["owner", "business", "tenant", "public"] },
+        "immutable": { "type": "boolean" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["artifact_id", "tenant_id", "business_id", "kind", "name", "media_type", "sha256", "size_bytes", "created_at"]
+    },
+    "Approval": {
+      "type": "object",
+      "description": "Durable approval state bound to the exact canonical payload hash. Any payload change invalidates the approval.",
+      "additionalProperties": false,
+      "properties": {
+        "approval_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "business_id": { "$ref": "#/$defs/Id" },
+        "job_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "run_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "action": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "status": { "enum": ["pending", "approved", "rejected", "expired", "cancelled"] },
+        "requested_by": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "decided_by": { "type": ["string", "null"], "maxLength": 200 },
+        "reason": { "type": "string", "maxLength": 2000 },
+        "idempotency_key": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{8,128}$" },
+        "request_hash": { "$ref": "#/$defs/Sha256" },
+        "canonical_payload_hash": {
+          "$ref": "#/$defs/Sha256",
+          "description": "SHA-256 of the canonical JSON payload (voicebridge.business.ids.fingerprint). Stored as bos_approval.request_hash."
+        },
+        "policy_version": { "type": "string", "pattern": "^v[0-9]+(\\.[0-9]+)*$" },
+        "payload": { "type": "object", "additionalProperties": true },
+        "created_at": { "type": "string", "format": "date-time" },
+        "decided_at": { "type": ["string", "null"], "format": "date-time" },
+        "expires_at": { "type": ["number", "null"], "description": "Epoch seconds, matching bos_approval.expires_at." }
+      },
+      "required": ["approval_id", "tenant_id", "business_id", "action", "status", "requested_by", "idempotency_key", "request_hash", "canonical_payload_hash", "policy_version", "payload", "created_at"]
+    },
+    "LedgerEntry": {
+      "type": "object",
+      "description": "Append-only financial truth. Amounts are integer minor units; narrative never equals financial truth.",
+      "additionalProperties": false,
+      "properties": {
+        "entry_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "business_id": { "$ref": "#/$defs/Id" },
+        "job_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "account": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "direction": { "enum": ["debit", "credit"] },
+        "amount_minor": { "type": "integer", "minimum": 0 },
+        "currency": { "$ref": "#/$defs/Currency" },
+        "idempotency_key": { "type": "string", "pattern": "^[A-Za-z0-9_.:-]{8,128}$" },
+        "request_hash": { "$ref": "#/$defs/Sha256" },
+        "memo": { "type": "string", "maxLength": 2000 },
+        "status": { "enum": ["pending", "committed", "unknown"] },
+        "provider_request_id": { "type": ["string", "null"], "maxLength": 256 },
+        "artifact_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["entry_id", "tenant_id", "business_id", "account", "direction", "amount_minor", "currency", "idempotency_key", "request_hash", "created_at"]
+    },
+    "Capability": {
+      "type": "object",
+      "description": "A gateway capability. Deny-by-default: no wildcard resource or action is representable.",
+      "additionalProperties": false,
+      "properties": {
+        "capability_id": { "$ref": "#/$defs/Id" },
+        "category": { "enum": ["read", "write", "execute", "publish", "finance", "admin"] },
+        "resource": { "type": "string", "pattern": "^[a-z][a-z0-9_.:-]{0,127}$" },
+        "action": { "type": "string", "pattern": "^[a-z][a-z0-9_.:-]{0,127}$" },
+        "risk": { "enum": ["low", "medium", "high", "critical"] },
+        "required_scopes": { "type": "array", "items": { "type": "string", "minLength": 1, "maxLength": 128 } },
+        "approval_policy": { "enum": ["none", "owner", "dual-control"] },
+        "budget_minor": { "type": ["integer", "null"], "minimum": 0 },
+        "rate_limit": { "type": "string", "maxLength": 64 },
+        "health": { "enum": ["healthy", "degraded", "unavailable"] },
+        "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" }
+      },
+      "required": ["capability_id", "category", "resource", "action", "risk", "required_scopes", "approval_policy", "health", "version"]
+    },
+    "Grant": {
+      "type": "object",
+      "description": "A scoped, expiring grant. No wildcard; deny wins.",
+      "additionalProperties": false,
+      "properties": {
+        "grant_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "subject_id": { "$ref": "#/$defs/Id" },
+        "capability_id": { "$ref": "#/$defs/Id" },
+        "resource": { "type": "string", "pattern": "^[a-z][a-z0-9_.:-]{0,127}$" },
+        "action": { "type": "string", "pattern": "^[a-z][a-z0-9_.:-]{0,127}$" },
+        "data_class": { "enum": ["public", "internal", "confidential", "restricted"] },
+        "environment": { "enum": ["dev", "staging", "production"] },
+        "expires_at": { "type": ["string", "null"], "format": "date-time" },
+        "approval_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" }
+      },
+      "required": ["grant_id", "tenant_id", "subject_id", "capability_id", "resource", "action", "data_class", "environment", "expires_at"]
+    },
+    "MemoryRecord": {
+      "type": "object",
+      "description": "A memory projection over the authoritative event log. Deletion and correction are first-class.",
+      "additionalProperties": false,
+      "properties": {
+        "memory_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "scope": { "enum": ["agent", "session", "task", "department", "office", "tenant"] },
+        "source": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "provenance": { "type": "object", "additionalProperties": true },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "visibility": { "enum": ["private", "owner", "participants", "department", "office", "tenant"] },
+        "retention": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "supersedes": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "content_hash": { "$ref": "#/$defs/Sha256" },
+        "deleted": { "type": "boolean" }
+      },
+      "required": ["memory_id", "tenant_id", "scope", "source", "provenance", "confidence", "visibility", "retention", "created_at", "updated_at"]
+    },
+    "AuditEvent": {
+      "type": "object",
+      "description": "Tamper-evident audit chain row. Append-only; exportable.",
+      "additionalProperties": false,
+      "properties": {
+        "audit_id": { "$ref": "#/$defs/Id" },
+        "tenant_id": { "$ref": "#/$defs/Id" },
+        "business_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "actor": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "agent_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "run_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+        "policy_revision": { "type": "integer", "minimum": 1 },
+        "action": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "target": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "id": { "type": ["string", "null"], "maxLength": 128 }
+          },
+          "required": ["type", "id"]
+        },
+        "decision": { "enum": ["allow", "deny", "allow_with_approval"] },
+        "before_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "after_hash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "chain_hash": { "$ref": "#/$defs/Sha256" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["audit_id", "tenant_id", "business_id", "actor", "policy_revision", "action", "target", "decision", "before_hash", "after_hash", "chain_hash", "created_at"]
+    }
+  }
+}

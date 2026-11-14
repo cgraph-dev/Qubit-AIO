@@ -1,0 +1,112 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-1/P1-01-identity.json": "4236306457884d9383053e33496d8b44fe5695054c06e51ebc52210604475106",
+    "evidence/phase-1/P1-02-eventlog.json": "721a81c224bccb8f73f6dbc9db68911999d32e34540d64e223e8a262ceb57b1b",
+    "evidence/phase-1/P1-03-gateway.json": "0a054ad5703f6716b0ca63bf4f7d785662107d09b1f0802f9a3b1f3577113572",
+    "evidence/phase-1/P1-04-runs.json": "e002297896d5fb623634e6081737114808242246a61f3913c8c81e199463cea4",
+    "evidence/phase-1/P1-05-a2a.json": "498267af68e0c8ac5885fe0590c697a7196716e766919c72001e13f1a7b9f690",
+    "evidence/phase-1/P1-06-approvals.json": "ea70750defe2f21c95801d7d88ee35538890cf929b340341083b9fbe063d2bc5",
+    "evidence/phase-1/P1-07-security.json": "dcf6a85bef1fc2478d0ba3adfab662a7acf02aa98d53aa020ba01928de739f38",
+    "evidence/phase-1/P1-08-otel.json": "12dc906c214f542a05e40be4e2b948f1707791d8af3c6f979c2b6b1858dc2e3c",
+    "evidence/phase-1/P1-09-backup-restore.json": "f1c330605499beff7a706826d8ef37faff3ec0a7bbcd56896786ddf5ce99f359",
+    "evidence/phase-1/P1-10-reference-lane.json": "3a144b8a2554b0d8901effffbfbd8c404486a543fb2897355f973a5e838e06ec"
+  },
+  "evidence_verification": {
+    "checked": 10,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T14:41:45Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured"
+  ],
+  "phase": 1,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_platform/test_identity.py",
+      "evidence": [
+        "evidence/phase-1/P1-01-identity.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_platform/test_eventlog.py",
+      "evidence": [
+        "evidence/phase-1/P1-02-eventlog.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_gateway tests/test_integration_tool_gateway.py tests/test_business_os_foundation.py",
+      "evidence": [
+        "evidence/phase-1/P1-03-gateway.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-03"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_platform/test_runs.py",
+      "evidence": [
+        "evidence/phase-1/P1-04-runs.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals/test_a2a.py",
+      "evidence": [
+        "evidence/phase-1/P1-05-a2a.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals/test_approvals.py",
+      "evidence": [
+        "evidence/phase-1/P1-06-approvals.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-06"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_security",
+      "evidence": [
+        "evidence/phase-1/P1-07-security.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-07"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_otel",
+      "evidence": [
+        "evidence/phase-1/P1-08-otel.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-08"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_backup",
+      "evidence": [
+        "evidence/phase-1/P1-09-backup-restore.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-09"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.QNTBb5/reference",
+      "evidence": [
+        "evidence/phase-1/P1-10-reference-lane.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P1-10"
+    }
+  ]
+}

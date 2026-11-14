@@ -67,7 +67,8 @@
    `documentElement.lang`, `localStorage` and the global key handlers. */
 /* Full-height standalone app mode keeps all the canvas interactive without
    introducing any host-level toolbar or diagnostics overlay. */
-.office-game:has(> .office-game__frame) {
+.office-game:has(> .office-game__frame),
+.office-game:has(> .office-game__main) {
   position: relative;
   display: block;
   flex: 1 1 auto;
@@ -87,6 +88,84 @@
   border: 0;
   display: block;
   background: #12151d;
+}
+
+/* P6-05 — the semantic <main> that wraps the canvas. It is a positioning
+   frame, not a layout change: the iframe keeps its exact absolute box, and the
+   skip link targets this landmark. `display: block` and `inset: 0` keep the
+   `:has()` block sizing above working whether the canvas is wrapped or not. */
+.office-game__main {
+  position: absolute;
+  inset: 0;
+  display: block;
+  min-height: 0;
+}
+
+.office-game__main > .office-game__frame {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  display: block;
+  background: #12151d;
+}
+
+.office-game__main:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: -2px;
+}
+
+/* --- skip links --------------------------------------------------------- */
+/* The first focusable controls on the page. Visually hidden until keyboard
+   focus, then pinned above the frame. The second skips PAST the canvas to the
+   shell toolbar, so a client that swallows Tab can never trap a keyboard
+   user. */
+.office-game__skipLink {
+  position: absolute;
+  z-index: 100;
+  top: var(--office-s3);
+  left: var(--office-s3);
+  min-height: 24px;
+  padding: var(--office-s1) var(--office-s3);
+  border: 1px solid var(--office-accent);
+  border-radius: var(--office-radius);
+  background: var(--office-void);
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+  text-decoration: none;
+  transform: translateY(-400%);
+  transition: transform var(--office-dur-fast) var(--office-ease);
+}
+
+.office-game__skipLink--controls {
+  top: calc(var(--office-s3) + 2.5rem);
+}
+
+.office-game__skipLink:focus,
+.office-game__skipLink:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
+}
+
+/* --- the persistent shell toolbar --------------------------------------- */
+/* Command Center and Timeline live in one real toolbar landmark. It wraps at
+   200% zoom and phone width instead of overflowing horizontally. */
+.office-game__toolbar {
+  position: absolute;
+  z-index: 5;
+  left: var(--office-s3);
+  bottom: var(--office-s3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+  max-width: calc(100% - (2 * var(--office-s3)));
+}
+
+.office-game__toolbar:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
 }
 
 /* Host-rendered menu fallback (when the app's own Panels group is missing).
@@ -144,6 +223,19 @@
 
 .office-game__credits a:hover {
   color: var(--office-accent, #7dd3c8);
+}
+
+.office-game__credits a:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
+}
+
+/* P6-05 reflow — long backend errors, ids and credit text wrap instead of
+   pushing the shell wider than the viewport at 200% zoom. */
+.office-game__connection,
+.office-game__credits,
+.office-game__announcement {
+  overflow-wrap: anywhere;
 }
 
 .office-game__loading,
@@ -269,6 +361,7 @@
 
 .office-game__dockHead {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--office-s3);
   padding: var(--office-s2) var(--office-s3);
@@ -407,6 +500,21 @@
   outline-offset: 2px;
 }
 
+/* P6-05 / WCAG 2.2 SC 2.5.8 — every shell control is at least 24x24 CSS px.
+   The injected iframe icons are styled by the vendored document and are
+   covered by the manual review; these are the shell-owned targets. */
+.office-game__btn,
+.office-game__dock-close,
+.office-game__skipLink,
+.tower__close,
+.agent-control__chip button,
+.etsy-connect__primary,
+.etsy-connect__secondary,
+.approvals-panel__actions button {
+  min-height: 24px;
+  min-width: 24px;
+}
+
 /* --- panels: one primary, one drawer ----------------------------------- */
 .office-game__panel {
   border: var(--office-border);
@@ -456,17 +564,20 @@
   .office-game__stat:nth-child(n + 4) {
     display: none;              /* the HUD degrades; the controls never do */
   }
-}
-
-/* The system preference is honoured separately from the in-game setting, so a
-   player cannot save a preference that overrides their OS. */
-@media (prefers-reduced-motion: reduce) {
-  .office-game,
-  .office-game * {
-    transition-duration: 1ms !important;
-    animation-duration: 1ms !important;
+  /* At phone width (and at 200% zoom, which resolves here) the toolbar wraps
+     and the credit moves above it instead of overflowing the viewport. */
+  .office-game__toolbar {
+    right: var(--office-s3);
+    max-width: none;
+  }
+  .office-game__credits {
+    bottom: calc(var(--office-s3) + 3rem);
+    max-width: calc(100% - 2rem);
+    text-align: center;
   }
 }
+
+
 
 /* --- the agents panel: the roster's seats, grouped by division ------------ */
 /* The trigger floats top-LEFT, opposite the HUD button, so opening one never
@@ -561,6 +672,9 @@
 .office-game .agents-panel[data-state="loading"],
 .office-game .agents-panel__error {
   color: var(--office-muted);
+  /* P6-05 — weight is a non-colour cue; the state text itself is the primary
+     one, so loading/error never rely on hue alone. */
+  font-weight: 600;
 }
 
 .office-game .agents-panel__error {
@@ -831,4 +945,1207 @@
 
 .office-game .office-theme-card .agents-panel__cardMeta {
   color: var(--ui-muted, var(--office-muted));
+}
+
+/* -------------------------------------------------------------------------
+   BUSINESS OS (War Room / role directory / agent controls)
+   The two Business panels live in the SAME shell dock system as Agents/HUD.
+   War Room opens on the left (it replaces the Agents sheet while open); agent
+   controls open on the right, mirroring HUD. Both start below the app toolbar
+   through the same `data-office-dock-top` marker.
+   ------------------------------------------------------------------------- */
+.office-game__dock.office-game__warRoomDock {
+  right: auto;
+  left: 0;
+  border: 0;
+  border-right: var(--office-border);
+  border-radius: 0;
+  box-shadow: var(--office-shadow);
+}
+
+.office-game__dock.office-game__agentControlDock {
+  right: 0;
+  left: auto;
+}
+
+.office-game .warroom,
+.office-game .agent-control {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--office-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+}
+
+.warroom__tabs {
+  display: flex;
+  gap: var(--office-s2);
+  border-bottom: var(--office-border);
+  padding-bottom: var(--office-s2);
+}
+
+.warroom__tab {
+  background: transparent;
+  border: 0;
+  color: var(--office-muted);
+  padding: 4px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.warroom__tab.is-active {
+  color: var(--office-ink);
+  border-bottom: 2px solid var(--office-accent);
+}
+
+.warroom__section {
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  padding: var(--office-s2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.warroom__sectionTitle,
+.agent-control__sectionTitle {
+  margin: 0;
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--office-muted);
+}
+
+.warroom__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+  align-items: center;
+}
+
+.warroom__input {
+  flex: 1 1 10rem;
+  min-width: 0;
+  background: var(--office-void);
+  color: var(--office-ink);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.warroom__picker {
+  display: flex;
+  gap: var(--office-s2);
+  align-items: center;
+}
+
+.warroom__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.warroom__list--scroll {
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.warroom__list li {
+  padding: 3px 0;
+  border-bottom: 1px dashed color-mix(in srgb, var(--office-muted) 35%, transparent);
+}
+
+.warroom__chip {
+  display: inline-block;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+  margin-left: 6px;
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+}
+
+.warroom__muted,
+.agent-control__muted {
+  color: var(--office-muted);
+}
+
+.warroom__state,
+.agent-control__state {
+  padding: var(--office-s2);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  color: var(--office-muted);
+}
+
+.warroom__state--error,
+.agent-control__state--error {
+  color: #ff9d9d;
+  border-color: #7f2b2b;
+}
+
+.warroom__sessionHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s2);
+}
+
+.warroom__dissent {
+  margin: 0;
+  color: #facc15;
+}
+
+.warroom__danger,
+.agent-control__danger {
+  border-color: #7f2b2b;
+  color: #ff9d9d;
+}
+
+.warroom__counts {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+/* -------------------------------------------------------------------------
+   TOWER DIRECTORY (War Room "Roles & floors" -> 100-floor navigator)
+   A vertical, wing-grouped index over the real floor templates. It is a
+   navigation layer, not a 3D scene: bands are flat rows with a pixel-ish
+   elevator rail, active floors carry the ok accent, dormant floors are
+   dimmed/dashed. The list and detail sit side by side when the dock is wide
+   enough and wrap to a single column when it is not.
+   ------------------------------------------------------------------------- */
+.office-game .tower {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  min-height: 0;
+}
+
+.tower__summary {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__honesty {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__empty {
+  padding: var(--office-s2);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+  align-items: flex-start;
+  min-height: 0;
+}
+
+.tower__scroll {
+  flex: 1 1 18rem;
+  min-width: 0;
+  max-height: 30rem;
+  overflow: auto;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+}
+
+.tower__wing {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tower__wingHead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--office-s2);
+  padding: 2px 4px;
+  background: var(--office-void);
+  border-bottom: var(--office-border);
+}
+
+.tower__wingName {
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.tower__wingCount {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  white-space: nowrap;
+}
+
+.tower__stack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tower__floor {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--office-s2);
+  width: 100%;
+  padding: 3px 6px;
+  text-align: left;
+  color: var(--office-ink);
+  cursor: pointer;
+  font: inherit;
+  background: color-mix(in srgb, var(--office-plate) 55%, transparent);
+  border: var(--office-border);
+  border-left: 3px solid var(--office-line-strong);
+  border-radius: 2px;
+}
+
+.tower__floor.is-active {
+  border-left-color: var(--office-ok);
+}
+
+.tower__floor.is-dormant {
+  opacity: 0.72;
+  border-left-style: dashed;
+}
+
+.tower__floor.is-selected,
+.tower__floor:focus-visible {
+  outline: 1px solid var(--office-accent);
+  outline-offset: 1px;
+  background: color-mix(in srgb, var(--office-accent) 16%,
+    var(--office-plate));
+}
+
+.tower__index {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__floorName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--office-fs-sm);
+}
+
+.tower__floorMeta {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  white-space: nowrap;
+}
+
+.tower__floorState {
+  color: var(--office-muted);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__floor.is-active .tower__floorState,
+.tower__detail.is-active .tower__floorState {
+  color: var(--office-ok);
+}
+
+.tower__detail {
+  flex: 1 1 16rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--office-s2);
+  background: color-mix(in srgb, var(--office-ground) 70%, transparent);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+}
+
+.tower__detail--empty {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__detailHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s2);
+}
+
+.tower__detailTitle {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+}
+
+.tower__detailRows {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tower__detailRow {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--office-s2);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__detailLabel {
+  color: var(--office-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__detailValue {
+  color: var(--office-ink);
+  overflow-wrap: anywhere;
+}
+
+.tower__detailNote {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__close {
+  margin-left: auto;
+  padding: 1px 8px;
+  color: var(--office-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--office-fs-xs);
+  background: transparent;
+  border: var(--office-border);
+  border-radius: 2px;
+}
+
+.tower__close:hover,
+.tower__close:focus-visible {
+  color: var(--office-ink);
+  border-color: var(--office-accent);
+}
+
+/* The visible replacement for the removed outline: colour alone is not a
+   focus indicator for a keyboard user, so a real ring is drawn. */
+.tower__close:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
+}
+
+/* Room scene: DOM/CSS only. One selected floor paints rooms; the 99 other
+   floors stay flat directory bands, so a 100-floor payload is never 100
+   canvases. Cells are drawn as a 16x12 grid via gradients; desk slots are the
+   only per-seat nodes. */
+.tower__scene {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: var(--office-border);
+}
+
+.tower__sceneHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px var(--office-s2);
+}
+
+.tower__sceneTitle {
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.tower__sceneMeta {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__sceneSource {
+  margin-left: auto;
+  color: var(--office-muted);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__rooms {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: var(--office-s2);
+}
+
+.tower__room {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px;
+  background: color-mix(in srgb, var(--office-plate) 45%, transparent);
+  border: var(--office-border);
+  border-left: 3px solid var(--office-ok);
+  border-radius: 2px;
+}
+
+.tower__room.is-dormant {
+  opacity: 0.76;
+  border-left-style: dashed;
+  border-left-color: var(--office-line-strong);
+}
+
+.tower__roomHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+}
+
+.tower__roomName {
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+}
+
+.tower__roomArchetype {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  text-transform: lowercase;
+}
+
+.tower__roomHead .tower__floorState {
+  margin-left: auto;
+}
+
+.tower__roomMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tower__cells {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 4px;
+}
+
+.tower__cell {
+  position: relative;
+  width: 100%;
+  min-height: 4.5rem;
+  overflow: hidden;
+  background-color: color-mix(in srgb, var(--office-void) 70%,
+    var(--office-ground));
+  background-image:
+    linear-gradient(to right,
+      color-mix(in srgb, var(--office-line-strong) 55%, transparent) 1px,
+      transparent 1px),
+    linear-gradient(to bottom,
+      color-mix(in srgb, var(--office-line-strong) 55%, transparent) 1px,
+      transparent 1px);
+  background-size: calc(100% / 16) calc(100% / 12);
+  border: var(--office-border);
+  border-radius: 2px;
+}
+
+.tower__cellLabel {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  color: var(--office-muted);
+  font-size: 0.55rem;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+}
+
+.tower__desk {
+  position: absolute;
+  display: block;
+  min-width: 4px;
+  min-height: 3px;
+  background: color-mix(in srgb, var(--office-plate) 85%, var(--office-ink));
+  border: 1px solid color-mix(in srgb, var(--office-line-strong) 80%,
+    transparent);
+  border-radius: 1px;
+}
+
+.tower__desk.is-occupied {
+  background: var(--office-ok);
+  border-color: var(--office-ok);
+}
+
+.tower__deskInitial {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--office-void);
+  font-size: 0.42rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.tower__occupants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 var(--office-s2) var(--office-s1);
+}
+
+.tower__occupant {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 12rem;
+  padding: 1px 6px 1px 3px;
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+  background: color-mix(in srgb, var(--office-ok) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--office-ok) 55%, transparent);
+  border-radius: 999px;
+}
+
+.tower__occupantInitial {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 2px;
+  color: var(--office-void);
+  font-size: 0.5rem;
+  font-weight: 700;
+  background: var(--office-ok);
+  border-radius: 999px;
+}
+
+.tower__occupantEmoji {
+  font-size: 0.65rem;
+  line-height: 1;
+}
+
+.tower__occupantName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tower__occupancy {
+  display: grid;
+  gap: var(--office-s1);
+  padding: var(--office-s2);
+  border: 1px solid color-mix(in srgb, var(--office-line-strong) 70%,
+    transparent);
+  border-radius: 2px;
+}
+
+.tower__occupancySummary {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__unplaced {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.tower__unplacedTitle {
+  flex-basis: 100%;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.tower__unplacedAgent {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  max-width: 100%;
+  padding: 1px 6px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  border: 1px dashed color-mix(in srgb, var(--office-line-strong) 80%,
+    transparent);
+  border-radius: 999px;
+}
+
+.tower__unplacedReason {
+  color: var(--office-warn, var(--office-muted));
+  font-size: 0.55rem;
+}
+
+.tower__unplacedMore,
+.tower__unplacedNone {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__room.is-dormant .tower__desk {
+  opacity: 0.55;
+}
+
+.tower__sceneNote {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.tower__emptyRooms {
+  padding: var(--office-s2);
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  border: 1px dashed var(--office-line-strong);
+  border-radius: 2px;
+}
+
+@media (max-width: 520px) {
+  .tower__floor {
+    grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  }
+
+  .tower__floorState {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .tower__detailRow {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}
+
+.agent-control__section {
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  padding: var(--office-s2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.agent-control__kv {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: var(--office-s2);
+  font-size: var(--office-fs-xs);
+}
+
+.agent-control__field {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr);
+  gap: var(--office-s2);
+  align-items: center;
+  font-size: var(--office-fs-xs);
+}
+
+.agent-control__field .agent-control__error {
+  grid-column: 2;
+}
+
+.agent-control__input {
+  min-width: 0;
+  background: var(--office-void);
+  color: var(--office-ink);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  padding: 4px 6px;
+  font: inherit;
+}
+
+.agent-control__error {
+  color: #ff9d9d;
+  font-size: var(--office-fs-xs);
+}
+
+.agent-control__permRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  font-size: var(--office-fs-xs);
+}
+
+.agent-control__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1 1 100%;
+}
+
+.agent-control__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0 6px;
+}
+
+.agent-control__chip button {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1;
+}
+
+.agent-control__dirty {
+  color: #facc15;
+  font-size: var(--office-fs-xs);
+}
+
+.agent-control__k {
+  color: var(--office-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agent-control__v {
+  color: var(--office-ink);
+  overflow-wrap: anywhere;
+}
+
+.agent-control__audit {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 12rem;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.agent-control__auditRow {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px dashed color-mix(in srgb, var(--office-muted) 35%, transparent);
+  padding-bottom: 3px;
+}
+
+.agent-control__auditAction {
+  color: var(--office-ink);
+}
+
+.agent-control__auditMeta {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.agent-control__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+}
+
+.agent-control__picker {
+  display: flex;
+  gap: var(--office-s2);
+  align-items: center;
+}
+
+
+/* -------------------------------------------------------------------------
+   ETSY CONNECTION (OAuth status + connect)
+   A Qubit-shell dock using the same head/button/panel styles as Approvals and
+   War Room. It only styles the shell; the vendored office document is not
+   touched. "Connected" is a state the backend proves, never a local guess.
+   ------------------------------------------------------------------------- */
+.office-game__dock.office-game__etsyDock {
+  right: 0;
+  left: auto;
+}
+
+.office-game .etsy-connect {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--office-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+}
+
+.etsy-connect__state {
+  color: var(--office-muted);
+  margin: 0;
+}
+
+.etsy-connect__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--office-s2);
+}
+
+.etsy-connect__label {
+  color: var(--office-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--office-fs-xs);
+}
+
+.etsy-connect__pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: var(--office-border);
+  border-radius: 999px;
+  font-size: var(--office-fs-xs);
+  font-weight: 700;
+}
+
+.etsy-connect__pill--connected {
+  border-color: var(--office-ok);
+  color: var(--office-ok);
+}
+
+.etsy-connect__pill--expired,
+.etsy-connect__pill--error {
+  border-color: var(--office-warn);
+  color: var(--office-warn);
+}
+
+.etsy-connect__pill--authorization_required,
+.etsy-connect__pill--not_configured {
+  border-color: var(--office-muted);
+  color: var(--office-muted);
+}
+
+.etsy-connect__hint,
+.etsy-connect__meta,
+.etsy-connect__notice {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  line-height: 1.5;
+}
+
+.etsy-connect__notice {
+  color: var(--office-ink);
+}
+
+.etsy-connect__error {
+  padding: var(--office-s2);
+  border: 1px solid var(--office-warn);
+  color: var(--office-warn);
+  font-size: var(--office-fs-xs);
+}
+
+.etsy-connect__actions {
+  display: flex;
+  gap: var(--office-s2);
+}
+
+.etsy-connect__primary {
+  border-color: var(--office-accent);
+  color: var(--office-accent);
+}
+
+.etsy-connect__secondary {
+  color: var(--office-muted);
+}
+
+.etsy-connect__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  border-top: var(--office-border);
+  padding-top: var(--office-s2);
+}
+
+.etsy-connect__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.etsy-connect__connected {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+}
+
+/* -------------------------------------------------------------------------
+   APPROVALS (shared journal)
+   The pending records the CLI/voice/banner settle, in the same shell dock
+   system as Agents/HUD/War Room. It is an exclusive right-hand sheet so it
+   can never cover another dock; the injected menu icon carries a live count
+   badge. Nothing here styles the vendored Habblaud document.
+   ------------------------------------------------------------------------- */
+.office-game__dock.office-game__approvalsDock {
+  right: 0;
+  left: auto;
+}
+
+.office-game__approvalsCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--office-accent);
+  color: var(--office-void);
+  font-size: var(--office-fs-xs);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.office-game .approvals-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--office-s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+}
+
+.approvals-panel__head {
+  display: flex;
+  align-items: center;
+  gap: var(--office-s2);
+  border-bottom: var(--office-border);
+  padding-bottom: var(--office-s2);
+}
+
+.approvals-panel__title {
+  margin: 0;
+  flex: 1 1 auto;
+  font-size: var(--office-fs-md);
+  font-weight: 600;
+}
+
+.approvals-panel__count {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  white-space: nowrap;
+}
+
+.approvals-panel__closeRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.approvals-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+}
+
+.approvals-panel__row {
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  padding: var(--office-s2);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: color-mix(in srgb, var(--office-plate) 22%, transparent);
+}
+
+.approvals-panel__summary {
+  margin: 0;
+  color: var(--office-ink);
+  font-size: var(--office-fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s1) var(--office-s2);
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.approvals-panel__tool {
+  color: var(--office-accent);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__chip {
+  display: inline-flex;
+  gap: 2px;
+  padding: 1px 6px;
+  border: var(--office-border);
+  border-radius: 999px;
+  font-size: var(--office-fs-xs);
+}
+
+.approvals-panel__chipKey {
+  color: var(--office-muted);
+}
+
+.approvals-panel__chipValue {
+  color: var(--office-ink);
+}
+
+.approvals-panel__chip[data-testid="approval-risk"][data-value="high"],
+.approvals-panel__chip[data-testid="approval-risk"][data-value="critical"] {
+  border-color: var(--office-bad);
+  color: var(--office-bad);
+}
+
+.approvals-panel__idLine {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.approvals-panel__id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color: var(--office-dim);
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+}
+
+.approvals-panel__approve {
+  border-color: var(--office-ok);
+}
+
+.approvals-panel__reject {
+  border-color: var(--office-bad);
+}
+
+.approvals-panel__empty,
+.approvals-panel__status {
+  margin: 0;
+  padding: var(--office-s3) 0;
+  color: var(--office-muted);
+}
+
+.approvals-panel__error,
+.approvals-panel__actionError {
+  border: 1px solid var(--office-bad);
+  border-radius: var(--office-radius);
+  padding: var(--office-s2);
+  color: var(--office-bad);
+  overflow-wrap: anywhere;
+}
+
+.approvals-panel__error p,
+.approvals-panel__actionError p {
+  margin: 0;
+}
+
+.approvals-panel__code {
+  margin-top: var(--office-s1);
+  font-size: var(--office-fs-xs);
+  opacity: 0.85;
+}
+
+.approvals-panel__notice {
+  margin: 0;
+  color: var(--office-ok);
+  font-size: var(--office-fs-xs);
+}
+
+/* The pending-count badge on the injected/host menu icon. */
+.office-theme-menu-btn {
+  position: relative;
+}
+
+.office-menu-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  border-radius: 999px;
+  background: var(--office-bad);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.office-menu-badge[hidden] {
+  display: none;
+}
+
+/* The system preference is honoured separately from the in-game setting, so a
+   player cannot save a preference that overrides their OS. The shell also
+   mirrors it to `data-office-reduced-motion`, which is what the token file
+   uses for components that read CSS variables instead of a media query.
+   CRITICAL CUES ARE TEXT: `office-game__connection` and the live announcer
+   stay visible/announced with motion reduced; no status depends on movement. */
+@media (prefers-reduced-motion: reduce) {
+  .office-game,
+  .office-game *,
+  .office-game[data-office-reduced-motion="1"],
+  .office-game[data-office-reduced-motion="1"] * {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.office-game[data-office-reduced-motion="1"],
+.office-game[data-office-reduced-motion="1"] * {
+  transition-duration: 1ms !important;
+  animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
 }

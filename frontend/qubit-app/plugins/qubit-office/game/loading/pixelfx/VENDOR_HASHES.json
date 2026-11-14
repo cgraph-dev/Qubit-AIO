@@ -1,0 +1,75 @@
+{
+  "upstream": "https://github.com/patch-gg/pixelfx",
+  "commit": "044e12a45dc9cc312cec50ee606dfc98afe5adc2",
+  "version": "0.3.1",
+  "license": "MIT",
+  "authored_locally": [
+    "core/index.js"
+  ],
+  "files": [
+    {
+      "path": "core/actor.js",
+      "sha256": "5c867a24a88e93520d020b77190f12db265eb8fc357136ce3d92de05e19e63c2"
+    },
+    {
+      "path": "core/color.js",
+      "sha256": "4e63f3074df7c1e138f721959858d12e4f6ccc2bf4f8e98c576efbae51241e54"
+    },
+    {
+      "path": "core/font.js",
+      "sha256": "c094f1d3a9f94478a255f1cc81aa7ccd2c2ba7a97fc1227a29d268acc1f2ec7c"
+    },
+    {
+      "path": "core/fx.js",
+      "sha256": "a959c5f7b1c15ba8e07cb26e5b1ccc0bce0aef54ca14cf01f9d6e794cf4e5a0b"
+    },
+    {
+      "path": "core/math.js",
+      "sha256": "da45e1ed43f7d119dd80fbe97c7de2b35b4ea95dea8781671c296ee5942ac0bc"
+    },
+    {
+      "path": "core/painter.js",
+      "sha256": "5b8ada6a25cdf1e63ae3684cc56276c61306558dc0a3a827a6a39ab038f74681"
+    },
+    {
+      "path": "core/sim.js",
+      "sha256": "517febe05b72de9d07e3596c019b9bb01e1f97a74089a30fa80e9e98849ba4b0"
+    },
+    {
+      "path": "fx/weather/_lib.js",
+      "sha256": "21ef7ecb43876b21d64e12126db7735d879ed6cdf119a8b17ce1cc0970ce8b84"
+    },
+    {
+      "path": "fx/weather/clouds.js",
+      "sha256": "c418c2f58555efb1a658e000f7c4af59c5e09218c41ee26996275a1259e489cb"
+    },
+    {
+      "path": "fx/weather/fog.js",
+      "sha256": "947b1fc98ec068e1041736417f52c68be336e70aad5288aa9c22ba12ec680ec0"
+    },
+    {
+      "path": "fx/weather/god-rays.js",
+      "sha256": "fc9782d584a0be0f46f8f54633e9cf83aedb9ed89366383afa099ca2ef611cdb"
+    },
+    {
+      "path": "fx/weather/rain.js",
+      "sha256": "af054eb7622571dc63e765026c764d81bf17bd9f3d2ebdf6564d9b574ba0ee63"
+    },
+    {
+      "path": "fx/weather/snow.js",
+      "sha256": "b2ec9fc21e2793183bb92a0a1a54c64f9e7581c1c556cfd1830288d8559d6203"
+    },
+    {
+      "path": "fx/weather/storm.js",
+      "sha256": "830efedfb8710f024642ecffdbe92adde79a3014124e81bd7a40799389b12e64"
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "0a77565a50c3462831244452f129c38d2adc4fd07897cbeba8adc943f958604e"
+    },
+    {
+      "path": "NOTICE.md",
+      "sha256": "d12932473f98b1a3f0b5820ae23d568b52e39294ba7c2d60c0649a93a808af3b"
+    }
+  ]
+}

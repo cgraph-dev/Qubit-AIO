@@ -385,15 +385,15 @@
     },
     {
       "path": "index.html",
-      "sha256": "ce7e36de5894bd815de214f8610f332c00a0ddbb24e617388aa178226cea1cd7",
-      "bytes": 2815
+      "sha256": "f020cae0ba989cbc27225eb85d7920ab71fe2515df2ed5b955970958c6099e87",
+      "bytes": 2796
     },
     {
       "path": "manifest.webmanifest",
-      "sha256": "76872f4f54bebce7b48dc746ac851caa0a6dd35e5d5d1b0b1736b5ad48449539",
-      "bytes": 818
+      "sha256": "68832bb7086ebb7ccda414de3646b523e93f7dd9cf333d82204be603a3c4c345",
+      "bytes": 820
     }
   ],
-  "total_bytes": 2149580,
+  "total_bytes": 2149563,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }

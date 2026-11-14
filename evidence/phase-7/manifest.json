@@ -1,0 +1,72 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-7/P7-01-actions.json": "b6d60be807c7e84684ecf8180c72dc7d29523556e8533c66566c790f2a505650",
+    "evidence/phase-7/P7-02-consequences.json": "f2861f91fd1cd71da26ed2e8d9ee9bf3d849048e1afb6d3513ed584997689136",
+    "evidence/phase-7/P7-03-mature-policy.json": "3da6998481c5dc3d3fdc986d11bacb960c5c2af1e1907872801a157aaa01a941",
+    "evidence/phase-7/P7-04-fx.json": "4f770e12d5dc40de4471c658ab3c110843554a8cffc78349c0499e65f66a4bba",
+    "evidence/phase-7/P7-05-outside-life.json": "d82676967e2979c0aeea0b58c0cef68bec22c637aba529cd46c750e29a9b7fba",
+    "evidence/phase-7/P7-06-simulation-replay.json": "0e7a07b199a3b1803f4fda590f7151c0a3632baefdf5f59dbca529246c9968e6"
+  },
+  "evidence_verification": {
+    "checked": 6,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T14:43:38Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured",
+    "mature content remains off by default; only policy/consent/HR/label checks were exercised, not mature rendering",
+    "simulation/FX/replay are hermetic and do not render a live canvas or produce external side effects",
+    "replay divergence is digest-based; a semantic error shared by recorder and replayer would not be caught"
+  ],
+  "phase": 7,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_simulation_actions.py --json",
+      "evidence": [
+        "evidence/phase-7/P7-01-actions.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P7-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_consequences.py --json",
+      "evidence": [
+        "evidence/phase-7/P7-02-consequences.json",
+        "evidence/phase-7/P7-03-mature-policy.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P7-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase7_fx",
+      "evidence": [
+        "evidence/phase-7/P7-04-fx.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P7-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_outside_life.py --json",
+      "evidence": [
+        "evidence/phase-7/P7-05-outside-life.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P7-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_simulation_replay.py --json",
+      "evidence": [
+        "evidence/phase-7/P7-06-simulation-replay.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P7-06"
+    }
+  ]
+}

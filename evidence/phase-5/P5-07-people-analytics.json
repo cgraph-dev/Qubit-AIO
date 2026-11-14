@@ -1,0 +1,118 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_legal_people_analytics.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "      \"ok\": true\n    },\n    {\n      \"detail\": \"signed_version_id=cver_wrong\",\n      \"name\": \"planted_wrong_signed_version_detected\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 26,\n  \"failed\": [],\n  \"limitations\": [\n    \"hermetic throwaway SQLite; no live service, credential or network\",\n    \"signing is an in-system attestation, never a real or cryptographic signature\",\n    \"jurisdiction rules are stored data selected by effective date; this is not legal or tax advice\",\n    \"KPI freshness is measured against stored row timestamps on this host\"\n  ],\n  \"ok\": true,\n  \"schema\": \"qubit-office-legal-people-analytics-verification/1\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase5_legal_people tests/phase2_registry_sessions tests/test_business_os_foundation.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "...................................................................      [100%]\n67 passed in 5.71s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/legal.py voicebridge/business/people.py voicebridge/business/analytics.py scripts/verify_legal_people_analytics.py tests/phase5_legal_people",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/legal.py voicebridge/business/people.py voicebridge/business/analytics.py scripts/verify_legal_people_analytics.py tests/phase5_legal_people/conftest.py tests/phase5_legal_people/test_legal.py tests/phase5_legal_people/test_people.py tests/phase5_legal_people/test_analytics.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T06:04:53Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "29ee8214e93ee39cc08cfacc30f6451daa405d0732a44e5e4d0b76ca59f929a0"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "tests/phase2_registry_sessions/test_schema_v5.py",
+      "sha256": "0f86a58c4b15114fb8c6dba0b0367f99b511b6e42f2a6dde704f04d0e9bc28c5"
+    },
+    {
+      "path": "tests/test_business_os_foundation.py",
+      "sha256": "fd7f58fb97a996ca275c191ac260764990e218c0514fa1d7e0e2a92a134e2209"
+    }
+  ],
+  "limitations": [
+    "hermetic fixture only; no live HR/payment provider, credential or network call",
+    "procurement money is a local double-entry ledger row and an artifact receipt, never a real payment",
+    "KPI staleness uses the host clock against stored row timestamps; no external analytics provider is read",
+    "the shared docs/STATUS.md and the phase manifest are outside this lane's owned files",
+    "refresh failures: command 2 exited 1, expected 0"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/people.py",
+      "sha256": "22ddd66077dca1639bd9fd1fc5c2de8986a72c6a5c9adcaac8ee96bc741b8678"
+    },
+    {
+      "path": "voicebridge/business/analytics.py",
+      "sha256": "89c3cb0890c54583873b711c5ad25b8b0e43268d43631b2fb4d55681ed7568fb"
+    },
+    {
+      "path": "scripts/verify_legal_people_analytics.py",
+      "sha256": "bf263dde967efa0ae98fe74fa445c81cbdccf43995e5676f14ff8e39e57d6b34"
+    },
+    {
+      "path": "tests/phase5_legal_people/test_people.py",
+      "sha256": "8e1d35bd354f1aa94c22de035a7b67cfabb356b91d5dfa72a002365eebbf20ec"
+    },
+    {
+      "path": "tests/phase5_legal_people/test_analytics.py",
+      "sha256": "70ecc37abe9780c7971b864d757490e1733035e9d483cbf9c446ca68b3ad05fa"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P5-07"
+}

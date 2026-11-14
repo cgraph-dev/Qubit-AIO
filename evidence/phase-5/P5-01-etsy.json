@@ -1,0 +1,126 @@
+{
+  "task_id": "P5-01",
+  "status": "PASS",
+  "generated_at": "2026-11-14T05:59:47Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-ASSET-LEDGER.md",
+      "sha256": "37655553a16485df9fdbbebe5b6bb2fcc4badb54b4d7eeb7952cdf61124edc52"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/etsy_workflow.py",
+      "sha256": "3ba029b5073fa7f778827f459d1864c8f01eb35b1fb5dc81632f35a19a5f2146"
+    },
+    {
+      "path": "voicebridge/business/integration_tools.py",
+      "sha256": "bcaddeee808218c36f2cc87f42c00b8b329d8dd88035c2e2627f4f5c98a46a15"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "aa6722d69fd9a9e15701d7fc25453d66ec599d59e8ce6c7916028b9d0608a10d"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/models.py",
+      "sha256": "c2544c04416024d1ad45c4ec2ed8d933c6766d7727ccbd9dd61bef852cac8ddc"
+    },
+    {
+      "path": "voicebridge/integrations/etsy_auth.py",
+      "sha256": "e78b3e0d45b752299fc86130a5f4df946ca91b50878d45fceffff58f43c35dc8"
+    },
+    {
+      "path": "voicebridge/integrations/etsy.py",
+      "sha256": "9c7e6acf15824198e3745e6580d3c587ee80e5b4a3443c5184a794f744c5932f"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/etsy_operations.py",
+      "sha256": "dd2872e0548c7dfb5b72596d0161dac4514296911090758f45443cbd108e8907"
+    },
+    {
+      "path": "scripts/verify_etsy_operations.py",
+      "sha256": "1a53c3131052d250280469a7b9982cd7b0b225de7535116f1336456eedae85e6"
+    },
+    {
+      "path": "tests/phase5_etsy/conftest.py",
+      "sha256": "a17cca8fda1aa7c69812bf665c3c7d516f648c3f275d32f278a3830b4373a4ae"
+    },
+    {
+      "path": "tests/phase5_etsy/_etsy_ops_helpers.py",
+      "sha256": "93b0530ca536404a6ed74bb9a217071a6bf37c4617312c30167e7dd164af4872"
+    },
+    {
+      "path": "tests/phase5_etsy/test_etsy_operations.py",
+      "sha256": "a21709f7c95002f03fc277a3d007d1372931022be7327b3113e6b88712dca5ee"
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_etsy_operations.py --json",
+      "exit_code": 0,
+      "stdout_tail": "eipt\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"unknown_job_status=completed\",\n      \"name\": \"unknown_never_completed_without_receipt\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=etsy_approval_required\",\n      \"name\": \"no_publish_without_approval\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=etsy_paid_art_guard assets_before=1 assets_after=1\",\n      \"name\": \"paid_art_guard\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"events=18 hashes_ok=True\",\n      \"name\": \"events_replayable\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"other_artifacts=0 other_events=0 other_ledger=0\",\n      \"name\": \"tenant_isolation\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"injected_transport_calls=6\",\n      \"name\": \"injected_transport_only\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 24,\n  \"code\": null,\n  \"generated_at\": \"2026-11-14T05:59:39Z\",\n  \"limitations\": [\n    \"Hermetic seed only: a throwaway SQLite store built through the real services, not live Etsy data.\",\n    \"The provider is an injected in-memory transport; it is the only seam the adapter can reach. No real Etsy publish, OAuth token or network call is performed.\",\n    \"No paid art is read, copied or committed; the paid-art check is a typed refusal with a synthetic inline field.\",\n    \"This verifies the operations layer and its durable records, not the live Etsy dashboard, the Office renderer or a full release matrix.\"\n  ],\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"problems\": [],\n  \"schema\": \"qubit-office-etsy-operations-verification/1\",\n  \"seed\": {\n    \"business_id\": \"biz_01M7CA7NVVAVBHKYP73MSD76TS\",\n    \"listing_job_id\": \"job_01M7CA7NXJDHM88BNE56D3TEJD\",\n    \"no_approval_code\": \"etsy_approval_required\",\n    \"paid_code\": \"etsy_paid_art_guard\",\n    \"publish_calls\": 1,\n    \"refund_calls\": 1,\n    \"refund_job_id\": \"job_01M7CA7P46JAVMNTA4EN3V753S\",\n    \"tenant_id\": \"ten_01M7CA7NTT371V60FFQBXM31DG\"\n  },\n  \"store\": \"/tmp/qubit-etsy-ops-12pkz9r8/business.db\",\n  \"task_id\": \"P5-01\"\n}\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase5_etsy tests/test_etsy_listing_workflow.py tests/test_business_etsy_pilot.py",
+      "exit_code": 0,
+      "stdout_tail": "..................................                                       [100%]\n34 passed in 7.53s\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/etsy_operations.py scripts/verify_etsy_operations.py tests/phase5_etsy/",
+      "exit_code": 0,
+      "stdout_tail": "All checks passed!\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/etsy_operations.py scripts/verify_etsy_operations.py",
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    }
+  ],
+  "limitations": [
+    "Hermetic seed only: a throwaway SQLite store built through the real Business OS services, not live Etsy data.",
+    "The provider is an injected in-memory Etsy transport; no real OAuth token, publish, refund or network call is performed.",
+    "No paid art or raw pack is read, copied or committed; the paid-art check is a typed refusal with a synthetic inline field.",
+    "The verify script checks the operations layer and its durable records; it does not run the live Etsy dashboard, the Office renderer or a full matrix.",
+    "Completing a job from an unknown outcome requires an explicit reconciliation provider reference; this is exercised hermetically."
+  ]
+}

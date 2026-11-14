@@ -106,6 +106,9 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `PLAN.md` | Qubit PLAN — where the real plan lives, and the rules for claiming progress |
 | `PORT-PLAN.md` | PORT PLAN — closing the upstream gap in finishable chunks |
 | `POST_RESTART_VERIFICATION_2026-10-10.md` | Post-Restart Verification + Health Baseline — 2026-10-10 |
+| `QUBIT-BUSINESS-OS-FOUNDATION.md` | Qubit Business OS foundation — control-plane boundary, schema, state machines, next steps |
+| `QUBIT-ETSY-PILOT-PLAYBOOK.md` | Etsy digital-download pilot — niche, listing/SEO, pricing, policies, approvals, launch |
+| `QUBIT-PLATFORM-POLICY.md` | Platform policy — official APIs, publish/engagement rules, approvals, safe fallbacks |
 | `REBRAND-FILENAMES-PLAN.md` | Filename rebrand — scope and ordering (measured 2026-10-17) |
 | `REBRAND-SWEEP-PLAN.md` | Rebrand Sweep Plan — env/attr symbols HERMES_* → QUBIT_* |
 | `REBRAND-SWEEP-STATUS.md` | Rebrand sweep status — CORRECTED 2026-10-17 |
@@ -154,3 +157,21 @@ for f in docs/IDENTITY.md docs/DECISIONS.md docs/STATUS.md docs/ARCHITECTURE.md 
   printf '%-45s %s\n' "$f" "$(test -f "$f" && echo present || echo MISSING)"
 done
 ```
+
+| `QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md` | Departments, sessions, memory, interactions, builder, FX and implementation order |
+| `QUBIT-OFFICE-RESEARCH-GAPS.md` | External research — platform/security/business gaps and forgotten requirements |
+| `QUBIT-OFFICE-IDEA-LEDGER.md` | Idea ledger — every owner idea and its status |
+| `QUBIT-OFFICE-ASSET-LEDGER.md` | Asset and license ledger — packs, counts, use, redistribution rules |
+| `QUBIT-OFFICE-REPO-LEDGER.md` | Repository dependency ledger — commits, licenses, take/avoid, status |
+| `QUBIT-OFFICE-DOMAIN-CONTRACT.md` | Domain contract — entities, authority, invariants and projections |
+| `QUBIT-OFFICE-THREAT-MODEL.md` | Threat model — assets, actors, boundaries, threats, controls and gates |
+| `QUBIT-OFFICE-MANDATORY-CHECKLIST.md` | Mandatory 100% gate — OWASP, MCP, accessibility, observability, durability, privacy, scale |
+| `QUBIT-OFFICE-TRADING-DEPARTMENT.md` | Trading Department — crypto, meme coins, forex, risk, ledger, integrations and live gates |
+| `QUBIT-OFFICE-PHASE-0.md` | Phase 0 — durable engine decision, staging/replay, work items and exit gates |
+
+| `QUBIT-OFFICE-COMPLETE-PLAN.md` | Complete consolidated plan — every phase, gate, artifact and deferred item |
+| `QUBIT-OFFICE-PLAN-REVIEW.md` | Plan review — bugs, misconfigurations, MVP simplification and what to defer |
+| `QUBIT-OFFICE-PLAN-AUDIT-V10.md` | Architecture audit — 26+ bugs and corrections to phase dependencies, acceptance tests and governance |
+| `QUBIT-OFFICE-UI-CONTRACT.md` | Canonical UI implementation contract — layout, renderer, maps, panels, characters, accessibility, resources |
+| `QUBIT-OFFICE-IMPROVEMENTS-2026.md` | 2026 release/UI/map/scale review — improvements, budgets, problems and technical choices |
+| `QUBIT-OFFICE-BROWSER-REVIEW.md` | Browser comparison — other builders, bad practices, corrections and sources |

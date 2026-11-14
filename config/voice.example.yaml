@@ -241,6 +241,30 @@ agent_runtime:
   platform_toolsets: {}
 
 # ---------------------------------------------------------------------------
+# Etsy OAuth (Qubit Office Business OS — connection only)
+# The Office Etsy panel builds the authorization URL from these settings, then
+# exchanges the redirected code and stores the token under
+# $QUBIT_HOME/voice/state/integrations/etsy (0700 dirs, 0600 files). It never
+# lists, publishes, prices, refunds, messages or spends on its own; those stay
+# behind the existing approval gates.
+#
+# Leave client_secret empty in this file if you prefer the environment:
+#   QUBIT_ETSY_CLIENT_ID, QUBIT_ETSY_CLIENT_SECRET, QUBIT_ETSY_REDIRECT_URI
+# The redirect URI must exactly match the one registered with your Etsy app.
+# ---------------------------------------------------------------------------
+# etsy:
+#   client_id: ""
+#   client_secret: ""
+#   redirect_uri: "http://127.0.0.1:8890/qubit-office/etsy/callback"
+#   scopes:
+#     - shops_r
+#     - listings_r
+#     - transactions_r
+#     - profile_r
+#   # authorize_url: "https://www.etsy.com/oauth/connect"
+#   # token_url: "https://api.etsy.com/v3/public/oauth/token"
+
+# ---------------------------------------------------------------------------
 # Update source/channel policy (all optional; see docs/UPDATE.md).
 # The canonical resolver is voicebridge/update_channel.py; the git mechanism is
 # voicebridge/update_manager.py. Leave these unset to use the defaults below.

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://qubit.local/schema/office/room_style.schema.json",
+  "title": "Qubit Office room style recipe",
+  "description": "The shareable part of a room style: archetype, palette, references and a deterministic seed. No art, files or operator paths.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "archetype", "palette", "floor", "wall", "rug", "furniture_set",
+    "lighting", "shadow", "decor", "seed", "style_version"
+  ],
+  "properties": {
+    "archetype": { "type": "string", "minLength": 1 },
+    "palette": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "floor": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "wall": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "rug": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "furniture_set": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "lighting": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" },
+    "shadow": { "enum": ["shadowless", "black_shadow"] },
+    "decor": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$" }
+    },
+    "seed": { "type": "integer", "minimum": 0 },
+    "style_version": { "type": "integer", "minimum": 1 }
+  }
+}

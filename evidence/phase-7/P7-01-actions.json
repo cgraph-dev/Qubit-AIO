@@ -1,0 +1,102 @@
+{
+  "commands": [
+    {
+      "cmd": "scripts/verify_simulation_actions.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "   \"ok\": true\n    },\n    {\n      \"detail\": \"code=SIMULATION_CONSENT_REQUIRED\",\n      \"name\": \"consent_enforced\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"social up, stress down\",\n      \"name\": \"effects_change_state\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"friendship 15.0 -> 18.0\",\n      \"name\": \"relationship_change\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"mature actions rejected without opt-in\",\n      \"name\": \"mature_off_by_default\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"selected 'romance-private-encounter' with consent + approval\",\n      \"name\": \"mature_routing\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"no business-truth keys keys=['accepted', 'action_id', 'agent_id', 'animation', 'approval', 'attraction']\",\n      \"name\": \"no_business_truth\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"tick=200 revision=200 needs={'energy': 100.0, 'hunger': 90.0, 'thirst': 100.0, 'hygiene': 70.0, 'social': 100.0, 'stress': 0.0, 'focus': 100.0, 'morale': 100.0, 'health': 100.0}\",\n      \"name\": \"bounded_state\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 18,\n  \"counts_by_category\": {\n    \"career\": 4,\n    \"conflict\": 6,\n    \"needs\": 9,\n    \"risky\": 2,\n    \"romance\": 6,\n    \"social\": 7,\n    \"work\": 6\n  },\n  \"mature_action_count\": 10,\n  \"schema\": \"qubit-office-simulation-verification/1\",\n  \"status\": \"PASS\",\n  \"summary\": {\n    \"replay_digest\": \"b7cd550241541e9a8a726593568ec4f69d943edf060bb0b8f6a9fa322ffee286\",\n    \"romance_route\": \"romance-private-encounter\",\n    \"selected_action\": \"social-coffee\",\n    \"selected_score\": 27.25\n  }\n}\n"
+    },
+    {
+      "cmd": "-m pytest -q tests/phase7_actions tests/phase3_room_caps",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "...............................................                          [100%]\n47 passed in 0.44s\n"
+    },
+    {
+      "cmd": "-m ruff check voicebridge/business/simulation.py scripts/verify_simulation_actions.py tests/phase7_actions",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "-m py_compile voicebridge/business/simulation.py scripts/verify_simulation_actions.py tests/phase7_actions/test_simulation.py tests/phase7_actions/test_verify_script.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T14:31:06Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/room_capabilities.py",
+      "sha256": "f399d433a44ecba00aa2af7f50a6b84ed645135b390bf0de476092f31de81686"
+    },
+    {
+      "path": "voicebridge/business/roles.py",
+      "sha256": "fbfa9b6c02fd1a00a1ac6e913a39e04e1ccf9566a332d7de6c43365c54536899"
+    },
+    {
+      "path": "voicebridge/business/memory.py",
+      "sha256": "bb3041e0bc05c57010475a5917663360d69cc0a94f8a9712e9ad91a976d5b4a9"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/office/world/model.py",
+      "sha256": "a9c091ca013eb7318e42e6e01876f76ddb8b2a2bdf51726823549049399de39b"
+    },
+    {
+      "path": "voicebridge/office/world/outside_world.py",
+      "sha256": "8be5fa1bc43f8e8fec546cf4f84858659298d9da9f2614b36ee676d740b72f82"
+    }
+  ],
+  "limitations": [
+    "Simulation effects are declared simulation state only; they never write a business fact, ledger row, receipt or real HR record.",
+    "No live service, store, model, network or wall-clock was touched; all checks are hermetic and deterministic.",
+    "Mature content is catalogued but flagged and disabled by default; no explicit rendering or mature gameplay was exercised.",
+    "Selector scoring is a deterministic declared utility heuristic, not a claim of optimal or learned agent behaviour.",
+    "No full repository matrix was run (implementation-first cadence; the P7-01 focused gate is the scope)."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/simulation.py",
+      "sha256": "7e909da5d2e181b9c90ca6894af784cff3fcbd4101d08e0731d6f81100347edf"
+    },
+    {
+      "path": "scripts/verify_simulation_actions.py",
+      "sha256": "8e3d0916c165f17cee756aff9bc3bbeaa5afcd1a649f065bd939793a4dda6815"
+    },
+    {
+      "path": "tests/phase7_actions/test_simulation.py",
+      "sha256": "e5c7261d290a98740073f5a4d2e7de8d160d32f81daac97b562518b6818f3069"
+    },
+    {
+      "path": "tests/phase7_actions/test_verify_script.py",
+      "sha256": "c2b38606971d6313be906d1d763eb73b036deffabd9f4014f34f1ce60b06f4b3"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P7-01"
+}

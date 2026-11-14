@@ -1,0 +1,75 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_security tests/phase1_otel tests/test_business_redaction.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 0.96s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/secrets.py voicebridge/business/sandbox.py voicebridge/business/otel.py tests/phase1_security tests/phase1_otel",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/secrets.py voicebridge/business/sandbox.py voicebridge/business/otel.py tests/phase1_security/test_secrets_vault.py tests/phase1_security/test_sandbox_policy.py tests/phase1_otel/test_otel_instrumentation.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T03:25:12Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-MODEL.md",
+      "sha256": "8cb98c73ac6bcf6984eeef2cb38d12219630c85831dcd4f0ab839b9b94cdaa3a"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-TESTS.json",
+      "sha256": "a09c092fd538f3950072749e25ecb1b368aa35778a28887b25781ec5bcada55d"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    }
+  ],
+  "limitations": [
+    "The vault is a filesystem policy substrate, not a KMS/HSM; at-rest encryption and OS keychain integration are out of scope for Phase 1.",
+    "The sandbox module validates policy and argv; it does not itself create a container/namespace. A real isolation backend must still enforce the returned profile.",
+    "Egress checks are hermetic via an injected resolver; no live DNS/TLS/redirect was exercised in this phase.",
+    "File permissions were asserted on Linux only (0700 dirs, 0600 files).",
+    "No live service, credential, network or full matrix was used."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/secrets.py",
+      "sha256": "0de8f0520b397feb4b3fcfa0f79bc8b0f3a312f2b1cf798dd16c1e59cf2f8f55"
+    },
+    {
+      "path": "voicebridge/business/sandbox.py",
+      "sha256": "c4ec7c591b0daecaf51104e3465357e40aa14065f96007fb84f917f020d479e3"
+    },
+    {
+      "path": "tests/phase1_security/test_secrets_vault.py",
+      "sha256": "91d9376cdd758e2b41235d620e45124079853721a619df7d3b2b10ea819e9fe0"
+    },
+    {
+      "path": "tests/phase1_security/test_sandbox_policy.py",
+      "sha256": "c2007ecf2e635ed5513c7731f0c480cbdf0770e1b8fab32add4aa091e6efc743"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P1-07"
+}

@@ -1,0 +1,451 @@
+import { describe, expect, it, vi } from "vitest";
+import { createWarRoomPanel } from "./WarRoomPanel";
+import {
+  allByTestId, byTestId, createHarness, recordingFetch, respond, textOf,
+} from "./business-test-harness";
+
+const OVERVIEW = {
+  ok: true, schema: "qubit-office-business/1",
+  tenants: [{ tenant_id: "ten_1", name: "Acme", created_at: "",
+              businesses: [] }],
+  default_tenant_id: "ten_1", default_business_id: null,
+  counts: { tenants: 1 },
+};
+
+function session(over = {}) {
+  return {
+    session_id: "wrs_1", tenant_id: "ten_1", business_id: null,
+    title: "Printable planner", state: "owner_decision",
+    brief: { idea: "printable budget planner", niche: "printables" },
+    score: { demand: 8, effort: 4, risk: 3 },
+    dissent: [{ argument_id: "warg_2", role: "skeptic", stance: "oppose",
+                text: "ad costs may dominate" }],
+    owner_note: "", created_at: "2026-01-01", updated_at: "2026-01-01",
+    ...over,
+  };
+}
+
+function bundle(over: Record<string, unknown> = {}) {
+  return {
+    ok: true, schema: "qubit-office-business-warroom-bundle/1",
+    tenant_id: "ten_1", session: session(),
+    sources: [{ source_id: "wsrc_1", session_id: "wrs_1", kind: "note",
+                locator: "owner's own notes", title: "", status: "pending",
+                adapter: "", artifact_id: null, text: null, metadata: {},
+                created_at: "2026-01-01" }],
+    evidence: [{ evidence_id: "wev_1", session_id: "wrs_1",
+                 label: "ASSUMPTION", claim: "buyers want a planner",
+                 source_id: null, quote: "", metadata: {},
+                 created_at: "2026-01-01" }],
+    arguments: [
+      { argument_id: "warg_1", session_id: "wrs_1", round_no: 1,
+        role: "marketer", stance: "support", text: "Pinterest demand is real",
+        evidence_ids: [], created_at: "2026-01-01" },
+      { argument_id: "warg_2", session_id: "wrs_1", round_no: 1,
+        role: "skeptic", stance: "oppose", text: "ad costs may dominate",
+        evidence_ids: [], created_at: "2026-01-01" },
+    ],
+    experiments: [{ experiment_id: "wexp_1", session_id: "wrs_1",
+                    name: "Pin A/B", hypothesis: "saves predict sales",
+                    method: "two pins", success_metric: "saves",
+                    status: "planned", created_at: "2026-01-01" }],
+    decisions: [], tasks: [],
+    ...over,
+  };
+}
+
+function backend(overrides: {
+  decision?: () => Response | Promise<Response>;
+} = {}) {
+  let current = bundle();
+  let sessions = [current.session];
+  const { calls, impl } = recordingFetch((call) => {
+    const path = new URL(call.url).pathname;
+    if (path.endsWith("/overview")) return respond(200, OVERVIEW);
+    if (path.endsWith("/directory")) {
+      return respond(200, {
+        ok: true, schema: "qubit-office-business-directory/1",
+        departments: [{ id: "revenue", title: "Revenue", description: "",
+                        service_lines: ["crm"] }],
+        roles: Array.from({ length: 132 }, (_, i) => ({
+          id: `role-${i}`, department: "revenue", title: `Role ${i}`,
+          mission: "", responsibilities: [], skills: [], toolsets: [],
+          data_scopes: [], permissions: [], budget: {}, autonomy: "L2",
+          approvals: [], schedule: "manual", kpis: [], escalation: "",
+          model: { provider_hint: "p", model_hint: "m" }, sop_refs: [],
+          memory_refs: [], human_owner: "owner", service_lines: [],
+          active_by_default: true,
+        })),
+        floors: Array.from({ length: 100 }, (_, i) => {
+          const wings = ["north", "east", "south", "west", "central"];
+          const wing = wings[Math.floor(i / 20)];
+          return {
+            floor_id: `floor-${String(i + 1).padStart(3, "0")}`,
+            index: i + 1, wing,
+            name: `${wing[0].toUpperCase()}${wing.slice(1)} Wing · `
+              + `Floor ${String(i + 1).padStart(3, "0")}`,
+            department_ids: ["revenue"], role_ids: ["role-0"],
+            room_count: 3, desk_capacity: 24,
+            active_by_default: i < 22, max_rooms: null, max_agents: null,
+            expansion_allowed: true,
+          };
+        }),
+        counts: { departments: 1, roles: 132, floors: 100,
+                  active_floors: 22, dormant_floors: 78, wings: 5 },
+      });
+    }
+    if (path.endsWith("/decisions")) {
+      if (overrides.decision) return overrides.decision();
+      const decision = { decision_id: "wdec_1", session_id: "wrs_1",
+                         status: "approved", decided_by: "owner",
+                         note: "ship it", created_at: "2026-01-02" };
+      current = bundle({
+        session: session({ state: "approved" }),
+        decisions: [decision],
+      });
+      sessions = [current.session];
+      return respond(200, { ok: true, created: true, decision });
+    }
+    if (path.endsWith("/sources")) {
+      return respond(200, { ok: true, created: true, source: {
+        source_id: "wsrc_2", session_id: "wrs_1", kind: "note",
+        locator: "more notes", title: "", status: "pending", adapter: "",
+        artifact_id: null, text: null, metadata: {}, created_at: "2026-01-02",
+      } });
+    }
+    if (path.endsWith("/evidence")) {
+      return respond(200, { ok: true, created: true, evidence: {
+        evidence_id: "wev_2", session_id: "wrs_1", label: "INFERENCE",
+        claim: "demand is plausible", source_id: null, quote: "",
+        metadata: {}, created_at: "2026-01-02",
+      } });
+    }
+    if (path.endsWith("/tasks")) {
+      current = bundle({
+        session: session({ state: "tasks_created" }),
+        decisions: current.decisions,
+        tasks: [{ task_id: "task_1", tenant_id: "ten_1",
+                  business_id: "biz_1", title: "draft layouts",
+                  status: "open", assigned_to: null,
+                  created_at: "2026-01-02", updated_at: "2026-01-02",
+                  metadata: {} }],
+      });
+      return respond(200, { ok: true, tasks: current.tasks });
+    }
+    if (path.endsWith("/warroom/sessions")) {
+      return respond(200, { ok: true, tenant_id: "ten_1", sessions });
+    }
+    if (path.includes("/warroom/sessions/")) {
+      return respond(200, current);
+    }
+    return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+  });
+  return { calls, impl };
+}
+
+async function mount(impl: typeof fetch, onClose = vi.fn()) {
+  const h = createHarness();
+  const Panel = createWarRoomPanel(h.React as never, h.hooks as never);
+  h.mount(Panel as never, { base: "", fetchImpl: impl, onClose });
+  await h.settle();
+  return { h, onClose };
+}
+
+describe("War Room renders durable rows", () => {
+  it("shows intake sources, evidence labels, debate/dissent, synthesis and decision", async () => {
+    const { impl } = backend();
+    const { h } = await mount(impl);
+    expect(byTestId(h, "warroom")).toHaveLength(1);
+    expect(textOf(byTestId(h, "warroom-session-head")[0]))
+      .toContain("Printable planner");
+    expect(allByTestId(h, "warroom-source")).toHaveLength(1);
+    expect(byTestId(h, "warroom-source")[0].props["data-status"]).toBe("pending");
+    expect(byTestId(h, "warroom-evidence-item")[0].props["data-label"])
+      .toBe("ASSUMPTION");
+    expect(allByTestId(h, "warroom-argument")).toHaveLength(2);
+    expect(byTestId(h, "warroom-dissent")).toHaveLength(1);
+    expect(textOf(byTestId(h, "warroom-brief")[0])).toContain("planner");
+    expect(textOf(byTestId(h, "warroom-score")[0])).toContain("demand=8");
+    expect(byTestId(h, "warroom-approve")).toHaveLength(1);
+    expect(byTestId(h, "warroom-reject")).toHaveLength(1);
+  });
+
+  it("approves through the owner door and re-reads the record", async () => {
+    const { calls, impl } = backend();
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-approve")[0].props.onClick as () => void)();
+    await h.settle();
+    const post = calls.find((c) => c.method === "POST" && c.url.endsWith("/decisions"));
+    expect(post?.body.owner).toBe(true);
+    expect(post?.body.decision).toBe("approved");
+    expect(textOf(byTestId(h, "warroom-decision")[0])).toContain("approved");
+    expect(textOf(byTestId(h, "warroom-notice")[0])).toContain("recorded");
+    expect(byTestId(h, "warroom-create-tasks")).toHaveLength(1);
+  });
+
+  it("renders a typed refusal instead of a fake approval", async () => {
+    const { impl } = backend({
+      decision: () => respond(403, {
+        ok: false, code: "BUSINESS_OWNER_ONLY", detail: "owner only",
+      }),
+    });
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-approve")[0].props.onClick as () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-error")[0]))
+      .toContain("BUSINESS_OWNER_ONLY");
+    expect(byTestId(h, "warroom-notice")).toHaveLength(0);
+  });
+
+  it("shows the role/floor template directory without inventing agents", async () => {
+    const { impl } = backend();
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-tab-directory")[0].props.onClick as () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-directory-counts")[0]))
+      .toContain("132 roles");
+    expect(allByTestId(h, "warroom-role")).toHaveLength(132);
+    expect(allByTestId(h, "warroom-department")).toHaveLength(1);
+    // The flat list is replaced by the tower navigator, which receives the
+    // directory's own 100 floors (rendering is pinned by TowerNavigator tests).
+    const tower = byTestId(h, "warroom-tower");
+    expect(tower).toHaveLength(1);
+    expect((tower[0].props.floors as unknown[])).toHaveLength(100);
+    expect(new Set((tower[0].props.floors as Array<{ wing: string }>)
+      .map((item) => item.wing)).size).toBe(5);
+    // Templates are not agents: no roster/control record is rendered here.
+    expect(byTestId(h, "agent-control")).toHaveLength(0);
+  });
+
+  it("shows the directory loading state before the catalog resolves", async () => {
+    const { impl } = backend();
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-tab-directory")[0].props.onClick as () => void)();
+    h.flush();
+    expect(byTestId(h, "warroom-directory-loading")).toHaveLength(1);
+    await h.settle();
+    expect(byTestId(h, "warroom-directory-loading")).toHaveLength(0);
+    expect(byTestId(h, "warroom-tower")).toHaveLength(1);
+  });
+
+  it("renders a typed directory failure instead of an empty tower", async () => {
+    const { impl } = recordingFetch((call) => {
+      const path = new URL(call.url).pathname;
+      if (path.endsWith("/overview")) return respond(200, OVERVIEW);
+      if (path.endsWith("/warroom/sessions")) {
+        return respond(200, { ok: true, tenant_id: "ten_1", sessions: [] });
+      }
+      if (path.endsWith("/directory")) {
+        return respond(500, { ok: false, code: "BUSINESS_DIRECTORY_FAILED",
+                              detail: "registry unavailable" });
+      }
+      return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+    });
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-tab-directory")[0].props.onClick as () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-error")[0]))
+      .toContain("BUSINESS_DIRECTORY_FAILED");
+    expect(byTestId(h, "tower-navigator")).toHaveLength(0);
+  });
+
+  it("closes through the host's callback", async () => {
+    const onClose = vi.fn();
+    const { impl } = backend();
+    const { h } = await mount(impl, onClose);
+    (byTestId(h, "warroom-close")[0].props.onClick as () => void)();
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("empty store is named and the first idea creates the local scope", async () => {
+    let created = false;
+    const emptyOverview = {
+      ok: true, schema: "x", tenants: [], default_tenant_id: null,
+      default_business_id: null, counts: { tenants: 0 },
+    };
+    const { calls, impl } = recordingFetch((call) => {
+      const path = new URL(call.url).pathname;
+      if (path.endsWith("/overview")) {
+        return respond(200, created ? OVERVIEW : emptyOverview);
+      }
+      if (path.endsWith("/warroom/sessions") && call.method === "POST") {
+        created = true;
+        return respond(200, { ok: true, created: true, tenant_id: "ten_1",
+                              session: session({ state: "intake" }) });
+      }
+      if (path.endsWith("/warroom/sessions")) {
+        return respond(200, { ok: true, tenant_id: "ten_1",
+                              sessions: created ? [session({ state: "intake" })] : [] });
+      }
+      if (path.includes("/warroom/sessions/")) {
+        return respond(200, bundle({ session: session({ state: "intake" }) }));
+      }
+      return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+    });
+    const { h } = await mount(impl);
+    expect(textOf(byTestId(h, "warroom-empty")[0])).toContain("No Business OS tenant");
+    const input = byTestId(h, "warroom-new-title")[0];
+    (input.props.onInput as (e: unknown) => void)({ target: { value: "First idea" } });
+    h.flush();
+    (byTestId(h, "warroom-new-create")[0].props.onClick as () => void)();
+    await h.settle();
+    const post = calls.find((c) => c.method === "POST" && c.url.endsWith("/warroom/sessions"));
+    expect(post?.body.owner).toBe(true);
+    expect(post?.body.title).toBe("First idea");
+    expect(textOf(byTestId(h, "warroom-session-head")[0])).toContain("Printable planner");
+  });
+});
+
+describe("Etsy pilot action", () => {
+  const PILOT_TITLE = "Etsy digital shop pilot";
+
+  function pilotBackend(fail = false) {
+    let created = false;
+    return recordingFetch((call) => {
+      const path = new URL(call.url).pathname;
+      if (path.endsWith("/overview")) return respond(200, OVERVIEW);
+      if (path.endsWith("/warroom/etsy-pilot")) {
+        if (fail) {
+          return respond(400, {
+            ok: false, code: "BUSINESS_RESEARCH_NOT_CONFIGURED",
+            detail: "the remote research provider is disabled by default",
+          });
+        }
+        created = true;
+        return respond(200, {
+          ok: true, schema: "qubit-office-business-warroom-etsy-pilot/1",
+          tenant_id: "ten_1", business_id: null, created: true,
+          session: session({ title: PILOT_TITLE, state: "owner_decision" }),
+          playbook_id: "etsy-digital-downloads", source_ids: ["wsrc_1"],
+          evidence_ids: ["wev_1"], experiment_names: ["Niche demand check"],
+          research_provider: "local-deterministic",
+        });
+      }
+      if (path.endsWith("/warroom/sessions")) {
+        return respond(200, {
+          ok: true, tenant_id: "ten_1",
+          sessions: created
+            ? [session({ title: PILOT_TITLE, state: "owner_decision" })]
+            : [],
+        });
+      }
+      if (path.includes("/warroom/sessions/")) {
+        return respond(200, bundle({
+          session: session({ title: PILOT_TITLE, state: "owner_decision" }),
+        }));
+      }
+      return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+    });
+  }
+
+  it("starts the pilot, opens the created session and says what did not happen", async () => {
+    const { calls, impl } = pilotBackend();
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-etsy-pilot")[0].props.onClick as () => void)();
+    await h.settle();
+
+    const post = calls.find((c) => c.method === "POST"
+      && c.url.endsWith("/warroom/etsy-pilot"));
+    expect(post?.body.owner).toBe(true);
+    expect(textOf(byTestId(h, "warroom-session-head")[0])).toContain(PILOT_TITLE);
+    expect(byTestId(h, "warroom-session-head")[0].props["data-session-state"])
+      .toBe("owner_decision");
+    expect(textOf(byTestId(h, "warroom-notice")[0])).toContain("recorded");
+  });
+
+  it("renders a typed pilot refusal instead of a fake session", async () => {
+    const { impl } = pilotBackend(true);
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-etsy-pilot")[0].props.onClick as () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-error")[0]))
+      .toContain("BUSINESS_RESEARCH_NOT_CONFIGURED");
+    expect(byTestId(h, "warroom-session-head")).toHaveLength(0);
+    expect(byTestId(h, "warroom-notice")).toHaveLength(0);
+  });
+});
+
+describe("Perplexity research action", () => {
+  function researchBackend(fail = false) {
+    let current = bundle({ session: session({ state: "research" }) });
+    const { calls, impl } = recordingFetch((call) => {
+      const path = new URL(call.url).pathname;
+      if (path.endsWith("/overview")) return respond(200, OVERVIEW);
+      if (path.endsWith("/research")) {
+        if (fail) {
+          return respond(400, {
+            ok: false, code: "BUSINESS_RESEARCH_NOT_CONFIGURED",
+            detail: "PERPLEXITY_API_KEY is not configured",
+          });
+        }
+        current = bundle({
+          session: session({ state: "research" }),
+          sources: [
+            ...bundle().sources,
+            { source_id: "wsrc_research", session_id: "wrs_1", kind: "url",
+              locator: "https://source.test/planners",
+              title: "Planner market report", status: "extracted",
+              adapter: "perplexity", artifact_id: null, text: "planners sell",
+              metadata: { research_provider: "perplexity" },
+              created_at: "2026-01-02" },
+          ],
+          evidence: [
+            ...bundle().evidence,
+            { evidence_id: "wev_research", session_id: "wrs_1", label: "FACT",
+              claim: "Printable planners sell on Etsy.",
+              source_id: "wsrc_research", quote: "", metadata: {},
+              created_at: "2026-01-02" },
+          ],
+        });
+        return respond(200, {
+          ok: true, schema: "qubit-office-business-warroom-research/1",
+          provider: "perplexity", query: "do planners sell",
+          query_digest: "d", created: true,
+          source_ids: ["wsrc_research"], evidence_ids: ["wev_research"],
+          sources: current.sources, evidence: current.evidence,
+        });
+      }
+      if (path.endsWith("/warroom/sessions")) {
+        return respond(200, {
+          ok: true, tenant_id: "ten_1", sessions: [current.session],
+        });
+      }
+      if (path.includes("/warroom/sessions/")) return respond(200, current);
+      return respond(404, { ok: false, code: "NOT_FOUND", detail: call.url });
+    });
+    return { calls, impl };
+  }
+
+  it("runs the owner-gated Perplexity action and refreshes the sources", async () => {
+    const { calls, impl } = researchBackend();
+    const { h } = await mount(impl);
+    const input = byTestId(h, "warroom-research-query")[0];
+    (input.props.onInput as (e: unknown) => void)(
+      { target: { value: "do planners sell" } });
+    h.flush();
+    (byTestId(h, "warroom-research-perplexity")[0].props.onClick as
+      () => void)();
+    await h.settle();
+
+    const post = calls.find((c) => c.method === "POST"
+      && c.url.endsWith("/research"));
+    expect(post?.body.owner).toBe(true);
+    expect(post?.body.provider).toBe("perplexity");
+    expect(post?.body.query).toBe("do planners sell");
+    expect(textOf(byTestId(h, "warroom-notice")[0])).toContain("Research");
+    expect(allByTestId(h, "warroom-source")).toHaveLength(2);
+    expect(allByTestId(h, "warroom-evidence-item")
+      .some((item) => item.props["data-label"] === "FACT")).toBe(true);
+  });
+
+  it("renders a typed research refusal and no fake evidence", async () => {
+    const { impl } = researchBackend(true);
+    const { h } = await mount(impl);
+    (byTestId(h, "warroom-research-perplexity")[0].props.onClick as
+      () => void)();
+    await h.settle();
+    expect(textOf(byTestId(h, "warroom-error")[0]))
+      .toContain("BUSINESS_RESEARCH_NOT_CONFIGURED");
+    expect(byTestId(h, "warroom-notice")).toHaveLength(0);
+  });
+});

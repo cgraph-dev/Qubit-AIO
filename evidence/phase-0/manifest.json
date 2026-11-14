@@ -1,0 +1,103 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-0/P0-01-contract.json": "a7e05199e678b86358824d74b7efe79df80b4a2d669d566a036c804567a24471",
+    "evidence/phase-0/P0-02-domain-contract.json": "7bda012f7bc2154c5062fb827a5039c075b3df774c0b665e854f3c49d1a3a024",
+    "evidence/phase-0/P0-03-asset-ledger.json": "58ab308e6eeebbdad63e09b236f18ab0ee7c2faa7694eab9f5dec30482f1f141",
+    "evidence/phase-0/P0-04-dependency-ledger.json": "c814f0c40daf8dfbed4e5a48f969401c3bb4170adffc3cf1be1bc0f426a2578e",
+    "evidence/phase-0/P0-05-threat-catalog.json": "25ab9c14d4bd69a6f1f9af032bdaf320f02760e87dee703d584524e0c31a58ba",
+    "evidence/phase-0/P0-06-stage-replay.json": "7ef53972cbbbad367eb34cd114676f0f0ca74cc844a97609afdb83ff87ee4cf7",
+    "evidence/phase-0/P0-07-campus.json": "3973c2b70f5f39980e95bef25fa13c5bc15f5e58f061db8f19e40cf23742eaec",
+    "evidence/phase-0/P0-08-renderer-benchmark.json": "48e279704e7ea4b63369187ed1f01ab60fcb8742311144ff97749e4d5f69538f",
+    "evidence/phase-0/P0-09-durable-substrate.json": "1a7384aa5bac9ae83b92313cd6a2758e0762f46058e3638bb018ce574dc6072d"
+  },
+  "evidence_verification": {
+    "checked": 9,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T14:41:24Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured"
+  ],
+  "phase": 0,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "office_phase0_contract (write) ; office_phase0_contract --check ; verify_doc_citations",
+      "evidence": [
+        "evidence/phase-0/P0-01-contract.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/validate_domain_contract.py --json",
+      "evidence": [
+        "evidence/phase-0/P0-02-domain-contract.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/office_asset_ledger.py --source /home/trick/Desktop/UI Office --out /tmp/qoffice-acceptance.FB8GYi/asset-manifest.json --check",
+      "evidence": [
+        "evidence/phase-0/P0-03-asset-ledger.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-03"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/validate_dependency_ledger.py --json",
+      "evidence": [
+        "evidence/phase-0/P0-04-dependency-ledger.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_threat_catalog.py tests/office_contracts/test_threat_denials.py",
+      "evidence": [
+        "evidence/phase-0/P0-05-threat-catalog.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/stage_replay.py --fixture synthetic-department --no-network --json --work-root /tmp/qoffice-acceptance.FB8GYi/stage",
+      "evidence": [
+        "evidence/phase-0/P0-06-stage-replay.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-06"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/generate_campus_fixture.py --check",
+      "evidence": [
+        "evidence/phase-0/P0-07-campus.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-07"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/office_benchmark_renderer.py --json",
+      "evidence": [
+        "evidence/phase-0/P0-08-renderer-benchmark.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-08"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/durable_substrate",
+      "evidence": [
+        "evidence/phase-0/P0-09-durable-substrate.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P0-09"
+    }
+  ]
+}

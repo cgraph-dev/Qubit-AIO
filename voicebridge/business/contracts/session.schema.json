@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "qubit.office/session.schema.json",
+  "title": "Session (frozen v1)",
+  "description": "Durable owner<->agent lane. Archiving a session with unfinished work creates an explicit handoff rather than silently dropping it. Workspace, checkpoint and policy revision are pinned so a resumed session knows exactly what it was doing.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "session_id": { "$ref": "#/$defs/Id" },
+    "agent_id": { "$ref": "#/$defs/Id" },
+    "owner_id": { "$ref": "#/$defs/Id" },
+    "participants": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "principal_type": { "enum": ["owner", "agent", "system"] },
+          "principal_id": { "$ref": "#/$defs/Id" },
+          "role": { "type": ["string", "null"], "maxLength": 64 }
+        },
+        "required": ["principal_type", "principal_id"]
+      }
+    },
+    "visibility": { "enum": ["private", "owner", "participants", "department", "office", "tenant"] },
+    "default_memory_scopes": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["agent", "session", "task", "department", "office", "tenant"] }
+    },
+    "default_workspace_id": { "$ref": "#/$defs/Id" },
+    "status": { "enum": ["active", "paused", "closed", "archived"] },
+    "last_checkpoint_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "current_policy_revision": { "type": "integer", "minimum": 1 },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" }
+  },
+  "required": [
+    "session_id",
+    "agent_id",
+    "owner_id",
+    "participants",
+    "visibility",
+    "default_memory_scopes",
+    "default_workspace_id",
+    "status",
+    "last_checkpoint_id",
+    "current_policy_revision"
+  ],
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{1,11}_[0-9A-HJKMNP-TV-Z]{26}$"
+    }
+  }
+}

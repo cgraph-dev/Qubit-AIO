@@ -1,0 +1,87 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_world tests/test_office_world_model.py tests/test_office_world_tower_plan.py tests/test_business_role_registry.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 81%]\n................                                                         [100%]\n88 passed in 2.28s"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/generate_campus_fixture.py --check",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "{\"check\": \"PASS\", \"counts\": {\"active_floors\": 23, \"cells\": 575, \"desks\": 3075, \"dormant_floors\": 77, \"floors\": 100, \"rooms\": 300, \"staffed_agents\": 0, \"wings\": 5}, \"digest\": \"915bc4eea30c989e1dc2eb48648a9e96be2789e306dd0c6855ae5aaedadcdaaa\", \"fixture_digest\": \"4533c2a2f6341f92b7373849d3471987996eeb17ff2478509051840868c7018a\"}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/validate_campus_schema.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "    \"rooms\": [\n      \"Trading Floor (Market Wall)\",\n      \"Strategy Lab\",\n      \"Risk Room\",\n      \"Data Room\",\n      \"Treasury / Accounting\",\n      \"Compliance / Archive\",\n      \"Incident Room\",\n      \"Reception\",\n      \"Kitchen / Break\",\n      \"Restrooms\",\n      \"Lounge\",\n      \"Boardroom\",\n      \"Focus Rooms\",\n      \"Head Office\",\n      \"Storage / Archive\",\n      \"Comms / Ops\"\n    ]\n  }\n}"
+    }
+  ],
+  "generated_at": "2026-11-14T04:54:18Z",
+  "inputs": [
+    {
+      "path": "voicebridge/business/role_catalog.py",
+      "sha256": "19dfdfb8bf4621e79ad608b51f019c806ff2957b72892eaeafd8c7d7bc796a75"
+    },
+    {
+      "path": "voicebridge/business/roles.py",
+      "sha256": "fbfa9b6c02fd1a00a1ac6e913a39e04e1ccf9566a332d7de6c43365c54536899"
+    },
+    {
+      "path": "voicebridge/office/world/tower_plan.py",
+      "sha256": "5d19979dd77e67e464dd8d0948570bcf62d265461faca93ba43d218f171c1ac9"
+    },
+    {
+      "path": "scripts/generate_campus_fixture.py",
+      "sha256": "44259089efc747b61297655cb0661271f7b6bd52541ed77fe8a52b87c446880a"
+    }
+  ],
+  "limitations": [
+    "The campus is a deterministic template projection: staffed_agents is 0 and no tenant, business or agent record is placed.",
+    "The Trading Department changes active floors 22 -> 23; 13 dormant expansion floors drop their generic focus room to keep rooms/cells/desks at 300/575/3075.",
+    "No live service, store, network or model was touched; no full matrix was run.",
+    "Not VERIFIED; this evidence covers P3-01 data only."
+  ],
+  "measurements": {
+    "counts": {
+      "active_floors": 23,
+      "cells": 575,
+      "desks": 3075,
+      "dormant_floors": 77,
+      "floors": 100,
+      "rooms": 300,
+      "staffed_agents": 0,
+      "wings": 5
+    },
+    "departments": 23,
+    "roles": 145,
+    "tower_digest": "d062f15d35e4d9413b3267d1ccd50303798b8201be1efc9b39cb5d30dd0b4fd2",
+    "trading_floor": "floor-023",
+    "trading_rooms": 16
+  },
+  "outputs": [
+    {
+      "path": "voicebridge/business/role_catalog.py",
+      "sha256": "19dfdfb8bf4621e79ad608b51f019c806ff2957b72892eaeafd8c7d7bc796a75"
+    },
+    {
+      "path": "voicebridge/office/world/tower_plan.py",
+      "sha256": "5d19979dd77e67e464dd8d0948570bcf62d265461faca93ba43d218f171c1ac9"
+    },
+    {
+      "path": "tests/phase3_world/test_campus_full.py",
+      "sha256": "5e670ddc9603254f96d71a2bf5c74ac33a29ec29d49df51a544b4bfa7eff5030"
+    },
+    {
+      "path": "tests/office_contracts/test_office_benchmark_renderer.py",
+      "sha256": "2eeea6555777f6d424c2afaedfc0fa1287a0576481103be8d7cea5e1ccf44aca"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P3-01"
+}

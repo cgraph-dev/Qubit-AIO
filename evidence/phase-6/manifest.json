@@ -1,0 +1,79 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-6/P6-01-character-studio.json": "13d146e64fa17f9232dcd9e936b40dd50c186e037227be6d51c9f8ed3343428b",
+    "evidence/phase-6/P6-02-room-builder.json": "33d95501909e9efb94aeb20d620e5eff41cf323187f9aa02b80fe795bc4904c7",
+    "evidence/phase-6/P6-03-outside-world.json": "4d3812fca6b38b183c134c72de2ca402b6d7810919f7894e8704b98ec048f268",
+    "evidence/phase-6/P6-04-panel-inventory.json": "cbeac58356c73cd888561b03b311d6256b44301ed645489aee081ed9b59091b8",
+    "evidence/phase-6/P6-05-accessibility.json": "72e49f1d5b5f6a72c4d36ee80fe5014bbc92d2856ade9a8bb8b05f4f8ee52e8e",
+    "evidence/phase-6/P6-06-asset-build.json": "4719fa9db0b5dd7851581476b5ae669e917798a40eb36dcd9e9166dce2cba303"
+  },
+  "evidence_verification": {
+    "checked": 6,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T14:43:32Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured",
+    "axe-core is not installed and there is no network; the accessibility audit is deterministic/structural, not an axe run, and no real screen-reader/zoomed/touch session was performed",
+    "the Character Studio, Room Builder, Outside World and Panel Inventory are mounted in the Studio dock but no live browser E2E was run",
+    "paid art was not read or committed; asset checks use metadata/manifest digests, not decoded pixels"
+  ],
+  "phase": 6,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_character_profile.py --json",
+      "evidence": [
+        "evidence/phase-6/P6-01-character-studio.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P6-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_room_builder.py --json",
+      "evidence": [
+        "evidence/phase-6/P6-02-room-builder.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P6-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_outside_world.py --json",
+      "evidence": [
+        "evidence/phase-6/P6-03-outside-world.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P6-03"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_panel_inventory.py --json",
+      "evidence": [
+        "evidence/phase-6/P6-04-panel-inventory.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P6-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/accessibility_audit.py --json",
+      "evidence": [
+        "evidence/phase-6/P6-05-accessibility.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P6-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_asset_build.py --json",
+      "evidence": [
+        "evidence/phase-6/P6-06-asset-build.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P6-06"
+    }
+  ]
+}

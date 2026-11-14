@@ -1,0 +1,76 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-5/P5-01-etsy.json": "fc465d7cf24bd65e99c57b1358a2e07374d1d7ab42e763cef33b7b0a8d566655",
+    "evidence/phase-5/P5-02-trading.json": "51ea14fb7f81685f1ca86a4e848267e8e144baf752bf1f5e719b9eb43cdb4082",
+    "evidence/phase-5/P5-03-crm-support.json": "959528d50519db747a6d5d7644ee927b359ab23b2f1b4f2e2639d79e0a933c23",
+    "evidence/phase-5/P5-04-marketing.json": "6a870e905774d2c164dfe820a1441924e874aa663f18132e3896de5e8867cc28",
+    "evidence/phase-5/P5-05-finance.json": "7bb295b9082a2125269bd9df5e8ac682d52cb0d90ea179fc82f4a899795c543e",
+    "evidence/phase-5/P5-06-legal.json": "dc637ae5892b85966843f96cd6910fb3481c958e2b884b9ed1247841247c68a2",
+    "evidence/phase-5/P5-07-people-analytics.json": "11fbcb650fe48b3ed65ca2ebda7efd51739806b3b311d240c00460c785b5aece",
+    "evidence/phase-5/P5-08-business-factory.json": "2da61cf9007d6b47f455fbdae32b471656b8698e1a0e051704df7f1bbe305758"
+  },
+  "evidence_verification": {
+    "checked": 8,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T14:43:16Z",
+  "git_head": "a6799d020dfe3d44d0da781f5d748ae65c1c6a68",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured",
+    "all external providers are injected/fake; no live Etsy/social/payment/bank/legal/HR/tax API, credentials, signatures or money movement",
+    "Trading is paper/testnet readiness only; live capital is a typed refusal without an owner risk-policy sign-off",
+    "no live outbound customer/social contact and no real marketplace publish; receipts are simulated"
+  ],
+  "phase": 5,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_etsy_operations.py --json",
+      "evidence": [
+        "evidence/phase-5/P5-01-etsy.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P5-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_trading_readiness.py --json",
+      "evidence": [
+        "evidence/phase-5/P5-02-trading.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P5-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_crm_marketing.py --json",
+      "evidence": [
+        "evidence/phase-5/P5-03-crm-support.json",
+        "evidence/phase-5/P5-04-marketing.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P5-03"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_finance_factory.py --json",
+      "evidence": [
+        "evidence/phase-5/P5-05-finance.json",
+        "evidence/phase-5/P5-08-business-factory.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P5-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_legal_people_analytics.py --json",
+      "evidence": [
+        "evidence/phase-5/P5-06-legal.json",
+        "evidence/phase-5/P5-07-people-analytics.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P5-06"
+    }
+  ]
+}

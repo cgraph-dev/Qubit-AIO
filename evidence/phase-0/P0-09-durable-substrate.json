@@ -1,0 +1,105 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/durable_substrate",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".......................                                                  [100%]\n23 passed in 1.70s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/durable_substrate tests/test_business_os_foundation.py tests/test_integration_tool_gateway.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "...........................................................              [100%]\n59 passed in 4.35s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/durable.py voicebridge/business/schema.py voicebridge/business/errors.py voicebridge/business/__init__.py tests/durable_substrate",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    }
+  ],
+  "generated_at": "2026-11-14T06:05:32Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-PHASE-0.md",
+      "sha256": "688028db6dfb6d64066735af5d5c9416e11c6db9daaf107c111501d1956661ef"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/models.py",
+      "sha256": "c2544c04416024d1ad45c4ec2ed8d933c6766d7727ccbd9dd61bef852cac8ddc"
+    }
+  ],
+  "limitations": [
+    "Prototype only: run/task records are the existing jobs.py machine; this adds checkpoints and an outbox, not a second scheduler or execution engine.",
+    "Temporal is explicitly deferred (docs/QUBIT-OFFICE-PHASE-0.md section 1); no Temporal adapter exists or is tested.",
+    "Single-process SQLite with BEGIN IMMEDIATE; concurrency is serialized by the store, not proven under multi-host contention.",
+    "Claiming is allowed only from pending. An unknown outcome must be reconciled (sent/dead) or explicitly marked dead; there is no automatic retry loop.",
+    "Workspace, lease-fencing and message records from the domain contract are not fully modelled here; only checkpoint/outbox plus the existing job lease are.",
+    "No network, no live QUBIT_HOME, no external provider call, no payment/email/CRM side effect; all tests use tmp_path SQLite files.",
+    "VERIFIED/COMPLETE/100% is not claimed; this is one Phase 0 work item with focused evidence, not a release gate."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/__init__.py",
+      "sha256": "fcc8a5e50b1a8e4ee16d2b07265b4dfb3472a126990ada4601544bff31368100"
+    },
+    {
+      "path": "tests/durable_substrate/test_checkpoint_resume.py",
+      "sha256": "db25d77260715eea6bdaa68823cb2727e5e5dc1533d7ff4618d50d91d21dc06a"
+    },
+    {
+      "path": "tests/durable_substrate/test_outbox_delivery.py",
+      "sha256": "38d1469e97e09d02c6196720e243e42e3960379acd3089328106cd7ecea3ea83"
+    },
+    {
+      "path": "tests/durable_substrate/test_lease_and_revoke.py",
+      "sha256": "6ffed3f6067945de79ca35eb38d6460c29e923c8549d555cc697cef7eb658f51"
+    },
+    {
+      "path": "tests/durable_substrate/test_recovery_restore.py",
+      "sha256": "1f1c7ea559facfd084fbc37aadb6913879bbe9552ae2cd551e0fe1846627a880"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P0-09"
+}

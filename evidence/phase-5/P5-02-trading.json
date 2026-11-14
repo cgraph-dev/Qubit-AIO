@@ -1,0 +1,129 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_trading_readiness.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_KILL_SWITCH_ENGAGED\",\n      \"name\": \"frozen_after_kill\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=TRADING_STALE_DATA\",\n      \"name\": \"stale_data_refused\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 32,\n  \"live_capital_touched\": false,\n  \"mode\": \"paper\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-trading-readiness/1\"\n}"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase5_trading tests/phase1_gateway",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "......................................................................   [100%]\n70 passed in 1.47s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/trading.py scripts/verify_trading_readiness.py tests/phase5_trading",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/trading.py scripts/verify_trading_readiness.py tests/phase5_trading/conftest.py tests/phase5_trading/test_backtest.py tests/phase5_trading/test_market_risk.py tests/phase5_trading/test_paper_oms.py tests/phase5_trading/test_ledger.py tests/phase5_trading/test_gates.py tests/phase5_trading/test_trading_verifier.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T06:08:52Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-TRADING-DEPARTMENT.md",
+      "sha256": "bb04243609531bb4a67d59621fb4928b6e42cb3d718dfdbf095ec22837dc8614"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "aa6722d69fd9a9e15701d7fc25453d66ec599d59e8ce6c7916028b9d0608a10d"
+    },
+    {
+      "path": "voicebridge/business/policy.py",
+      "sha256": "9627e3121929d90b1555b708a946425a738dadab18ad1c17a94c5d6f89379d62"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    }
+  ],
+  "limitations": [
+    "paper simulator only: no exchange API, no credentials, no network and no live order or withdrawal",
+    "live mode is a typed refusal without an owner risk-policy sign-off; even with a matching sign-off the only wired broker is the deterministic paper simulator (no live broker adapter exists)",
+    "the backtest fixture is synthetic; no historical survivorship/liquidity dataset is bundled and no returns are promised",
+    "daily-loss tracking uses in-process observed equity snapshots, not a persisted accounting-day boundary",
+    "unknown reconciliation uses an injected resolver; no live venue reconciliation API is exercised",
+    "no dashboard UI or voice wiring is covered; no full matrix was run",
+    "simulated fills are readiness evidence, not live trades, and are not financial advice",
+    "the evidence file itself and the phase manifest are outside this task's owned files"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/trading.py",
+      "sha256": "737fdd687a6f5b22d2d753466fdc106fca7c18e014aefee55e0587c2b4dca695"
+    },
+    {
+      "path": "scripts/verify_trading_readiness.py",
+      "sha256": "e3e0199136e221f29628b928911aebe1118bb7738ecbeb044051d6d960e7fffa"
+    },
+    {
+      "path": "tests/phase5_trading/conftest.py",
+      "sha256": "bc9618e59ebe3de8f803f8eaeeacf41625243523d4711657bbed78b3e1e88eab"
+    },
+    {
+      "path": "tests/phase5_trading/test_backtest.py",
+      "sha256": "0846bc9adabe3b70eb3d92591e84f7af60bb2050a82a96849d974d9c0da1c297"
+    },
+    {
+      "path": "tests/phase5_trading/test_market_risk.py",
+      "sha256": "a068684767c17166f3f9298d865eef9d2ac35ed13bb3769b44723146716300b9"
+    },
+    {
+      "path": "tests/phase5_trading/test_paper_oms.py",
+      "sha256": "00565e7cbb2858ac85b8e575c2999d5e9965b7ba4cf14c25df5bceb1c2f0d0dc"
+    },
+    {
+      "path": "tests/phase5_trading/test_ledger.py",
+      "sha256": "b74df239332c82a910f9393bf3790bb9385917a1d0426e75fe69e0f83c056a47"
+    },
+    {
+      "path": "tests/phase5_trading/test_gates.py",
+      "sha256": "ec539a4c5d736f2bcd59044210c68039bc859fb7b97d929d848e4b255a77c7ff"
+    },
+    {
+      "path": "tests/phase5_trading/test_trading_verifier.py",
+      "sha256": "9e7eeb314522a590fc227b779d8940b445808109caba6ee1419a4ab02602d90c"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P5-02"
+}

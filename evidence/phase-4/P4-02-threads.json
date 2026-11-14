@@ -1,0 +1,113 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_threads_delegation.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "OST\",\n      \"name\": \"lease_expiry_stops\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=BUSINESS_DELEGATION_NO_PROGRESS status=blocked\",\n      \"name\": \"no_progress_blocks\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=BUSINESS_DELEGATION_ATTEMPTS_EXCEEDED status=blocked\",\n      \"name\": \"retry_cap_blocks\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"v1=art_01M7C84BE0TG9TXYSTP9C4PMJ7 v2=art_01M7C84BG34WC4RGHKJSJXRB8F refusal=BUSINESS_DELEGATION_SINGLE_OWNER\",\n      \"name\": \"single_writer_and_immutable_versions\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"handoff=hnd_01M7C84BH5D0BTEYQY4ADCS8N0 artifacts=('art_01M7C84BG34WC4RGHKJSJXRB8F',)\",\n      \"name\": \"handoff_preserves_artifacts\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"delegate_repeat=False complete_repeat=False events=1\",\n      \"name\": \"idempotent_delegate_and_complete\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"code=ESCALATED_BLOCKED status=blocked\",\n      \"name\": \"escalation_blocks\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 18,\n  \"generated_at\": \"2026-11-14T05:22:52Z\",\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-threads-delegation-verification/1\"\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase4_threads_delegation tests/phase1_a2a_approvals tests/phase2_registry_sessions",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 7.17s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/threads.py voicebridge/business/delegation.py scripts/verify_threads_delegation.py tests/phase4_threads_delegation/test_threads.py tests/phase4_threads_delegation/test_delegation.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/threads.py voicebridge/business/delegation.py scripts/verify_threads_delegation.py tests/phase4_threads_delegation/test_threads.py tests/phase4_threads_delegation/test_delegation.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T05:22:52Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "voicebridge/business/a2a.py",
+      "sha256": "265874aa0dd95baad02f9e1c080eb7cdda7c00a1b91a6f15696d1316e79bbae1"
+    },
+    {
+      "path": "voicebridge/business/sessions.py",
+      "sha256": "d7e827c736997490c08e0c97f9ac96cc34fb3646a3ca6e3e95223560071e6b7a"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/ids.py",
+      "sha256": "1b60a89793cf78e9f93a351eeb34c979bb5d339a6d29de3fde3c992e70423ecc"
+    },
+    {
+      "path": "voicebridge/business/util.py",
+      "sha256": "d07c29e4b413bfa402c7052b532323a6321379581425ad17d61ca58857404933"
+    },
+    {
+      "path": "tests/phase1_a2a_approvals/test_a2a.py",
+      "sha256": "4f8c04cb19f125b50dbf78b1c73d75ddc67b9263089e0c5dc5c7577aa9b70738"
+    },
+    {
+      "path": "tests/phase2_registry_sessions/test_a2a_handoff.py",
+      "sha256": "3897d5c0045e5506d8f0601f4c0b03f0ace11ee9a1d7416e4ac482bbf10a8ebe"
+    },
+    {
+      "path": "tests/phase2_registry_sessions/test_sessions.py",
+      "sha256": "3e4ece49978d3c260e62e828605807270da8190b136ae0e0a3ca76207226af5e"
+    }
+  ],
+  "limitations": [
+    "threads are verified over the injected in-memory A2A test double; the authoritative durable event-log binding is a later integration lane",
+    "broadcast threads remain participant-scoped; no tenant-wide/global chat surface exists or is claimed",
+    "mention authorization is only as strong as the injected can_mention callback; no identity provider is exercised",
+    "no network, no live service, no credential and no UI surface is touched"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/threads.py",
+      "sha256": "ae33528e44155e547f22fd9a5d731786a8fcd004c5e187cdd5248e697c3d89ee"
+    },
+    {
+      "path": "tests/phase4_threads_delegation/test_threads.py",
+      "sha256": "435907b2c298b1a26163bdba0cc97e9e3e5334f225b86ae9a946626ed829bf79"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P4-02-threads"
+}

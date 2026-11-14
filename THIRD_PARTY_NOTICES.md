@@ -987,6 +987,26 @@ statement in distributions:
 > OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 > SOFTWARE.
 
+## Habblaud — Qubit Office vendored client (MIT)
+
+Qubit Office includes a modified build of the Habblaud client, vendored at
+`frontend/qubit-app/plugins/qubit-office/habblaud/` and served from
+`/plugin-apps/qubit-office/habblaud/`.
+
+- Upstream repository: https://github.com/marmottajr/habblaud
+- Upstream commit: `4ccce2537472fe5a8d432f06974494d2e778ff15` (v0.11.0)
+- Local source commit carrying Qubit changes:
+  `3303cc16545a585f43bec1a78b94c86f6f9f91a3`
+- Licence: MIT
+- Copyright (c) 2026 Márcio Junior
+
+The full MIT text ships beside the vendored tree at
+`frontend/qubit-app/plugins/qubit-office/habblaud/LICENSE` and in
+`PROVENANCE.json`. Qubit modifications are additive: the theme floor-surface
+provider plus the Qubit Office document/PWA labels and the English locale pin,
+applied by `scripts/vendor_habblaud.py`; the copyright holder is unchanged.
+The upstream server, Claude Code mod and Docker setup are not vendored.
+
 ## LimeZu — purchased office art (office UI upgrade)
 
 Owner-purchased pixel-art packs held outside the repository at

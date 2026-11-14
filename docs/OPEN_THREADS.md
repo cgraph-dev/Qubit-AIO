@@ -1,5 +1,191 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Phase 8 repo-wide matrix ran — release remains BLOCKED (2026-11-14, `feat/qoffice-next`):** The
+canonical root suite (`qubit_runtime/scripts/run_tests_parallel.py`, `tests/`, 6 workers) ran on frozen
+`864891f96` (tree `ba368148b`): **56 failing files + 1 error file**, so **no VERIFIED claim**. Triage:
+the 5 branch-only failures were fixed or classified — four were caused by operator paths embedded in
+my own acceptance/verifier scripts (now `$HOME`/generic), and `test_qbpv2_chat_transport.py` fails
+identically on the base (10 failures, live local Ollama, ~12 min). After the fixes, **no new Office
+failure remains**: all 53 remaining failing files reproduce at the base commit `47491b2e3` or are
+environmental. Evidence: `evidence/phase-8/final-matrix-repo.json`. The bounded Office feature matrix
+still PASSED on `e215be57c` (tree `0069d110e`). **Release blockers:** a green repo-wide matrix and the
+owner release decision record. No owner signature, `VERIFIED`, `COMPLETE`, or `100%` claim.
+
+**Qubit Office Phase 8 implementation complete — release BLOCKED on owner decision (2026-11-14, `feat/qoffice-next`, not merged):**
+P8-01..P8-04 are implemented and green; P8-05 release-evidence tooling correctly returns
+`READY_FOR_OWNER_DECISION`, and `scripts/acceptance/phase-8.sh` exits **2/BLOCKED** rather than
+faking a release. Delivered: deterministic 100-floor/3,075-desk/1,000-agent scale fixture with
+active-set caps (40/80), pathfinding/event budgets and honest `not_measured` GPU/heap fields
+(P8-01); a 21-row executable OWASP ASI01–10 + MCP matrix (PKCE/audience/redirect/state/replay/
+schema hash/allowlist/SSRF/sandbox/approval/A2A/kill switch; 21/21, 138 focused tests) (P8-02);
+encrypted snapshot/restore/tenant-replay/kill-switch/deployment-ring drills with measured RPO/RTO
+(P8-03); observability/evals + accessibility honesty + performance/device/context-loss matrices
+(P8-04); and release-evidence/decision + bounded Office feature-matrix tooling (P8-05). The bounded
+Office feature matrix **PASSED** on frozen `e215be57c` (tree `0069d110e`) over 59 targets; it is
+explicitly **not the repo-wide matrix**. **Remaining blockers:** owner release decision record
+(human), and for a `VERIFIED` verdict the repo-wide final matrix on a frozen SHA. No owner
+signature was fabricated; **no `VERIFIED`/`COMPLETE`/`100%`** is claimed.
+
+**Qubit Office Phase 7 interactions/FX/simulation accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-7.sh` exits 0 and writes `evidence/phase-7/manifest.json`
+(`status: PASS`) after accepted Phase 0–6 manifests. Five lanes: P7-01 needs/traits/relationships +
+a 40-action catalog with deterministic utility selection, preconditions/cooldowns/props/rooms,
+consent/mature routing and declared-only effects (18 checks, 25 tests); P7-02 consequence engine
+(effects bounded, simulation effects separated from authoritative HR/legal/business receipts,
+approval/consent for sensitive consequences, recovery paths, audit/dead-letter) and P7-03
+mature-content policy (off by default, owner per-department opt-in, consent/age/privacy/HR checks,
+fade-to-black, no real-world drug instructions, audit) (13 checks, 48 tests); P7-04 event-to-FX
+schema + pure client planner (priority/cancel/replay/dedupe, reduced-motion critical cues,
+disable-nonessential, typed asset fallback, no FX from empty events; 17 Python + 21 UI tests);
+P7-05 outside-life/weather/seasons/social graph projection from source events only (no fake
+activity, active-zone bounds, scoped social ACL; 13 checks, 30 tests); and P7-06 deterministic
+simulation replay/audit with typed divergence incidents, cancel/retention and no external side
+effects (14 checks, 57 tests). Two test-helper name collisions (`conftest` imports across dirs)
+were fixed by moving helpers to uniquely named modules. **Measured:** gates 0–7 PASS; broad
+business/office/world/UI/simulation regression **1164 passed**. **Honest limits:** mature content is
+off/default-gated and was not rendered; no live canvas/FX renderer; replay divergence is digest-based
+and cannot catch a semantic error shared by recorder and replayer; no full matrix, no `VERIFIED`.
+Next: Phase 8 scale/security/release/recovery and final evidence.
+
+**Qubit Office Phase 6 Character Studio/UI/world accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-6.sh` exits 0 and writes `evidence/phase-6/manifest.json`
+(`status: PASS`) after accepted Phase 0–5 manifests. Five lanes: P6-01 Character Studio adapters
+(Habblaud/LimeZu character/portrait projections, 23 verifier checks, 35 UI tests); P6-02 room
+builder/styles (draft→preview→validate→approve→publish/undo/rollback, 16×12 cells, paths/egress/
+collision/capacity, unique department style; 29 checks, 26 UI tests); P6-03 outside-world
+presentation (landmarks/lobby/elevators/weather/day-night, active-zone only) and P6-06 licence-aware
+asset build + local-first sync/conflict/export/exit (provenance required, paid-art leak scan, safe
+close); P6-04 a 21-panel inventory with authority/permissions/empty/error/retry/typed refusal/real
+action per panel; P6-05 WCAG 2.2 AA shell wiring (skip links, focus restore, live announcements,
+reduced-motion, 24px targets, reflow) plus a deterministic accessibility audit. The lead mounted a
+**Studio dock** (Panel Inventory / Room Builder / Outside World) in `OfficeAppShell`; the full
+Phase 6 UI suite is **199 passed**. **Measured:** gates 0–6 PASS; broad business/office/world/UI
+regression **1042 passed**. **Honest limits:** axe-core is unavailable offline (no axe run claimed),
+no real screen-reader/zoom/touch session, no live browser E2E; paid art was not read; the committed
+game bundle was not rebuilt; no full matrix, no `VERIFIED`. Next: Phase 7 interactions/FX/simulation.
+
+**Qubit Office Phase 5 business operations accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-5.sh` exits 0 and writes `evidence/phase-5/manifest.json`
+(`status: PASS`) after accepted Phase 0–4 manifests. Five lanes: P5-01 Etsy sandbox operations
+(niche/asset ref → draft → exact-intent approval → injected sandbox publish receipt → order/
+entitlement → support → refund → payout → balanced ledger/reconciliation; 24 verifier checks);
+P5-02 paper/testnet trading readiness (market snapshots, strategy registry, deterministic
+backtest with fees/slippage/no look-ahead, paper broker/OMS, risk veto/kill switch, double-entry
+portfolio; live capital is a typed refusal without owner sign-off; 32/32 checks); P5-03 CRM/consent/
+support (dedupe, suppression, single-owner leases, SLA/handoff, internal vs customer notes) and
+P5-04 marketing (draft → brand/legal check → exact-payload approval → sandbox receipt, rate
+limits, no fake engagement); P5-05 finance (balanced double-entry, provider idempotency, unknown →
+reconcile, refunds/chargebacks/payouts) and P5-08 multi-entity books/business factory (structure-only
+cloning, no inherited authority/budget/keys); P5-06 legal (versioned contracts/clauses, approval-for-
+signing, obligations/renewals, jurisdiction rules) and P5-07 people/procurement/analytics (lifecycle
+with immediate revocation, SoD, KPI drill-through, stale/unknown honesty). **Schema:** the 30
+module-owned legal/people/metric tables were moved into the single `schema.py` v6 migration; the
+modules now verify/no-op instead of owning DDL. A duplicate `test_verifier.py` basename was renamed
+to keep collection deterministic. **Measured:** gates 0–5 PASS; broad business/office/world/workforce
+regression **927 passed**. **Honest limits:** every external provider is injected/fake; no live
+Etsy/social/payment/bank/legal/HR/tax API, signatures or money movement; Trading is paper/testnet
+only; no full matrix. **Not done:** live deploy, `VERIFIED`. Next: Phase 6 Character Studio/styles/
+outside-world panels.
+
+**Qubit Office Phase 4 workforce/collaboration accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-4.sh` exits 0 and writes `evidence/phase-4/manifest.json`
+(`status: PASS`) after accepted Phase 0/1/2/3 manifests. Five lanes: P4-01 `workforce.py` provisions
+one durable session/workspace/task + explicit grants per agent, reports paused/revoked/archived/
+disconnected/unknown as non-working and seed agents as projection (18/18 verifier checks); P4-02
+`threads.py` (owner↔agent, room, direct; ordering/RYW, dedupe, offline replay, participant ACL,
+mention authorization) and P4-03 `delegation.py` (bounded depth/waves/handoffs/retries, no-progress,
+lease/fence loss stops effects, single-writer worktree/artifact versions); P4-04 `capability_runtime.py`
+routes model/tool/MCP/terminal/browser/files/messages/memory/connectors through the one ToolGateway
+with policy/egress/budget/approval checks, and P4-06 `safety.py` adds baseline/anomaly, quarantine,
+pause/stop/revoke/archive and an out-of-band kill switch over injected stoppers (13/13 verifier
+checks); P4-05 `memory_projection.py` builds department/office Obsidian MOCs, backlinks, ACL-filtered
+views, rebuild/export and `office/global|department|agent` OpenViking scopes; P4-07
+`operator_timeline.py` + `Timeline.tsx` project the causal run/task/tool/approval/artifact/receipt/
+reconciliation timeline with cost/evidence/unknown and replay-stubbed effects, mounted in the shell.
+**Measured:** gates 0–4 PASS; broad business/office/world/workforce regression **783 passed**;
+P4-07 UI Vitest **62 passed**. **Honest limits:** kill-switch stoppers are injected, not wired to
+live services; threads use the injected event-log seam; delegation worktrees are references; replay
+stubs effects; no live browser/PTY/OpenViking. **Not done:** live deploy, full matrix, `VERIFIED`.
+Next: Phase 5 business operations (Etsy, Trading paper/testnet, CRM/support, finance, legal,
+procurement, marketing, research).
+
+**Qubit Office Phase 3 campus/maps/shell accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-3.sh` exits 0 and writes `evidence/phase-3/manifest.json`
+(`status: PASS`) after accepted Phase 0/1/2 manifests. Five lanes: P3-01 full campus data with a
+Trading Department floor (100 floors / 5 wings / 300 rooms / 575 cells / 3,075 desks / 0 staffed;
+Trading `floor-023`, 16 rooms, 13 roles) + P3-03 versioned `qubit-office-map/1` with Tiled
+round-trip, strict validation and a publish/undo/rollback registry; P3-02 room capability manifests
+(77 manifests, 300/300 rooms covered, decorative room refused, Trading execution/risk/approval
+separation); P3-04 renderer-neutral floor/culling/LRU/dirty/context-loss contract + measured
+data-path budget verifier (GPU/heap explicitly `not_measured`); P3-05 command-center shell over a
+real read-only projection (search/roster/filters/inbox/deep links/semantic DOM) mounted in
+`OfficeAppShell` without breaking docks/menu; P3-06 outside-world data (6 zones / 20 chunks / 8
+portals / 15 assets) and P3-07 canonical `CharacterProfile` store (versioned revisions/rollback,
+paid-art guard, Habblaud/LimeZu projections) + Character Studio mounted in the Agent Control
+drawer. **Measured:** gates 0–3 PASS; broad business/office/world regression **677 passed**; Phase 3
+focused Python + UI suites green; Character Studio mount wiring pinned. **Known:** three
+shell-CSS assertions in `tests/test_office_game_shell.py` fail identically on base `c95366a3f` and
+are excluded from the gate; GPU frame/heap/live-browser metrics are not measured. **Not done:** live
+deploy, real browser/Phaser E2E, full matrix, `VERIFIED`. Next: Phase 4 full workforce/collaboration.
+
+**Qubit Office Phase 2 workforce/runtime accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-2.sh` exits 0 and writes `evidence/phase-2/manifest.json`
+(`status: PASS`) after checking accepted Phase 0/1 manifests. Five lanes: P2-01 agent registry +
+`AgentControlService.effective_profile` (explicit/inherited/effective/denied grants, skills as
+requirements, MCP schema hashes, model route/fallback) with schema v5; P2-02 durable
+sessions/workspaces/checkpoints/handoffs/recovery + P2-05 typed A2A handoff (recipient acceptance,
+ACL, no privilege inheritance); P2-03 `AgentBackend` adapter/registry + `DynamicCapabilityCatalog`
+(catalog sources, complete schema hashes, typed availability, `policy.compile_snapshot`);
+P2-04 event-log-authoritative memory with Obsidian projection, ACL/provenance/confidence/expiry,
+quarantine, supersede/delete/rebuild and an injected OpenViking adapter; P2-06 `TurnOrchestrator`
+(fake `ModelPort`, gateway-bound tool calls, approval-gated write, artifact/receipt/before-after
+checkpoints, `unknown` never completed, resume from validated checkpoint, step/tool limits);
+P2-07 effective-state projection + independent verifier + accessible panel mounted in the Agent
+Control drawer (read-only route). **Measured:** combined Phase 2+1+0 focused **521 passed**; broader
+business/office regression **475 passed**; P2-07 Vitest **9 passed**; verifier **16/16 checks**.
+**Honest limits:** no live model/provider/MCP/network; `NativeBackend` wiring to the runtime port is
+still the lead's step; memory recall is per single aggregate; approval postcondition validation and
+out-of-process isolation are not implemented; UI `tsc` still reports the 3 pre-existing
+PhaserSceneHost/phaser errors only. **Not done:** live deploy, real external effects, full matrix,
+`VERIFIED`. Next: Phase 3 full campus data/maps/renderer/shell.
+
+**Qubit Office Phase 1 execution boundary accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-1.sh` exits 0 and writes `evidence/phase-1/manifest.json` with
+`status: PASS` after checking the accepted Phase 0 manifest/contracts. Five integrated lanes:
+P1-01 identity (principals, RBAC+ABAC, deny-by-default, tenant/audience-bound sessions, step-up,
+immediate revocation) + P1-02 authoritative append-only event log/outbox/projection checkpoints +
+P1-04 task/workspace/lease records with single-writer/fencing/handoff (schema v4, additive); P1-03
+capability catalog + frozen policy snapshot and ToolGateway enforcement incl. execution-time
+approval payload binding; P1-05 typed A2A fabric (ACL, spoof/dup/replay/over-delegation refused)
+and P1-06 durable approvals bound to canonical normalized intent (approve A/execute B fails,
+edit/delegate/expiry); P1-07 secrets vault/sandbox/egress and P1-08 dependency-free OpenTelemetry
+GenAI trace seam (content capture off); P1-09 encrypted snapshot/verify/tenant-restore/replay with
+measured RPO/RTO; P1-10 hermetic reference lane owner → session → scoped context → read tool →
+owner-approved fake provider write → receipt/artifact → checkpoints → restart → `unknown` →
+reconciled `completed`, with one trace and no network. **Measured:** combined Phase 1+0 suite
+**426 passed**; broader business/office regression **306 passed**; phase gate focused suite green.
+**Honest limits:** identity evaluation is not yet wired into the gateway snapshot (a seam exists),
+approval postcondition validation and out-of-process sandbox/KMS/OTel exporters are not implemented,
+A2A defaults to the authoritative event-log adapter only in the reference lane, backup is
+single-process. **Not done:** live service/deploy, real external side effects, full matrix,
+`VERIFIED`. Next: Phase 2 agent runtime/sessions/memory/handoffs behind these contracts.
+
+**Qubit Office Phase 0 accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):** P0-01..P0-09
+are implemented with real evidence and the gate `bash scripts/acceptance/phase-0.sh` exits 0,
+writing `evidence/phase-0/manifest.json` with `status: PASS`. Five disjoint lanes were integrated:
+domain/event/agent/session/run JSON contracts + validator (P0-02); per-file asset ledger re-measured
+at **57,268 files / 904,388,468 bytes** with the stale 1,523/404 MB doc corrected (P0-03); approved
+dependency lock + validator (P0-04); OWASP ASI01–ASI10 + mandatory-gate threat catalog with real
+denial tests (P0-05); hermetic staged replay with a blocked network (P0-06); deterministic campus
+fixture **100 floors / 5 wings / 300 rooms / 575 cells / 3,075 desks / 0 staffed agents** (P0-07);
+honest data-path renderer benchmark selecting the pinned Phaser/Habblaud path (P0-08); and additive
+Business OS schema v3 (`bos_checkpoint`, `bos_outbox`) + recovery/reconciliation tests (P0-09).
+Combined focused set **203 passed**; new scripts ruff/compile clean. **Next:** Phase 1 — identity,
+event log/outbox, capability gateway, runs/leases/checkpoints, A2A, approval execution binding,
+secrets/sandbox/egress, OTel, backup/restore, then the P1-10 reference lane. **Not done:** no live
+service, no real external write, no full matrix, and **no `VERIFIED`/COMPLETE claim**; renderer GPU
+frames and the production pack licences remain unmeasured.
+
 **Controls artifact lane — 2026-11-11 (branch `feat/controls-artifact`, not merged):** `docs/generated/QUBIT_CONTROLS_E2E_2026-09-23.json` regenerated against a throwaway scratch dashboard on `:8892` with `--allow-live-mutations` (96 controls: 77 PASS / 3 GATED / 1 FAIL / 15 SKIP; the one FAIL is the `/skills` category-filter selector timeout, recorded honestly). The artifact test target pin was relaxed to `validate_target(artifact["target"])` so a scratch loopback port is valid (the mutating controls require one). Focused `test_controls_e2e_audit.py` + `test_controls_e2e_audit_gate9v.py` → **19 passed, 1 deselected**. No live service/config touched; no full matrix, no `VERIFIED`.
 
 **Live office theme deploy — 2026-11-10 (merged, live-verified):** All four lanes are merged through `integration/office-theme` and `main` (`0c5c3f79d`, audit guard `15e16f145`): `feat/office-habblaud-assets` (contains the theme shell), `feat/office-db-adopt` (automatic read-old adoption), `feat/office-ui-followup` (iframe dataset marker + non-overlapping dual docks), and `feat/office-classic-gate` (classic rollback proof). Live `:8890` serves `limezu`: marker present, 6 floor surfaces, 4 rooms / 10 agents, 0 tower 503s, dual docks 24 px apart with a clickable Agents Close, classic rollback verified by a live restart (inactive classic payload, no theme marker/style/URLs; provider tests pin procedural fallback) and then reverted to `limezu`. The tower 503 fix is `2f8a8f990`; the full evidence is in `docs/STATUS.md` (2026-11-10). Lifecycle: profile/webhook mutations in `scripts/controls_e2e_audit.py` now require `--allow-live-mutations`; the state.db FATAL was the live audit run, not a DB loss. **Open:** structural cgroup separation for agent PTYs/tests (recommended, not implemented); HUD dock occludes the office top-right Panels icons while open; the generated controls artefact `docs/generated/QUBIT_CONTROLS_E2E_2026-09-23.json` is absent; no full matrix, no `VERIFIED`.

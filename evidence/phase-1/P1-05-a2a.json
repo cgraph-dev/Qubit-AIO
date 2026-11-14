@@ -1,0 +1,76 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_a2a_approvals/test_a2a.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............                                                             [100%]\n12 passed in 0.28s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/a2a.py voicebridge/business/errors.py tests/phase1_a2a_approvals/test_a2a.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/a2a.py tests/phase1_a2a_approvals/test_a2a.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T04:21:22Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/contracts/event.schema.json",
+      "sha256": "e228c82f6b417c3057c381ea03e00b405789946f6d349936ee7a484374ceb394"
+    }
+  ],
+  "limitations": [
+    "the authoritative Business OS event log is not wired here; a2a.py is built behind the injected EventLog (append/read) protocol and InMemoryEventLog is a hermetic test double, not a product authority",
+    "payloads are stored inline in the injected log; the authoritative log may instead carry payload_ref and must preserve the same record fields",
+    "delivery state is folded from append-only receipt records; no message row is mutated, which is the shape the append-only event log requires",
+    "concurrency is delegated to the injected log append(); InMemoryEventLog is not thread-safe and is test-only",
+    "sender authentication is injected (authenticated_principal/verify_sender); no cryptographic message signature is implemented in this lane",
+    "retention is a logical dead-letter receipt, not physical deletion; a tombstone policy belongs to the event-log lane"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/a2a.py",
+      "sha256": "265874aa0dd95baad02f9e1c080eb7cdda7c00a1b91a6f15696d1316e79bbae1"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "tests/phase1_a2a_approvals/test_a2a.py",
+      "sha256": "4f8c04cb19f125b50dbf78b1c73d75ddc67b9263089e0c5dc5c7577aa9b70738"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P1-05"
+}

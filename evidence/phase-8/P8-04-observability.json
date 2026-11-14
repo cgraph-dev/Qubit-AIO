@@ -1,0 +1,99 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_observability.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "      \"frame_p95_ms\",\n      \"heap_mb\"\n    ],\n    \"kind\": \"performance\",\n    \"limitations\": [\n      \"GPU frame time, browser heap and event rates are NOT measured by this hermetic process; they stay not_measured unless --sample supplies a real browser measurement\",\n      \"the measured floor-projection timing is a Python data-path number, not a rendered frame time\",\n      \"the verifier exercises the projection/culling contract, not the vendored Habblaud client, a browser compositor or a GPU\",\n      \"no live service, state, credential or network is touched\"\n    ],\n    \"ok\": true,\n    \"sample_supplied\": false,\n    \"schema\": \"qubit-office-observability-matrix/1\",\n    \"source\": \"scripts/verify_renderer_budget.py\",\n    \"tier\": \"desktop\"\n  },\n  \"schema\": \"qubit-office-observability-verification/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P8-04\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_observability tests/phase1_otel tests/phase6_accessibility tests/phase3_renderer",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 6.01s"
+    },
+    {
+      "cmd": "ruff check voicebridge/business/observability.py scripts/verify_observability.py tests/phase8_observability",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/observability.py scripts/verify_observability.py tests/phase8_observability/*.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T15:15:53Z",
+  "inputs": [
+    {
+      "path": "voicebridge/business/otel.py",
+      "sha256": "8111c1674335704bd3764c856f9eb880b35e47a839df9c1b2545ec49bc956d8f"
+    },
+    {
+      "path": "scripts/accessibility_audit.py",
+      "sha256": "ab11272cc48c0fad5f7dac821691425843472efb98208b3d21ca1f7d1dccfcc4"
+    },
+    {
+      "path": "scripts/verify_renderer_budget.py",
+      "sha256": "3eb77e068758e0cb7bb09fe15e5cd429c4868c9c018166a5067e1f0a8a979520"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-floor.ts",
+      "sha256": "d9c55d0c590f55d3c1e7f60638ec47be08eb0088b8a4534ede4af06d2649614e"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-budget.ts",
+      "sha256": "c29e417c981f7023f393f29b97971aee1110417cbf5c25005aa80ee28e1f76c8"
+    }
+  ],
+  "limitations": [
+    "PASS covers the P8-04 contract checks only; it is not a VERIFIED release verdict.",
+    "accessibility is a static source/CSS audit: axe-core is not installed, no axe run was performed, and screen-reader (NVDA/VoiceOver/TalkBack), high-contrast, 200% zoom, touch and muted-audio reviews were NOT performed.",
+    "GPU frame time and browser heap are NOT measured; the only timing is the deterministic Python floor-projection data path, and frame/heap stay not_measured.",
+    "device tiers and context-loss/recovery are exercised by executing the shipped TypeScript renderer contract in node; no real WebGL context was lost and no GPU/browser was used.",
+    "evaluation regression is proven with deterministic probe evaluations, not a production eval dataset or judge calibration.",
+    "no live service, state, credential, browser or network was touched; no full matrix was run."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/observability.py",
+      "sha256": "f6455591670f98af236f9895dab702fa9b347c1cb735cfb4831ee5614ca14b0a"
+    },
+    {
+      "path": "scripts/verify_observability.py",
+      "sha256": "341de87293072df51babb3534f3be490e26cfd14c25d2f2fc1f80ebf152e83bd"
+    },
+    {
+      "path": "tests/phase8_observability/_p8_observability_helpers.py",
+      "sha256": "9250d62b9ad0e1681b55fe342ceba3215cef9ad5cf81b18c4fc2a185b727f1ef"
+    },
+    {
+      "path": "tests/phase8_observability/conftest.py",
+      "sha256": "e20a660b7d42fc50d8ad3f9f71f8942edf83b5c6e3b7df6f5abcdf74eb79e744"
+    },
+    {
+      "path": "tests/phase8_observability/test_eval_regression.py",
+      "sha256": "1e0357fbb193b2409e7f3b40f08aa8a888a101ec0bebe0517a293ac6a286b4df"
+    },
+    {
+      "path": "tests/phase8_observability/test_matrices.py",
+      "sha256": "8ad81d33ac28f7fd26c089ab99668f9e92ed5faed5e3e02f45a86d6af0d67638"
+    },
+    {
+      "path": "tests/phase8_observability/test_observability_trace.py",
+      "sha256": "152526226628ff1c77d29d9eb44cfd1bb0818037d2d9d094c742bd65105948b0"
+    },
+    {
+      "path": "tests/phase8_observability/test_verifier_integration.py",
+      "sha256": "a3f4cf2ab91cc5bfc2e7a4c0504858f0902fd558bf82f8ced89849244f71b446"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P8-04"
+}

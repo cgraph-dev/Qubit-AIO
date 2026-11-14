@@ -1,0 +1,81 @@
+{
+  "blockers": [
+    "repo-wide final matrix FAIL: 56 failing files + 1 error pre-exist at base (no new Office failures after fixes)",
+    "owner release decision record (evidence/phase-8/owner-release-decision.json)"
+  ],
+  "evidence_hashes": {
+    "evidence/phase-8/P8-01-scale.json": "2012fa7e8b75c660035cebdee73bca590869fde9b3313e882434dbddce76ecc2",
+    "evidence/phase-8/P8-02-security.json": "940fe919dd0014fc1c3852c5a8789c5570f97d938719f3cfad9184063d486474",
+    "evidence/phase-8/P8-03-dr.json": "63f84e88fd231ea42e9323d9c579a6eb98ac68a6ad14fc21a382bebb857ea2e5",
+    "evidence/phase-8/P8-04-observability.json": "54063f73dc424adb5b67e0b61fdc89900062f2bc1aee3b2a7abf1192e9ef8ac4",
+    "evidence/phase-8/P8-05-release.json": "2291affcc82b6b4a67e82b8649ddbf6e3e5103fd9c894185757d8bdf45232abe"
+  },
+  "evidence_verification": {
+    "checked": 5,
+    "failures": [],
+    "ok": true
+  },
+  "frozen": {
+    "commit": "e215be57cfd1a0828e7f20f8d2bbfba0cfc3282a",
+    "tree": "0069d110eb9d1de06b19568eb2d07210ec0077fd"
+  },
+  "generated_at": "2026-11-14T15:17:33Z",
+  "git_head": "78d9a31b625253fbfb64e706292d928a3dd6de79",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured",
+    "GPU frame time, browser heap and real device/browser matrices remain not_measured",
+    "security/DR/scale assertions are hermetic with injected providers; no live MCP/OAuth/payment/broker endpoint was exercised",
+    "the final matrix is the bounded Office feature matrix, not the repo-wide matrix; the owner release decision is not signed"
+  ],
+  "phase": 8,
+  "python": "3.14.7",
+  "release_status": "READY_FOR_OWNER_DECISION",
+  "repo_matrix_evidence": "evidence/phase-8/final-matrix-repo.json",
+  "repo_matrix_status": "FAIL",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "BLOCKED",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_scale.py --json",
+      "evidence": [
+        "evidence/phase-8/P8-01-scale.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P8-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/security_matrix.py --json",
+      "evidence": [
+        "evidence/phase-8/P8-02-security.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P8-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/drill_recovery.py --json",
+      "evidence": [
+        "evidence/phase-8/P8-03-dr.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P8-03"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/verify_observability.py --json",
+      "evidence": [
+        "evidence/phase-8/P8-04-observability.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P8-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/release_evidence.py --commit e215be57cfd1a0828e7f20f8d2bbfba0cfc3282a --tree 0069d110eb9d1de06b19568eb2d07210ec0077fd --json",
+      "evidence": [
+        "evidence/phase-8/P8-05-release.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P8-05"
+    }
+  ]
+}

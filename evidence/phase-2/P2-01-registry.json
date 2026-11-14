@@ -1,0 +1,132 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_registry_sessions/test_agent_profile.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".............                                                            [100%]\n13 passed in 1.16s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agents.py tests/phase2_registry_sessions/test_agent_profile.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/agents.py tests/phase2_registry_sessions/test_agent_profile.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_registry_sessions tests/phase1_platform tests/test_business_agent_controls.py tests/test_business_agent_preview.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 57%]\n.....................................................                    [100%]\n125 passed in 8.09s"
+    }
+  ],
+  "generated_at": "2026-11-14T06:06:18Z",
+  "git_head": "a0e7dde792185793cf9e2003f226c259239da073",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "29ee8214e93ee39cc08cfacc30f6451daa405d0732a44e5e4d0b76ca59f929a0"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "voicebridge/business/durable.py",
+      "sha256": "ededb4dadd938876f166f406c146a8ada47155ddebf0cfa5d06e5de7eb9a2f50"
+    },
+    {
+      "path": "voicebridge/business/a2a.py",
+      "sha256": "265874aa0dd95baad02f9e1c080eb7cdda7c00a1b91a6f15696d1316e79bbae1"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/sessions.py",
+      "sha256": "d7e827c736997490c08e0c97f9ac96cc34fb3646a3ca6e3e95223560071e6b7a"
+    },
+    {
+      "path": "voicebridge/business/__init__.py",
+      "sha256": "fcc8a5e50b1a8e4ee16d2b07265b4dfb3472a126990ada4601544bff31368100"
+    },
+    {
+      "path": "tests/test_business_agent_controls.py",
+      "sha256": "afb8e443e245997e535d33dd23ac7b820a011ff10b4b33d95698ca1fb1bd154d"
+    },
+    {
+      "path": "tests/test_business_agent_preview.py",
+      "sha256": "530dd38c82ba2113362f96dfbda2e0ea15073a36168e6b0f0a73a2d147b28b4b"
+    }
+  ],
+  "limitations": [
+    "the profile is a projection: no live provider/model/HTTP probe is made in this lane",
+    "the capability catalog is optional and injected; without it grants are reported without risk/version enrichment",
+    "desk/room/department are presentation metadata and are never authorization inputs",
+    "the frozen agent.schema.json core fields are preserved; MCP allowed_tools and the grant diff are additive selectors",
+    "an unpinned primary route is preserved for the existing preview path (it reports pinned=false); a declared fallback must pin both provider and model, so no provider is silently inherited"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "29ee8214e93ee39cc08cfacc30f6451daa405d0732a44e5e4d0b76ca59f929a0"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "343bdfdad5c58f6292777bb9b51d139464b492c05b12d60dea4181ab890b156f"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "tests/phase2_registry_sessions/test_agent_profile.py",
+      "sha256": "28982ece568b69f65b41c3439041c255b4248ebf365f2c62340acd9402120b94"
+    }
+  ],
+  "python": "3.14.7",
+  "status": "PASS",
+  "task_id": "P2-01-registry"
+}

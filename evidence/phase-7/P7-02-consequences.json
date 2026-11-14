@@ -1,0 +1,109 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_consequences.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "ited\",\n      \"ok\": true\n    },\n    {\n      \"name\": \"p7-02.no_fabricated_business_state\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_passed\": 13,\n  \"checks_total\": 13,\n  \"limitations\": [\n    \"hermetic: in-memory state and recording authority callbacks\",\n    \"does not prove a live HR/legal system, live service or UI\",\n    \"complements, and does not replace, the pytest suites\"\n  ],\n  \"status\": \"PASS\"\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase7_consequences tests/phase5_legal_people",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "................................................                         [100%]\n48 passed in 2.48s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/consequences.py voicebridge/business/mature_policy.py scripts/verify_consequences.py tests/phase7_consequences",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/consequences.py voicebridge/business/mature_policy.py scripts/verify_consequences.py tests/phase7_consequences/test_consequences.py tests/phase7_consequences/test_mature_policy.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T14:28:38Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "29ee8214e93ee39cc08cfacc30f6451daa405d0732a44e5e4d0b76ca59f929a0"
+    },
+    {
+      "path": "voicebridge/business/people.py",
+      "sha256": "22ddd66077dca1639bd9fd1fc5c2de8986a72c6a5c9adcaac8ee96bc741b8678"
+    },
+    {
+      "path": "voicebridge/business/legal.py",
+      "sha256": "304a09e80d182c0a82c71ac94c81c42f83c162528f6f18885eed59a6bbced73e"
+    },
+    {
+      "path": "voicebridge/business/memory.py",
+      "sha256": "bb3041e0bc05c57010475a5917663360d69cc0a94f8a9712e9ad91a976d5b4a9"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    }
+  ],
+  "limitations": [
+    "hermetic: in-memory SimulationState and recording authority callbacks",
+    "no live HR/legal/business system, store write, service, UI or credential was exercised",
+    "authoritative events are proven only as callback receipts; real HR/legal persistence is out of scope",
+    "does not prove deterministic replay (P7-06) or FX mapping (P7-04)"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/consequences.py",
+      "sha256": "d19dcfb634f282febb16bd4cb66f00fdc03a1defac15b5d93df2b82d27319647"
+    },
+    {
+      "path": "voicebridge/business/mature_policy.py",
+      "sha256": "0ebbcdadd0bf366eda586f143b5510c6fa8aa4485685882248a3842fb02036b6"
+    },
+    {
+      "path": "scripts/verify_consequences.py",
+      "sha256": "fd4a9a1e3ef330d83294a09bdf44ac64ef451640e4eed5cb717ea1b8d7889185"
+    },
+    {
+      "path": "tests/phase7_consequences/test_consequences.py",
+      "sha256": "f864454464c85c97c352d899eae22cd0d70d42a0b352ed7dd3367d22150aba8e"
+    },
+    {
+      "path": "tests/phase7_consequences/test_mature_policy.py",
+      "sha256": "aba632df42b1ce6eec1707c674a64a0c2a75f509f63c825b6dfde3fb4c3891c8"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P7-02"
+}
