@@ -15,8 +15,8 @@ cd "$ROOT"
 
 PY="${QUBIT_ACCEPTANCE_PYTHON:-}"
 if [ -z "$PY" ]; then
-  if [ -x /home/trick/venvs/qubit314/bin/python ]; then
-    PY=/home/trick/venvs/qubit314/bin/python
+  if [ -x "$HOME/venvs/qubit314/bin/python" ]; then
+    PY="$HOME/venvs/qubit314/bin/python"
   elif [ -x "$ROOT/.venv/bin/python" ]; then
     PY="$ROOT/.venv/bin/python"
   else
@@ -33,7 +33,7 @@ mkdir -p "$RESULTS" "$LOGS"
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
-ASSET_ROOT="${QUBIT_OFFICE_ASSET_ROOT:-/home/trick/Desktop/UI Office}"
+ASSET_ROOT="${QUBIT_OFFICE_ASSET_ROOT:-$HOME/Desktop/UI Office}"
 FAILED=0
 
 record_result() {

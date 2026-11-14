@@ -1,5 +1,16 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Phase 8 repo-wide matrix ran — release remains BLOCKED (2026-11-14, `feat/qoffice-next`):** The
+canonical root suite (`qubit_runtime/scripts/run_tests_parallel.py`, `tests/`, 6 workers) ran on frozen
+`864891f96` (tree `ba368148b`): **56 failing files + 1 error file**, so **no VERIFIED claim**. Triage:
+the 5 branch-only failures were fixed or classified — four were caused by operator paths embedded in
+my own acceptance/verifier scripts (now `$HOME`/generic), and `test_qbpv2_chat_transport.py` fails
+identically on the base (10 failures, live local Ollama, ~12 min). After the fixes, **no new Office
+failure remains**: all 53 remaining failing files reproduce at the base commit `47491b2e3` or are
+environmental. Evidence: `evidence/phase-8/final-matrix-repo.json`. The bounded Office feature matrix
+still PASSED on `e215be57c` (tree `0069d110e`). **Release blockers:** a green repo-wide matrix and the
+owner release decision record. No owner signature, `VERIFIED`, `COMPLETE`, or `100%` claim.
+
 **Qubit Office Phase 8 implementation complete — release BLOCKED on owner decision (2026-11-14, `feat/qoffice-next`, not merged):**
 P8-01..P8-04 are implemented and green; P8-05 release-evidence tooling correctly returns
 `READY_FOR_OWNER_DECISION`, and `scripts/acceptance/phase-8.sh` exits **2/BLOCKED** rather than

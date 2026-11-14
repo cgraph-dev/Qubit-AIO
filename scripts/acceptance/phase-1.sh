@@ -14,8 +14,8 @@ cd "$ROOT"
 
 PY="${QUBIT_ACCEPTANCE_PYTHON:-}"
 if [ -z "$PY" ]; then
-  if [ -x /home/trick/venvs/qubit314/bin/python ]; then
-    PY=/home/trick/venvs/qubit314/bin/python
+  if [ -x "$HOME/venvs/qubit314/bin/python" ]; then
+    PY="$HOME/venvs/qubit314/bin/python"
   elif [ -x "$ROOT/.venv/bin/python" ]; then
     PY="$ROOT/.venv/bin/python"
   else

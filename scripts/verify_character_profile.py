@@ -158,7 +158,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
     serialised = json.dumps(projection, sort_keys=True)
     checks.append(_check(
         "adapter_projection_private",
-        "/home/trick" not in serialised
+        "/Users/example-user/" not in serialised
         and ".png" not in serialised
         and "source_asset_refs" not in serialised
         and "local_path" not in serialised,

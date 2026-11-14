@@ -104,7 +104,7 @@ def _leak_fixture(root: Path, paid_hash: str, paid_bytes: bytes) -> Dict[str, Pa
     (targets["bundle"] / "manifest.json").write_text(
         '{"pack": "free-tiles", "files": 2}\n', encoding="utf-8")
     (targets["cache"] / "notes.json").write_text(
-        '{"source": "/home/trick/Desktop/UI Office/moderninteriors-win"}\n',
+        '{"source": "~/Desktop/UI Office/moderninteriors-win"}\n',
         encoding="utf-8")
     (targets["screenshots"] / "shot.png").write_bytes(paid_bytes)
     (targets["exports"] / f"{PAID_PACK}.zip").write_bytes(b"PK\x03\x04paid")

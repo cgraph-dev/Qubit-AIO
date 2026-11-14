@@ -1,6 +1,6 @@
 {
   "blockers": [
-    "phase 8 manifest (evidence/phase-8/manifest.json)",
+    "repo-wide final matrix FAIL: 56 failing files + 1 error pre-exist at base (no new Office failures after fixes)",
     "owner release decision record (evidence/phase-8/owner-release-decision.json)"
   ],
   "evidence_hashes": {
@@ -32,6 +32,8 @@
   "phase": 8,
   "python": "3.14.7",
   "release_status": "READY_FOR_OWNER_DECISION",
+  "repo_matrix_evidence": "evidence/phase-8/final-matrix-repo.json",
+  "repo_matrix_status": "FAIL",
   "schema": "qubit-office-phase-manifest/1",
   "status": "BLOCKED",
   "tasks": [

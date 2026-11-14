@@ -1,0 +1,99 @@
+{
+  "base_also_fails": [
+    "tests/test_qbpv2_chat_transport.py"
+  ],
+  "base_comparison": {
+    "base_commit": "47491b2e3269547ef1c15e1e393318cdaaffb8a4",
+    "base_failing_files": 52,
+    "source": "/tmp/base-failing.log"
+  },
+  "branch_only_original": [
+    "tests/test_integration8tf.py",
+    "tests/test_packet8k.py",
+    "tests/test_paths8tf.py",
+    "tests/test_public_tree_feature_parity.py",
+    "tests/test_qbpv2_chat_transport.py"
+  ],
+  "fixed_branch_only": [
+    "tests/test_integration8tf.py",
+    "tests/test_packet8k.py",
+    "tests/test_paths8tf.py",
+    "tests/test_public_tree_feature_parity.py"
+  ],
+  "frozen": {
+    "commit": "864891f96505690135a19eb0a8c8ecc7f02fff0d",
+    "tree": "ba368148bf8d0055b77f6267420164fee0b9b362"
+  },
+  "generated_at": "2026-11-14T18:06:07Z",
+  "limitations": [
+    "This is the repo-wide root test suite (tests/), not qubit_runtime/; the Office feature matrix is separate and PASSED.",
+    "56 files failed + 1 error file in the frozen run; no Office-specific failure remains after the path fixes: all remaining failures reproduce at the branch base or are environmental (local Ollama/model path).",
+    "The full repo suite is not green, so no VERIFIED/COMPLETE claim is possible.",
+    "test_qbpv2_chat_transport.py takes ~12 minutes and fails identically on base (live local Ollama); it timed out under the parallel base run."
+  ],
+  "remaining_pre_existing_failing_files": 53,
+  "remaining_pre_existing_list": [
+    "tests/test_branding_parity_wave3.py",
+    "tests/test_cli_update_native9u.py",
+    "tests/test_compat_handler_reachability.py",
+    "tests/test_config_binding_manifest_d3.py",
+    "tests/test_dashboard_agent3_plugins.py",
+    "tests/test_dashboard_branding_wave1.py",
+    "tests/test_dashboard_families8u.py",
+    "tests/test_dashboard_page_closure_wave2.py",
+    "tests/test_dashboard_page_inventory8u.py",
+    "tests/test_dashboard_plugin_fleet.py",
+    "tests/test_dashboard_ui_parity_wave4.py",
+    "tests/test_differential_parity8u.py",
+    "tests/test_docs8u.py",
+    "tests/test_final_integrity_fixes.py",
+    "tests/test_gateway_rpc_listener8u.py",
+    "tests/test_host_hygiene_pra07.py",
+    "tests/test_ledger_ingestion_wave3.py",
+    "tests/test_macos_install_path.py",
+    "tests/test_office_assets_vendored.py",
+    "tests/test_office_atomic_serving.py",
+    "tests/test_office_autonomous_driver.py",
+    "tests/test_office_bundle.py",
+    "tests/test_office_done_script.py",
+    "tests/test_office_game_shell.py",
+    "tests/test_office_plugin_wiring.py",
+    "tests/test_office_tower_plugin.py",
+    "tests/test_openclaw_extensions_wave5.py",
+    "tests/test_packaging_wave3.py",
+    "tests/test_packet8s.py",
+    "tests/test_printed_home_guidance_wave24.py",
+    "tests/test_public_surface_branding_wave22.py",
+    "tests/test_qbpv2_agent2_chat_runtime.py",
+    "tests/test_qbpv2_agent3_inventory.py",
+    "tests/test_qbpv2_agent5_packaging.py",
+    "tests/test_qbpv2_chat_routes.py",
+    "tests/test_qbpv2_chat_transport.py",
+    "tests/test_qbpv2_qubit_brain4.py",
+    "tests/test_qbpv2_reach_deadcode.py",
+    "tests/test_qubit_backend8u.py",
+    "tests/test_qubit_runtime_vendor8u.py",
+    "tests/test_qubit_vendor8tf.py",
+    "tests/test_qubitchat_web_search9u.py",
+    "tests/test_rebrand_asymmetry_wave24.py",
+    "tests/test_rebrand_determinism.py",
+    "tests/test_safe_equivalent_evidence.py",
+    "tests/test_smoke.py",
+    "tests/test_ui_tui_vendor_gap12_9u.py",
+    "tests/test_update_lifecycle_gaps_wave21.py",
+    "tests/test_update_packaging9u.py",
+    "tests/test_update_qualification9u.py",
+    "tests/test_upstream8u.py",
+    "tests/test_v0215_rebase_finish.py",
+    "tests/test_vscode_edit_slice3_9u.py"
+  ],
+  "schema": "qubit-office-repo-final-matrix/1",
+  "scope": "repo-wide root test suite (tests/, excluding qubit_runtime/) via qubit_runtime/scripts/run_tests_parallel.py",
+  "status": "FAIL",
+  "summary": {
+    "error_files": 1,
+    "failing_files": 56,
+    "total_failing_or_error": 57
+  },
+  "task_id": "P8-05"
+}

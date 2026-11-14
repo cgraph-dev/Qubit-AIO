@@ -25,7 +25,7 @@
     "tree": "0069d110eb9d1de06b19568eb2d07210ec0077fd",
     "working_tree": "dirty"
   },
-  "generated_at": "2026-11-14T15:17:33Z",
+  "generated_at": "2026-11-14T18:06:24Z",
   "limitations": [
     "this gate consumes evidence; it does not run the full repo matrix or the live behavioural oracle",
     "phase manifests are verified by content hash; their git_head is recorded, not required to equal the frozen SHA",
@@ -36,7 +36,6 @@
     "the working tree was dirty when this report was generated; a final matrix must be run on the frozen commit's exact tree"
   ],
   "missing": [
-    "phase 8 manifest (evidence/phase-8/manifest.json)",
     "owner release decision record (evidence/phase-8/owner-release-decision.json)"
   ],
   "owner_decision": {
@@ -131,14 +130,19 @@
         "status": "PASS"
       },
       {
+        "generated_at": "2026-11-14T15:17:33Z",
+        "git_head": "78d9a31b625253fbfb64e706292d928a3dd6de79",
         "path": "evidence/phase-8/manifest.json",
         "phase": 8,
-        "present": false
+        "present": true,
+        "problems": [
+          "status is 'BLOCKED', expected 'PASS'"
+        ],
+        "sha256": "a408be84c75c1b9de51e6dcd8ec887890f56fe487af64514bca56adc4c92e46f",
+        "status": "BLOCKED"
       }
     ],
-    "missing": [
-      8
-    ],
+    "missing": [],
     "present": [
       0,
       1,
@@ -147,9 +151,12 @@
       4,
       5,
       6,
-      7
+      7,
+      8
     ],
-    "problems": [],
+    "problems": [
+      "phase 8 manifest: status is 'BLOCKED', expected 'PASS'"
+    ],
     "required": [
       0,
       1,
@@ -162,9 +169,11 @@
       8
     ]
   },
-  "problems": [],
+  "problems": [
+    "phase 8 manifest: status is 'BLOCKED', expected 'PASS'"
+  ],
   "release_task": "P8-05",
   "schema": "qubit-office-release-evidence/1",
-  "status": "READY_FOR_OWNER_DECISION",
+  "status": "FAIL",
   "waivers": []
 }

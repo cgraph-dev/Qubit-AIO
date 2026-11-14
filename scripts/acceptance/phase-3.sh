@@ -12,15 +12,15 @@ cd "$ROOT"
 
 PY="${QUBIT_ACCEPTANCE_PYTHON:-}"
 if [ -z "$PY" ]; then
-  if [ -x /home/trick/venvs/qubit314/bin/python ]; then
-    PY=/home/trick/venvs/qubit314/bin/python
+  if [ -x "$HOME/venvs/qubit314/bin/python" ]; then
+    PY="$HOME/venvs/qubit314/bin/python"
   elif [ -x "$ROOT/.venv/bin/python" ]; then
     PY="$ROOT/.venv/bin/python"
   else
     PY=python3
   fi
 fi
-NODE_MODULES="${QUBIT_OFFICE_NODE_MODULES:-/home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules}"
+NODE_MODULES="${QUBIT_OFFICE_NODE_MODULES:-$HOME/Projects/Repos/Qubit/frontend/qubit-web/node_modules}"
 
 export PYTHONPATH="$ROOT${PYTHONPATH:+:$PYTHONPATH}"
 export TMPDIR="${TMPDIR:-/tmp}"
