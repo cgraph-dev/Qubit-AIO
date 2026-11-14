@@ -22,6 +22,7 @@ import { createAgentControlDrawer } from "./AgentControlDrawer";
 import { createWarRoomPanel } from "./WarRoomPanel";
 import { createApprovalsPanel } from "./ApprovalsPanel";
 import { createCommandCenter } from "./CommandCenter";
+import { createTimeline } from "./Timeline";
 import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
 import type { AgentSeat } from "./agents-panel";
@@ -127,6 +128,7 @@ type ShellComponents = {
   WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
   ApprovalsPanel: ReturnType<typeof createApprovalsPanel>;
   CommandCenter: ReturnType<typeof createCommandCenter>;
+  Timeline: ReturnType<typeof createTimeline>;
   EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
@@ -168,6 +170,7 @@ function shellComponents(
     WarRoomPanel: createWarRoomPanel(R, hooks),
     ApprovalsPanel: createApprovalsPanel(R, hooks),
     CommandCenter: createCommandCenter(R, hooks),
+    Timeline: createTimeline(R, hooks),
     EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
@@ -232,11 +235,14 @@ export function createOfficeApp(
     // The command-center shell region. Declared last so every seeded state
     // index in the shell's own tests stays stable.
     const [commandCenterOpen, setCommandCenterOpen] = useState(false);
+    // The operator timeline (P4-07). Declared last so every seeded state
+    // index in the shell's own tests stays stable.
+    const [timelineOpen, setTimelineOpen] = useState(false);
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
-      ApprovalsPanel, CommandCenter, EtsyConnectPanel, LoadingScreen,
+      ApprovalsPanel, CommandCenter, Timeline, EtsyConnectPanel, LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
@@ -320,11 +326,13 @@ export function createOfficeApp(
           onToggleAgents: () => {
             setApprovalsOpen(false);
             setCommandCenterOpen(false);
+            setTimelineOpen(false);
             setAgentsOpen((v: boolean) => !v);
           },
           onToggleHud: () => {
             setApprovalsOpen(false);
             setCommandCenterOpen(false);
+            setTimelineOpen(false);
             setControlSeat(null);
             setHudOpen((v: boolean) => !v);
           },
@@ -333,6 +341,7 @@ export function createOfficeApp(
             setHudOpen(false);
             setWarRoomOpen(false);
             setCommandCenterOpen(false);
+            setTimelineOpen(false);
             setControlSeat(null);
             setApprovalsOpen((v: boolean) => !v);
           },
@@ -392,6 +401,7 @@ export function createOfficeApp(
         setWarRoomOpen(false);
         setApprovalsOpen(false);
         setEtsyOpen(false);
+        setTimelineOpen(false);
         setControlSeat(null);
         setCommandCenterOpen(true);
       };
@@ -558,6 +568,7 @@ export function createOfficeApp(
             onClick: () => {
               setAgentsOpen(false);
               setApprovalsOpen(false);
+              setTimelineOpen(false);
               setControlSeat(null);
               setWarRoomOpen(true);
             },
@@ -571,6 +582,7 @@ export function createOfficeApp(
             onClick: () => {
               setAgentsOpen(false);
               setApprovalsOpen(false);
+              setTimelineOpen(false);
               setControlSeat(null);
               setWarRoomOpen(false);
               setHudOpen(false);
@@ -753,12 +765,14 @@ export function createOfficeApp(
           ? () => {
               setApprovalsOpen(false);
               setCommandCenterOpen(false);
+              setTimelineOpen(false);
               setAgentsOpen((v: boolean) => !v);
             }
           : spec.id === "hud"
           ? () => {
               setApprovalsOpen(false);
               setCommandCenterOpen(false);
+              setTimelineOpen(false);
               setControlSeat(null);
               setHudOpen((v: boolean) => !v);
             }
@@ -767,6 +781,7 @@ export function createOfficeApp(
               setHudOpen(false);
               setWarRoomOpen(false);
               setCommandCenterOpen(false);
+              setTimelineOpen(false);
               setControlSeat(null);
               setApprovalsOpen((v: boolean) => !v);
             };
@@ -857,6 +872,58 @@ export function createOfficeApp(
       ]));
     }
 
+    // THE OPERATOR TIMELINE TOGGLE (P4-07). A visible, labelled shell control
+    // beside the command center. Opening it closes every other sheet so two
+    // side sheets can never overlap the iframe or each other.
+    children.push(R.createElement("button", {
+      key: "timeline-toggle",
+      type: "button",
+      className: "office-game__btn office-theme-menu-btn office-game__timelineToggle",
+      "data-testid": "office-timeline-toggle",
+      "aria-expanded": timelineOpen,
+      "aria-controls": "office-game-timeline-dock",
+      "aria-label": "Open the operator timeline",
+      style: {
+        position: "absolute",
+        left: "calc(var(--office-s3) + 10.5rem)",
+        bottom: "var(--office-s3)",
+        zIndex: 5,
+      },
+      onClick: () => {
+        setAgentsOpen(false);
+        setHudOpen(false);
+        setWarRoomOpen(false);
+        setApprovalsOpen(false);
+        setEtsyOpen(false);
+        setCommandCenterOpen(false);
+        setControlSeat(null);
+        setTimelineOpen((v: boolean) => !v);
+      },
+    }, "Timeline"));
+
+    // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
+    // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full
+    // frame, the toolbar offset applies through the existing root marker, and
+    // replay is labelled inside the panel.
+    if (timelineOpen) {
+      children.push(R.createElement("div", {
+        key: "timeline-dock",
+        id: "office-game-timeline-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__timelineDock",
+        "data-testid": "office-game-timeline-dock",
+        "data-office-dock": "timeline",
+        "data-office-slice": dockSlice,
+        role: "region",
+        "aria-label": "Operator timeline",
+      }, [
+        R.createElement(Timeline as never, {
+          key: "body",
+          base: props.base,
+          onClose: () => setTimelineOpen(false),
+        }),
+      ]));
+    }
+
     // THE LOADING SCREEN. One import, one render seam: it overlays the iframe,
     // owns the weather/pixelfx layer, and fades itself out on `ready`. It is
     // ALWAYS mounted so a failed frame can show the same screen with a retry;
@@ -893,7 +960,7 @@ export function createOfficeApp(
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
     const dockOpen = agentsOpen || hudOpen || warRoomOpen
       || controlSeat !== null || approvalsOpen || etsyOpen
-      || commandCenterOpen;
+      || commandCenterOpen || timelineOpen;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
