@@ -13,9 +13,14 @@ import {
   moveLayer,
   partCounts,
   pickPart,
+  projectHabblaud,
+  projectLimezuCharacter,
+  projectLimezuPortrait,
+  projectProfile,
   randomize,
   redo,
   resolveProfile,
+  rollbackCharacterProfile,
   saveCharacterProfile,
   searchParts,
   selectCategory,
@@ -197,6 +202,100 @@ describe("one save call", () => {
     expect(result.kind).toBe("error");
     if (result.kind === "error") {
       expect(result.code).toBe("BUSINESS_UNREACHABLE");
+    }
+  });
+});
+
+describe("three adapter projections", () => {
+  it("projects one canonical profile into all three adapters deterministically", () => {
+    const state = createStudioState({
+      profile_id: "profile-a", agent_id: "agent-a", revision: 4,
+    });
+    const first = projectProfile(state.draft);
+    const second = projectProfile(state.draft);
+    expect(first).toEqual(second);
+    expect(first.schema).toBe("qubit-office-character-projection/1");
+    expect(Object.keys(first.adapters).sort()).toEqual([
+      "habblaud", "limezu_character", "limezu_portrait"]);
+    expect(first.revision).toBe(4);
+    expect(first.profile_id).toBe("profile-a");
+  });
+
+  it("maps Habblaud layers in the profile's declared order", () => {
+    const state = createStudioState({
+      layer_order: ["body", "outfit", "skin", "hair", "eyes", "accessory"],
+      accessory_ids: ["accessory-01", "accessory-03"],
+    });
+    const projection = projectHabblaud(state.draft);
+    expect(projection.layers.map((row) => row.layer)).toEqual([
+      "body", "outfit", "skin", "hair", "eyes", "accessory"]);
+    expect(projection.layers[0].part_id).toBe("body-00");
+    const accessory = projection.layers[5];
+    expect(accessory.part_ids).toEqual(["accessory-01", "accessory-03"]);
+    expect(accessory.indices).toEqual([1, 3]);
+    expect(projection.shadow_policy).toBe("sprite");
+  });
+
+  it("maps Character Generator 2.0 part indices", () => {
+    const state = createStudioState({
+      body_id: "body-03", eyes_id: "eyes-05",
+      hair_id: "hair-27", outfit_id: "outfit-30", skin_id: "skin-08",
+    });
+    const projection = projectLimezuCharacter(state.draft);
+    expect(projection.adapter).toBe("limezu-character-generator-2.0");
+    expect(projection.parts).toEqual({
+      body: 3, skin: 8, eyes: 5, hair: 27, outfit: 30,
+    });
+    expect(projection.part_ids.body).toBe("body-03");
+  });
+
+  it("maps Portrait Generator 1.5 cell and size", () => {
+    let state = createStudioState();
+    expect(projectLimezuPortrait(state.draft).cell_index).toBe(0);
+    state = setPortraitSize(state, 48);
+    const projection = projectLimezuPortrait(state.draft);
+    expect(projection.portrait_size).toBe(48);
+    expect(projection.frame).toBe("cell-0_48");
+  });
+
+  it("never carries a local or paid asset path", () => {
+    const serialised = JSON.stringify(projectProfile(createStudioState().draft));
+    expect(serialised).not.toContain("/home/trick");
+    expect(serialised).not.toContain(".png");
+    expect(serialised).not.toContain("source_asset_refs");
+    expect(serialised).not.toContain("local_path");
+  });
+});
+
+describe("rollback over the one save authority", () => {
+  it("posts the target revision once and returns the appended revision", async () => {
+    const { calls, impl } = recordingFetch((call) =>
+      respond(200, {
+        ok: true,
+        profile: { ...call.body.profile, revision: 5 },
+      }));
+    const saved = await rollbackCharacterProfile("profile-a", 1, {
+      fetchImpl: impl,
+    });
+    expect(saved.kind).toBe("saved");
+    if (saved.kind === "saved") expect(saved.profile.revision).toBe(5);
+    expect(calls).toHaveLength(1);
+    expect(calls[0].method).toBe("POST");
+    expect(calls[0].url).toContain("/character-profiles/profile-a/rollback");
+    expect(calls[0].body.revision).toBe(1);
+  });
+
+  it("turns a missing revision into a visible typed error", async () => {
+    const { impl } = recordingFetch(() =>
+      respond(404, {
+        ok: false, code: "CHARACTER_REVISION_NOT_FOUND", detail: "no r9",
+      }));
+    const result = await rollbackCharacterProfile("profile-a", 9, {
+      fetchImpl: impl,
+    });
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      expect(result.code).toBe("CHARACTER_REVISION_NOT_FOUND");
     }
   });
 });

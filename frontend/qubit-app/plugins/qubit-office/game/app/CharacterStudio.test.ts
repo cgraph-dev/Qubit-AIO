@@ -220,3 +220,64 @@ describe("CharacterStudio", () => {
     expect(serialised).not.toContain(".png");
   });
 });
+
+describe("CharacterStudio adapters and revisions", () => {
+  it("renders the three adapter projections without any asset path", () => {
+    const h = mount();
+    const cards = allByTestId(h, "character-adapter");
+    expect(cards.map((card) => card.props["data-adapter"])).toEqual([
+      "habblaud", "limezu_character", "limezu_portrait"]);
+    const details = allByTestId(h, "character-adapter-detail");
+    expect(textOf(details[0])).toContain("layers");
+    expect(textOf(details[1])).toContain("body 0");
+    expect(textOf(details[2])).toContain("cell 0");
+    expect(allByTestId(h, "character-adapters")[0].props.role).toBe("group");
+    const serialised = JSON.stringify(h.tree);
+    expect(serialised).not.toContain("/home/trick");
+    expect(serialised).not.toContain(".png");
+  });
+
+  it("offers rollback only when the authority supplies revisions", async () => {
+    let rolled: { profileId: string; revision: number } | null = null;
+    const h = mount({
+      revisions: [
+        { revision: 1, kind: "save" },
+        { revision: 2, kind: "save", current: true },
+      ],
+      rollbackProfile: async (profileId: string, revision: number) => {
+        rolled = { profileId, revision };
+        return {
+          kind: "saved",
+          profile: {
+            profile_id: profileId, agent_id: "agent-draft",
+            body_id: "body-00", skin_id: "skin-00", eyes_id: "eyes-00",
+            hair_id: "hair-00", outfit_id: "outfit-00",
+            accessory_ids: [], palette: ["#1f2933", "#3e4c59", "#f0b429", "#7fb3d5"],
+            layer_order: ["body", "outfit", "skin", "eyes", "hair", "accessory"],
+            shadow_policy: "sprite", portrait_cell: "cell-0",
+            portrait_size: 32,
+            animation_set: ["idle", "walk", "type", "talk", "think", "break", "celebrate"],
+            style_version: 1, seed: 0, revision: 3,
+          },
+        };
+      },
+    });
+    const buttons = allByTestId(h, "character-rollback");
+    expect(buttons).toHaveLength(2);
+    expect(buttons.find((b) => b.props["data-revision"] === 2)
+      ?.props.disabled).toBe(true);
+    click(h, "character-rollback", (el) => el.props["data-revision"] === 1);
+    await h.settle();
+    expect(rolled).toEqual({ profileId: "profile-draft", revision: 1 });
+    expect(allByTestId(h, "character-save-status")[0]
+      .props["data-state"]).toBe("saved");
+    expect(textOf(allByTestId(h, "character-save-status")[0]))
+      .toContain("Saved revision 3");
+  });
+
+  it("shows no revision controls by default", () => {
+    const h = mount();
+    expect(allByTestId(h, "character-revisions")).toHaveLength(0);
+    expect(allByTestId(h, "character-rollback")).toHaveLength(0);
+  });
+});

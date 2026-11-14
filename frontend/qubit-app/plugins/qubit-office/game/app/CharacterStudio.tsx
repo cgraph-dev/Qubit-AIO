@@ -36,8 +36,10 @@ import {
   moveLayer,
   partCounts,
   pickPart,
+  projectProfile,
   randomize,
   redo,
+  rollbackCharacterProfile,
   saveCharacterProfile,
   searchParts,
   selectCategory,
@@ -50,6 +52,12 @@ import {
   undo,
 } from "./character-studio";
 
+export interface StudioRevision {
+  revision: number;
+  kind: string;
+  current?: boolean;
+}
+
 export interface CharacterStudioProps {
   initialProfile?: Partial<CharacterProfile> | null;
   catalog?: Part[];
@@ -57,6 +65,12 @@ export interface CharacterStudioProps {
   fetchImpl?: typeof fetch;
   /** Injected in tests; the default is the one Business OS save call. */
   saveProfile?: (profile: CharacterProfile) => Promise<SaveResult>;
+  /** Revision history from the save authority; rollback is only offered here. */
+  revisions?: StudioRevision[];
+  rollbackProfile?: (
+    profileId: string,
+    revision: number,
+  ) => Promise<SaveResult>;
 }
 
 type SaveState =
@@ -103,6 +117,8 @@ export function createCharacterStudio(
     const counts = partCounts(catalog);
     const parts = searchParts(state.selectedCategory, state.search, catalog);
     const palette = state.draft.palette;
+    const projection = projectProfile(state.draft);
+    const revisions = props.revisions ?? [];
     const swatch = `linear-gradient(135deg, ${palette[0] ?? "#1f2933"}, ${
       palette[1] ?? palette[0] ?? "#3e4c59"})`;
 
@@ -125,6 +141,36 @@ export function createCharacterStudio(
         setSave({
           kind: "error",
           code: "CHARACTER_SAVE_FAILED",
+          detail: err instanceof Error ? err.message : String(err),
+        });
+      });
+    };
+
+    const onRollback = (revision: number) => {
+      setSave({ kind: "saving" });
+      const roller = props.rollbackProfile
+        ?? ((profileId: string, target: number) =>
+          rollbackCharacterProfile(profileId, target, {
+            base: props.base, fetchImpl: props.fetchImpl,
+          }));
+      void roller(state.draft.profile_id, revision).then((result) => {
+        if (result.kind === "saved") {
+          setState((current) => ({
+            ...current,
+            draft: result.profile,
+            history: [...current.history, current.draft].slice(-50),
+            future: [],
+          }));
+          setSave({ kind: "saved", revision: result.profile.revision });
+        } else {
+          setSave({
+            kind: "error", code: result.code, detail: result.detail,
+          });
+        }
+      }).catch((err: unknown) => {
+        setSave({
+          kind: "error",
+          code: "CHARACTER_ROLLBACK_FAILED",
           detail: err instanceof Error ? err.message : String(err),
         });
       });
@@ -336,6 +382,31 @@ export function createCharacterStudio(
       animation,
     );
 
+    const adapterCard = (adapter: string, label: string, detail: string) =>
+      R.createElement("div", {
+        key: `adapter-${adapter}`,
+        "data-testid": "character-adapter",
+        "data-adapter": adapter,
+        role: "group",
+        "aria-label": `${label} projection: ${detail}`,
+      }, [
+        R.createElement("strong", { key: "label" }, label),
+        R.createElement("span", {
+          key: "detail",
+          "data-testid": "character-adapter-detail",
+        }, detail),
+      ]);
+
+    const revisionRow = (row: StudioRevision) => R.createElement("button", {
+      key: `revision-${row.revision}`,
+      type: "button",
+      "data-testid": "character-rollback",
+      "data-revision": row.revision,
+      "aria-label": `Rollback to revision ${row.revision}`,
+      disabled: Boolean(row.current) || save.kind === "saving",
+      onClick: () => onRollback(row.revision),
+    }, `r${row.revision} ${row.kind}`);
+
     const preview = (id: string, size: number, portrait: boolean) =>
       R.createElement("div", {
         key: id,
@@ -455,6 +526,38 @@ export function createCharacterStudio(
         preview("character-world-preview", 96, false),
         preview("character-portrait-preview", state.portraitSize, true),
       ]),
+
+      R.createElement("div", {
+        key: "adapters",
+        role: "group",
+        "aria-label": "Adapter projections",
+        "data-testid": "character-adapters",
+      }, [
+        adapterCard(
+          "habblaud", "Habblaud",
+          `${projection.adapters.habblaud.layers.length} layers; `
+          + `shadow ${projection.adapters.habblaud.shadow_policy}; `
+          + `${projection.adapters.habblaud.animation_set.length} animations`),
+        adapterCard(
+          "limezu_character", "LimeZu Character 2.0",
+          `body ${projection.adapters.limezu_character.parts.body}; `
+          + `eyes ${projection.adapters.limezu_character.parts.eyes}; `
+          + `hair ${projection.adapters.limezu_character.parts.hair}; `
+          + `outfit ${projection.adapters.limezu_character.parts.outfit}; `
+          + `skin ${projection.adapters.limezu_character.parts.skin}`),
+        adapterCard(
+          "limezu_portrait", "LimeZu Portrait 1.5",
+          `cell ${projection.adapters.limezu_portrait.cell_index}; `
+          + `${projection.adapters.limezu_portrait.portrait_size}px; `
+          + `${projection.adapters.limezu_portrait.frame}`),
+      ]),
+
+      revisions.length ? R.createElement("div", {
+        key: "revisions",
+        "data-testid": "character-revisions",
+        role: "group",
+        "aria-label": "Profile revisions",
+      }, revisions.map(revisionRow)) : null,
 
       R.createElement("div", { key: "selection", "data-testid": "character-selection" },
         liveText(state)),

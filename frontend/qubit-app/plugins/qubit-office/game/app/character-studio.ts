@@ -447,6 +447,208 @@ export function profileEquals(a: CharacterProfile,
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/* --------------------------------------------------------------------------
+ * Three adapter projections over the one canonical profile.
+ *
+ * A projection is disposable: it maps the profile into an adapter's vocabulary
+ * and never reads raw paid art, never writes state and never carries a local
+ * asset path. Habblaud gets layer slots; Character Generator 2.0 gets integer
+ * part indices; Portrait Generator 1.5 gets a cell/size frame.
+ */
+export const ADAPTERS = [
+  "habblaud", "limezu_character", "limezu_portrait",
+] as const;
+export type AdapterName = (typeof ADAPTERS)[number];
+
+const HABBLAUD_LAYER_SOURCE: Record<LayerName, string> = {
+  body: "body_id",
+  outfit: "outfit_id",
+  skin: "skin_id",
+  eyes: "eyes_id",
+  hair: "hair_id",
+  accessory: "accessory_ids",
+};
+
+export interface HabblaudLayer {
+  layer: LayerName;
+  adapter_layer: string;
+  part_id?: string;
+  part_ids?: string[];
+  index?: number;
+  indices?: number[];
+  z: number;
+  visible: boolean;
+}
+
+export interface HabblaudProjection {
+  adapter: "habblaud";
+  profile_id: string;
+  agent_id: string;
+  revision: number;
+  style_version: number;
+  layer_order: LayerName[];
+  layers: HabblaudLayer[];
+  palette: string[];
+  shadow_policy: ShadowPolicy;
+  animation_set: AnimationName[];
+  seed: number;
+}
+
+export interface LimezuCharacterProjection {
+  adapter: "limezu-character-generator-2.0";
+  profile_id: string;
+  revision: number;
+  style_version: number;
+  parts: Record<string, number>;
+  part_ids: Record<string, string>;
+  accessories: Array<{ part_id: string; index: number }>;
+  palette: string[];
+  shadow_policy: ShadowPolicy;
+  seed: number;
+}
+
+export interface LimezuPortraitProjection {
+  adapter: "limezu-portrait-generator-1.5";
+  profile_id: string;
+  revision: number;
+  portrait_cell: string;
+  cell_index: number;
+  portrait_size: 32 | 48;
+  frame: string;
+  part_indices: Record<string, number>;
+  palette: string[];
+  seed: number;
+}
+
+export interface CharacterProjection {
+  schema: "qubit-office-character-projection/1";
+  profile_id: string;
+  agent_id: string;
+  revision: number;
+  style_version: number;
+  seed: number;
+  adapters: {
+    habblaud: HabblaudProjection;
+    limezu_character: LimezuCharacterProjection;
+    limezu_portrait: LimezuPortraitProjection;
+  };
+}
+
+function partIndex(partId: string): number {
+  return PART_INDEX.get(partId)?.index ?? -1;
+}
+
+function partIndices(profile: CharacterProfile): Record<string, number> {
+  const indices: Record<string, number> = {};
+  for (const category of PART_CATEGORIES) {
+    indices[category] = partIndex(
+      String(profile[`${category}_id` as keyof CharacterProfile]));
+  }
+  return indices;
+}
+
+const PORTRAIT_CELL_RE = /^cell-(\d+)$/;
+
+export function projectHabblaud(
+  profile: CharacterProfile,
+): HabblaudProjection {
+  const layers: HabblaudLayer[] = profile.layer_order.map((layer, z) => {
+    if (layer === "accessory") {
+      return {
+        layer,
+        adapter_layer: "accessory",
+        part_ids: profile.accessory_ids.slice(),
+        indices: profile.accessory_ids.map(partIndex),
+        z,
+        visible: profile.accessory_ids.length > 0,
+      };
+    }
+    const partId = String(
+      profile[HABBLAUD_LAYER_SOURCE[layer] as keyof CharacterProfile]);
+    return {
+      layer,
+      adapter_layer: layer,
+      part_id: partId,
+      index: partIndex(partId),
+      z,
+      visible: true,
+    };
+  });
+  return {
+    adapter: "habblaud",
+    profile_id: profile.profile_id,
+    agent_id: profile.agent_id,
+    revision: profile.revision,
+    style_version: profile.style_version,
+    layer_order: profile.layer_order.slice(),
+    layers,
+    palette: profile.palette.slice(),
+    shadow_policy: profile.shadow_policy,
+    animation_set: profile.animation_set.slice(),
+    seed: profile.seed,
+  };
+}
+
+export function projectLimezuCharacter(
+  profile: CharacterProfile,
+): LimezuCharacterProjection {
+  const part_ids: Record<string, string> = {};
+  for (const category of PART_CATEGORIES) {
+    part_ids[category] = String(
+      profile[`${category}_id` as keyof CharacterProfile]);
+  }
+  return {
+    adapter: "limezu-character-generator-2.0",
+    profile_id: profile.profile_id,
+    revision: profile.revision,
+    style_version: profile.style_version,
+    parts: partIndices(profile),
+    part_ids,
+    accessories: profile.accessory_ids.map((partId) => ({
+      part_id: partId, index: partIndex(partId),
+    })),
+    palette: profile.palette.slice(),
+    shadow_policy: profile.shadow_policy,
+    seed: profile.seed,
+  };
+}
+
+export function projectLimezuPortrait(
+  profile: CharacterProfile,
+): LimezuPortraitProjection {
+  const match = PORTRAIT_CELL_RE.exec(profile.portrait_cell);
+  return {
+    adapter: "limezu-portrait-generator-1.5",
+    profile_id: profile.profile_id,
+    revision: profile.revision,
+    portrait_cell: profile.portrait_cell,
+    cell_index: match ? Number(match[1]) : -1,
+    portrait_size: profile.portrait_size,
+    frame: `${profile.portrait_cell}_${profile.portrait_size}`,
+    part_indices: partIndices(profile),
+    palette: profile.palette.slice(),
+    seed: profile.seed,
+  };
+}
+
+export function projectProfile(
+  profile: CharacterProfile,
+): CharacterProjection {
+  return {
+    schema: "qubit-office-character-projection/1",
+    profile_id: profile.profile_id,
+    agent_id: profile.agent_id,
+    revision: profile.revision,
+    style_version: profile.style_version,
+    seed: profile.seed,
+    adapters: {
+      habblaud: projectHabblaud(profile),
+      limezu_character: projectLimezuCharacter(profile),
+      limezu_portrait: projectLimezuPortrait(profile),
+    },
+  };
+}
+
 export function selectedPartId(state: StudioState,
                                category: PartCategory = state.selectedCategory):
 string {
@@ -494,6 +696,54 @@ export async function saveCharacterProfile(
     return {
       kind: "error",
       code: "CHARACTER_SAVE_FAILED",
+      detail: exc instanceof Error ? exc.message : String(exc),
+    };
+  }
+}
+
+/**
+ * Ask the one save authority to roll a profile back to an earlier revision.
+ * The authority appends a new revision; the studio never rewrites history and
+ * never keeps a local revision list of its own.
+ */
+export async function rollbackCharacterProfile(
+  profileId: string,
+  revision: number,
+  opts: SaveOptions = {},
+): Promise<SaveResult> {
+  try {
+    const body = await businessFetch<{
+      ok?: boolean;
+      profile?: Partial<CharacterProfile>;
+    }>(`/character-profiles/${encodeURIComponent(profileId)}/rollback`, {
+      method: "POST",
+      body: { revision },
+      base: opts.base,
+      fetchImpl: opts.fetchImpl,
+      signal: opts.signal,
+    });
+    if (!body.profile) {
+      return {
+        kind: "error",
+        code: "CHARACTER_ROLLBACK_FAILED",
+        detail: "the save authority returned no profile",
+      };
+    }
+    return {
+      kind: "saved",
+      profile: resolveProfile(body.profile).profile,
+    };
+  } catch (exc) {
+    if (exc instanceof BusinessApiError) {
+      return {
+        kind: "error",
+        code: exc.code || `HTTP_${exc.status}`,
+        detail: exc.message,
+      };
+    }
+    return {
+      kind: "error",
+      code: "CHARACTER_ROLLBACK_FAILED",
       detail: exc instanceof Error ? exc.message : String(exc),
     };
   }
