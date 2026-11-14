@@ -1,0 +1,102 @@
+{
+  "task_id": "P4-01",
+  "status": "PASS",
+  "generated_at": "2026-11-14T05:19:04Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "29ee8214e93ee39cc08cfacc30f6451daa405d0732a44e5e4d0b76ca59f929a0"
+    },
+    {
+      "path": "voicebridge/business/sessions.py",
+      "sha256": "d7e827c736997490c08e0c97f9ac96cc34fb3646a3ca6e3e95223560071e6b7a"
+    },
+    {
+      "path": "voicebridge/business/runs.py",
+      "sha256": "ccc3cc0c981e475f1f4d65b8b4caaf6f0e3c29a3f6bcb143fc3a7fcca4875bf1"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/effective_state.py",
+      "sha256": "090b3fb805160f7f142afa7c71866bf5a40c6b50b10d32598f4a01bfb2130e2f"
+    },
+    {
+      "path": "voicebridge/business/workforce.py",
+      "sha256": "941f2bb0baa925fb586b9d1527f4b8a4d9c74d69e57057316bd658f5e4ae6ea8"
+    },
+    {
+      "path": "scripts/verify_workforce.py",
+      "sha256": "94a43ca0cdc77db2bf226cc9a5c6891967eded2ab6704857e7bc933a0cc40b92"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/workforce.py",
+      "sha256": "941f2bb0baa925fb586b9d1527f4b8a4d9c74d69e57057316bd658f5e4ae6ea8"
+    },
+    {
+      "path": "scripts/verify_workforce.py",
+      "sha256": "94a43ca0cdc77db2bf226cc9a5c6891967eded2ab6704857e7bc933a0cc40b92"
+    },
+    {
+      "path": "tests/phase4_workforce/test_workforce.py",
+      "sha256": "880c9b2c9d3bef2d80774fa7f153ebf6eb35bf2a935363ada1c6bee6d034cd78"
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_workforce.py --json",
+      "exit_code": 0,
+      "stdout_tail": "{\n  \"checks\": [\n    {\n      \"detail\": \"reported=['agt_01M7C7WTAXD0CJREDBTH2JHQ0P', 'agt_01M7C7WTB4ZEKKZGP47DQA02PX', 'agt_01M7C7WTBAWX7NXSBVSSWDXW9X', 'agt_01M7C7WTBHYF1K03PR3JS0XR1N', 'agt_01M7C7WTBQJWEV19HMGPVPXBPH', 'agt_01M7C7WTBY941XMM3GTF6W69HV'] raw=['agt_01M7C7WTAXD0CJREDBTH2JHQ0P', 'agt_01M7C7WTB4ZEKKZGP47DQA02PX', 'agt_01M7C7WTBAWX7NXSBVSSWDXW9X', 'agt_01M7C7WTBHYF1K03PR3JS0XR1N', 'agt_01M7C7WTBQJWEV19HMGPVPXBPH', 'agt_01M7C7WTBY941XMM3GTF6W69HV']\",\n      \"name\": \"no_invented_agents\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"reported=6 sql=6\",\n      \"name\": \"counts_match_sql\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"6 agents, one lane each\",\n      \"name\": \"one_lane_per_agent\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"session -> workspace -> task all linked\",\n      \"name\": \"session_workspace_links\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"every state recomputed from raw rows\",\n      \"name\": \"state_matches_raw\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"all declared non-working\",\n      \"name\": \"paused_revoked_archived_not_working\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"seed/projection agents are not live\",\n      \"name\": \"projection_not_live\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"20 explicit grants\",\n      \"name\": \"no_wildcard_grants\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"every non-archived agent has an allow grant\",\n      \"name\": \"every_agent_has_explicit_access\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"lease states match raw expiry\",\n      \"name\": \"expired_leases_not_active\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"mutated=False claimed=0 unknown=1\",\n      \"name\": \"reconcile_claims_nothing\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"other_tenant_agents=['agt_01M7C7WTW28V7ZGHAPKTKQ1HBP']\",\n      \"name\": \"tenant_isolation\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"12/12 store checks\",\n      \"name\": \"good_fixture_passes\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"idle works; the seed agent is projection and not working\",\n      \"name\": \"working_state_is_real\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"state=unknown lease=expired\",\n      \"name\": \"expired_lane_is_unknown\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"states=['archived', 'idle', 'paused', 'projection', 'revoked', 'unknown']\",\n      \"name\": \"all_states_are_declared\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"skipped=[{'agent_id': 'agt_01M7C7WTBQJWEV19HMGPVPXBPH', 'reason': 'archived'}]\",\n      \"name\": \"provision_skips_archived\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"failed=['no_wildcard_grants', 'one_lane_per_agent', 'session_workspace_links']\",\n      \"name\": \"planted_inconsistency_detected\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 18,\n  \"mode\": \"self-check\",\n  \"ok\": true,\n  \"schema\": \"qubit-office-workforce-verification/1\"\n}\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase4_workforce tests/phase2_registry_sessions tests/phase2_effective",
+      "exit_code": 0,
+      "stdout_tail": "...............................................                          [100%]\n47 passed in 16.52s\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/workforce.py scripts/verify_workforce.py tests/phase4_workforce",
+      "exit_code": 0,
+      "stdout_tail": "All checks passed!\n",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/workforce.py scripts/verify_workforce.py tests/phase4_workforce/test_workforce.py",
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    }
+  ],
+  "limitations": [
+    "hermetic/seed fixture only; no live service, live state, credentials or network",
+    "reconciliation is read-only and reports expired leases; it does not release or re-lease",
+    "memory policy is recorded as scope names on the session; no memory row is written",
+    "UI/desk presentation is not exercised; a desk/room is never authorization",
+    "the evidence file itself and the phase manifest are outside this task's owned files"
+  ]
+}
