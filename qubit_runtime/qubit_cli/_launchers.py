@@ -139,12 +139,48 @@ def resolve_store_python(repo_root: Path, *, publication: bool = False) -> Path 
     for the running process (an e2e fixture, a desktop toolchain) that a later
     scratch cleanup may delete, leaving the launcher to exit 127 forever
     (#131745). It still supplies the store when the tree records none.
+
+    EXISTENCE IS NOT USABILITY. A store Python boots with no packages of its
+    own; it can only run the CLI once PM has committed a dependency environment
+    for this install (``pm.environments.committed_venv``). With nothing
+    committed, ``pm.environments._require_own_dependencies`` refuses that
+    interpreter by design — so returning it here hands every DETACHED child a
+    command that exits 1 on its first import. That is how the dashboard's
+    gateway-restart button reported success while doing nothing: the spawned
+    ``qubit gateway restart`` died with "no dependency environment is committed
+    for this install", and the 200 for the spawn looked like a 200 for the
+    restart.
+
+    Answer ``None`` when nothing is committed, so callers fall through to the
+    interpreter that is actually running (a venv carries its own packages and
+    passes that guard's first branch).
     """
+    if not _store_python_is_runnable(repo_root):
+        return None
     if publication:
         own = _store_python(store_root(repo_root, honor_runtime_override=False))
         if own is not None:
             return own
     return _store_python(store_root(repo_root))
+
+
+def _store_python_is_runnable(repo_root: Path) -> bool:
+    """True when PM has committed an environment the store Python can boot into.
+
+    Only the committed record is consulted: probing the interpreter by running
+    it would pay a subprocess on every launcher build. ``committed_venv`` is the
+    same authority the boot-time guard uses, so the two cannot disagree.
+    """
+    try:
+        from pm.environments import committed_venv
+    except Exception:  # PM absent (standalone payload): no store to bind to
+        return False
+    try:
+        return committed_venv(Path(repo_root).resolve()) is not None
+    except Exception:
+        # A corrupt/foreign record must not take the launcher down with it; the
+        # caller falling back to sys.executable is always a runnable choice.
+        return False
 
 
 def _store_python(runtime: Path) -> Path | None:
