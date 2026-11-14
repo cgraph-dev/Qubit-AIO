@@ -202259,6 +202259,279 @@ create: function(game) {
 			}, panels.map(renderRow))]);
 		};
 	}
+	// ../qubit-app/plugins/qubit-office/game/types.ts
+	/** The schema this adapter is written against. A mismatch is refused, not coerced. */
+	var EXPECTED_SCHEMA = "qubit-office-tower/1";
+	// ../qubit-app/plugins/qubit-office/game/adapter.ts
+	/**
+	* Poll cadence. It is deliberately slower than the store's animation tick: the
+	* tower fold takes hundreds of milliseconds, and a sub-second abort/restart
+	* loop starves both this read and the iframe's `/api/stream` (see the header).
+	* `POLL_INTERVAL_MS` in `office-api.ts` states the same 2 s contract.
+	*/
+	var DEFAULT_INTERVAL_MS = 2e3;
+	var OfficeAdapter = class {
+		revision = 0;
+		payload = null;
+		error = null;
+		loading = false;
+		provenance = "none";
+		inflight = null;
+		timer = null;
+		disposed = false;
+		opts;
+		constructor(opts) {
+			this.opts = {
+				baseUrl: "/agent",
+				intervalMs: DEFAULT_INTERVAL_MS,
+				...opts
+			};
+		}
+		/** The current snapshot. A pure read — never triggers a load. */
+		snapshot() {
+			return {
+				revision: this.revision,
+				payload: this.payload,
+				error: this.error,
+				loading: this.loading,
+				stale: this.error !== null && this.payload !== null,
+				provenance: this.provenance
+			};
+		}
+		/**
+		* One serialized load. A call while one is already in flight is a no-op, so
+		* a timer tick can never abort the request before it returns: the next tick
+		* simply asks again. One request is on the wire at a time, and two responses
+		* can never race.
+		*/
+		async load() {
+			if (this.disposed || this.inflight !== null) return;
+			const ctl = new AbortController();
+			this.inflight = ctl;
+			const requestedAt = this.revision;
+			this.loading = true;
+			this.emit();
+			const f = this.opts.fetchImpl ?? fetch;
+			const token = this.opts.token ?? readSessionToken();
+			try {
+				const headers = {};
+				if (token) {
+					headers["X-Api-Token"] = token;
+					headers["X-Qubit-Session-Token"] = token;
+				}
+				const res = await f(`${this.opts.baseUrl}/api/office/tower`, {
+					signal: ctl.signal,
+					headers: token ? headers : void 0
+				});
+				if (ctl.signal.aborted) return;
+				if (!res.ok) throw new Error(`HTTP ${res.status}`);
+				const body = await res.json();
+				if (ctl.signal.aborted) return;
+				this.accept(body, requestedAt);
+			} catch (err) {
+				if (ctl.signal.aborted || this.disposed) return;
+				this.error = err instanceof Error ? err.message : String(err);
+				this.loading = false;
+				this.emit();
+			} finally {
+				if (this.inflight === ctl) this.inflight = null;
+			}
+		}
+		/** Validate + apply one payload. Exposed so tests can drive it directly. */
+		accept(body, requestedAt) {
+			const check = parseTower(body);
+			if (!check.ok) {
+				this.error = check.error;
+				this.loading = false;
+				this.emit();
+				return;
+			}
+			if (requestedAt < this.revision) {
+				this.loading = false;
+				return;
+			}
+			this.payload = check.payload;
+			this.revision = requestedAt + 1;
+			this.error = null;
+			this.loading = false;
+			this.provenance = check.payload.preview ? "recording" : "live";
+			this.emit();
+		}
+		/** Start polling. Pauses while the document is hidden. */
+		start() {
+			if (this.timer !== null || this.disposed) return;
+			this.load();
+			this.timer = setInterval(() => {
+				if (isHidden()) return;
+				this.load();
+			}, this.opts.intervalMs);
+		}
+		stop() {
+			if (this.timer !== null) {
+				clearInterval(this.timer);
+				this.timer = null;
+			}
+		}
+		/** Release everything. Idempotent — safe in a React cleanup. */
+		dispose() {
+			if (this.disposed) return;
+			this.disposed = true;
+			this.stop();
+			this.inflight?.abort();
+			this.inflight = null;
+			this.loading = false;
+		}
+		emit() {
+			if (this.disposed) return;
+			this.opts.onSnapshot(this.snapshot());
+		}
+	};
+	function isHidden() {
+		return typeof document !== "undefined" && document.visibilityState === "hidden";
+	}
+	/**
+	* The session token the server injects into the SPA shell
+	* (`webui.py:1563` `window.__QUBIT_SESSION_TOKEN__`). Never a query param —
+	* `token_ok` rejects query tokens outright.
+	*/
+	function readSessionToken() {
+		const w = globalThis;
+		return typeof w.__QUBIT_SESSION_TOKEN__ === "string" ? w.__QUBIT_SESSION_TOKEN__ : "";
+	}
+	/** Structural validation. Returns a typed refusal, never a coerced payload. */
+	function parseTower(body) {
+		if (body === null || typeof body !== "object") return {
+			ok: false,
+			error: "the response was not an object"
+		};
+		const b = body;
+		if (b.schema !== "qubit-office-tower/1") return {
+			ok: false,
+			error: `unexpected schema ${JSON.stringify(b.schema)}; this build reads ${EXPECTED_SCHEMA}`
+		};
+		if (b.ok !== true) return {
+			ok: false,
+			error: typeof b.detail === "string" ? b.detail : "the tower report answered not-ok"
+		};
+		if (typeof b.hud !== "object" || b.hud === null) return {
+			ok: false,
+			error: "the payload carries no hud"
+		};
+		if (!Array.isArray(b.characters)) return {
+			ok: false,
+			error: "the payload carries no characters array"
+		};
+		return {
+			ok: true,
+			payload: body
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/FloorCampus.tsx
+	function embedCss(win) {
+		const doc = win?.document;
+		if (!doc || !doc.head) return;
+		if (doc.getElementById("qubit-campus-embed")) return;
+		const style = doc.createElement("style");
+		style.id = "qubit-campus-embed";
+		style.textContent = [
+			"html,body{margin:0!important;overflow:hidden!important;background:#0b0a13!important}",
+			".ui-topbar,.ui-panel.ui-sidebar,.ui-panel.ui-feed,.ui-lapse-vignette{display:none!important}",
+			".ui-root{padding:0!important}"
+		].join("");
+		doc.head.appendChild(style);
+	}
+	function createFloorCampus(R, H) {
+		return function FloorCampus(props) {
+			const { useState, useEffect } = H;
+			const [floors, setFloors] = useState([]);
+			const [error, setError] = useState("");
+			useEffect(() => {
+				let live = true;
+				const adapter = new OfficeAdapter({
+					baseUrl: props.base ? `${props.base}/agent` : "/agent",
+					intervalMs: 5e3,
+					onSnapshot: (snapshot) => {
+						if (!live) return;
+						if (!snapshot.payload) {
+							if (snapshot.error) setError(snapshot.error);
+							return;
+						}
+						const chars = snapshot.payload.characters ?? [];
+						const rows = (snapshot.payload.floorplan?.floors ?? []).map((floor) => ({
+							number: floor.number,
+							name: floor.name,
+							role: floor.role || "",
+							rooms: floor.rooms?.length ?? 0,
+							agents: chars.filter((ch) => Number(ch.position?.floor) === Number(floor.number)).length
+						}));
+						setFloors(rows);
+						setError("");
+					}
+				});
+				adapter.start();
+				return () => {
+					live = false;
+					adapter.dispose();
+				};
+			}, [props.base]);
+			const cards = floors.map((floor) => R.createElement("article", {
+				key: floor.number,
+				className: "office-game__floorCard",
+				"data-testid": `office-floor-card-${floor.number}`
+			}, [R.createElement("header", {
+				key: "head",
+				className: "office-game__floorCardHead"
+			}, [
+				R.createElement("strong", { key: "n" }, `Floor ${floor.number}`),
+				R.createElement("span", { key: "r" }, floor.role || floor.name),
+				R.createElement("span", { key: "c" }, `${floor.agents} agent${floor.agents === 1 ? "" : "s"} · ${floor.rooms} room${floor.rooms === 1 ? "" : "s"}`)
+			]), R.createElement("iframe", {
+				key: "frame",
+				title: `Floor ${floor.number} · ${floor.role || floor.name}`,
+				className: "office-game__floorFrame",
+				"data-testid": `office-floor-frame-${floor.number}`,
+				sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
+				allow: "clipboard-read; clipboard-write",
+				src: officeAppSrc({
+					base: props.base,
+					theme: props.theme,
+					floor: `live:${floor.number}`
+				}),
+				onLoad: (ev) => {
+					const win = ev.currentTarget.contentWindow;
+					if (!win) return;
+					try {
+						installOfficeApiBridge(win);
+						installOfficeBrand(win);
+						embedCss(win);
+					} catch {}
+				}
+			})]));
+			return R.createElement("div", {
+				className: "office-game__floorCampus",
+				"data-testid": "office-floor-campus"
+			}, [
+				R.createElement("p", {
+					key: "note",
+					className: "office-game__floorCampusNote"
+				}, "Each card is the Habblaud office rendered for one real floor, using the same LimeZu art and that floor's characters."),
+				error ? R.createElement("p", {
+					key: "error",
+					className: "office-game__campusState",
+					role: "alert"
+				}, `Floor campus unavailable: ${error}`) : null,
+				!floors.length && !error ? R.createElement("p", {
+					key: "loading",
+					className: "office-game__campusState",
+					role: "status"
+				}, "Loading the live floors…") : null,
+				R.createElement("div", {
+					key: "grid",
+					className: "office-game__floorGrid"
+				}, cards)
+			]);
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/etsy-connection.ts
 	var ETSY_PATH = "/api/office/business/etsy";
 	var ETSY_STATUS_PATH = `${ETSY_PATH}/status`;
@@ -207140,7 +207413,7 @@ create: function(game) {
 			RoomBuilder: createRoomBuilder(R, hooks),
 			OutsideWorld: createOutsideWorld(R, hooks),
 			PanelInventory: createPanelInventoryPanel(R, hooks),
-			TowerNavigator: createTowerNavigator(R, hooks),
+			FloorCampus: createFloorCampus(R, hooks),
 			EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
 			LoadingScreen: createOfficeLoadingScreen(R, hooks)
 		};
@@ -207174,15 +207447,10 @@ create: function(game) {
 			const [studioTab, setStudioTab] = useState("panels");
 			const [outsideView, setOutsideView] = useState(null);
 			const [campusOpen, setCampusOpen] = useState(false);
-			const [floorScope, setFloorScope] = useState("");
-			const [campusDirectory, setCampusDirectory] = useState(null);
-			const [campusWorld, setCampusWorld] = useState(null);
-			const [campusState, setCampusState] = useState("loading");
-			const [campusError, setCampusError] = useState("");
 			const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion());
 			const [highContrast, setHighContrast] = useState(prefersHighContrast());
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, FloorCampus, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			useEffect(() => {
 				if (!studioOpen || studioTab !== "outside") return;
 				let live = true;
@@ -207201,40 +207469,6 @@ create: function(game) {
 				studioOpen,
 				studioTab,
 				props.base
-			]);
-			useEffect(() => {
-				if (!campusOpen) return;
-				let live = true;
-				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
-				setCampusState("loading");
-				setCampusError("");
-				fetchDirectory({
-					base: props.base,
-					fetchImpl: props.fetchImpl,
-					signal: ctl?.signal
-				}).then(async (directory) => {
-					const world = await fetchWorldTower(directory.floors, {
-						base: props.base,
-						fetchImpl: props.fetchImpl,
-						signal: ctl?.signal
-					});
-					if (!live) return;
-					setCampusDirectory(directory);
-					setCampusWorld(world);
-					setCampusState("ready");
-				}).catch((exc) => {
-					if (!live) return;
-					setCampusState("error");
-					setCampusError(exc instanceof Error ? exc.message : String(exc));
-				});
-				return () => {
-					live = false;
-					ctl?.abort();
-				};
-			}, [
-				campusOpen,
-				props.base,
-				props.fetchImpl
 			]);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
@@ -207384,8 +207618,7 @@ create: function(game) {
 				const baseSrc = officeAppSrc({
 					base: props.base,
 					mock: props.mock,
-					theme: requestedTheme,
-					floor: floorScope
+					theme: requestedTheme
 				});
 				frame.src = retryToken ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}` : baseSrc;
 				return () => {
@@ -207400,7 +207633,6 @@ create: function(game) {
 				props.base,
 				props.mock,
 				requestedTheme,
-				floorScope,
 				retryToken
 			]);
 			useEffect(() => {
@@ -207888,45 +208120,9 @@ create: function(game) {
 				"data-testid": "office-campus-toggle",
 				"aria-expanded": campusOpen,
 				"aria-controls": "office-game-campus",
-				"aria-label": "Open the 100-floor campus directory",
+				"aria-label": "Open the floor campus",
 				onClick: () => setCampusOpen((v) => !v)
 			}, "Campus");
-			const floorPicker = R.createElement("label", {
-				key: "floor-picker",
-				className: "office-game__floorPicker",
-				"data-testid": "office-floor-picker"
-			}, [R.createElement("span", { key: "label" }, "Floor"), R.createElement("select", {
-				key: "select",
-				value: floorScope,
-				"data-testid": "office-floor-select",
-				"aria-label": "Choose the live office floor",
-				onChange: (ev) => setFloorScope(ev.target.value)
-			}, [
-				R.createElement("option", {
-					key: "all",
-					value: ""
-				}, "All live floors"),
-				floorScope && ![
-					"live:1",
-					"live:2",
-					"live:3"
-				].includes(floorScope) ? R.createElement("option", {
-					key: "campus",
-					value: floorScope
-				}, `Campus ${floorScope}`) : null,
-				R.createElement("option", {
-					key: "f1",
-					value: "live:1"
-				}, "Floor 1 · Executive"),
-				R.createElement("option", {
-					key: "f2",
-					value: "live:2"
-				}, "Floor 2 · Operations"),
-				R.createElement("option", {
-					key: "f3",
-					value: "live:3"
-				}, "Floor 3 · Review")
-			])]);
 			children.push(R.createElement("div", {
 				key: "toolbar",
 				id: "office-game-controls",
@@ -207939,8 +208135,7 @@ create: function(game) {
 				commandCenterToggle,
 				timelineToggle,
 				studioToggle,
-				campusToggle,
-				floorPicker
+				campusToggle
 			]));
 			if (timelineOpen) children.push(R.createElement("div", {
 				key: "timeline-dock",
@@ -208006,55 +208201,32 @@ create: function(game) {
 					className: "office-game__studioBody"
 				}, body)]));
 			}
-			if (campusOpen) {
-				const counts = campusDirectory?.counts;
-				const body = campusState === "loading" ? R.createElement("div", {
-					key: "loading",
-					className: "office-game__campusState",
-					"data-testid": "office-campus-loading",
-					role: "status"
-				}, "Loading the 100-floor campus…") : campusState === "error" ? R.createElement("div", {
-					key: "error",
-					className: "office-game__campusState",
-					"data-testid": "office-campus-error",
-					role: "alert"
-				}, `Campus unavailable: ${campusError}`) : campusDirectory ? R.createElement(TowerNavigator, {
-					key: "tower",
-					floors: campusDirectory.floors,
-					world: campusWorld,
-					onOpenLiveFloor: (scope) => {
-						setFloorScope(scope);
-						setCampusOpen(false);
-					},
-					onOpenFloor: (floorId) => {
-						setFloorScope(floorId);
-						setCampusOpen(false);
-					}
-				}) : null;
-				children.push(R.createElement("section", {
-					key: "campus",
-					id: "office-game-campus",
-					className: "office-game__campus",
-					"data-testid": "office-campus",
-					"data-office-slice": dockSlice,
-					"aria-label": "100-floor Qubit campus"
-				}, [R.createElement("div", {
-					key: "head",
-					className: "office-game__campusHead"
-				}, [R.createElement("div", { key: "title" }, [R.createElement("h2", { key: "h" }, "Qubit Campus Directory"), R.createElement("p", {
-					key: "counts",
-					"data-testid": "office-campus-counts"
-				}, (counts ? `${counts.floors} floors · ${counts.wings} wings` + (campusWorld?.counts ? ` · ${campusWorld.counts.rooms} rooms · ${campusWorld.counts.desks} desks` : "") : "100 floor templates, 5 wings, 3,075 desks") + " · directory only, no characters")]), R.createElement("button", {
-					key: "close",
-					type: "button",
-					className: "office-game__btn office-theme-dock-close",
-					"data-testid": "office-campus-close",
-					onClick: () => setCampusOpen(false)
-				}, "Close campus")]), R.createElement("div", {
-					key: "body",
-					className: "office-game__campusBody"
-				}, body)]));
-			}
+			if (campusOpen) children.push(R.createElement("section", {
+				key: "campus",
+				id: "office-game-campus",
+				className: "office-game__campus office-game__campus--floors",
+				"data-testid": "office-campus",
+				"data-office-slice": dockSlice,
+				"aria-label": "Qubit floor campus"
+			}, [R.createElement("div", {
+				key: "head",
+				className: "office-game__campusHead"
+			}, [R.createElement("div", { key: "title" }, [R.createElement("h2", { key: "h" }, "Qubit Floor Campus"), R.createElement("p", {
+				key: "counts",
+				"data-testid": "office-campus-counts"
+			}, "Live floors · each card is the Habblaud office with LimeZu art")]), R.createElement("button", {
+				key: "close",
+				type: "button",
+				className: "office-game__btn office-theme-dock-close",
+				"data-testid": "office-campus-close",
+				onClick: () => setCampusOpen(false)
+			}, "Close campus")]), R.createElement("div", {
+				key: "body",
+				className: "office-game__campusBody"
+			}, R.createElement(FloorCampus, {
+				base: props.base,
+				theme: requestedTheme
+			}))]));
 			children.push(R.createElement(LoadingScreen, {
 				key: "loading-screen",
 				phase: failed ? "error" : "loading",
@@ -208080,173 +208252,6 @@ create: function(game) {
 				className: rootClass,
 				style: { position: "relative" }
 			}, children);
-		};
-	}
-	// ../qubit-app/plugins/qubit-office/game/types.ts
-	/** The schema this adapter is written against. A mismatch is refused, not coerced. */
-	var EXPECTED_SCHEMA = "qubit-office-tower/1";
-	// ../qubit-app/plugins/qubit-office/game/adapter.ts
-	/**
-	* Poll cadence. It is deliberately slower than the store's animation tick: the
-	* tower fold takes hundreds of milliseconds, and a sub-second abort/restart
-	* loop starves both this read and the iframe's `/api/stream` (see the header).
-	* `POLL_INTERVAL_MS` in `office-api.ts` states the same 2 s contract.
-	*/
-	var DEFAULT_INTERVAL_MS = 2e3;
-	var OfficeAdapter = class {
-		revision = 0;
-		payload = null;
-		error = null;
-		loading = false;
-		provenance = "none";
-		inflight = null;
-		timer = null;
-		disposed = false;
-		opts;
-		constructor(opts) {
-			this.opts = {
-				baseUrl: "/agent",
-				intervalMs: DEFAULT_INTERVAL_MS,
-				...opts
-			};
-		}
-		/** The current snapshot. A pure read — never triggers a load. */
-		snapshot() {
-			return {
-				revision: this.revision,
-				payload: this.payload,
-				error: this.error,
-				loading: this.loading,
-				stale: this.error !== null && this.payload !== null,
-				provenance: this.provenance
-			};
-		}
-		/**
-		* One serialized load. A call while one is already in flight is a no-op, so
-		* a timer tick can never abort the request before it returns: the next tick
-		* simply asks again. One request is on the wire at a time, and two responses
-		* can never race.
-		*/
-		async load() {
-			if (this.disposed || this.inflight !== null) return;
-			const ctl = new AbortController();
-			this.inflight = ctl;
-			const requestedAt = this.revision;
-			this.loading = true;
-			this.emit();
-			const f = this.opts.fetchImpl ?? fetch;
-			const token = this.opts.token ?? readSessionToken();
-			try {
-				const headers = {};
-				if (token) {
-					headers["X-Api-Token"] = token;
-					headers["X-Qubit-Session-Token"] = token;
-				}
-				const res = await f(`${this.opts.baseUrl}/api/office/tower`, {
-					signal: ctl.signal,
-					headers: token ? headers : void 0
-				});
-				if (ctl.signal.aborted) return;
-				if (!res.ok) throw new Error(`HTTP ${res.status}`);
-				const body = await res.json();
-				if (ctl.signal.aborted) return;
-				this.accept(body, requestedAt);
-			} catch (err) {
-				if (ctl.signal.aborted || this.disposed) return;
-				this.error = err instanceof Error ? err.message : String(err);
-				this.loading = false;
-				this.emit();
-			} finally {
-				if (this.inflight === ctl) this.inflight = null;
-			}
-		}
-		/** Validate + apply one payload. Exposed so tests can drive it directly. */
-		accept(body, requestedAt) {
-			const check = parseTower(body);
-			if (!check.ok) {
-				this.error = check.error;
-				this.loading = false;
-				this.emit();
-				return;
-			}
-			if (requestedAt < this.revision) {
-				this.loading = false;
-				return;
-			}
-			this.payload = check.payload;
-			this.revision = requestedAt + 1;
-			this.error = null;
-			this.loading = false;
-			this.provenance = check.payload.preview ? "recording" : "live";
-			this.emit();
-		}
-		/** Start polling. Pauses while the document is hidden. */
-		start() {
-			if (this.timer !== null || this.disposed) return;
-			this.load();
-			this.timer = setInterval(() => {
-				if (isHidden()) return;
-				this.load();
-			}, this.opts.intervalMs);
-		}
-		stop() {
-			if (this.timer !== null) {
-				clearInterval(this.timer);
-				this.timer = null;
-			}
-		}
-		/** Release everything. Idempotent — safe in a React cleanup. */
-		dispose() {
-			if (this.disposed) return;
-			this.disposed = true;
-			this.stop();
-			this.inflight?.abort();
-			this.inflight = null;
-			this.loading = false;
-		}
-		emit() {
-			if (this.disposed) return;
-			this.opts.onSnapshot(this.snapshot());
-		}
-	};
-	function isHidden() {
-		return typeof document !== "undefined" && document.visibilityState === "hidden";
-	}
-	/**
-	* The session token the server injects into the SPA shell
-	* (`webui.py:1563` `window.__QUBIT_SESSION_TOKEN__`). Never a query param —
-	* `token_ok` rejects query tokens outright.
-	*/
-	function readSessionToken() {
-		const w = globalThis;
-		return typeof w.__QUBIT_SESSION_TOKEN__ === "string" ? w.__QUBIT_SESSION_TOKEN__ : "";
-	}
-	/** Structural validation. Returns a typed refusal, never a coerced payload. */
-	function parseTower(body) {
-		if (body === null || typeof body !== "object") return {
-			ok: false,
-			error: "the response was not an object"
-		};
-		const b = body;
-		if (b.schema !== "qubit-office-tower/1") return {
-			ok: false,
-			error: `unexpected schema ${JSON.stringify(b.schema)}; this build reads ${EXPECTED_SCHEMA}`
-		};
-		if (b.ok !== true) return {
-			ok: false,
-			error: typeof b.detail === "string" ? b.detail : "the tower report answered not-ok"
-		};
-		if (typeof b.hud !== "object" || b.hud === null) return {
-			ok: false,
-			error: "the payload carries no hud"
-		};
-		if (!Array.isArray(b.characters)) return {
-			ok: false,
-			error: "the payload carries no characters array"
-		};
-		return {
-			ok: true,
-			payload: body
 		};
 	}
 	// ../qubit-app/plugins/qubit-office/game/entry.ts

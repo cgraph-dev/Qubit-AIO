@@ -26,9 +26,7 @@ import { createTimeline } from "./Timeline";
 import { createRoomBuilder } from "./RoomBuilder";
 import { createOutsideWorld } from "./OutsideWorld";
 import { createPanelInventoryPanel } from "./PanelInventory";
-import { createTowerNavigator } from "./TowerNavigator";
-import { fetchDirectory, type BusinessDirectory } from "./business-api";
-import { fetchWorldTower, type WorldTower } from "./world-tower";
+import { createFloorCampus } from "./FloorCampus";
 import { fetchOutsideWorld, type OutsideWorldView } from "./outside-world";
 import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
@@ -150,7 +148,7 @@ type ShellComponents = {
   RoomBuilder: ReturnType<typeof createRoomBuilder>;
   OutsideWorld: ReturnType<typeof createOutsideWorld>;
   PanelInventory: ReturnType<typeof createPanelInventoryPanel>;
-  TowerNavigator: ReturnType<typeof createTowerNavigator>;
+  FloorCampus: ReturnType<typeof createFloorCampus>;
   EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
@@ -196,7 +194,7 @@ function shellComponents(
     RoomBuilder: createRoomBuilder(R, hooks),
     OutsideWorld: createOutsideWorld(R, hooks),
     PanelInventory: createPanelInventoryPanel(R, hooks),
-    TowerNavigator: createTowerNavigator(R, hooks),
+    FloorCampus: createFloorCampus(R, hooks),
     EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
@@ -270,21 +268,9 @@ export function createOfficeApp(
       "panels");
     const [outsideView, setOutsideView] = useState<OutsideWorldView | null>(
       null);
-    // The animated office is the primary surface. The 100-floor campus is a
-    // directory projection, not a renderer, so it must never be presented as
-    // the office until a floor renderer exists.
+    // The Habblaud office is the primary surface. Campus multiplies it into
+    // one card per real floor; it is not a directory and not a second renderer.
     const [campusOpen, setCampusOpen] = useState(false);
-    // Which real floor the animated renderer draws. Empty keeps every live
-    // floor in one building, exactly as before; `live:<n>` narrows the stream
-    // server-side so the chosen floor's rooms and characters are the only ones
-    // on screen.
-    const [floorScope, setFloorScope] = useState("");
-    const [campusDirectory, setCampusDirectory] = useState<
-      BusinessDirectory | null>(null);
-    const [campusWorld, setCampusWorld] = useState<WorldTower | null>(null);
-    const [campusState, setCampusState] = useState<
-      "loading" | "ready" | "error">("loading");
-    const [campusError, setCampusError] = useState<string>("");
     // P6-05 accessibility preferences. Declared AFTER every earlier slot so
     // seeded state indices in the shell's own tests stay stable. The OS
     // preference is honoured by default; an explicit shell setting could win
@@ -298,7 +284,7 @@ export function createOfficeApp(
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
       ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld,
-      PanelInventory, TowerNavigator, EtsyConnectPanel, LoadingScreen,
+      PanelInventory, FloorCampus, EtsyConnectPanel, LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     useEffect(() => {
       if (!studioOpen || studioTab !== "outside") return;
@@ -309,32 +295,6 @@ export function createOfficeApp(
         .then((view) => { if (live) setOutsideView(view); });
       return () => { live = false; ctl?.abort(); };
     }, [studioOpen, studioTab, props.base]);
-    useEffect(() => {
-      if (!campusOpen) return;
-      let live = true;
-      const ctl = typeof AbortController === "undefined" ? undefined
-        : new AbortController();
-      setCampusState("loading");
-      setCampusError("");
-      fetchDirectory({ base: props.base, fetchImpl: props.fetchImpl,
-        signal: ctl?.signal })
-        .then(async (directory) => {
-          const world = await fetchWorldTower(directory.floors, {
-            base: props.base, fetchImpl: props.fetchImpl,
-            signal: ctl?.signal,
-          });
-          if (!live) return;
-          setCampusDirectory(directory);
-          setCampusWorld(world);
-          setCampusState("ready");
-        })
-        .catch((exc) => {
-          if (!live) return;
-          setCampusState("error");
-          setCampusError(exc instanceof Error ? exc.message : String(exc));
-        });
-      return () => { live = false; ctl?.abort(); };
-    }, [campusOpen, props.base, props.fetchImpl]);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
@@ -551,7 +511,6 @@ export function createOfficeApp(
       setLoaded(false);
       const baseSrc = officeAppSrc({
         base: props.base, mock: props.mock, theme: requestedTheme,
-        floor: floorScope,
       });
       frame.src = retryToken
         ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}`
@@ -564,7 +523,7 @@ export function createOfficeApp(
         restoreEscape?.();
         restoreBridge?.();
       };
-    }, [props.base, props.mock, requestedTheme, floorScope, retryToken]);
+    }, [props.base, props.mock, requestedTheme, retryToken]);
 
     // Mirror the dock state onto the injected buttons after every render: the
     // office paints its own active state from `aria-pressed`, and the
@@ -1155,42 +1114,9 @@ export function createOfficeApp(
       "data-testid": "office-campus-toggle",
       "aria-expanded": campusOpen,
       "aria-controls": "office-game-campus",
-      "aria-label": "Open the 100-floor campus directory",
+      "aria-label": "Open the floor campus",
       onClick: () => setCampusOpen((v: boolean) => !v),
     }, "Campus");
-
-    // The animated renderer flattens the live floors into one building. This
-    // picker narrows it to one real floor; the server does the filtering, so a
-    // floor with no agent shows its empty rooms instead of borrowing another
-    // floor's characters.
-    const floorPicker = R.createElement("label", {
-      key: "floor-picker",
-      className: "office-game__floorPicker",
-      "data-testid": "office-floor-picker",
-    }, [
-      R.createElement("span", { key: "label" }, "Floor"),
-      R.createElement("select", {
-        key: "select",
-        value: floorScope,
-        "data-testid": "office-floor-select",
-        "aria-label": "Choose the live office floor",
-        onChange: (ev: { target: { value: string } }) =>
-          setFloorScope(ev.target.value),
-      }, [
-        R.createElement("option", { key: "all", value: "" },
-          "All live floors"),
-        floorScope && !["live:1", "live:2", "live:3"].includes(floorScope)
-          ? R.createElement("option", { key: "campus", value: floorScope },
-              `Campus ${floorScope}`)
-          : null,
-        R.createElement("option", { key: "f1", value: "live:1" },
-          "Floor 1 · Executive"),
-        R.createElement("option", { key: "f2", value: "live:2" },
-          "Floor 2 · Operations"),
-        R.createElement("option", { key: "f3", value: "live:3" },
-          "Floor 3 · Review"),
-      ]),
-    ]);
 
     // P6-05 — a real toolbar landmark groups the persistent shell controls.
     // It is also the skip target that gets a keyboard user OUT of the canvas
@@ -1203,8 +1129,7 @@ export function createOfficeApp(
       role: "toolbar",
       "aria-label": "Office panels",
       tabIndex: -1,
-    }, [commandCenterToggle, timelineToggle, studioToggle, campusToggle,
-        floorPicker]));
+    }, [commandCenterToggle, timelineToggle, studioToggle, campusToggle]));
 
     // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
     // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full
@@ -1283,55 +1208,22 @@ export function createOfficeApp(
     }
 
     if (campusOpen) {
-      const counts = campusDirectory?.counts;
-      const body = campusState === "loading"
-        ? R.createElement("div", {
-            key: "loading", className: "office-game__campusState",
-            "data-testid": "office-campus-loading", role: "status",
-          }, "Loading the 100-floor campus…")
-        : campusState === "error"
-        ? R.createElement("div", {
-            key: "error", className: "office-game__campusState",
-            "data-testid": "office-campus-error", role: "alert",
-          }, `Campus unavailable: ${campusError}`)
-        : campusDirectory
-        ? R.createElement(TowerNavigator as never, {
-            key: "tower",
-            floors: campusDirectory.floors,
-            world: campusWorld,
-            onOpenLiveFloor: (scope: string) => {
-              setFloorScope(scope);
-              setCampusOpen(false);
-            },
-            onOpenFloor: (floorId: string) => {
-              setFloorScope(floorId);
-              setCampusOpen(false);
-            },
-          })
-        : null;
       children.push(R.createElement("section", {
         key: "campus",
         id: "office-game-campus",
-        className: "office-game__campus",
+        className: "office-game__campus office-game__campus--floors",
         "data-testid": "office-campus",
         "data-office-slice": dockSlice,
-        "aria-label": "100-floor Qubit campus",
+        "aria-label": "Qubit floor campus",
       }, [
         R.createElement("div", {
           key: "head", className: "office-game__campusHead",
         }, [
           R.createElement("div", { key: "title" }, [
-            R.createElement("h2", { key: "h" }, "Qubit Campus Directory"),
+            R.createElement("h2", { key: "h" }, "Qubit Floor Campus"),
             R.createElement("p", {
               key: "counts", "data-testid": "office-campus-counts",
-            }, (counts
-              ? `${counts.floors} floors · ${counts.wings} wings`
-                + (campusWorld?.counts
-                  ? ` · ${campusWorld.counts.rooms} rooms · `
-                    + `${campusWorld.counts.desks} desks`
-                  : "")
-              : "100 floor templates, 5 wings, 3,075 desks")
-              + " · directory only, no characters"),
+            }, "Live floors · each card is the Habblaud office with LimeZu art"),
           ]),
           R.createElement("button", {
             key: "close", type: "button",
@@ -1342,7 +1234,10 @@ export function createOfficeApp(
         ]),
         R.createElement("div", {
           key: "body", className: "office-game__campusBody",
-        }, body),
+        }, R.createElement(FloorCampus as never, {
+          base: props.base,
+          theme: requestedTheme,
+        })),
       ]));
     }
 
