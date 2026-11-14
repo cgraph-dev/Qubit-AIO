@@ -1,0 +1,111 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_renderer_budget.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "r heap and event rates are NOT measured by this hermetic process; they stay not_measured unless --sample supplies a real browser measurement\",\n    \"the measured floor-projection timing is a Python data-path number, not a rendered frame time\",\n    \"the verifier exercises the projection/culling contract, not the vendored Habblaud client, a browser compositor or a GPU\",\n    \"no live service, state, credential or network is touched\"\n  ],\n  \"no_fabricated_metrics\": true,\n  \"ok\": true,\n  \"schema\": \"qoffice-renderer-budget/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P3-04\",\n  \"tier\": \"desktop\",\n  \"tower\": {\n    \"checks\": {\n      \"desks\": true,\n      \"floors\": true,\n      \"rooms\": true,\n      \"staffed_agents\": true,\n      \"wings\": true\n    },\n    \"counts\": {\n      \"active_floors\": 22,\n      \"cells\": 575,\n      \"desks\": 3075,\n      \"dormant_floors\": 78,\n      \"floors\": 100,\n      \"rooms\": 300,\n      \"staffed_agents\": 0,\n      \"wings\": 5\n    },\n    \"digest\": \"5aeab697402792513db5036d59c73a06aedecb4c27f111a6d9ae6c1d21f655b9\",\n    \"expected\": {\n      \"desks\": 3075,\n      \"floors\": 100,\n      \"rooms\": 300,\n      \"staffed_agents\": 0,\n      \"wings\": 5\n    },\n    \"problems\": [],\n    \"valid\": true\n  }\n}\n"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase3_renderer",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "............                                                             [100%]\n12 passed in 3.98s\n"
+    },
+    {
+      "cmd": "bash -lc 'ln -s \u2026/frontend/qubit-web/node_modules frontend/qubit-web/node_modules; trap \"rm -f \u2026/node_modules\" EXIT; cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/renderer-floor.test.ts ../qubit-app/plugins/qubit-office/game/app/renderer-budget.test.ts'",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p3-renderer/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  28 passed (28)\n   Start at  06:36:40\n   Duration  245ms (transform 107ms, setup 0ms, import 142ms, tests 24ms, environment 0ms)\n\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/verify_renderer_budget.py tests/phase3_renderer",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile scripts/verify_renderer_budget.py tests/phase3_renderer/test_renderer_budget.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "tsc --noEmit --strict --target ES2023 --module ESNext --moduleResolution bundler --skipLibCheck --verbatimModuleSyntax --erasableSyntaxOnly renderer-floor.ts renderer-budget.ts",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T04:36:58Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md",
+      "sha256": "3f823ebf1188ca25898e494339e9ec674b78a39afabf37500a8c032527850a65"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-BROWSER-REVIEW.md",
+      "sha256": "91cb49e4cead1c28ed1d93a60f87b538140e8b25c328da9937477257b7794614"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/office/world/tower_plan.py",
+      "sha256": "5d19979dd77e67e464dd8d0948570bcf62d265461faca93ba43d218f171c1ac9"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/world-tower.ts",
+      "sha256": "ab5239b18ee33e84626143b0a3169003b550db5dfb5e70621a82a256eef072cc"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/PhaserSceneHost.ts",
+      "sha256": "d7c3061a4dc1396a4f7777e1e08455809e856edc1b6a12008b5df65878430a20"
+    }
+  ],
+  "limitations": [
+    "GPU frame time, browser heap and client event rates are not measured by the hermetic verifier; they remain not_measured unless a real --sample is supplied",
+    "the reported floor-projection timing is the Python projection data path, not a rendered frame time",
+    "the renderer-floor and renderer-budget contracts are pure modules; they are not wired into OfficeAppShell or the vendored Habblaud client, which other lanes own",
+    "Vitest runs from the main checkout node_modules through a temporary symlink that is removed after the run and is not committed",
+    "tsc was run with ad hoc strict flags over only the two new modules; pre-existing project type drift elsewhere was not re-checked",
+    "no live service, live state, credentials, network or full matrix; VERIFIED/COMPLETE is not claimed"
+  ],
+  "outputs": [
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-floor.ts",
+      "sha256": "d9c55d0c590f55d3c1e7f60638ec47be08eb0088b8a4534ede4af06d2649614e"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-budget.ts",
+      "sha256": "c29e417c981f7023f393f29b97971aee1110417cbf5c25005aa80ee28e1f76c8"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-floor.test.ts",
+      "sha256": "11b7322288da60215063a862092c0fdde809e71cfa48cfac9eaa043eeb3251c3"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/renderer-budget.test.ts",
+      "sha256": "014d0ee47f660c74458dfbd55a529a833f6780589cded632638ab5e000ca800a"
+    },
+    {
+      "path": "scripts/verify_renderer_budget.py",
+      "sha256": "3eb77e068758e0cb7bb09fe15e5cd429c4868c9c018166a5067e1f0a8a979520"
+    },
+    {
+      "path": "tests/phase3_renderer/test_renderer_budget.py",
+      "sha256": "dc76d10c05b9d97572f5aed17f6fc07a3c70f8f11337825185286c2faef47438"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P3-04"
+}
