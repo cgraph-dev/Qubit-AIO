@@ -5,14 +5,14 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "    \"wrong_audience_denied\": true\n  },\n  \"status\": \"PASS\",\n  \"task\": {\n    \"status\": \"completed\",\n    \"task_id\": \"task_01M7C1PV51YMYS600XH0E3B7M6\",\n    \"workspace\": \"wsp_01M7C1PV5HDKTMV8GX1PH46J9N\",\n    \"workspace_revision\": \"1\"\n  },\n  \"tenant\": \"ten_01M7C1PV1T6F3JDP015QRPTY9W\",\n  \"write\": {\n    \"executed\": true,\n    \"receipt\": {\n      \"listing\": \"synthetic-reference-listing\",\n      \"provider\": \"fake-etsy\",\n      \"request_id\": \"fake-provider-request-1\",\n      \"status\": \"accepted\"\n    }\n  }\n}"
+      "stdout_tail": "    \"wrong_audience_denied\": true\n  },\n  \"status\": \"PASS\",\n  \"task\": {\n    \"status\": \"completed\",\n    \"task_id\": \"task_01M7C4MBQZ0W4CPR74Q1HZG0SM\",\n    \"workspace\": \"wsp_01M7C4MBRHRGZR2ZB9A7BXDN9X\",\n    \"workspace_revision\": \"1\"\n  },\n  \"tenant\": \"ten_01M7C4MBMBKPQ0EH9QG531PCR7\",\n  \"write\": {\n    \"executed\": true,\n    \"receipt\": {\n      \"listing\": \"synthetic-reference-listing\",\n      \"provider\": \"fake-etsy\",\n      \"request_id\": \"fake-provider-request-1\",\n      \"status\": \"accepted\"\n    }\n  }\n}"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_reference",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "....                                                                     [100%]\n4 passed in 1.86s"
+      "stdout_tail": "....                                                                     [100%]\n4 passed in 1.90s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/phase1_reference_lane.py tests/phase1_reference",
@@ -29,7 +29,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:30:41Z",
+  "generated_at": "2026-11-14T04:21:45Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -69,7 +69,7 @@
     },
     {
       "path": "voicebridge/business/a2a.py",
-      "sha256": "c32dc133ecc8fbe05e6505b91c0c66d282777f45f29ad66ffdf861368d651d76"
+      "sha256": "265874aa0dd95baad02f9e1c080eb7cdda7c00a1b91a6f15696d1316e79bbae1"
     },
     {
       "path": "voicebridge/business/otel.py",

@@ -1,23 +1,23 @@
 {
   "evidence_hashes": {
-    "evidence/phase-1/P1-01-identity.json": "226444942392d00bae0fd69f3003ef539e8606be2ad1c9afed574047d44842da",
-    "evidence/phase-1/P1-02-eventlog.json": "efb7a53e3afce34e8403a8367c68cea7be801aaaa65afafa0282d55cfc4123b6",
-    "evidence/phase-1/P1-03-gateway.json": "307c04eeb7ed763c18a860f01b1cd3600900796dac6dd5619d55e31afed99d1c",
-    "evidence/phase-1/P1-04-runs.json": "5244cddea5c24cae606cfa7501670e26d634b7ca045fcfa34d8ab15ffa6d4fa6",
-    "evidence/phase-1/P1-05-a2a.json": "3377b142449bae8094d3a2fb9b6865beb75494837e504113407a7d1c2a2ee4e0",
-    "evidence/phase-1/P1-06-approvals.json": "02c7c6980f4df343d714603d5a647b28c310cbeb974be6345f645fa73811183d",
+    "evidence/phase-1/P1-01-identity.json": "dcf78b457570907d526a5499b53804f3d3db0ffac7ac708bf54f38ac05d1d25b",
+    "evidence/phase-1/P1-02-eventlog.json": "4202a96846b2ee834a9ee12565daec164884e111c1b0d313a35cce4fceda11ef",
+    "evidence/phase-1/P1-03-gateway.json": "0a054ad5703f6716b0ca63bf4f7d785662107d09b1f0802f9a3b1f3577113572",
+    "evidence/phase-1/P1-04-runs.json": "9851e8b9426f65409dcd052ffde0f2a9a45ea49a4963ac88ed24eb98faf27fbb",
+    "evidence/phase-1/P1-05-a2a.json": "498267af68e0c8ac5885fe0590c697a7196716e766919c72001e13f1a7b9f690",
+    "evidence/phase-1/P1-06-approvals.json": "3eaf7f568f3a883d9c415fd6863d0ec7761843a3a9d90d9021b378dc60c19976",
     "evidence/phase-1/P1-07-security.json": "dcf6a85bef1fc2478d0ba3adfab662a7acf02aa98d53aa020ba01928de739f38",
     "evidence/phase-1/P1-08-otel.json": "12dc906c214f542a05e40be4e2b948f1707791d8af3c6f979c2b6b1858dc2e3c",
-    "evidence/phase-1/P1-09-backup-restore.json": "bff5e7fae18afbe0e51e4225ef6611b2b62fa03fafb0e3b13b3c1432bc1048c8",
-    "evidence/phase-1/P1-10-reference-lane.json": "272dbb330533825eb819e085232604a2ffb3a8d41ff6bf7161579fa8d3cad16f"
+    "evidence/phase-1/P1-09-backup-restore.json": "a1af528819dc46fff3123ac6638d2b35cd0d6ada324957870a60985c0c2773b3",
+    "evidence/phase-1/P1-10-reference-lane.json": "3a144b8a2554b0d8901effffbfbd8c404486a543fb2897355f973a5e838e06ec"
   },
   "evidence_verification": {
     "checked": 10,
     "failures": [],
     "ok": true
   },
-  "generated_at": "2026-11-14T03:31:02Z",
-  "git_head": "73d28da24d1505a14b81f6286013b113f7584f8c",
+  "generated_at": "2026-11-14T04:22:24Z",
+  "git_head": "52f1dfaeed55a387f363429796741bd46da03d84",
   "limitations": [
     "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
     "no live services, credentials or external side effects",
@@ -101,7 +101,7 @@
       "task_id": "P1-09"
     },
     {
-      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.jbehRc/reference",
+      "command": "/home/trick/venvs/qubit314/bin/python scripts/phase1_reference_lane.py --json --work-root /tmp/qoffice-phase1-acceptance.zomMOC/reference",
       "evidence": [
         "evidence/phase-1/P1-10-reference-lane.json"
       ],

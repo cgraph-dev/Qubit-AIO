@@ -1,5 +1,26 @@
 # OPEN_THREADS.md — durable handoff ledger
 
+**Qubit Office Phase 2 workforce/runtime accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
+`bash scripts/acceptance/phase-2.sh` exits 0 and writes `evidence/phase-2/manifest.json`
+(`status: PASS`) after checking accepted Phase 0/1 manifests. Five lanes: P2-01 agent registry +
+`AgentControlService.effective_profile` (explicit/inherited/effective/denied grants, skills as
+requirements, MCP schema hashes, model route/fallback) with schema v5; P2-02 durable
+sessions/workspaces/checkpoints/handoffs/recovery + P2-05 typed A2A handoff (recipient acceptance,
+ACL, no privilege inheritance); P2-03 `AgentBackend` adapter/registry + `DynamicCapabilityCatalog`
+(catalog sources, complete schema hashes, typed availability, `policy.compile_snapshot`);
+P2-04 event-log-authoritative memory with Obsidian projection, ACL/provenance/confidence/expiry,
+quarantine, supersede/delete/rebuild and an injected OpenViking adapter; P2-06 `TurnOrchestrator`
+(fake `ModelPort`, gateway-bound tool calls, approval-gated write, artifact/receipt/before-after
+checkpoints, `unknown` never completed, resume from validated checkpoint, step/tool limits);
+P2-07 effective-state projection + independent verifier + accessible panel mounted in the Agent
+Control drawer (read-only route). **Measured:** combined Phase 2+1+0 focused **521 passed**; broader
+business/office regression **475 passed**; P2-07 Vitest **9 passed**; verifier **16/16 checks**.
+**Honest limits:** no live model/provider/MCP/network; `NativeBackend` wiring to the runtime port is
+still the lead's step; memory recall is per single aggregate; approval postcondition validation and
+out-of-process isolation are not implemented; UI `tsc` still reports the 3 pre-existing
+PhaserSceneHost/phaser errors only. **Not done:** live deploy, real external effects, full matrix,
+`VERIFIED`. Next: Phase 3 full campus data/maps/renderer/shell.
+
 **Qubit Office Phase 1 execution boundary accepted — 2026-11-14 (branch `feat/qoffice-next`, not merged):**
 `bash scripts/acceptance/phase-1.sh` exits 0 and writes `evidence/phase-1/manifest.json` with
 `status: PASS` after checking the accepted Phase 0 manifest/contracts. Five integrated lanes:

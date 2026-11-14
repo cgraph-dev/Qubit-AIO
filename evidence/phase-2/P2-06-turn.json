@@ -3,29 +3,33 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_turn tests/phase1_reference tests/phase1_gateway",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................                 [100%]\n56 passed in 7.00s\n"
+      "stdout_tail": "........................................................                 [100%]\n56 passed in 8.14s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/phase2_agent_turn.py --json",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "_id\": \"fake-request-1\",\n      \"status\": \"accepted\"\n    },\n    \"run_id\": \"job_01M7C3GEAZNFCJCC2DWT1SDZW2\",\n    \"steps\": 3,\n    \"text\": \"Published the listing.\",\n    \"tool_calls\": 2,\n    \"trace_count\": 1,\n    \"trace_spans\": [\n      \"approval\",\n      \"chat\",\n      \"execute_tool\",\n      \"external_receipt\",\n      \"invoke_agent\"\n    ]\n  },\n  \"task\": \"task_01M7C3GEAHHP1TMSY86RQ9TWPK\",\n  \"tenant\": \"ten_01M7C3GE8827KWSSC3KVSHJ1B5\",\n  \"timeout\": {\n    \"error_code\": \"AGENT_TURN_MODEL_TIMEOUT\",\n    \"initial_status\": \"unknown\",\n    \"job_status\": \"unknown\",\n    \"resumed_checkpoints\": [\n      1,\n      2,\n      3\n    ],\n    \"resumed_status\": \"completed\",\n    \"run_id\": \"job_01M7C3GENBHE8V1QG7DAQYW675\"\n  }\n}\n"
+      "stdout_tail": "      \"execute_tool\",\n      \"external_receipt\",\n      \"invoke_agent\"\n    ]\n  },\n  \"task\": \"task_01M7C4Q3ZWGPNDSGJBH88CASHD\",\n  \"tenant\": \"ten_01M7C4Q3XCK1C2Q0F2RGDV1DBN\",\n  \"timeout\": {\n    \"error_code\": \"AGENT_TURN_MODEL_TIMEOUT\",\n    \"initial_status\": \"unknown\",\n    \"job_status\": \"unknown\",\n    \"resumed_checkpoints\": [\n      1,\n      2,\n      3\n    ],\n    \"resumed_status\": \"completed\",\n    \"run_id\": \"job_01M7C4Q4AGJ4GXHAH6JJPZFBQM\"\n  }\n}"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "All checks passed!\n"
+      "stdout_tail": "All checks passed!"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/agent_turn.py scripts/phase2_agent_turn.py tests/phase2_turn/*.py",
       "exit_code": 0,
+      "expected_exit": 0,
       "stderr_tail": "",
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T04:02:21Z",
+  "generated_at": "2026-11-14T04:23:13Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -81,7 +85,7 @@
     },
     {
       "path": "voicebridge/business/errors.py",
-      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
     },
     {
       "path": "voicebridge/business/identity.py",

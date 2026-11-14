@@ -8,6 +8,7 @@
  * store's answer — never a local guess.
  */
 import type { OfficeGameShellProps } from "../OfficeGameShell";
+import { createEffectiveStatePanel } from "./EffectiveStatePanel";
 import type { AgentSeat } from "./agents-panel";
 import {
   type AgentDetail, type AgentRecord, type AgentTurnPlan, type AuditEvent,
@@ -87,6 +88,7 @@ export function createAgentControlDrawer(
   hooks: OfficeGameShellProps["hooks"],
 ) {
   const { useState, useEffect, useRef } = hooks;
+  const EffectiveStatePanel = createEffectiveStatePanel(R, hooks);
 
   return function AgentControlDrawer(props: AgentControlDrawerProps) {
     const [load, setLoad] = useState<LoadState>({ kind: "loading" });
@@ -898,6 +900,14 @@ export function createAgentControlDrawer(
         key: "busy", className: "agent-control__state",
         "data-testid": "agent-control-busy", role: "status",
       }, `${busy}…`));
+    }
+    if (selectedId) {
+      children.push(section(R, "Effective state", "effective", [
+        R.createElement(EffectiveStatePanel, {
+          key: "effective", agentId: selectedId,
+          base: props.base, fetchImpl: props.fetchImpl,
+        }),
+      ]));
     }
     if (actionError) {
       children.push(R.createElement("div", {

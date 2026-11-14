@@ -5,14 +5,14 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".......................                                                  [100%]\n23 passed in 2.36s"
+      "stdout_tail": ".......................                                                  [100%]\n23 passed in 1.89s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/durable_substrate tests/test_business_os_foundation.py tests/test_integration_tool_gateway.py",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "...........................................................              [100%]\n59 passed in 5.36s"
+      "stdout_tail": "...........................................................              [100%]\n59 passed in 4.40s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/durable.py voicebridge/business/schema.py voicebridge/business/errors.py voicebridge/business/__init__.py tests/durable_substrate",
@@ -22,7 +22,7 @@
       "stdout_tail": "All checks passed!"
     }
   ],
-  "generated_at": "2026-11-14T03:29:18Z",
+  "generated_at": "2026-11-14T04:20:24Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -69,7 +69,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "16719619ecde70d12e20532d6dc114c78d81f9c258d4d1c72e7b7c2364d41b4b"
+      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
     },
     {
       "path": "voicebridge/business/durable.py",
@@ -77,11 +77,11 @@
     },
     {
       "path": "voicebridge/business/errors.py",
-      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
     },
     {
       "path": "voicebridge/business/__init__.py",
-      "sha256": "c1de942f45ac4b9d734680b070b006cadb1fe95199d92631efde18fe944e7890"
+      "sha256": "fcc8a5e50b1a8e4ee16d2b07265b4dfb3472a126990ada4601544bff31368100"
     },
     {
       "path": "tests/durable_substrate/test_checkpoint_resume.py",
@@ -97,7 +97,7 @@
     },
     {
       "path": "tests/durable_substrate/test_recovery_restore.py",
-      "sha256": "cf53044e946b9d6b29bf06cc4c94257b4101654ea136d3bdc7422049efd3e95c"
+      "sha256": "1f1c7ea559facfd084fbc37aadb6913879bbe9552ae2cd551e0fe1846627a880"
     }
   ],
   "status": "PASS",

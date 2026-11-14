@@ -564,7 +564,6 @@ def run_existing_store(db: Path, tenant_id: str, agent_id: str) -> dict[str, Any
         checks.append(_check(
             "every_projected_allow_is_authorized", allow_ok,
             f"{len(projected)} effective capabilities re-decided"))
-        now = time.time()
         projected_expired = {
             row["lease_id"] for row in projection["leases"]["expired"]}
         active_ids = {

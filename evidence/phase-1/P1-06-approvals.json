@@ -5,14 +5,14 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".....................................                                    [100%]\n37 passed in 2.94s"
+      "stdout_tail": ".....................................                                    [100%]\n37 passed in 2.12s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_threat_denials.py tests/test_integration_tool_gateway.py tests/test_etsy_listing_workflow.py tests/test_business_warroom.py tests/office_contracts/test_stage_replay.py tests/test_business_office_bridge.py",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 82%]\n...............                                                          [100%]\n87 passed in 9.93s"
+      "stdout_tail": "........................................................................ [ 82%]\n...............                                                          [100%]\n87 passed in 8.98s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/ruff check voicebridge/business/approvals.py voicebridge/business/errors.py tests/phase1_a2a_approvals/",
@@ -29,7 +29,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:25:10Z",
+  "generated_at": "2026-11-14T04:21:34Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -53,7 +53,7 @@
     },
     {
       "path": "voicebridge/business/errors.py",
-      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
     },
     {
       "path": "voicebridge/business/models.py",
@@ -61,7 +61,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "16719619ecde70d12e20532d6dc114c78d81f9c258d4d1c72e7b7c2364d41b4b"
+      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
     },
     {
       "path": "voicebridge/business/store.py",
@@ -91,7 +91,7 @@
     },
     {
       "path": "voicebridge/business/errors.py",
-      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
     },
     {
       "path": "tests/phase1_a2a_approvals/test_approvals.py",

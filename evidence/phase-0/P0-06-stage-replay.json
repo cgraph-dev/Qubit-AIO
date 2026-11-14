@@ -5,17 +5,17 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "  \"no_network_flag\": true,\n  \"projection_parts\": {\n    \"agents\": \"7d414e449fda84bfd77d5706b8ee2509b6c80f464302bb05bf9fb33fde2f683a\",\n    \"approvals\": \"869da3bc61b87f89160776e73dc0e232669aa689537eb816b0e61726c9d7fd7b\",\n    \"artifacts\": \"aaffc8582078f1c887d94825099f38fc8843a725f2cb04d9d898aa557204f137\",\n    \"audit\": \"8f2e529cb1713df4aae422ec9c54a8df4f0e313bb8b03d2a54c6edd04f5b7d0d\",\n    \"jobs\": \"b34c04caed77890af95c93c562822b180daa114476d97fe379c9e929dc70a9ec\",\n    \"ledger\": \"8964c220de4466471ec386ce5cedafb7ad9b6ac5327e6ec19f08959a87227b0a\",\n    \"tool_invocations\": \"97c43461160feb1e0c0579261100170929a5a856a9942a7f226d50703dc8e16f\"\n  },\n  \"replay_digest\": \"51b3896f03652afd5b082325a29070745f7e12e63f58d0a84a708b115a2af1aa\",\n  \"report_path\": \"/tmp/qoffice-stage-p5youuzi/stage-report.json\",\n  \"report_sha256\": \"6d135f706591b3a1bc11776aa8a04e95172373ac17ea4104d32b52df9adc6647\",\n  \"schema\": \"qoffice-stage-replay/1\",\n  \"seed\": 1337,\n  \"status\": \"PASS\",\n  \"task_id\": \"P0-06\",\n  \"unknown_reconciled\": 1,\n  \"work_root\": \"/tmp/qoffice-stage-p5youuzi\"\n}"
+      "stdout_tail": "  \"no_network_flag\": true,\n  \"projection_parts\": {\n    \"agents\": \"7d414e449fda84bfd77d5706b8ee2509b6c80f464302bb05bf9fb33fde2f683a\",\n    \"approvals\": \"869da3bc61b87f89160776e73dc0e232669aa689537eb816b0e61726c9d7fd7b\",\n    \"artifacts\": \"aaffc8582078f1c887d94825099f38fc8843a725f2cb04d9d898aa557204f137\",\n    \"audit\": \"8f2e529cb1713df4aae422ec9c54a8df4f0e313bb8b03d2a54c6edd04f5b7d0d\",\n    \"jobs\": \"b34c04caed77890af95c93c562822b180daa114476d97fe379c9e929dc70a9ec\",\n    \"ledger\": \"8964c220de4466471ec386ce5cedafb7ad9b6ac5327e6ec19f08959a87227b0a\",\n    \"tool_invocations\": \"97c43461160feb1e0c0579261100170929a5a856a9942a7f226d50703dc8e16f\"\n  },\n  \"replay_digest\": \"51b3896f03652afd5b082325a29070745f7e12e63f58d0a84a708b115a2af1aa\",\n  \"report_path\": \"/tmp/qoffice-stage-dcn1lbxn/stage-report.json\",\n  \"report_sha256\": \"a349d644797059b26d5d93f4a24f28493f8a0f1cc8f81680a5572968611fd136\",\n  \"schema\": \"qoffice-stage-replay/1\",\n  \"seed\": 1337,\n  \"status\": \"PASS\",\n  \"task_id\": \"P0-06\",\n  \"unknown_reconciled\": 1,\n  \"work_root\": \"/tmp/qoffice-stage-dcn1lbxn\"\n}"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_stage_replay.py",
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "......                                                                   [100%]\n6 passed in 2.45s"
+      "stdout_tail": "......                                                                   [100%]\n6 passed in 2.07s"
     }
   ],
-  "generated_at": "2026-11-14T03:29:50Z",
+  "generated_at": "2026-11-14T04:20:17Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-PHASE-0.md",
@@ -51,7 +51,7 @@
     },
     {
       "path": "voicebridge/business/agents.py",
-      "sha256": "15b4814df84d1371e4885b0ea5b23fdc8227f50ae96b4e36a83fdaf745566b98"
+      "sha256": "29ee8214e93ee39cc08cfacc30f6451daa405d0732a44e5e4d0b76ca59f929a0"
     }
   ],
   "limitations": [

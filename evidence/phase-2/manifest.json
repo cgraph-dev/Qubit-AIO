@@ -1,0 +1,85 @@
+{
+  "evidence_hashes": {
+    "evidence/phase-2/P2-01-registry.json": "680d4eb0144259c01cac859a88eee283050bb896521821b6b1efb34124af881f",
+    "evidence/phase-2/P2-02-sessions.json": "5b9a850680f8246fd0c0f10679ba0f8c72a32891b8042f54b9e1286d28fd0f43",
+    "evidence/phase-2/P2-03-adapter.json": "42fee7daa491b2394bd173ad7f8b4c0b99692a680de899279af04f18de2efc6f",
+    "evidence/phase-2/P2-04-memory.json": "b4a190083517903f61dc4d4c8f9d6378a1c5aa95fe076160426b286b1852eb6e",
+    "evidence/phase-2/P2-05-handoff.json": "15e00e5fb272e2c480cfb56e0e52af834131316b0d8db55480b02c3e24304b73",
+    "evidence/phase-2/P2-06-turn.json": "36bfff5100b6f67f35f0a92c74b7fd987077c1c8d35e78c126c19716f6025bde",
+    "evidence/phase-2/P2-07-effective-state.json": "672bfaaf63397624f2a358fc79e12c12ec5f3bb782060dac95b9fe2f65014afc"
+  },
+  "evidence_verification": {
+    "checked": 7,
+    "failures": [],
+    "ok": true
+  },
+  "generated_at": "2026-11-14T04:23:40Z",
+  "git_head": "52f1dfaeed55a387f363429796741bd46da03d84",
+  "limitations": [
+    "gate covers Phase 0 contracts, fixtures, replay and durable substrate only",
+    "no live services, credentials or external side effects",
+    "renderer metrics are data-path only; GPU frames are not measured"
+  ],
+  "phase": 2,
+  "python": "3.14.7",
+  "schema": "qubit-office-phase-manifest/1",
+  "status": "PASS",
+  "tasks": [
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_registry_sessions/test_agent_profile.py",
+      "evidence": [
+        "evidence/phase-2/P2-01-registry.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P2-01"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_registry_sessions/test_sessions.py tests/phase2_registry_sessions/test_schema_v5.py",
+      "evidence": [
+        "evidence/phase-2/P2-02-sessions.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P2-02"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_adapter",
+      "evidence": [
+        "evidence/phase-2/P2-03-adapter.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P2-03"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_memory",
+      "evidence": [
+        "evidence/phase-2/P2-04-memory.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P2-04"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_registry_sessions/test_a2a_handoff.py",
+      "evidence": [
+        "evidence/phase-2/P2-05-handoff.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P2-05"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_turn",
+      "evidence": [
+        "evidence/phase-2/P2-06-turn.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P2-06"
+    },
+    {
+      "command": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_effective tests/test_business_agent_controls.py",
+      "evidence": [
+        "evidence/phase-2/P2-07-effective-state.json"
+      ],
+      "exit_code": 0,
+      "task_id": "P2-07"
+    }
+  ]
+}

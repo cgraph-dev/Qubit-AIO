@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "............................................................             [100%]\n60 passed in 8.69s"
+      "stdout_tail": "............................................................             [100%]\n60 passed in 7.77s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/backup.py tests/phase1_backup",
@@ -22,7 +22,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:25:22Z",
+  "generated_at": "2026-11-14T04:21:42Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -50,7 +50,7 @@
     },
     {
       "path": "voicebridge/business/schema.py",
-      "sha256": "16719619ecde70d12e20532d6dc114c78d81f9c258d4d1c72e7b7c2364d41b4b"
+      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
     },
     {
       "path": "voicebridge/business/jobs.py",
