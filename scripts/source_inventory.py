@@ -581,6 +581,13 @@ def _normalise_route(route: str) -> str:
     route = re.sub(r"\.\*\$?$", "", route)
     # Any remaining wildcard is a mid-path segment placeholder.
     route = re.sub(r"\.\*\$?", "{}", route)
+    # A pre-rebrand segment is the SAME path shape as its Qubit spelling. The
+    # rebrand renamed the surface without keeping the upstream path as a second
+    # registration (`/api/hermes/update/check` answers as
+    # `/api/qubit/update/check`), so an inventory row enumerated from the pinned
+    # upstream source read as MISSING for branding alone. Only whole path tokens
+    # are swapped, so a segment that merely contains "hermes" is untouched.
+    route = re.sub(r"(?<=/)hermes(?=/|$)", "qubit", route)
     return route
 
 

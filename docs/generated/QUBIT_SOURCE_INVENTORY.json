@@ -23046,7 +23046,7 @@
    },
    {
     "path": "vendor/pixelfx/.gitignore",
-    "local_sha256": "a306b42a3bfb190e3c1beaf4037d89ae576737dca1c83bc360b5e2ef6cf9d96f"
+    "local_sha256": "f801ae3b436814376a1346d059f906c8b2ee497eda2c36aa83636fd61b58d8ec"
    },
    {
     "path": "vendor/pixelfx/LICENSE",
@@ -34305,7 +34305,7 @@
     "upstream_path": "apps/desktop/src/plugins/radio/plugin.js",
     "upstream_blob": "383f3b1db5e1bf3bae81eee5a441c904c2e70cee",
     "upstream_sha256": "b99c1a28ad7f8f0a729f85843ded557c229b5fbb1f5d52f3fe9fb7f69a97ab8f",
-    "local_sha256": "6e62cc0e1ec70532ec6829abbf729afbac7bcaf946982cb028f9d87b90deb141"
+    "local_sha256": "6a932f098ab2908ea5eae79f73d488e8ed381d441617b2c1e0bc6e1b134de7cf"
    },
    {
     "path": "apps/desktop/src/sdk/composer.ts",
@@ -43538,7 +43538,7 @@
     "upstream_path": "hermes_cli/_launchers.py",
     "upstream_blob": "8c6464c9ae69c49a2a43211980ec05a9a6df93fe",
     "upstream_sha256": "d6fc90ff21944378cd3c1a08467693e5e9ae920eeb617ca5fe9b6d1059d1335b",
-    "local_sha256": "3bce3923215e726b33d25f5b7a29cb8eb3d670e2fa0b855a6f59d05f7147443f"
+    "local_sha256": "6fb88afcc89f33cb58da4d8c71eaecaf0a258644ed2471383c1462f683ae3392"
    },
    {
     "path": "qubit_cli/_old_updater.py",
@@ -45211,7 +45211,7 @@
     "upstream_path": "hermes_cli/memory_setup.py",
     "upstream_blob": "f4859289e8b9fd96975b15f3741c4a014fca8a82",
     "upstream_sha256": "ba98e3010d27141ad4568c17f86a78b227def9bdd04ef8dd15f328350a737c5e",
-    "local_sha256": "5492398a7cce4da619d355a6e7fe8dbdd762f033015eb6e5f24f70162b818eea"
+    "local_sha256": "e3589b8ff369cafe55ccc0ec13cbe8969ab8c4bc4e19e97dd0b1027b91970a19"
    },
    {
     "path": "qubit_cli/middleware.py",
@@ -46583,7 +46583,7 @@
     "upstream_path": "hermes_cli/subcommands/gateway.py",
     "upstream_blob": "569e6fbe438608f11d41299ab7cf9010b704b5d1",
     "upstream_sha256": "0a01f63817e8ee168f657f60f77c38d01852718ac87308f7e420ebdce0427a02",
-    "local_sha256": "9d815d880978887eeb7b30f8df7fb54b442f5b269adbe59a3ac455d00fafe3b8"
+    "local_sha256": "e75d9c4fae44ee7c680c06474561a5843973673a44237c897900cf1bb6daffc5"
    },
    {
     "path": "qubit_cli/subcommands/gui.py",
@@ -46709,7 +46709,7 @@
     "upstream_path": "hermes_cli/subcommands/peer.py",
     "upstream_blob": "ede98d3766e08fd5f6256141b1709cb833407d76",
     "upstream_sha256": "6a33cb89002de9dba09b07143831b77dca27132294ab98740d465abfd51854a7",
-    "local_sha256": "e184108865a019de95c020032eefecba75bf528e2b26bc28cf95c61712f31a24"
+    "local_sha256": "33f75ddf844123da218773bc7c069879fd81297a9bf6936a0699023b28e5279a"
    },
    {
     "path": "qubit_cli/subcommands/pets.py",
@@ -47591,7 +47591,7 @@
     "upstream_path": "hermes_constants.py",
     "upstream_blob": "6a69179fba98504ea3f5cd6a093d97df6dc80974",
     "upstream_sha256": "a3c37e029e57eb29469d028e34f34795c9146bcec9acd8876e509043fcc1ab87",
-    "local_sha256": "4bd704ee8dffd990dcd111cb0dce84ad16ce4ca6073f2f13a92d44639bb9963d"
+    "local_sha256": "060fee941b1b458a8aed51a183b0b1ed666f99ba15a346b4eb0aad587f911791"
    },
    {
     "path": "qubit_constants_scratch.py",
@@ -199027,7 +199027,17 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "match_strategy": "normalised_shape",
+    "matched_route": "GET /api/qubit/update/check",
+    "reason": "GET /api/hermes/update/check is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/hermes/update/receipt",
@@ -199044,7 +199054,17 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:_r",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "match_strategy": "normalised_shape",
+    "matched_route": "GET /api/qubit/update/receipt",
+    "reason": "GET /api/hermes/update/receipt is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.",
+    "needs": "none"
+   }
   },
   {
    "id": "api:GET /api/host/identity",
@@ -202108,7 +202128,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "OPERATOR_ONLY",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:GATED",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/hermes/update is registered as a deliberate typed refusal in voicebridge/qubit_compat.py (GATED table / __gate__ handler): the route answers with a policy error by design, so the capability is accounted for and refused, not missing.",
+    "needs": "owner"
+   }
   },
   {
    "id": "api:POST /api/local-models/activate",
@@ -203552,7 +203580,15 @@
    "coverage": "",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "OPERATOR_ONLY",
+    "capability": "qubit_backend_route",
+    "backend": "voicebridge.qubit_compat:GATED",
+    "proving_test": "tests/test_backend_routes_integration8u.py",
+    "reason": "POST /api/tools/toolsets/{name}/post-setup is registered as a deliberate typed refusal in voicebridge/qubit_compat.py (GATED table / __gate__ handler): the route answers with a policy error by design, so the capability is accounted for and refused, not missing.",
+    "needs": "owner"
+   }
   },
   {
    "id": "api:POST /api/webhooks",
@@ -225865,7 +225901,7 @@
     "status": "GATED",
     "capability": "openclaw extension acpx",
     "backend": "voicebridge/acp_client.py HARNESS_CAPS/adapters",
-    "proving_test": "",
+    "proving_test": "tests/test_acp_client8u.py::test_catalog_and_status_honest",
     "reason": "OpenClaw extension 'acpx' -> wave-6 audit: the ACP harness *client* contract is real; the acpx harness runtime is not shipped, so execution has no transport. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).",
     "needs": "hardware"
    }
@@ -226207,7 +226243,15 @@
    "coverage": "openclaw-capability",
    "parent_resolved": null,
    "parent_status": null,
-   "parent_covered": false
+   "parent_covered": false,
+   "fork_disposition": {
+    "status": "IMPLEMENTED",
+    "capability": "openclaw extension byteplus",
+    "backend": "qubit_cli.providers:get_provider",
+    "proving_test": "tests/test_cli_agent1_families.py",
+    "reason": "'byteplus' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.",
+    "needs": "none"
+   }
   },
   {
    "id": "openclaw-ext:canvas",
@@ -226384,7 +226428,7 @@
     "status": "GATED",
     "capability": "openclaw extension codex",
     "backend": "voicebridge/acp_client.py HARNESS_CAPS/catalog/handshake",
-    "proving_test": "",
+    "proving_test": "tests/test_acp_client8u.py::test_catalog_and_status_honest",
     "reason": "OpenClaw extension 'codex' -> wave-6 audit: codex is a declared ACP harness: Qubit shapes the real handshake but never executes it, and the catalog reports ACP_HARNESS_UNAVAILABLE until the `codex` binary and a credential reference exist. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).",
     "needs": "hardware"
    }
@@ -226500,7 +226544,7 @@
     "status": "GATED",
     "capability": "openclaw extension copilot",
     "backend": "voicebridge/acp_client.py HARNESS_CAPS/send",
-    "proving_test": "",
+    "proving_test": "tests/test_acp_client8u.py::test_handshake_gates_absent_and_unconfigured",
     "reason": "OpenClaw extension 'copilot' -> wave-6 audit: same ACP boundary: send always resolves to the typed ACP_REFUSED gate, so no live harness runs in Qubit. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).",
     "needs": "hardware"
    }

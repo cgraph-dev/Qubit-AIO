@@ -1154,6 +1154,36 @@ EVIDENCE_CATEGORIES = frozenset({
 _INVENTORY_ID_RENAMES = {
     "plugin:hermes-achievements": "plugin:qubit-achievements",
 }
+
+
+def _rebrand_alias_ids(idx) -> Dict[str, str]:
+    """Upstream `hermes`-named surfaces -> their Qubit-named equivalents.
+
+    The rebrand renamed product surfaces without keeping the upstream spelling
+    as a second registration: `/api/hermes/update/check` answers as
+    `/api/qubit/update/check`, `hermes_plugins_compat` as `plugins_compat`. The
+    inventory still enumerates the upstream names from the pinned source, so
+    every one of them fell through to MISSING — a rename read as a missing
+    capability.
+
+    Resolved structurally rather than by a hand-written list: for a candidate
+    id, swap the legacy token for the Qubit one and accept it ONLY if the ledger
+    already carries that id. A surface that was never renamed, or whose Qubit
+    form does not exist, still reports MISSING.
+    """
+    out: Dict[str, str] = {}
+    for candidate in list(getattr(idx, "keys", lambda: [])()):
+        if "hermes" not in candidate.lower():
+            continue
+        swapped = candidate.replace("hermes", "qubit").replace("HERMES", "QUBIT")
+        if swapped == candidate:
+            # `api:GET_/api/hermes/...` -> the verb keeps its case.
+            swapped = candidate.replace("api/hermes", "api/qubit")
+        if swapped != candidate and swapped in idx:
+            out[candidate] = swapped
+    return out
+
+
 _HARDWARE_TOKENS = (
     "device", "audio", "camera", "screen", "desktop", "browser",
     "local_model", "local-model", "computer", "gpu", "mic", "vision",
@@ -1299,13 +1329,110 @@ def _inventory_needs(item: Dict[str, object]) -> str:
     return "owner"
 
 
+def _left_core_dispositions() -> Dict[str, str]:
+    """Surface id -> the catalog plugin that took it over, read from LEFT_CORE.
+
+    ``qubit_cli.left_core_migration.LEFT_CORE`` is the live registry of features
+    that deliberately LEFT core for a catalog plugin (agent importers, spotify,
+    langfuse, ...). A home that uses one installs the plugin on first use, so the
+    surface still exists — it just is not registered in core any more.
+
+    Without this, every relocated surface fell through to ``MISSING``: the
+    inventory looks for ``hermes_import-agent`` in the core parser and finds
+    nothing, because the command was replaced by the plugin's own `import-agent`
+    (``main.py`` calls ``recover_for_command`` before the parser is built). Those
+    81 rows read as missing capabilities when the capability had merely moved.
+
+    Keyed by the inventory's spelling of the surface, which prefixes the legacy
+    command with ``hermes_`` / ``hermes_claw``.
+    """
+    try:
+        import sys as _sys
+        from pathlib import Path as _Path
+        root = _Path(__file__).resolve().parents[1] / "qubit_runtime"
+        if str(root) not in _sys.path:
+            _sys.path.insert(0, str(root))
+        from qubit_cli.left_core_migration import LEFT_CORE
+    except Exception:
+        return {}
+    out: Dict[str, str] = {}
+    for feature in LEFT_CORE:
+        plugin = getattr(feature, "plugin", "") or ""
+        if not plugin:
+            continue
+        # The CURRENT verb the plugin answers to, plus every legacy spelling the
+        # inventory may still carry. `old_cli` holds retired top-level commands
+        # (`claw`, replaced by the `import-agent` family); `command` is the
+        # surviving verb, itself often still listed under a `hermes_` prefix
+        # because the upstream name predates the rebrand.
+        names = set()
+        command = getattr(feature, "command", "") or ""
+        if command:
+            names |= {command, f"hermes_{command}",
+                      "hermes_" + command.replace("-", "_")}
+        for old in (getattr(feature, "old_cli", ()) or ()):
+            names |= {old, f"hermes_{old}", f"hermes_{old}_"}
+        for name in names:
+            out[f"inv:{name}"] = plugin
+            # The inventory's own spelling omits the ledger's ``inv:`` prefix.
+            out[name] = plugin
+            # Older rows spell a retired command prefix as `hermes_claw_<verb>`.
+            if name.startswith("hermes_"):
+                out[f"inv:hermes_claw_{name[len('hermes_'):]}"] = plugin
+                out[f"hermes_claw_{name[len('hermes_'):]}"] = plugin
+    return out
+
+
+def _openclaw_extension_dispositions() -> Dict[str, str]:
+    """``inv:openclaw-ext:<name>`` -> its audited disposition parent.
+
+    ``scripts/rebuild_ledger_openclaw.py`` carries the authoritative
+    ``EXTENSION_MAP``: every OpenClaw extension is either mapped to an audited
+    Qubit capability (``parent``), a bounded adapter behind a typed gate
+    (``gate``), or a distinct Qubit form proven by its own test. The Qubit
+    ledger never consulted it, so those extensions all fell through to MISSING —
+    the inventory categorizer resolves an extension's parent from the *pinned*
+    ledger and cannot see this map.
+
+    Reading the map here keeps ONE authority: the disposition is authored once,
+    in the OpenClaw ledger, and this ledger reports what that ledger decided.
+    """
+    try:
+        import importlib.util as _ilu
+        from pathlib import Path as _Path
+        path = _Path(__file__).resolve().parent / "rebuild_ledger_openclaw.py"
+        spec = _ilu.spec_from_file_location("_rq_openclaw", path)
+        if spec is None or spec.loader is None:
+            return {}
+        mod = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        ext_map = getattr(mod, "EXTENSION_MAP", None)
+    except Exception:
+        return {}
+    if not isinstance(ext_map, dict):
+        return {}
+    out: Dict[str, str] = {}
+    for name, row in ext_map.items():
+        if not isinstance(row, dict):
+            continue
+        target = row.get("parent") or row.get("gate") or row.get("impl") or ""
+        if target:
+            # The inventory spells these WITHOUT the ledger's ``inv:`` prefix
+            # (``openclaw-ext:brave``); publish both so the comparison works
+            # whichever spelling reaches it.
+            out[f"openclaw-ext:{name}"] = str(target)
+            out[f"inv:openclaw-ext:{name}"] = str(target)
+    return out
+
+
 def _inventory_row_id(item_id: str) -> str:
     clean = re.sub(r"\s+", "_", item_id.strip())
     return "inv:" + clean.replace("|", "/")
 
 
 def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
-                         known_status: Optional[Dict[str, str]] = None
+                         known_status: Optional[Dict[str, str]] = None,
+                         relocated: Optional[Dict[str, str]] = None
                          ) -> Tuple[List[Dict[str, str]], Dict[str, object]]:
     """Turn every non-evidence inventory item into a matched or open row.
 
@@ -1385,6 +1512,16 @@ def build_inventory_rows(report: Dict[str, object], known_ids: Set[str],
         parent_status = str(item.get("parent_status") or "")
         covered = bool((_match_key and _match_key in known_ids)
                        or item_id in known_ids)
+        # A surface that LEFT core for a catalog plugin, or an OpenClaw extension
+        # with an audited disposition, still EXISTS — it just is not registered
+        # in core any more. Without this they fell through to MISSING, reading a
+        # deliberate relocation as a missing capability. Both maps are authored
+        # elsewhere (left_core_migration.LEFT_CORE, rebuild_ledger_openclaw's
+        # EXTENSION_MAP); this ledger only reports what they decided.
+        relocated_to = (relocated or {}).get(item_id) or (
+            (relocated or {}).get(_match_key))
+        if relocated_to:
+            covered = True
         if is_parented:
             declared = item.get("parent_resolved")
             resolved = declared if isinstance(declared, str) else ""
@@ -1689,10 +1826,14 @@ def build_ledger(inventory_path: Optional[Path] = None) -> Dict[str, object]:
     inventory = load_source_inventory(inventory_path)
     docs_dir = _docs_dir()
     known_ids = {r["id"] for r in rows} | _load_section_ids(docs_dir)
+    # Surfaces that deliberately moved out of core. Built once per run: both
+    # maps are the authoritative disposition tables owned by other modules.
+    _RELOCATED = {**_left_core_dispositions(),
+                  **_openclaw_extension_dispositions()}
     known_status = {r["id"]: r["status"] for r in rows}
     known_status.update(_load_section_status(docs_dir))
     inventory_rows, inventory_summary = build_inventory_rows(
-        inventory, known_ids, known_status)
+        inventory, known_ids, known_status, relocated=_RELOCATED)
     if (inventory_path is None
             and inventory_summary.get("unexplained_omissions")
             and ARCHIVE_INVENTORY_PATH.is_file()):

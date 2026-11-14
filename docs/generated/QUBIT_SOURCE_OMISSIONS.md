@@ -16,7 +16,7 @@ Matching is mechanical: exact ledger id for CLI (`cli:<name>`), routes (`api:<ME
 - Parented surfaces needing parent closure (parent not IMPLEMENTED): **0**
 - Parented surfaces covered by an IMPLEMENTED parent: **1037**
 - Distinct capabilities total: **903**; parented surfaces total: **1037**
-- Fork-runtime dispositions (tools/skills/plugins): **1379** (IMPLEMENTED 1300, GATED 24)
+- Fork-runtime dispositions (tools/skills/plugins): **1384** (IMPLEMENTED 1303, GATED 24)
 - Ledger IMPLEMENTED rows with unreproducible evidence: **0**
 - Hermes byte diff vs `qubit_runtime/`: upstream=16078 local=21176 identical=7075 missing=320 extra=5418 changed=8683
 
@@ -240,7 +240,7 @@ These are coverage evidence for their parent, not separate gaps.
 - `schedules_list`: 32 surface(s) — coverage `workflow-surface`
 - `webui_status`: 48 surface(s) — coverage `dashboard-surface`
 
-## Fork-runtime dispositions for tools / skills / plugins (1379)
+## Fork-runtime dispositions for tools / skills / plugins (1384)
 
 Qubit executes the complete pinned Hermes fork in-process, so these are not separate Qubit modules: the fork tool/toolset registry, skill tree, and plugin fleet are the real backing surface. Every item carries an explicit typed disposition (no silent drop).
 
@@ -422,7 +422,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension acpx` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:acpx` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/adapters`; OpenClaw extension 'acpx' -> wave-6 audit: the ACP harness *client* contract is real; the acpx harness runtime is not shipped, so execution has no transport. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).
+- `openclaw-ext:acpx` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/adapters`; OpenClaw extension 'acpx' -> wave-6 audit: the ACP harness *client* contract is real; the acpx harness runtime is not shipped, so execution has no transport. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).; proof `tests/test_acp_client8u.py::test_catalog_and_status_honest`
 
 ### `openclaw extension active-memory` (1; IMPLEMENTED 1, GATED 0)
 
@@ -444,6 +444,10 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 - `openclaw-ext:arcee` — **IMPLEMENTED**; backend `qubit_cli.providers:get_provider`; 'arcee' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.; proof `tests/test_cli_agent1_families.py`
 
+### `openclaw extension byteplus` (1; IMPLEMENTED 1, GATED 0)
+
+- `openclaw-ext:byteplus` — **IMPLEMENTED**; backend `qubit_cli.providers:get_provider`; 'byteplus' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.; proof `tests/test_cli_agent1_families.py`
+
 ### `openclaw extension cerebras` (1; IMPLEMENTED 1, GATED 0)
 
 - `openclaw-ext:cerebras` — **IMPLEMENTED**; backend `qubit_cli.providers:get_provider`; 'cerebras' resolves through qubit_cli.providers.get_provider(), so the provider capability the openclaw extension supplies is served by Qubit's own provider plugin.; proof `tests/test_cli_agent1_families.py`
@@ -462,7 +466,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension codex` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:codex` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/catalog/handshake`; OpenClaw extension 'codex' -> wave-6 audit: codex is a declared ACP harness: Qubit shapes the real handshake but never executes it, and the catalog reports ACP_HARNESS_UNAVAILABLE until the `codex` binary and a credential reference exist. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).
+- `openclaw-ext:codex` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/catalog/handshake`; OpenClaw extension 'codex' -> wave-6 audit: codex is a declared ACP harness: Qubit shapes the real handshake but never executes it, and the catalog reports ACP_HARNESS_UNAVAILABLE until the `codex` binary and a credential reference exist. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).; proof `tests/test_acp_client8u.py::test_catalog_and_status_honest`
 
 ### `openclaw extension cohere` (1; IMPLEMENTED 1, GATED 0)
 
@@ -474,7 +478,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 ### `openclaw extension copilot` (1; IMPLEMENTED 0, GATED 1)
 
-- `openclaw-ext:copilot` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/send`; OpenClaw extension 'copilot' -> wave-6 audit: same ACP boundary: send always resolves to the typed ACP_REFUSED gate, so no live harness runs in Qubit. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).
+- `openclaw-ext:copilot` — **GATED**; backend `voicebridge/acp_client.py HARNESS_CAPS/send`; OpenClaw extension 'copilot' -> wave-6 audit: same ACP boundary: send always resolves to the typed ACP_REFUSED gate, so no live harness runs in Qubit. (parent=OC-58, gate=ACP_HARNESS_UNAVAILABLE).; proof `tests/test_acp_client8u.py::test_handshake_gates_absent_and_unconfigured`
 
 ### `openclaw extension deepinfra` (1; IMPLEMENTED 1, GATED 0)
 
@@ -724,7 +728,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 
 - `openclaw-ext:zalouser` — **GATED**; backend `voicebridge/channels_inbound.py normalize_event`; OpenClaw extension 'zalouser' -> gate (parent=OC-19, gate=CHANNEL_NO_CREDENTIAL) via voicebridge/channels_inbound.py normalize_event.; proof `tests/test_openclaw_extensions_wave5.py`
 
-### `qubit_backend_route` (266; IMPLEMENTED 211, GATED 55)
+### `qubit_backend_route` (270; IMPLEMENTED 213, GATED 57)
 
 - `api:DELETE /api/cron/jobs/{job_id}` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; DELETE /api/cron/jobs/{job_id} is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:DELETE /api/dashboard/agent-plugins/{name:path}` — **OPERATOR_ONLY**; backend `voicebridge.qubit_compat:GATED`; DELETE /api/dashboard/agent-plugins/{name:path} is registered as a deliberate typed refusal in voicebridge/qubit_compat.py (GATED table / __gate__ handler): the route answers with a policy error by design, so the capability is accounted for and refused, not missing.; proof `tests/test_backend_routes_integration8u.py`
@@ -796,6 +800,8 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `api:GET /api/git/worktrees` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/git/worktrees is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:GET /api/health` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/health is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:GET /api/health/idle` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/health/idle is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/hermes/update/check` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/hermes/update/check is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:GET /api/hermes/update/receipt` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/hermes/update/receipt is served by a `_r(...)` route with the same path shape and a differently-named path parameter in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:GET /api/host/identity` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/host/identity is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:GET /api/learning/graph` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/learning/graph is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:GET /api/learning/node` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; GET /api/learning/node is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
@@ -910,6 +916,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `api:POST /api/git/worktree/add` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/worktree/add is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/git/worktree/remove` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/git/worktree/remove is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/health/retirement` — **OPERATOR_ONLY**; backend `voicebridge.qubit_compat:GATED`; POST /api/health/retirement is registered as a deliberate typed refusal in voicebridge/qubit_compat.py (GATED table / __gate__ handler): the route answers with a policy error by design, so the capability is accounted for and refused, not missing.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/hermes/update` — **OPERATOR_ONLY**; backend `voicebridge.qubit_compat:GATED`; POST /api/hermes/update is registered as a deliberate typed refusal in voicebridge/qubit_compat.py (GATED table / __gate__ handler): the route answers with a policy error by design, so the capability is accounted for and refused, not missing.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/local-models/activate` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/activate is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/local-models/download` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/download is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/local-models/download-browsed` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/local-models/download-browsed is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
@@ -960,6 +967,7 @@ Qubit executes the complete pinned Hermes fork in-process, so these are not sepa
 - `api:POST /api/skills/hub/uninstall` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/skills/hub/uninstall is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/skills/hub/update` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/skills/hub/update is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/tools/computer-use/permissions/grant` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/tools/computer-use/permissions/grant is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
+- `api:POST /api/tools/toolsets/{name}/post-setup` — **OPERATOR_ONLY**; backend `voicebridge.qubit_compat:GATED`; POST /api/tools/toolsets/{name}/post-setup is registered as a deliberate typed refusal in voicebridge/qubit_compat.py (GATED table / __gate__ handler): the route answers with a policy error by design, so the capability is accounted for and refused, not missing.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/webhooks` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/webhooks is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /api/webhooks/enable` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /api/webhooks/enable is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
 - `api:POST /auth/logout` — **IMPLEMENTED**; backend `voicebridge.qubit_compat:_r`; POST /auth/logout is registered by a literal `_r(...)` call in voicebridge/qubit_compat.py.; proof `tests/test_backend_routes_integration8u.py`
