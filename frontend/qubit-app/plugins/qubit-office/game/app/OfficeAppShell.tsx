@@ -36,6 +36,17 @@ import {
 } from "./office-api";
 import { createOfficeLoadingScreen } from "../loading/OfficeLoadingScreen";
 import type { OfficeLoadingConfigInput } from "../loading/config";
+import {
+  captureFocus,
+  focusFirst,
+  installEscapeToShell,
+  onMediaQueryChange,
+  onReducedMotionChange,
+  officeAnnouncement,
+  prefersHighContrast,
+  prefersReducedMotion,
+  restoreFocus,
+} from "./a11y";
 
 /** Always-present art credit; it must not depend on a theme being active. */
 export const OFFICE_ART_CREDIT = OFFICE_BRAND.credit;
@@ -238,6 +249,14 @@ export function createOfficeApp(
     // The operator timeline (P4-07). Declared last so every seeded state
     // index in the shell's own tests stays stable.
     const [timelineOpen, setTimelineOpen] = useState(false);
+    // P6-05 accessibility preferences. Declared AFTER every earlier slot so
+    // seeded state indices in the shell's own tests stay stable. The OS
+    // preference is honoured by default; an explicit shell setting could win
+    // later without changing the token contract.
+    const [reducedMotion, setReducedMotion] = useState<boolean>(
+      prefersReducedMotion());
+    const [highContrast, setHighContrast] = useState<boolean>(
+      prefersHighContrast());
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
@@ -248,6 +267,10 @@ export function createOfficeApp(
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
     const menuRef = useRef<OfficeMenuController | null>(null);
+    // P6-05 focus management: which dock is open, and what had focus before it
+    // opened. A ref (not state) so restoring focus never causes a render.
+    const openDockRef = useRef<string | null>(null);
+    const focusReturnRef = useRef<HTMLElement | null>(null);
 
     // Load the host theme ONCE per request/base. The server injects the
     // resolved payload as `window.__QUBIT_OFFICE_THEME__` (config/env included),
@@ -272,6 +295,87 @@ export function createOfficeApp(
       if (typeof document === "undefined") return;
       return applyHostTheme(document, officeTheme);
     }, [officeTheme]);
+
+    // P6-05 — the single open dock (sheet) and the label a live region uses.
+    // Order mirrors exclusivity: the later sheets close the earlier ones, so at
+    // most one id is ever non-null.
+    const openDockId = agentsOpen ? "office-game-agents-dock"
+      : hudOpen ? "office-game-hud-dock"
+      : warRoomOpen ? "office-game-warroom-dock"
+      : controlSeat ? "office-game-agent-control-dock"
+      : approvalsOpen ? "office-game-approvals-dock"
+      : etsyOpen ? "office-game-etsy-dock"
+      : commandCenterOpen ? "office-game-command-center-dock"
+      : timelineOpen ? "office-game-timeline-dock"
+      : null;
+    const openDockLabel = agentsOpen ? "Agents"
+      : hudOpen ? "HUD"
+      : warRoomOpen ? "War Room"
+      : controlSeat ? "Agent controls"
+      : approvalsOpen ? "Approvals"
+      : etsyOpen ? "Etsy connection"
+      : commandCenterOpen ? "Command Center"
+      : timelineOpen ? "Timeline"
+      : null;
+
+    // Honour the OS reduced-motion and high-contrast preferences and keep the
+    // root attributes in sync if they change while the page is open. The CSS
+    // tokens already consume both attributes; setting them here is what makes
+    // the shell (not just the vendored frame's own setting) obey the system.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      setReducedMotion(prefersReducedMotion());
+      setHighContrast(prefersHighContrast());
+      const offReduced = onReducedMotionChange((next: boolean) => setReducedMotion(next));
+      const offContrast = onMediaQueryChange(
+        "(prefers-contrast: more)",
+        () => setHighContrast(prefersHighContrast()),
+      );
+      return () => { offReduced(); offContrast(); };
+    }, []);
+
+    // P6-05 — remember the control that opened a sheet. A capture-phase click
+    // listener records it BEFORE React's onClick renders the dock, so a child
+    // panel that focuses its own search field cannot steal the captured opener
+    // (child effects run before the parent's, which made a restore target the
+    // newly mounted input instead of the button the operator pressed).
+    useEffect(() => {
+      const doc = typeof document === "undefined" ? null : document;
+      if (!doc) return;
+      const remember = (event: Event) => {
+        const target = event.target as HTMLElement | null;
+        const control = target?.closest?.(
+          "button, a, [role='button'], input, select, textarea") as HTMLElement | null;
+        if (control) focusReturnRef.current = control;
+      };
+      doc.addEventListener("click", remember, true);
+      return () => doc.removeEventListener("click", remember, true);
+    }, []);
+
+    // P6-05 — focus restoration. When a sheet opens, move focus into it; when
+    // it closes, put focus back (or on the main landmark if the opener is
+    // gone). Side sheets are not traps, so the office canvas stays usable.
+    useEffect(() => {
+      const doc = typeof document === "undefined" ? null : document;
+      if (!doc) return;
+      const previous = openDockRef.current;
+      if (openDockId && openDockId !== previous) {
+        if (!focusReturnRef.current) {
+          const captured = captureFocus(doc);
+          focusReturnRef.current = captured.element;
+        }
+        const dock = doc.getElementById(openDockId);
+        if (dock) focusFirst(dock as HTMLElement);
+      } else if (!openDockId && previous) {
+        const target = focusReturnRef.current;
+        if (!restoreFocus(target, doc)) {
+          const main = doc.getElementById("office-game-main") as HTMLElement | null;
+          main?.focus?.();
+        }
+        focusReturnRef.current = null;
+      }
+      openDockRef.current = openDockId;
+    }, [openDockId]);
 
     // The pending-approval count for the injected badge. Read-only, on the
     // existing session-token-gated route, at a slow cadence; the panel itself
@@ -313,10 +417,24 @@ export function createOfficeApp(
         setFailed("The office API could not be connected from this page.");
         return;
       }
+      // The vendored client owns its document and may swallow Tab. Give a
+      // keyboard user a guaranteed escape back to the shell controls.
+      let restoreEscape: (() => void) | undefined;
       const onLoad = () => {
         setLoaded(true);
         setFailed(null);
         installOfficeBrand(win);
+        restoreEscape?.();
+        // Resolve the frame window AT LOAD, not from the pre-navigation
+        // closure: on a navigation the earlier window wrapper can still be
+        // around while the live document belongs to the loaded frame.
+        const loadedWindow = frame.contentWindow as Window | null;
+        restoreEscape = installEscapeToShell(loadedWindow, () => {
+          if (typeof document === "undefined") return;
+          const controls = document.getElementById("office-game-controls");
+          const main = document.getElementById("office-game-main");
+          (controls ?? main)?.focus?.();
+        });
         // Put the Agents and HUD icons where the office keeps its own panel
         // buttons. The document is same-origin, so the shell can append to the
         // group; the buttons drive THIS component's dock state.
@@ -370,6 +488,7 @@ export function createOfficeApp(
         frame.removeEventListener("error", onError);
         menuRef.current?.dispose();
         menuRef.current = null;
+        restoreEscape?.();
         restoreBridge?.();
       };
     }, [props.base, props.mock, requestedTheme, retryToken]);
@@ -416,29 +535,55 @@ export function createOfficeApp(
     const buttonSlice = officeSliceName(officeTheme, "button");
 
     const children: unknown[] = [
-      R.createElement("iframe", {
-        key: "frame",
-        ref: frameRef,
-        title: OFFICE_BRAND.title,
-        "data-testid": "office-app-frame",
-        className: "office-game__frame",
-        "aria-label": OFFICE_BRAND.name,
-        "aria-describedby": "office-app-description",
-        "aria-busy": !loaded && !failed,
-        "data-state": failed ? "error" : loaded ? "ready" : "loading",
-        // Keep the upstream app in a distinct origin and storage namespace.
-        // allow-scripts + allow-same-origin is still required for its module
-        // worker, canvas and storage APIs; the dashboard host stays separate.
-        // The server injects the session token into the app document itself.
-        sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
-        allow: "clipboard-read; clipboard-write",
-        style: { border: "0", width: "100%", height: "100%", display: "block" },
-      }),
-      R.createElement("p", {
-        key: "description",
-        id: "office-app-description",
-        className: "office-game__sr-only",
-      }, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled.`),
+      // P6-05 — the first focusable thing on the page is a skip link, so a
+      // keyboard user is never forced through the canvas to reach the shell.
+      // The second link jumps PAST the canvas to the shell controls, which is
+      // the guaranteed escape from a client that swallows Tab.
+      R.createElement("a", {
+        key: "skip-main",
+        href: "#office-game-main",
+        className: "office-game__skipLink",
+        "data-testid": "office-app-skip-link",
+      }, "Skip to office content"),
+      R.createElement("a", {
+        key: "skip-controls",
+        href: "#office-game-controls",
+        className: "office-game__skipLink office-game__skipLink--controls",
+        "data-testid": "office-app-skip-controls",
+      }, "Skip past the office canvas"),
+      R.createElement("main", {
+        key: "main",
+        id: "office-game-main",
+        className: "office-game__main",
+        tabIndex: -1,
+        "aria-label": `${OFFICE_BRAND.name} workspace`,
+      }, [
+        R.createElement("iframe", {
+          key: "frame",
+          ref: frameRef,
+          title: OFFICE_BRAND.title,
+          "data-testid": "office-app-frame",
+          className: "office-game__frame",
+          "aria-label": OFFICE_BRAND.name,
+          "aria-describedby": "office-app-description",
+          "aria-busy": !loaded && !failed,
+          "data-state": failed ? "error" : loaded ? "ready" : "loading",
+          // Keep the upstream app in a distinct origin and storage namespace.
+          // allow-scripts + allow-same-origin is still required for its module
+          // worker, canvas and storage APIs; the dashboard host stays separate.
+          // The server injects the session token into the app document itself.
+          sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
+          allow: "clipboard-read; clipboard-write",
+          style: { border: "0", width: "100%", height: "100%", display: "block" },
+        }),
+        R.createElement("p", {
+          key: "description",
+          id: "office-app-description",
+          className: "office-game__sr-only",
+        }, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled. `
+          + `Every critical status is also shown as text, so muting audio never hides it. `
+          + `On touch screens the shell controls are at least 24 by 24 pixels.`),
+      ]),
       // The persistent Credits/About surface. It is part of the Qubit shell,
       // not the vendored client and not the theme, so the LimeZu attribution
       // stays visible with `classic` and after a theme is removed.
@@ -461,6 +606,26 @@ export function createOfficeApp(
         title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`,
       }, OFFICE_BRAND.legalLabel)),
     ];
+
+    // P6-05 — one polite live region carries loading, connection and dock
+    // changes. It is always mounted (an inserted region is not reliably
+    // announced) and its text is derived from real state, never a spinner.
+    children.push(R.createElement("div", {
+      key: "announcer",
+      className: "office-game__sr-only",
+      "data-testid": "office-app-announcer",
+      role: "status",
+      "aria-live": "polite",
+      "aria-atomic": "true",
+    }, officeAnnouncement({
+      loaded,
+      failed,
+      state: props.officeState,
+      rooms: props.officeRooms,
+      agents: props.officeAgents,
+      error: props.officeError,
+      dockLabel: openDockLabel,
+    })));
 
     // The host's tower read is the only connection state this page can prove.
     // Show it, so "Connecting…" is never a permanent lie and a failure is named
@@ -825,7 +990,7 @@ export function createOfficeApp(
     // THE COMMAND-CENTER TOGGLE. A visible, labelled shell control (not an
     // icon-only button) that opens the semantic search region. It is an
     // overlay so the office iframe keeps its full height and width.
-    children.push(R.createElement("button", {
+    const commandCenterToggle = R.createElement("button", {
       key: "command-center-toggle",
       type: "button",
       className: "office-game__btn office-theme-menu-btn office-game__commandCenterToggle",
@@ -833,12 +998,6 @@ export function createOfficeApp(
       "aria-expanded": commandCenterOpen,
       "aria-controls": "office-game-command-center-dock",
       "aria-label": "Open the office command center",
-      style: {
-        position: "absolute",
-        left: "var(--office-s3)",
-        bottom: "var(--office-s3)",
-        zIndex: 5,
-      },
       onClick: () => {
         setAgentsOpen(false);
         setHudOpen(false);
@@ -848,7 +1007,7 @@ export function createOfficeApp(
         setControlSeat(null);
         setCommandCenterOpen((v: boolean) => !v);
       },
-    }, "Command Center"));
+    }, "Command Center");
 
     // THE COMMAND CENTER. A read-only projection over the real tower, roster,
     // tasks, sessions and approvals. It is an exclusive side sheet, so it can
@@ -875,7 +1034,7 @@ export function createOfficeApp(
     // THE OPERATOR TIMELINE TOGGLE (P4-07). A visible, labelled shell control
     // beside the command center. Opening it closes every other sheet so two
     // side sheets can never overlap the iframe or each other.
-    children.push(R.createElement("button", {
+    const timelineToggle = R.createElement("button", {
       key: "timeline-toggle",
       type: "button",
       className: "office-game__btn office-theme-menu-btn office-game__timelineToggle",
@@ -883,12 +1042,6 @@ export function createOfficeApp(
       "aria-expanded": timelineOpen,
       "aria-controls": "office-game-timeline-dock",
       "aria-label": "Open the operator timeline",
-      style: {
-        position: "absolute",
-        left: "calc(var(--office-s3) + 10.5rem)",
-        bottom: "var(--office-s3)",
-        zIndex: 5,
-      },
       onClick: () => {
         setAgentsOpen(false);
         setHudOpen(false);
@@ -899,7 +1052,20 @@ export function createOfficeApp(
         setControlSeat(null);
         setTimelineOpen((v: boolean) => !v);
       },
-    }, "Timeline"));
+    }, "Timeline");
+
+    // P6-05 — a real toolbar landmark groups the persistent shell controls.
+    // It is also the skip target that gets a keyboard user OUT of the canvas
+    // when the vendored client swallows Tab (and the Escape escape hatch).
+    children.push(R.createElement("div", {
+      key: "toolbar",
+      id: "office-game-controls",
+      className: "office-game__toolbar",
+      "data-testid": "office-app-toolbar",
+      role: "toolbar",
+      "aria-label": "Office panels",
+      tabIndex: -1,
+    }, [commandCenterToggle, timelineToggle]));
 
     // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
     // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full
@@ -966,6 +1132,10 @@ export function createOfficeApp(
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,
       "data-office-docks": dualDocks ? "both" : undefined,
       "data-office-dock-top": dockOpen ? "toolbar" : undefined,
+      // P6-05 — system preferences become token switches the stylesheet
+      // already understands; critical status cues stay textual either way.
+      "data-office-reduced-motion": reducedMotion ? "1" : undefined,
+      "data-office-contrast": highContrast ? "high" : undefined,
       className: rootClass,
       style: { position: "relative" },
     }, children);
