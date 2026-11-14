@@ -10,7 +10,7 @@
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase8_observability tests/phase1_otel tests/phase6_accessibility tests/phase3_renderer",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 7.10s\n"
+      "stdout_tail": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 6.86s\n"
     },
     {
       "cmd": "ruff check voicebridge/business/observability.py scripts/verify_observability.py tests/phase8_observability",
@@ -25,7 +25,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T15:06:21Z",
+  "generated_at": "2026-11-14T15:07:43Z",
   "inputs": [
     {
       "path": "voicebridge/business/otel.py",
@@ -59,11 +59,11 @@
   "outputs": [
     {
       "path": "voicebridge/business/observability.py",
-      "sha256": "b150bb7df1006800a471c829d439c111b18a695442963c210bdec64ed1c8f6aa"
+      "sha256": "f6455591670f98af236f9895dab702fa9b347c1cb735cfb4831ee5614ca14b0a"
     },
     {
       "path": "scripts/verify_observability.py",
-      "sha256": "60018fc6a9f0df4d9206b252e5e0d3c00b23a435340ccca938e24a8018953b71"
+      "sha256": "341de87293072df51babb3534f3be490e26cfd14c25d2f2fc1f80ebf152e83bd"
     },
     {
       "path": "tests/phase8_observability/_p8_helpers.py",
@@ -79,11 +79,11 @@
     },
     {
       "path": "tests/phase8_observability/test_matrices.py",
-      "sha256": "641b74e5ab7ecf6182289d8a0758826b53b826bdca5816c6ec440ca2af48cc04"
+      "sha256": "b783b7de35d258352e8e1b3ca8a19afcf01768f06ab78a5ad034f93be7b3e135"
     },
     {
       "path": "tests/phase8_observability/test_observability_trace.py",
-      "sha256": "7054195013550863cfe54150868bd22f51a065f00dffcfcc838acfa586bf6d44"
+      "sha256": "e160fe150e4acd7988dea84e488415981ba3a91a6c1a5bd6c1a29607de042be9"
     },
     {
       "path": "tests/phase8_observability/test_verifier_integration.py",
