@@ -1415,7 +1415,14 @@ def _openclaw_extension_dispositions() -> Dict[str, str]:
     for name, row in ext_map.items():
         if not isinstance(row, dict):
             continue
-        target = row.get("parent") or row.get("gate") or row.get("impl") or ""
+        target = (row.get("parent") or row.get("gate") or row.get("impl")
+                  or row.get("detail") or "")
+        if not target and row.get("disposition") == "distinct":
+            # A `distinct` extension has no parent and no gate: the disposition
+            # itself IS the answer (an audited "this is not a capability Qubit
+            # claims"). Without this they fell through to MISSING even though
+            # the audit had decided about them.
+            target = "distinct (audited: no Qubit analogue)"
         if target:
             # The inventory spells these WITHOUT the ledger's ``inv:`` prefix
             # (``openclaw-ext:brave``); publish both so the comparison works

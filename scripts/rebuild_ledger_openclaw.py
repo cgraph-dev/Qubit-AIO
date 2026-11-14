@@ -208,6 +208,42 @@ _ext("gate", "OC-19", "CHANNEL_NO_CREDENTIAL", "creds",
       "raft", "reef", "signal", "sms", "synology-chat", "tlon", "twitch",
       "zalo", "zalouser"])
 
+# ---- extensions the inventory carries at the current pin but the audited map
+# still lacked, so they fell through to MISSING in the Qubit ledger.
+_ext("parent", "OC-19", "", "creds",
+     "QQ messaging channel: ported as a Qubit platform plugin "
+     "(qubit_runtime/plugins/platforms/qqbot, adapter/crypto/keyboards)",
+     ["qqbot"])
+_ext("gate", "OC-57", "SANDBOX_PROVIDER_REFUSED", "owner",
+     "supervised codex runner: Qubit runs supervised coding through its own "
+     "opencode runner; an external supervisor is refused by the "
+     "single-policy confinement",
+     ["codex-supervisor"])
+_ext("gate", "OC-56", "NODE_HOST_UNAVAILABLE", "hardware",
+     "phone handset control needs a paired node host with a live media "
+     "transport; Qubit types the remote actuator UNAVAILABLE",
+     ["phone-control"])
+_ext("gate", "OC-65", "MEDIA_GEN_UNAVAILABLE", "creds",
+     "media understanding beyond single-image vision is typed UNAVAILABLE "
+     "until a multi-modal provider is configured",
+     ["media-understanding-core"])
+_ext("gate", "OC-64", "MEDIA_GEN_UNAVAILABLE", "creds",
+     "video generation is modelled in media_gen KINDS with a credential gate; "
+     "only the OpenAI image transport is real",
+     ["video-generation-core"])
+_ext("gate", "OC-D05", "QA_LAB_ABSENT", "none",
+     "the upstream QA matrix is an operator E2E stack; Qubit's pytest harness "
+     "is the equivalent and no scenario runner is shipped",
+     ["qa-matrix"])
+_ext("distinct", "", "", "none",
+     "open-prose is an authoring/drafting surface with no Qubit analogue; it "
+     "is not a capability Qubit claims",
+     ["open-prose"])
+_ext("distinct", "", "", "none",
+     "thread-ownership is an OpenClaw gateway-internal scheduling concern; "
+     "Qubit has one event path and no thread-ownership concept",
+     ["thread-ownership"])
+
 # ---- gateway
 _ext("gate", "OC-01", "GATEWAY_NO_SERVER", "owner",
      "no standalone gateway listener; single-event-path policy",
