@@ -1,0 +1,129 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_memory tests/phase1_platform",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 5.59s"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_memory_projection.py --root /tmp/qoffice-memory-projection --check",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "OK: 2 note(s) across 2 scope(s) under /tmp/qoffice-memory-projection"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/memory.py scripts/verify_memory_projection.py tests/phase2_memory/",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/memory.py scripts/verify_memory_projection.py tests/phase2_memory/conftest.py tests/phase2_memory/test_memory_core.py tests/phase2_memory/test_memory_acl.py tests/phase2_memory/test_memory_projection.py tests/phase2_memory/test_memory_openviking.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T03:56:55Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-THREAT-MODEL.md",
+      "sha256": "8cb98c73ac6bcf6984eeef2cb38d12219630c85831dcd4f0ab839b9b94cdaa3a"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "16719619ecde70d12e20532d6dc114c78d81f9c258d4d1c72e7b7c2364d41b4b"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "192f5c52eee27601c8c5a75de44790d190aef9d5e11896c79a5144809b19c9d2"
+    },
+    {
+      "path": "voicebridge/business/util.py",
+      "sha256": "d07c29e4b413bfa402c7052b532323a6321379581425ad17d61ca58857404933"
+    },
+    {
+      "path": "voicebridge/office/agent_memory.py",
+      "sha256": "fdb14d610ac4e8e52594e526cf1b92890227a278190db035e7e7eec5af11b5ac"
+    },
+    {
+      "path": "tests/test_office_agent_memory.py",
+      "sha256": "879f73992062677107b46beb2f489554d01fc456a02c56f3343d26e1cfdc3f21"
+    }
+  ],
+  "limitations": [
+    "recall reads exactly one aggregate (scope, scope_id). Cross-scope reads require an explicit separate call; there is no multi-scope pool and no API that merges scopes.",
+    "The Obsidian projection directory is scoped per service/store. rebuild() with tenant_id=None clears and rewrites the whole root; do not share one projection root across independent stores.",
+    "OpenViking is an injected adapter seam verified with the hermetic InMemoryOpenViking double. No live OpenViking server or network path was contacted or verified.",
+    "eventlog.append_event resolves an outbox-owning business, so a tenant must have at least one business before a memory event can be appended (P1-02 contract).",
+    "A supersession link to a tombstoned record is cleared in the projection (frontmatter supersedes=null) so no note links to a missing note; the authoritative event log still records the supersedes id.",
+    "Poisoning admission uses deterministic confidence/instruction-pattern rules, not a classifier. Untrusted content can be admitted explicitly with allow_untrusted/policy_allows, a trusted label, or a provenance policy marker.",
+    "The fixed acceptance projection path /tmp/qoffice-memory-projection is materialized by tests/phase2_memory/test_memory_projection.py; the verifier is read-only and expects that path to exist.",
+    "No live services, credentials, network access or full matrix were used; no VERIFIED/COMPLETE claim is made."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/memory.py",
+      "sha256": "bb3041e0bc05c57010475a5917663360d69cc0a94f8a9712e9ad91a976d5b4a9"
+    },
+    {
+      "path": "scripts/verify_memory_projection.py",
+      "sha256": "0f50c24588f05d4ab60ac34fdf833a8c4bf45f13b6055af7a4ec140d5c815d77"
+    },
+    {
+      "path": "tests/phase2_memory/conftest.py",
+      "sha256": "47ee10d6e1b91f65dea9f8d4e2f5c8e3754d1cdb773d99b44584e4b2fe1af029"
+    },
+    {
+      "path": "tests/phase2_memory/test_memory_core.py",
+      "sha256": "a9db87695b4f538874dcc0b6111b080d506589d07af89526430d06c4bbce6444"
+    },
+    {
+      "path": "tests/phase2_memory/test_memory_acl.py",
+      "sha256": "77b20f9beec290af09cf71ca318c8ac009df00277daccd3cbe7bbac5006adf16"
+    },
+    {
+      "path": "tests/phase2_memory/test_memory_projection.py",
+      "sha256": "7a1224e578b209262cb9a683ebe1f10a0a97cebe676aeac436f4c0821919f9a2"
+    },
+    {
+      "path": "tests/phase2_memory/test_memory_openviking.py",
+      "sha256": "1a2251f4e3f81321b1588ef6afb71a80e7632258b1d9b2cc4933fc691cc4cf2f"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P2-04"
+}
