@@ -589,6 +589,7 @@ class MemoryService:
         labels: Iterable[str] | None = None,
         department: str | None = None,
         allow_untrusted: bool = False,
+        policy_allows: bool = False,
         allow_protected: bool = False,
         memory_id: str | None = None,
         now: float | None = None,
@@ -650,12 +651,20 @@ class MemoryService:
                     " superseding it needs allow_protected=True",
                 )
 
+        explicit_untrusted = (
+            allow_untrusted
+            or policy_allows
+            or "trusted" in labels_clean
+            or "policy:allow-untrusted" in labels_clean
+            or str(prov.get("policy") or "").lower()
+            in ("allow-untrusted", "allow_untrusted")
+        )
         quarantined = False
         reason: str | None = None
         if source_clean in UNTRUSTED_SOURCES:
             if "untrusted" not in labels_clean:
                 labels_clean.append("untrusted")
-            if not allow_untrusted:
+            if not explicit_untrusted:
                 if conf < MIN_TRUSTED_CONFIDENCE:
                     quarantined = True
                     reason = f"untrusted source {source_clean!r} below confidence floor"

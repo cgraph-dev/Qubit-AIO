@@ -177,6 +177,11 @@ def verify(root: Path) -> tuple[list[str], dict]:
             errors.append(f"{moc}: scope MOC is missing")
             continue
         moc_text = moc.read_text(encoding="utf-8")
+        scan = _without_redactions(moc_text)
+        if any(pattern.search(scan) for pattern in SECRET_PATTERNS):
+            errors.append(f"{moc}: secret-shaped text leaked into the projection")
+        if any(pattern.search(scan) for pattern in PAID_ART_PATTERNS):
+            errors.append(f"{moc}: paid-art reference leaked into the projection")
         listed = [
             match.group(1).strip()
             for match in _LINK_RE.finditer(moc_text)

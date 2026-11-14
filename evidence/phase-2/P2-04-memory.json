@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 97%]\n..                                                                       [100%]\n74 passed in 6.06s"
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 5.59s"
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_memory_projection.py --root /tmp/qoffice-memory-projection --check",
@@ -29,7 +29,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:55:24Z",
+  "generated_at": "2026-11-14T03:56:55Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -90,17 +90,18 @@
     "OpenViking is an injected adapter seam verified with the hermetic InMemoryOpenViking double. No live OpenViking server or network path was contacted or verified.",
     "eventlog.append_event resolves an outbox-owning business, so a tenant must have at least one business before a memory event can be appended (P1-02 contract).",
     "A supersession link to a tombstoned record is cleared in the projection (frontmatter supersedes=null) so no note links to a missing note; the authoritative event log still records the supersedes id.",
-    "Poisoning admission uses deterministic confidence/instruction-pattern rules, not a classifier; an explicitly opted-in caller can admit untrusted content with the untrusted label.",
+    "Poisoning admission uses deterministic confidence/instruction-pattern rules, not a classifier. Untrusted content can be admitted explicitly with allow_untrusted/policy_allows, a trusted label, or a provenance policy marker.",
+    "The fixed acceptance projection path /tmp/qoffice-memory-projection is materialized by tests/phase2_memory/test_memory_projection.py; the verifier is read-only and expects that path to exist.",
     "No live services, credentials, network access or full matrix were used; no VERIFIED/COMPLETE claim is made."
   ],
   "outputs": [
     {
       "path": "voicebridge/business/memory.py",
-      "sha256": "072e1f481b07f0267df801bf11b63ebc423b64d94ba286ae34c79003b0ef94a1"
+      "sha256": "bb3041e0bc05c57010475a5917663360d69cc0a94f8a9712e9ad91a976d5b4a9"
     },
     {
       "path": "scripts/verify_memory_projection.py",
-      "sha256": "8b07530fc1aa8f2922edf1e86fc38b60e723014d82c7d21cc4dbd519b1b462c4"
+      "sha256": "0f50c24588f05d4ab60ac34fdf833a8c4bf45f13b6055af7a4ec140d5c815d77"
     },
     {
       "path": "tests/phase2_memory/conftest.py",
@@ -108,7 +109,7 @@
     },
     {
       "path": "tests/phase2_memory/test_memory_core.py",
-      "sha256": "d1072a0e19e81c5ef6674fb14f9f8cb99601c32808615a2bc7729a1bd5d8a4cf"
+      "sha256": "a9db87695b4f538874dcc0b6111b080d506589d07af89526430d06c4bbce6444"
     },
     {
       "path": "tests/phase2_memory/test_memory_acl.py",
