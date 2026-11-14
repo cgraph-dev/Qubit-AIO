@@ -1,0 +1,118 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_adapter tests/phase1_gateway tests/phase1_platform",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 70%]\n..............................                                           [100%]\n102 passed in 4.78s"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase2_adapter",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "..................................                                       [100%]\n34 passed in 0.56s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agent_adapter.py voicebridge/business/dynamic_catalog.py tests/phase2_adapter/",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/agent_adapter.py voicebridge/business/dynamic_catalog.py tests/phase2_adapter/_p2_helpers.py tests/phase2_adapter/test_agent_adapter.py tests/phase2_adapter/test_dynamic_catalog.py tests/phase2_adapter/test_snapshot_gateway.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/test_business_os_foundation.py tests/test_integration_tool_gateway.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "....................................                                     [100%]\n36 passed in 3.35s"
+    }
+  ],
+  "generated_at": "2026-11-14T03:55:00Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/policy.py",
+      "sha256": "9627e3121929d90b1555b708a946425a738dadab18ad1c17a94c5d6f89379d62"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "aa6722d69fd9a9e15701d7fc25453d66ec599d59e8ce6c7916028b9d0608a10d"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/office/runner.py",
+      "sha256": "a196128da7ce272b14e0fff0b530de66093e75a8ce674a7f3b1e0f92889ff350"
+    },
+    {
+      "path": "qubit_runtime/agent/runtime_port.py",
+      "sha256": "2ae7ef7f4149337243984718a87e007423118e57df28be89b8ca5c2917470637"
+    }
+  ],
+  "limitations": [
+    "No live model, provider, MCP server, network or credentials were used; backends are injected fakes/callables and catalog sources are pure provider functions.",
+    "NativeBackend.from_runtime_backend is the integration seam for runtime_port/office runner; this lane does not import or wire them.",
+    "Availability/health are catalog declarations; no live health poller or periodic refresh loop is included.",
+    "Snapshot digests are only reproducible when issued_at/expires_at are pinned; a real caller uses the live clock.",
+    "Skills are stored as requirements only and are never capability records or grants.",
+    "No full matrix was run; VERIFIED/COMPLETE/100% are not claimed."
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/agent_adapter.py",
+      "sha256": "ed8334a51a9e23d73ed9367d7bd20534aea516bb74a6bdfcfd2e0249c65a6328"
+    },
+    {
+      "path": "voicebridge/business/dynamic_catalog.py",
+      "sha256": "34f40e7bb6d6d2ca0a47f316d497c766992a1bcb8c0597e238906966978fca6d"
+    },
+    {
+      "path": "tests/phase2_adapter/_p2_helpers.py",
+      "sha256": "0d220b2219cecd5e40ea29bced8024663f9cdbc1614eb53d079270f3fd116eef"
+    },
+    {
+      "path": "tests/phase2_adapter/test_agent_adapter.py",
+      "sha256": "ee78e9d4512f40adef58af5f020ba65efe71579c76b5c0f6fa3c83421b99fbad"
+    },
+    {
+      "path": "tests/phase2_adapter/test_dynamic_catalog.py",
+      "sha256": "e855d5ecec0a9aa9e1494094d2c92db1909d1055414efac817c870483c834826"
+    },
+    {
+      "path": "tests/phase2_adapter/test_snapshot_gateway.py",
+      "sha256": "92586ac39ea37285354fb71d995f5bc753ac3806d7807c28f4f457776ccf2b1f"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P2-03"
+}
