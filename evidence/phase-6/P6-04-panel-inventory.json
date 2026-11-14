@@ -1,0 +1,106 @@
+{
+  "commands": [
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python scripts/verify_panel_inventory.py --json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "{\n  \"checks\": [\n    {\n      \"detail\": \"registry schema is 'qubit-office-panel-inventory/1'\",\n      \"name\": \"schema\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"21 rows for 21 required panels\",\n      \"name\": \"panel_count\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"missing=[]\",\n      \"name\": \"coverage\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"duplicates=[]\",\n      \"name\": \"unique_ids\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"21 declared authorities\",\n      \"name\": \"authority_modules_backend_only\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"real=20 typed_refusal=1\",\n      \"name\": \"action_or_refusal_present\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"every row names a real action or an explicit typed refusal\",\n      \"name\": \"no_row_without_action\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"every row declares loading, empty, error, retry, unavailable, typed_refusal\",\n      \"name\": \"states_complete\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"0 problem(s)\",\n      \"name\": \"no_validation_problems\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"664 registered compat routes\",\n      \"name\": \"route_table_loaded\",\n      \"ok\": true\n    }\n  ],\n  \"checks_failed\": 0,\n  \"checks_total\": 10,\n  \"generated_at\": \"2026-11-14T13:39:09Z\",\n  \"limitations\": [\n    \"declarative registry verification only; no panel is rendered or clicked\",\n    \"module symbols are checked for existence, not exercised\",\n    \"registered route existence is checked against the compat ROUTES table; the route is not called\",\n    \"no live service, store, credential, network or browser is used\"\n  ],\n  \"ok\": true,\n  \"panels_total\": 21,\n  \"problems\": [],\n  \"real_actions\": 20,\n  \"required_total\": 21,\n  \"schema\": \"qubit-office-panel-inventory-verification/1\",\n  \"task_id\": \"P6-04\",\n  \"typed_refusals\": 1\n}\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase6_panels tests/phase4_operator_ui tests/phase3_command_center",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "..................................................                       [100%]\n50 passed in 5.90s\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/panel_inventory.py scripts/verify_panel_inventory.py tests/phase6_panels",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!\n"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/panel_inventory.py scripts/verify_panel_inventory.py tests/phase6_panels/test_panel_inventory.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    },
+    {
+      "cmd": "npx vitest run --config vitest.office-app.config.ts ../qubit-app/plugins/qubit-office/game/app/panel-inventory.test.ts ../qubit-app/plugins/qubit-office/game/app/PanelInventory.test.ts",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "\n RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p6-panels/frontend/qubit-web\n\n\n Test Files  2 passed (2)\n      Tests  21 passed (21)\n   Start at  15:39:16\n   Duration  488ms (transform 103ms, setup 0ms, import 136ms, tests 341ms, environment 0ms)\n\n"
+    },
+    {
+      "cmd": "npx tsc -p /tmp/tsconfig.p6data.json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T13:39:17Z",
+  "inputs": [
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "voicebridge/qubit_compat.py",
+      "sha256": "a541fad8f194345b8670d982641cca04ddae2c22ae8ab3914901cd75f8f5bede"
+    }
+  ],
+  "limitations": [
+    "declarative registry and its parser are verified; no panel is clicked in a live browser",
+    "the catalog fetch route /agent/api/office/business/panel-inventory is not registered in this lane; the component renders an honest unavailable state until the lead wires it",
+    "CRM, marketing and trading panels have module authorities/actions but no compat HTTP route yet",
+    "component typecheck (PanelInventory.tsx) is blocked by pre-existing errors in OfficeGameShell.tsx and PhaserSceneHost.ts; the data module and its tests typecheck clean",
+    "no live service, store, credential, network or full matrix was used"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/panel_inventory.py",
+      "sha256": "5377e1b9bfc43b9e0d1ec9c321561c877074e6ffe3eba8b0e2792768db069f24"
+    },
+    {
+      "path": "scripts/verify_panel_inventory.py",
+      "sha256": "446e77a66936ebbf6fc871239cc9e732da6f596c8a300b751c63641fde9f1323"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/panel-inventory.ts",
+      "sha256": "0e07228676ca0faf957bcdd38de07a9f929dc5f399a8226971012456f7b6b82a"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/PanelInventory.tsx",
+      "sha256": "81998f4c64c594c65c9ef6eae63b4b22d591dacc7932347adf41b1567af637e7"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/panel-inventory.test.ts",
+      "sha256": "44cb4afa29d0d7d3196f6677e0bf678111dc4be5d3ef50c104bc2386fdc0f7ff"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/PanelInventory.test.ts",
+      "sha256": "7c73505380c9715ba8af31cc1a872529b9f2a9bfc62458684e3f4170fc013c13"
+    },
+    {
+      "path": "tests/phase6_panels/test_panel_inventory.py",
+      "sha256": "93f4f81bbb9fc7c357d9f4ee3cbc897b1ef8e9fa701a3597adb4c85310da1686"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P6-04"
+}
