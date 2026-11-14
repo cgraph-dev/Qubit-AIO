@@ -1323,11 +1323,13 @@ class RoomBuilder:
         registry: Optional[MS.MapRegistry] = None,
         required_zones: Sequence[str] = DEPARTMENT_ZONES,
         require_unique_style: bool = True,
+        capabilities: Any = None,
     ) -> None:
         self._document = document
         self._registry = registry or MS.MapRegistry()
         self._required_zones = tuple(required_zones)
         self._require_unique_style = bool(require_unique_style)
+        self._capabilities = capabilities
         self._history: List[Tuple[MS.MapDocument, str]] = []
         self._future: List[Tuple[MS.MapDocument, str]] = []
         self._status = "draft"
@@ -1583,6 +1585,21 @@ class RoomBuilder:
 
     def versions(self) -> Tuple[MS.MapVersion, ...]:
         return self._registry.versions(self._document.map_id)
+
+    def resolve_capability(
+        self, room_id: str, *, department_id: Optional[str] = None,
+    ) -> Any:
+        """Resolve the room's capability manifest through the authority.
+
+        :mod:`voicebridge.business.room_capabilities` owns manifests; this
+        builder never keeps a second capability list. A caller that has already
+        built a registry may inject it at construction.
+        """
+        from .room_capabilities import build_shipped_registry
+
+        registry = self._capabilities or build_shipped_registry()
+        return registry.manifest_for(
+            _room(self._document, room_id), department_id=department_id)
 
 
 # ------------------------------------------------------------------- sample

@@ -1,7 +1,7 @@
 {
   "task_id": "P6-02",
   "status": "PASS",
-  "generated_at": "2026-11-14T13:48:27Z",
+  "generated_at": "2026-11-14T13:49:47Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -47,7 +47,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/room_builder.py",
-      "sha256": "fc932f0578a4d5b067cbd66f67e5c8c4961dbd2f5419464c64fb49e59bfcaf0f"
+      "sha256": "e52412aca060916ceb02c56fc010a0905bf4c60a640cff6a42d1278e8ab89dfa"
     },
     {
       "path": "scripts/verify_room_builder.py",
@@ -71,7 +71,7 @@
     },
     {
       "path": "tests/phase6_room_builder/test_room_builder.py",
-      "sha256": "e0ad3962f4e963e0cbd3930b1f55ef066a670c1be8eb8a84e23fa1c871dfc27c"
+      "sha256": "57021f1c2cf53ff23ce1f8ad84cf4c8fec6f9b086fc3108e224a82fc4de33db8"
     },
     {
       "path": "tests/phase6_room_builder/test_verifier.py",
@@ -82,13 +82,13 @@
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_room_builder.py --json",
       "exit_code": 0,
-      "stdout_tail": " \"room 'rec-1' asset 'art:raw': references a paid art pack\",\n        \"room 'rec-1' asset 'art:raw': paid art file is not a recipe coordinate\",\n        \"room 'rec-1' asset 'art:raw': raw sprite sheets are not embedded\"\n      ],\n      \"id\": \"raw_sprite_sheet_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": [\n        \"STYLE_COLLISION: floors 'floor-001' and 'floor-002' both use 'operations'\"\n      ],\n      \"id\": \"department_style_collision_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"refused\": true,\n        \"versions\": 1\n      },\n      \"id\": \"invalid_publish_refused_atomically\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"asset_refs\": 10,\n        \"hash_digest\": \"037f6b12835761e7f25fd839a1a8eea8e1d85edae311b56712c04566d6999228\",\n        \"kinds\": {\n          \"recipe\": 10\n        },\n        \"paid_refs\": 0\n      },\n      \"id\": \"asset_report_clean\",\n      \"ok\": true\n    }\n  ],\n  \"counts\": {\n    \"cells\": 10,\n    \"desks\": 17,\n    \"floors\": 1,\n    \"portals\": 9,\n    \"rooms\": 10\n  },\n  \"egress\": 9,\n  \"generated_at\": \"2026-11-14T13:48:00Z\",\n  \"problems\": [],\n  \"schema\": \"qubit-office-room-builder-validation/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P6-02\"\n}\n",
+      "stdout_tail": " \"room 'rec-1' asset 'art:raw': references a paid art pack\",\n        \"room 'rec-1' asset 'art:raw': paid art file is not a recipe coordinate\",\n        \"room 'rec-1' asset 'art:raw': raw sprite sheets are not embedded\"\n      ],\n      \"id\": \"raw_sprite_sheet_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": [\n        \"STYLE_COLLISION: floors 'floor-001' and 'floor-002' both use 'operations'\"\n      ],\n      \"id\": \"department_style_collision_refused\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"refused\": true,\n        \"versions\": 1\n      },\n      \"id\": \"invalid_publish_refused_atomically\",\n      \"ok\": true\n    },\n    {\n      \"detail\": {\n        \"asset_refs\": 10,\n        \"hash_digest\": \"037f6b12835761e7f25fd839a1a8eea8e1d85edae311b56712c04566d6999228\",\n        \"kinds\": {\n          \"recipe\": 10\n        },\n        \"paid_refs\": 0\n      },\n      \"id\": \"asset_report_clean\",\n      \"ok\": true\n    }\n  ],\n  \"counts\": {\n    \"cells\": 10,\n    \"desks\": 17,\n    \"floors\": 1,\n    \"portals\": 9,\n    \"rooms\": 10\n  },\n  \"egress\": 9,\n  \"generated_at\": \"2026-11-14T13:49:31Z\",\n  \"problems\": [],\n  \"schema\": \"qubit-office-room-builder-validation/1\",\n  \"status\": \"PASS\",\n  \"task_id\": \"P6-02\"\n}\n",
       "stderr_tail": ""
     },
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase6_room_builder tests/phase3_room_caps tests/phase3_world",
       "exit_code": 0,
-      "stdout_tail": "79 passed in 1.44s\n",
+      "stdout_tail": "80 passed in 1.41s\n",
       "stderr_tail": ""
     },
     {

@@ -406,3 +406,12 @@ def test_unknown_operation_is_typed(document):
     builder = RB.RoomBuilder(document)
     with pytest.raises(RB.RoomBuilderError):
         builder.propose("demolish_everything")
+
+
+def test_capability_resolution_uses_the_room_capability_authority(document):
+    builder = RB.RoomBuilder(document)
+    manifest = builder.resolve_capability(
+        "work-1", department_id="executive")
+    assert manifest.manifest_id == "roomcap:executive:work"
+    assert manifest.room_kinds == ("work",)
+    assert manifest.workflow_id == "executive.work"
