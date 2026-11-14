@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": ".............                                                            [100%]\n13 passed in 1.53s"
+      "stdout_tail": ".............                                                            [100%]\n13 passed in 1.23s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/agents.py tests/phase2_registry_sessions/test_agent_profile.py",
@@ -26,11 +26,11 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "........................................................................ [ 57%]\n.....................................................                    [100%]\n125 passed in 10.29s"
+      "stdout_tail": "........................................................................ [ 57%]\n.....................................................                    [100%]\n125 passed in 9.81s"
     }
   ],
-  "generated_at": "2026-11-14T04:08:51Z",
-  "git_head": "b8b57fb7379e93329b3bb8878edc48e30141b7b3",
+  "generated_at": "2026-11-14T04:10:29Z",
+  "git_head": "a0e7dde792185793cf9e2003f226c259239da073",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -86,7 +86,7 @@
     },
     {
       "path": "voicebridge/business/sessions.py",
-      "sha256": "5dc5ba6bef8429b015bf24154c2e22b22c7721856aac30c0d17b92fd8c001cbe"
+      "sha256": "d7e827c736997490c08e0c97f9ac96cc34fb3646a3ca6e3e95223560071e6b7a"
     },
     {
       "path": "voicebridge/business/__init__.py",
@@ -105,7 +105,8 @@
     "the profile is a projection: no live provider/model/HTTP probe is made in this lane",
     "the capability catalog is optional and injected; without it grants are reported without risk/version enrichment",
     "desk/room/department are presentation metadata and are never authorization inputs",
-    "the frozen agent.schema.json core fields are preserved; MCP allowed_tools and the grant diff are additive selectors"
+    "the frozen agent.schema.json core fields are preserved; MCP allowed_tools and the grant diff are additive selectors",
+    "an unpinned primary route is preserved for the existing preview path (it reports pinned=false); a declared fallback must pin both provider and model, so no provider is silently inherited"
   ],
   "outputs": [
     {
@@ -122,7 +123,7 @@
     },
     {
       "path": "tests/phase2_registry_sessions/test_agent_profile.py",
-      "sha256": "4819f97d58f1e3cab266e0b3195ef399126746d5a1f08d6f7c018c91a3d90849"
+      "sha256": "28982ece568b69f65b41c3439041c255b4248ebf365f2c62340acd9402120b94"
     }
   ],
   "python": "3.14.7",

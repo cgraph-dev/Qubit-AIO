@@ -410,6 +410,18 @@ def test_wildcards_in_selectors_are_refused(tmp_path):
     tenant, business = _scope(store)
     _owner, principal = _principals(store, tenant.tenant_id)
 
+    for wildcard in ("*", "?"):
+        with pytest.raises(BusinessError) as exc:
+            identity.grant(
+                store,
+                tenant.tenant_id,
+                subject_id=principal.principal_id,
+                capability=wildcard,
+                resource="crm",
+                action="read",
+            )
+        assert _code(exc) == "BUSINESS_WILDCARD_NOT_ALLOWED"
+
     with pytest.raises(BusinessError) as exc:
         _agent(
             store,

@@ -549,6 +549,14 @@ def create_session(
     # nested BEGIN IMMEDIATE here would deadlock on SQLite's write lock.
     with store.read() as conn:
         store._require_business(conn, tenant_id, business_id)
+        exists = conn.execute(
+            "SELECT 1 FROM bos_session WHERE tenant_id=? AND session_id=?",
+            (tenant_id, sid),
+        ).fetchone()
+        if exists is not None:
+            raise BusinessError(
+                SESSION_BAD_STATE_CODE, f"session {sid!r} already exists"
+            )
         agent = _agent_row(conn, tenant_id, agent_id)
         if agent["business_id"] != business_id:
             raise BusinessError(

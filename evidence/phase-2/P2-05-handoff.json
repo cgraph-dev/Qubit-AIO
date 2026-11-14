@@ -5,7 +5,7 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "...................                                                      [100%]\n19 passed in 0.48s"
+      "stdout_tail": "...................                                                      [100%]\n19 passed in 0.41s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/a2a.py tests/phase2_registry_sessions/test_a2a_handoff.py",
@@ -26,11 +26,11 @@
       "exit_code": 0,
       "expected_exit": 0,
       "stderr_tail": "",
-      "stdout_tail": "...............................                                          [100%]\n31 passed in 1.44s"
+      "stdout_tail": "...............................                                          [100%]\n31 passed in 1.75s"
     }
   ],
-  "generated_at": "2026-11-14T04:08:51Z",
-  "git_head": "b8b57fb7379e93329b3bb8878edc48e30141b7b3",
+  "generated_at": "2026-11-14T04:10:29Z",
+  "git_head": "a0e7dde792185793cf9e2003f226c259239da073",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -86,7 +86,7 @@
     },
     {
       "path": "voicebridge/business/sessions.py",
-      "sha256": "5dc5ba6bef8429b015bf24154c2e22b22c7721856aac30c0d17b92fd8c001cbe"
+      "sha256": "d7e827c736997490c08e0c97f9ac96cc34fb3646a3ca6e3e95223560071e6b7a"
     },
     {
       "path": "voicebridge/business/__init__.py",
@@ -110,7 +110,7 @@
     },
     {
       "path": "voicebridge/business/sessions.py",
-      "sha256": "5dc5ba6bef8429b015bf24154c2e22b22c7721856aac30c0d17b92fd8c001cbe"
+      "sha256": "d7e827c736997490c08e0c97f9ac96cc34fb3646a3ca6e3e95223560071e6b7a"
     },
     {
       "path": "voicebridge/business/errors.py",
