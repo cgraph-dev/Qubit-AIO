@@ -1,0 +1,75 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/stage_replay.py --fixture synthetic-department --no-network --json --work-root /tmp/qoffice-stage-evidence --keep",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "  \"network_probe\": {\n    \"blocked\": true,\n    \"detail\": \"connect() refused by the stage network guard\",\n    \"error\": \"QOFFICE_STAGE_NETWORK_BLOCKED\"\n  },\n  \"no_network_flag\": true,\n  \"projection_parts\": {\n    \"agents\": \"7d414e449fda84bfd77d5706b8ee2509b6c80f464302bb05bf9fb33fde2f683a\",\n    \"approvals\": \"869da3bc61b87f89160776e73dc0e232669aa689537eb816b0e61726c9d7fd7b\",\n    \"artifacts\": \"aaffc8582078f1c887d94825099f38fc8843a725f2cb04d9d898aa557204f137\",\n    \"audit\": \"8f2e529cb1713df4aae422ec9c54a8df4f0e313bb8b03d2a54c6edd04f5b7d0d\",\n    \"jobs\": \"b34c04caed77890af95c93c562822b180daa114476d97fe379c9e929dc70a9ec\",\n    \"ledger\": \"8964c220de4466471ec386ce5cedafb7ad9b6ac5327e6ec19f08959a87227b0a\",\n    \"tool_invocations\": \"97c43461160feb1e0c0579261100170929a5a856a9942a7f226d50703dc8e16f\"\n  },\n  \"replay_digest\": \"51b3896f03652afd5b082325a29070745f7e12e63f58d0a84a708b115a2af1aa\",\n  \"report_path\": \"/tmp/qoffice-stage-evidence/stage-report.json\",\n  \"report_sha256\": \"94977a7dd4ac54c6de787b23d9af46b81afe0d668438931cce3fb747c4c518f7\",\n  \"schema\": \"qoffice-stage-replay/1\",\n  \"seed\": 1337,\n  \"status\": \"PASS\",\n  \"task_id\": \"P0-06\",\n  \"unknown_reconciled\": 1,\n  \"work_root\": \"/tmp/qoffice-stage-evidence\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_stage_replay.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "......                                                                   [100%]\n6 passed in 5.90s"
+    }
+  ],
+  "generated_at": "2026-11-14T02:51:37Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-PHASE-0.md",
+      "sha256": "688028db6dfb6d64066735af5d5c9416e11c6db9daaf107c111501d1956661ef"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "002925be71f51f249893d1aaba1e2b20c3cd02178ce4fa0af44b30526e087160"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "3897fc647e602dd188d70d72952f4450fa15c200058909d8ecb5599c23aa0e0a"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/tools.py",
+      "sha256": "567915566838ed47beef2771a0f16640e40269bbbc9ef3f233ff2787015c18a0"
+    },
+    {
+      "path": "voicebridge/business/agents.py",
+      "sha256": "15b4814df84d1371e4885b0ea5b23fdc8227f50ae96b4e36a83fdaf745566b98"
+    }
+  ],
+  "limitations": [
+    "the digest is a deterministic semantic projection: generated ULIDs and wall-clock timestamps are normalised out",
+    "the tool executor is an in-process Python callable; no provider, tool integration or network is contacted",
+    "P1 checkpoint/outbox records are not implemented; the shipped jobs/approvals/ledger/tools APIs are used unchanged",
+    "the restart is simulated by reopening the SQLite file in-process and expiring a lease, not by killing an OS process",
+    "reported digest=c6496193ed4c837f58ed3097e129f6194e5ecdf223117d641ed001d938a6fc82 replay_digest=51b3896f03652afd5b082325a29070745f7e12e63f58d0a84a708b115a2af1aa equal=True unknown_reconciled=1 network_blocked=True",
+    "the kept throwaway work root is /tmp/qoffice-stage-evidence and is not part of the repository"
+  ],
+  "outputs": [
+    {
+      "path": "scripts/stage_replay.py",
+      "sha256": "d375a8bf3ef4e07f4051d5739ce43c534f33eb2717c25cdf5fcf50d934e30664"
+    },
+    {
+      "path": "tests/office_contracts/test_stage_replay.py",
+      "sha256": "a580b11e7d45ac7be4db4709c5a89ad36c486045bb329e2edca8c426f250de2f"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P0-06"
+}

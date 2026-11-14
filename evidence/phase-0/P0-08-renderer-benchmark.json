@@ -1,0 +1,67 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python scripts/office_benchmark_renderer.py --json --out /tmp/qoffice-benchmark-evidence.json",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": "      \"p95_ms\": 0.021609,\n      \"samples_ms\": [\n        0.01114,\n        0.01133,\n        0.011491,\n        0.01332,\n        0.023681\n      ]\n    },\n    \"tower_build\": {\n      \"iterations\": 5,\n      \"max_ms\": 118.764868,\n      \"median_ms\": 73.694642,\n      \"min_ms\": 65.082968,\n      \"p95_ms\": 110.697533,\n      \"samples_ms\": [\n        65.082968,\n        67.10055,\n        73.694642,\n        78.428195,\n        118.764868\n      ]\n    }\n  }\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/office_contracts/test_office_benchmark_renderer.py",
+      "exit_code": 0,
+      "stderr_tail": "",
+      "stdout_tail": ".....                                                                    [100%]\n5 passed in 5.40s"
+    }
+  ],
+  "generated_at": "2026-11-14T02:51:37Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-PHASE-0.md",
+      "sha256": "688028db6dfb6d64066735af5d5c9416e11c6db9daaf107c111501d1956661ef"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md",
+      "sha256": "3f823ebf1188ca25898e494339e9ec674b78a39afabf37500a8c032527850a65"
+    },
+    {
+      "path": "docs/DECISIONS.md",
+      "sha256": "d5e1b8d881c062ef837ea4603d838975ff38e08f58e3fec79c4a3008dad9a863"
+    },
+    {
+      "path": "voicebridge/office/world/tower_plan.py",
+      "sha256": "5d19979dd77e67e464dd8d0948570bcf62d265461faca93ba43d218f171c1ac9"
+    },
+    {
+      "path": "voicebridge/office/world/model.py",
+      "sha256": "a9c091ca013eb7318e42e6e01876f76ddb8b2a2bdf51726823549049399de39b"
+    }
+  ],
+  "limitations": [
+    "GPU frame time, heap usage and browser compositor cost are NOT measured; this is a hermetic Python data path benchmark only",
+    "both candidates consume the same deterministic projection, so their data-path metrics are identical by construction",
+    "atlas size is the size of the derived sheet plan metadata, not decoded or encoded image bytes",
+    "selection is pinned by product state and docs/DECISIONS.md ruling 16, not chosen by these numbers",
+    "selected=phaser deterministic_digest=43fde2c741166154b6b7aa46a76d9edbb38eaade95f9ca817ca7e0a7ef8e8b81 floor=floor-001",
+    "the written report /tmp/qoffice-benchmark-evidence.json is not part of the repository"
+  ],
+  "outputs": [
+    {
+      "path": "scripts/office_benchmark_renderer.py",
+      "sha256": "b7f790e0097ef5d0080f2ba98986c6f47e008b26e471a9fafc9d341f29eb53f8"
+    },
+    {
+      "path": "tests/office_contracts/test_office_benchmark_renderer.py",
+      "sha256": "6357aa49e711542caf513e95ec1d3b7be302cd97c558c557d533778960c746fe"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P0-08"
+}
