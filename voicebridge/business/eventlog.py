@@ -267,8 +267,14 @@ def append_event(
     business_id: str | None = None,
     retention_class: str = DEFAULT_RETENTION_CLASS,
     now: float | None = None,
+    conn: sqlite3.Connection | None = None,
 ) -> EventEnvelope:
-    """Append one event, its outbox row and their audit trail atomically."""
+    """Append one event, its outbox row and their audit trail atomically.
+
+    ``conn`` is for a caller that already owns an open ``BEGIN IMMEDIATE``
+    transaction (the run/task module does this so a state change and its event
+    commit together). When omitted, this function opens its own transaction.
+    """
     aggregate = _text(aggregate_id, "aggregate_id", max_len=200)
     kind = _event_type(event_type)
     actor_clean = _text(actor, "actor", max_len=200)
@@ -292,115 +298,154 @@ def append_event(
     moment = time.time() if now is None else float(now)
     stamp = now_iso(moment)
     event_id = new_id("evnt")
+    args = (
+        store,
+        conn,
+        tenant_id,
+        aggregate,
+        kind,
+        safe_payload,
+        payload_hash,
+        actor_clean,
+        key,
+        corr,
+        cause,
+        policy,
+        retention,
+        explicit_business,
+        stamp,
+        event_id,
+    )
+    if conn is not None:
+        return _append_locked(*args)
+    with store.transaction() as owned:
+        return _append_locked(store, owned, *args[2:])
 
-    with store.transaction() as conn:
-        store._require_tenant(conn, tenant_id)
-        existing = conn.execute(
-            "SELECT * FROM bos_event WHERE tenant_id=? AND idempotency_key=?",
-            (tenant_id, key),
+
+def _append_locked(
+    store: "BusinessStore",
+    conn: sqlite3.Connection,
+    tenant_id: str,
+    aggregate: str,
+    kind: str,
+    safe_payload: Mapping[str, Any],
+    payload_hash: str,
+    actor_clean: str,
+    key: str,
+    corr: str,
+    cause: str | None,
+    policy: str,
+    retention: str,
+    explicit_business: str | None,
+    stamp: str,
+    event_id: str,
+) -> EventEnvelope:
+    store._require_tenant(conn, tenant_id)
+    existing = conn.execute(
+        "SELECT * FROM bos_event WHERE tenant_id=? AND idempotency_key=?",
+        (tenant_id, key),
+    ).fetchone()
+    if existing is not None:
+        if (
+            existing["payload_hash"] != payload_hash
+            or existing["aggregate_id"] != aggregate
+            or existing["type"] != kind
+        ):
+            raise BusinessError(
+                IDEMPOTENCY_CONFLICT_CODE,
+                f"idempotency key {key!r} was already used for a different"
+                " event (payload, aggregate or type changed)",
+            )
+        return EventEnvelope.from_row(existing)
+
+    owner_business = _resolve_business(
+        store, conn, tenant_id, aggregate, explicit_business
+    )
+    seq = int(
+        conn.execute(
+            "SELECT COALESCE(MAX(seq), 0) + 1 FROM bos_event"
+            " WHERE tenant_id=? AND aggregate_id=?",
+            (tenant_id, aggregate),
+        ).fetchone()[0]
+    )
+    try:
+        conn.execute(
+            "INSERT INTO bos_event(event_id, tenant_id, aggregate_id, seq,"
+            " type, actor, correlation_id, causation_id, idempotency_key,"
+            " payload_hash, payload_json, policy_version, occurred_at,"
+            " retention_class, created_at)"
+            " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (
+                event_id,
+                tenant_id,
+                aggregate,
+                seq,
+                kind,
+                actor_clean,
+                corr,
+                cause,
+                key,
+                payload_hash,
+                json_dumps(safe_payload),
+                policy,
+                stamp,
+                retention,
+                stamp,
+            ),
+        )
+    except sqlite3.IntegrityError as exc:  # concurrent identical append
+        raise BusinessError(
+            IDEMPOTENCY_CONFLICT_CODE,
+            f"event idempotency key {key!r} is already in use",
+        ) from exc
+
+    result = EventEnvelope.from_row(
+        conn.execute(
+            "SELECT * FROM bos_event WHERE tenant_id=? AND event_id=?",
+            (tenant_id, event_id),
         ).fetchone()
-        if existing is not None:
-            if (
-                existing["payload_hash"] != payload_hash
-                or existing["aggregate_id"] != aggregate
-                or existing["type"] != kind
-            ):
-                raise BusinessError(
-                    IDEMPOTENCY_CONFLICT_CODE,
-                    f"idempotency key {key!r} was already used for a different"
-                    " event (payload, aggregate or type changed)",
-                )
-            return EventEnvelope.from_row(existing)
+    )
+    envelope = {**result.to_dict(), "payload": safe_payload}
+    outbox_key = f"event:{key}"
+    outbox_kind = f"event.{kind}"[:120]
+    try:
+        conn.execute(
+            "INSERT INTO bos_outbox(outbox_id, tenant_id, business_id,"
+            " aggregate_id, kind, idempotency_key, request_hash, payload_json,"
+            " status, attempts, created_at, updated_at)"
+            " VALUES(?,?,?,?,?,?,?,?,'pending',0,?,?)",
+            (
+                new_id("obx"),
+                tenant_id,
+                owner_business,
+                aggregate,
+                outbox_kind,
+                outbox_key,
+                payload_hash,
+                json_dumps(envelope),
+                stamp,
+                stamp,
+            ),
+        )
+    except sqlite3.IntegrityError as exc:
+        # Same transaction: the event above is rolled back with this raise.
+        raise BusinessError(
+            IDEMPOTENCY_CONFLICT_CODE,
+            f"outbox key {outbox_key!r} is already in use; the event was"
+            " rolled back with it",
+        ) from exc
 
-        owner_business = _resolve_business(
-            store, conn, tenant_id, aggregate, explicit_business
-        )
-        seq = int(
-            conn.execute(
-                "SELECT COALESCE(MAX(seq), 0) + 1 FROM bos_event"
-                " WHERE tenant_id=? AND aggregate_id=?",
-                (tenant_id, aggregate),
-            ).fetchone()[0]
-        )
-        try:
-            conn.execute(
-                "INSERT INTO bos_event(event_id, tenant_id, aggregate_id, seq,"
-                " type, actor, correlation_id, causation_id, idempotency_key,"
-                " payload_hash, payload_json, policy_version, occurred_at,"
-                " retention_class, created_at)"
-                " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    event_id,
-                    tenant_id,
-                    aggregate,
-                    seq,
-                    kind,
-                    actor_clean,
-                    corr,
-                    cause,
-                    key,
-                    payload_hash,
-                    json_dumps(safe_payload),
-                    policy,
-                    stamp,
-                    retention,
-                    stamp,
-                ),
-            )
-        except sqlite3.IntegrityError as exc:  # concurrent identical append
-            raise BusinessError(
-                IDEMPOTENCY_CONFLICT_CODE,
-                f"event idempotency key {key!r} is already in use",
-            ) from exc
-
-        result = EventEnvelope.from_row(
-            conn.execute(
-                "SELECT * FROM bos_event WHERE tenant_id=? AND event_id=?",
-                (tenant_id, event_id),
-            ).fetchone()
-        )
-        envelope = {**result.to_dict(), "payload": safe_payload}
-        outbox_key = f"event:{key}"
-        outbox_kind = f"event.{kind}"[:120]
-        try:
-            conn.execute(
-                "INSERT INTO bos_outbox(outbox_id, tenant_id, business_id,"
-                " aggregate_id, kind, idempotency_key, request_hash, payload_json,"
-                " status, attempts, created_at, updated_at)"
-                " VALUES(?,?,?,?,?,?,?,?,'pending',0,?,?)",
-                (
-                    new_id("obx"),
-                    tenant_id,
-                    owner_business,
-                    aggregate,
-                    outbox_kind,
-                    outbox_key,
-                    payload_hash,
-                    json_dumps(envelope),
-                    stamp,
-                    stamp,
-                ),
-            )
-        except sqlite3.IntegrityError as exc:
-            # Same transaction: the event above is rolled back with this raise.
-            raise BusinessError(
-                IDEMPOTENCY_CONFLICT_CODE,
-                f"outbox key {outbox_key!r} is already in use; the event was"
-                " rolled back with it",
-            ) from exc
-
-        store._audit(
-            conn, tenant_id, owner_business, actor_clean, "event.append",
-            "event", event_id, "ok",
-            {
-                "aggregate_id": aggregate,
-                "sequence": seq,
-                "type": kind,
-                "payload_hash": payload_hash,
-            },
-        )
+    store._audit(
+        conn, tenant_id, owner_business, actor_clean, "event.append",
+        "event", event_id, "ok",
+        {
+            "aggregate_id": aggregate,
+            "sequence": seq,
+            "type": kind,
+            "payload_hash": payload_hash,
+        },
+    )
     return result
-
 
 def get_event(store: "BusinessStore", tenant_id: str, event_id: str) -> EventEnvelope:
     with store.read() as conn:
