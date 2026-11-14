@@ -216,7 +216,7 @@ describe("CharacterStudio", () => {
       .props["aria-label"]).toBe("Character Studio");
 
     const serialised = JSON.stringify(h.tree);
-    expect(serialised).not.toContain("/home/trick");
+    expect(serialised).not.toContain("/home/example/paid-art");
     expect(serialised).not.toContain(".png");
   });
 });
@@ -233,7 +233,7 @@ describe("CharacterStudio adapters and revisions", () => {
     expect(textOf(details[2])).toContain("cell 0");
     expect(allByTestId(h, "character-adapters")[0].props.role).toBe("group");
     const serialised = JSON.stringify(h.tree);
-    expect(serialised).not.toContain("/home/trick");
+    expect(serialised).not.toContain("/home/example/paid-art");
     expect(serialised).not.toContain(".png");
   });
 

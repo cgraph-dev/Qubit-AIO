@@ -105,7 +105,7 @@ DEFAULT_PALETTE: Tuple[str, ...] = (
 
 _PACK_CHARACTER = "Character Generator 2.0 Linux Build"
 _PACK_PORTRAIT = "Portrait_Generator_1.5.0_Linux_Build"
-_LOCAL_ROOT = "/home/trick/Desktop/UI Office"
+_LOCAL_ROOT = str(Path.home() / "Desktop" / "UI Office")
 _ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,63}$")
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 _HEX_RE = re.compile(r"^#[0-9a-fA-F]{6}$")

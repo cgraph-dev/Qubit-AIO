@@ -516,7 +516,7 @@ def compute_digest(payload: Mapping[str, Any]) -> str:
 # ------------------------------------------------------------------ builder
 _PACK_MODERN = "Modern_Interiors_RPG_Maker_Version"
 _PACK_SERENE = "Serene_Village_revamped_v1.9"
-_LOCAL_ROOT = "/home/trick/Desktop/UI Office"
+_LOCAL_ROOT = str(Path.home() / "Desktop" / "UI Office")
 
 
 def _manifest_digest(pack: str, feature: str, asset_id: str) -> str:

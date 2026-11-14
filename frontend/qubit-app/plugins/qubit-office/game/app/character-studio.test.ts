@@ -49,7 +49,7 @@ describe("character catalog", () => {
 
   it("never exposes a local paid path in a part", () => {
     const serialised = JSON.stringify(PART_CATALOG);
-    expect(serialised).not.toContain("/home/trick");
+    expect(serialised).not.toContain("/home/example/paid-art");
     expect(serialised).not.toContain(".png");
   });
 });
@@ -260,7 +260,7 @@ describe("three adapter projections", () => {
 
   it("never carries a local or paid asset path", () => {
     const serialised = JSON.stringify(projectProfile(createStudioState().draft));
-    expect(serialised).not.toContain("/home/trick");
+    expect(serialised).not.toContain("/home/example/paid-art");
     expect(serialised).not.toContain(".png");
     expect(serialised).not.toContain("source_asset_refs");
     expect(serialised).not.toContain("local_path");
