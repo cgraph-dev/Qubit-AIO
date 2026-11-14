@@ -35,6 +35,9 @@ def _run(tracer, **kwargs):
         agent_id="agt_1",
         task_id="tsk_1",
         session_id="ses_1",
+        provider_request_id="prq_1",
+        artifact_id="art_1",
+        approval_id="apr_1",
         **kwargs,
     )
 
@@ -68,6 +71,9 @@ def test_one_trace_covers_the_full_chain():
     assert root.attributes["qubit.run.id"] == "run_1"
     assert root.attributes["qubit.task.id"] == "tsk_1"
     assert root.attributes["qubit.session.id"] == "ses_1"
+    assert root.attributes["qubit.provider.request.id"] == "prq_1"
+    assert root.attributes["qubit.artifact.id"] == "art_1"
+    assert root.attributes["qubit.approval.id"] == "apr_1"
 
 
 def test_chain_spans_are_children_of_the_root():

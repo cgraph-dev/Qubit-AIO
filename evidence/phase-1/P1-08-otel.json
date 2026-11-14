@@ -1,7 +1,7 @@
 {
   "task_id": "P1-08",
   "status": "PASS",
-  "generated_at": "2026-11-14T03:12:05Z",
+  "generated_at": "2026-11-14T03:12:34Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -27,18 +27,18 @@
   "outputs": [
     {
       "path": "voicebridge/business/otel.py",
-      "sha256": "5d62f68dc49be6c95cb7b7354a19ac42b115002f7c7f0ee32bc09518016aab81"
+      "sha256": "8111c1674335704bd3764c856f9eb880b35e47a839df9c1b2545ec49bc956d8f"
     },
     {
       "path": "tests/phase1_otel/test_otel_instrumentation.py",
-      "sha256": "622f8d31707769d341496633e77e91c5232251bf3e67e7058ecdc20876d96abd"
+      "sha256": "c811066ab16e0c23dfd5711a866d53505b8488e2384bb59b60c8bddd1effc972"
     }
   ],
   "commands": [
     {
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_security tests/phase1_otel tests/test_business_redaction.py",
       "exit_code": 0,
-      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 0.54s\n",
+      "stdout_tail": "........................................................................ [ 96%]\n...                                                                      [100%]\n75 passed in 0.51s\n",
       "stderr_tail": ""
     },
     {

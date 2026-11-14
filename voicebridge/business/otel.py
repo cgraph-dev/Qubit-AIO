@@ -561,6 +561,8 @@ class Tracer:
         task_id: str | None = None,
         session_id: str | None = None,
         provider_request_id: str | None = None,
+        artifact_id: str | None = None,
+        approval_id: str | None = None,
     ) -> Iterator[RunTrace]:
         trace_id = self._new_id("trace")
         start = self._now()
@@ -574,6 +576,8 @@ class Tracer:
             ("qubit.task.id", task_id),
             ("qubit.session.id", session_id),
             ("qubit.provider.request.id", provider_request_id),
+            ("qubit.artifact.id", artifact_id),
+            ("qubit.approval.id", approval_id),
         ):
             if value is not None:
                 attrs.setdefault(key, value)
@@ -596,6 +600,8 @@ class Tracer:
                 "task_id": task_id,
                 "session_id": session_id,
                 "provider_request_id": provider_request_id,
+                "artifact_id": artifact_id,
+                "approval_id": approval_id,
             }
         )
         self._runs().append(trace)
