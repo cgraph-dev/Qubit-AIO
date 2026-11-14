@@ -42,7 +42,9 @@ __all__ = [
     "SCHEMA",
     "STORE_SCHEMA",
     "EXPORT_SCHEMA",
+    "PROJECTION_SCHEMA",
     "STYLE_VERSION",
+    "ADAPTERS",
     "PART_CATEGORIES",
     "PART_COUNTS",
     "ANIMATIONS",
@@ -64,12 +66,17 @@ __all__ = [
     "validate_profile",
     "apply_fallbacks",
     "migrate_profile_dict",
+    "project_habblaud",
+    "project_limezu_character",
+    "project_limezu_portrait",
+    "project_profile",
     "CharacterProfileStore",
 ]
 
 SCHEMA = "qubit-office-character-profile/1"
 STORE_SCHEMA = "qubit-office-character-profile-store/1"
 EXPORT_SCHEMA = "qubit-office-character-profile-export/1"
+PROJECTION_SCHEMA = "qubit-office-character-projection/1"
 STYLE_VERSION = 1
 
 PART_CATEGORIES: Tuple[str, ...] = ("body", "skin", "eyes", "hair", "outfit")
@@ -84,6 +91,9 @@ ACCESSORY_COUNT = 6
 
 ANIMATIONS: Tuple[str, ...] = (
     "idle", "walk", "type", "talk", "think", "break", "celebrate",
+)
+ADAPTERS: Tuple[str, ...] = (
+    "habblaud", "limezu_character", "limezu_portrait",
 )
 SHADOW_POLICIES: Tuple[str, ...] = ("none", "sprite", "room")
 LAYER_ORDER: Tuple[str, ...] = (
@@ -624,6 +634,151 @@ def apply_fallbacks(
         **updates,
     )
     return resolved, fallbacks
+
+
+# --------------------------------------------------------------- projections
+# One canonical profile, three disposable projections. A projection is a pure
+# mapping from the profile to an adapter's vocabulary: it never reads art,
+# never writes state and never carries a local/paid asset path.
+_HABBLAUD_LAYER_SOURCE: Mapping[str, str] = {
+    "body": "body_id",
+    "outfit": "outfit_id",
+    "skin": "skin_id",
+    "eyes": "eyes_id",
+    "hair": "hair_id",
+    "accessory": "accessory_ids",
+}
+
+_PORTRAIT_CELL_RE = re.compile(r"^cell-(\d+)$")
+
+
+def _part_index(part_id: str) -> int:
+    part = CATALOG_INDEX.get(part_id or "")
+    return int(part.index) if part is not None else -1
+
+
+def _part_indices(profile: CharacterProfile) -> Dict[str, int]:
+    return {
+        category: _part_index(getattr(profile, f"{category}_id"))
+        for category in PART_CATEGORIES
+    }
+
+
+def project_habblaud(profile: CharacterProfile) -> Dict[str, Any]:
+    """Project the profile onto Habblaud's layer/sprite vocabulary.
+
+    Habblaud owns layer compositing and its own animation names; this maps the
+    canonical parts to those layer slots in the profile's declared order. The
+    accessory layer can hold several canonical accessories, so it reports a
+    list. No sprite pixels or paths cross this boundary.
+    """
+    layers: List[Dict[str, Any]] = []
+    for z, layer in enumerate(profile.layer_order):
+        source = _HABBLAUD_LAYER_SOURCE[layer]
+        if layer == "accessory":
+            part_ids = list(profile.accessory_ids)
+            layers.append({
+                "layer": layer,
+                "adapter_layer": "accessory",
+                "part_ids": part_ids,
+                "indices": [_part_index(part_id) for part_id in part_ids],
+                "z": z,
+                "visible": bool(part_ids),
+            })
+        else:
+            part_id = str(getattr(profile, source))
+            layers.append({
+                "layer": layer,
+                "adapter_layer": layer,
+                "part_id": part_id,
+                "index": _part_index(part_id),
+                "z": z,
+                "visible": True,
+            })
+    return {
+        "adapter": "habblaud",
+        "profile_id": profile.profile_id,
+        "agent_id": profile.agent_id,
+        "revision": int(profile.revision),
+        "style_version": int(profile.style_version),
+        "layer_order": list(profile.layer_order),
+        "layers": layers,
+        "palette": list(profile.palette),
+        "shadow_policy": profile.shadow_policy,
+        "animation_set": list(profile.animation_set),
+        "seed": int(profile.seed),
+    }
+
+
+def project_limezu_character(profile: CharacterProfile) -> Dict[str, Any]:
+    """Project the profile onto Character Generator 2.0 part indices.
+
+    The generator takes integer part indices per category; this is metadata
+    only. A part that is absent from the measured catalog reports ``-1`` so the
+    caller can run :func:`apply_fallbacks` first instead of guessing art.
+    """
+    return {
+        "adapter": "limezu-character-generator-2.0",
+        "profile_id": profile.profile_id,
+        "revision": int(profile.revision),
+        "style_version": int(profile.style_version),
+        "parts": _part_indices(profile),
+        "part_ids": {
+            category: str(getattr(profile, f"{category}_id"))
+            for category in PART_CATEGORIES
+        },
+        "accessories": [
+            {"part_id": part_id, "index": _part_index(part_id)}
+            for part_id in profile.accessory_ids
+        ],
+        "palette": list(profile.palette),
+        "shadow_policy": profile.shadow_policy,
+        "seed": int(profile.seed),
+    }
+
+
+def _portrait_cell_index(cell: str) -> int:
+    match = _PORTRAIT_CELL_RE.match(cell or "")
+    return int(match.group(1)) if match else -1
+
+
+def project_limezu_portrait(profile: CharacterProfile) -> Dict[str, Any]:
+    """Project the profile onto Portrait Generator 1.5 cell/size metadata.
+
+    ``portrait_cell`` is a logical cell name (``cell-N``); the generator
+    resolves it against its local atlas. The projection exposes only the cell
+    index, size and part indices, never an atlas or paid-art path.
+    """
+    cell = str(profile.portrait_cell)
+    return {
+        "adapter": "limezu-portrait-generator-1.5",
+        "profile_id": profile.profile_id,
+        "revision": int(profile.revision),
+        "portrait_cell": cell,
+        "cell_index": _portrait_cell_index(cell),
+        "portrait_size": int(profile.portrait_size),
+        "frame": f"{cell}_{int(profile.portrait_size)}",
+        "part_indices": _part_indices(profile),
+        "palette": list(profile.palette),
+        "seed": int(profile.seed),
+    }
+
+
+def project_profile(profile: CharacterProfile) -> Dict[str, Any]:
+    """The bundle of all three adapter projections for one canonical profile."""
+    return {
+        "schema": PROJECTION_SCHEMA,
+        "profile_id": profile.profile_id,
+        "agent_id": profile.agent_id,
+        "revision": int(profile.revision),
+        "style_version": int(profile.style_version),
+        "seed": int(profile.seed),
+        "adapters": {
+            "habblaud": project_habblaud(profile),
+            "limezu_character": project_limezu_character(profile),
+            "limezu_portrait": project_limezu_portrait(profile),
+        },
+    }
 
 
 # -------------------------------------------------------------------- store

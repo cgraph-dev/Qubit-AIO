@@ -38,7 +38,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from voicebridge.business.character_profile import (  # noqa: E402
+    ADAPTERS,
+    CATALOG_INDEX,
     PART_COUNTS,
+    PROJECTION_SCHEMA,
     SCHEMA,
     STYLE_VERSION,
     CharacterProfile,
@@ -50,6 +53,7 @@ from voicebridge.business.character_profile import (  # noqa: E402
     default_profile,
     migrate_profile_dict,
     part_counts,
+    project_profile,
     validate_profile,
 )
 
@@ -99,7 +103,68 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
     checks.append(_check("default_profile_valid", not problems,
                          "valid" if not problems else "; ".join(problems)))
 
-    # 3. save + atomic permissions + revision 1
+    # 3. three adapter projections derived from the one canonical profile
+    projection = project_profile(profile)
+    again = project_profile(profile)
+    adapters = projection.get("adapters", {})
+    checks.append(_check(
+        "adapter_projection_schema",
+        projection.get("schema") == PROJECTION_SCHEMA
+        and set(adapters) == set(ADAPTERS),
+        f"adapters={sorted(adapters)}"))
+    habblaud = adapters.get("habblaud", {})
+    layer_rows = habblaud.get("layers", [])
+    checks.append(_check(
+        "adapter_layer_order",
+        [row.get("layer") for row in layer_rows]
+        == list(profile.layer_order)
+        and all(
+            (row.get("part_id") == getattr(profile, f"{row['layer']}_id")
+             if row.get("layer") != "accessory"
+             else row.get("part_ids") == list(profile.accessory_ids))
+            for row in layer_rows),
+        f"layers={[row.get('layer') for row in layer_rows]}"))
+    limezu = adapters.get("limezu_character", {})
+    expected_indices = {
+        category: CATALOG_INDEX[
+            getattr(profile, f"{category}_id")].index
+        for category in ("body", "skin", "eyes", "hair", "outfit")
+    }
+    checks.append(_check(
+        "adapter_part_indices",
+        limezu.get("parts") == expected_indices
+        and limezu.get("part_ids", {}).get("body") == profile.body_id,
+        f"parts={limezu.get('parts')} expected={expected_indices}"))
+    portrait = adapters.get("limezu_portrait", {})
+    checks.append(_check(
+        "adapter_portrait_projection",
+        portrait.get("portrait_cell") == profile.portrait_cell
+        and portrait.get("portrait_size") == profile.portrait_size
+        and portrait.get("cell_index") == 0,
+        f"cell={portrait.get('portrait_cell')}"
+        f" size={portrait.get('portrait_size')}"
+        f" index={portrait.get('cell_index')}"))
+    forty_eight = project_profile(_with_part(profile, portrait_size=48))
+    checks.append(_check(
+        "adapter_portrait_size_48",
+        forty_eight["adapters"]["limezu_portrait"]["portrait_size"] == 48,
+        f"portrait_size={forty_eight['adapters']['limezu_portrait'][
+            'portrait_size']}"))
+    checks.append(_check(
+        "adapter_projection_pure",
+        projection == again and projection["revision"] == profile.revision
+        and projection["profile_id"] == profile.profile_id,
+        "two projections are identical and echo the canonical identity"))
+    serialised = json.dumps(projection, sort_keys=True)
+    checks.append(_check(
+        "adapter_projection_private",
+        "/home/trick" not in serialised
+        and ".png" not in serialised
+        and "source_asset_refs" not in serialised
+        and "local_path" not in serialised,
+        "projections carry no local or paid asset path"))
+
+    # 4. save + atomic permissions + revision 1
     saved = store_a.save(profile)
     path_a = store_a.path_for(saved.profile_id)
     mode = os.stat(path_a).st_mode & 0o777
@@ -113,7 +178,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         mode == 0o600 and dir_mode == 0o700,
         f"file={oct(mode)} dir={oct(dir_mode)}"))
 
-    # 4. stale writer refused, then an accepted revision 2
+    # 5. stale writer refused, then an accepted revision 2
     stale_refused = False
     try:
         store_a.save(_with_part(saved, body_id="body-01", revision=0))
@@ -129,7 +194,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         and store_a.load(saved.profile_id).body_id == "body-01",
         f"revision={second.revision} body={second.body_id}"))
 
-    # 5. rollback appends a new revision (history is not rewritten)
+    # 6. rollback appends a new revision (history is not rewritten)
     rolled = store_a.rollback(saved.profile_id, 1)
     revisions = store_a.list_revisions(saved.profile_id)
     checks.append(_check(
@@ -142,7 +207,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         and revisions[-1]["kind"] == "rollback",
         f"history={[(r['revision'], r['kind']) for r in revisions]}"))
 
-    # 6. export / import round-trip through a second store
+    # 7. export / import round-trip through a second store
     document = store_a.export(saved.profile_id, export_path)
     imported = store_b.import_file(export_path)
     original = store_a.load(saved.profile_id)
@@ -155,7 +220,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         same and export_path.exists() and imported.revision == 1,
         f"export={export_path.name} imported_revision={imported.revision}"))
 
-    # 7. missing-part fallback
+    # 8. missing-part fallback
     broken = _with_part(original, body_id="body-999",
                         accessory_ids=("accessory-999",))
     resolved, fallbacks = apply_fallbacks(broken, repo_root=repo)
@@ -166,7 +231,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         and "body" in categories and "accessory" in categories,
         f"body={resolved.body_id} fallbacks={len(fallbacks)}"))
 
-    # 8. revision migration
+    # 9. revision migration
     legacy = {
         "profile_id": "profile-legacy",
         "agent_id": "agent-legacy",
@@ -184,7 +249,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         and bool(steps),
         f"steps={steps}"))
 
-    # 9. paid-art guard: save and export refuse repository paths
+    # 10. paid-art guard: save and export refuse repository paths
     paid_repo_ref = SourceAssetRef(
         path=str(repo / "paid-body.png"),
         sha256=hashlib.sha256(b"paid").hexdigest(),
@@ -209,7 +274,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         export_refused and not repo_export.exists(),
         "export refused the repository path and wrote nothing"))
 
-    # 10. writes stay inside the caller-supplied targets
+    # 11. writes stay inside the caller-supplied targets
     store_files = sorted(
         p.relative_to(tmp).as_posix()
         for p in state_a.rglob("*") if p.is_file())
@@ -221,7 +286,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         and repo_files == [],
         f"store_files={store_files} repo_files={repo_files}"))
 
-    # 11. export document identity
+    # 12. export document identity
     checks.append(_check(
         "export_document_identity",
         document.get("schema", "").startswith("qubit-office-character-profile")
@@ -229,7 +294,7 @@ def run_verification(workdir: Path | str | None = None) -> Dict[str, Any]:
         == saved.profile_id,
         f"schema={document.get('schema')}"))
 
-    # 12. schema version
+    # 13. schema version
     checks.append(_check("profile_schema", original.schema == SCHEMA,
                          original.schema))
 
