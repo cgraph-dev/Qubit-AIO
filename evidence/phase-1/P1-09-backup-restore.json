@@ -4,7 +4,7 @@
       "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase1_backup tests/durable_substrate tests/test_business_os_foundation.py",
       "exit_code": 0,
       "stderr_tail": "",
-      "stdout_tail": "............................................................             [100%]\n60 passed in 10.11s"
+      "stdout_tail": "............................................................             [100%]\n60 passed in 7.44s"
     },
     {
       "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/backup.py tests/phase1_backup",
@@ -19,7 +19,7 @@
       "stdout_tail": ""
     }
   ],
-  "generated_at": "2026-11-14T03:13:58Z",
+  "generated_at": "2026-11-14T03:16:37Z",
   "inputs": [
     {
       "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
@@ -78,7 +78,7 @@
   "outputs": [
     {
       "path": "voicebridge/business/backup.py",
-      "sha256": "a51fb0a42d7a31b999a4a3fee5c071439e4231ca205a7196460407abcf474f19"
+      "sha256": "9631120bc381bd6cc47065ec3e39b1b06f2b103f0120fa1d1ebd575ec41759e2"
     },
     {
       "path": "tests/phase1_backup/test_snapshot_verify.py",

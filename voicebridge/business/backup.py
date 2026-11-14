@@ -349,13 +349,6 @@ def _columns(conn: sqlite3.Connection, table: str) -> list[str]:
     ]
 
 
-def _primary_key(conn: sqlite3.Connection, table: str) -> str | None:
-    for row in conn.execute(f'PRAGMA table_info("{table}")').fetchall():
-        if int(row[5]):
-            return str(row[1])
-    return None
-
-
 def _table_counts(
     conn: sqlite3.Connection, tenant_id: str | None = None
 ) -> dict[str, int]:
@@ -464,6 +457,7 @@ def _online_backup(source: Path, destination: Path) -> None:
     dst = None
     try:
         src = sqlite3.connect(str(source), timeout=30.0)
+        src.execute("PRAGMA query_only=ON")
         dst = sqlite3.connect(str(destination))
         src.backup(dst)
         dst.execute("PRAGMA journal_mode=DELETE")
@@ -620,9 +614,9 @@ def snapshot(
             "files": files,
             "table_counts": counts,
             "row_counts": {"total": sum(counts.values()), "tables": counts},
+            "duration_seconds": round(time.perf_counter() - started, 6),
         }
         _write_json(dest / MANIFEST_NAME, manifest)
-        manifest["_duration_seconds"] = round(time.perf_counter() - started, 6)
         return manifest
     finally:
         for leftover in (raw_copy, plain_copy):
