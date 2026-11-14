@@ -207414,6 +207414,7 @@ create: function(game) {
 			OutsideWorld: createOutsideWorld(R, hooks),
 			PanelInventory: createPanelInventoryPanel(R, hooks),
 			FloorCampus: createFloorCampus(R, hooks),
+			TowerNavigator: createTowerNavigator(R, hooks),
 			EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
 			LoadingScreen: createOfficeLoadingScreen(R, hooks)
 		};
@@ -207447,10 +207448,15 @@ create: function(game) {
 			const [studioTab, setStudioTab] = useState("panels");
 			const [outsideView, setOutsideView] = useState(null);
 			const [campusOpen, setCampusOpen] = useState(false);
+			const [campusTab, setCampusTab] = useState("floors");
+			const [campusDirectory, setCampusDirectory] = useState(null);
+			const [campusWorld, setCampusWorld] = useState(null);
+			const [campusState, setCampusState] = useState("loading");
+			const [campusError, setCampusError] = useState("");
 			const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion());
 			const [highContrast, setHighContrast] = useState(prefersHighContrast());
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, FloorCampus, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, FloorCampus, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			useEffect(() => {
 				if (!studioOpen || studioTab !== "outside") return;
 				let live = true;
@@ -207469,6 +207475,41 @@ create: function(game) {
 				studioOpen,
 				studioTab,
 				props.base
+			]);
+			useEffect(() => {
+				if (!campusOpen || campusTab !== "directory") return;
+				let live = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				setCampusState("loading");
+				setCampusError("");
+				fetchDirectory({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then(async (directory) => {
+					const world = await fetchWorldTower(directory.floors, {
+						base: props.base,
+						fetchImpl: props.fetchImpl,
+						signal: ctl?.signal
+					});
+					if (!live) return;
+					setCampusDirectory(directory);
+					setCampusWorld(world);
+					setCampusState("ready");
+				}).catch((exc) => {
+					if (!live) return;
+					setCampusState("error");
+					setCampusError(exc instanceof Error ? exc.message : String(exc));
+				});
+				return () => {
+					live = false;
+					ctl?.abort();
+				};
+			}, [
+				campusOpen,
+				campusTab,
+				props.base,
+				props.fetchImpl
 			]);
 			const frameRef = useRef(null);
 			const menuRef = useRef(null);
@@ -208201,32 +208242,71 @@ create: function(game) {
 					className: "office-game__studioBody"
 				}, body)]));
 			}
-			if (campusOpen) children.push(R.createElement("section", {
-				key: "campus",
-				id: "office-game-campus",
-				className: "office-game__campus office-game__campus--floors",
-				"data-testid": "office-campus",
-				"data-office-slice": dockSlice,
-				"aria-label": "Qubit floor campus"
-			}, [R.createElement("div", {
-				key: "head",
-				className: "office-game__campusHead"
-			}, [R.createElement("div", { key: "title" }, [R.createElement("h2", { key: "h" }, "Qubit Floor Campus"), R.createElement("p", {
-				key: "counts",
-				"data-testid": "office-campus-counts"
-			}, "Live floors · each card is the Habblaud office with LimeZu art")]), R.createElement("button", {
-				key: "close",
-				type: "button",
-				className: "office-game__btn office-theme-dock-close",
-				"data-testid": "office-campus-close",
-				onClick: () => setCampusOpen(false)
-			}, "Close campus")]), R.createElement("div", {
-				key: "body",
-				className: "office-game__campusBody"
-			}, R.createElement(FloorCampus, {
-				base: props.base,
-				theme: requestedTheme
-			}))]));
+			if (campusOpen) {
+				const directoryBody = campusState === "loading" ? R.createElement("div", {
+					key: "loading",
+					className: "office-game__campusState",
+					"data-testid": "office-campus-loading",
+					role: "status"
+				}, "Loading the 100-floor directory…") : campusState === "error" ? R.createElement("div", {
+					key: "error",
+					className: "office-game__campusState",
+					"data-testid": "office-campus-error",
+					role: "alert"
+				}, `Directory unavailable: ${campusError}`) : campusDirectory ? R.createElement(TowerNavigator, {
+					key: "tower",
+					floors: campusDirectory.floors,
+					world: campusWorld,
+					onOpenLiveFloor: () => setCampusTab("floors")
+				}) : null;
+				children.push(R.createElement("section", {
+					key: "campus",
+					id: "office-game-campus",
+					className: "office-game__campus office-game__campus--floors",
+					"data-testid": "office-campus",
+					"data-office-slice": dockSlice,
+					"aria-label": "Qubit campus"
+				}, [R.createElement("div", {
+					key: "head",
+					className: "office-game__campusHead"
+				}, [R.createElement("div", { key: "title" }, [
+					R.createElement("h2", { key: "h" }, "Qubit Campus"),
+					R.createElement("p", {
+						key: "counts",
+						"data-testid": "office-campus-counts"
+					}, campusTab === "floors" ? "Floor scenes · the Habblaud office repeated per real floor" : "100-floor directory · floors, rooms, desks and occupancy"),
+					R.createElement("div", {
+						key: "tabs",
+						className: "office-game__campusTabs"
+					}, [R.createElement("button", {
+						key: "floors",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "office-campus-tab-floors",
+						"aria-pressed": campusTab === "floors",
+						onClick: () => setCampusTab("floors")
+					}, "Floor scenes"), R.createElement("button", {
+						key: "directory",
+						type: "button",
+						className: "office-game__btn",
+						"data-testid": "office-campus-tab-directory",
+						"aria-pressed": campusTab === "directory",
+						onClick: () => setCampusTab("directory")
+					}, "100-floor directory")])
+				]), R.createElement("button", {
+					key: "close",
+					type: "button",
+					className: "office-game__btn office-theme-dock-close",
+					"data-testid": "office-campus-close",
+					onClick: () => setCampusOpen(false)
+				}, "Close campus")]), R.createElement("div", {
+					key: "body",
+					className: "office-game__campusBody"
+				}, campusTab === "floors" ? R.createElement(FloorCampus, {
+					base: props.base,
+					theme: requestedTheme
+				}) : directoryBody)]));
+			}
 			children.push(R.createElement(LoadingScreen, {
 				key: "loading-screen",
 				phase: failed ? "error" : "loading",

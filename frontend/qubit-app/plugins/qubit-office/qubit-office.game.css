@@ -2738,4 +2738,22 @@
   display: block;
   background: #0b0a13;
 }
+
+/* Campus has two real surfaces: the Habblaud floor copies and the 100-floor
+   directory. The tabs keep both reachable instead of replacing one with the
+   other. */
+.office-game__campusTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.office-game__campusTabs .office-game__btn {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+.office-game__campusTabs .office-game__btn[aria-pressed="true"] {
+  border-color: #e08fb0;
+  background: rgba(224, 143, 176, 0.18);
+}
 /*$vite$:1*/

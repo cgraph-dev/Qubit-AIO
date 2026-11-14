@@ -27,6 +27,9 @@ import { createRoomBuilder } from "./RoomBuilder";
 import { createOutsideWorld } from "./OutsideWorld";
 import { createPanelInventoryPanel } from "./PanelInventory";
 import { createFloorCampus } from "./FloorCampus";
+import { createTowerNavigator } from "./TowerNavigator";
+import { fetchDirectory, type BusinessDirectory } from "./business-api";
+import { fetchWorldTower, type WorldTower } from "./world-tower";
 import { fetchOutsideWorld, type OutsideWorldView } from "./outside-world";
 import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
@@ -149,6 +152,7 @@ type ShellComponents = {
   OutsideWorld: ReturnType<typeof createOutsideWorld>;
   PanelInventory: ReturnType<typeof createPanelInventoryPanel>;
   FloorCampus: ReturnType<typeof createFloorCampus>;
+  TowerNavigator: ReturnType<typeof createTowerNavigator>;
   EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
 };
@@ -195,6 +199,7 @@ function shellComponents(
     OutsideWorld: createOutsideWorld(R, hooks),
     PanelInventory: createPanelInventoryPanel(R, hooks),
     FloorCampus: createFloorCampus(R, hooks),
+    TowerNavigator: createTowerNavigator(R, hooks),
     EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
   };
@@ -271,6 +276,13 @@ export function createOfficeApp(
     // The Habblaud office is the primary surface. Campus multiplies it into
     // one card per real floor; it is not a directory and not a second renderer.
     const [campusOpen, setCampusOpen] = useState(false);
+    const [campusTab, setCampusTab] = useState<"floors" | "directory">("floors");
+    const [campusDirectory, setCampusDirectory] = useState<
+      BusinessDirectory | null>(null);
+    const [campusWorld, setCampusWorld] = useState<WorldTower | null>(null);
+    const [campusState, setCampusState] = useState<
+      "loading" | "ready" | "error">("loading");
+    const [campusError, setCampusError] = useState<string>("");
     // P6-05 accessibility preferences. Declared AFTER every earlier slot so
     // seeded state indices in the shell's own tests stay stable. The OS
     // preference is honoured by default; an explicit shell setting could win
@@ -284,7 +296,8 @@ export function createOfficeApp(
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
       ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld,
-      PanelInventory, FloorCampus, EtsyConnectPanel, LoadingScreen,
+      PanelInventory, FloorCampus, TowerNavigator, EtsyConnectPanel,
+      LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     useEffect(() => {
       if (!studioOpen || studioTab !== "outside") return;
@@ -295,6 +308,32 @@ export function createOfficeApp(
         .then((view) => { if (live) setOutsideView(view); });
       return () => { live = false; ctl?.abort(); };
     }, [studioOpen, studioTab, props.base]);
+    useEffect(() => {
+      if (!campusOpen || campusTab !== "directory") return;
+      let live = true;
+      const ctl = typeof AbortController === "undefined" ? undefined
+        : new AbortController();
+      setCampusState("loading");
+      setCampusError("");
+      fetchDirectory({ base: props.base, fetchImpl: props.fetchImpl,
+        signal: ctl?.signal })
+        .then(async (directory) => {
+          const world = await fetchWorldTower(directory.floors, {
+            base: props.base, fetchImpl: props.fetchImpl,
+            signal: ctl?.signal,
+          });
+          if (!live) return;
+          setCampusDirectory(directory);
+          setCampusWorld(world);
+          setCampusState("ready");
+        })
+        .catch((exc) => {
+          if (!live) return;
+          setCampusState("error");
+          setCampusError(exc instanceof Error ? exc.message : String(exc));
+        });
+      return () => { live = false; ctl?.abort(); };
+    }, [campusOpen, campusTab, props.base, props.fetchImpl]);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
@@ -1208,22 +1247,60 @@ export function createOfficeApp(
     }
 
     if (campusOpen) {
+      const directoryBody = campusState === "loading"
+        ? R.createElement("div", {
+            key: "loading", className: "office-game__campusState",
+            "data-testid": "office-campus-loading", role: "status",
+          }, "Loading the 100-floor directory…")
+        : campusState === "error"
+        ? R.createElement("div", {
+            key: "error", className: "office-game__campusState",
+            "data-testid": "office-campus-error", role: "alert",
+          }, `Directory unavailable: ${campusError}`)
+        : campusDirectory
+        ? R.createElement(TowerNavigator as never, {
+            key: "tower",
+            floors: campusDirectory.floors,
+            world: campusWorld,
+            onOpenLiveFloor: () => setCampusTab("floors"),
+          })
+        : null;
       children.push(R.createElement("section", {
         key: "campus",
         id: "office-game-campus",
         className: "office-game__campus office-game__campus--floors",
         "data-testid": "office-campus",
         "data-office-slice": dockSlice,
-        "aria-label": "Qubit floor campus",
+        "aria-label": "Qubit campus",
       }, [
         R.createElement("div", {
           key: "head", className: "office-game__campusHead",
         }, [
           R.createElement("div", { key: "title" }, [
-            R.createElement("h2", { key: "h" }, "Qubit Floor Campus"),
+            R.createElement("h2", { key: "h" }, "Qubit Campus"),
             R.createElement("p", {
               key: "counts", "data-testid": "office-campus-counts",
-            }, "Live floors · each card is the Habblaud office with LimeZu art"),
+            }, campusTab === "floors"
+              ? "Floor scenes · the Habblaud office repeated per real floor"
+              : "100-floor directory · floors, rooms, desks and occupancy"),
+            R.createElement("div", {
+              key: "tabs", className: "office-game__campusTabs",
+            }, [
+              R.createElement("button", {
+                key: "floors", type: "button",
+                className: "office-game__btn",
+                "data-testid": "office-campus-tab-floors",
+                "aria-pressed": campusTab === "floors",
+                onClick: () => setCampusTab("floors"),
+              }, "Floor scenes"),
+              R.createElement("button", {
+                key: "directory", type: "button",
+                className: "office-game__btn",
+                "data-testid": "office-campus-tab-directory",
+                "aria-pressed": campusTab === "directory",
+                onClick: () => setCampusTab("directory"),
+              }, "100-floor directory"),
+            ]),
           ]),
           R.createElement("button", {
             key: "close", type: "button",
@@ -1234,10 +1311,12 @@ export function createOfficeApp(
         ]),
         R.createElement("div", {
           key: "body", className: "office-game__campusBody",
-        }, R.createElement(FloorCampus as never, {
-          base: props.base,
-          theme: requestedTheme,
-        })),
+        }, campusTab === "floors"
+          ? R.createElement(FloorCampus as never, {
+              base: props.base,
+              theme: requestedTheme,
+            })
+          : directoryBody),
       ]));
     }
 
