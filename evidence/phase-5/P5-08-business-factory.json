@@ -1,0 +1,122 @@
+{
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/verify_finance_factory.py --json",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "    {\n      \"detail\": \"audit=15 events=15\",\n      \"name\": \"creation_is_audited\",\n      \"ok\": true\n    },\n    {\n      \"detail\": \"BUSINESS_FINANCE_PAYMENT_NOT_FOUND\",\n      \"name\": \"tenant_isolation\",\n      \"ok\": true\n    }\n  ],\n  \"failed\": 0,\n  \"limitations\": [\n    \"hermetic: throwaway SQLite, no network, no live provider or bank\",\n    \"a provider is a label and a receipt is caller-supplied evidence; no live payment was attempted\",\n    \"the verifier re-reads SQLite but exercises the real finance/factory modules, so it complements rather than replaces pytest\"\n  ],\n  \"passed\": 18,\n  \"status\": \"PASS\"\n}"
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase5_finance_factory tests/phase1_backup tests/test_business_os_foundation.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 12.64s"
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check voicebridge/business/finance.py voicebridge/business/business_factory.py scripts/verify_finance_factory.py tests/phase5_finance_factory",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": "All checks passed!"
+    },
+    {
+      "cmd": "PYTHONPATH=. /home/trick/venvs/qubit314/bin/python -m py_compile voicebridge/business/finance.py voicebridge/business/business_factory.py scripts/verify_finance_factory.py tests/phase5_finance_factory/test_finance.py tests/phase5_finance_factory/test_business_factory.py tests/phase5_finance_factory/test_verify_finance_factory.py",
+      "exit_code": 0,
+      "expected_exit": 0,
+      "stderr_tail": "",
+      "stdout_tail": ""
+    }
+  ],
+  "generated_at": "2026-11-14T06:00:07Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DOMAIN-CONTRACT.md",
+      "sha256": "1a9ab6ee4ee12b4c8859cd3f213eb990764e4ed691fe62b391dbdc88099625b3"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-DEPARTMENTS-AND-INTERACTIONS.md",
+      "sha256": "3fe99db86248e0133e16f771d17395ccb2a1338aa87371d2eda841dd259d6792"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    },
+    {
+      "path": "voicebridge/business/ledger.py",
+      "sha256": "5991f30ccb9654bcbf79f0679466e5d6d1b50dad6054ca7f9ae4ce2dca9ea75d"
+    },
+    {
+      "path": "voicebridge/business/approvals.py",
+      "sha256": "b5e4a24bc2b4d9cfe5837f0c6768f30c7cb806f392f6f9fbf3f256716c8e0a37"
+    },
+    {
+      "path": "voicebridge/business/eventlog.py",
+      "sha256": "a90ee6a5b9d7e169d0f3dafa63078acca07e0f4f41a4560ef092493e8bb26c00"
+    },
+    {
+      "path": "voicebridge/business/jobs.py",
+      "sha256": "fc9da1b65d0ff980e998d2fbc495f82e51af958ecc67752a6a9e90292711cbb6"
+    },
+    {
+      "path": "voicebridge/business/store.py",
+      "sha256": "c4c3394736391da1f5b9c0cdb537ab884d815ba2a9220ccb4b915a121099cbe9"
+    },
+    {
+      "path": "voicebridge/business/identity.py",
+      "sha256": "882f0b44a084bddb7bd31452e6cd8dba2d958a3b40bbd45365134811f300d683"
+    },
+    {
+      "path": "voicebridge/business/models.py",
+      "sha256": "c2544c04416024d1ad45c4ec2ed8d933c6766d7727ccbd9dd61bef852cac8ddc"
+    },
+    {
+      "path": "voicebridge/business/errors.py",
+      "sha256": "553f3de94e5464e88121561baebe17b98fe5bb79304dc0b271a3303bb544f4e2"
+    },
+    {
+      "path": "voicebridge/business/schema.py",
+      "sha256": "b65b791d487f098eaaecb8df0c799ed88043d94d8c27c34805784c722589af00"
+    },
+    {
+      "path": "voicebridge/business/finance.py",
+      "sha256": "98f2f3746939064fe09c9d8e4ee8b012bbc870ce27d73c886c1e3830cdc56419"
+    }
+  ],
+  "limitations": [
+    "hermetic: throwaway SQLite only; legal-entity and brand records are event-sourced in bos_event, no new tables",
+    "cloning copies structural metadata only; grants, budgets, banks, credentials, agents, treasury and ledger history are never inherited",
+    "personal-first means a tenant needs a personal entity/business before a company entity or business can be created",
+    "per-entity books are ledger account namespaces, not a separate database per entity",
+    "no full matrix, no live service, and no VERIFIED/COMPLETE/100% claim is made"
+  ],
+  "outputs": [
+    {
+      "path": "voicebridge/business/business_factory.py",
+      "sha256": "a0e68bd2333809fda1b34fee47bf8a5637b817d72c3b8ebafda89592e9fb81a0"
+    },
+    {
+      "path": "scripts/verify_finance_factory.py",
+      "sha256": "eab3352d5800519527ce96df9562e6c19f7b25582c827f3bf172a37553c55c29"
+    },
+    {
+      "path": "tests/phase5_finance_factory/test_business_factory.py",
+      "sha256": "7b52993ee34144c2ba377d6f7a8f5e3fb483e2964d31b3840872954690038ba0"
+    },
+    {
+      "path": "tests/phase5_finance_factory/test_verify_finance_factory.py",
+      "sha256": "94abab3af2b90ba48269ef5908d2b5d702a3726f15384ac79f164d2ba7206ab8"
+    }
+  ],
+  "status": "PASS",
+  "task_id": "P5-08"
+}
