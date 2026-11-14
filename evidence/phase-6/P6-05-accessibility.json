@@ -1,0 +1,114 @@
+{
+  "task_id": "P6-05",
+  "status": "PASS",
+  "generated_at": "2026-11-14T14:05:43Z",
+  "inputs": [
+    {
+      "path": "docs/QUBIT-OFFICE-COMPLETE-PLAN.md",
+      "sha256": "d03f74a03c597ef030aaa55906cf3acceb857495555c587c07b32eafab0082b1"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-UI-CONTRACT.md",
+      "sha256": "03edd1fdc351401ce98c493be20608439e2ab2de46566e4505d1129b2141185e"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-MANDATORY-CHECKLIST.md",
+      "sha256": "ac11e5393c29680e50a79e6b4516b72f3358c98b6b907c876ccd4a0aa2a3637b"
+    },
+    {
+      "path": "docs/QUBIT-OFFICE-IMPROVEMENTS-2026.md",
+      "sha256": "3f823ebf1188ca25898e494339e9ec674b78a39afabf37500a8c032527850a65"
+    },
+    {
+      "path": "AGENTS.md",
+      "sha256": "0ef06fe43961f0501e953360f838eb92679270d5b9c41e2efba85263d2c0dc3e"
+    }
+  ],
+  "outputs": [
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/a11y.ts",
+      "sha256": "926c02a0c09200ac4c30cf85c192dc51773d58951b275eec0d3f4139c257326b"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.tsx",
+      "sha256": "0e87b2960beb550a655aa70c43500407feb0933f40f7ad5ea018c9f0e111c586"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/styles/game.css",
+      "sha256": "6872efeded18d748907ca66374d37b456d98efa921da090dc164d9132d747590"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/a11y.test.ts",
+      "sha256": "025d1a46fda177ede48ba0865468f9685a726d351e7ddc43c1664b2fc4b001d1"
+    },
+    {
+      "path": "frontend/qubit-app/plugins/qubit-office/game/app/OfficeAppShell.a11y.test.ts",
+      "sha256": "a98a15903a0ffa4f5cf95ada4a1ef4d818f02b08fa29d6128c48bfa1af163b38"
+    },
+    {
+      "path": "scripts/accessibility_audit.py",
+      "sha256": "ab11272cc48c0fad5f7dac821691425843472efb98208b3d21ca1f7d1dccfcc4"
+    },
+    {
+      "path": "tests/phase6_accessibility/conftest.py",
+      "sha256": "d187da6a0852b29867a94c490eee5695a05487e3cc300bdedfd1308906e47dc3"
+    },
+    {
+      "path": "tests/phase6_accessibility/test_accessibility_audit.py",
+      "sha256": "6bb7b50002fbc5b73e74da66f7b30b67b5308941a63405cb12f5610cf38d32ba"
+    },
+    {
+      "path": "tests/phase6_accessibility/test_a11y_ts_contract.py",
+      "sha256": "34ff1d43d67e4c0d6a6ee5543d2b86156714a04231e7eab48fd84b7c36e070c5"
+    }
+  ],
+  "commands": [
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python scripts/accessibility_audit.py --json",
+      "exit_code": 0,
+      "stdout_tail": " \"screen-reader loading/error states\",\n      \"reason\": \"live regions exist and are unit-asserted; no screen reader was run\",\n      \"status\": \"not_performed\"\n    }\n  ],\n  \"ok\": true,\n  \"plugin_root\": \"/home/trick/qubit-worktrees/qoffice-p6-a11y/frontend/qubit-app/plugins/qubit-office\",\n  \"schema\": \"qubit-office-accessibility-audit/1\",\n  \"status\": \"PASS\",\n  \"summary\": {\n    \"checks\": [\n      \"interactive_name\"\n    ],\n    \"errors\": 0,\n    \"findings\": 5,\n    \"warnings\": 5\n  },\n  \"task_id\": \"P6-05\"\n}",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "PYTHONPATH=. TMPDIR=/tmp /home/trick/venvs/qubit314/bin/python -m pytest -q tests/phase6_accessibility",
+      "exit_code": 0,
+      "stdout_tail": ".....................                                                    [100%]\n21 passed in 0.37s",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "ln -s /home/trick/Projects/Repos/Qubit/frontend/qubit-web/node_modules frontend/qubit-web/node_modules && cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts && cd - >/dev/null && rm frontend/qubit-web/node_modules",
+      "exit_code": 0,
+      "stdout_tail": "RUN  v4.1.12 /home/trick/qubit-worktrees/qoffice-p6-a11y/frontend/qubit-web\n\n\n Test Files  36 passed (36)\n      Tests  403 passed (403)\n   Start at  16:04:52\n   Duration  3.55s (transform 6.13s, setup 0ms, import 9.12s, tests 11.77s, environment 5.82s)",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m ruff check scripts/accessibility_audit.py tests/phase6_accessibility",
+      "exit_code": 0,
+      "stdout_tail": "All checks passed!",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "/home/trick/venvs/qubit314/bin/python -m py_compile scripts/accessibility_audit.py tests/phase6_accessibility/*.py",
+      "exit_code": 0,
+      "stdout_tail": "",
+      "stderr_tail": ""
+    },
+    {
+      "cmd": "npx tsc -p /tmp/qoffice-tsconfig.json  # temp config: a11y.ts + OfficeAppShell.tsx only, with the worktree node_modules symlink",
+      "exit_code": 2,
+      "stdout_tail": "or TS2322: Type 'Promise<{ ok: true; created: boolean; decision: WarRoomDecision; }>' is not assignable to type 'Promise<string | void>'.\n  Type '{ ok: true; created: boolean; decision: WarRoomDecision; }' is not assignable to type 'string | void'.\n../qubit-app/plugins/qubit-office/game/app/WarRoomPanel.tsx(665,21): error TS2322: Type 'Promise<{ ok: true; tasks: BusinessTask[]; }>' is not assignable to type 'Promise<string | void>'.\n  Type '{ ok: true; tasks: BusinessTask[]; }' is not assignable to type 'string | void'.\n../qubit-app/plugins/qubit-office/game/loading/OfficeLoadingScreen.tsx(27,8): error TS2882: Cannot find module or type declarations for side-effect import of './loading.css'.",
+      "stderr_tail": ""
+    }
+  ],
+  "limitations": [
+    "axe-core is not installed in this checkout and the task runs offline, so no axe scan was performed (recorded as axe: not_available in the audit JSON); no axe run is claimed",
+    "no manual screen-reader review (NVDA/VoiceOver/TalkBack) was performed; loading/error live regions are unit-asserted in jsdom only",
+    "no high-contrast, 200% zoom, touch-device or muted-audio session was exercised; the CSS contracts for those exist and are statically checked",
+    "the vendored Habblaud document is a separate origin and its internal controls were not audited (owner ruling 16 permits additive changes only; no vendored file was touched)",
+    "5 warnings are placeholder-only inputs/selects in WarRoomPanel.tsx and AgentControlDrawer.tsx, owned by other panel lanes; this lane must not edit their component files, so they are surfaced as warnings rather than silently passed",
+    "tsc exits 2 with 7 pre-existing errors in PhaserSceneHost.ts / WarRoomPanel.ts / loading CSS; there are zero errors in the owned files (a11y.ts, OfficeAppShell.tsx)",
+    "the committed built bundle qubit-office.game.js/.css was NOT rebuilt; the source changes reach the product on the next office bundle build",
+    "pre-existing root tests test_office_game_shell.py::test_the_game_css_exists_and_is_scoped_to_the_shell and test_office_assets_vendored.py::test_served_plugin_artifacts_have_no_operator_or_build_paths fail identically at base ec5dd7f98 (scoping rules and a committed-bundle '~/' literal); they are not caused by this lane",
+    "no live service, runtime state, credential or network was touched; no full matrix was run"
+  ]
+}
