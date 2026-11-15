@@ -1701,9 +1701,54 @@
   },
   "credit": "LimeZu \u2014 https://limezu.itch.io",
   "format": "qubit-office-theme",
+  "fx": {
+    "clips": {
+      "alarm": {
+        "sheet": "Super Pixel Effects Gigapack (Free Version)/spritesheet/Lightning/lightning_burst_001/lightning_burst_001_small_violet/spritesheet.png"
+      },
+      "complete": {
+        "sheet": "Super Pixel Effects Gigapack (Free Version)/spritesheet/Symbols/symbol_success_001/symbol_success_001_small_green/spritesheet.png"
+      },
+      "fail": {
+        "sheet": "Super Pixel Effects Gigapack (Free Version)/spritesheet/Symbols/symbol_alert_001/symbol_alert_001_small_red/spritesheet.png"
+      },
+      "party": {
+        "sheet": "Super Pixel Effects Gigapack (Free Version)/spritesheet/Magic Bursts/round_sparkle_burst_002/round_sparkle_burst_002_small_green/spritesheet.png"
+      }
+    }
+  },
   "id": "limezu",
   "label": "Limezu",
   "license": "LimeZu \u2014 Modern Interiors / Modern User Interface licence; redistribution prohibited; credit required",
+  "outside": {
+    "cell": 16,
+    "tiles": {
+      "grass": {
+        "h": 16,
+        "scale": 1.0,
+        "sheet": "All Tileset/16x16.png",
+        "w": 16,
+        "x": 128,
+        "y": 0
+      },
+      "tree": {
+        "h": 61,
+        "scale": 0.75,
+        "sheet": "All Tileset/16x16.png",
+        "w": 64,
+        "x": 0,
+        "y": 80
+      },
+      "tree_orange": {
+        "h": 64,
+        "scale": 0.75,
+        "sheet": "All Tileset/16x16.png",
+        "w": 64,
+        "x": 80,
+        "y": 80
+      }
+    }
+  },
   "parts": {
     "eyes": 7,
     "hair": 29,
@@ -1820,6 +1865,144 @@
     "color-text-primary": "#f6ecdd",
     "radius-control": "4px",
     "radius-panel": "8px"
+  },
+  "ui": {
+    "icons": {
+      "feed": {
+        "sheet": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon10.png"
+      },
+      "settings": {
+        "sheet": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon4.png"
+      },
+      "sidebar": {
+        "sheet": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon9.png"
+      },
+      "timelapse": {
+        "sheet": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon16.png"
+      }
+    },
+    "slices": {
+      "button": {
+        "h": 46,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          14,
+          14,
+          14,
+          14
+        ],
+        "w": 46,
+        "width": "6px",
+        "x": 210,
+        "y": 18
+      },
+      "button-hover": {
+        "h": 32,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "w": 32,
+        "width": "5px",
+        "x": 256,
+        "y": 96
+      },
+      "button-pressed": {
+        "h": 32,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "w": 32,
+        "width": "5px",
+        "x": 224,
+        "y": 96
+      },
+      "card": {
+        "h": 46,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          14,
+          14,
+          14,
+          14
+        ],
+        "w": 46,
+        "width": "8px",
+        "x": 306,
+        "y": 18
+      },
+      "dialog": {
+        "h": 96,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "w": 96,
+        "width": "10px",
+        "x": 0,
+        "y": 0
+      },
+      "dock": {
+        "h": 96,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "w": 96,
+        "width": "10px",
+        "x": 0,
+        "y": 0
+      },
+      "panel": {
+        "h": 96,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          32,
+          32,
+          32,
+          32
+        ],
+        "w": 96,
+        "width": "10px",
+        "x": 0,
+        "y": 0
+      },
+      "tab": {
+        "h": 32,
+        "repeat": "stretch",
+        "sheet": "DarkAgesUi_v1.0/32x32-Tilesheet.png",
+        "slice": [
+          8,
+          8,
+          8,
+          8
+        ],
+        "w": 32,
+        "width": "4px",
+        "x": 192,
+        "y": 96
+      }
+    }
   },
   "version": "1.0.0"
 }

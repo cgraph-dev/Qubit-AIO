@@ -66,6 +66,39 @@ def test_animations_can_be_disabled_for_a_static_pack(tmp_path):
     assert not any(name.startswith("characters/") for name in manifest["files"])
 
 
+def test_prepare_outside_and_fx_write_their_payloads():
+    png = B._encode_png(Image.new("RGBA", (32, 32), (1, 2, 3, 255)))
+    outside = {
+        "grass": {"data": png, "sheet": "Green.png", "x": 128, "y": 0, "w": 16, "h": 16},
+        "tree": {"data": png, "ax": 16, "ay": 32, "scale": 0.75,
+                 "sheet": "Green.png", "x": 0, "y": 80, "w": 32, "h": 32},
+        "tree_orange": {"data": png, "ax": 16, "ay": 32, "scale": 0.75,
+                        "sheet": "Green.png", "x": 80, "y": 80, "w": 32, "h": 32},
+    }
+    payloads, manifest, recipe = B._prepare_outside(outside)
+    assert "outside/grass.png" not in payloads
+    assert set(payloads) == {"outside/tree.png", "outside/tree_orange.png"}
+    assert manifest["props"]["tree"]["scale"] == 0.75
+    assert manifest["props"]["pine"] == manifest["props"]["tree_orange"]
+    assert recipe["tiles"]["tree"]["x"] == 0
+
+    fx = {"complete": {"data": png, "frame": {"w": 40, "h": 40},
+                       "frames": 60, "fps": 15, "sheet": "fx.png"}}
+    payloads, manifest, recipe = B._prepare_fx(fx)
+    assert payloads == {"fx/complete.png": png}
+    assert manifest["clips"]["complete"]["frames"] == 60
+    assert recipe["clips"]["complete"]["sheet"] == "fx.png"
+
+
+def test_prepare_extras_writes_toolbar_icons():
+    png = B._encode_png(Image.new("RGBA", (32, 32), (9, 9, 9, 255)))
+    payloads, manifest, recipe = B._prepare_extras(
+        {"ui_icons": {"settings": {"data": png, "sheet": "Icons/icon4.png"}}})
+    assert payloads["ui/icons/settings.png"]
+    assert manifest["ui"]["icons"]["settings"]["w"] == 32
+    assert recipe["ui"]["icons"]["settings"]["sheet"] == "Icons/icon4.png"
+
+
 def test_prepare_rooms_writes_tiles_window_and_recipe_coordinates():
     png = B._encode_png(Image.new("RGBA", (16, 32), (1, 2, 3, 255)))
     rooms = {

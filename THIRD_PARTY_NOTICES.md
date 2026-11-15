@@ -1120,6 +1120,39 @@ Interiors archive is recorded here for provenance but is not read by the v1
 build. The build slices, positions and composites pixels; it does not train or
 generate art, and no art is minted as an NFT.
 
+## Additional local UI / HUD / FX packs (2026-11-15, Qubit Office)
+
+These packs were added to the owner's local `UI Office` folder after the first
+LimeZu pass. They are read in memory by `scripts/office_theme_extract.py` and
+composited into a **local** theme pack only; no raw art, zip, extracted part or
+derived atlas is committed to this repository. The shareable
+`theme.recipe.json` carries coordinates/metadata only.
+
+| Pack | Author / source | sha256 (zip) | Used for | Licence / redistribution posture |
+|---|---|---|---|---|
+| Dark Ages UI v1.0 | Hypnobius — https://hypnobius.itch.io/ | `a66df9c2af0e8867f55a12955a94aa790aef26c5ab85c8c61d8b8c6960bea360` | 9-slice panel/dialog/dock/card/button/tab frames + hover/pressed states | Commercial and personal use allowed; modification allowed; credit optional but appreciated. **No resale/redistribution** of the pack or modified pack; no NFT/blockchain/AI-training use. |
+| Free Medieval Fantasy UI Pack | Kibyra | `cb9de5447044ad68f71133c64ac7a8aea9f1297c9e71d7142564e0b5523db16b` | four generic toolbar icons (sidebar/feed/timelapse/settings) | Free personal and commercial use; credit appreciated; **no redistribution/resale as-is**. Text-baked menu buttons are deliberately not used. |
+| Green Forest v2 | Clockwork Raven Studios (Caio) — purchased | `256539462e714ba827b014fb8c01d135fa61585a4a6ee073eb15919a417d606e` | exterior `grass` floor tile and `tree`/`pine` props | Purchased local asset; **not redistributed**. Credit: Clockwork Raven Studios. |
+| Super Pixel Effects Gigapack (Free) v3.2.0 | Will Tice / unTied Games — https://untiedgames.itch.io/ | `b52ad8d2a6460c9a54469a6750f3d779703faf51fa32ffb25fc2c7c616fffcdb` | four **event-driven** FX clips: shell complete, shell fail, room party, room alarm | Commercial and non-commercial use allowed; **attribution required** (`Super Pixel Effects - Will Tice / unTied Games`); no public redistribution of the pack; no AI training. |
+| NEW FRAMES GIFs | PixelLab (owner downloads) | (loose GIFs, no archive) | **catalog metadata only** (16 GIFs, 256x256, 9 frames, 130 ms); **not used as character art** | No licence file was found in the folder. Treated as **not redistributable**; no GIF, frame or derived character sprite is shipped. |
+
+Deliberately not used:
+
+* **dragon-huds** (`75439a2b…`): the dialogue/button art is fixed-size and/or has
+  baked labels ("Start", "Options"), so it cannot skin arbitrary office labels.
+  Licence: Kibyra, personal/commercial use, no redistribution.
+* **uı-fonts** (`0a5116ac…`): despite the name the pack contains social/logo
+  icon sheets, not font glyphs; there is no font slot in the theme contract.
+  Licence: Kibyra, personal/commercial use, no redistribution.
+* **Free - Raven Fantasy Icons** (`3656dc0d…`): a large generic icon atlas with
+  no home in the existing `ui.slices`/`ui.icons` contract beyond the four
+  toolbar roles already covered by the Medieval pack. Purchased, not
+  redistributed.
+* **Free Medieval Fantasy text buttons / menu frame**: baked labels; only the
+  four generic icons are used.
+
+The pack does not train or generate art, and no asset is minted as an NFT.
+
 ## pixelfx — Qubit voice orb (`ghost` theme)
 
 **Upstream:** https://github.com/patch-gg/pixelfx

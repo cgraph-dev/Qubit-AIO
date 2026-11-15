@@ -545,6 +545,95 @@ def _prepare_rooms(rooms: Optional[Mapping[str, Mapping[str, object]]]
     return payloads, manifest, recipe
 
 
+def _prepare_outside(outside: Optional[Mapping[str, Mapping[str, object]]]
+                      ) -> Tuple[Dict[str, bytes], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Write the optional Green Forest exterior props (grass is a floor tile)."""
+    if not outside:
+        return {}, None, None
+    payloads: Dict[str, bytes] = {}
+    props: Dict[str, Any] = {}
+    recipe_tiles: Dict[str, Any] = {}
+    for name, entry in outside.items():
+        if (not isinstance(name, str) or name == "grass"
+                or not isinstance(entry, Mapping)):
+            continue
+        data = entry.get("data")
+        if not isinstance(data, (bytes, bytearray)) or not data:
+            continue
+        relative = f"outside/{name}.png"
+        payloads[relative] = bytes(data)
+        props[name] = {
+            "src": relative,
+            "ax": entry.get("ax", 0),
+            "ay": entry.get("ay", 0),
+            "scale": entry.get("scale", 1),
+        }
+        if name == "tree_orange":
+            # Habblaud's conifer kind reuses the second Green Forest tree.
+            props["pine"] = dict(props[name])
+        if isinstance(entry.get("sheet"), str):
+            recipe_tiles[name] = {
+                "sheet": entry["sheet"],
+                "x": entry.get("x", 0),
+                "y": entry.get("y", 0),
+                "w": entry.get("w", 0),
+                "h": entry.get("h", 0),
+                "scale": entry.get("scale", 1),
+            }
+    if not props:
+        return {}, None, None
+    return (
+        payloads,
+        {"cell": FLOOR_TILE, "props": props},
+        {"cell": FLOOR_TILE, "tiles": recipe_tiles},
+    )
+
+
+def _prepare_fx(fx: Optional[Mapping[str, Mapping[str, object]]]
+                ) -> Tuple[Dict[str, bytes], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Write the optional event-driven Super Pixel Effects clips."""
+    if not fx:
+        return {}, None, None
+    payloads: Dict[str, bytes] = {}
+    clips: Dict[str, Any] = {}
+    recipe_clips: Dict[str, Any] = {}
+    for name, entry in fx.items():
+        if not isinstance(name, str) or not isinstance(entry, Mapping):
+            continue
+        data = entry.get("data")
+        if not isinstance(data, (bytes, bytearray)) or not data:
+            continue
+        relative = f"fx/{name}.png"
+        payloads[relative] = bytes(data)
+        clips[name] = {
+            "src": relative,
+            "frame": dict(entry.get("frame") or {}),
+            "frames": entry.get("frames", 1),
+            "fps": entry.get("fps", 15),
+        }
+        if isinstance(entry.get("sheet"), str):
+            recipe_clips[name] = {"sheet": entry["sheet"]}
+    if not clips:
+        return {}, None, None
+    return payloads, {"clips": clips}, {"clips": recipe_clips}
+
+
+def _prepare_frames(items: Any) -> Tuple[Dict[str, bytes], Optional[Dict[str, Any]],
+                                         Optional[Dict[str, Any]]]:
+    """Catalog NEW FRAMES metadata only (never the GIF art)."""
+    if not isinstance(items, (list, tuple)) or not items:
+        return {}, None, None
+    document = {"schema": 1, "items": [dict(item) for item in items if isinstance(item, Mapping)]}
+    if not document["items"]:
+        return {}, None, None
+    relative = "frames/new_frames.json"
+    return (
+        {relative: _json_bytes(document)},
+        {"index": relative, "count": len(document["items"]), "character_compatible": False},
+        {"index": relative, "count": len(document["items"])},
+    )
+
+
 def _encode_png(image: Image.Image) -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, format="PNG", optimize=True)
@@ -979,6 +1068,36 @@ def _prepare_extras(extras: Optional[Mapping[str, Any]]
         if slices:
             manifest["ui"] = {"slices": slices}
             recipe["ui"] = {"slices": rec}
+
+    icons = extras.get("ui_icons") or {}
+    if isinstance(icons, Mapping):
+        icon_out: Dict[str, Any] = {}
+        icon_rec: Dict[str, Any] = {}
+        for name, entry in icons.items():
+            if (not isinstance(name, str)
+                    or not re.fullmatch(r"^[a-z][a-z0-9-]{0,39}$", name)):
+                continue
+            if not isinstance(entry, Mapping):
+                continue
+            data = entry.get("data")
+            if not isinstance(data, (bytes, bytearray)) or not data:
+                continue
+            image = _decode(bytes(data))
+            if image is None:
+                continue
+            relative = f"ui/icons/{name}.png"
+            encoded = _encode_png(image.convert("RGBA"))
+            payloads[relative] = encoded
+            icon_out[name] = {
+                "src": relative,
+                "w": image.width,
+                "h": image.height,
+            }
+            if isinstance(entry.get("sheet"), str):
+                icon_rec[name] = {"sheet": entry["sheet"]}
+        if icon_out:
+            manifest.setdefault("ui", {}).setdefault("icons", {}).update(icon_out)
+            recipe.setdefault("ui", {}).setdefault("icons", {}).update(icon_rec)
     return payloads, manifest, recipe
 
 
@@ -1154,7 +1273,10 @@ def shareable_recipe(manifest: Mapping[str, Any],
                      assets: Optional[Mapping[str, Any]] = None,
                      furniture: Optional[Mapping[str, Any]] = None,
                      ui: Optional[Mapping[str, Any]] = None,
-                     rooms: Optional[Mapping[str, Any]] = None
+                     rooms: Optional[Mapping[str, Any]] = None,
+                     outside: Optional[Mapping[str, Any]] = None,
+                     fx: Optional[Mapping[str, Any]] = None,
+                     frames: Optional[Mapping[str, Any]] = None
                      ) -> Dict[str, Any]:
     """The shareable ``theme.recipe.json`` derived from a built manifest.
 
@@ -1188,6 +1310,12 @@ def shareable_recipe(manifest: Mapping[str, Any],
         recipe["ui"] = dict(ui)
     if rooms is not None:
         recipe["rooms"] = dict(rooms)
+    if outside is not None:
+        recipe["outside"] = dict(outside)
+    if fx is not None:
+        recipe["fx"] = dict(fx)
+    if frames is not None:
+        recipe["frames"] = dict(frames)
     return recipe
 
 
@@ -1202,6 +1330,9 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
                  furniture: Optional[Mapping[str, Any]] = None,
                  ui: Optional[Mapping[str, Any]] = None,
                  rooms: Optional[Mapping[str, Any]] = None,
+                 outside: Optional[Mapping[str, Any]] = None,
+                 fx: Optional[Mapping[str, Any]] = None,
+                 frames: Optional[Mapping[str, Any]] = None,
                  label: Optional[str] = None) -> Dict[str, Any]:
     """Write ONLY the shareable ``theme.recipe.json`` for a purchase.
 
@@ -1261,7 +1392,8 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
     }
     recipe = shareable_recipe(manifest, recipes, surfaces=surfaces,
                               assets=asset_metadata,
-                              furniture=furniture, ui=ui, rooms=rooms)
+                              furniture=furniture, ui=ui, rooms=rooms,
+                              outside=outside, fx=fx, frames=frames)
     recipe_problems = theme_contract.validate_recipe(recipe)
     if recipe_problems:
         raise ThemeBuildError(recipe_problems)
@@ -1302,7 +1434,10 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
                 extras: Optional[Mapping[str, Any]] = None,
                 rooms: Optional[Mapping[str, Mapping[str, object]]] = None,
                 animation_layers: Any = None,
-                animations: bool = True) -> Dict[str, Any]:
+                animations: bool = True,
+                outside: Optional[Mapping[str, Mapping[str, object]]] = None,
+                fx: Optional[Mapping[str, Mapping[str, object]]] = None,
+                frames: Any = None) -> Dict[str, Any]:
     """Build a local theme pack and return its manifest.
 
     ``layers`` must be supplied (Task 3's extractor does that for the CLI);
@@ -1345,6 +1480,9 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     asset_payloads, asset_block, _asset_metadata = _prepare_assets(assets)
     extra_payloads, extra_manifest, _extra_recipe = _prepare_extras(extras)
     room_payloads, room_manifest, _room_recipe = _prepare_rooms(rooms)
+    outside_payloads, outside_manifest, _outside_recipe = _prepare_outside(outside)
+    fx_payloads, fx_manifest, _fx_recipe = _prepare_fx(fx)
+    frames_payloads, frames_manifest, _frames_recipe = _prepare_frames(frames)
     slugs = _resolve_personas(personas)
     cols = DEFAULT_COLS
     rows = max(1, math.ceil(len(slugs) / cols))
@@ -1422,6 +1560,9 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     payloads.update(asset_payloads)
     payloads.update(extra_payloads)
     payloads.update(room_payloads)
+    payloads.update(outside_payloads)
+    payloads.update(fx_payloads)
+    payloads.update(frames_payloads)
     surfaces_block = _floor_surfaces_block(floor_png)
     animation_doc: Optional[Dict[str, Any]] = None
     if animations:
@@ -1487,6 +1628,12 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     }
     if animation_doc is not None and animation_doc.get("clips"):
         manifest["characters"]["animations"] = animation_doc
+    if outside_manifest is not None:
+        manifest["outside"] = outside_manifest
+    if fx_manifest is not None:
+        manifest["fx"] = fx_manifest
+    if frames_manifest is not None:
+        manifest["frames"] = frames_manifest
     if room_manifest is not None:
         manifest["rooms"] = room_manifest
         window = room_manifest.get("window") or {}
@@ -1817,7 +1964,10 @@ def _check(args: argparse.Namespace,
            assets: Any = None,
            extras: Optional[Mapping[str, Any]] = None,
            rooms: Optional[Mapping[str, Mapping[str, object]]] = None,
-           animation_layers: Any = None) -> int:
+           animation_layers: Any = None,
+           outside: Optional[Mapping[str, Mapping[str, object]]] = None,
+           fx: Optional[Mapping[str, Mapping[str, object]]] = None,
+           frames: Any = None) -> int:
     out = Path(args.out)
     if not out.is_dir():
         raise ThemeBuildError(f"check: {out} does not exist")
@@ -1825,7 +1975,8 @@ def _check(args: argparse.Namespace,
         rebuilt = Path(work) / out.name
         build_theme(DEFAULT_SOURCE, rebuilt, size=args.size, layers=layers,
                     floors=floors, assets=assets, extras=extras, rooms=rooms,
-                    animation_layers=animation_layers)
+                    animation_layers=animation_layers, outside=outside, fx=fx,
+                    frames=frames)
         problems = compare_packs(out, rebuilt)
     if problems:
         for problem in problems:
@@ -1897,19 +2048,37 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         extras: Dict[str, Any] = {}
         rooms: Any = None
         animation_layers: Any = None
+        outside: Any = None
+        fx: Any = None
+        new_frames: Any = None
         if not args.calibrate:
             floors, surfaces = _floor_inputs(args.source)
             if args.assets:
                 assets = _asset_catalog(args.source, args.size, asset_categories)
             try:
                 import office_theme_extract as extractor  # type: ignore
+                ui = dict(extractor.extract_ui_parts(args.source))
+                ui.update(extractor.extract_ui_extras(args.source))
                 extras = {
                     "furniture": extractor.extract_furniture_parts(args.source),
-                    "ui": extractor.extract_ui_parts(args.source),
+                    "ui": ui,
+                    "ui_icons": extractor.extract_ui_icon_parts(args.source),
                 }
                 rooms = extractor.extract_room_parts(args.source)
+                outside = extractor.extract_outside_parts(args.source)
+                fx = extractor.extract_fx_parts(args.source)
+                new_frames = extractor.extract_new_frames()
+                grass = (outside or {}).get("grass")
+                if isinstance(grass, Mapping) and grass.get("data"):
+                    floors["grass"] = grass["data"]
+                    if surfaces is not None:
+                        surfaces["floor"]["grass"] = {
+                            "sheet": grass.get("sheet"),
+                            "col": int(grass.get("x", 0)) // FLOOR_TILE,
+                            "row": int(grass.get("y", 0)) // FLOOR_TILE,
+                        }
             except ThemeBuildError as exc:
-                print(f"warning: furniture/ui/room assets skipped: {exc}",
+                print(f"warning: furniture/ui/room/outside/fx assets skipped: {exc}",
                       file=sys.stderr)
                 extras = {}
                 rooms = None
@@ -1922,7 +2091,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     animation_layers = None
         if args.check:
             return _check(args, layers, floors, assets, extras, rooms,
-                          animation_layers)
+                          animation_layers, outside, fx, new_frames)
         if args.calibrate:
             return _calibrate(args, layers)
         tokens = None
@@ -1938,12 +2107,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.recipe_out:
             _payloads, _manifest, extra_recipe = _prepare_extras(extras)
             _room_payloads, _room_manifest, room_recipe = _prepare_rooms(rooms)
+            _outside_payloads, _outside_manifest, _outside_recipe = _prepare_outside(outside)
+            _fx_payloads, _fx_manifest, _fx_recipe = _prepare_fx(fx)
+            _frames_payloads, _frames_manifest, _frames_recipe = _prepare_frames(new_frames)
             recipe = build_recipe(DEFAULT_SOURCE, args.recipe_out,
                                   size=args.size, layers=layers, tokens=tokens,
                                   surfaces=surfaces, assets=assets,
                                   furniture=extra_recipe.get("furniture"),
                                   ui=extra_recipe.get("ui"),
-                                  rooms=room_recipe)
+                                  rooms=room_recipe,
+                                  outside=_outside_recipe,
+                                  fx=_fx_recipe,
+                                  frames=_frames_recipe)
             print(json.dumps({
                 "ok": True,
                 "recipe": str(Path(args.recipe_out)),
@@ -1955,7 +2130,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
                                layers=layers, tokens=tokens, floors=floors,
                                assets=assets, extras=extras, rooms=rooms,
-                               animation_layers=animation_layers)
+                               animation_layers=animation_layers, outside=outside,
+                               fx=fx, frames=new_frames)
         recipes = json.loads(
             (Path(args.out) / "agents.json").read_text(encoding="utf-8")
         )["recipes"]

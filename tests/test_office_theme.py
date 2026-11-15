@@ -354,6 +354,57 @@ def _add_room_animation_and_portrait_assets(pack):
     return pack
 
 
+def _add_outside_fx_and_icon_assets(pack):
+    manifest = json.loads((pack / "theme.json").read_text())
+    for rel in ("outside/tree.png", "fx/complete.png", "frames/new_frames.json",
+                "ui/icons/settings.png"):
+        manifest["files"][rel] = _write(pack, rel, f"ASSET-{rel}".encode())
+    manifest["outside"] = {
+        "cell": 16,
+        "props": {"tree": {"src": "outside/tree.png", "ax": 16, "ay": 32, "scale": 0.75}},
+    }
+    manifest["fx"] = {
+        "clips": {"complete": {"src": "fx/complete.png",
+                               "frame": {"w": 40, "h": 40},
+                               "frames": 60, "fps": 15}},
+    }
+    manifest["frames"] = {"index": "frames/new_frames.json", "count": 16,
+                          "character_compatible": False}
+    manifest.setdefault("ui", {})["icons"] = {
+        "settings": {"src": "ui/icons/settings.png", "w": 32, "h": 32},
+    }
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    return pack
+
+
+def test_outside_fx_frames_and_icons_validate_and_payload(tmp_path, monkeypatch):
+    pack = _add_outside_fx_and_icon_assets(_pack(tmp_path))
+    assert T.validate_theme(pack) == []
+    monkeypatch.setattr(T, "theme_roots", lambda: [tmp_path])
+    monkeypatch.delenv("QUBIT_OFFICE_THEME", raising=False)
+    payload = T.theme_payload({}, requested="demo")
+    assert payload["outside"]["props"]["tree"]["src"].endswith(
+        "outside/tree.png?v=1.0.0")
+    assert payload["fx"]["clips"]["complete"]["frames"] == 60
+    assert payload["frames"]["count"] == 16
+    assert payload["frames"]["character_compatible"] is False
+    assert payload["ui"]["icons"]["settings"]["src"].endswith(
+        "ui/icons/settings.png?v=1.0.0")
+
+
+def test_outside_fx_and_icon_files_must_be_declared(tmp_path):
+    pack = _add_outside_fx_and_icon_assets(_pack(tmp_path))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["outside"]["props"]["tree"]["src"] = "outside/missing.png"
+    assert any("declared file" in p for p in T.validate_manifest(manifest))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["fx"]["clips"]["complete"]["src"] = "fx/missing.png"
+    assert any("declared file" in p for p in T.validate_manifest(manifest))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["ui"]["icons"]["settings"]["src"] = "ui/icons/missing.png"
+    assert any("declared file" in p for p in T.validate_manifest(manifest))
+
+
 def test_rooms_animations_and_portraits_validate_and_payload(tmp_path, monkeypatch):
     pack = _add_room_animation_and_portrait_assets(_pack(tmp_path))
     assert T.validate_theme(pack) == []

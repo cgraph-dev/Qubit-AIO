@@ -254,6 +254,9 @@ class Theme:
     assets: Mapping[str, Any] = field(default_factory=dict)
     characters: Mapping[str, Any] = field(default_factory=dict)
     rooms: Mapping[str, Any] = field(default_factory=dict)
+    outside: Mapping[str, Any] = field(default_factory=dict)
+    fx: Mapping[str, Any] = field(default_factory=dict)
+    frames: Mapping[str, Any] = field(default_factory=dict)
     furniture: Mapping[str, Any] = field(default_factory=dict)
     ui: Mapping[str, Any] = field(default_factory=dict)
     files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
@@ -1102,6 +1105,106 @@ def _validate_rooms_full(section: Any, files: Optional[Set[str]]) -> List[str]:
     return problems
 
 
+def _validate_outside_full(section: Any, files: Optional[Set[str]]) -> List[str]:
+    """Validate the optional ``outside`` block (Green Forest props)."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["outside: must be an object"]
+    problems: List[str] = []
+    props = section.get("props")
+    if props is not None:
+        if not isinstance(props, dict):
+            problems.append("outside.props: must be an object")
+        else:
+            for kind, descriptor in props.items():
+                if not isinstance(kind, str) or not kind:
+                    problems.append("outside.props: invalid kind")
+                    continue
+                if not isinstance(descriptor, dict):
+                    problems.append(f"outside.props.{kind}: must be an object")
+                    continue
+                src = descriptor.get("src")
+                if not isinstance(src, str) or not src:
+                    problems.append(f"outside.props.{kind}.src: path is required")
+                else:
+                    problems.extend(
+                        f"outside.props.{kind}.src: {p}" for p in _path_problems(src))
+                    if files is not None and src not in files:
+                        problems.append(
+                            f"outside.props.{kind}.src: {src!r} is not a declared file")
+                for key in ("ax", "ay", "scale"):
+                    value = descriptor.get(key)
+                    if value is not None and not _number(value):
+                        problems.append(
+                            f"outside.props.{kind}.{key}: must be a non-negative number")
+    return problems
+
+
+def _validate_fx_full(section: Any, files: Optional[Set[str]]) -> List[str]:
+    """Validate the optional event-driven ``fx`` clips."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["fx: must be an object"]
+    problems: List[str] = []
+    clips = section.get("clips")
+    if not isinstance(clips, dict) or not clips:
+        return ["fx.clips: must be a non-empty object"]
+    for name, clip in clips.items():
+        if not isinstance(name, str) or not name:
+            problems.append("fx.clips: invalid name")
+            continue
+        if not isinstance(clip, dict):
+            problems.append(f"fx.clips.{name}: must be an object")
+            continue
+        src = clip.get("src")
+        if not isinstance(src, str) or not src:
+            problems.append(f"fx.clips.{name}.src: path is required")
+        else:
+            problems.extend(f"fx.clips.{name}.src: {p}" for p in _path_problems(src))
+            if files is not None and src not in files:
+                problems.append(
+                    f"fx.clips.{name}.src: {src!r} is not a declared file")
+        frame = clip.get("frame")
+        if not isinstance(frame, dict):
+            problems.append(f"fx.clips.{name}.frame: must be an object")
+        else:
+            for key in ("w", "h"):
+                value = frame.get(key)
+                if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                    problems.append(
+                        f"fx.clips.{name}.frame.{key}: must be a positive integer")
+        for key in ("frames", "fps"):
+            value = clip.get(key)
+            if value is not None and (not isinstance(value, (int, float))
+                                      or isinstance(value, bool) or value <= 0):
+                problems.append(
+                    f"fx.clips.{name}.{key}: must be a positive number")
+    return problems
+
+
+def _validate_frames_full(section: Any, files: Optional[Set[str]]) -> List[str]:
+    """Validate the optional NEW FRAMES metadata catalog (no art)."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["frames: must be an object"]
+    index = section.get("index")
+    problems: List[str] = []
+    if not isinstance(index, str) or not index:
+        problems.append("frames.index: path is required")
+    else:
+        problems.extend(f"frames.index: {p}" for p in _path_problems(index))
+        if files is not None and index not in files:
+            problems.append(f"frames.index: {index!r} is not a declared file")
+    count = section.get("count")
+    if count is not None and (not isinstance(count, int) or isinstance(count, bool)
+                              or count < 0):
+        problems.append("frames.count: must be a non-negative integer")
+    return problems
+
+
 def _validate_ui_full(section: Any, files: Optional[Set[str]]) -> List[str]:
     """Validate the full-pack ``ui`` block (Modern UI 9-slice backgrounds)."""
     if section is None:
@@ -1114,6 +1217,27 @@ def _validate_ui_full(section: Any, files: Optional[Set[str]]) -> List[str]:
         problems.extend(
             f"ui.{p}" if not p.startswith("slices") else p
             for p in _validate_slices(slices, files))
+    icons = section.get("icons")
+    if icons is not None:
+        if not isinstance(icons, dict):
+            problems.append("ui.icons: must be an object")
+        else:
+            for name, descriptor in icons.items():
+                if not isinstance(name, str) or not _SLICE_NAME_RE.fullmatch(name):
+                    problems.append(f"ui.icons {name!r}: invalid name")
+                    continue
+                if not isinstance(descriptor, dict):
+                    problems.append(f"ui.icons.{name}: must be an object")
+                    continue
+                src = descriptor.get("src")
+                if not isinstance(src, str) or not src:
+                    problems.append(f"ui.icons.{name}.src: path is required")
+                else:
+                    problems.extend(
+                        f"ui.icons.{name}.src: {p}" for p in _path_problems(src))
+                    if files is not None and src not in files:
+                        problems.append(
+                            f"ui.icons.{name}.src: {src!r} is not a declared file")
     return problems
 
 
@@ -1611,6 +1735,9 @@ def validate_manifest(manifest: Any, root: Optional[Path] = None) -> List[str]:
     problems.extend(_validate_characters_full(manifest.get("characters"), declared))
     problems.extend(_validate_furniture_full(manifest.get("furniture"), declared))
     problems.extend(_validate_rooms_full(manifest.get("rooms"), declared))
+    problems.extend(_validate_outside_full(manifest.get("outside"), declared))
+    problems.extend(_validate_fx_full(manifest.get("fx"), declared))
+    problems.extend(_validate_frames_full(manifest.get("frames"), declared))
     problems.extend(_validate_ui_full(manifest.get("ui"), declared))
     for section_name in ("portraits", "bodies"):
         problems.extend(_validate_asset_section(
@@ -1780,6 +1907,9 @@ def load_theme(root: Any) -> Theme:
         assets=dict(manifest.get("assets") or {}),
         characters=dict(manifest.get("characters") or {}),
         rooms=dict(manifest.get("rooms") or {}),
+        outside=dict(manifest.get("outside") or {}),
+        fx=dict(manifest.get("fx") or {}),
+        frames=dict(manifest.get("frames") or {}),
         furniture=dict(manifest.get("furniture") or {}),
         ui=dict(manifest.get("ui") or {}),
         files=dict(files),
@@ -1819,6 +1949,9 @@ def _classic_payload(reason: Optional[str]) -> Dict[str, Any]:
         "characters": None,
         "portraits": None,
         "rooms": None,
+        "outside": None,
+        "fx": None,
+        "frames": None,
         "furniture": {},
         "ui": {"slices": {}},
         "reason": reason or "",
@@ -1886,6 +2019,9 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
         "characters": _characters_payload(theme),
         "portraits": _portraits_payload(theme),
         "rooms": _rooms_payload(theme),
+        "outside": _outside_payload(theme),
+        "fx": _fx_payload(theme),
+        "frames": _frames_payload(theme),
         "furniture": _furniture_payload(theme),
         "ui": _ui_payload(theme),
         "reason": "",
@@ -2079,7 +2215,84 @@ def _ui_payload(theme: Theme) -> Dict[str, Any]:
                 "width": descriptor.get("width"),
                 "repeat": descriptor.get("repeat"),
             }
-    return {"slices": out}
+    icons = (theme.ui or {}).get("icons")
+    icon_out: Dict[str, Any] = {}
+    if isinstance(icons, dict):
+        for name, descriptor in icons.items():
+            if not isinstance(descriptor, dict):
+                continue
+            src = descriptor.get("src")
+            if not isinstance(src, str) or not src:
+                continue
+            icon_out[name] = {
+                "src": f"{base}/{src}{suffix}",
+                "w": descriptor.get("w"),
+                "h": descriptor.get("h"),
+            }
+    return {"slices": out, "icons": icon_out}
+
+
+def _outside_payload(theme: Theme) -> Optional[Dict[str, Any]]:
+    """The Green Forest exterior props (grass is served through ``surfaces``)."""
+    section = theme.outside or {}
+    props = section.get("props")
+    if not isinstance(props, dict) or not props:
+        return None
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+    out: Dict[str, Any] = {}
+    for kind, descriptor in props.items():
+        if not isinstance(descriptor, dict):
+            continue
+        src = descriptor.get("src")
+        if not isinstance(src, str) or not src:
+            continue
+        out[kind] = {
+            "src": f"{base}/{src}{suffix}",
+            "ax": descriptor.get("ax"),
+            "ay": descriptor.get("ay"),
+            "scale": descriptor.get("scale"),
+        }
+    return {"cell": section.get("cell", 16), "props": out}
+
+
+def _fx_payload(theme: Theme) -> Optional[Dict[str, Any]]:
+    """Event-driven Super Pixel Effects clips."""
+    section = theme.fx or {}
+    clips = section.get("clips")
+    if not isinstance(clips, dict) or not clips:
+        return None
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+    out: Dict[str, Any] = {}
+    for name, clip in clips.items():
+        if not isinstance(clip, dict):
+            continue
+        src = clip.get("src")
+        if not isinstance(src, str) or not src:
+            continue
+        out[name] = {
+            "src": f"{base}/{src}{suffix}",
+            "frame": dict(clip.get("frame") or {}),
+            "frames": clip.get("frames", 1),
+            "fps": clip.get("fps", 15),
+        }
+    return {"clips": out} if out else None
+
+
+def _frames_payload(theme: Theme) -> Optional[Dict[str, Any]]:
+    """The NEW FRAMES metadata catalog (no art, not character-compatible)."""
+    section = theme.frames or {}
+    index = section.get("index")
+    if not isinstance(index, str) or not index:
+        return None
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+    return {
+        "index": f"{base}/{index}{suffix}",
+        "count": section.get("count", 0),
+        "character_compatible": False,
+    }
 
 
 def theme_payload(cfg: Any, requested: Optional[str] = None) -> Dict[str, Any]:

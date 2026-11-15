@@ -235,6 +235,62 @@ ROOM_TILES: Dict[str, Tuple[str, int, int, int, int]] = {
 #: Opaque glass region inside :data:`ROOM_TILES`'s window sprite.
 WINDOW_GLASS = {"x": 8, "y": 8, "w": 16, "h": 32}
 
+#: Additional local UI packs (Dark Ages / Medieval Fantasy / fonts / icons).
+UI_EXTRA_ZIPS: Tuple[str, ...] = ("DarkAgesUi_v1.0.zip",)
+UI_EXTRA_SHEET = "DarkAgesUi_v1.0/32x32-Tilesheet.png"
+
+#: ``name -> (x, y, w, h, slice, width, repeat)`` measured on the sheet.
+#: Dark Ages is a generic frame pack (no baked labels), so it can skin the
+#: office's own panels/buttons/tabs without changing their text.
+UI_EXTRA_SLICES: Dict[str, Tuple[int, int, int, int, List[int], str, str]] = {
+    "panel": (0, 0, 96, 96, [32, 32, 32, 32], "10px", "stretch"),
+    "dialog": (0, 0, 96, 96, [32, 32, 32, 32], "10px", "stretch"),
+    "dock": (0, 0, 96, 96, [32, 32, 32, 32], "10px", "stretch"),
+    "card": (306, 18, 46, 46, [14, 14, 14, 14], "8px", "stretch"),
+    "button": (210, 18, 46, 46, [14, 14, 14, 14], "6px", "stretch"),
+    "button-hover": (256, 96, 32, 32, [8, 8, 8, 8], "5px", "stretch"),
+    "button-pressed": (224, 96, 32, 32, [8, 8, 8, 8], "5px", "stretch"),
+    "tab": (192, 96, 32, 32, [8, 8, 8, 8], "4px", "stretch"),
+}
+
+#: Free Medieval Fantasy UI icons (32x32, no baked labels on the chosen set).
+ICON_ZIPS: Tuple[str, ...] = ("Free_Medieval_Fantasy_UI_Pack.zip",)
+UI_ICON_FILES: Dict[str, str] = {
+    "sidebar": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon9.png",
+    "feed": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon10.png",
+    "timelapse": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon16.png",
+    "settings": "Free_Medieval_Fantasy_UI_Pack/UI Icons 2/icon4.png",
+}
+
+#: Green Forest tileset (Clockwork Raven Studios): grass tile + two trees.
+OUTSIDE_ZIPS: Tuple[str, ...] = (
+    "Raven Fantasy - Pixel Art Tileset - Green Forest v2.zip",
+)
+OUTSIDE_TILES: Dict[str, Tuple[str, int, int, int, int, float]] = {
+    "grass": ("All Tileset/16x16.png", 8 * 16, 0, 16, 16, 1.0),
+    "tree": ("All Tileset/16x16.png", 0, 80, 64, 61, 0.75),
+    "tree_orange": ("All Tileset/16x16.png", 80, 80, 64, 64, 0.75),
+}
+
+#: Super Pixel Effects clips used by real event triggers only.
+FX_ZIPS: Tuple[str, ...] = (
+    "Super Pixel Effects Gigapack (Free Version) v3.2.0.zip",
+)
+FX_SOURCES: Dict[str, str] = {
+    "complete": "Super Pixel Effects Gigapack (Free Version)/spritesheet/"
+                "Symbols/symbol_success_001/symbol_success_001_small_green",
+    "fail": "Super Pixel Effects Gigapack (Free Version)/spritesheet/"
+            "Symbols/symbol_alert_001/symbol_alert_001_small_red",
+    "party": "Super Pixel Effects Gigapack (Free Version)/spritesheet/"
+             "Magic Bursts/round_sparkle_burst_002/"
+             "round_sparkle_burst_002_small_green",
+    "alarm": "Super Pixel Effects Gigapack (Free Version)/spritesheet/"
+             "Lightning/lightning_burst_001/lightning_burst_001_small_violet",
+}
+
+#: NEW FRAMES GIFs are decorative fantasy frames, not character sprites.
+NEW_FRAMES_DIR = "/home/trick/Desktop/NEW FRAMES"
+
 #: The Modern UI sheet and the measured 9-slice regions. ``slice`` is
 #: ``[top, right, bottom, left]`` as CSS ``border-image-slice`` expects.
 UI_SHEET = "16x16/Modern_UI_Style_1.png"
@@ -721,6 +777,146 @@ def extract_room_parts(source: str) -> Dict[str, Dict[str, object]]:
             "y": y,
         }
     return out
+
+
+def _read_member_bytes(source: str, member: str, zips: Sequence[str],
+                       description: str) -> bytes:
+    archive_path, found = _resolve_member(source, member, zips, description)
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            return archive.read(found)
+    except (KeyError, OSError, RuntimeError, zipfile.BadZipFile) as exc:
+        raise ThemeBuildError(
+            f"{archive_path.name}: cannot read {found} ({exc})") from exc
+
+
+def extract_ui_extras(source: str) -> Dict[str, Dict[str, object]]:
+    """Crop the generic Dark Ages UI frames into optional 9-slice extras."""
+    try:
+        archive_path, found = _resolve_member(
+            source, UI_EXTRA_SHEET, UI_EXTRA_ZIPS, "the Dark Ages UI pack")
+        sheet = _read_rgba(archive_path, found)
+    except ThemeBuildError:
+        return {}
+    out: Dict[str, Dict[str, object]] = {}
+    for name, spec in UI_EXTRA_SLICES.items():
+        x, y, w, h, cell, width, repeat = spec
+        if x + w > sheet.width or y + h > sheet.height:
+            continue
+        tile = sheet.crop((x, y, x + w, y + h))
+        out[name] = {
+            "data": _png_bytes(tile),
+            "slice": list(cell),
+            "width": width,
+            "repeat": repeat,
+            "sheet": UI_EXTRA_SHEET,
+            "x": x,
+            "y": y,
+            "w": w,
+            "h": h,
+        }
+    return out
+
+
+def extract_ui_icon_parts(source: str) -> Dict[str, Dict[str, object]]:
+    """Read the generic Medieval Fantasy icons used by the office toolbar."""
+    out: Dict[str, Dict[str, object]] = {}
+    for name, member in UI_ICON_FILES.items():
+        try:
+            data = _read_member_bytes(
+                source, member, ICON_ZIPS, "the Medieval Fantasy UI pack")
+            image = Image.open(io.BytesIO(data))
+            image.load()
+        except (ThemeBuildError, Exception):  # noqa: BLE001 - fail-open pack
+            continue
+        image = image.convert("RGBA")
+        out[name] = {
+            "data": data,
+            "w": image.width,
+            "h": image.height,
+            "sheet": member,
+        }
+    return out
+
+
+def extract_outside_parts(source: str) -> Dict[str, Dict[str, object]]:
+    """Crop the Green Forest grass tile and tree props (additive exterior art)."""
+    out: Dict[str, Dict[str, object]] = {}
+    for name, (member, x, y, w, h, scale) in OUTSIDE_TILES.items():
+        try:
+            archive_path, found = _resolve_member(
+                source, member, OUTSIDE_ZIPS, "the Green Forest tileset")
+            sheet = _read_rgba(archive_path, found)
+        except ThemeBuildError:
+            continue
+        if x + w > sheet.width or y + h > sheet.height:
+            continue
+        tile = sheet.crop((x, y, x + w, y + h))
+        out[name] = {
+            "data": _png_bytes(tile),
+            "w": w,
+            "h": h,
+            "ax": w // 2,
+            "ay": h,
+            "scale": scale,
+            "sheet": member,
+            "x": x,
+            "y": y,
+        }
+    return out
+
+
+def extract_fx_parts(source: str) -> Dict[str, Dict[str, object]]:
+    """Read the event-driven Super Pixel Effects spritesheets + frame geometry."""
+    out: Dict[str, Dict[str, object]] = {}
+    for name, base in FX_SOURCES.items():
+        png_member = f"{base}/spritesheet.png"
+        txt_member = f"{base}/spritesheet.txt"
+        try:
+            data = _read_member_bytes(
+                source, png_member, FX_ZIPS, "the Super Pixel Effects pack")
+            text = _read_member_bytes(
+                source, txt_member, FX_ZIPS, "the Super Pixel Effects pack")
+            image = Image.open(io.BytesIO(data))
+            image.load()
+        except ThemeBuildError:
+            continue
+        lines = [line for line in text.decode("utf-8", "replace").splitlines()
+                 if line.strip()]
+        match = re.search(r"=\s*\d+\s+\d+\s+(\d+)\s+(\d+)\s*$", lines[0]) if lines else None
+        if match is None:
+            continue
+        frame_w, frame_h = int(match.group(1)), int(match.group(2))
+        out[name] = {
+            "data": data,
+            "frame": {"w": frame_w, "h": frame_h},
+            "frames": max(1, len(lines)),
+            "fps": 15,
+            "sheet": png_member,
+        }
+    return out
+
+
+def extract_new_frames(source: str = NEW_FRAMES_DIR) -> List[Dict[str, object]]:
+    """Catalog the NEW FRAMES GIF geometry without ever using it as character art."""
+    directory = Path(source).expanduser()
+    if not directory.is_dir():
+        return []
+    items: List[Dict[str, object]] = []
+    for path in sorted(directory.glob("*.gif")):
+        try:
+            with Image.open(path) as image:
+                items.append({
+                    "id": path.stem,
+                    "frames": int(getattr(image, "n_frames", 1)),
+                    "size": {"w": image.width, "h": image.height},
+                    "duration_ms": int(image.info.get("duration") or 0),
+                    "character_compatible": False,
+                    "reason": "decorative fantasy frame; not a LimeZu character grid",
+                })
+        except Exception:  # noqa: BLE001 - a broken GIF is simply not catalogued
+            continue
+    return items
 
 
 # ---------------------------------------------------------------------------
@@ -1902,6 +2098,11 @@ __all__ = [
     "ROOM_TILES",
     "WINDOW_GLASS",
     "extract_room_parts",
+    "extract_ui_extras",
+    "extract_ui_icon_parts",
+    "extract_outside_parts",
+    "extract_fx_parts",
+    "extract_new_frames",
     "PORTRAIT_ZIP_NAMES",
     "SEMANTIC_TOKENS",
     "derive_tokens",
