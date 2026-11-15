@@ -251,8 +251,8 @@
     },
     {
       "path": "bundle/main-GDimLoNI.js",
-      "sha256": "d3c1d08b0d5b6cc52760d19b16238a9d0272087fba3fdc24bd2a1756871b92ab",
-      "bytes": 15294
+      "sha256": "edf5c4e504a31baf7730049e07073a0dc78a42621445b225c6a8b6aef29e113c",
+      "bytes": 15337
     },
     {
       "path": "bundle/pixelify-sans-cyrillic-400-normal-Ckz2YJkH.woff2",
@@ -395,6 +395,6 @@
       "bytes": 820
     }
   ],
-  "total_bytes": 2154456,
+  "total_bytes": 2154499,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }

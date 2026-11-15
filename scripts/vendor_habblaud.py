@@ -403,6 +403,16 @@ def rewrite_js(js: str) -> str:
             rewritten,
             count=1,
         )
+        # Vite's preload helper (`assetsURL`) does `"/" + e`. Now that the dep
+        # list returns an absolute href, that turns it into `/http://...`. Keep
+        # the helper permissive: an absolute or root-relative href is used as
+        # is, and only a bare relative name is prefixed. Idempotent: after the
+        # rewrite the literal `return`/`/`+e` form is gone.
+        rewritten = re.sub(
+            r"function\(e\)\{return`/`\+e\}",
+            "function(e){return e.startsWith(`/`)||e.startsWith(`http`)?e:`/`+e}",
+            rewritten,
+        )
 
     # The SSE URL is constructed in `client/src/net/store.ts` and passed to an
     # EventSource factory, so rewrite the exact factory call with any variable
