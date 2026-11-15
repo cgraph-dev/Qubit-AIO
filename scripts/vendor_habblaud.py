@@ -190,16 +190,30 @@ def fix_ticker_icon(js: str) -> str:
     IDEMPOTENCE. `--retransform` re-runs over an already-fixed tree, so the
     already-fixed form is accepted as a no-op.
     """
-    buggy = "${c.agentName}: ${c.activity.icon} ${c.activity.text}"
-    fixed = "${c.agentName}: ${c.activity.icon ? `${c.activity.icon} ` : ``}${c.activity.text}"
-    if fixed in js:
+    # Minifier variable names drift (`c`, `e`, `latest` …); anchor on the
+    # SHAPE and reuse whichever identifier it chose.
+    buggy = re.compile(
+        r"\$\{([A-Za-z_$][\w$]*)\.agentName\}: \$\{\1\.activity\.icon\} "
+        r"\$\{\1\.activity\.text\}")
+    fixed = re.compile(
+        r"\$\{([A-Za-z_$][\w$]*)\.agentName\}: "
+        r"\$\{\1\.activity\.icon \? `\$\{\1\.activity\.icon\} ` : ``\}"
+        r"\$\{\1\.activity\.text\}")
+    if fixed.search(js):
         return js  # already fixed
-    if js.count(buggy) != 1:
+    matches = buggy.findall(js)
+    if len(matches) != 1:
         raise SystemExit(
             f"fix_ticker_icon: expected exactly 1 ticker interpolation site, "
-            f"found {js.count(buggy)} — upstream changed; re-derive the anchor."
+            f"found {len(matches)} — upstream changed; re-derive the anchor."
         )
-    return js.replace(buggy, fixed, 1)
+    name = matches[0]
+    replacement = (
+        f"${{{name}.agentName}}: "
+        f"${{{name}.activity.icon ? `${{{name}.activity.icon}} ` : ``}}"
+        f"${{{name}.activity.text}}"
+    )
+    return buggy.sub(lambda _m: replacement, js, count=1)
 
 
 def rewrite_manifest(text: str) -> str:
@@ -266,13 +280,13 @@ INDEX_META_COPY = {
 #: component is named only in the legal/provenance records.
 INDEX_BRAND_COPY = {
     "<title>Habblaud</title>": f"<title>{BRAND_NAME}</title>",
-    f'<meta property="og:site_name" content="Habblaud" />':
+    '<meta property="og:site_name" content="Habblaud" />':
         f'<meta property="og:site_name" content="{BRAND_NAME}" />',
-    f'<meta property="og:title" content="Habblaud" />':
+    '<meta property="og:title" content="Habblaud" />':
         f'<meta property="og:title" content="{BRAND_NAME}" />',
-    f'<meta name="twitter:title" content="Habblaud" />':
+    '<meta name="twitter:title" content="Habblaud" />':
         f'<meta name="twitter:title" content="{BRAND_NAME}" />',
-    f'<meta name="apple-mobile-web-app-title" content="Habblaud" />':
+    '<meta name="apple-mobile-web-app-title" content="Habblaud" />':
         f'<meta name="apple-mobile-web-app-title" content="{BRAND_NAME}" />',
     '<meta property="og:image:alt" content="The Habblaud office in pixel art, '
     'with project rooms and agents at work." />':

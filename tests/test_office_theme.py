@@ -317,6 +317,71 @@ def test_characters_furniture_and_ui_validate_and_payload(tmp_path, monkeypatch)
     assert "files" not in payload
 
 
+def _add_room_animation_and_portrait_assets(pack):
+    """Add the full-pack room/animation/window blocks to a valid demo pack."""
+    manifest = json.loads((pack / "theme.json").read_text())
+    for rel in ("rooms/wall_face.png", "rooms/wall_south.png", "rooms/wall_top.png",
+                "rooms/door_face.png", "rooms/door_south.png", "rooms/window.png",
+                "characters/idle.webp"):
+        manifest["files"][rel] = _write(pack, rel, f"ASSET-{rel}".encode())
+    manifest["rooms"] = {
+        "cell": 16,
+        "wall": {"face": "rooms/wall_face.png", "south": "rooms/wall_south.png",
+                 "top": "rooms/wall_top.png"},
+        "door": {"face": "rooms/door_face.png", "south": "rooms/door_south.png"},
+        "window": {"src": "rooms/window.png", "ax": 16, "ay": 48,
+                   "rects": {"glass": {"x": 8, "y": 8, "w": 16, "h": 32}}},
+    }
+    manifest["characters"] = {
+        "atlas": "bodies/atlas32.png",
+        "cell": {"w": 32, "h": 64},
+        "cols": 20, "rows": 15, "count": 2,
+        "anchor": {"x": 16, "y": 64}, "scale": 0.5,
+        "animations": {
+            "cell": {"w": 16, "h": 32},
+            "anchor": {"x": 8, "y": 32},
+            "scale": 1,
+            "directions": ["left", "up", "right", "down"],
+            "cells": {"ceo": 0},
+            "clips": {"idle": {"atlas": "characters/idle.webp", "frames": 2, "fps": 4}},
+        },
+    }
+    manifest["furniture"] = {
+        "window": {"src": "rooms/window.png", "ax": 16, "ay": 48,
+                   "rects": {"glass": {"x": 8, "y": 8, "w": 16, "h": 32}}},
+    }
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    return pack
+
+
+def test_rooms_animations_and_portraits_validate_and_payload(tmp_path, monkeypatch):
+    pack = _add_room_animation_and_portrait_assets(_pack(tmp_path))
+    assert T.validate_theme(pack) == []
+    theme = T.load_theme(pack)
+    assert theme.rooms["wall"]["face"] == "rooms/wall_face.png"
+    monkeypatch.setattr(T, "theme_roots", lambda: [tmp_path])
+    monkeypatch.delenv("QUBIT_OFFICE_THEME", raising=False)
+    payload = T.theme_payload({}, requested="demo")
+    assert payload["rooms"]["wall"]["face"].endswith(
+        "rooms/wall_face.png?v=1.0.0")
+    assert payload["rooms"]["window"]["rects"]["glass"]["w"] == 16
+    assert payload["characters"]["animations"]["clips"]["idle"]["atlas"].endswith(
+        "characters/idle.webp?v=1.0.0")
+    assert payload["characters"]["animations"]["cells"] == {"ceo": 0}
+    assert payload["portraits"]["cells"]["ceo"] == [0, 0]
+    assert payload["furniture"]["window"]["rects"]["glass"]["h"] == 32
+
+
+def test_room_tiles_and_animation_atlases_must_be_declared(tmp_path):
+    pack = _add_room_animation_and_portrait_assets(_pack(tmp_path))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["rooms"]["wall"]["face"] = "rooms/missing.png"
+    assert any("declared file" in p for p in T.validate_manifest(manifest))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["characters"]["animations"]["clips"]["idle"]["atlas"] = "characters/missing.webp"
+    assert any("declared file" in p for p in T.validate_manifest(manifest))
+
+
 def test_characters_may_be_derived_from_the_bodies_atlas(tmp_path, monkeypatch):
     pack = _pack(tmp_path)
     manifest = json.loads((pack / "theme.json").read_text())

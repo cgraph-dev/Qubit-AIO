@@ -122,6 +122,24 @@ OUTFIT_FRAMES: Tuple[Tuple[str, int], ...] = (
     ("outfit_top", 8),
 )
 
+#: Animation clips in the shared LimeZu part-sheet grid (row, frames per
+#: direction). The row order is measured from the Character Generator's own
+#: ``Animation Data`` assets; ``frames`` is the per-direction span inside the
+#: row's 4 equal direction blocks.
+ANIMATIONS: Dict[str, Dict[str, int]] = {
+    "idle": {"row": 1, "frames": 6, "fps": 4},
+    "walk": {"row": 2, "frames": 6, "fps": 8},
+    "sit": {"row": 4, "frames": 3, "fps": 2},
+    "read": {"row": 7, "frames": 3, "fps": 4},
+    "talk": {"row": 6, "frames": 3, "fps": 4},
+}
+
+#: Direction order inside an animation row (measured: left, up, right, down).
+ANIMATION_DIRECTIONS: Tuple[str, ...] = ("left", "up", "right", "down")
+
+#: Animation atlases are always composed at the 16px world tier.
+ANIMATION_TILE = 16
+
 #: The calibrated frames (row, col) per logical layer. Rows are frame indices,
 #: so they are size-independent.
 CALIBRATION: Dict[str, Dict[str, int]] = {
@@ -379,6 +397,152 @@ def _compose_body(recipe: Mapping[str, int], layers: Mapping[str, List[Sheet]],
             sheet, row=row, col=0, width=frame_w, height=frame_h,
             part=part, empty_ok=False))
     return canvas
+
+
+def _compose_animation_frame(recipe: Mapping[str, int], layers: Mapping[str, List[Sheet]],
+                             size: int, row: int, col: int) -> Optional[Image.Image]:
+    """Compose one shared-grid animation frame (body/outfit/eyes/hair).
+
+    Unlike the static preview, every layer is cropped from the SAME (row, col)
+    cell: the Character Generator overlays its part sheets and crops an
+    animation region afterwards, so the animation is coherent only when all
+    layers advance together.
+    """
+    frame_w, frame_h = size, size * 2
+    canvas = Image.new("RGBA", (frame_w, frame_h), (0, 0, 0, 0))
+    skin_index = recipe.get("skin")
+    body_list = layers["body"]
+    if isinstance(skin_index, int) and not isinstance(skin_index, bool) and skin_index >= 0:
+        body_index = min(skin_index, len(body_list) - 1)
+    else:
+        body_index = BODY_VARIANT
+    base = _sheet_image(body_list[body_index], "body")
+    body = _crop_frame(base, row=row, col=col, width=frame_w, height=frame_h,
+                       part="body", empty_ok=True)
+    if body is None:
+        return None
+    canvas.alpha_composite(body)
+    for part in ("outfit", "eyes", "hair"):
+        index = recipe.get(part)
+        if not isinstance(index, int) or index < 0 or index >= len(layers[part]):
+            continue
+        sheet = _sheet_image(layers[part][index], "body")
+        tile = _crop_frame(sheet, row=row, col=col, width=frame_w, height=frame_h,
+                           part=part, empty_ok=True)
+        if tile is not None:
+            canvas.alpha_composite(tile)
+    return canvas
+
+
+def _build_animation_atlases(recipes: Mapping[str, Mapping[str, int]],
+                             layers: Any) -> Tuple[Dict[str, bytes], Dict[str, Any]]:
+    """Compose one atlas per animation clip (row per persona).
+
+    Each atlas is ``len(slugs)`` rows tall and ``4 * frames`` columns wide, so
+    the renderer picks a row by the persona's stable index and a column by
+    ``direction * frames + frame``. WebP keeps the pack small (pixel-art alpha
+    compresses very well).
+    """
+    normalized = layers if isinstance(layers, Mapping) else _normalize_layers(layers)
+    slugs = list(recipes.keys())
+    size = ANIMATION_TILE
+    cell_w, cell_h = size, size * 2
+    payloads: Dict[str, bytes] = {}
+    cells: Dict[str, int] = {}
+    clips: Dict[str, Any] = {}
+    for row_index, slug in enumerate(slugs):
+        cells[slug] = row_index
+    for name, spec in ANIMATIONS.items():
+        row = int(spec["row"])
+        frames = int(spec["frames"])
+        cols = frames * len(ANIMATION_DIRECTIONS)
+        atlas = Image.new("RGBA", (cols * cell_w, len(slugs) * cell_h), (0, 0, 0, 0))
+        for row_index, slug in enumerate(slugs):
+            recipe = recipes[slug]
+            for dir_index in range(len(ANIMATION_DIRECTIONS)):
+                for frame in range(frames):
+                    col = dir_index * frames + frame
+                    tile = _compose_animation_frame(recipe, normalized, size, row, col)
+                    if tile is not None:
+                        atlas.alpha_composite(tile, (col * cell_w, row_index * cell_h))
+        if atlas.getchannel("A").getbbox() is None:
+            continue
+        ext, data = encode_atlas(atlas)
+        relative = f"characters/{name}{ext}"
+        payloads[relative] = data
+        clips[name] = {
+            "atlas": relative,
+            "frames": frames,
+            "fps": int(spec["fps"]),
+            "cols": cols,
+            "rows": len(slugs),
+        }
+    document = {
+        "schema": 1,
+        "cell": {"w": cell_w, "h": cell_h},
+        "anchor": {"x": cell_w // 2, "y": cell_h},
+        "scale": 1,
+        "directions": list(ANIMATION_DIRECTIONS),
+        "cells": cells,
+        "clips": clips,
+    }
+    return payloads, document
+
+
+def _prepare_rooms(rooms: Optional[Mapping[str, Mapping[str, object]]]
+                   ) -> Tuple[Dict[str, bytes], Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Turn the extracted room tiles into pack payloads + manifest/recipe blocks."""
+    if not rooms:
+        return {}, None, None
+    payloads: Dict[str, bytes] = {}
+    files: Dict[str, str] = {}
+    recipe_tiles: Dict[str, Any] = {}
+    for name, entry in rooms.items():
+        if not isinstance(name, str) or not isinstance(entry, Mapping):
+            continue
+        data = entry.get("data")
+        if not isinstance(data, (bytes, bytearray)) or not data:
+            continue
+        relative = f"rooms/{name}.png"
+        payloads[relative] = bytes(data)
+        files[name] = relative
+        if isinstance(entry.get("sheet"), str):
+            recipe_tiles[name] = {
+                "sheet": entry["sheet"],
+                "x": entry.get("x", 0),
+                "y": entry.get("y", 0),
+                "w": entry.get("w", 0),
+                "h": entry.get("h", 0),
+            }
+    if not files:
+        return {}, None, None
+    try:
+        from office_theme_extract import WINDOW_GLASS  # type: ignore
+    except ImportError:  # imported as ``scripts.office_theme_build``
+        from scripts.office_theme_extract import WINDOW_GLASS  # type: ignore
+    manifest: Dict[str, Any] = {
+        "cell": FLOOR_TILE,
+        "wall": {
+            "face": files.get("wall_face"),
+            "south": files.get("wall_south"),
+            "top": files.get("wall_top"),
+        },
+        "door": {
+            "face": files.get("door_face"),
+            "south": files.get("door_south"),
+        },
+        "window": {
+            "src": files.get("window"),
+            "ax": 16,
+            "ay": 48,
+            "rects": {"glass": dict(WINDOW_GLASS)},
+        },
+    }
+    manifest["wall"] = {k: v for k, v in manifest["wall"].items() if v}
+    manifest["door"] = {k: v for k, v in manifest["door"].items() if v}
+    manifest["window"] = {k: v for k, v in manifest["window"].items() if v is not None}
+    recipe = {"cell": FLOOR_TILE, "tiles": recipe_tiles}
+    return payloads, manifest, recipe
 
 
 def _encode_png(image: Image.Image) -> bytes:
@@ -989,7 +1153,8 @@ def shareable_recipe(manifest: Mapping[str, Any],
                      surfaces: Optional[Mapping[str, Any]] = None,
                      assets: Optional[Mapping[str, Any]] = None,
                      furniture: Optional[Mapping[str, Any]] = None,
-                     ui: Optional[Mapping[str, Any]] = None
+                     ui: Optional[Mapping[str, Any]] = None,
+                     rooms: Optional[Mapping[str, Any]] = None
                      ) -> Dict[str, Any]:
     """The shareable ``theme.recipe.json`` derived from a built manifest.
 
@@ -1021,6 +1186,8 @@ def shareable_recipe(manifest: Mapping[str, Any],
         recipe["furniture"] = dict(furniture)
     if ui is not None:
         recipe["ui"] = dict(ui)
+    if rooms is not None:
+        recipe["rooms"] = dict(rooms)
     return recipe
 
 
@@ -1034,6 +1201,7 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
                  assets: Any = None,
                  furniture: Optional[Mapping[str, Any]] = None,
                  ui: Optional[Mapping[str, Any]] = None,
+                 rooms: Optional[Mapping[str, Any]] = None,
                  label: Optional[str] = None) -> Dict[str, Any]:
     """Write ONLY the shareable ``theme.recipe.json`` for a purchase.
 
@@ -1093,7 +1261,7 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
     }
     recipe = shareable_recipe(manifest, recipes, surfaces=surfaces,
                               assets=asset_metadata,
-                              furniture=furniture, ui=ui)
+                              furniture=furniture, ui=ui, rooms=rooms)
     recipe_problems = theme_contract.validate_recipe(recipe)
     if recipe_problems:
         raise ThemeBuildError(recipe_problems)
@@ -1131,7 +1299,10 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
                 tokens: Optional[Mapping[str, str]] = None,
                 floors: Optional[Mapping[str, bytes]] = None,
                 assets: Any = None,
-                extras: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
+                extras: Optional[Mapping[str, Any]] = None,
+                rooms: Optional[Mapping[str, Mapping[str, object]]] = None,
+                animation_layers: Any = None,
+                animations: bool = True) -> Dict[str, Any]:
     """Build a local theme pack and return its manifest.
 
     ``layers`` must be supplied (Task 3's extractor does that for the CLI);
@@ -1173,6 +1344,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     floor_png = _prepare_floors(floors)
     asset_payloads, asset_block, _asset_metadata = _prepare_assets(assets)
     extra_payloads, extra_manifest, _extra_recipe = _prepare_extras(extras)
+    room_payloads, room_manifest, _room_recipe = _prepare_rooms(rooms)
     slugs = _resolve_personas(personas)
     cols = DEFAULT_COLS
     rows = max(1, math.ceil(len(slugs) / cols))
@@ -1249,7 +1421,13 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         payloads[f"surfaces/floor_{kind}.png"] = data
     payloads.update(asset_payloads)
     payloads.update(extra_payloads)
+    payloads.update(room_payloads)
     surfaces_block = _floor_surfaces_block(floor_png)
+    animation_doc: Optional[Dict[str, Any]] = None
+    if animations:
+        layer_source = animation_layers if animation_layers is not None else normalized
+        animation_payloads, animation_doc = _build_animation_atlases(recipes, layer_source)
+        payloads.update(animation_payloads)
 
     label = out_path.name.replace("-", " ").replace("_", " ").title()
     manifest: Dict[str, Any] = {
@@ -1303,10 +1481,23 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         "rows": rows,
         "count": len(slugs),
         "anchor": {"x": size // 2, "y": size * 2},
-        # Habblaud's world is 16px+; the 32-tier body frame reads best at half
-        # size there. The shell's Agents panel still uses the 32px atlas.
-        "scale": 0.5,
+        # Draw the theme body at the same 16x32 world size as the procedural
+        # character (the shell's Agents panel still uses the raw atlas).
+        "scale": ANIMATION_TILE / size,
     }
+    if animation_doc is not None and animation_doc.get("clips"):
+        manifest["characters"]["animations"] = animation_doc
+    if room_manifest is not None:
+        manifest["rooms"] = room_manifest
+        window = room_manifest.get("window") or {}
+        if isinstance(window, dict) and window.get("src"):
+            furniture = extra_manifest.setdefault("furniture", {})
+            furniture["window"] = {
+                "src": window["src"],
+                "ax": window.get("ax", 16),
+                "ay": window.get("ay", 48),
+                "rects": dict(window.get("rects") or {}),
+            }
     manifest.update(extra_manifest)
 
     structural = theme_contract.validate_manifest(manifest)
@@ -1624,14 +1815,17 @@ def _check(args: argparse.Namespace,
            layers: Mapping[str, List[Sheet]],
            floors: Optional[Mapping[str, bytes]] = None,
            assets: Any = None,
-           extras: Optional[Mapping[str, Any]] = None) -> int:
+           extras: Optional[Mapping[str, Any]] = None,
+           rooms: Optional[Mapping[str, Mapping[str, object]]] = None,
+           animation_layers: Any = None) -> int:
     out = Path(args.out)
     if not out.is_dir():
         raise ThemeBuildError(f"check: {out} does not exist")
     with tempfile.TemporaryDirectory(prefix="office-theme-check-") as work:
         rebuilt = Path(work) / out.name
         build_theme(DEFAULT_SOURCE, rebuilt, size=args.size, layers=layers,
-                    floors=floors, assets=assets, extras=extras)
+                    floors=floors, assets=assets, extras=extras, rooms=rooms,
+                    animation_layers=animation_layers)
         problems = compare_packs(out, rebuilt)
     if problems:
         for problem in problems:
@@ -1701,6 +1895,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         surfaces: Optional[Dict[str, Any]] = None
         assets: Any = None
         extras: Dict[str, Any] = {}
+        rooms: Any = None
+        animation_layers: Any = None
         if not args.calibrate:
             floors, surfaces = _floor_inputs(args.source)
             if args.assets:
@@ -1711,12 +1907,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     "furniture": extractor.extract_furniture_parts(args.source),
                     "ui": extractor.extract_ui_parts(args.source),
                 }
+                rooms = extractor.extract_room_parts(args.source)
             except ThemeBuildError as exc:
-                print(f"warning: furniture/ui assets skipped: {exc}",
+                print(f"warning: furniture/ui/room assets skipped: {exc}",
                       file=sys.stderr)
                 extras = {}
+                rooms = None
+            if args.size != ANIMATION_TILE:
+                try:
+                    animation_layers = extract_layers(args.source, size=ANIMATION_TILE)
+                except ThemeBuildError as exc:
+                    print(f"warning: animation layers skipped: {exc}",
+                          file=sys.stderr)
+                    animation_layers = None
         if args.check:
-            return _check(args, layers, floors, assets, extras)
+            return _check(args, layers, floors, assets, extras, rooms,
+                          animation_layers)
         if args.calibrate:
             return _calibrate(args, layers)
         tokens = None
@@ -1731,11 +1937,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     print(f"warning: palette fallback: {reason}", file=sys.stderr)
         if args.recipe_out:
             _payloads, _manifest, extra_recipe = _prepare_extras(extras)
+            _room_payloads, _room_manifest, room_recipe = _prepare_rooms(rooms)
             recipe = build_recipe(DEFAULT_SOURCE, args.recipe_out,
                                   size=args.size, layers=layers, tokens=tokens,
                                   surfaces=surfaces, assets=assets,
                                   furniture=extra_recipe.get("furniture"),
-                                  ui=extra_recipe.get("ui"))
+                                  ui=extra_recipe.get("ui"),
+                                  rooms=room_recipe)
             print(json.dumps({
                 "ok": True,
                 "recipe": str(Path(args.recipe_out)),
@@ -1746,7 +1954,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
                                layers=layers, tokens=tokens, floors=floors,
-                               assets=assets, extras=extras)
+                               assets=assets, extras=extras, rooms=rooms,
+                               animation_layers=animation_layers)
         recipes = json.loads(
             (Path(args.out) / "agents.json").read_text(encoding="utf-8")
         )["recipes"]

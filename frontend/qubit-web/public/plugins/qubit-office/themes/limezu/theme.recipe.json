@@ -1710,6 +1710,53 @@
     "outfit": 33,
     "skin": 9
   },
+  "rooms": {
+    "cell": 16,
+    "tiles": {
+      "door_face": {
+        "h": 32,
+        "sheet": "3_Animated_objects/16x16/spritesheets/animated_door_glass_double.png",
+        "w": 32,
+        "x": 0,
+        "y": 16
+      },
+      "door_south": {
+        "h": 16,
+        "sheet": "3_Animated_objects/16x16/spritesheets/animated_door_glass_double.png",
+        "w": 32,
+        "x": 0,
+        "y": 32
+      },
+      "wall_face": {
+        "h": 32,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Walls_16x16.png",
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "wall_south": {
+        "h": 16,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Walls_16x16.png",
+        "w": 16,
+        "x": 0,
+        "y": 16
+      },
+      "wall_top": {
+        "h": 16,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Walls_16x16.png",
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "window": {
+        "h": 48,
+        "sheet": "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_3d_walls_16x16.png",
+        "w": 32,
+        "x": 304,
+        "y": 112
+      }
+    }
+  },
   "schema": 1,
   "slices": {},
   "source": "owner purchase of LimeZu Modern Interiors + Modern User Interface (built locally, 2026-11-09)",

@@ -184,7 +184,56 @@ FURNITURE_FILES: Dict[str, str] = {
     "armchair": "2_Living_Room_Singles/Living_Room_Singles_117.png",
     "coffee_table": "2_Living_Room_Singles/Living_Room_Singles_30.png",
     "floor_lamp": "2_Living_Room_Singles/Living_Room_Singles_80.png",
+    "filing_cabinet": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_64.png",
+    "printer": "23_Television_and_Film_Studio_SIngles/Television_and_FIlm_Studio_Singles_29.png",
+    "trash_bin": "2_Living_Room_Singles/Living_Room_Singles_27.png",
+    "glass_partition": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_37.png",
+    "binder_shelf": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_65.png",
+    "stool": "13_Conference_Hall_Singles/Conference_Hall_Singles_25.png",
+    "water_cooler": "12_Kitchen_Singles/Kitchen_Singles_158.png",
+    "clock": "2_Living_Room_Singles/Living_Room_Singles_92.png",
+    "poster": "23_Television_and_Film_Studio_SIngles/Television_and_FIlm_Studio_Singles_49.png",
+    "painting": "23_Television_and_Film_Studio_SIngles/Television_and_FIlm_Studio_Singles_50.png",
+    "tv": "23_Television_and_Film_Studio_SIngles/Television_and_FIlm_Studio_Singles_49.png",
+    "light_switch": "23_Television_and_Film_Studio_SIngles/Television_and_FIlm_Studio_Singles_34.png",
+    "elevator": "26_Condominium_Singles/Condominium_Singles_1.png",
+    "sign": "23_Television_and_Film_Studio_SIngles/Television_and_FIlm_Studio_Singles_43.png",
+    "mirror": "3_Bathroom_Singles/Bathroom_Singles_61.png",
+    "shelf_wall": "23_Television_and_Film_Studio_SIngles/Television_and_FIlm_Studio_Singles_41.png",
+    "counter": "12_Kitchen_Singles/Kitchen_Singles_113.png",
+    "counter_sink": "12_Kitchen_Singles/Kitchen_Singles_138.png",
+    "coffee_machine": "12_Kitchen_Singles/Kitchen_Singles_204.png",
+    "microwave": "12_Kitchen_Singles/Kitchen_Singles_160.png",
+    "fridge": "12_Kitchen_Singles/Kitchen_Singles_161.png",
+    "vending_machine": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_31.png",
+    "cafe_table": "2_Living_Room_Singles/Living_Room_Singles_30.png",
+    "cafe_chair": "2_Living_Room_Singles/Living_Room_Singles_18.png",
+    "pingpong_table": "13_Conference_Hall_Singles/Conference_Hall_Singles_5.png",
+    "beanbag": "2_Living_Room_Singles/Living_Room_Singles_118.png",
+    "arcade": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_31.png",
+    "toilet_stall": "3_Bathroom_Singles/Bathroom_Singles_155.png",
+    "sink": "3_Bathroom_Singles/Bathroom_Singles_1.png",
+    "bench": "2_Living_Room_Singles/Living_Room_Singles_31.png",
 }
+
+#: Room-builder sheets and the measured 16px tiles used by the in-scene rooms.
+WALL_SHEET = "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Walls_16x16.png"
+DOOR_SHEET = "3_Animated_objects/16x16/spritesheets/animated_door_glass_double.png"
+WINDOW_SHEET = "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_3d_walls_16x16.png"
+
+#: ``name -> (sheet, x, y, w, h)`` in source pixels. ``wall_face`` is 16x32
+#: (two tile rows: top trim + wallpaper), which is exactly Habblaud's wall face.
+ROOM_TILES: Dict[str, Tuple[str, int, int, int, int]] = {
+    "wall_face": (WALL_SHEET, 0, 0, 16, 32),
+    "wall_south": (WALL_SHEET, 0, 16, 16, 16),
+    "wall_top": (WALL_SHEET, 0, 0, 16, 16),
+    "door_face": (DOOR_SHEET, 0, 16, 32, 32),
+    "door_south": (DOOR_SHEET, 0, 32, 32, 16),
+    "window": (WINDOW_SHEET, 19 * 16, 7 * 16, 32, 48),
+}
+
+#: Opaque glass region inside :data:`ROOM_TILES`'s window sprite.
+WINDOW_GLASS = {"x": 8, "y": 8, "w": 16, "h": 32}
 
 #: The Modern UI sheet and the measured 9-slice regions. ``slice`` is
 #: ``[top, right, bottom, left]`` as CSS ``border-image-slice`` expects.
@@ -642,6 +691,36 @@ def extract_floor_tiles(source: str, out_dir: str, *,
         tile.save(path, format="PNG")
         written[kind] = path
     return written
+
+
+def extract_room_parts(source: str) -> Dict[str, Dict[str, object]]:
+    """Crop the measured Modern Interiors room tiles, in memory.
+
+    Returns ``{name: {"data": png_bytes, "w", "h", "sheet", "x", "y"}}`` for
+    the wall face/south/top, the door face/south and the window. A purchase
+    without the interior/doors sheets yields ``{}`` (procedural rooms remain).
+    """
+    out: Dict[str, Dict[str, object]] = {}
+    for name, (member, x, y, w, h) in ROOM_TILES.items():
+        try:
+            archive, found = _resolve_member(
+                source, member, INTERIOR_ZIP_NAMES + ("moderninteriors-win.zip",),
+                "the interior pack")
+            sheet = _read_rgba(archive, found)
+        except ThemeBuildError:
+            continue
+        if x + w > sheet.width or y + h > sheet.height:
+            continue
+        tile = sheet.crop((x, y, x + w, y + h))
+        out[name] = {
+            "data": _png_bytes(tile),
+            "w": w,
+            "h": h,
+            "sheet": member,
+            "x": x,
+            "y": y,
+        }
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1820,6 +1899,9 @@ __all__ = [
     "FLOOR_SHEET",
     "FLOOR_TILE",
     "INTERIOR_ZIP_NAMES",
+    "ROOM_TILES",
+    "WINDOW_GLASS",
+    "extract_room_parts",
     "PORTRAIT_ZIP_NAMES",
     "SEMANTIC_TOKENS",
     "derive_tokens",

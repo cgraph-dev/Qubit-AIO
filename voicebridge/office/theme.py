@@ -253,6 +253,7 @@ class Theme:
     surfaces: Mapping[str, Any] = field(default_factory=dict)
     assets: Mapping[str, Any] = field(default_factory=dict)
     characters: Mapping[str, Any] = field(default_factory=dict)
+    rooms: Mapping[str, Any] = field(default_factory=dict)
     furniture: Mapping[str, Any] = field(default_factory=dict)
     ui: Mapping[str, Any] = field(default_factory=dict)
     files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
@@ -861,6 +862,76 @@ def _validate_characters_full(section: Any,
                               or isinstance(scale, bool) or scale <= 0
                               or scale > 4):
         problems.append("characters.scale: must be a number in (0, 4]")
+    problems.extend(_validate_animations(section.get("animations"), files))
+    return problems
+
+
+def _validate_animations(section: Any, files: Optional[Set[str]]) -> List[str]:
+    """Validate the optional ``characters.animations`` clip block."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["characters.animations: must be an object"]
+    problems: List[str] = []
+    cell = section.get("cell")
+    if not isinstance(cell, dict):
+        problems.append("characters.animations.cell: must be an object")
+    else:
+        for key in ("w", "h"):
+            value = cell.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                problems.append(
+                    f"characters.animations.cell.{key}: must be a positive integer")
+    scale = section.get("scale")
+    if scale is not None and (not isinstance(scale, (int, float))
+                              or isinstance(scale, bool) or scale <= 0
+                              or scale > 4):
+        problems.append("characters.animations.scale: must be a number in (0, 4]")
+    directions = section.get("directions")
+    if directions is not None and (not isinstance(directions, list)
+                                   or not directions
+                                   or any(not isinstance(d, str) or not d
+                                          for d in directions)):
+        problems.append("characters.animations.directions: must be non-empty strings")
+    cells = section.get("cells")
+    if not isinstance(cells, dict) or not cells:
+        problems.append("characters.animations.cells: must be a non-empty object")
+    else:
+        for slug, row in cells.items():
+            if not isinstance(slug, str) or not slug:
+                problems.append("characters.animations.cells: invalid slug")
+            if not isinstance(row, int) or isinstance(row, bool) or row < 0:
+                problems.append(
+                    f"characters.animations.cells.{slug}: must be a non-negative integer")
+    clips = section.get("clips")
+    if not isinstance(clips, dict) or not clips:
+        problems.append("characters.animations.clips: must be a non-empty object")
+    else:
+        for name, clip in clips.items():
+            if not isinstance(name, str) or not name:
+                problems.append("characters.animations.clips: invalid name")
+                continue
+            if not isinstance(clip, dict):
+                problems.append(f"characters.animations.clips.{name}: must be an object")
+                continue
+            atlas = clip.get("atlas")
+            if not isinstance(atlas, str) or not atlas:
+                problems.append(
+                    f"characters.animations.clips.{name}.atlas: path is required")
+            else:
+                problems.extend(
+                    f"characters.animations.clips.{name}.atlas: {p}"
+                    for p in _path_problems(atlas))
+                if files is not None and atlas not in files:
+                    problems.append(
+                        f"characters.animations.clips.{name}.atlas: {atlas!r} "
+                        "is not a declared file")
+            for key in ("frames", "cols", "rows"):
+                value = clip.get(key)
+                if value is not None and (not isinstance(value, int)
+                                          or isinstance(value, bool) or value <= 0):
+                    problems.append(
+                        f"characters.animations.clips.{name}.{key}: must be a positive integer")
     return problems
 
 
@@ -952,6 +1023,82 @@ def _validate_furniture_recipe(section: Any) -> List[str]:
                     or value < 0):
                 problems.append(
                     f"furniture.{kind}.{key}: must be a non-negative integer")
+    return problems
+
+
+def _validate_rooms_full(section: Any, files: Optional[Set[str]]) -> List[str]:
+    """Validate the optional ``rooms`` block (wall/door/window tiles + decor)."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["rooms: must be an object"]
+    problems: List[str] = []
+    cell = section.get("cell")
+    if cell is not None and (not isinstance(cell, int) or isinstance(cell, bool)
+                             or cell <= 0):
+        problems.append("rooms.cell: must be a positive integer")
+
+    def check_path(value: Any, label: str) -> None:
+        if not isinstance(value, str) or not value:
+            problems.append(f"{label}: path is required")
+            return
+        problems.extend(f"{label}: {p}" for p in _path_problems(value))
+        if files is not None and value not in files:
+            problems.append(f"{label}: {value!r} is not a declared file")
+
+    def check_room(room: Any, label: str) -> None:
+        if room is None:
+            return
+        if not isinstance(room, dict):
+            problems.append(f"{label}: must be an object")
+            return
+        wall = room.get("wall")
+        if wall is not None:
+            if not isinstance(wall, dict):
+                problems.append(f"{label}.wall: must be an object")
+            else:
+                for part in ("face", "south", "top"):
+                    if part in wall:
+                        check_path(wall[part], f"{label}.wall.{part}")
+        door = room.get("door")
+        if door is not None:
+            if not isinstance(door, dict):
+                problems.append(f"{label}.door: must be an object")
+            else:
+                for part in ("face", "south"):
+                    if part in door:
+                        check_path(door[part], f"{label}.door.{part}")
+        window = room.get("window")
+        if window is not None:
+            if not isinstance(window, dict):
+                problems.append(f"{label}.window: must be an object")
+            else:
+                if "src" in window:
+                    check_path(window["src"], f"{label}.window.src")
+                for key in ("ax", "ay"):
+                    if key in window and not _number(window[key]):
+                        problems.append(
+                            f"{label}.window.{key}: must be a non-negative number")
+                rects = window.get("rects")
+                if rects is not None and not isinstance(rects, dict):
+                    problems.append(f"{label}.window.rects: must be an object")
+        furniture = room.get("furniture")
+        if furniture is not None:
+            problems.extend(
+                f"{label}.{p}" if not p.startswith("furniture") else p
+                for p in _validate_furniture_full(furniture, files))
+
+    check_room({k: section.get(k) for k in ("wall", "door", "window")}, "rooms")
+    archetypes = section.get("archetypes")
+    if archetypes is not None:
+        if not isinstance(archetypes, dict):
+            problems.append("rooms.archetypes: must be an object")
+        else:
+            for name, room in archetypes.items():
+                if not isinstance(name, str) or not name:
+                    problems.append("rooms.archetypes: invalid name")
+                    continue
+                check_room(room, f"rooms.archetypes.{name}")
     return problems
 
 
@@ -1463,6 +1610,7 @@ def validate_manifest(manifest: Any, root: Optional[Path] = None) -> List[str]:
     problems.extend(_validate_assets_full(manifest.get("assets"), declared))
     problems.extend(_validate_characters_full(manifest.get("characters"), declared))
     problems.extend(_validate_furniture_full(manifest.get("furniture"), declared))
+    problems.extend(_validate_rooms_full(manifest.get("rooms"), declared))
     problems.extend(_validate_ui_full(manifest.get("ui"), declared))
     for section_name in ("portraits", "bodies"):
         problems.extend(_validate_asset_section(
@@ -1631,6 +1779,7 @@ def load_theme(root: Any) -> Theme:
         surfaces=dict(manifest.get("surfaces") or {}),
         assets=dict(manifest.get("assets") or {}),
         characters=dict(manifest.get("characters") or {}),
+        rooms=dict(manifest.get("rooms") or {}),
         furniture=dict(manifest.get("furniture") or {}),
         ui=dict(manifest.get("ui") or {}),
         files=dict(files),
@@ -1668,6 +1817,8 @@ def _classic_payload(reason: Optional[str]) -> Dict[str, Any]:
         "surfaces": None,
         "assets": None,
         "characters": None,
+        "portraits": None,
+        "rooms": None,
         "furniture": {},
         "ui": {"slices": {}},
         "reason": reason or "",
@@ -1733,6 +1884,8 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
         "surfaces": surfaces_payload,
         "assets": assets_payload,
         "characters": _characters_payload(theme),
+        "portraits": _portraits_payload(theme),
+        "rooms": _rooms_payload(theme),
         "furniture": _furniture_payload(theme),
         "ui": _ui_payload(theme),
         "reason": "",
@@ -1774,7 +1927,118 @@ def _characters_payload(theme: Theme) -> Optional[Dict[str, Any]]:
         payload["count"] = section["count"]
     if isinstance(section.get("scale"), (int, float)):
         payload["scale"] = section["scale"]
+    animations = section.get("animations")
+    if isinstance(animations, dict):
+        clips = animations.get("clips")
+        if isinstance(clips, dict) and clips:
+            payload["animations"] = {
+                "cell": dict(animations.get("cell") or {}),
+                "anchor": dict(animations.get("anchor") or {}),
+                "scale": animations.get("scale"),
+                "directions": list(animations.get("directions") or []),
+                "cells": dict(animations.get("cells") or {}),
+                "clips": {
+                    name: {
+                        "atlas": f"{base}/{clip['atlas']}{suffix}",
+                        "frames": clip.get("frames"),
+                        "fps": clip.get("fps"),
+                    }
+                    for name, clip in clips.items()
+                    if isinstance(clip, dict) and isinstance(clip.get("atlas"), str)
+                },
+            }
     return payload
+
+
+def _portraits_payload(theme: Theme) -> Optional[Dict[str, Any]]:
+    """The portrait atlas + slug cells (same semantic recipe as the body)."""
+    section = theme.portraits or {}
+    atlas = section.get("atlas")
+    if not isinstance(atlas, str) or not atlas:
+        return None
+    size = section.get("size")
+    if not isinstance(size, int) or isinstance(size, bool) or size <= 0:
+        return None
+    cells = _index_cells(theme, "portraits")
+    if not cells:
+        return None
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+    return {
+        "atlas": f"{base}/{atlas}{suffix}",
+        "cell": {"w": size, "h": size},
+        "cells": {slug: list(cell) for slug, cell in cells.items()},
+        "scale": 1,
+    }
+
+
+def _rooms_payload(theme: Theme) -> Optional[Dict[str, Any]]:
+    """The room blueprint: themed wall/door/window tiles + per-area furniture."""
+    section = theme.rooms or {}
+    if not isinstance(section, dict) or not section:
+        return None
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+
+    def url(relative: Any) -> Optional[str]:
+        return f"{base}/{relative}{suffix}" if isinstance(relative, str) and relative else None
+
+    def furniture(entries: Any) -> Dict[str, Any]:
+        out: Dict[str, Any] = {}
+        if not isinstance(entries, dict):
+            return out
+        for kind, descriptor in entries.items():
+            if not isinstance(descriptor, dict):
+                continue
+            src = descriptor.get("src")
+            if not isinstance(src, str) or not src:
+                continue
+            entry: Dict[str, Any] = {"src": url(src)}
+            for key in ("ax", "ay", "scale", "footprint", "layer", "z", "rects"):
+                if key in descriptor:
+                    entry[key] = descriptor[key]
+            out[kind] = entry
+        return out
+
+    def room(entries: Any) -> Dict[str, Any]:
+        if not isinstance(entries, dict):
+            return {}
+        out: Dict[str, Any] = {}
+        wall = entries.get("wall")
+        if isinstance(wall, dict):
+            mapped = {part: url(wall.get(part)) for part in ("face", "south", "top")}
+            out["wall"] = {k: v for k, v in mapped.items() if v}
+        door = entries.get("door")
+        if isinstance(door, dict):
+            mapped = {part: url(door.get(part)) for part in ("face", "south")}
+            out["door"] = {k: v for k, v in mapped.items() if v}
+        window = entries.get("window")
+        if isinstance(window, dict) and url(window.get("src")):
+            out["window"] = {
+                "src": url(window["src"]),
+                "ax": window.get("ax"),
+                "ay": window.get("ay"),
+                "rects": dict(window.get("rects") or {}),
+            }
+        furn = furniture(entries.get("furniture"))
+        if furn:
+            out["furniture"] = furn
+        return out
+
+    payload = room(section)
+    archetypes = section.get("archetypes")
+    if isinstance(archetypes, dict):
+        mapped = {
+            name: room(value)
+            for name, value in archetypes.items()
+            if isinstance(name, str)
+        }
+        mapped = {k: v for k, v in mapped.items() if v}
+        if mapped:
+            payload["archetypes"] = mapped
+    if "cell" in section:
+        payload["cell"] = section["cell"]
+    return payload or None
 
 
 def _furniture_payload(theme: Theme) -> Dict[str, Any]:
@@ -1789,7 +2053,7 @@ def _furniture_payload(theme: Theme) -> Dict[str, Any]:
         if not isinstance(src, str) or not src:
             continue
         entry: Dict[str, Any] = {"src": f"{base}/{src}{suffix}"}
-        for key in ("ax", "ay", "scale"):
+        for key in ("ax", "ay", "scale", "rects", "footprint", "layer", "z"):
             if key in descriptor:
                 entry[key] = descriptor[key]
         out[kind] = entry
