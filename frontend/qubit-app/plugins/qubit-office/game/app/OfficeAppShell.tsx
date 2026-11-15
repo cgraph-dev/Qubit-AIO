@@ -18,6 +18,7 @@ import {
 import { createSeatModelPanel } from "./SeatModelPanel";
 import { isEditableTarget } from "./command-center";
 import { createAgentsPanel } from "./AgentsPanel";
+import { createTalkPanel } from "./TalkPanel";
 import { createAgentControlDrawer } from "./AgentControlDrawer";
 import { createWarRoomPanel } from "./WarRoomPanel";
 import { createApprovalsPanel } from "./ApprovalsPanel";
@@ -35,7 +36,8 @@ import { createEtsyConnectPanel } from "./EtsyConnectPanel";
 import { fetchApprovals } from "./approvals-panel";
 import type { AgentSeat } from "./agents-panel";
 import {
-  applyHostTheme, loadOfficeTheme, officeSliceName, officeThemeClass,
+  applyHostTheme, applyOfficeUiSlices, loadOfficeTheme, officeSliceName,
+  officeThemeClass, officeUiSliceAttrs,
   type OfficeTheme,
 } from "./office-theme";
 import {
@@ -109,8 +111,6 @@ export interface OfficeAppProps {
    * explicit/test path. See `../loading/config.ts`.
    */
   loading?: OfficeLoadingConfigInput;
-  /** Injected fetch for tests/hosts; the live paths default to `fetch`. */
-  fetchImpl?: typeof fetch;
 }
 
 /**
@@ -150,6 +150,7 @@ type ShellComponents = {
   base?: string;
   HudDock: ReturnType<typeof createHudDock>;
   AgentsPanel: ReturnType<typeof createAgentsPanel>;
+  TalkPanel: ReturnType<typeof createTalkPanel>;
   SeatModelPanel: ReturnType<typeof createSeatModelPanel>;
   AgentControlDrawer: ReturnType<typeof createAgentControlDrawer>;
   WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
@@ -197,6 +198,7 @@ function shellComponents(
     base,
     HudDock: createHudDock({ React: R, hooks, base }),
     AgentsPanel: createAgentsPanel(R, hooks),
+    TalkPanel: createTalkPanel(R, hooks),
     SeatModelPanel: createSeatModelPanel(R, hooks),
     AgentControlDrawer: createAgentControlDrawer(R, hooks),
     WarRoomPanel: createWarRoomPanel(R, hooks),
@@ -311,6 +313,10 @@ export function createOfficeApp(
       prefersReducedMotion());
     const [highContrast, setHighContrast] = useState<boolean>(
       prefersHighContrast());
+    // The agent TALK panel. It is the conversation surface for one roster seat;
+    // declared LAST so every seeded state index in the shell's tests stays
+    // stable. The panel is a side sheet, never a modal: the office stays usable.
+    const [talkSeat, setTalkSeat] = useState<AgentSeat | null>(null);
 
     // THE PANEL TOGGLES. Every dock is opened from the office's OWN icon group
     // (the top-right Panels row), so the shell no longer paints a text-button
@@ -377,6 +383,20 @@ export function createOfficeApp(
       setStudioOpen((v: boolean) => !v);
     };
     const toggleCampus = () => setCampusOpen((v: boolean) => !v);
+    // Open the seat's canonical conversation. It is exclusive with the other
+    // side sheets so the office never stacks two overlapping panels.
+    const openTalk = (seat: AgentSeat) => {
+      setAgentsOpen(false);
+      setHudOpen(false);
+      setWarRoomOpen(false);
+      setApprovalsOpen(false);
+      setEtsyOpen(false);
+      setCommandCenterOpen(false);
+      setTimelineOpen(false);
+      setStudioOpen(false);
+      setControlSeat(null);
+      setTalkSeat(seat);
+    };
     const toggleFor = (id: string): (() => void) => {
       switch (id) {
         case "agents": return toggleAgents;
@@ -393,8 +413,9 @@ export function createOfficeApp(
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
-      HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
-      ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld,
+      HudDock, AgentsPanel, TalkPanel, SeatModelPanel, AgentControlDrawer,
+      WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder,
+      OutsideWorld,
       PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel,
       LoadingScreen,
     } = shellComponents(R, hooks, props.base);
@@ -466,6 +487,14 @@ export function createOfficeApp(
       return applyHostTheme(document, officeTheme);
     }, [officeTheme]);
 
+    // Apply the full pack's Modern UI 9-slice frames to the shell's own chrome.
+    // The server stylesheet only owns the legacy top-level slices; this adds the
+    // `ui.slices` block (panel/button/dialog/input/tab) as scoped host CSS.
+    useEffect(() => {
+      if (typeof document === "undefined") return;
+      return applyOfficeUiSlices(document, officeTheme);
+    }, [officeTheme]);
+
     // P6-05 — the single open dock (sheet) and the label a live region uses.
     // Order mirrors exclusivity: the later sheets close the earlier ones, so at
     // most one id is ever non-null.
@@ -477,6 +506,7 @@ export function createOfficeApp(
       : etsyOpen ? "office-game-etsy-dock"
       : commandCenterOpen ? "office-game-command-center-dock"
       : timelineOpen ? "office-game-timeline-dock"
+      : talkSeat ? "office-game-talk-dock"
       : null;
     const openDockLabel = agentsOpen ? "Agents"
       : hudOpen ? "HUD"
@@ -486,6 +516,7 @@ export function createOfficeApp(
       : etsyOpen ? "Etsy connection"
       : commandCenterOpen ? "Command Center"
       : timelineOpen ? "Timeline"
+      : talkSeat ? "Talk"
       : null;
 
     // Honour the OS reduced-motion and high-contrast preferences and keep the
@@ -730,6 +761,13 @@ export function createOfficeApp(
     // [data-office-slice], so an absent/classic theme emits no border-image.
     const dockSlice = officeSliceName(officeTheme, "dock");
     const buttonSlice = officeSliceName(officeTheme, "button");
+    // Full-pack Modern UI frames (ui.slices). The attribute is emitted only
+    // when the pack actually declares a matching/fallback slice, so classic
+    // chrome stays byte-identical.
+    const dockUiAttrs = officeUiSliceAttrs(officeTheme, "dock");
+    const buttonUiAttrs = officeUiSliceAttrs(officeTheme, "button", true);
+    const tabUiAttrs = officeUiSliceAttrs(officeTheme, "tab");
+    const panelUiAttrs = officeUiSliceAttrs(officeTheme, "panel", true);
 
     const children: unknown[] = [
       // P6-05 — the first focusable thing on the page is a skip link, so a
@@ -916,6 +954,7 @@ export function createOfficeApp(
         "data-testid": "office-game-agents-dock",
         "data-office-dock": "agents",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "Office agents",
       }, [
@@ -927,6 +966,7 @@ export function createOfficeApp(
             "data-testid": "office-game-warroom-open",
             "aria-label": "Open War Room and role directory",
             "data-office-slice": buttonSlice,
+            ...buttonUiAttrs,
             onClick: () => {
               setAgentsOpen(false);
               setApprovalsOpen(false);
@@ -941,6 +981,7 @@ export function createOfficeApp(
             "data-testid": "office-game-etsy-open",
             "aria-label": "Open the Etsy connection settings",
             "data-office-slice": buttonSlice,
+            ...buttonUiAttrs,
             onClick: () => {
               setAgentsOpen(false);
               setApprovalsOpen(false);
@@ -955,17 +996,45 @@ export function createOfficeApp(
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
             "data-office-slice": buttonSlice,
+            ...buttonUiAttrs,
             onClick: () => setAgentsOpen(false),
           }, "Close"),
         ]),
         R.createElement(AgentsPanel as never, {
           key: "body", base: props.base, theme: officeTheme,
+          onTalk: openTalk,
           onOpenAgent: (seat: AgentSeat) => {
             setAgentsOpen(false);
             setHudOpen(false);
             setApprovalsOpen(false);
             setControlSeat(seat);
           },
+        }),
+      ]));
+    }
+
+    // THE AGENT TALK PANEL. The canonical conversation for one roster seat,
+    // opened from the Agents panel. It is a side sheet (not a modal), so the
+    // office canvas stays fully usable beside it.
+    if (talkSeat) {
+      children.push(R.createElement("div", {
+        key: "talk-dock",
+        id: "office-game-talk-dock",
+        className: "office-game__dock office-game__panel office-theme-dock office-game__talkDock",
+        "data-testid": "office-game-talk-dock",
+        "data-office-dock": "talk",
+        "data-office-slice": dockSlice,
+        ...panelUiAttrs,
+        role: "region",
+        "aria-label": `Talk with ${talkSeat.name}`,
+      }, [
+        R.createElement(TalkPanel as never, {
+          key: "body",
+          seat: talkSeat,
+          theme: officeTheme,
+          base: props.base,
+          fetchImpl: props.fetchImpl,
+          onClose: () => setTalkSeat(null),
         }),
       ]));
     }
@@ -981,6 +1050,7 @@ export function createOfficeApp(
         "data-testid": "office-game-warroom-dock",
         "data-office-dock": "warroom",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "War Room and role directory",
       }, [
@@ -1002,6 +1072,7 @@ export function createOfficeApp(
         "data-testid": "office-game-agent-control-dock",
         "data-office-dock": "agent-control",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "Agent controls",
       }, [
@@ -1025,6 +1096,7 @@ export function createOfficeApp(
         "data-testid": "office-game-approvals-dock",
         "data-office-dock": "approvals",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "Office approvals",
       }, [
@@ -1040,6 +1112,7 @@ export function createOfficeApp(
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-approvals-close", "aria-label": "Close approvals",
             "data-office-slice": buttonSlice,
+            ...buttonUiAttrs,
             onClick: () => setApprovalsOpen(false),
           }, "Close"),
         ]),
@@ -1063,6 +1136,7 @@ export function createOfficeApp(
         "data-testid": "office-game-etsy-dock",
         "data-office-dock": "etsy",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "Etsy connection",
       }, [
@@ -1086,6 +1160,7 @@ export function createOfficeApp(
         "data-testid": "office-game-hud-dock",
         "data-office-dock": "hud",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "HUD",
       }, [
@@ -1101,6 +1176,7 @@ export function createOfficeApp(
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-hud-close", "aria-label": "Close HUD",
             "data-office-slice": buttonSlice,
+            ...buttonUiAttrs,
             onClick: () => setHudOpen(false),
           }, "Close"),
         ]),
@@ -1161,6 +1237,7 @@ export function createOfficeApp(
           "aria-pressed": pressed ? "true" : "false",
           "data-pending": spec.id === "approvals" ? String(approvalCount) : undefined,
           "data-office-slice": buttonSlice,
+            ...buttonUiAttrs,
           onClick: onActivate,
         }, ...parts);
       })));
@@ -1178,6 +1255,7 @@ export function createOfficeApp(
         "data-testid": "office-game-command-center-dock",
         "data-office-dock": "command-center",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "Command center",
       }, [
@@ -1219,6 +1297,7 @@ export function createOfficeApp(
         "data-testid": "office-game-timeline-dock",
         "data-office-dock": "timeline",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "Operator timeline",
       }, [
@@ -1237,6 +1316,7 @@ export function createOfficeApp(
           className: "office-game__btn office-game__studioTab",
           "data-testid": `office-studio-tab-${id}`,
           "aria-pressed": studioTab === id,
+          ...tabUiAttrs,
           onClick: () => setStudioTab(id),
         }, label);
       const body = studioTab === "rooms"
@@ -1257,6 +1337,7 @@ export function createOfficeApp(
         "data-testid": "office-game-studio-dock",
         "data-office-dock": "studio",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         role: "region",
         "aria-label": "Office studio",
       }, [
@@ -1325,6 +1406,7 @@ export function createOfficeApp(
         className: "office-game__campus office-game__campus--floors",
         "data-testid": "office-campus",
         "data-office-slice": dockSlice,
+        ...dockUiAttrs,
         "aria-label": "Qubit campus",
       }, [
         R.createElement("div", {
@@ -1345,6 +1427,7 @@ export function createOfficeApp(
                 className: "office-game__btn",
                 "data-testid": "office-campus-tab-floors",
                 "aria-pressed": campusTab === "floors",
+                ...tabUiAttrs,
                 onClick: () => setCampusTab("floors"),
               }, "Campus world"),
               R.createElement("button", {
@@ -1352,6 +1435,7 @@ export function createOfficeApp(
                 className: "office-game__btn",
                 "data-testid": "office-campus-tab-directory",
                 "aria-pressed": campusTab === "directory",
+                ...tabUiAttrs,
                 onClick: () => setCampusTab("directory"),
               }, "100-floor directory"),
             ]),
@@ -1416,7 +1500,8 @@ export function createOfficeApp(
     // visible and clickable (measured: HUD top≈75 covered Panels at y≈90).
     const dockOpen = agentsOpen || hudOpen || warRoomOpen
       || controlSeat !== null || approvalsOpen || etsyOpen
-      || commandCenterOpen || timelineOpen || studioOpen;
+      || commandCenterOpen || timelineOpen || studioOpen
+      || talkSeat !== null;
     return R.createElement("div", {
       "data-testid": "office-app",
       "data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : undefined,

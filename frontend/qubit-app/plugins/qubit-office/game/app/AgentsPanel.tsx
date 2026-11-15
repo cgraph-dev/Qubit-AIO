@@ -37,6 +37,7 @@ import {
   bodyCellStyle,
   initialsFor,
   officeSliceName,
+  officeUiSliceAttrs,
   portraitCellStyle,
   preloadThemeAtlases,
   themeAtlasUrls,
@@ -50,6 +51,11 @@ export interface AgentsPanelProps {
    * panel keeps its original select-and-preview behaviour exactly.
    */
   onOpenAgent?: (seat: AgentSeat) => void;
+  /**
+   * Open the canonical TALK panel for a seat. Optional: without it the panel
+   * keeps its original select-and-preview behaviour exactly.
+   */
+  onTalk?: (seat: AgentSeat) => void;
   /** Injected for tests; defaults to the page's own fetch. */
   fetchImpl?: typeof fetch;
   /**
@@ -78,6 +84,7 @@ interface SeatInteraction {
   activeSlug: string | null;
   onActivate: (seat: AgentSeat) => void;
   onOpenAgent?: (seat: AgentSeat) => void;
+  onTalk?: (seat: AgentSeat) => void;
   rowId: (slug: string) => string;
 }
 
@@ -185,6 +192,23 @@ function seatRow(
     R.createElement("span", {
       key: "m", className: "agents-panel__meta",
     }, meta.join(" \u00b7 ")),
+    interaction.onTalk
+      ? R.createElement("button", {
+          key: "talk", type: "button",
+          className: "agents-panel__talk office-game__btn",
+          "data-testid": "agents-panel-talk-seat",
+          "data-seat-slug": seat.slug,
+          "aria-label": `Talk with ${seat.name}`,
+          // The CARD is the single keyboard owner of the roster (283 rows must
+          // not become 283 tab stops). The row button is a one-click mouse
+          // shortcut; keyboard/AT users reach the same action from the card.
+          tabIndex: -1,
+          onClick: (event: { stopPropagation?: () => void }) => {
+            event.stopPropagation?.();
+            interaction.onTalk?.(seat);
+          },
+        }, "Talk")
+      : null,
   ]);
 }
 
@@ -204,6 +228,7 @@ function agentCard(
   theme: OfficeTheme | null | undefined,
   ready: boolean,
   onKeyDown: (event: SeatKeyEvent) => void,
+  onTalk?: (seat: AgentSeat) => void,
 ) {
   const urls = themeAtlasUrls(theme);
   // Optional chaining here is deliberate: the payload type requires `bodies`,
@@ -220,6 +245,7 @@ function agentCard(
     "data-seat-slug": seat.slug,
     // Opt in to the pack's card 9-slice only when the theme declares it.
     "data-office-slice": officeSliceName(theme, "card"),
+    ...officeUiSliceAttrs(theme, "card"),
     role: "group",
     "aria-label": "Active agent",
     // The live region is the announcement path. `aria-activedescendant` was
@@ -239,6 +265,7 @@ function agentCard(
     R.createElement("div", {
       key: "t", className: "agents-panel__cardTab",
       "data-office-slice": officeSliceName(theme, "tab"),
+      ...officeUiSliceAttrs(theme, "tab"),
     }, [
       R.createElement("span", {
         key: "n", className: "agents-panel__cardName",
@@ -256,6 +283,17 @@ function agentCard(
           "data-sprite": "body",
           style: { ...bodyStyle, backgroundImage: `url("${urls.body}")` },
         })
+      : null,
+    onTalk
+      ? R.createElement("button", {
+          key: "talk", type: "button",
+          className: "agents-panel__talk office-game__btn",
+          "data-testid": "agents-panel-talk",
+          "data-seat-slug": seat.slug,
+          "aria-label": `Talk with ${seat.name}`,
+          onClick: () => onTalk(seat),
+          ...officeUiSliceAttrs(theme, "button", true),
+        }, "Talk")
       : null,
   ]);
 }
@@ -460,6 +498,7 @@ export function createAgentsPanel(
       activeSlug: activeSeat ? activeSeat.slug : null,
       onActivate: (seat: AgentSeat) => setActiveSlug(seat.slug),
       onOpenAgent: props.onOpenAgent,
+      onTalk: props.onTalk,
       rowId,
     };
 
@@ -472,7 +511,8 @@ export function createAgentsPanel(
       "data-portraits": portraitsReady ? "ready" : "fallback",
     }, [
       activeSeat
-        ? agentCard(R, activeSeat, props.theme, portraitsReady, onCardKeyDown)
+        ? agentCard(R, activeSeat, props.theme, portraitsReady,
+            onCardKeyDown, props.onTalk)
         : null,
       R.createElement("div", {
         key: "summary",

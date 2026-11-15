@@ -193873,6 +193873,159 @@ create: function(game) {
 		return slices[role] ? role : void 0;
 	}
 	/**
+	* The documented fallback chain per role. Each name is looked up in
+	* ``theme.ui.slices``; the first present wins. The list is intentionally
+	* narrow: a button must never borrow a dialog frame unless no button/panel art
+	* exists at all.
+	*/
+	var OFFICE_UI_SLICE_CHAIN = {
+		panel: ["panel", "dialog"],
+		dock: [
+			"dock",
+			"panel",
+			"dialog"
+		],
+		card: [
+			"card",
+			"panel",
+			"dialog"
+		],
+		dialog: ["dialog", "panel"],
+		button: ["button", "panel"],
+		tab: [
+			"tab",
+			"button",
+			"panel"
+		],
+		input: [
+			"input",
+			"dialog",
+			"panel"
+		]
+	};
+	var OFFICE_UI_ROLES = [
+		"panel",
+		"dock",
+		"card",
+		"dialog",
+		"button",
+		"tab",
+		"input"
+	];
+	/**
+	* The resolved `ui.slices` entry name for a role, or undefined.
+	*
+	* Classic / absent / malformed payloads return undefined so callers emit no
+	* attribute and no CSS — the classic chrome stays byte-identical.
+	*/
+	function officeUiSliceName(theme, role) {
+		if (!theme || !theme.active) return void 0;
+		const slices = theme.ui && theme.ui.slices;
+		if (!slices || typeof slices !== "object") return void 0;
+		const chain = OFFICE_UI_SLICE_CHAIN[role] || [];
+		for (const candidate of chain) if (slices[candidate]) return candidate;
+	}
+	/**
+	* The data attributes one shell element should carry for a role.
+	*
+	* The attribute VALUE is the role (not the resolved slice name) so the
+	* generated rules stay stable when a pack later adds a purpose-built asset:
+	* ``[data-office-ui-slice="button"]`` always gets the button frame, whichever
+	* descriptor currently backs it.
+	*/
+	function officeUiSliceAttrs(theme, role, filled = false) {
+		if (!officeUiSliceName(theme, role)) return {};
+		const attrs = { "data-office-ui-slice": role };
+		if (filled) attrs["data-office-ui-filled"] = "true";
+		return attrs;
+	}
+	function cssString(value) {
+		return String(value).replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
+	}
+	function cssUrl(value) {
+		return cssString(withHostBase(value));
+	}
+	function validSlice(descriptor) {
+		if (!descriptor || typeof descriptor !== "object") return null;
+		const raw = descriptor.slice;
+		if (!Array.isArray(raw) || raw.length !== 4) return null;
+		const numbers = raw.map((value) => typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.round(value) : NaN);
+		if (numbers.some((value) => Number.isNaN(value))) return null;
+		const width = String(descriptor.width || "");
+		if (!/^[1-9][0-9]{0,3}px$/.test(width)) return null;
+		const repeat = descriptor.repeat;
+		if (repeat !== "stretch" && repeat !== "round" && repeat !== "repeat") return null;
+		const src = typeof descriptor.src === "string" ? descriptor.src : "";
+		if (!src.startsWith("/")) return null;
+		return {
+			slice: numbers,
+			width,
+			repeat,
+			src
+		};
+	}
+	/**
+	* The scoped host stylesheet for the payload's ``ui.slices`` block.
+	*
+	* Only the roles a pack can actually frame are emitted, and every rule is
+	* scoped to the Qubit shell root (``.office-game[data-office-theme="<id>"]``)
+	* so the vendored office document and the rest of the dashboard are never
+	* targeted. Returns "" for classic or a payload with no usable slices.
+	*/
+	function officeUiSliceCss(theme) {
+		if (!theme || !theme.active || !theme.id) return "";
+		const slices = theme.ui && theme.ui.slices;
+		if (!slices || typeof slices !== "object") return "";
+		const scope = `.office-game[data-office-theme="${cssString(theme.id)}"] [data-office-ui-slice=`;
+		const lines = [];
+		for (const role of OFFICE_UI_ROLES) {
+			const name = officeUiSliceName(theme, role);
+			if (!name) continue;
+			const descriptor = validSlice(slices[name]);
+			if (!descriptor) continue;
+			const target = `${scope}"${role}"]`;
+			lines.push(`${target} {`);
+			lines.push(`  border-image-source: url("${cssUrl(descriptor.src)}");`);
+			lines.push(`  border-image-slice: ${descriptor.slice.join(" ")};`);
+			lines.push(`  border-image-width: ${descriptor.width};`);
+			lines.push(`  border-image-repeat: ${descriptor.repeat};`);
+			lines.push("  border-style: solid;");
+			lines.push(`  border-width: ${descriptor.width};`);
+			lines.push("  box-sizing: border-box;");
+			lines.push("  image-rendering: pixelated;");
+			lines.push("}");
+			lines.push(`${target}[data-office-ui-filled="true"] {`);
+			lines.push(`  border-image-slice: ${descriptor.slice.join(" ")} fill;`);
+			lines.push("  color: #2a1a12;");
+			lines.push("}");
+		}
+		return lines.length ? `${lines.join("\n")}\n` : "";
+	}
+	/**
+	* Apply the Modern UI slice stylesheet to the HOST document, returning a
+	* disposer that removes only what this call installed.
+	*
+	* Exactly one ``<style data-office-ui-slices>`` exists at a time; a classic
+	* theme installs nothing.
+	*/
+	function applyOfficeUiSlices(doc, theme) {
+		if (!doc || typeof doc.createElement !== "function") return () => {};
+		const previous = Array.from(doc.querySelectorAll("style[data-office-ui-slices]"));
+		for (const node of previous) node.remove();
+		const css = officeUiSliceCss(theme);
+		if (!css) return () => {};
+		const style = doc.createElement("style");
+		style.setAttribute("data-office-ui-slices", theme ? theme.id : "");
+		style.textContent = css;
+		(doc.head ?? doc.documentElement ?? doc.body).appendChild(style);
+		let disposed = false;
+		return () => {
+			if (disposed) return;
+			disposed = true;
+			if (style.isConnected) style.remove();
+		};
+	}
+	/**
 	* The generated host stylesheet URL for an active theme, or "" for classic.
 	*
 	* The CSS is generated server-side from the SAME validated payload: a classic
@@ -194016,7 +194169,7 @@ create: function(game) {
 	* then the initials/emoji carry the row and remain announced. A failed preload
 	* therefore degrades to the same truthful fallback instead of an empty box.
 	*/
-	function seatAvatar(R, seat, theme, ready, key) {
+	function seatAvatar$1(R, seat, theme, ready, key) {
 		const urls = themeAtlasUrls(theme);
 		const initials = initialsFor(seat.name);
 		const style = seat.portrait ? portraitCellStyle(seat.portrait, PORTRAIT_PX) : void 0;
@@ -194075,7 +194228,7 @@ create: function(game) {
 			R.createElement("span", {
 				key: "a",
 				className: "agents-panel__avatar"
-			}, [seatAvatar(R, seat, theme, ready, "p")]),
+			}, [seatAvatar$1(R, seat, theme, ready, "p")]),
 			R.createElement("span", {
 				key: "n",
 				className: "agents-panel__name"
@@ -194083,7 +194236,20 @@ create: function(game) {
 			R.createElement("span", {
 				key: "m",
 				className: "agents-panel__meta"
-			}, meta.join(" · "))
+			}, meta.join(" · ")),
+			interaction.onTalk ? R.createElement("button", {
+				key: "talk",
+				type: "button",
+				className: "agents-panel__talk office-game__btn",
+				"data-testid": "agents-panel-talk-seat",
+				"data-seat-slug": seat.slug,
+				"aria-label": `Talk with ${seat.name}`,
+				tabIndex: -1,
+				onClick: (event) => {
+					event.stopPropagation?.();
+					interaction.onTalk?.(seat);
+				}
+			}, "Talk") : null
 		]);
 	}
 	/**
@@ -194096,7 +194262,7 @@ create: function(game) {
 	* Fixed 72px tall (64px body + padding) and a fixed three-column grid, so
 	* moving the pointer down 283 rows cannot reflow the list under it.
 	*/
-	function agentCard(R, seat, theme, ready, onKeyDown) {
+	function agentCard(R, seat, theme, ready, onKeyDown, onTalk) {
 		const urls = themeAtlasUrls(theme);
 		const frame = theme?.bodies?.frame ?? null;
 		const bodyStyle = seat.body ? bodyCellStyle(seat.body, frame) : void 0;
@@ -194108,6 +194274,7 @@ create: function(game) {
 			"data-testid": "agents-panel-card",
 			"data-seat-slug": seat.slug,
 			"data-office-slice": officeSliceName(theme, "card"),
+			...officeUiSliceAttrs(theme, "card"),
 			role: "group",
 			"aria-label": "Active agent",
 			"aria-live": "polite",
@@ -194118,11 +194285,12 @@ create: function(game) {
 			R.createElement("div", {
 				key: "p",
 				className: "agents-panel__cardPortrait"
-			}, [seatAvatar(R, seat, theme, ready, "p")]),
+			}, [seatAvatar$1(R, seat, theme, ready, "p")]),
 			R.createElement("div", {
 				key: "t",
 				className: "agents-panel__cardTab",
-				"data-office-slice": officeSliceName(theme, "tab")
+				"data-office-slice": officeSliceName(theme, "tab"),
+				...officeUiSliceAttrs(theme, "tab")
 			}, [R.createElement("span", {
 				key: "n",
 				className: "agents-panel__cardName"
@@ -194140,7 +194308,17 @@ create: function(game) {
 					...bodyStyle,
 					backgroundImage: `url("${urls.body}")`
 				}
-			}) : null
+			}) : null,
+			onTalk ? R.createElement("button", {
+				key: "talk",
+				type: "button",
+				className: "agents-panel__talk office-game__btn",
+				"data-testid": "agents-panel-talk",
+				"data-seat-slug": seat.slug,
+				"aria-label": `Talk with ${seat.name}`,
+				onClick: () => onTalk(seat),
+				...officeUiSliceAttrs(theme, "button", true)
+			}, "Talk") : null
 		]);
 	}
 	/** One division: a heading with its REAL headcount, then its seats. */
@@ -194273,6 +194451,7 @@ create: function(game) {
 				activeSlug: activeSeat ? activeSeat.slug : null,
 				onActivate: (seat) => setActiveSlug(seat.slug),
 				onOpenAgent: props.onOpenAgent,
+				onTalk: props.onTalk,
 				rowId
 			};
 			return R.createElement("div", {
@@ -194283,7 +194462,7 @@ create: function(game) {
 				"data-divisions": String(counts?.divisions ?? divisions.length),
 				"data-portraits": portraitsReady ? "ready" : "fallback"
 			}, [
-				activeSeat ? agentCard(R, activeSeat, props.theme, portraitsReady, onCardKeyDown) : null,
+				activeSeat ? agentCard(R, activeSeat, props.theme, portraitsReady, onCardKeyDown, props.onTalk) : null,
 				R.createElement("div", {
 					key: "summary",
 					className: "agents-panel__summary",
@@ -194296,6 +194475,567 @@ create: function(game) {
 					className: "agents-panel__types",
 					"data-testid": "agents-panel-types"
 				}, Object.entries(counts.seat_types).map(([type, n]) => `${n} ${seatTypeLabel(type).toLowerCase()}`).join(" · ")) : null
+			]);
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/talk-panel.ts
+	/** The seat -> session prefix. Kept exported so tests pin the contract. */
+	var TALK_SESSION_PREFIX = "office-talk-";
+	/** The canonical chat routes this panel uses (under the office `/agent`). */
+	var TALK_SESSION_ROUTE = "/api/qubit/chat/sessions";
+	var TALK_TURN_ROUTE = "/api/qubit/chat";
+	/** A route-relative URL rebased onto the host's base and office prefix. */
+	function talkUrl(path, base) {
+		const raw = base === void 0 ? hostBasePath$1() : base;
+		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX$1}${path}`;
+	}
+	/**
+	* A deterministic, store-legal session id for a roster seat.
+	*
+	* The canonical store bounds ids at 80 chars and accepts a free-form string;
+	* this helper keeps only URL-safe characters, collapses runs, and never emits
+	* the bare prefix (an empty/odd slug still yields a distinct id).
+	*/
+	function talkSessionId(seat) {
+		return `${TALK_SESSION_PREFIX}${String(seat && seat.slug ? seat.slug : "").toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "") || "seat"}`.slice(0, 80);
+	}
+	/** The persisted session title, so the conversation is identifiable later. */
+	function talkSessionName(seat) {
+		return `Office talk · ${String(seat && seat.name ? seat.name : "").trim() || "Agent"}`.slice(0, 120);
+	}
+	function requestHeaders(win, body) {
+		const token = readToken(win);
+		const headers = { Accept: "application/json" };
+		if (body) headers["Content-Type"] = "application/json";
+		if (token) headers["X-Qubit-Session-Token"] = token;
+		return {
+			headers,
+			token
+		};
+	}
+	/**
+	* Keep only real, displayable rows. A malformed row is dropped rather than
+	* rendered as an empty message, and no row is ever synthesised.
+	*/
+	function normalizeTalkMessages(raw) {
+		if (!Array.isArray(raw)) return [];
+		const out = [];
+		for (const row of raw) {
+			if (!row || typeof row !== "object") continue;
+			const rec = row;
+			const role = typeof rec.role === "string" ? rec.role : "";
+			const content = typeof rec.content === "string" ? rec.content : "";
+			if (!role || !content.trim()) continue;
+			const message = {
+				role,
+				content
+			};
+			if (typeof rec.timestamp === "number" && Number.isFinite(rec.timestamp)) message.timestamp = rec.timestamp;
+			out.push(message);
+		}
+		return out;
+	}
+	/** Rows a conversation panel renders as exchange text (user/assistant only). */
+	function visibleTalkMessages(messages) {
+		return messages.filter((row) => row.role === "user" || row.role === "assistant");
+	}
+	/**
+	* Read one seat's canonical conversation.
+	*
+	* A 404 is the store's honest "no conversation exists" answer and becomes a
+	* typed empty state. A 401/403 is a typed unavailable state (the composer is
+	* disabled); any other failure is unavailable with the HTTP status or the
+	* transport error, never a fabricated transcript.
+	*/
+	async function fetchTalkTranscript(seat, options = {}) {
+		const sessionId = talkSessionId(seat);
+		const f = options.fetchImpl ?? (typeof fetch === "function" ? fetch : null);
+		if (!f) return {
+			kind: "unavailable",
+			code: "TRANSPORT_UNAVAILABLE",
+			detail: "This page has no fetch transport, so the conversation cannot be read."
+		};
+		const { headers, token } = requestHeaders(options.win, false);
+		if (!token) return {
+			kind: "unavailable",
+			code: "NO_SESSION_TOKEN",
+			detail: "The office session token is unavailable, so the canonical chat store cannot be reached. Reload the page from the Qubit dashboard."
+		};
+		try {
+			const response = await f(talkUrl(`${TALK_SESSION_ROUTE}/${encodeURIComponent(sessionId)}`, options.base), {
+				headers,
+				credentials: "same-origin",
+				signal: options.signal
+			});
+			if (response.status === 404) return {
+				kind: "empty",
+				code: "NO_SESSION",
+				sessionId,
+				detail: "This agent has no conversation in the canonical chat store yet."
+			};
+			if (response.status === 401 || response.status === 403) return {
+				kind: "unavailable",
+				code: "TOKEN_REFUSED",
+				detail: `The chat store refused the office session (HTTP ${response.status}).`
+			};
+			if (response.ok === false) return {
+				kind: "unavailable",
+				code: "STORE_ERROR",
+				detail: `The chat store answered HTTP ${response.status}.`
+			};
+			const payload = await response.json().catch(() => null);
+			if (!payload || typeof payload !== "object") return {
+				kind: "unavailable",
+				code: "BAD_PAYLOAD",
+				detail: "The chat store answered with no JSON object."
+			};
+			const session = payload.session && typeof payload.session === "object" ? payload.session : null;
+			if (!session) return {
+				kind: "unavailable",
+				code: "BAD_PAYLOAD",
+				detail: "The chat store answered without a session record."
+			};
+			return {
+				kind: "ready",
+				sessionId: typeof session.id === "string" && session.id ? session.id : sessionId,
+				name: typeof session.name === "string" ? session.name : "",
+				messages: normalizeTalkMessages(payload.messages)
+			};
+		} catch (err) {
+			return {
+				kind: "unavailable",
+				code: "NETWORK",
+				detail: `The conversation could not be reached: ${(err instanceof Error ? err.message : String(err)).slice(0, 200)}`
+			};
+		}
+	}
+	/**
+	* Create the seat's conversation if it does not exist, then read it.
+	*
+	* A concurrent create is not an error: the store answers 409/EXISTS and this
+	* falls through to the same transcript read.
+	*/
+	async function startTalkSession(seat, options = {}) {
+		const sessionId = talkSessionId(seat);
+		const f = options.fetchImpl ?? (typeof fetch === "function" ? fetch : null);
+		if (!f) return {
+			kind: "unavailable",
+			code: "TRANSPORT_UNAVAILABLE",
+			detail: "This page has no fetch transport, so a conversation cannot be started."
+		};
+		const { headers, token } = requestHeaders(options.win, true);
+		if (!token) return {
+			kind: "unavailable",
+			code: "NO_SESSION_TOKEN",
+			detail: "The office session token is unavailable, so a conversation cannot be started. Reload the page from the Qubit dashboard."
+		};
+		try {
+			const response = await f(talkUrl(TALK_SESSION_ROUTE, options.base), {
+				method: "POST",
+				headers,
+				body: JSON.stringify({
+					id: sessionId,
+					name: talkSessionName(seat)
+				}),
+				credentials: "same-origin",
+				signal: options.signal
+			});
+			if (response.status === 401 || response.status === 403) return {
+				kind: "unavailable",
+				code: "TOKEN_REFUSED",
+				detail: `The chat store refused the office session (HTTP ${response.status}).`
+			};
+			if (response.ok !== false && response.status !== 409) return fetchTalkTranscript(seat, options);
+			if (response.status === 409) return fetchTalkTranscript(seat, options);
+			const payload = await response.json().catch(() => null);
+			return {
+				kind: "unavailable",
+				code: payload && typeof payload.code === "string" ? payload.code : "CREATE_FAILED",
+				detail: payload && typeof payload.detail === "string" ? payload.detail : `The chat store answered HTTP ${response.status}.`
+			};
+		} catch (err) {
+			return {
+				kind: "unavailable",
+				code: "NETWORK",
+				detail: `The conversation could not be started: ${(err instanceof Error ? err.message : String(err)).slice(0, 200)}`
+			};
+		}
+	}
+	/**
+	* Send one turn through the canonical non-streaming chat action.
+	*
+	* The reply is returned exactly as the store produced it; on any refusal the
+	* result is typed and no reply text is invented.
+	*/
+	async function sendTalkMessage(seat, text, options = {}) {
+		const trimmed = String(text || "").trim();
+		if (!trimmed) return {
+			ok: false,
+			code: "EMPTY_MESSAGE",
+			detail: "Type a message first."
+		};
+		const sessionId = talkSessionId(seat);
+		const f = options.fetchImpl ?? (typeof fetch === "function" ? fetch : null);
+		if (!f) return {
+			ok: false,
+			code: "TRANSPORT_UNAVAILABLE",
+			detail: "This page has no fetch transport, so the message cannot be sent."
+		};
+		const { headers, token } = requestHeaders(options.win, true);
+		if (!token) return {
+			ok: false,
+			code: "NO_SESSION_TOKEN",
+			detail: "The office session token is unavailable, so the message cannot be sent."
+		};
+		try {
+			const response = await f(talkUrl(TALK_TURN_ROUTE, options.base), {
+				method: "POST",
+				headers,
+				body: JSON.stringify({
+					text: trimmed,
+					session: sessionId
+				}),
+				credentials: "same-origin",
+				signal: options.signal
+			});
+			const payload = await response.json().catch(() => null);
+			if (response.ok !== false && payload && payload.ok === true) {
+				const reply = typeof payload.reply === "string" ? payload.reply : typeof payload.text === "string" ? payload.text : "";
+				if (reply) return {
+					ok: true,
+					reply
+				};
+				return {
+					ok: false,
+					code: "EMPTY_REPLY",
+					detail: "The agent turn completed without reply text."
+				};
+			}
+			return {
+				ok: false,
+				code: payload && typeof payload.code === "string" ? payload.code : response.status === 401 || response.status === 403 ? "TOKEN_REFUSED" : "SEND_FAILED",
+				detail: payload && typeof payload.detail === "string" ? payload.detail : `The chat action answered HTTP ${response.status}.`
+			};
+		} catch (err) {
+			return {
+				ok: false,
+				code: "NETWORK",
+				detail: `The message could not be sent: ${(err instanceof Error ? err.message : String(err)).slice(0, 200)}`
+			};
+		}
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/TalkPanel.tsx
+	/** The portrait display box (the pack's tier is normally 16 or 32). */
+	var PORTRAIT_BOX = 32;
+	/**
+	* The portrait atlas cell size. The payload exposes the BODY tier; the builder
+	* emits the same tier for portraits. The sprite is displayed at its native
+	* cell size: `background-size: 200%` would be 200% of the ELEMENT, not of the
+	* atlas, and would misplace every cell after the first.
+	*/
+	function portraitCellPx(theme) {
+		const size = theme?.bodies?.size;
+		return typeof size === "number" && Number.isFinite(size) && size > 0 ? Math.round(size) : PORTRAIT_BOX;
+	}
+	function seatAvatar(R, seat, theme) {
+		const urls = themeAtlasUrls(theme);
+		const displayPx = Math.min(PORTRAIT_BOX, portraitCellPx(theme));
+		const style = seat.portrait ? portraitCellStyle(seat.portrait, displayPx) : void 0;
+		if (urls.portrait && style) return R.createElement("span", {
+			key: "portrait",
+			className: "office-talk__portrait",
+			"data-testid": "talk-portrait",
+			role: "img",
+			"aria-label": `${seat.name} portrait`,
+			"data-sprite": "portrait",
+			style: {
+				...style,
+				backgroundImage: `url("${urls.portrait}")`,
+				backgroundSize: "auto",
+				width: `${displayPx}px`,
+				height: `${displayPx}px`
+			}
+		});
+		const initials = initialsFor(seat.name);
+		if (initials) return R.createElement("span", {
+			key: "portrait",
+			className: "office-talk__initials",
+			"data-testid": "talk-portrait",
+			role: "img",
+			"aria-label": `${seat.name} initials`,
+			"data-sprite": "initials"
+		}, initials);
+		return R.createElement("span", {
+			key: "portrait",
+			className: "office-talk__emoji",
+			"data-testid": "talk-portrait",
+			role: "img",
+			"aria-label": seat.name ? `${seat.name} portrait` : "Agent portrait",
+			"data-sprite": "emoji"
+		}, (seat.emoji || "").trim() || "•");
+	}
+	function stateLabel$1(state) {
+		switch (state.kind) {
+			case "loading": return "Loading conversation…";
+			case "empty": return "No conversation yet";
+			case "ready": return "Conversation open";
+			default: return "Conversation unavailable";
+		}
+	}
+	function stateCode(state) {
+		if (state.kind === "empty" || state.kind === "unavailable") return state.code;
+		return "";
+	}
+	function messageRow(R, message, index, seatName) {
+		const mine = message.role === "user";
+		return R.createElement("li", {
+			key: `${message.role}:${index}:${message.timestamp ?? ""}`,
+			className: "office-talk__message office-talk__message--" + (mine ? "user" : "assistant"),
+			"data-testid": "talk-message",
+			"data-role": message.role
+		}, [R.createElement("span", {
+			key: "a",
+			className: "office-talk__author"
+		}, mine ? "You" : seatName), R.createElement("span", {
+			key: "t",
+			className: "office-talk__text"
+		}, message.content)]);
+	}
+	function createTalkPanel(R, hooks) {
+		const { useState, useEffect, useRef } = hooks;
+		return function TalkPanel(props) {
+			const [state, setState] = useState({ kind: "loading" });
+			const [draft, setDraft] = useState("");
+			const [sending, setSending] = useState(false);
+			const [notice, setNotice] = useState("");
+			const listRef = useRef(null);
+			const seat = props.seat;
+			const sessionId = talkSessionId(seat);
+			const theme = props.theme ?? null;
+			useEffect(() => {
+				let live = true;
+				setState({ kind: "loading" });
+				setNotice("");
+				fetchTalkTranscript(seat, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				}).then((next) => {
+					if (live) setState(next);
+				});
+				return () => {
+					live = false;
+				};
+			}, [
+				seat.slug,
+				seat.name,
+				props.base
+			]);
+			useEffect(() => {
+				if (state.kind !== "ready") return;
+				const node = listRef.current;
+				if (node && typeof node.scrollIntoView === "function") node.scrollIntoView({ block: "nearest" });
+			}, [state.kind === "ready" ? state.messages.length : -1]);
+			const tokenOk = state.kind === "ready" || state.kind === "empty";
+			const canCompose = state.kind === "ready" && tokenOk && !sending;
+			const status = stateLabel$1(state);
+			const code = stateCode(state);
+			const onKeyDown = (event) => {
+				if (event.key !== "Escape") return;
+				event.preventDefault?.();
+				props.onClose();
+			};
+			const onStart = async () => {
+				setNotice("");
+				setState({ kind: "loading" });
+				const next = await startTalkSession(seat, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				});
+				setState(next);
+				if (next.kind === "unavailable") setNotice(`[${next.code}] ${next.detail}`);
+			};
+			const onSubmit = async (event) => {
+				event.preventDefault();
+				const text = String(draft || "").trim();
+				if (!text || !canCompose) return;
+				setSending(true);
+				setNotice("");
+				const result = await sendTalkMessage(seat, text, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				});
+				if (!result.ok) {
+					setNotice(`[${result.code}] ${result.detail}`);
+					setSending(false);
+					return;
+				}
+				setDraft("");
+				const next = await fetchTalkTranscript(seat, {
+					base: props.base,
+					fetchImpl: props.fetchImpl
+				});
+				setState(next);
+				setSending(false);
+			};
+			const onComposerKeyDown = (event) => {
+				if (event.key !== "Enter" || event.shiftKey) return;
+				event.preventDefault?.();
+				onSubmit({ preventDefault: () => {} });
+			};
+			const portrait = seatAvatar(R, seat, theme);
+			const role = seatTypeLabel(seat.seat_type);
+			const room = seat.room ? seat.room === "boardroom" ? "Boardroom" : seat.room : "No room";
+			const visible = state.kind === "ready" ? visibleTalkMessages(state.messages) : [];
+			const emptyTranscript = state.kind === "ready" && visible.length === 0;
+			const canStart = state.kind === "empty";
+			return R.createElement("section", {
+				className: "office-talk",
+				"data-testid": "talk-panel",
+				"data-state": state.kind,
+				"data-code": code || void 0,
+				"aria-label": `Talk with ${seat.name}`,
+				onKeyDown
+			}, [
+				R.createElement("header", {
+					key: "head",
+					className: "office-talk__head"
+				}, [
+					portrait,
+					R.createElement("div", {
+						key: "who",
+						className: "office-talk__who"
+					}, [
+						R.createElement("h2", {
+							key: "n",
+							className: "office-talk__name",
+							"data-testid": "talk-name"
+						}, seat.name),
+						R.createElement("p", {
+							key: "r",
+							className: "office-talk__meta",
+							"data-testid": "talk-role"
+						}, [
+							R.createElement("span", { key: "role" }, role),
+							R.createElement("span", { key: "sep" }, " · "),
+							R.createElement("span", { key: "room" }, room),
+							R.createElement("span", { key: "sep2" }, " · "),
+							R.createElement("span", { key: "div" }, seat.division || "Boardroom")
+						]),
+						R.createElement("p", {
+							key: "s",
+							className: "office-talk__status",
+							"data-testid": "talk-status",
+							"aria-live": "polite"
+						}, status)
+					]),
+					R.createElement("button", {
+						key: "x",
+						type: "button",
+						className: "office-game__btn office-theme-dock-close",
+						"data-testid": "talk-close",
+						"aria-label": `Close conversation with ${seat.name}`,
+						onClick: () => props.onClose(),
+						...officeUiSliceAttrs(theme, "panel", true)
+					}, "Close")
+				]),
+				R.createElement("div", {
+					key: "body",
+					className: "office-talk__body"
+				}, [
+					state.kind === "loading" ? R.createElement("p", {
+						key: "loading",
+						className: "office-talk__note",
+						"data-testid": "talk-loading",
+						role: "status"
+					}, "Reading the canonical conversation…") : null,
+					state.kind === "unavailable" ? R.createElement("div", {
+						key: "unavailable",
+						className: "office-talk__unavailable",
+						"data-testid": "talk-unavailable",
+						role: "alert"
+					}, [R.createElement("p", { key: "d" }, state.detail), R.createElement("p", {
+						key: "c",
+						className: "office-talk__code"
+					}, state.code)]) : null,
+					state.kind === "empty" ? R.createElement("div", {
+						key: "empty",
+						className: "office-talk__empty",
+						"data-testid": "talk-empty"
+					}, [R.createElement("p", { key: "d" }, state.detail), R.createElement("button", {
+						key: "start",
+						type: "button",
+						className: "office-game__btn office-talk__start",
+						"data-testid": "talk-start",
+						onClick: () => {
+							onStart();
+						},
+						...officeUiSliceAttrs(theme, "panel", true)
+					}, "Start conversation")]) : null,
+					state.kind === "ready" ? emptyTranscript ? R.createElement("p", {
+						key: "empty-transcript",
+						className: "office-talk__note",
+						"data-testid": "talk-empty-transcript"
+					}, "No user or assistant messages in this conversation yet.") : R.createElement("ol", {
+						key: "transcript",
+						ref: listRef,
+						className: "office-talk__transcript",
+						"data-testid": "talk-transcript",
+						"aria-label": `Conversation with ${seat.name}`
+					}, visible.map((message, index) => messageRow(R, message, index, seat.name))) : null
+				]),
+				R.createElement("form", {
+					key: "composer",
+					className: "office-talk__composer",
+					onSubmit,
+					"data-testid": "talk-composer"
+				}, [
+					R.createElement("label", {
+						key: "l",
+						className: "office-talk__label",
+						htmlFor: `talk-input-${sessionId}`
+					}, `Message ${seat.name}`),
+					R.createElement("textarea", {
+						key: "i",
+						id: `talk-input-${sessionId}`,
+						className: "office-talk__input",
+						"data-testid": "talk-input",
+						rows: 2,
+						value: draft,
+						disabled: !canCompose,
+						"aria-disabled": canCompose ? void 0 : "true",
+						"aria-describedby": "talk-composer-note",
+						placeholder: canStart ? "Start the conversation to write a message." : state.kind === "unavailable" ? "Conversation unavailable." : "Write a message…",
+						onChange: (event) => setDraft(event.target.value),
+						onKeyDown: onComposerKeyDown,
+						...officeUiSliceAttrs(theme, "panel", true)
+					}),
+					R.createElement("div", {
+						key: "actions",
+						className: "office-talk__actions"
+					}, [R.createElement("button", {
+						key: "send",
+						type: "submit",
+						className: "office-game__btn office-talk__send",
+						"data-testid": "talk-send",
+						disabled: !canCompose || !String(draft).trim(),
+						"aria-busy": sending ? "true" : void 0,
+						...officeUiSliceAttrs(theme, "panel", true)
+					}, sending ? "Sending…" : "Send")]),
+					R.createElement("p", {
+						key: "note",
+						id: "talk-composer-note",
+						className: "office-talk__composerNote",
+						"data-testid": "talk-composer-note",
+						role: "status",
+						"aria-live": "polite"
+					}, sending ? "Waiting for the agent's real reply…" : state.kind === "empty" ? "Start the conversation first; messages go through the canonical chat store." : state.kind === "unavailable" ? `Composer disabled: ${state.code}. ${state.detail}` : notice || "Enter sends · Shift+Enter adds a line."),
+					notice && state.kind === "ready" ? R.createElement("p", {
+						key: "notice",
+						className: "office-talk__error",
+						"data-testid": "talk-error",
+						role: "alert"
+					}, notice) : null
+				])
 			]);
 		};
 	}
@@ -209219,6 +209959,7 @@ create: function(game) {
 				base
 			}),
 			AgentsPanel: createAgentsPanel(R, hooks),
+			TalkPanel: createTalkPanel(R, hooks),
 			SeatModelPanel: createSeatModelPanel(R, hooks),
 			AgentControlDrawer: createAgentControlDrawer(R, hooks),
 			WarRoomPanel: createWarRoomPanel(R, hooks),
@@ -209279,6 +210020,7 @@ create: function(game) {
 			const [campusError, setCampusError] = useState("");
 			const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion());
 			const [highContrast, setHighContrast] = useState(prefersHighContrast());
+			const [talkSeat, setTalkSeat] = useState(null);
 			const toggleAgents = () => {
 				setApprovalsOpen(false);
 				setCommandCenterOpen(false);
@@ -209338,6 +210080,18 @@ create: function(game) {
 				setStudioOpen((v) => !v);
 			};
 			const toggleCampus = () => setCampusOpen((v) => !v);
+			const openTalk = (seat) => {
+				setAgentsOpen(false);
+				setHudOpen(false);
+				setWarRoomOpen(false);
+				setApprovalsOpen(false);
+				setEtsyOpen(false);
+				setCommandCenterOpen(false);
+				setTimelineOpen(false);
+				setStudioOpen(false);
+				setControlSeat(null);
+				setTalkSeat(seat);
+			};
 			const toggleFor = (id) => {
 				switch (id) {
 					case "agents": return toggleAgents;
@@ -209351,7 +210105,7 @@ create: function(game) {
 				}
 			};
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, TalkPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			useEffect(() => {
 				if (!studioOpen || studioTab !== "outside") return;
 				let live = true;
@@ -209426,8 +210180,12 @@ create: function(game) {
 				if (typeof document === "undefined") return;
 				return applyHostTheme(document, officeTheme);
 			}, [officeTheme]);
-			const openDockId = agentsOpen ? "office-game-agents-dock" : hudOpen ? "office-game-hud-dock" : warRoomOpen ? "office-game-warroom-dock" : controlSeat ? "office-game-agent-control-dock" : approvalsOpen ? "office-game-approvals-dock" : etsyOpen ? "office-game-etsy-dock" : commandCenterOpen ? "office-game-command-center-dock" : timelineOpen ? "office-game-timeline-dock" : null;
-			const openDockLabel = agentsOpen ? "Agents" : hudOpen ? "HUD" : warRoomOpen ? "War Room" : controlSeat ? "Agent controls" : approvalsOpen ? "Approvals" : etsyOpen ? "Etsy connection" : commandCenterOpen ? "Command Center" : timelineOpen ? "Timeline" : null;
+			useEffect(() => {
+				if (typeof document === "undefined") return;
+				return applyOfficeUiSlices(document, officeTheme);
+			}, [officeTheme]);
+			const openDockId = agentsOpen ? "office-game-agents-dock" : hudOpen ? "office-game-hud-dock" : warRoomOpen ? "office-game-warroom-dock" : controlSeat ? "office-game-agent-control-dock" : approvalsOpen ? "office-game-approvals-dock" : etsyOpen ? "office-game-etsy-dock" : commandCenterOpen ? "office-game-command-center-dock" : timelineOpen ? "office-game-timeline-dock" : talkSeat ? "office-game-talk-dock" : null;
+			const openDockLabel = agentsOpen ? "Agents" : hudOpen ? "HUD" : warRoomOpen ? "War Room" : controlSeat ? "Agent controls" : approvalsOpen ? "Approvals" : etsyOpen ? "Etsy connection" : commandCenterOpen ? "Command Center" : timelineOpen ? "Timeline" : talkSeat ? "Talk" : null;
 			useEffect(() => {
 				if (typeof window === "undefined") return;
 				setReducedMotion(prefersReducedMotion());
@@ -209631,6 +210389,10 @@ create: function(game) {
 			}, []);
 			const dockSlice = officeSliceName(officeTheme, "dock");
 			const buttonSlice = officeSliceName(officeTheme, "button");
+			const dockUiAttrs = officeUiSliceAttrs(officeTheme, "dock");
+			const buttonUiAttrs = officeUiSliceAttrs(officeTheme, "button", true);
+			const tabUiAttrs = officeUiSliceAttrs(officeTheme, "tab");
+			const panelUiAttrs = officeUiSliceAttrs(officeTheme, "panel", true);
 			const children = [
 				R.createElement("a", {
 					key: "skip-main",
@@ -209771,6 +210533,7 @@ create: function(game) {
 				"data-testid": "office-game-agents-dock",
 				"data-office-dock": "agents",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "Office agents"
 			}, [R.createElement("div", {
@@ -209788,6 +210551,7 @@ create: function(game) {
 					"data-testid": "office-game-warroom-open",
 					"aria-label": "Open War Room and role directory",
 					"data-office-slice": buttonSlice,
+					...buttonUiAttrs,
 					onClick: () => {
 						setAgentsOpen(false);
 						setApprovalsOpen(false);
@@ -209803,6 +210567,7 @@ create: function(game) {
 					"data-testid": "office-game-etsy-open",
 					"aria-label": "Open the Etsy connection settings",
 					"data-office-slice": buttonSlice,
+					...buttonUiAttrs,
 					onClick: () => {
 						setAgentsOpen(false);
 						setApprovalsOpen(false);
@@ -209820,18 +210585,38 @@ create: function(game) {
 					"data-testid": "office-game-agents-close",
 					"aria-label": "Close agents",
 					"data-office-slice": buttonSlice,
+					...buttonUiAttrs,
 					onClick: () => setAgentsOpen(false)
 				}, "Close")
 			]), R.createElement(AgentsPanel, {
 				key: "body",
 				base: props.base,
 				theme: officeTheme,
+				onTalk: openTalk,
 				onOpenAgent: (seat) => {
 					setAgentsOpen(false);
 					setHudOpen(false);
 					setApprovalsOpen(false);
 					setControlSeat(seat);
 				}
+			})]));
+			if (talkSeat) children.push(R.createElement("div", {
+				key: "talk-dock",
+				id: "office-game-talk-dock",
+				className: "office-game__dock office-game__panel office-theme-dock office-game__talkDock",
+				"data-testid": "office-game-talk-dock",
+				"data-office-dock": "talk",
+				"data-office-slice": dockSlice,
+				...panelUiAttrs,
+				role: "region",
+				"aria-label": `Talk with ${talkSeat.name}`
+			}, [R.createElement(TalkPanel, {
+				key: "body",
+				seat: talkSeat,
+				theme: officeTheme,
+				base: props.base,
+				fetchImpl: props.fetchImpl,
+				onClose: () => setTalkSeat(null)
 			})]));
 			if (warRoomOpen) children.push(R.createElement("div", {
 				key: "warroom-dock",
@@ -209840,6 +210625,7 @@ create: function(game) {
 				"data-testid": "office-game-warroom-dock",
 				"data-office-dock": "warroom",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "War Room and role directory"
 			}, [R.createElement(WarRoomPanel, {
@@ -209854,6 +210640,7 @@ create: function(game) {
 				"data-testid": "office-game-agent-control-dock",
 				"data-office-dock": "agent-control",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "Agent controls"
 			}, [R.createElement(AgentControlDrawer, {
@@ -209869,6 +210656,7 @@ create: function(game) {
 				"data-testid": "office-game-approvals-dock",
 				"data-office-dock": "approvals",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "Office approvals"
 			}, [R.createElement("div", {
@@ -209892,6 +210680,7 @@ create: function(game) {
 					"data-testid": "office-game-approvals-close",
 					"aria-label": "Close approvals",
 					"data-office-slice": buttonSlice,
+					...buttonUiAttrs,
 					onClick: () => setApprovalsOpen(false)
 				}, "Close")
 			]), R.createElement(ApprovalsPanel, {
@@ -209907,6 +210696,7 @@ create: function(game) {
 				"data-testid": "office-game-etsy-dock",
 				"data-office-dock": "etsy",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "Etsy connection"
 			}, [R.createElement(EtsyConnectPanel, {
@@ -209921,6 +210711,7 @@ create: function(game) {
 				"data-testid": "office-game-hud-dock",
 				"data-office-dock": "hud",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "HUD"
 			}, [R.createElement("div", {
@@ -209944,6 +210735,7 @@ create: function(game) {
 					"data-testid": "office-game-hud-close",
 					"aria-label": "Close HUD",
 					"data-office-slice": buttonSlice,
+					...buttonUiAttrs,
 					onClick: () => setHudOpen(false)
 				}, "Close")
 			]), R.createElement(HudDock, { key: "body" })]));
@@ -209987,6 +210779,7 @@ create: function(game) {
 					"aria-pressed": pressed ? "true" : "false",
 					"data-pending": spec.id === "approvals" ? String(approvalCount) : void 0,
 					"data-office-slice": buttonSlice,
+					...buttonUiAttrs,
 					onClick: onActivate
 				}, ...parts);
 			})));
@@ -209997,6 +210790,7 @@ create: function(game) {
 				"data-testid": "office-game-command-center-dock",
 				"data-office-dock": "command-center",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "Command center"
 			}, [R.createElement(CommandCenter, {
@@ -210023,6 +210817,7 @@ create: function(game) {
 				"data-testid": "office-game-timeline-dock",
 				"data-office-dock": "timeline",
 				"data-office-slice": dockSlice,
+				...dockUiAttrs,
 				role: "region",
 				"aria-label": "Operator timeline"
 			}, [R.createElement(Timeline, {
@@ -210037,6 +210832,7 @@ create: function(game) {
 					className: "office-game__btn office-game__studioTab",
 					"data-testid": `office-studio-tab-${id}`,
 					"aria-pressed": studioTab === id,
+					...tabUiAttrs,
 					onClick: () => setStudioTab(id)
 				}, label);
 				const body = studioTab === "rooms" ? R.createElement(RoomBuilder, { key: "rooms" }) : studioTab === "outside" ? R.createElement(OutsideWorld, {
@@ -210054,6 +210850,7 @@ create: function(game) {
 					"data-testid": "office-game-studio-dock",
 					"data-office-dock": "studio",
 					"data-office-slice": dockSlice,
+					...dockUiAttrs,
 					role: "region",
 					"aria-label": "Office studio"
 				}, [R.createElement("div", {
@@ -210115,6 +210912,7 @@ create: function(game) {
 					className: "office-game__campus office-game__campus--floors",
 					"data-testid": "office-campus",
 					"data-office-slice": dockSlice,
+					...dockUiAttrs,
 					"aria-label": "Qubit campus"
 				}, [R.createElement("div", {
 					key: "head",
@@ -210134,6 +210932,7 @@ create: function(game) {
 						className: "office-game__btn",
 						"data-testid": "office-campus-tab-floors",
 						"aria-pressed": campusTab === "floors",
+						...tabUiAttrs,
 						onClick: () => setCampusTab("floors")
 					}, "Campus world"), R.createElement("button", {
 						key: "directory",
@@ -210141,6 +210940,7 @@ create: function(game) {
 						className: "office-game__btn",
 						"data-testid": "office-campus-tab-directory",
 						"aria-pressed": campusTab === "directory",
+						...tabUiAttrs,
 						onClick: () => setCampusTab("directory")
 					}, "100-floor directory")])
 				]), R.createElement("button", {
@@ -210177,7 +210977,7 @@ create: function(game) {
 			}));
 			const rootClass = ["office-game", officeThemeClass(officeTheme)].filter(Boolean).join(" ");
 			const dualDocks = agentsOpen && hudOpen || warRoomOpen && controlSeat !== null;
-			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null || approvalsOpen || etsyOpen || commandCenterOpen || timelineOpen || studioOpen;
+			const dockOpen = agentsOpen || hudOpen || warRoomOpen || controlSeat !== null || approvalsOpen || etsyOpen || commandCenterOpen || timelineOpen || studioOpen || talkSeat !== null;
 			return R.createElement("div", {
 				"data-testid": "office-app",
 				"data-office-theme": officeTheme && officeTheme.active ? officeTheme.id : void 0,

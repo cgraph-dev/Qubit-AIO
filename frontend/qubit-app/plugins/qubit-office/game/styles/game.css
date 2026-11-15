@@ -3085,3 +3085,270 @@
 .room-builder [data-testid="room-builder-rooms"] button {
   font-size: 11px;
 }
+
+/* -------------------------------------------------------------------------
+   THE AGENT TALK PANEL + MODERN UI 9-SLICE CHROME
+   The shell's own conversation surface for one roster seat. The frame is a
+   real Modern UI 9-slice from the active pack (ui.slices -> dialog/panel); the
+   generated host stylesheet (`applyOfficeUiSlices`) owns the border-image and
+   the light-paper text colour, while this section owns layout and the
+   parchment-friendly palette. With `classic` no slice attribute exists and the
+   same panel falls back to the themed dark chrome.
+   ------------------------------------------------------------------------- */
+
+/* The row/card Talk actions. The card is the keyboard owner of the roster, so
+   the per-row button is a mouse shortcut only (tabIndex -1 in the component):
+   283 rows must never become 283 tab stops. */
+.office-game .agents-panel__talk {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  padding: 0 var(--office-s1);
+  font-size: var(--office-fs-xs);
+  min-height: 20px;
+}
+
+.office-game .agents-panel__card {
+  grid-template-columns: 40px minmax(0, 1fr) 32px auto;
+}
+
+/* The conversation is the single right-hand side sheet. */
+.office-game__dock.office-game__talkDock {
+  right: 0;
+  left: auto;
+  width: min(38rem, 94%);
+  --talk-ink: var(--ui-text, var(--office-ink));
+  --talk-muted: var(--ui-muted, var(--office-muted));
+  --talk-line: var(--ui-line, var(--office-line));
+  --talk-paper: rgba(255, 249, 235, 0.42);
+  --talk-own-paper: rgba(255, 176, 102, 0.18);
+}
+
+/* A filled Modern UI sheet is light parchment, so its text is dark ink. The
+   generated stylesheet already sets `color`; these tokens carry the rest. */
+.office-game .office-game__talkDock[data-office-ui-filled="true"] {
+  --talk-ink: #2a1a12;
+  --talk-muted: #5a4634;
+  --talk-line: #8a6a4a;
+  --talk-paper: rgba(255, 255, 255, 0.50);
+  --talk-own-paper: rgba(168, 95, 70, 0.18);
+  color: var(--talk-ink);
+}
+
+.office-game .office-game__talkDock .office-theme-dock-close,
+.office-game .office-game__talkDock .office-game__btn {
+  color: var(--talk-ink);
+  background: var(--talk-paper);
+  border-color: var(--talk-line);
+}
+
+.office-game .office-game__talkDock .office-theme-dock-close:hover,
+.office-game .office-game__talkDock .office-game__btn:hover {
+  border-color: var(--ui-accent, var(--office-accent));
+  background: var(--talk-own-paper);
+}
+
+.office-game .office-talk {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  gap: var(--office-s2);
+  color: var(--talk-ink);
+}
+
+.office-game .office-talk:focus-visible,
+.office-game .office-talk__input:focus-visible,
+.office-game .office-talk__send:focus-visible {
+  outline: 2px solid var(--ui-accent, var(--office-accent));
+  outline-offset: 2px;
+}
+
+.office-game .office-talk__head {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--office-s2);
+  align-items: center;
+  padding-bottom: var(--office-s2);
+  border-bottom: 1px solid var(--talk-line);
+}
+
+.office-game .office-talk__portrait,
+.office-game .office-talk__initials,
+.office-game .office-talk__emoji {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--talk-line);
+  border-radius: var(--office-radius);
+  background: var(--talk-paper);
+  color: var(--talk-ink);
+}
+
+.office-game .office-talk__portrait {
+  background-repeat: no-repeat;
+  background-size: auto;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+.office-game .office-talk__initials {
+  font-size: var(--office-fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.office-game .office-talk__who {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.office-game .office-talk__name {
+  margin: 0;
+  font-size: var(--office-fs-md);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.office-game .office-talk__meta,
+.office-game .office-talk__status,
+.office-game .office-talk__note,
+.office-game .office-talk__composerNote {
+  margin: 2px 0 0;
+  color: var(--talk-muted);
+  font-size: var(--office-fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.office-game .office-talk__status {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.office-game .office-talk__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.office-game .office-talk__transcript {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.office-game .office-talk__message {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 92%;
+  padding: var(--office-s2);
+  border: 1px solid var(--talk-line);
+  border-radius: var(--office-radius);
+  background: var(--talk-paper);
+  overflow-wrap: anywhere;
+}
+
+.office-game .office-talk__message--user {
+  align-self: flex-end;
+  background: var(--talk-own-paper);
+}
+
+.office-game .office-talk__author {
+  color: var(--talk-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.office-game .office-talk__text {
+  white-space: pre-wrap;
+  font-size: var(--office-fs-sm);
+  line-height: 1.45;
+}
+
+.office-game .office-talk__empty,
+.office-game .office-talk__unavailable {
+  margin: auto 0;
+  padding: var(--office-s3);
+  border: 1px dashed var(--talk-line);
+  border-radius: var(--office-radius);
+  background: var(--talk-paper);
+  text-align: center;
+}
+
+.office-game .office-talk__empty p,
+.office-game .office-talk__unavailable p {
+  margin: 0 0 var(--office-s2);
+}
+
+.office-game .office-talk__code {
+  color: var(--talk-muted);
+  font-size: var(--office-fs-xs);
+  letter-spacing: 0.04em;
+}
+
+.office-game .office-talk__composer {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: var(--office-s1);
+  padding-top: var(--office-s2);
+  border-top: 1px solid var(--talk-line);
+}
+
+.office-game .office-talk__label {
+  color: var(--talk-muted);
+  font-size: var(--office-fs-xs);
+  font-weight: 600;
+}
+
+.office-game .office-talk__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 3.2em;
+  resize: vertical;
+  padding: var(--office-s2);
+  border: 1px solid var(--talk-line);
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+  color: var(--talk-ink);
+  font: inherit;
+  font-size: var(--office-fs-sm);
+}
+
+.office-game .office-talk__input[data-office-ui-filled="true"] {
+  /* The 9-slice fill paints the parchment centre; do not paint over it. */
+  background: transparent;
+  color: #2a1a12;
+}
+
+.office-game .office-talk__input:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.office-game .office-talk__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--office-s2);
+}
+
+.office-game .office-talk__error {
+  margin: 0;
+  color: #8a2418;
+  font-size: var(--office-fs-xs);
+  overflow-wrap: anywhere;
+}

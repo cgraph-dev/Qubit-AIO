@@ -413,6 +413,51 @@ describe("host theme + rerender stability", () => {
     h.cleanup();
   });
 
+  it("renders the Talk side sheet with the pack's Modern UI dialog frame", () => {
+    const uiTheme = {
+      id: "demo",
+      label: "Demo",
+      version: "1.0.0",
+      credit: "LimeZu",
+      license: "LimeZu",
+      active: true,
+      assetBase: "/plugins/qubit-office/themes/demo",
+      atlas: null,
+      index: null,
+      bodies: { atlas: null, index: null, size: null, frame: null },
+      tokens: {},
+      slices: {},
+      ui: { slices: {
+        panel: {
+          src: "/plugins/qubit-office/themes/demo/ui/panel.png",
+          slice: [8, 8, 8, 8], width: "8px", repeat: "stretch",
+        },
+        button: {
+          src: "/plugins/qubit-office/themes/demo/ui/button.png",
+          slice: [8, 8, 8, 8], width: "6px", repeat: "stretch",
+        },
+      } },
+    } as never;
+    const seat = {
+      slug: "ada", name: "Ada Lovelace", seat_type: "worker",
+      supervisor: null, division: "quality", room: "quality-desk-a",
+      emoji: "🔍", color: "#111", portrait: null, body: null,
+    };
+    // State order: ..., officeTheme (5), ..., talkSeat (27).
+    const h = createStatefulHarness({ 5: uiTheme, 27: seat });
+    h.render({});
+    const dock = h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-talk-dock");
+    expect(dock).toBeDefined();
+    expect(dock?.props["data-office-dock"]).toBe("talk");
+    expect(dock?.props["data-office-ui-slice"]).toBe("panel");
+    expect(dock?.props["data-office-ui-filled"]).toBe("true");
+    expect(dock?.props["aria-label"]).toBe("Talk with Ada Lovelace");
+    const root = h.tree.find((e) => e.props["data-testid"] === "office-app");
+    expect(root?.props["data-office-dock-top"]).toBe("toolbar");
+    h.cleanup();
+  });
+
   it("leaves the docks slice-free without a declared slice", () => {
     const plainTheme = {
       id: "demo",

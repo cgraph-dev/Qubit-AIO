@@ -785,3 +785,71 @@ describe("atlas portraits in the agents panel", () => {
     h.cleanup();
   });
 });
+
+// ======================================================================
+// The TALK action: one canonical conversation per roster seat
+// ======================================================================
+
+describe("the agents panel's Talk action", () => {
+  const seats = [
+    seat({ slug: "ada", name: "Ada Lovelace" }),
+    seat({ slug: "grace", name: "Grace Hopper" }),
+  ];
+
+  it("offers Talk for the active seat on the keyboard-owned card", async () => {
+    const onTalk = vi.fn();
+    const h = await mountPanel(activeTheme(), oneDivision(seats), { onTalk });
+    const talk = h.tree.find(
+      (e) => e.props["data-testid"] === "agents-panel-talk");
+    expect(talk).toBeDefined();
+    expect(talk?.props["aria-label"]).toBe("Talk with Ada Lovelace");
+    talk?.props.onClick();
+    expect(onTalk).toHaveBeenCalledTimes(1);
+    expect(onTalk.mock.calls[0][0].slug).toBe("ada");
+    h.cleanup();
+  });
+
+  it("offers a mouse Talk shortcut per row without a second tab stop", async () => {
+    const onTalk = vi.fn();
+    const onOpenAgent = vi.fn();
+    const h = await mountPanel(activeTheme(), oneDivision(seats), {
+      onTalk, onOpenAgent,
+    });
+    const rowTalks = h.tree.filter(
+      (e) => e.props["data-testid"] === "agents-panel-talk-seat");
+    expect(rowTalks).toHaveLength(2);
+    expect(rowTalks[1].props["data-seat-slug"]).toBe("grace");
+    expect(rowTalks[1].props.tabIndex).toBe(-1);
+    const stopPropagation = vi.fn();
+    rowTalks[1].props.onClick({ stopPropagation });
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+    expect(onTalk).toHaveBeenCalledWith(expect.objectContaining({ slug: "grace" }));
+    expect(onOpenAgent).not.toHaveBeenCalled();
+    h.cleanup();
+  });
+
+  it("opts the card and tab into the pack's Modern UI frames", async () => {
+    const themed = activeTheme({
+      ui: { slices: {
+        panel: {
+          src: "/plugins/qubit-office/themes/demo/ui/panel.png",
+          slice: [8, 8, 8, 8], width: "8px", repeat: "stretch",
+        },
+        button: {
+          src: "/plugins/qubit-office/themes/demo/ui/button.png",
+          slice: [8, 8, 8, 8], width: "6px", repeat: "stretch",
+        },
+      } },
+    });
+    const h = await mountPanel(themed, oneDivision([seats[0]]), {
+      onTalk: vi.fn(),
+    });
+    const card = h.tree.find(
+      (e) => e.props["data-testid"] === "agents-panel-card");
+    expect(card?.props["data-office-ui-slice"]).toBe("card");
+    const tab = h.tree.find(
+      (e) => String(e.props.className).includes("agents-panel__cardTab"));
+    expect(tab?.props["data-office-ui-slice"]).toBe("tab");
+    h.cleanup();
+  });
+});

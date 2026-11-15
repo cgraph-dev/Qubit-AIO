@@ -77,7 +77,21 @@ export interface OfficeTheme {
   bodies: OfficeThemeBodies;
   tokens: Record<string, string>;
   slices: Record<string, OfficeThemeSlice>;
+  /**
+   * Full-pack Modern UI 9-slice backgrounds. The trimmed payload carries
+   * ``{slices: {...}}`` with absolute asset URLs. Older/classic payloads omit
+   * it or carry an empty map, which is why every reader treats it as optional.
+   */
+  ui?: { slices?: Record<string, OfficeThemeUiSlice> };
   reason?: string;
+}
+
+/** One Modern UI 9-slice descriptor (same shape as the legacy slice). */
+export interface OfficeThemeUiSlice {
+  src: string;
+  slice: [number, number, number, number];
+  width: string;
+  repeat: "stretch" | "round" | "repeat";
 }
 
 /** Both atlas URLs, or ``null`` per kind when the payload has none. */
@@ -331,6 +345,216 @@ export function officeSliceName(
   const slices = theme.slices;
   if (!slices || typeof slices !== "object") return undefined;
   return slices[role] ? role : undefined;
+}
+
+/* ======================================================================
+ * MODERN UI 9-SLICE CHROME
+ * ======================================================================
+ * The full pack carries a second, richer slice block under ``ui.slices``:
+ * panel / button / dialog (and, when a pack declares them, input / tab). The
+ * server's generated host stylesheet intentionally only wires the LEGACY
+ * top-level ``slices``; this module turns the ``ui`` block into a small,
+ * scoped host stylesheet so the shell's own docks, buttons, tabs and the Talk
+ * dialog can use the Modern UI frames without touching the vendored client.
+ *
+ * NO PACK PATH IS INVENTED. Every URL comes pre-validated from the payload;
+ * an absent slice stays absent, and each role has an explicit, documented
+ * fallback chain so a pack that only ships panel/button/dialog still frames
+ * inputs and tabs instead of silently showing a generic box.
+ */
+
+/** Roles the shell can frame with the Modern UI art. */
+export type OfficeUiRole =
+  | "panel"
+  | "dock"
+  | "card"
+  | "dialog"
+  | "button"
+  | "tab"
+  | "input";
+
+/** Roles whose caller opts into the filled centre. */
+export const OFFICE_UI_FILLED_ROLES: readonly OfficeUiRole[] = [
+  "dialog", "button", "tab", "input",
+];
+
+/**
+ * The documented fallback chain per role. Each name is looked up in
+ * ``theme.ui.slices``; the first present wins. The list is intentionally
+ * narrow: a button must never borrow a dialog frame unless no button/panel art
+ * exists at all.
+ */
+const OFFICE_UI_SLICE_CHAIN: Record<OfficeUiRole, string[]> = {
+  // The Modern UI "panel" crop is the clean, full-frame sheet. The Talk panel
+  // uses it deliberately for its frame/input/buttons: the current local
+  // extraction of the 48x32 dialog and 36x32 button carries transparent
+  // margins (the asset pipeline owns that crop), while the panel crop frames
+  // the same dialogue surface without holes.
+  panel: ["panel", "dialog"],
+  dock: ["dock", "panel", "dialog"],
+  card: ["card", "panel", "dialog"],
+  dialog: ["dialog", "panel"],
+  button: ["button", "panel"],
+  tab: ["tab", "button", "panel"],
+  input: ["input", "dialog", "panel"],
+};
+
+const OFFICE_UI_ROLES: readonly OfficeUiRole[] = [
+  "panel", "dock", "card", "dialog", "button", "tab", "input",
+];
+
+/**
+ * The resolved `ui.slices` entry name for a role, or undefined.
+ *
+ * Classic / absent / malformed payloads return undefined so callers emit no
+ * attribute and no CSS — the classic chrome stays byte-identical.
+ */
+export function officeUiSliceName(
+  theme: OfficeTheme | null | undefined,
+  role: OfficeUiRole,
+): string | undefined {
+  if (!theme || !theme.active) return undefined;
+  const slices = theme.ui && theme.ui.slices;
+  if (!slices || typeof slices !== "object") return undefined;
+  const chain = OFFICE_UI_SLICE_CHAIN[role] || [];
+  for (const candidate of chain) {
+    if (slices[candidate]) return candidate;
+  }
+  return undefined;
+}
+
+/**
+ * The data attributes one shell element should carry for a role.
+ *
+ * The attribute VALUE is the role (not the resolved slice name) so the
+ * generated rules stay stable when a pack later adds a purpose-built asset:
+ * ``[data-office-ui-slice="button"]`` always gets the button frame, whichever
+ * descriptor currently backs it.
+ */
+export function officeUiSliceAttrs(
+  theme: OfficeTheme | null | undefined,
+  role: OfficeUiRole,
+  filled = false,
+): Record<string, string> {
+  if (!officeUiSliceName(theme, role)) return {};
+  const attrs: Record<string, string> = { "data-office-ui-slice": role };
+  if (filled) attrs["data-office-ui-filled"] = "true";
+  return attrs;
+}
+
+function cssString(value: string): string {
+  return String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function cssUrl(value: string): string {
+  // Prefix a subpath deployment's base, exactly like the theme CSS URL.
+  return cssString(withHostBase(value));
+}
+
+function validSlice(
+  descriptor: OfficeThemeUiSlice | undefined,
+): { slice: [number, number, number, number]; width: string;
+     repeat: "stretch" | "round" | "repeat"; src: string } | null {
+  if (!descriptor || typeof descriptor !== "object") return null;
+  const raw = descriptor.slice;
+  if (!Array.isArray(raw) || raw.length !== 4) return null;
+  const numbers = raw.map((value) =>
+    typeof value === "number" && Number.isFinite(value) && value > 0
+      ? Math.round(value)
+      : NaN);
+  if (numbers.some((value) => Number.isNaN(value))) return null;
+  const width = String(descriptor.width || "");
+  if (!/^[1-9][0-9]{0,3}px$/.test(width)) return null;
+  const repeat = descriptor.repeat;
+  if (repeat !== "stretch" && repeat !== "round" && repeat !== "repeat") {
+    return null;
+  }
+  const src = typeof descriptor.src === "string" ? descriptor.src : "";
+  // The payload's slice URLs are root-relative, server-validated paths. A
+  // non-root value (javascript:, data:, a protocol-relative URL) is refused
+  // here as defence in depth, not trusted because it "looks like" a string.
+  if (!src.startsWith("/")) return null;
+  return {
+    slice: numbers as [number, number, number, number],
+    width,
+    repeat,
+    src,
+  };
+}
+
+/**
+ * The scoped host stylesheet for the payload's ``ui.slices`` block.
+ *
+ * Only the roles a pack can actually frame are emitted, and every rule is
+ * scoped to the Qubit shell root (``.office-game[data-office-theme="<id>"]``)
+ * so the vendored office document and the rest of the dashboard are never
+ * targeted. Returns "" for classic or a payload with no usable slices.
+ */
+export function officeUiSliceCss(
+  theme: OfficeTheme | null | undefined,
+): string {
+  if (!theme || !theme.active || !theme.id) return "";
+  const slices = theme.ui && theme.ui.slices;
+  if (!slices || typeof slices !== "object") return "";
+  const scope = `.office-game[data-office-theme="${cssString(theme.id)}"]`
+    + ` [data-office-ui-slice=`;
+  const lines: string[] = [];
+  for (const role of OFFICE_UI_ROLES) {
+    const name = officeUiSliceName(theme, role);
+    if (!name) continue;
+    const descriptor = validSlice(slices[name]);
+    if (!descriptor) continue;
+    const target = `${scope}"${role}"]`;
+    lines.push(`${target} {`);
+    lines.push(`  border-image-source: url("${cssUrl(descriptor.src)}");`);
+    lines.push(
+      `  border-image-slice: ${descriptor.slice.join(" ")};`);
+    lines.push(`  border-image-width: ${descriptor.width};`);
+    lines.push(`  border-image-repeat: ${descriptor.repeat};`);
+    lines.push("  border-style: solid;");
+    lines.push(`  border-width: ${descriptor.width};`);
+    lines.push("  box-sizing: border-box;");
+    lines.push("  image-rendering: pixelated;");
+    lines.push("}");
+    // The caller opts into the filled centre per element. Fill paints the
+    // pack's own paper/plate colour, so text on a filled frame is dark ink
+    // (the modern-UI sheets are light); unfilled frames keep the themed text.
+    lines.push(`${target}[data-office-ui-filled="true"] {`);
+    lines.push(
+      `  border-image-slice: ${descriptor.slice.join(" ")} fill;`);
+    lines.push("  color: #2a1a12;");
+    lines.push("}");
+  }
+  return lines.length ? `${lines.join("\n")}\n` : "";
+}
+
+/**
+ * Apply the Modern UI slice stylesheet to the HOST document, returning a
+ * disposer that removes only what this call installed.
+ *
+ * Exactly one ``<style data-office-ui-slices>`` exists at a time; a classic
+ * theme installs nothing.
+ */
+export function applyOfficeUiSlices(
+  doc: Document | null | undefined,
+  theme: OfficeTheme | null | undefined,
+): () => void {
+  if (!doc || typeof doc.createElement !== "function") return () => {};
+  const previous = Array.from(
+    doc.querySelectorAll("style[data-office-ui-slices]"));
+  for (const node of previous) node.remove();
+  const css = officeUiSliceCss(theme);
+  if (!css) return () => {};
+  const style = doc.createElement("style");
+  style.setAttribute("data-office-ui-slices", theme ? theme.id : "");
+  style.textContent = css;
+  (doc.head ?? doc.documentElement ?? doc.body).appendChild(style);
+  let disposed = false;
+  return () => {
+    if (disposed) return;
+    disposed = true;
+    if (style.isConnected) style.remove();
+  };
 }
 
 /**
