@@ -189,7 +189,7 @@ describe("OutsideScene in a real DOM", () => {
     expect(anchors.map((a) => a.getAttribute("data-kind")))
       .toEqual(["elevator", "stairs"]);
     expect(anchors[0].getAttribute("href")).toBe(
-      "/qubit-office/floor/floor-001");
+      "/qubit-office?floor=floor-001");
     await act(async () => {
       anchors[0].dispatchEvent(new MouseEvent("click", {
         bubbles: true, cancelable: true,

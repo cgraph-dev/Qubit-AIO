@@ -3416,4 +3416,114 @@
 .outside-scene[data-art-status="error"] .outside-scene__caption {
   color: #e0b070;
 }
+
+
+/* A scoped floor keeps the office page. The banner clears the scope without
+   sending the operator to another dashboard route. */
+.office-game__floorScope {
+  position: absolute;
+  z-index: 6;
+  top: var(--office-s2);
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--office-s2);
+  padding: 4px 8px;
+  border: 1px solid var(--office-line, #6f5a45);
+  border-radius: var(--office-radius, 6px);
+  background: rgba(20, 15, 12, 0.92);
+  color: var(--office-ink, #f6ecdd);
+  font-size: var(--office-fs-xs, 12px);
+}
+
+
+/* --- Room Builder -------------------------------------------------------
+   The panel had no styles at all, so every field, button and status line
+   collapsed into one text run. This gives the same form a readable vertical
+   layout with labelled fields and a visible problem surface. */
+.room-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  color: var(--office-ink, #f6ecdd);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.room-builder > button,
+.room-builder > label > button {
+  align-self: flex-start;
+}
+.room-builder__field {
+  display: grid;
+  grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(154, 123, 90, 0.25);
+}
+.room-builder__field > span {
+  color: var(--office-muted, #c9b69c);
+  font-size: 11px;
+}
+.room-builder__field input,
+.room-builder__field select {
+  min-width: 0;
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--office-line, #6f5a45);
+  border-radius: 4px;
+  background: rgba(12, 9, 7, 0.72);
+  color: inherit;
+  font: inherit;
+}
+.room-builder__problems {
+  margin: 6px 0 0;
+  padding: 8px;
+  border: 1px solid #b45a4a;
+  border-radius: 4px;
+  background: rgba(92, 30, 24, 0.45);
+  color: #ffd0c8;
+  white-space: pre-wrap;
+}
+.room-builder__problems:empty {
+  display: none;
+}
+
+
+/* The Room Builder's toolbar and room list were unspaced direct children. */
+.room-builder > header h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+.room-builder > header p {
+  margin: 0;
+  color: var(--office-muted, #c9b69c);
+}
+.room-builder [role="toolbar"],
+.room-builder [data-testid="room-builder-rooms"] {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.room-builder button {
+  padding: 4px 8px;
+  border: 1px solid var(--office-line, #6f5a45);
+  border-radius: 4px;
+  background: rgba(30, 22, 17, 0.85);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.room-builder button:hover,
+.room-builder button:focus-visible {
+  border-color: var(--office-accent, #e08fb0);
+  outline: 1px solid var(--office-accent, #e08fb0);
+  outline-offset: 1px;
+}
+.room-builder [data-testid="room-builder-rooms"] button {
+  font-size: 11px;
+}
 /*$vite$:1*/

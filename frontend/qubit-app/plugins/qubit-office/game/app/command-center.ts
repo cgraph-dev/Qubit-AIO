@@ -302,7 +302,7 @@ export interface FloorDeepLink {
   base?: string;
 }
 
-/** Build the contract deep link: `/qubit-office/floor/<id>?room=&agent=`. */
+/** Build the contract deep link: `/qubit-office?floor=<id>&room=&agent=`. */
 export function floorDeepLink(link: FloorDeepLink): string {
   const floorId = String(link.floorId ?? "").trim();
   if (!floorId) return "";
@@ -311,8 +311,8 @@ export function floorDeepLink(link: FloorDeepLink): string {
   if (link.agentId) params.set("agent", String(link.agentId));
   const suffix = params.toString();
   return withBase(
-    `/qubit-office/floor/${encodeURIComponent(floorId)}`
-      + (suffix ? `?${suffix}` : ""),
+    `/qubit-office?floor=${encodeURIComponent(floorId)}`
+      + (suffix ? `&${suffix}` : ""),
     link.base,
   );
 }

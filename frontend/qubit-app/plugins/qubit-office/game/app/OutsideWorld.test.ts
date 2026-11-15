@@ -217,7 +217,7 @@ describe("OutsideWorld in a real DOM", () => {
     const onSelectFloor = vi.fn();
     await render({ payload: payload(), onSelectFloor });
     const link = q('[data-testid="outside-floor-link"]');
-    expect(link.getAttribute("href")).toBe("/qubit-office/floor/floor-001");
+    expect(link.getAttribute("href")).toBe("/qubit-office?floor=floor-001");
     await act(async () => {
       link.dispatchEvent(new MouseEvent("click", { bubbles: true,
         cancelable: true }));

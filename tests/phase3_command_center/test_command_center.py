@@ -143,7 +143,7 @@ def test_projection_composes_floor_room_desk_agent_task_and_approval(env):
     assert agent["title"] == "Ada"
     assert agent["floor_id"] == "floor-001"
     assert agent["room_id"] == "floor-001-main"
-    assert agent["link"]["path"].startswith("/qubit-office/floor/floor-001?")
+    assert agent["link"]["path"].startswith("/qubit-office?floor=floor-001&")
     code, task_body = _call(cfg, {"tenant_id": tenant.tenant_id, "kind": "task"})
     assert code == 200
     projection = task_body["projection"]
@@ -357,6 +357,6 @@ def test_links_name_the_contract_route_template(env):
     assert code == 200
     links = body["projection"]["links"]
     assert links["route_template"] == (
-        "/qubit-office/floor/{floor_id}?room={room_id}&agent={agent_id}")
+        "/qubit-office?floor={floor_id}&room={room_id}&agent={agent_id}")
     assert len(links["floors"]) == 100
-    assert links["floors"][0]["path"].startswith("/qubit-office/floor/floor-")
+    assert links["floors"][0]["path"].startswith("/qubit-office?floor=floor-")

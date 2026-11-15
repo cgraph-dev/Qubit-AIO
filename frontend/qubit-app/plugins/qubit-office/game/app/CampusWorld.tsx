@@ -66,6 +66,8 @@ export interface CampusWorldProps {
   /** Maximum floor scenes in the current window. */
   maxFloors?: number;
   onSelectFloor?: (floor: CampusFloor) => void;
+  /** Open one floor in the full office view. */
+  onOpenFloor?: (floor: CampusFloor) => void;
 }
 
 export const CAMPUS_FLOOR_WIDTH = 720;
@@ -697,6 +699,8 @@ export function createCampusWorld(
             controlButton("next", "Floor below", "campus-world-next",
               () => step(1),
               floors.indexOf(focused.floor) >= floors.length - 1),
+            controlButton("open", "Open floor", "campus-world-open",
+              () => props.onOpenFloor?.(focused.floor)),
             controlButton("reset", "Reset view", "campus-world-reset",
               resetView),
           ]),

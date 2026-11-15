@@ -246,7 +246,7 @@ describe("helpers", () => {
   it("uses a non-color state label and a canonical floor href", () => {
     expect(stateLabel("active")).toBe("active");
     expect(stateLabel("dormant")).toBe("dormant");
-    expect(floorHref("floor-001")).toBe("/qubit-office/floor/floor-001");
+    expect(floorHref("floor-001")).toBe("/qubit-office?floor=floor-001");
   });
 
   it("builds the read-only API url", () => {

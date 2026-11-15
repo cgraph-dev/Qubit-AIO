@@ -193609,7 +193609,7 @@ create: function(game) {
 		const raw = base === void 0 ? hostBasePath() : base;
 		return `${String(raw ?? "").replace(/\/+$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 	}
-	/** Build the contract deep link: `/qubit-office/floor/<id>?room=&agent=`. */
+	/** Build the contract deep link: `/qubit-office?floor=<id>&room=&agent=`. */
 	function floorDeepLink(link) {
 		const floorId = String(link.floorId ?? "").trim();
 		if (!floorId) return "";
@@ -193617,7 +193617,7 @@ create: function(game) {
 		if (link.roomId) params.set("room", String(link.roomId));
 		if (link.agentId) params.set("agent", String(link.agentId));
 		const suffix = params.toString();
-		return withBase(`/qubit-office/floor/${encodeURIComponent(floorId)}` + (suffix ? `?${suffix}` : ""), link.base);
+		return withBase(`/qubit-office?floor=${encodeURIComponent(floorId)}` + (suffix ? `&${suffix}` : ""), link.base);
 	}
 	/** The entry's own link when the backend proved one; never a guessed floor. */
 	function entryDeepLink(entry, base) {
@@ -201731,7 +201731,7 @@ create: function(game) {
 	/** The canonical floor route for a lobby link. */
 	function floorHref(floorId) {
 		const safe = String(floorId || "").trim();
-		return `/qubit-office/floor/${encodeURIComponent(safe)}`;
+		return `/qubit-office?floor=${encodeURIComponent(safe)}`;
 	}
 	/** Non-color, text-first status label for a zone/chunk state. */
 	function stateLabel(state) {
@@ -204291,6 +204291,7 @@ create: function(game) {
 				}, [
 					controlButton("prev", "Floor above", "campus-world-prev", () => step(-1), floors.indexOf(focused.floor) <= 0),
 					controlButton("next", "Floor below", "campus-world-next", () => step(1), floors.indexOf(focused.floor) >= floors.length - 1),
+					controlButton("open", "Open floor", "campus-world-open", () => props.onOpenFloor?.(focused.floor)),
 					controlButton("reset", "Reset view", "campus-world-reset", resetView)
 				])
 			]) : null;
@@ -209240,6 +209241,14 @@ create: function(game) {
 	* Build the component. React and hooks arrive as arguments, exactly as the rest
 	* of the plugin does it.
 	*/
+	function initialFloorScope() {
+		if (typeof window === "undefined") return "";
+		try {
+			return String(new URLSearchParams(window.location.search).get("floor") || "").trim();
+		} catch {
+			return "";
+		}
+	}
 	function createOfficeApp(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
 		return function OfficeApp(props = {}) {
@@ -209262,6 +209271,7 @@ create: function(game) {
 			const [studioTab, setStudioTab] = useState("panels");
 			const [outsideView, setOutsideView] = useState(null);
 			const [campusOpen, setCampusOpen] = useState(false);
+			const [floorScope, setFloorScope] = useState(initialFloorScope());
 			const [campusTab, setCampusTab] = useState("floors");
 			const [campusDirectory, setCampusDirectory] = useState(null);
 			const [campusWorld, setCampusWorld] = useState(null);
@@ -209533,7 +209543,8 @@ create: function(game) {
 				const baseSrc = officeAppSrc({
 					base: props.base,
 					mock: props.mock,
-					theme: requestedTheme
+					theme: requestedTheme,
+					floor: typeof floorScope === "string" ? floorScope : ""
 				});
 				frame.src = retryToken ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}` : baseSrc;
 				return () => {
@@ -209548,8 +209559,16 @@ create: function(game) {
 				props.base,
 				props.mock,
 				requestedTheme,
+				floorScope,
 				retryToken
 			]);
+			useEffect(() => {
+				if (typeof window === "undefined") return;
+				const url = new URL(window.location.href);
+				if (typeof floorScope === "string" && floorScope) url.searchParams.set("floor", floorScope);
+				else url.searchParams.delete("floor");
+				window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+			}, [floorScope]);
 			useEffect(() => {
 				if (typeof window === "undefined") return;
 				const onToggle = (event) => {
@@ -210061,6 +210080,18 @@ create: function(game) {
 					className: "office-game__studioBody"
 				}, body)]));
 			}
+			if (typeof floorScope === "string" && floorScope) children.push(R.createElement("div", {
+				key: "floor-scope",
+				className: "office-game__floorScope",
+				"data-testid": "office-floor-scope",
+				role: "status"
+			}, [R.createElement("span", { key: "t" }, `Viewing ${floorScope.replace("live:", "Floor ")}`), R.createElement("button", {
+				key: "all",
+				type: "button",
+				className: "office-game__btn",
+				"data-testid": "office-floor-scope-clear",
+				onClick: () => setFloorScope("")
+			}, "All floors")]));
 			if (campusOpen) {
 				const directoryBody = campusState === "loading" ? R.createElement("div", {
 					key: "loading",
@@ -210125,7 +210156,11 @@ create: function(game) {
 					base: props.base,
 					theme: requestedTheme,
 					fetchImpl: props.fetchImpl,
-					templates: campusDirectory?.floors
+					templates: campusDirectory?.floors,
+					onOpenFloor: (floor) => {
+						setFloorScope(floor.scope);
+						setCampusOpen(false);
+					}
 				}) : directoryBody)]));
 			}
 			children.push(R.createElement(LoadingScreen, {

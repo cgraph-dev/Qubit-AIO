@@ -46,7 +46,7 @@ function entry(overrides: Partial<CommandCenterEntry> = {}): CommandCenterEntry 
       floor_id: "floor-001",
       room_id: "floor-001-main",
       agent_id: "agent-1",
-      path: "/qubit-office/floor/floor-001?room=floor-001-main&agent=agent-1",
+      path: "/qubit-office?floor=floor-001&room=floor-001-main&agent=agent-1",
       reason: null,
     },
     ...overrides,
@@ -95,7 +95,7 @@ const projection = (overrides: Partial<CommandCenterProjection> = {}) =>
       }],
     },
     sessions: { total: 1, by_status: { active: 1 } },
-    links: { route_template: "/qubit-office/floor/{floor_id}?room={room_id}&agent={agent_id}", floors: [] },
+    links: { route_template: "/qubit-office?floor={floor_id}&room={room_id}&agent={agent_id}", floors: [] },
     sources: {
       world: { state: "ok", count: 100, code: null, reason: null },
       roster: { state: "ok", count: 2, code: null, reason: null },
@@ -147,11 +147,11 @@ describe("command-center client", () => {
   it("builds the contract deep link and never guesses a floor", () => {
     expect(floorDeepLink({ floorId: "floor-001", roomId: "room-1",
       agentId: "agent 1" }))
-      .toBe("/qubit-office/floor/floor-001?room=room-1&agent=agent+1");
+      .toBe("/qubit-office?floor=floor-001&room=room-1&agent=agent+1");
     expect(floorDeepLink({ floorId: "" })).toBe("");
     expect(floorDeepLink({ floorId: "floor-001", base: "/base" }))
-      .toBe("/base/qubit-office/floor/floor-001");
-    expect(entryDeepLink(entry())).toContain("/qubit-office/floor/floor-001");
+      .toBe("/base/qubit-office?floor=floor-001");
+    expect(entryDeepLink(entry())).toContain("/qubit-office?floor=floor-001");
     expect(entryDeepLink(entry({ link: { ...entry().link, path: null } })))
       .toContain("room=floor-001-main");
     expect(entryDeepLink(entry({

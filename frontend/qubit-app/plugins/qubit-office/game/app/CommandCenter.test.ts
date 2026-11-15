@@ -26,7 +26,7 @@ const ENTRY = (overrides: Record<string, unknown> = {}) => ({
     floor_id: "floor-001",
     room_id: "floor-001-main",
     agent_id: "agent-1",
-    path: "/qubit-office/floor/floor-001?room=floor-001-main&agent=agent-1",
+    path: "/qubit-office?floor=floor-001&room=floor-001-main&agent=agent-1",
     reason: null,
   },
   ...overrides,
@@ -65,7 +65,7 @@ const PROJECTION = (overrides: Record<string, unknown> = {}) => ({
       link: { floor_id: null, room_id: null, agent_id: "agent-1",
         path: null, reason: "no floor is known" } }] },
   sessions: { total: 1, by_status: { active: 1 } },
-  links: { route_template: "/qubit-office/floor/{floor_id}?room={room_id}&agent={agent_id}", floors: [] },
+  links: { route_template: "/qubit-office?floor={floor_id}&room={room_id}&agent={agent_id}", floors: [] },
   sources: {
     world: { state: "ok", count: 100, code: null, reason: null },
     roster: { state: "ok", count: 2, code: null, reason: null },
@@ -121,7 +121,7 @@ describe("CommandCenter", () => {
     expect(entries).toHaveLength(2);
     expect(entries[0].props["data-entry-kind"]).toBe("agent");
     expect(entries[0].props.href)
-      .toBe("/qubit-office/floor/floor-001?room=floor-001-main&agent=agent-1");
+      .toBe("/qubit-office?floor=floor-001&room=floor-001-main&agent=agent-1");
     expect(entries[1].props["data-attention"]).toBe("true");
     expect(textOf(entries[1])).toContain("needs attention");
     // Status is text, never color alone.

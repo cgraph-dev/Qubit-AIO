@@ -37,7 +37,7 @@ MAX_LIMIT = 200
 _KIND_RANK = {kind: index for index, kind in enumerate(KINDS)}
 
 #: The UI deep-link contract (``QUBIT-OFFICE-UI-CONTRACT.md`` §4.5).
-ROUTE_TEMPLATE = "/qubit-office/floor/{floor_id}?room={room_id}&agent={agent_id}"
+ROUTE_TEMPLATE = "/qubit-office?floor={floor_id}&room={room_id}&agent={agent_id}"
 
 
 def _int(value: Any, fallback: int = 0) -> int:
@@ -113,15 +113,14 @@ def _path(
     fid = _clean(floor_id)
     if not fid:
         return None
-    params: list[str] = []
+    params: list[str] = [f"floor={quote(fid, safe='')}"]
     rid = _clean(room_id)
     aid = _clean(agent_id)
     if rid:
         params.append(f"room={quote(rid, safe='')}")
     if aid:
         params.append(f"agent={quote(aid, safe='')}")
-    suffix = f"?{'&'.join(params)}" if params else ""
-    return f"/qubit-office/floor/{quote(fid, safe='')}{suffix}"
+    return f"/qubit-office?{'&'.join(params)}"
 
 
 def _link(

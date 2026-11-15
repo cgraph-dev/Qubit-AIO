@@ -644,7 +644,7 @@ export function currentEnvironment(
 /** The canonical floor route for a lobby link. */
 export function floorHref(floorId: string): string {
   const safe = String(floorId || "").trim();
-  return `/qubit-office/floor/${encodeURIComponent(safe)}`;
+  return `/qubit-office?floor=${encodeURIComponent(safe)}`;
 }
 
 /** Non-color, text-first status label for a zone/chunk state. */

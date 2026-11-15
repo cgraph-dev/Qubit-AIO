@@ -220,6 +220,16 @@ function shellComponents(
  * Build the component. React and hooks arrive as arguments, exactly as the rest
  * of the plugin does it.
  */
+function initialFloorScope(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return String(new URLSearchParams(window.location.search).get("floor") || "")
+      .trim();
+  } catch {
+    return "";
+  }
+}
+
 export function createOfficeApp(
   R: OfficeGameShellProps["React"],
   hooks: OfficeGameShellProps["hooks"],
@@ -284,6 +294,8 @@ export function createOfficeApp(
     // The Habblaud office is the primary surface. Campus places its real
     // floors on one shared stage; it is not a directory and not a second renderer.
     const [campusOpen, setCampusOpen] = useState(false);
+    const [floorScope, setFloorScope] = useState<string>(
+      initialFloorScope());
     const [campusTab, setCampusTab] = useState<"floors" | "directory">("floors");
     const [campusDirectory, setCampusDirectory] = useState<
       BusinessDirectory | null>(null);
@@ -624,6 +636,7 @@ export function createOfficeApp(
       setLoaded(false);
       const baseSrc = officeAppSrc({
         base: props.base, mock: props.mock, theme: requestedTheme,
+        floor: typeof floorScope === "string" ? floorScope : "",
       });
       frame.src = retryToken
         ? `${baseSrc}${baseSrc.includes("?") ? "&" : "?"}_retry=${retryToken}`
@@ -636,7 +649,19 @@ export function createOfficeApp(
         restoreEscape?.();
         restoreBridge?.();
       };
-    }, [props.base, props.mock, requestedTheme, retryToken]);
+    }, [props.base, props.mock, requestedTheme, floorScope, retryToken]);
+
+    // Keep the URL shareable/reload-safe while staying on the office page.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      const url = new URL(window.location.href);
+      if (typeof floorScope === "string" && floorScope) {
+        url.searchParams.set("floor", floorScope);
+      } else {
+        url.searchParams.delete("floor");
+      }
+      window.history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }, [floorScope]);
 
     // Programmatic panel control. The injected menu is the visible surface;
     // this event lets the host, voice routing and tests open the same panels
@@ -1258,6 +1283,23 @@ export function createOfficeApp(
       ]));
     }
 
+    if (typeof floorScope === "string" && floorScope) {
+      children.push(R.createElement("div", {
+        key: "floor-scope",
+        className: "office-game__floorScope",
+        "data-testid": "office-floor-scope",
+        role: "status",
+      }, [
+        R.createElement("span", { key: "t" },
+          `Viewing ${floorScope.replace("live:", "Floor ")}`),
+        R.createElement("button", {
+          key: "all", type: "button", className: "office-game__btn",
+          "data-testid": "office-floor-scope-clear",
+          onClick: () => setFloorScope(""),
+        }, "All floors"),
+      ]));
+    }
+
     if (campusOpen) {
       const directoryBody = campusState === "loading"
         ? R.createElement("div", {
@@ -1329,6 +1371,10 @@ export function createOfficeApp(
               theme: requestedTheme,
               fetchImpl: props.fetchImpl,
               templates: campusDirectory?.floors,
+              onOpenFloor: (floor: { scope: string }) => {
+                setFloorScope(floor.scope);
+                setCampusOpen(false);
+              },
             })
           : directoryBody),
       ]));
