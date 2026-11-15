@@ -203773,25 +203773,13 @@ create: function(game) {
 			payload: body
 		};
 	}
-	var CAMPUS_MIN_ZOOM = .22;
-	var CAMPUS_MAX_ZOOM = 2.4;
-	var WINGS = [
-		"north",
-		"east",
-		"south",
-		"west",
-		"central"
-	];
+	// ../qubit-app/plugins/qubit-office/game/app/CampusWorld.tsx
 	var EMBED_STYLE_ID = "qubit-campus-world-embed";
 	function clamp$1(value, min, max) {
 		return Math.max(min, Math.min(max, value));
 	}
 	function pad3(value) {
 		return String(Math.max(0, Math.trunc(value))).padStart(3, "0");
-	}
-	function wingIndex(wing) {
-		const index = WINGS.indexOf(String(wing || ""));
-		return index >= 0 ? index : 2;
 	}
 	function wingTitle(wing) {
 		const value = String(wing || "").trim();
@@ -203808,6 +203796,42 @@ create: function(game) {
 		const id = character.agent_id;
 		return id === void 0 || id === null ? "" : String(id);
 	}
+	function characterRoomId(character) {
+		const position = character.position;
+		if (!position || typeof position !== "object") return null;
+		return finiteNumber(position.room_id);
+	}
+	function roomName(raw, index) {
+		const slug = typeof raw.slug === "string" ? raw.slug.trim() : "";
+		if (slug) return slug;
+		const kind = typeof raw.kind === "string" ? raw.kind.trim() : "";
+		if (kind) return kind;
+		return `Room ${index + 1}`;
+	}
+	/** Real rooms from one live floorplan floor, with real occupants attached. */
+	function liveRooms(number, floor, people) {
+		const rawRooms = Array.isArray(floor?.rooms) ? floor.rooms : [];
+		const seen = /* @__PURE__ */ new Set();
+		const rooms = [];
+		rawRooms.forEach((raw, index) => {
+			if (!raw || typeof raw !== "object") return;
+			const roomNumber = finiteNumber(raw.id);
+			const id = `f${number}r${roomNumber === null ? index : roomNumber}`;
+			if (seen.has(id)) return;
+			seen.add(id);
+			const agents = people.filter((character) => characterRoomId(character) === roomNumber).map(characterName).filter((name) => Boolean(name));
+			rooms.push({
+				id,
+				name: roomName(raw, index),
+				kind: typeof raw.kind === "string" ? raw.kind : "",
+				template: false,
+				active: true,
+				capacity: Array.isArray(raw.seats) ? raw.seats.length : 0,
+				agents
+			});
+		});
+		return rooms;
+	}
 	/** Project a tower payload into the live floor rows this world can draw. */
 	function liveFloorsFromSnapshot(payload) {
 		const root = payload && typeof payload === "object" ? payload : null;
@@ -203819,18 +203843,24 @@ create: function(game) {
 			const number = finiteNumber(floor?.number);
 			if (number === null || number < 0 || byNumber.has(number)) continue;
 			const people = characters.filter((character) => finiteNumber(character?.position?.floor) === number);
+			const roomDetails = liveRooms(number, floor, people);
 			byNumber.set(number, {
 				number,
 				name: typeof floor?.name === "string" && floor.name ? floor.name : `Floor ${pad3(number)}`,
 				role: typeof floor?.role === "string" ? floor.role : "",
-				rooms: Array.isArray(floor?.rooms) ? floor.rooms.length : 0,
+				rooms: roomDetails.length || (Array.isArray(floor?.rooms) ? floor.rooms.length : 0),
 				agents: people.length,
-				characters: people.map((character) => characterName(character)).filter((name) => Boolean(name))
+				characters: people.map((character) => characterName(character)).filter((name) => Boolean(name)),
+				roomDetails
 			});
 		}
 		return [...byNumber.values()].sort((a, b) => a.number - b.number);
 	}
 	function liveFloorRow(floor) {
+		const roomDetails = (floor.roomDetails ?? []).map((room) => ({
+			...room,
+			agents: [...room.agents]
+		}));
 		return {
 			id: `live:${floor.number}`,
 			number: floor.number,
@@ -203839,14 +203869,42 @@ create: function(game) {
 			wing: "central",
 			live: true,
 			active: true,
-			rooms: Math.max(0, floor.rooms),
-			desks: 0,
+			rooms: Math.max(roomDetails.length, floor.rooms),
+			desks: roomDetails.reduce((sum, room) => sum + room.capacity, 0),
 			agents: Math.max(0, floor.agents),
 			characters: [...floor.characters],
+			roomDetails,
 			scope: `live:${floor.number}`
 		};
 	}
-	function templateFloorRow(floor) {
+	/** Rooms declared for a template floor by the directory and/or world plan. */
+	function templateRoomsFor(floor, worldFloor) {
+		const planned = worldFloor?.rooms ?? [];
+		if (planned.length) return planned.map((room) => ({
+			id: room.room_id,
+			name: room.name || room.room_id,
+			kind: room.kind || "",
+			template: true,
+			active: room.active,
+			capacity: Math.max(0, room.capacity),
+			agents: []
+		}));
+		const count = Math.max(0, Math.trunc(floor.room_count));
+		const desks = Math.max(0, Math.trunc(floor.desk_capacity));
+		const base = count > 0 ? Math.floor(desks / count) : 0;
+		const extra = count > 0 ? desks % count : 0;
+		return Array.from({ length: count }, (_, index) => ({
+			id: `${floor.floor_id}-room-${index + 1}`,
+			name: `Room ${index + 1}`,
+			kind: "template",
+			template: true,
+			active: floor.active_by_default,
+			capacity: base + (index < extra ? 1 : 0),
+			agents: []
+		}));
+	}
+	function templateFloorRow(floor, worldFloor) {
+		const roomDetails = templateRoomsFor(floor, worldFloor);
 		return {
 			id: floor.floor_id,
 			number: floor.index,
@@ -203855,10 +203913,11 @@ create: function(game) {
 			wing: floor.wing || "central",
 			live: false,
 			active: floor.active_by_default === true,
-			rooms: Math.max(0, floor.room_count),
+			rooms: roomDetails.length || Math.max(0, floor.room_count),
 			desks: Math.max(0, floor.desk_capacity),
 			agents: 0,
 			characters: [],
+			roomDetails,
 			scope: floor.floor_id
 		};
 	}
@@ -203867,66 +203926,56 @@ create: function(game) {
 		for (const anchor of anchors) best = Math.min(best, Math.abs(anchor - number));
 		return best;
 	}
-	/** Build the bounded, ordered floor window without inventing occupancy. */
+	/** Build the ordered floor list without inventing occupancy.
+	*
+	* The world plan (when available) supplies the real room names/capacity for
+	* template floors. Without it the directory's declared room count is used and
+	* every room is still explicitly marked as a template.
+	*/
 	function buildCampusFloors(live, templates, opts = {}) {
-		const cap = Math.max(1, Math.trunc(opts.maxFloors ?? 9));
+		const cap = opts.maxFloors === void 0 ? Number.POSITIVE_INFINITY : Math.max(1, Math.trunc(opts.maxFloors));
+		const worldByIndex = /* @__PURE__ */ new Map();
+		const worldById = /* @__PURE__ */ new Map();
+		for (const floor of opts.world?.floors ?? []) {
+			worldByIndex.set(floor.index, floor);
+			worldById.set(floor.floor_id, floor);
+		}
 		const liveByNumber = /* @__PURE__ */ new Map();
 		for (const row of live ?? []) {
 			if (!Number.isFinite(row.number) || row.number < 0) continue;
 			if (!liveByNumber.has(row.number)) liveByNumber.set(row.number, row);
 		}
-		const keptLive = [...liveByNumber.values()].sort((a, b) => a.number - b.number).map(liveFloorRow).slice(0, cap);
+		const liveFloors = [...liveByNumber.values()].sort((a, b) => a.number - b.number).map(liveFloorRow);
+		for (const floor of liveFloors) {
+			if (floor.roomDetails.length) continue;
+			const plan = worldByIndex.get(floor.number);
+			if (!plan) continue;
+			floor.roomDetails = plan.rooms.map((room) => ({
+				id: room.room_id,
+				name: room.name || room.room_id,
+				kind: room.kind || "",
+				template: true,
+				active: room.active,
+				capacity: Math.max(0, room.capacity),
+				agents: []
+			}));
+			floor.rooms = floor.roomDetails.length;
+		}
+		const keptLive = Number.isFinite(cap) ? liveFloors.slice(0, cap) : liveFloors;
 		const templateByNumber = /* @__PURE__ */ new Map();
 		for (const floor of templates ?? []) {
 			if (!Number.isFinite(floor.index) || floor.index <= 0) continue;
 			if (liveByNumber.has(floor.index)) continue;
 			if (!templateByNumber.has(floor.index)) templateByNumber.set(floor.index, floor);
 		}
-		const templateFloors = [...templateByNumber.values()].sort((a, b) => a.index - b.index).map(templateFloorRow);
+		const templateFloors = [...templateByNumber.values()].sort((a, b) => a.index - b.index).map((floor) => templateFloorRow(floor, worldById.get(floor.floor_id) ?? worldByIndex.get(floor.index)));
+		const room = Number.isFinite(cap) ? Math.max(0, cap - keptLive.length) : Infinity;
 		const anchors = keptLive.length ? keptLive.map((floor) => floor.number) : templateFloors.length ? [templateFloors[0].number] : [];
-		const remaining = Math.max(0, cap - keptLive.length);
-		const selectedTemplates = templateFloors.slice().sort((a, b) => {
+		const selectedTemplates = Number.isFinite(room) ? templateFloors.slice().sort((a, b) => {
 			const distance = nearestDistance(a.number, anchors) - nearestDistance(b.number, anchors);
 			return distance !== 0 ? distance : a.number - b.number;
-		}).slice(0, remaining);
+		}).slice(0, room) : templateFloors;
 		return [...keptLive, ...selectedTemplates].sort((a, b) => a.number - b.number);
-	}
-	/** Place the window as one tower: vertical bands with per-wing lateral offsets. */
-	function layoutCampusFloors(floors) {
-		const placements = floors.map((floor, index) => {
-			return {
-				floor,
-				index,
-				x: (wingIndex(floor.wing) - 2) * 64 + (index % 2 === 0 ? -18 : 18),
-				y: index * 508
-			};
-		});
-		const minX = Math.min(0, ...placements.map((item) => item.x));
-		const maxX = Math.max(720, ...placements.map((item) => item.x + 720));
-		const minY = Math.min(0, ...placements.map((item) => item.y));
-		const maxY = Math.max(420, ...placements.map((item) => item.y + 420));
-		return {
-			floors: placements.map((item) => ({
-				...item,
-				x: item.x - minX,
-				y: item.y - minY
-			})),
-			width: Math.max(1, maxX - minX),
-			height: Math.max(1, maxY - minY)
-		};
-	}
-	/** The shared camera transform that centres one floor in the viewport. */
-	function campusCameraFor(floor, viewport, zoom) {
-		const z = clamp$1(Number.isFinite(zoom) ? zoom : 1, CAMPUS_MIN_ZOOM, CAMPUS_MAX_ZOOM);
-		const width = Math.max(1, viewport.width);
-		const height = Math.max(1, viewport.height);
-		const cx = floor ? floor.x + 360 : 360;
-		const cy = floor ? floor.y + 210 : 210;
-		return {
-			x: width / 2 - cx * z,
-			y: height / 2 - cy * z,
-			zoom: z
-		};
 	}
 	/** The next/previous floor in the world order, clamped at the ends. */
 	function stepCampusFloor(floors, currentId, delta) {
@@ -203935,9 +203984,20 @@ create: function(game) {
 		if (current < 0) return floors[0];
 		return floors[clamp$1(current + (delta || 0), 0, floors.length - 1)] ?? null;
 	}
+	/** The next/previous room in the selected floor, wrapping the ends. */
+	function stepCampusRoom(rooms, currentId, delta) {
+		if (!rooms.length) return null;
+		const current = rooms.findIndex((room) => room.id === currentId);
+		if (current < 0) return rooms[delta < 0 ? rooms.length - 1 : 0] ?? null;
+		return rooms[clamp$1(current + (delta || 0), 0, rooms.length - 1)] ?? null;
+	}
 	function campusFloorStatus(floor) {
 		if (floor.live) return `Live · ${floor.agents} agent${floor.agents === 1 ? "" : "s"} · ${floor.rooms} room${floor.rooms === 1 ? "" : "s"}`;
 		return `Unstaffed template · ${floor.rooms} room${floor.rooms === 1 ? "" : "s"} · ${floor.desks} desks`;
+	}
+	function campusRoomStatus(room) {
+		if (room.template) return `Unstaffed template · capacity ${room.capacity}`;
+		return `${room.agents.length} agent${room.agents.length === 1 ? "" : "s"} · capacity ${room.capacity}`;
 	}
 	function embedFloorCss(win) {
 		const doc = win?.document;
@@ -203964,22 +204024,13 @@ create: function(game) {
 			const { useState, useEffect, useRef } = H;
 			const [live, setLive] = useState(props.liveFloors ?? []);
 			const [templates, setTemplates] = useState(props.templates ?? null);
+			const [world, setWorld] = useState(props.world === void 0 ? null : props.world);
 			const [liveError, setLiveError] = useState("");
 			const [templateError, setTemplateError] = useState("");
-			const [limit, setLimit] = useState(Math.max(1, props.maxFloors ?? 9));
-			const [focusId, setFocusId] = useState(null);
-			const [zoom, setZoom] = useState(.64);
-			const [camera, setCamera] = useState({
-				x: 0,
-				y: 0,
-				zoom: .64
-			});
-			const [viewport, setViewport] = useState({
-				width: 1280,
-				height: 720
-			});
-			const viewportRef = useRef(null);
-			const dragRef = useRef(null);
+			const [focusId, setFocusId] = useState(props.initialFloor ?? null);
+			const [roomFocusId, setRoomFocusId] = useState(null);
+			const [characterFocus, setCharacterFocus] = useState(null);
+			const elevatorRef = useRef(null);
 			useEffect(() => {
 				if (props.liveFloors !== void 0) {
 					setLive(props.liveFloors);
@@ -204044,34 +204095,44 @@ create: function(game) {
 				props.fetchImpl
 			]);
 			useEffect(() => {
-				const node = viewportRef.current;
-				if (!node) return;
-				const measure = () => {
-					const rect = node.getBoundingClientRect?.();
-					if (rect && rect.width > 1 && rect.height > 1) setViewport({
-						width: rect.width,
-						height: rect.height
-					});
-				};
-				measure();
-				let observer = null;
-				if (typeof ResizeObserver !== "undefined") {
-					observer = new ResizeObserver(measure);
-					observer.observe(node);
-				} else if (typeof window !== "undefined") window.addEventListener("resize", measure);
+				if (props.world !== void 0) {
+					setWorld(props.world);
+					return;
+				}
+				if (props.liveFloors !== void 0) {
+					setWorld(null);
+					return;
+				}
+				const floorRows = props.templates ?? templates;
+				if (!floorRows || !floorRows.length) return;
+				let active = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				fetchWorldTower(floorRows, {
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then((tower) => {
+					if (active) setWorld(tower);
+				}).catch(() => {
+					if (active) setWorld(null);
+				});
 				return () => {
-					observer?.disconnect();
-					if (typeof window !== "undefined") window.removeEventListener("resize", measure);
+					active = false;
+					ctl?.abort();
 				};
-			}, []);
-			const floors = buildCampusFloors(live, templates, { maxFloors: limit });
-			const layout = layoutCampusFloors(floors);
+			}, [
+				props.world,
+				props.liveFloors,
+				props.templates,
+				templates,
+				props.base,
+				props.fetchImpl
+			]);
+			const floors = buildCampusFloors(live, templates, {
+				maxFloors: props.maxFloors,
+				world
+			});
 			const floorKey = floors.map((floor) => floor.id).join("|");
-			const layoutKey = layout.floors.map((item) => `${item.floor.id}:${item.x}:${item.y}`).join("|");
-			const knownNumbers = /* @__PURE__ */ new Set();
-			for (const floor of live) if (Number.isFinite(floor.number) && floor.number >= 0) knownNumbers.add(floor.number);
-			for (const floor of templates ?? []) if (Number.isFinite(floor.index) && floor.index > 0) knownNumbers.add(floor.index);
-			const totalFloors = knownNumbers.size;
 			const liveCount = floors.filter((floor) => floor.live).length;
 			useEffect(() => {
 				if (!floors.length) {
@@ -204082,91 +204143,86 @@ create: function(game) {
 				const first = floors.find((floor) => floor.live) ?? floors[0];
 				setFocusId(first.id);
 			}, [floorKey, focusId]);
-			const focused = focusId ? layout.floors.find((item) => item.floor.id === focusId) ?? null : null;
 			useEffect(() => {
-				if (!layout.floors.length) return;
-				const node = viewportRef.current;
-				let width = viewport.width;
-				let height = viewport.height;
-				const rect = node?.getBoundingClientRect?.();
-				if (rect && rect.width > 1 && rect.height > 1) {
-					width = rect.width;
-					height = rect.height;
-				}
-				setCamera(campusCameraFor(focused, {
-					width,
-					height
-				}, zoom));
-			}, [
-				focusId,
-				layoutKey,
-				zoom,
-				viewport.width,
-				viewport.height
-			]);
+				setRoomFocusId(null);
+				setCharacterFocus(null);
+			}, [focusId]);
+			useEffect(() => {
+				(elevatorRef.current?.querySelector?.("[aria-current=\"true\"]"))?.scrollIntoView?.({ block: "nearest" });
+			}, [focusId]);
+			const focused = focusId ? floors.find((floor) => floor.id === focusId) ?? null : null;
+			const rooms = focused?.roomDetails ?? [];
+			const focusedRoom = roomFocusId ? rooms.find((room) => room.id === roomFocusId) ?? null : null;
 			const selectFloor = (floor) => {
 				setFocusId(floor.id);
-				setZoom((value) => Math.max(value, .9));
 				props.onSelectFloor?.(floor);
 			};
-			const step = (delta) => {
+			const selectIndex = (index) => {
+				if (!floors.length) return;
+				const floor = floors[clamp$1(index, 0, floors.length - 1)];
+				if (floor) selectFloor(floor);
+			};
+			const stepFloor = (delta) => {
 				const next = stepCampusFloor(floors, focusId, delta);
 				if (next) selectFloor(next);
 			};
-			const setZoomBy = (factor) => {
-				setZoom((value) => clamp$1(value * factor, CAMPUS_MIN_ZOOM, CAMPUS_MAX_ZOOM));
+			const enterRoom = (room, character) => {
+				setRoomFocusId(room.id);
+				setCharacterFocus(character ?? null);
 			};
-			const resetView = () => {
-				const first = floors.find((floor) => floor.id === focusId) ?? floors.find((floor) => floor.live) ?? floors[0];
-				if (first) setFocusId(first.id);
-				setZoom(.64);
+			const focusCharacter = (name) => {
+				const room = rooms.find((candidate) => candidate.agents.includes(name));
+				if (room) {
+					enterRoom(room, name);
+					return;
+				}
+				setRoomFocusId(null);
+				setCharacterFocus(name);
 			};
-			const onPointerDown = (event) => {
-				if (event.button !== void 0 && event.button !== 0) return;
-				if (event.target?.closest?.("button")) return;
-				dragRef.current = {
-					pointerId: event.pointerId,
-					startX: event.clientX,
-					startY: event.clientY,
-					originX: camera.x,
-					originY: camera.y
-				};
-				event.currentTarget?.setPointerCapture?.(event.pointerId);
+			const exitRoom = () => {
+				setRoomFocusId(null);
+				setCharacterFocus(null);
 			};
-			const onPointerMove = (event) => {
-				const drag = dragRef.current;
-				if (!drag || drag.pointerId !== event.pointerId) return;
-				setCamera((value) => ({
-					...value,
-					x: drag.originX + (event.clientX - drag.startX),
-					y: drag.originY + (event.clientY - drag.startY)
-				}));
-			};
-			const endDrag = (event) => {
-				if (!dragRef.current) return;
-				dragRef.current = null;
-				event.currentTarget?.releasePointerCapture?.(event.pointerId);
+			const moveRoom = (delta) => {
+				const next = stepCampusRoom(rooms, roomFocusId, delta);
+				if (next) enterRoom(next);
 			};
 			const onKeyDown = (event) => {
-				if (event.key === "ArrowDown") {
-					event.preventDefault?.();
-					step(1);
-				} else if (event.key === "ArrowUp") {
-					event.preventDefault?.();
-					step(-1);
-				} else if (event.key === "+" || event.key === "=") {
-					event.preventDefault?.();
-					setZoomBy(1.2);
-				} else if (event.key === "-") {
-					event.preventDefault?.();
-					setZoomBy(1 / 1.2);
-				} else if (event.key === "0") {
-					event.preventDefault?.();
-					resetView();
+				switch (event.key) {
+					case "ArrowUp":
+						stepFloor(-1);
+						break;
+					case "ArrowDown":
+						stepFloor(1);
+						break;
+					case "PageUp":
+						stepFloor(-10);
+						break;
+					case "PageDown":
+						stepFloor(10);
+						break;
+					case "Home":
+						selectIndex(0);
+						break;
+					case "End":
+						selectIndex(floors.length - 1);
+						break;
+					case "ArrowLeft":
+						moveRoom(-1);
+						break;
+					case "ArrowRight":
+						moveRoom(1);
+						break;
+					case "Escape":
+						if (roomFocusId || characterFocus) {
+							exitRoom();
+							break;
+						}
+						return;
+					default: return;
 				}
+				event.preventDefault?.();
 			};
-			const canLoadMore = floors.length < totalFloors;
-			const canLoadFewer = floors.length > 4 && limit > 4;
 			const controlButton = (key, label, testId, onClick, disabled = false) => R.createElement("button", {
 				key,
 				type: "button",
@@ -204201,105 +204257,185 @@ create: function(game) {
 					"data-testid": "campus-world-state"
 				}, notes.join(" "));
 			};
-			const floorSlab = (item) => {
-				const floor = item.floor;
+			const floorOption = (floor) => {
 				const isFocus = focusId === floor.id;
-				const className = "office-game__campusFloor" + (floor.live ? " is-live" : " is-template") + (isFocus ? " is-focus" : "");
-				return R.createElement("section", {
+				return R.createElement("button", {
 					key: floor.id,
-					className,
-					"data-testid": "campus-world-floor",
-					"data-floor": floor.id,
+					type: "button",
+					className: "office-game__campusElevatorFloor" + (floor.live ? " is-live" : " is-template") + (isFocus ? " is-focus" : ""),
+					"data-testid": "campus-world-floor-option",
+					"data-floor-id": floor.id,
 					"data-floor-number": floor.number,
 					"data-live": floor.live ? "true" : "false",
 					"data-agents": String(floor.agents),
-					"data-focus": isFocus ? "true" : "false",
-					"aria-label": `${floor.live ? "Live" : "Unstaffed"} floor ${floor.number}, ${floor.name}, ${floor.rooms} rooms, ${floor.agents} agents`,
-					style: {
-						left: `${item.x}px`,
-						top: `${item.y}px`,
-						width: `720px`,
-						height: `420px`
-					}
-				}, [R.createElement("button", {
-					key: "label",
-					type: "button",
-					className: "office-game__campusFloorLabel",
-					"data-testid": "campus-world-floor-label",
-					"aria-pressed": isFocus ? "true" : "false",
 					"aria-current": isFocus ? "true" : void 0,
-					"aria-label": `Enter floor ${floor.number}, ${floor.name}`,
+					"aria-label": `Floor ${pad3(floor.number)}, ${floor.name}, ${campusFloorStatus(floor)}${isFocus ? ". Current floor" : ""}`,
 					onClick: () => selectFloor(floor)
 				}, [
 					R.createElement("span", {
-						key: "n",
-						className: "office-game__campusFloorNumber"
-					}, `Floor ${pad3(floor.number)}`),
+						key: "number",
+						className: "office-game__campusElevatorNumber"
+					}, pad3(floor.number)),
 					R.createElement("span", {
 						key: "name",
-						className: "office-game__campusFloorName"
+						className: "office-game__campusElevatorName"
 					}, floor.name),
 					R.createElement("span", {
-						key: "s",
-						className: "office-game__campusFloorState"
-					}, campusFloorStatus(floor))
-				]), R.createElement("iframe", {
-					key: "frame",
-					title: `Floor ${pad3(floor.number)} · ${floor.name}`,
+						key: "badge",
+						className: "office-game__campusElevatorBadge"
+					}, floor.live ? `Live · ${floor.agents}` : "Unstaffed")
+				]);
+			};
+			const roomChip = (room) => {
+				const isFocus = roomFocusId === room.id;
+				return R.createElement("button", {
+					key: room.id,
+					type: "button",
+					className: "office-game__campusRoomChip" + (room.template ? " is-template" : " is-live") + (isFocus ? " is-focus" : ""),
+					"data-testid": "campus-world-room",
+					"data-room-id": room.id,
+					"data-template": room.template ? "true" : "false",
+					"aria-pressed": isFocus ? "true" : "false",
+					"aria-label": `${room.template ? "Unstaffed template room" : "Enter room"} ${room.name}, ${campusRoomStatus(room)}`,
+					onClick: () => enterRoom(room)
+				}, [R.createElement("span", {
+					key: "name",
+					className: "office-game__campusRoomName"
+				}, room.name), R.createElement("span", {
+					key: "meta",
+					className: "office-game__campusRoomMeta"
+				}, room.template ? "Unstaffed" : `${room.agents.length} agent${room.agents.length === 1 ? "" : "s"}`)]);
+			};
+			const characterChip = (name) => R.createElement("button", {
+				key: name,
+				type: "button",
+				className: "office-game__campusCharacter" + (characterFocus === name ? " is-focus" : ""),
+				"data-testid": "campus-world-character",
+				"data-character": name,
+				"aria-pressed": characterFocus === name ? "true" : "false",
+				"aria-label": `Focus ${name} on this floor`,
+				onClick: () => focusCharacter(name)
+			}, name);
+			const roomPanel = focusedRoom ? R.createElement("section", {
+				key: "room-focus",
+				className: "office-game__campusRoomFocus" + (focusedRoom.template ? " is-template" : " is-live"),
+				"data-testid": "campus-world-room-focus",
+				"data-room-id": focusedRoom.id,
+				"data-template": focusedRoom.template ? "true" : "false",
+				"aria-label": `Room ${focusedRoom.name}`
+			}, [
+				R.createElement("div", {
+					key: "head",
+					className: "office-game__campusRoomFocusHead"
+				}, [R.createElement("strong", {
+					key: "title",
+					"data-testid": "campus-world-room-focus-title"
+				}, focusedRoom.name), R.createElement("span", {
+					key: "status",
+					className: "office-game__campusRoomFocusStatus",
+					"data-testid": "campus-world-room-focus-status"
+				}, campusRoomStatus(focusedRoom))]),
+				focusedRoom.template ? R.createElement("p", {
+					key: "empty",
+					className: "office-game__campusRoomFocusNote",
+					"data-testid": "campus-world-room-empty"
+				}, "Unstaffed template room — no agent is placed here.") : focusedRoom.agents.length ? R.createElement("div", {
+					key: "agents",
+					className: "office-game__campusRoomAgents"
+				}, focusedRoom.agents.map(characterChip)) : R.createElement("p", {
+					key: "empty",
+					className: "office-game__campusRoomFocusNote",
+					"data-testid": "campus-world-room-empty"
+				}, "No agent is placed in this room right now."),
+				R.createElement("button", {
+					key: "exit",
+					type: "button",
+					className: "office-game__btn",
+					"data-testid": "campus-world-room-exit",
+					onClick: exitRoom
+				}, "Back to floor")
+			]) : null;
+			const unplaced = characterFocus && !focusedRoom ? characterFocus : null;
+			const plaque = focused ? R.createElement("div", {
+				key: "plaque",
+				className: "office-game__campusFloorPlaque",
+				"data-testid": "campus-world-plaque"
+			}, [R.createElement("strong", {
+				key: "title",
+				"data-testid": "campus-world-focus-title"
+			}, `Floor ${pad3(focused.number)} · ${focused.name}`), R.createElement("span", {
+				key: "meta",
+				"data-testid": "campus-world-focus-meta"
+			}, campusFloorStatus(focused))]) : null;
+			const floorScene = focused ? R.createElement("div", {
+				key: "scene",
+				className: "office-game__campusFloorScene",
+				"data-testid": "campus-world-floor",
+				"data-floor": focused.id,
+				"data-floor-number": focused.number,
+				"data-live": focused.live ? "true" : "false",
+				"data-agents": String(focused.agents)
+			}, [
+				R.createElement("iframe", {
+					key: `frame-${focused.id}`,
+					title: `Floor ${pad3(focused.number)} · ${focused.name}`,
 					"data-testid": "campus-world-frame",
-					"data-floor-scope": floor.scope,
+					"data-floor-scope": focused.scope,
 					className: "office-game__campusFloorFrame",
 					sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
 					allow: "clipboard-read; clipboard-write",
-					loading: floor.live || isFocus ? "eager" : "lazy",
+					loading: "eager",
 					src: officeAppSrc({
 						base: props.base,
 						theme: props.theme,
-						floor: floor.scope
+						floor: focused.scope
 					}),
 					onLoad: (event) => {
 						const win = event.currentTarget.contentWindow;
 						if (win) installFloorFrame(win);
 					}
-				})]);
-			};
-			const focusBar = focused ? R.createElement("div", {
-				key: "focus",
-				className: "office-game__campusFocusBar",
-				"data-testid": "campus-world-focus",
-				role: "status"
-			}, [
-				R.createElement("strong", {
-					key: "title",
-					className: "office-game__campusFocusTitle",
-					"data-testid": "campus-world-focus-title"
-				}, `Floor ${pad3(focused.floor.number)} · ${focused.floor.name}`),
-				R.createElement("span", {
-					key: "meta",
-					className: "office-game__campusFocusMeta",
-					"data-testid": "campus-world-focus-meta"
-				}, campusFloorStatus(focused.floor)),
-				focused.floor.characters.length ? R.createElement("span", {
-					key: "people",
-					className: "office-game__campusFocusPeople",
-					title: focused.floor.characters.join(", "),
-					"data-testid": "campus-world-focus-people"
-				}, focused.floor.characters.join(", ")) : null,
+				}),
+				plaque,
 				R.createElement("div", {
-					key: "actions",
-					className: "office-game__campusFocusActions"
-				}, [
-					controlButton("prev", "Floor above", "campus-world-prev", () => step(-1), floors.indexOf(focused.floor) <= 0),
-					controlButton("next", "Floor below", "campus-world-next", () => step(1), floors.indexOf(focused.floor) >= floors.length - 1),
-					controlButton("open", "Open floor", "campus-world-open", () => props.onOpenFloor?.(focused.floor)),
-					controlButton("reset", "Reset view", "campus-world-reset", resetView)
-				])
+					key: "rooms",
+					className: "office-game__campusRoomRail",
+					"data-testid": "campus-world-rooms",
+					role: "group",
+					"aria-label": `Rooms on floor ${pad3(focused.number)}`
+				}, rooms.length ? rooms.map(roomChip) : R.createElement("span", {
+					key: "none",
+					className: "office-game__campusRoomMeta"
+				}, "No rooms are declared on this floor."))
 			]) : null;
+			const people = focused?.characters ?? [];
+			const peopleBar = focused ? R.createElement("div", {
+				key: "people",
+				className: "office-game__campusPeople",
+				"data-testid": "campus-world-people",
+				role: "group",
+				"aria-label": `People on floor ${pad3(focused.number)}`
+			}, people.length ? [R.createElement("span", {
+				key: "label",
+				className: "office-game__campusPeopleLabel"
+			}, focused.live ? "Real agents on this floor" : "Unstaffed template"), ...people.map(characterChip)] : [R.createElement("span", {
+				key: "label",
+				className: "office-game__campusPeopleLabel"
+			}, focused.live ? "Real agents on this floor" : "Unstaffed template"), R.createElement("span", {
+				key: "none",
+				className: "office-game__campusPeopleEmpty",
+				"data-testid": "campus-world-unstaffed"
+			}, "No agent is placed on this floor.")]) : null;
+			const announcement = [
+				focused ? `Floor ${pad3(focused.number)}, ${focused.name}. ` + campusFloorStatus(focused) + "." : "",
+				focusedRoom ? ` Room ${focusedRoom.name} focused.` : "",
+				unplaced ? ` ${unplaced} is on this floor but not in a declared room.` : ""
+			].join("").trim();
 			return R.createElement("div", {
 				className: "office-game__campusWorld",
 				"data-testid": "office-campus-world",
 				"data-floor-count": String(floors.length),
-				"data-live-floors": String(liveCount)
+				"data-live-floors": String(liveCount),
+				"data-rendered-frames": focused ? "1" : "0"
 			}, [
 				R.createElement("div", {
 					key: "controls",
@@ -204313,37 +204449,62 @@ create: function(game) {
 					}, [R.createElement("strong", { key: "title" }, "Campus world"), R.createElement("span", {
 						key: "counts",
 						"data-testid": "campus-world-counts"
-					}, `${floors.length} of ${totalFloors} floors in view · ${liveCount} live · one shared camera`)]),
-					controlButton("zoom-in", "Zoom in", "campus-world-zoom-in", () => setZoomBy(1.2)),
-					controlButton("zoom-out", "Zoom out", "campus-world-zoom-out", () => setZoomBy(1 / 1.2)),
-					controlButton("more", "Load more floors", "campus-world-more", () => setLimit((value) => value + 6), !canLoadMore),
-					controlButton("fewer", "Load fewer floors", "campus-world-fewer", () => setLimit((value) => Math.max(4, value - 6)), !canLoadFewer)
+					}, `${floors.length} floors · ${liveCount} live · one Habblaud floor view at room scale`)]),
+					controlButton("prev", "Floor above", "campus-world-prev", () => stepFloor(-1), !focused || floors.indexOf(focused) <= 0),
+					controlButton("next", "Floor below", "campus-world-next", () => stepFloor(1), !focused || floors.indexOf(focused) >= floors.length - 1),
+					controlButton("open", "Open in office", "campus-world-open", () => {
+						if (focused) props.onOpenFloor?.(focused);
+					}, !focused || !props.onOpenFloor)
 				]),
 				worldState(),
 				R.createElement("div", {
-					key: "viewport",
-					ref: viewportRef,
-					className: "office-game__campusViewport",
-					"data-testid": "campus-world-viewport",
-					role: "region",
-					"aria-label": "Campus world floors",
-					tabIndex: 0,
-					onKeyDown,
-					onPointerDown,
-					onPointerMove,
-					onPointerUp: endDrag,
-					onPointerCancel: endDrag,
-					onPointerLeave: endDrag
+					key: "body",
+					className: "office-game__campusWorldBody"
+				}, [R.createElement("aside", {
+					key: "elevator",
+					className: "office-game__campusElevator",
+					"aria-label": "Elevator and floors"
 				}, [R.createElement("div", {
+					key: "head",
+					className: "office-game__campusElevatorHead"
+				}, [R.createElement("span", { key: "label" }, "Floors"), R.createElement("span", {
+					key: "count",
+					className: "office-game__campusElevatorCount"
+				}, String(floors.length))]), R.createElement("div", {
+					key: "list",
+					ref: elevatorRef,
+					className: "office-game__campusElevatorList",
+					"data-testid": "campus-world-elevator",
+					role: "navigation",
+					"aria-label": "Switch floor"
+				}, floors.map(floorOption))]), R.createElement("div", {
 					key: "stage",
-					className: "office-game__campusStage",
-					"data-testid": "campus-world-stage",
-					style: {
-						width: `${layout.width}px`,
-						height: `${layout.height}px`,
-						transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`
-					}
-				}, layout.floors.map(floorSlab)), focusBar])
+					className: "office-game__campusStageWrap"
+				}, [
+					R.createElement("div", {
+						key: "viewport",
+						className: "office-game__campusViewport",
+						"data-testid": "campus-world-viewport",
+						role: "region",
+						"aria-label": focused ? `Floor ${pad3(focused.number)} ${focused.name} room view` : "Campus floor view",
+						tabIndex: 0,
+						onKeyDown
+					}, floorScene),
+					unplaced ? R.createElement("p", {
+						key: "unplaced",
+						className: "office-game__campusWorldState",
+						role: "status",
+						"data-testid": "campus-world-unplaced"
+					}, `${unplaced} is on this floor, but the tower does not place them in a declared room. They are not moved to one.`) : null,
+					roomPanel,
+					peopleBar
+				])]),
+				R.createElement("p", {
+					key: "announcer",
+					className: "office-game__sr-only",
+					"aria-live": "polite",
+					"data-testid": "campus-world-announcer"
+				}, announcement)
 			]);
 		};
 	}
@@ -210124,7 +210285,7 @@ create: function(game) {
 					R.createElement("p", {
 						key: "counts",
 						"data-testid": "office-campus-counts"
-					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "100-floor directory · floors, rooms, desks and occupancy"),
+					}, campusTab === "floors" ? "Room-scale world · one real Habblaud floor at a time · switch floors from the elevator and enter rooms" : "100-floor directory · floors, rooms, desks and occupancy"),
 					R.createElement("div", {
 						key: "tabs",
 						className: "office-game__campusTabs"

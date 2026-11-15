@@ -1335,7 +1335,8 @@ export function createOfficeApp(
             R.createElement("p", {
               key: "counts", "data-testid": "office-campus-counts",
             }, campusTab === "floors"
-              ? "Campus world · real live floors and unstaffed templates on one camera"
+              ? "Room-scale world · one real Habblaud floor at a time · "
+                + "switch floors from the elevator and enter rooms"
               : "100-floor directory · floors, rooms, desks and occupancy"),
             R.createElement("div", {
               key: "tabs", className: "office-game__campusTabs",

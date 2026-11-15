@@ -2239,11 +2239,12 @@
 .office-game__campusBody { padding: 0 18px 24px; }
 .office-game__campusState { padding: 24px; opacity: .8; }
 
-/* --- the campus world: the real floors on one shared camera stage ---------
-   The owner rejected isolated cards, a floor picker, a text directory and the
-   bare vector shell. Each floor below is still the real Habblaud renderer, but
-   the floors share one stage, one pan/zoom camera and a label plaque instead of
-   unrelated card chrome. */
+/* --- the campus world: ONE room-scale Habblaud floor at a time ------------
+   The owner rejected the stack of miniature floor previews. This surface mounts
+   exactly one real floor renderer and lets the reader move between floors from
+   the elevator and enter the floor's real rooms from the room rail. The big
+   iframe is the primary surface; the list at the left is navigation, not a
+   directory of thumbnails. */
 .office-game__campus--floors {
   background: #070a10;
 }
@@ -2286,11 +2287,104 @@
   font-size: var(--office-fs-xs);
   font-variant-numeric: tabular-nums;
 }
+.office-game__campusWorldBody {
+  display: grid;
+  grid-template-columns: minmax(190px, 248px) minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+.office-game__campusElevator {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #2c3550;
+  border-radius: 8px;
+  background: rgba(13, 19, 32, 0.86);
+  color: #c9d4ea;
+  max-height: clamp(520px, 68vh, 860px);
+}
+.office-game__campusElevatorHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 4px;
+  border-bottom: 1px solid #24304a;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.office-game__campusElevatorCount {
+  color: var(--office-muted);
+  font-variant-numeric: tabular-nums;
+}
+.office-game__campusElevatorList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+}
+.office-game__campusElevatorFloor {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  color: #c9d4ea;
+  text-align: left;
+  cursor: pointer;
+}
+.office-game__campusElevatorFloor:hover,
+.office-game__campusElevatorFloor:focus-visible {
+  border-color: #3d4c6e;
+  outline: none;
+}
+.office-game__campusElevatorFloor.is-live {
+  border-color: #33546a;
+}
+.office-game__campusElevatorFloor.is-focus {
+  border-color: var(--office-accent);
+  background: rgba(224, 143, 176, 0.14);
+}
+.office-game__campusElevatorNumber {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: #9fb0d0;
+}
+.office-game__campusElevatorName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--office-fs-sm);
+}
+.office-game__campusElevatorBadge {
+  color: #7fd6ae;
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.office-game__campusElevatorFloor.is-template .office-game__campusElevatorBadge {
+  color: #8b97ad;
+}
+.office-game__campusStageWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
 .office-game__campusViewport {
   position: relative;
-  flex: 1 1 auto;
-  min-height: 440px;
-  height: clamp(440px, 64vh, 820px);
+  min-height: 520px;
+  height: clamp(520px, 68vh, 860px);
   overflow: hidden;
   border: 1px solid #22304c;
   border-radius: 10px;
@@ -2298,44 +2392,22 @@
     radial-gradient(1200px 640px at 18% 0%, rgba(72, 104, 172, 0.24), transparent 68%),
     radial-gradient(900px 520px at 82% 100%, rgba(160, 64, 120, 0.16), transparent 70%),
     linear-gradient(180deg, #0b1220 0%, #070a10 72%);
-  cursor: grab;
-  touch-action: none;
 }
-.office-game__campusViewport:active {
-  cursor: grabbing;
+.office-game__campusViewport:focus-visible {
+  outline: 2px solid var(--office-accent);
+  outline-offset: 2px;
 }
-.office-game__campusStage {
+.office-game__campusFloorScene {
   position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
-  will-change: transform;
+  inset: 0;
 }
-.office-game__campusFloor {
-  position: absolute;
-  overflow: visible;
+.office-game__campusFloorScene[data-live="false"] {
   border: 1px solid #2b3856;
   border-radius: 10px;
-  background: #0b0a13;
-  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
-  transition:
-    border-color var(--office-dur-fast) var(--office-ease),
-    box-shadow var(--office-dur-fast) var(--office-ease);
-}
-.office-game__campusFloor.is-live {
-  border-color: #3f6f8f;
-  box-shadow:
-    0 0 0 1px rgba(111, 211, 166, 0.18),
-    0 26px 60px rgba(0, 0, 0, 0.55);
-}
-.office-game__campusFloor.is-focus {
-  z-index: 2;
-  border-color: var(--office-accent);
-  box-shadow:
-    0 0 0 2px rgba(224, 143, 176, 0.45),
-    0 30px 70px rgba(0, 0, 0, 0.6);
 }
 .office-game__campusFloorFrame {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -2343,90 +2415,168 @@
   border-radius: 9px;
   background: #0b0a13;
 }
-.office-game__campusFloorLabel {
+.office-game__campusFloorPlaque {
   position: absolute;
-  left: 10px;
-  top: -18px;
+  left: 12px;
+  top: 72px;
   z-index: 3;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  max-width: calc(100% - 20px);
-  padding: 4px 10px;
+  flex-direction: column;
+  gap: 2px;
+  max-width: calc(100% - 24px);
+  padding: 6px 10px;
   border: 1px solid #33425f;
-  border-radius: 999px;
-  background: rgba(13, 19, 32, 0.95);
+  border-radius: 8px;
+  background: rgba(13, 19, 32, 0.92);
   color: #dbe5f7;
   font-size: var(--office-fs-xs);
-  line-height: 1.2;
-  cursor: pointer;
+  pointer-events: none;
 }
-.office-game__campusFloorLabel:hover,
-.office-game__campusFloorLabel:focus-visible {
-  border-color: var(--office-accent);
-  outline: none;
+.office-game__campusFloorPlaque strong {
+  letter-spacing: 0.03em;
 }
-.office-game__campusFloorLabel[aria-pressed="true"] {
-  border-color: var(--office-accent);
-  background: rgba(42, 21, 34, 0.95);
-}
-.office-game__campusFloorNumber {
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.office-game__campusFloorName {
-  max-width: 20rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.office-game__campusFloorPlaque span {
   color: #9fb0d0;
-}
-.office-game__campusFloorState {
-  color: #7fd6ae;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 }
-.office-game__campusFloor.is-template .office-game__campusFloorState {
-  color: #8b97ad;
-}
-.office-game__campusFocusBar {
+.office-game__campusRoomRail {
   position: absolute;
   left: 12px;
   right: 12px;
   bottom: 12px;
-  z-index: 4;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 8px;
+  border: 1px solid #33425f;
+  border-radius: 8px;
+  background: rgba(13, 19, 32, 0.9);
+  scrollbar-width: thin;
+}
+.office-game__campusRoomChip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 5.5rem;
+  padding: 5px 9px;
+  border: 1px solid #33425f;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  color: #dbe5f7;
+  text-align: left;
+  cursor: pointer;
+}
+.office-game__campusRoomChip:hover,
+.office-game__campusRoomChip:focus-visible {
+  border-color: var(--office-accent);
+  outline: none;
+}
+.office-game__campusRoomChip.is-live {
+  border-color: #3f6f8f;
+}
+.office-game__campusRoomChip.is-focus {
+  border-color: var(--office-accent);
+  background: rgba(224, 143, 176, 0.16);
+}
+.office-game__campusRoomChip.is-template {
+  border-style: dashed;
+}
+.office-game__campusRoomName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--office-fs-sm);
+}
+.office-game__campusRoomMeta {
+  color: #8b97ad;
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.office-game__campusRoomChip.is-live .office-game__campusRoomMeta {
+  color: #7fd6ae;
+}
+.office-game__campusRoomFocus {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px 14px;
-  padding: 8px 12px;
+  gap: 6px 12px;
+  padding: 10px 12px;
   border: 1px solid #33425f;
   border-radius: 8px;
   background: rgba(13, 19, 32, 0.9);
   color: #dbe5f7;
   font-size: var(--office-fs-sm);
 }
-.office-game__campusFocusTitle {
-  letter-spacing: 0.03em;
+.office-game__campusRoomFocus.is-template {
+  border-style: dashed;
 }
-.office-game__campusFocusMeta {
+.office-game__campusRoomFocusHead {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.office-game__campusRoomFocusStatus {
   color: #9fb0d0;
+  font-size: var(--office-fs-xs);
   font-variant-numeric: tabular-nums;
 }
-.office-game__campusFocusPeople {
-  max-width: 28%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #7fd6ae;
-}
-.office-game__campusFocusActions {
+.office-game__campusRoomAgents {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+.office-game__campusRoomFocusNote {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+.office-game__campusRoomFocus .office-game__btn {
   margin-left: auto;
+  padding: 3px 9px;
+  font-size: var(--office-fs-sm);
+}
+.office-game__campusPeople {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 8px 10px;
+  border: 1px solid #2c3550;
+  border-radius: 8px;
+  background: rgba(13, 19, 32, 0.72);
+  color: #dbe5f7;
+  font-size: var(--office-fs-sm);
+}
+.office-game__campusPeopleLabel {
+  color: var(--office-muted);
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+.office-game__campusPeopleEmpty {
+  color: #8b97ad;
+  font-size: var(--office-fs-xs);
+}
+.office-game__campusCharacter {
+  padding: 3px 9px;
+  border: 1px solid #3f6f8f;
+  border-radius: 999px;
+  background: rgba(111, 211, 166, 0.08);
+  color: #bfe9d8;
+  font-size: var(--office-fs-xs);
+  cursor: pointer;
+}
+.office-game__campusCharacter:hover,
+.office-game__campusCharacter:focus-visible {
+  border-color: var(--office-accent);
+  outline: none;
+}
+.office-game__campusCharacter.is-focus {
+  border-color: var(--office-accent);
+  background: rgba(224, 143, 176, 0.18);
 }
 .office-game__campusWorldState {
   margin: 0;
@@ -2437,16 +2587,35 @@
 .office-game__campusWorldState[role="alert"] {
   color: var(--office-warn);
 }
+@media (max-width: 960px) {
+  .office-game__campusWorldBody {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .office-game__campusElevator {
+    max-height: 34vh;
+  }
+  .office-game__campusElevatorList {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  .office-game__campusElevatorFloor {
+    flex: 0 0 auto;
+    grid-template-columns: auto minmax(6rem, 12rem) auto;
+  }
+}
 @media (max-width: 680px) {
-  .office-game__campusFloorName {
+  .office-game__campusElevatorName {
     display: none;
   }
   .office-game__campusViewport {
     height: 56vh;
     min-height: 320px;
   }
-  .office-game__campusFocusPeople {
-    display: none;
+  .office-game__campusRoomRail {
+    left: 6px;
+    right: 6px;
+    bottom: 6px;
   }
 }
 
