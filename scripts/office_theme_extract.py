@@ -1062,6 +1062,92 @@ _SERENE_PREFIX = "SERENE_VILLAGE_REVAMPED"
 _OUTSIDE_CREDIT = "LimeZu — https://limezu.itch.io"
 _OUTSIDE_LICENSE = "CC-BY 4.0 (Serene Village, LimeZu)"
 
+#: Pack ids for the extra purchases. Each is resolved by directory name, and
+#: zip/dir fallbacks are added where the owner ships both.
+EXTRA_PACK_DIRS: Dict[str, Tuple[str, ...]] = {
+    "darkages": ("DarkAgesUi_v1.0",),
+    "dragon_huds": ("dragon-huds",),
+    "medieval_ui": ("Free_Medieval_Fantasy_UI_Pack",),
+    "raven_icons": ("Free - Raven Fantasy Icons",),
+    "green_forest": ("Raven Fantasy - Pixel Art Tileset - Green Forest v2",),
+    "pixel_effects": (
+        "Super Pixel Effects Gigapack (Free Version) v3.2.0",),
+    "ui_fonts": ("uı-fonts",),
+}
+EXTRA_PACK_ZIPS: Dict[str, Tuple[str, ...]] = {
+    "green_forest": ("Raven Fantasy - Pixel Art Tileset - Green Forest v2.zip",),
+    "pixel_effects": (
+        "Super Pixel Effects Gigapack (Free Version) v3.2.0.zip",),
+    "ui_fonts": ("uı-fonts.zip",),
+}
+EXTRA_PACK_FILES: Dict[str, Tuple[str, ...]] = {
+    "frames": ("NEW FRAMES",),
+}
+
+#: Licence and credit read from each pack's own readme/licence file. This is
+#: recorded per entry and in the manifest; nothing here is inferred.
+PACK_PROVENANCE: Dict[str, Dict[str, str]] = {
+    "darkages": {
+        "name": "Dark Ages UI Pixel Art Asset Pack v1.0",
+        "credit": "Hypnobius (https://hypnobius.itch.io/)",
+        "license": "Commercial/personal use allowed; no resale or redistribution; no NFTs, blockchain games, or AI training datasets.",
+        "source": "DarkAgesUi_v1.0/LICENSE.txt",
+        "status": "declared",
+    },
+    "dragon_huds": {
+        "name": "Dragon HUDs",
+        "credit": "Kibyra",
+        "license": "Personal and commercial use allowed; redistribution/resale of the original files not allowed.",
+        "source": "dragon-huds/readme.txt",
+        "status": "declared",
+    },
+    "medieval_ui": {
+        "name": "Free Medieval Fantasy UI Pack",
+        "credit": "Kibyra",
+        "license": "Free for personal and commercial use; redistribution or resale of the files as-is not allowed.",
+        "source": "Free_Medieval_Fantasy_UI_Pack/Readme.txt",
+        "status": "declared",
+    },
+    "raven_icons": {
+        "name": "Free - Raven Fantasy Icons",
+        "credit": "Clockwork Raven Studios (Caio)",
+        "license": "No licence text supplied in the pack; owner purchase, local use only, no redistribution.",
+        "source": "Free - Raven Fantasy Icons/Special Note to the Dev.txt",
+        "status": "unverified",
+    },
+    "green_forest": {
+        "name": "Raven Fantasy - Pixel Art Tileset - Green Forest v2",
+        "credit": "Clockwork Raven Studios (Caio); palette by Kerrie Lake (Resurrect 64)",
+        "license": "No licence text supplied in the pack; owner purchase, local use only, no redistribution.",
+        "source": "Raven Fantasy - Pixel Art Tileset - Green Forest v2/A Note to the Dev.txt",
+        "status": "unverified",
+    },
+    "pixel_effects": {
+        "name": "Super Pixel Effects Gigapack (Free Version) v3.2.0",
+        "credit": "Will Tice / unTied Games",
+        "license": "Commercial and non-commercial game use allowed with attribution; no asset-pack redistribution or engine bundling; no AI training.",
+        "source": "Super Pixel Effects Gigapack (Free Version) v3.2.0/Super Pixel Effects Gigapack (Free Version)/license.txt",
+        "status": "declared",
+    },
+    "ui_fonts": {
+        "name": "UI Fonts",
+        "credit": "Kibyra",
+        "license": "Personal and commercial use allowed; redistribution/resale of the original files not allowed.",
+        "source": "uı-fonts/readme.txt",
+        "status": "declared",
+    },
+    "frames": {
+        "name": "NEW FRAMES",
+        "credit": "PixelLab-generated frames (owner-provided)",
+        "license": "No licence or readme supplied with these frames; local use only, do not redistribute.",
+        "source": "NEW FRAMES (no licence/readme supplied)",
+        "status": "unverified",
+    },
+}
+
+#: FPS for the Super Pixel Effects pack, stated in its readme.
+_EFFECTS_FPS = 15.0
+
 
 class _AssetTree:
     """Read-only access to a purchased pack, from a zip or an extracted tree.
@@ -1179,6 +1265,292 @@ def _resolve_asset_tree(source: str, kind: str) -> Optional[_AssetTree]:
             actual_prefix = ""
         return _AssetTree(path, prefix=actual_prefix)
     return None
+
+
+def _open_extra_pack(source: str, pack: str) -> Optional[_AssetTree]:
+    """Open one extra purchase by directory (preferred) or zip.
+
+    A malformed present zip is a typed error; an absent pack returns ``None``.
+    """
+    path = Path(source).expanduser() if isinstance(source, str) else Path(source)
+    search = _purchase_dir(source)
+    for name in EXTRA_PACK_DIRS.get(pack, ()):
+        candidate = search / name
+        if candidate.is_dir():
+            return _AssetTree(candidate)
+    for name in EXTRA_PACK_ZIPS.get(pack, ()):
+        candidate = search / name
+        if not candidate.is_file():
+            continue
+        prefix = ""
+        try:
+            with zipfile.ZipFile(candidate) as archive:
+                names = [item.replace("\\", "/") for item in archive.namelist()]
+        except (zipfile.BadZipFile, OSError) as exc:
+            raise ThemeBuildError(
+                f"{candidate.name}: not a valid zip archive ({exc})") from exc
+        for root in EXTRA_PACK_DIRS.get(pack, ()):
+            marker = root.rstrip("/") + "/"
+            if names and all(item == root or item.startswith(marker)
+                             for item in names if not item.endswith("/")):
+                prefix = root
+                break
+        return _AssetTree(candidate, prefix=prefix)
+    return None
+
+
+def _extra_entry(*, pack: str, source_name: str, sprite_id: str,
+                 kind: str, blob: bytes, image: Image.Image,
+                 frame: Mapping[str, object], **extra: object
+                 ) -> Dict[str, object]:
+    entry: Dict[str, object] = {
+        "id": sprite_id,
+        "kind": kind,
+        "sheet": source_name,
+        "frame": dict(frame),
+        "nine_slice_candidate": bool(extra.pop("nine_slice_candidate", False)),
+        "frame_source": "sheet",
+        "blob": blob,
+        "image_size": image.size,
+        "pack": pack,
+        "license": PACK_PROVENANCE[pack]["license"],
+        "credit": PACK_PROVENANCE[pack]["credit"],
+    }
+    entry.update(extra)
+    return entry
+
+
+def _extra_id(prefix: str, relative: str, tier: str = "") -> str:
+    digest = hashlib.sha256(relative.encode("utf-8")).hexdigest()[:8]
+    slug = _slug(relative.rsplit(".", 1)[0])
+    suffix = f"-{tier}" if tier else ""
+    return f"{prefix}-{slug}{suffix}-{digest}"
+
+
+def _ui_extra_assets(source: str, size: int) -> List[Dict[str, object]]:
+    entries: List[Dict[str, object]] = []
+    roles = {
+        "buttons": "button",
+        "panels": "panel",
+        "dialogue-box": "dialog",
+        "line-bars": "bar",
+        "rounded-bars": "bar",
+        "item-slot": "icon",
+        "icons": "icon",
+        "inventory-grid": "panel",
+        "skill-tree": "panel",
+        "main-menu": "panel",
+    }
+    for pack in ("darkages", "dragon_huds", "medieval_ui", "ui_fonts"):
+        tree = _open_extra_pack(source, pack)
+        if tree is None:
+            continue
+        with tree:
+            for name in tree.names(suffix=".png"):
+                lower = name.lower()
+                if pack == "ui_fonts":
+                    base = lower.rsplit("/", 1)[-1]
+                    if "logo" in base:
+                        role = "font_logo"
+                    elif re.match(r"u-[a-z0-9]*\d+\.png$", base):
+                        role = "font_glyph"
+                    else:
+                        role = "font_atlas"
+                elif pack == "darkages":
+                    role = "ui_atlas"
+                elif pack == "medieval_ui":
+                    role = "icon_sheet" if "icon" in lower else "ui_atlas"
+                else:
+                    role = "ui_atlas"
+                    for folder, candidate in roles.items():
+                        if folder in lower:
+                            role = candidate
+                            break
+                image = tree.read_image(name)
+                kind = "sheet" if role in (
+                    "ui_atlas", "icon_sheet", "font_atlas", "font_logo",
+                    "panel", "hud", "dialog", "bar") else "sprite"
+                grid = None
+                if role == "ui_atlas" and image.width % 32 == 0                         and image.height % 32 == 0:
+                    grid = {"cell": 32, "cols": image.width // 32,
+                            "rows": image.height // 32}
+                elif role == "font_atlas" and image.width % 32 == 0                         and image.height % 32 == 0:
+                    grid = {"cell": 32, "cols": image.width // 32,
+                            "rows": image.height // 32}
+                entries.append(_extra_entry(
+                    pack=pack, source_name=name,
+                    sprite_id=_extra_id(f"ui-extra-{pack}", name),
+                    kind=kind, blob=tree.read(name), image=image,
+                    frame={"w": image.width, "h": image.height,
+                           "count": 1, "fps": None},
+                    role=role, grid=grid))
+    return [entry for entry in entries if entry is not None]
+
+
+def _icon_assets(source: str, size: int) -> List[Dict[str, object]]:
+    tree = _open_extra_pack(source, "raven_icons")
+    if tree is None:
+        return []
+    entries: List[Dict[str, object]] = []
+    with tree:
+        for name in tree.names(suffix=".png"):
+            normalized = name.replace("\\", "/")
+            tier = ""
+            for candidate in ("16x16", "32x32", "64x64"):
+                if f"/{candidate}/" in f"/{normalized}":
+                    tier = candidate
+                    break
+            if not tier:
+                continue
+            image = tree.read_image(name)
+            entries.append(_extra_entry(
+                pack="raven_icons", source_name=name,
+                sprite_id=_extra_id("icon-raven", normalized, tier),
+                kind="sprite", blob=tree.read(name), image=image,
+                frame={"w": image.width, "h": image.height,
+                       "count": 1, "fps": None},
+                role="icon", tier=tier))
+        for name in tree.names(suffix=".png"):
+            normalized = name.replace("\\", "/")
+            if "/Separated Files/" in f"/{normalized}":
+                continue
+            image = tree.read_image(name)
+            cell = 16 if "16x16" in normalized else (
+                64 if "64x64" in normalized else 32)
+            grid = None
+            if image.width % cell == 0 and image.height % cell == 0:
+                grid = {"cell": cell, "cols": image.width // cell,
+                        "rows": image.height // cell}
+            entries.append(_extra_entry(
+                pack="raven_icons", source_name=name,
+                sprite_id=_extra_id("icon-raven-sheet", normalized),
+                kind="sheet", blob=tree.read(name), image=image,
+                frame={"w": image.width, "h": image.height,
+                       "count": 1, "fps": None},
+                role="icon_sheet", grid=grid))
+    return entries
+
+
+def _effects_assets(source: str, size: int) -> List[Dict[str, object]]:
+    tree = _open_extra_pack(source, "pixel_effects")
+    if tree is None:
+        return []
+    entries: List[Dict[str, object]] = []
+    with tree:
+        for name in tree.names(suffix=".png"):
+            normalized = name.replace("\\", "/")
+            if "/spritesheet/" not in f"/{normalized}":
+                continue
+            image = tree.read_image(name)
+            metadata = normalized[:-4] + ".txt"
+            frames = 0
+            frame_w, frame_h = image.size
+            if tree.has(metadata):
+                lines = tree.read(metadata).decode("utf-8", "replace").splitlines()
+                rects = [line.split("=")[-1].strip() for line in lines if "=" in line]
+                if rects:
+                    frames = len(rects)
+                    parts = rects[0].split()
+                    if len(parts) == 4:
+                        frame_w, frame_h = int(parts[2]), int(parts[3])
+            if frames <= 0 and image.height > 0:
+                frames = max(1, image.width // image.height)
+                frame_w, frame_h = image.height, image.height
+            entries.append(_extra_entry(
+                pack="pixel_effects", source_name=normalized,
+                sprite_id=_extra_id("effect-untied", normalized),
+                kind="animated", blob=tree.read(name), image=image,
+                frame={"w": frame_w, "h": frame_h, "count": frames,
+                       "fps": _EFFECTS_FPS},
+                role="effect", frame_source="sheet", animation_fps_source="readme.txt"))
+    return entries
+
+
+def _tileset_assets(source: str, size: int) -> List[Dict[str, object]]:
+    tree = _open_extra_pack(source, "green_forest")
+    if tree is None:
+        return []
+    entries: List[Dict[str, object]] = []
+    with tree:
+        for name in tree.names(suffix=".png"):
+            normalized = name.replace("\\", "/")
+            image = tree.read_image(name)
+            if normalized.endswith("!$Fire and Water.png"):
+                frame_w, frame_h = image.width // 3, image.height // 3
+                entries.append(_extra_entry(
+                    pack="green_forest", source_name=normalized,
+                    sprite_id=_extra_id("tileset-green-forest", normalized),
+                    kind="animated", blob=tree.read(name), image=image,
+                    frame={"w": frame_w, "h": frame_h, "count": 9,
+                           "fps": None},
+                    role="animation", frame_source="inferred"))
+                continue
+            if "/All Tileset/" in f"/{normalized}":
+                cell = 16 if "16x16" in normalized else (
+                    64 if "64x64" in normalized else (
+                        48 if "48x48" in normalized else 32))
+                grid = {"cell": cell, "cols": image.width // cell,
+                        "rows": image.height // cell}
+                role = "tileset"
+            else:
+                cell = 16
+                grid = {"cell": cell, "cols": image.width // cell,
+                        "rows": image.height // cell}
+                role = "tileset"
+            entries.append(_extra_entry(
+                pack="green_forest", source_name=normalized,
+                sprite_id=_extra_id("tileset-green-forest", normalized),
+                kind="sheet", blob=tree.read(name), image=image,
+                frame={"w": image.width, "h": image.height,
+                       "count": 1, "fps": None},
+                role=role, grid=grid))
+    return entries
+
+
+def _frame_assets(source: str, size: int) -> List[Dict[str, object]]:
+    """NEW FRAMES GIFs turned into deterministic horizontal PNG strips."""
+    base = Path(source).expanduser() if isinstance(source, str) else Path(source)
+    candidates = []
+    if base.is_dir():
+        candidates.append(base)
+        candidates.append(base.parent)
+    for directory in candidates:
+        folder = directory / "NEW FRAMES"
+        if not folder.is_dir():
+            continue
+        entries: List[Dict[str, object]] = []
+        for path in sorted(folder.glob("*.gif")):
+            try:
+                with Image.open(path) as gif:
+                    frames = []
+                    duration = 0
+                    for index in range(getattr(gif, "n_frames", 1)):
+                        gif.seek(index)
+                        frames.append(gif.convert("RGBA").copy())
+                        duration = int(gif.info.get("duration") or duration)
+            except Exception as exc:  # noqa: BLE001 - themed typed failure
+                raise ThemeBuildError(
+                    f"{path.name}: unreadable GIF ({exc})") from exc
+            if not frames:
+                continue
+            width, height = frames[0].size
+            strip = Image.new("RGBA", (width * len(frames), height),
+                              (0, 0, 0, 0))
+            for index, frame in enumerate(frames):
+                strip.paste(frame, (index * width, 0))
+            buffer = io.BytesIO()
+            strip.save(buffer, format="PNG")
+            blob = buffer.getvalue()
+            fps = round(1000.0 / duration, 3) if duration > 0 else None
+            entries.append(_extra_entry(
+                pack="frames", source_name=f"NEW FRAMES/{path.name}",
+                sprite_id=_extra_id("frame-pixellab", path.name),
+                kind="animated", blob=blob, image=strip,
+                frame={"w": width, "h": height, "count": len(frames),
+                       "fps": fps},
+                role="frame_sequence", frame_source="gif"))
+        return entries
+    return []
 
 
 def _slug(value: str, *, fallback: str = "asset") -> str:
@@ -1838,6 +2210,11 @@ _ASSET_BUILDERS = {
     "animated": _animated_assets,
     "ui": _ui_assets,
     "outside": _outside_assets,
+    "ui_extra": _ui_extra_assets,
+    "icons": _icon_assets,
+    "effects": _effects_assets,
+    "tilesets": _tileset_assets,
+    "frames": _frame_assets,
 }
 
 
@@ -1871,11 +2248,18 @@ def extract_assets(source: str, *, size: int = 16,
     if size not in _SIZES:
         raise ThemeBuildError(
             f"size: must be one of {', '.join(map(str, _SIZES))} (got {size!r})")
-    result: Dict[str, object] = {"schema": 1, "categories": {}}
+    result: Dict[str, object] = {"schema": 1, "categories": {}, "packs": {}}
+    used: set[str] = set()
     for category in _selected_categories(categories):
         entries = _ASSET_BUILDERS[category](source, size)
         if entries:
             result["categories"][category] = {"entries": entries}
+            used.update(str(entry.get("pack")) for entry in entries
+                        if isinstance(entry, Mapping) and entry.get("pack"))
+    result["packs"] = {
+        pack: dict(PACK_PROVENANCE[pack])
+        for pack in sorted(used) if pack in PACK_PROVENANCE
+    }
     return result
 
 
@@ -2258,7 +2642,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument(
         "--categories", default=None,
         help="comma-separated asset categories for --assets "
-             "(default: all of characters,furniture,animated,ui,outside)")
+             "(default: all categories)")
     parser.add_argument("--out", default=None,
                         help="output directory for --ui-contact-sheet")
     parser.add_argument("--member", default=None,

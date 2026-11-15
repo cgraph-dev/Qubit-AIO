@@ -738,7 +738,23 @@ def _asset_metadata(manifest: Mapping[str, Any]) -> Dict[str, Any]:
             metadata[str(category)] = entry
     if not metadata:
         return {}
-    return {"assets": {"schema": 1, "categories": metadata}}
+    block: Dict[str, Any] = {"schema": 1, "categories": metadata}
+    packs = assets.get("packs")
+    if isinstance(packs, Mapping) and packs:
+        provenance: Dict[str, Any] = {}
+        for pack, entry in packs.items():
+            if not isinstance(entry, Mapping):
+                continue
+            row: Dict[str, Any] = {}
+            for key in ("name", "credit", "license", "source", "status"):
+                value = entry.get(key)
+                if isinstance(value, str):
+                    row[key] = value
+            if row:
+                provenance[str(pack)] = row
+        if provenance:
+            block["packs"] = provenance
+    return {"assets": block}
 
 
 def _command_export(cfg: Any, theme_id: str, out: str,

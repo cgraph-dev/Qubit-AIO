@@ -147,6 +147,11 @@ ASSET_CATEGORIES: Sequence[str] = (
     "animated",
     "ui",
     "outside",
+    "ui_extra",
+    "icons",
+    "effects",
+    "tilesets",
+    "frames",
 )
 
 #: Kind of entry inside an asset index. ``sprite`` is one standalone image,
@@ -160,6 +165,31 @@ ASSET_KINDS: Sequence[str] = (
     "button_icon_sheet",
     "gamepad_sheet",
 )
+
+#: Optional role metadata for the extra packs. It is descriptive only; the
+#: renderer decides how to use an entry. Unknown roles are refused so a typo
+#: does not silently produce an unusable pack.
+ASSET_ROLES: Sequence[str] = (
+    "ui_atlas",
+    "button",
+    "icon",
+    "icon_sheet",
+    "font_atlas",
+    "font_glyph",
+    "font_logo",
+    "hud",
+    "panel",
+    "dialog",
+    "bar",
+    "tileset",
+    "prop",
+    "animation",
+    "effect",
+    "frame_sequence",
+)
+
+#: Provenance status for a pack whose licence/readme is missing.
+LICENSE_STATUSES: Sequence[str] = ("declared", "unverified", "public-domain")
 
 #: Room archetypes a full local pack may declare. The list is closed so a
 #: typo is refused rather than silently producing an unrenderable room.
@@ -1242,6 +1272,44 @@ def _validate_kind_counts(value: Any, label: str) -> List[str]:
     return problems
 
 
+def _validate_asset_provenance(assets: Any) -> List[str]:
+    """Validate the optional per-pack licence/credit metadata.
+
+    The block is metadata only (no files, no art). It is what makes a pack
+    honest about an unlicensed source instead of silently claiming a licence.
+    """
+    if not isinstance(assets, dict):
+        return []
+    packs = assets.get("packs")
+    if packs is None:
+        return []
+    if not isinstance(packs, dict):
+        return ["assets.packs: must be an object"]
+    problems: List[str] = []
+    for pack_id, entry in packs.items():
+        label = f"assets.packs.{pack_id}"
+        if not isinstance(pack_id, str) or not _ASSET_KIND_RE.fullmatch(pack_id):
+            problems.append(f"{label}: invalid pack id")
+            continue
+        if not isinstance(entry, dict):
+            problems.append(f"{label}: must be an object")
+            continue
+        for key in ("name", "credit", "license", "source"):
+            if key in entry:
+                problems.extend(_bounded_text_problems(
+                    entry.get(key), f"{label}.{key}"))
+        status = entry.get("status")
+        if status is not None and status not in LICENSE_STATUSES:
+            problems.append(
+                f"{label}.status: must be one of {', '.join(LICENSE_STATUSES)}")
+        extra = sorted(set(entry) - {"name", "credit", "license", "source",
+                                     "status"})
+        if extra:
+            problems.append(
+                f"{label}: may not carry {', '.join(extra)} (metadata only)")
+    return problems
+
+
 def _validate_assets_recipe(assets: Any) -> List[str]:
     """Validate the shareable recipe ``assets`` block: metadata only.
 
@@ -1261,6 +1329,7 @@ def _validate_assets_recipe(assets: Any) -> List[str]:
     if not isinstance(categories, dict) or not categories:
         problems.append("assets.categories: must be a non-empty object")
         return problems
+    problems.extend(_validate_asset_provenance(assets))
     for category, config in categories.items():
         if category not in ASSET_CATEGORIES:
             problems.append(f"assets.categories: unknown category {category!r}")
@@ -1296,6 +1365,7 @@ def _validate_assets_full(assets: Any, files: Set[str]) -> List[str]:
     if not isinstance(categories, dict) or not categories:
         problems.append("assets.categories: must be a non-empty object")
         return problems
+    problems.extend(_validate_asset_provenance(assets))
     for category, config in categories.items():
         if category not in ASSET_CATEGORIES:
             problems.append(f"assets.categories: unknown category {category!r}")
@@ -1415,10 +1485,13 @@ def _validate_assets_index(root: Path, files: Mapping[str, Any],
         view = entry.get("view")
         if view is not None and view not in ("body", "portrait", "sheet"):
             problems.append(f"{label}.view: must be body, portrait, or sheet")
-        for key in ("license", "credit"):
+        for key in ("license", "credit", "pack"):
             if key in entry and entry.get(key) is not None:
                 problems.extend(_bounded_text_problems(
                     entry.get(key), f"{label}.{key}"))
+        role = entry.get("role")
+        if role is not None and role not in ASSET_ROLES:
+            problems.append(f"{label}.role: unknown role {role!r}")
     return problems
 
 

@@ -948,6 +948,12 @@ def _prepare_assets(assets: Any) -> Tuple[Dict[str, bytes],
             for category, config in manifest_categories.items()
         },
     }
+    packs = assets.get("packs") if isinstance(assets, Mapping) else None
+    if isinstance(packs, Mapping) and packs:
+        assets_manifest["packs"] = {
+            str(pack): dict(entry) for pack, entry in packs.items()
+            if isinstance(entry, Mapping)
+        }
     payloads["assets/manifest.json"] = _json_bytes(assets_manifest)
     if "outside" in manifest_categories:
         sheet_entry = None
@@ -976,11 +982,16 @@ def _prepare_assets(assets: Any) -> Tuple[Dict[str, bytes],
                     "water": {"sheet": relative, "col": 12, "row": 0},
                 },
             })
-    return (
-        payloads,
-        {"schema": 1, "categories": manifest_categories},
-        {"schema": 1, "categories": recipe_categories},
-    )
+    provenance = (
+        {str(pack): dict(entry) for pack, entry in packs.items()
+         if isinstance(entry, Mapping)}
+        if isinstance(packs, Mapping) and packs else {})
+    manifest_block = {"schema": 1, "categories": manifest_categories}
+    recipe_block = {"schema": 1, "categories": recipe_categories}
+    if provenance:
+        manifest_block["packs"] = provenance
+        recipe_block["packs"] = provenance
+    return payloads, manifest_block, recipe_block
 
 
 
@@ -1909,7 +1920,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
              "UI, outside) into the local pack (default: enabled)")
     parser.add_argument(
         "--asset-categories", default=None,
-        help="comma-separated subset of characters,furniture,animated,ui,outside "
+        help="comma-separated subset of the asset categories "
              "(default: all)")
     parser.add_argument(
         "--rooms", action=argparse.BooleanOptionalAction, default=True,
