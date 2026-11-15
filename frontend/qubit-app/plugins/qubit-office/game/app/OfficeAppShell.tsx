@@ -638,6 +638,31 @@ export function createOfficeApp(
       };
     }, [props.base, props.mock, requestedTheme, retryToken]);
 
+    // Programmatic panel control. The injected menu is the visible surface;
+    // this event lets the host, voice routing and tests open the same panels
+    // without adding a second text toolbar.
+    useEffect(() => {
+      if (typeof window === "undefined") return;
+      const onToggle = (event: Event) => {
+        const detail = (event as CustomEvent).detail;
+        const panel = typeof detail === "string"
+          ? detail
+          : (detail && typeof detail === "object" ? detail.panel : "");
+        switch (panel) {
+          case "command-center": setCommandCenterOpen(true); break;
+          case "timeline": setTimelineOpen(true); break;
+          case "studio": setStudioOpen(true); break;
+          case "campus": setCampusOpen((v: boolean) => !v); break;
+          case "agents": setAgentsOpen((v: boolean) => !v); break;
+          case "hud": setHudOpen((v: boolean) => !v); break;
+          case "approvals": setApprovalsOpen((v: boolean) => !v); break;
+          default: break;
+        }
+      };
+      window.addEventListener("qubit-office:toggle", onToggle);
+      return () => window.removeEventListener("qubit-office:toggle", onToggle);
+    }, []);
+
     // Mirror the dock state onto the injected buttons after every render: the
     // office paints its own active state from `aria-pressed`, and the
     // Approvals icon carries the live pending count badge.

@@ -209545,6 +209545,35 @@ create: function(game) {
 				retryToken
 			]);
 			useEffect(() => {
+				if (typeof window === "undefined") return;
+				const onToggle = (event) => {
+					const detail = event.detail;
+					switch (typeof detail === "string" ? detail : detail && typeof detail === "object" ? detail.panel : "") {
+						case "command-center":
+							setCommandCenterOpen(true);
+							break;
+						case "timeline":
+							setTimelineOpen(true);
+							break;
+						case "studio":
+							setStudioOpen(true);
+							break;
+						case "campus":
+							setCampusOpen((v) => !v);
+							break;
+						case "agents":
+							setAgentsOpen((v) => !v);
+							break;
+						case "hud":
+							setHudOpen((v) => !v);
+							break;
+						case "approvals": setApprovalsOpen((v) => !v);
+					}
+				};
+				window.addEventListener("qubit-office:toggle", onToggle);
+				return () => window.removeEventListener("qubit-office:toggle", onToggle);
+			}, []);
+			useEffect(() => {
 				menuRef.current?.update({
 					agents: agentsOpen,
 					hud: hudOpen,

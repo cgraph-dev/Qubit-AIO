@@ -178,10 +178,13 @@ describe("office shell accessibility landmarks", () => {
   it("opens the singular campus world instead of the old per-floor cards", async () => {
     stubFetch();
     await act(async () => { render({}); });
-    const toggle = document.querySelector(
-      '[data-testid="office-campus-toggle"]') as HTMLButtonElement;
-    expect(toggle).not.toBeNull();
-    await act(async () => { toggle.click(); });
+    // The visible control is the injected Panels icon. The host seam is the
+    // same programmatic toggle voice/host code uses; no duplicate text button.
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("qubit-office:toggle", {
+        detail: "campus",
+      }));
+    });
     expect(document.querySelector('[data-testid="office-campus-world"]'))
       .not.toBeNull();
     expect(document.querySelector('[data-testid="office-floor-campus"]'))
