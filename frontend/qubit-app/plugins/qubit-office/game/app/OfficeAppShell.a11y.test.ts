@@ -92,10 +92,13 @@ describe("office shell accessibility landmarks", () => {
     const toolbar = document.getElementById("office-game-controls") as HTMLElement;
     expect(toolbar.getAttribute("role")).toBe("toolbar");
     expect(toolbar.getAttribute("aria-label")).toBe("Office panels");
+    // The panel controls live in the office's own Panels icon group, not in a
+    // second bottom text toolbar; the landmark stays as the escape target.
     expect(toolbar.querySelector('[data-testid="office-command-center-toggle"]'))
-      .not.toBeNull();
+      .toBeNull();
     expect(toolbar.querySelector('[data-testid="office-timeline-toggle"]'))
-      .not.toBeNull();
+      .toBeNull();
+    expect(toolbar.textContent).toContain("top right");
 
     // The whole experience is not an ARIA application (that would trap SRs).
     expect(shell.getAttribute("role")).not.toBe("application");
@@ -146,25 +149,30 @@ describe("office shell accessibility landmarks", () => {
     expect(shell.getAttribute("data-office-contrast")).toBe("high");
   });
 
-  it("moves focus into a sheet and restores the opener when it closes", async () => {
+  it("opens the command center from the keyboard and restores focus on close", async () => {
     stubFetch();
     await act(async () => { render({}); });
-    const toggle = document.querySelector(
-      '[data-testid="office-command-center-toggle"]') as HTMLButtonElement;
-    expect(toggle).not.toBeNull();
+    // No duplicate text toggle: the control is the injected Panels icon.
+    expect(document.querySelector(
+      '[data-testid="office-command-center-toggle"]')).toBeNull();
 
-    toggle.focus();
-    expect(document.activeElement).toBe(toggle);
-    await act(async () => { toggle.click(); });
+    await act(async () => {
+      window.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "k", ctrlKey: true, bubbles: true,
+      }));
+    });
     const dock = document.getElementById("office-game-command-center-dock");
     expect(dock).not.toBeNull();
-    // Focus landed inside the sheet (its own close button from the panel).
+    // Focus landed inside the sheet (its search field or close button).
     expect(dock?.contains(document.activeElement)).toBe(true);
 
-    await act(async () => { toggle.click(); });
+    const close = document.querySelector(
+      '[data-testid="command-center-close"]') as HTMLButtonElement;
+    await act(async () => { close.click(); });
     expect(document.getElementById("office-game-command-center-dock")).toBeNull();
-    // The opener is still attached, so focus returns to it exactly.
-    expect(document.activeElement).toBe(toggle);
+    // The opener (a keyboard shortcut, not a button) has no element to restore
+    // to, so focus returns to the workspace landmark instead of the body.
+    expect(document.activeElement?.id).toBe("office-game-main");
   });
 
   it("offers Escape inside the office frame as an escape from the canvas", async () => {

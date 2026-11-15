@@ -12,6 +12,7 @@
  * React comes from the HOST: `R.createElement`, never an import.
  */
 import type { OfficeGameShellProps } from "../OfficeGameShell";
+import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
 import {
   TIMELINE_KINDS,
   announcement,
@@ -93,6 +94,7 @@ export function createTimeline(
   hooks: OfficeGameShellProps["hooks"],
 ) {
   const { useState, useEffect, useRef } = hooks;
+  const useBusinessSetup = createBusinessSetup(R, hooks);
 
   return function Timeline(props: TimelineProps) {
     const [query, setQuery] = useState("");
@@ -103,6 +105,14 @@ export function createTimeline(
     const [activeIndex, setActiveIndex] = useState(-1);
     const [retryToken, setRetryToken] = useState(0);
     const [reducedMotion, setReducedMotion] = useState(false);
+    // Called unconditionally so the hook order is stable; it only renders a
+    // write control and never creates a tenant on mount.
+    const setup = useBusinessSetup({
+      base: props.base,
+      fetchImpl: props.fetchImpl,
+      surface: "operator timeline",
+      onBootstrapped: () => setRetryToken((value: number) => value + 1),
+    });
     const restoreRef = useRef<HTMLElement | null>(null);
     const itemRefs = useRef<Array<HTMLElement | null>>([]);
 
@@ -297,25 +307,29 @@ export function createTimeline(
     } else if (read.kind === "error" || read.kind === "unavailable") {
       const code = read.kind === "unavailable" ? read.code : "TIMELINE_READ_FAILED";
       const detail = read.kind === "unavailable" ? read.detail : read.message;
-      children.push(R.createElement("div", {
-        key: "error",
-        className: "timeline__state timeline__state--error",
-        "data-testid": "timeline-error",
-        "data-code": code,
-        role: "alert",
-      }, [
-        R.createElement("strong", { key: "t" },
-          "The operator timeline is unavailable"),
-        R.createElement("div", {
-          key: "d", className: "timeline__muted",
-          "data-testid": "timeline-error-detail",
-        }, `${code}: ${detail}`),
-        R.createElement("button", {
-          key: "r", type: "button",
-          "data-testid": "timeline-retry",
-          onClick: () => setRetryToken((value: number) => value + 1),
-        }, "Retry"),
-      ]));
+      if (isTenantMissing(read.kind === "unavailable" ? read.code : "")) {
+        children.push(setup.render());
+      } else {
+        children.push(R.createElement("div", {
+          key: "error",
+          className: "timeline__state timeline__state--error",
+          "data-testid": "timeline-error",
+          "data-code": code,
+          role: "alert",
+        }, [
+          R.createElement("strong", { key: "t" },
+            "The operator timeline is unavailable"),
+          R.createElement("div", {
+            key: "d", className: "timeline__muted",
+            "data-testid": "timeline-error-detail",
+          }, `${code}: ${detail}`),
+          R.createElement("button", {
+            key: "r", type: "button",
+            "data-testid": "timeline-retry",
+            onClick: () => setRetryToken((value: number) => value + 1),
+          }, "Retry"),
+        ]));
+      }
     } else if (read.kind === "empty" || items.length === 0) {
       children.push(R.createElement("div", {
         key: "empty",

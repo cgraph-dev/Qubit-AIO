@@ -10,6 +10,7 @@
  * React comes from the HOST: `R.createElement`, never an import.
  */
 import type { OfficeGameShellProps } from "../OfficeGameShell";
+import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
 import {
   announcement,
   clampIndex,
@@ -56,6 +57,7 @@ export function createCommandCenter(
   hooks: OfficeGameShellProps["hooks"],
 ) {
   const { useState, useEffect, useRef } = hooks;
+  const useBusinessSetup = createBusinessSetup(R, hooks);
 
   return function CommandCenter(props: CommandCenterProps) {
     const [query, setQuery] = useState(String(props.initialQuery ?? ""));
@@ -65,6 +67,17 @@ export function createCommandCenter(
       String(props.initialStatus ?? "all"));
     const [read, setRead] = useState<CommandCenterRead>({ kind: "loading" });
     const [activeIndex, setActiveIndex] = useState(-1);
+    // Bumped after the owner boots the Business OS, so the effect re-reads and
+    // the projection replaces the setup state.
+    const [attempt, setAttempt] = useState(0);
+    // Called unconditionally so the hook order is stable. It only renders a
+    // write control; nothing is created unless the operator presses it.
+    const setup = useBusinessSetup({
+      base: props.base,
+      fetchImpl: props.fetchImpl,
+      surface: "command center",
+      onBootstrapped: () => setAttempt((value: number) => value + 1),
+    });
     const searchRef = useRef<HTMLInputElement | null>(null);
     const restoreRef = useRef<HTMLElement | null>(null);
     const itemRefs = useRef<Array<HTMLElement | null>>([]);
@@ -103,7 +116,7 @@ export function createCommandCenter(
         live = false;
         ctl?.abort();
       };
-    }, [query, kindFilter, statusFilter, props.base, props.fetchImpl]);
+    }, [query, kindFilter, statusFilter, props.base, props.fetchImpl, attempt]);
 
     const projection = read.kind === "available" ? read.projection : null;
     const entries = filterEntries(projection?.entries, {
@@ -270,19 +283,25 @@ export function createCommandCenter(
       const code = read.kind === "unavailable"
         ? read.code : "COMMAND_CENTER_READ_FAILED";
       const detail = read.kind === "unavailable" ? read.detail : read.message;
-      children.push(R.createElement("div", {
-        key: "state",
-        className: "command-center__state command-center__state--error",
-        "data-testid": "command-center-state",
-        "data-state": read.kind,
-        "data-code": code,
-        role: "alert",
-      }, [
-        R.createElement("strong", { key: "t" }, "Command center unavailable"),
-        R.createElement("span", {
-          key: "d", "data-testid": "command-center-error-detail",
-        }, `${code}: ${detail}`),
-      ]));
+      if (isTenantMissing(read.kind === "unavailable" ? read.code : "")) {
+        // A fresh profile is a real state, not an error: offer the explicit,
+        // owner-triggered setup instead of an inert failure message.
+        children.push(setup.render());
+      } else {
+        children.push(R.createElement("div", {
+          key: "state",
+          className: "command-center__state command-center__state--error",
+          "data-testid": "command-center-state",
+          "data-state": read.kind,
+          "data-code": code,
+          role: "alert",
+        }, [
+          R.createElement("strong", { key: "t" }, "Command center unavailable"),
+          R.createElement("span", {
+            key: "d", "data-testid": "command-center-error-detail",
+          }, `${code}: ${detail}`),
+        ]));
+      }
     } else if (projection) {
       children.push(R.createElement("p", {
         key: "announce",

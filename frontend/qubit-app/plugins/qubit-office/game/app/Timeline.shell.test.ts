@@ -3,6 +3,7 @@
  * contracts. State-slot seeding mirrors the established shell harness. */
 import { describe, expect, it, vi } from "vitest";
 import { createOfficeApp } from "./OfficeAppShell";
+import { MENU_BUTTONS } from "./office-menu";
 
 function createStatefulHarness(seed: Record<number, unknown> = {}) {
   const frame = {
@@ -108,25 +109,38 @@ describe("operator timeline shell dock", () => {
     h.cleanup();
   });
 
-  it("exposes a labelled toggle that reports the dock state", () => {
+  it("exposes the timeline as an injected Panels icon, not a text toggle", () => {
     const h = createStatefulHarness({ 14: true });
     h.render({});
-    const toggle = h.tree.find(
-      (e) => e.props["data-testid"] === "office-timeline-toggle");
-    expect(toggle).toBeDefined();
-    expect(toggle?.props["aria-controls"]).toBe("office-game-timeline-dock");
-    expect(toggle?.props["aria-expanded"]).toBe(true);
-    expect(toggle?.props["aria-label"]).toBe("Open the operator timeline");
-    expect(String(toggle?.props.children)).toContain("Timeline");
+    // The dock exists...
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-timeline-dock"))
+      .toBeDefined();
+    // ...and the duplicate shell text toggle is gone. The control is the
+    // office's own icon menu entry, whose contract names the same dock.
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-timeline-toggle")).toBeUndefined();
+    const spec = MENU_BUTTONS.find((button) => button.id === "timeline");
+    expect(spec).toBeDefined();
+    expect(spec?.label).toBe("Timeline");
+    expect(spec?.title).toContain("Timeline");
+    expect(spec?.controls).toBe("office-game-timeline-dock");
+    expect(spec?.icon.d).toMatch(/^M/);
     h.cleanup();
   });
 
   it("closing the timeline removes the sheet and clears the toolbar marker", () => {
     const h = createStatefulHarness({ 14: true });
     h.render({});
-    const toggle = h.tree.find(
-      (e) => e.props["data-testid"] === "office-timeline-toggle");
-    (toggle?.props.onClick as () => void)();
+    expect(h.tree.find(
+      (e) => e.props["data-testid"] === "office-game-timeline-dock"))
+      .toBeDefined();
+    // The dock's panel is the Timeline function element; call its real close
+    // handler, which is what the dock's own Close button does.
+    const panel = h.tree.find(
+      (e) => typeof e.type === "function"
+        && typeof e.props.onClose === "function");
+    (panel?.props.onClose as () => void)();
     h.render({});
     expect(h.tree.find(
       (e) => e.props["data-testid"] === "office-game-timeline-dock"))

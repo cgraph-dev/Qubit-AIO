@@ -66,6 +66,12 @@ export interface OfficeAppProps {
   /** Serve the client's own demo data. Off by default — see office-app.ts. */
   mock?: boolean;
   /**
+   * Optional fetch override for the shell's own reads (campus directory,
+   * outside world). Production leaves it undefined and uses the host fetch;
+   * tests inject a hermetic one.
+   */
+  fetchImpl?: typeof fetch;
+  /**
    * Which seat the model panel configures. Omitted = no panel, so the pure
    * game view (and every existing caller) is unchanged.
    */
@@ -291,6 +297,85 @@ export function createOfficeApp(
       prefersReducedMotion());
     const [highContrast, setHighContrast] = useState<boolean>(
       prefersHighContrast());
+
+    // THE PANEL TOGGLES. Every dock is opened from the office's OWN icon group
+    // (the top-right Panels row), so the shell no longer paints a text-button
+    // toolbar at the bottom of the screen. The callbacks keep the previous
+    // exclusivity rules: a side sheet closes the others, while Agents and HUD
+    // may share the row (the stylesheet splits it). Campus keeps its original
+    // behavior because it is a full-surface view, not a side sheet.
+    const toggleAgents = () => {
+      setApprovalsOpen(false);
+      setCommandCenterOpen(false);
+      setTimelineOpen(false);
+      setStudioOpen(false);
+      setAgentsOpen((v: boolean) => !v);
+    };
+    const toggleHud = () => {
+      setApprovalsOpen(false);
+      setCommandCenterOpen(false);
+      setTimelineOpen(false);
+      setStudioOpen(false);
+      setControlSeat(null);
+      setHudOpen((v: boolean) => !v);
+    };
+    const toggleApprovals = () => {
+      setAgentsOpen(false);
+      setHudOpen(false);
+      setWarRoomOpen(false);
+      setCommandCenterOpen(false);
+      setTimelineOpen(false);
+      setStudioOpen(false);
+      setControlSeat(null);
+      setApprovalsOpen((v: boolean) => !v);
+    };
+    const toggleCommandCenter = () => {
+      setAgentsOpen(false);
+      setHudOpen(false);
+      setWarRoomOpen(false);
+      setApprovalsOpen(false);
+      setEtsyOpen(false);
+      setTimelineOpen(false);
+      setStudioOpen(false);
+      setControlSeat(null);
+      setCommandCenterOpen((v: boolean) => !v);
+    };
+    const toggleTimeline = () => {
+      setAgentsOpen(false);
+      setHudOpen(false);
+      setWarRoomOpen(false);
+      setApprovalsOpen(false);
+      setEtsyOpen(false);
+      setCommandCenterOpen(false);
+      setStudioOpen(false);
+      setControlSeat(null);
+      setTimelineOpen((v: boolean) => !v);
+    };
+    const toggleStudio = () => {
+      setAgentsOpen(false);
+      setHudOpen(false);
+      setWarRoomOpen(false);
+      setApprovalsOpen(false);
+      setEtsyOpen(false);
+      setCommandCenterOpen(false);
+      setTimelineOpen(false);
+      setControlSeat(null);
+      setStudioOpen((v: boolean) => !v);
+    };
+    const toggleCampus = () => setCampusOpen((v: boolean) => !v);
+    const toggleFor = (id: string): (() => void) => {
+      switch (id) {
+        case "agents": return toggleAgents;
+        case "hud": return toggleHud;
+        case "approvals": return toggleApprovals;
+        case "command-center": return toggleCommandCenter;
+        case "timeline": return toggleTimeline;
+        case "studio": return toggleStudio;
+        case "campus": return toggleCampus;
+        default: return () => {};
+      }
+    };
+
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
@@ -512,34 +597,21 @@ export function createOfficeApp(
         menuRef.current?.dispose();
         setMenuFallback(false);
         menuRef.current = installOfficeMenuButtons(win, {
-          onToggleAgents: () => {
-            setApprovalsOpen(false);
-            setCommandCenterOpen(false);
-            setTimelineOpen(false);
-            setAgentsOpen((v: boolean) => !v);
-          },
-          onToggleHud: () => {
-            setApprovalsOpen(false);
-            setCommandCenterOpen(false);
-            setTimelineOpen(false);
-            setControlSeat(null);
-            setHudOpen((v: boolean) => !v);
-          },
-          onToggleApprovals: () => {
-            setAgentsOpen(false);
-            setHudOpen(false);
-            setWarRoomOpen(false);
-            setCommandCenterOpen(false);
-            setTimelineOpen(false);
-            setControlSeat(null);
-            setApprovalsOpen((v: boolean) => !v);
-          },
+          onToggleAgents: toggleAgents,
+          onToggleHud: toggleHud,
+          onToggleApprovals: toggleApprovals,
+          onToggleCommandCenter: toggleCommandCenter,
+          onToggleTimeline: toggleTimeline,
+          onToggleStudio: toggleStudio,
+          onToggleCampus: toggleCampus,
           onFallback: (show: boolean) => setMenuFallback(show),
           onAttach: () => setMenuFallback(false),
         });
         menuRef.current?.update({
           agents: agentsOpen, hud: hudOpen,
           approvals: approvalsOpen, pendingApprovals: approvalCount,
+          commandCenter: commandCenterOpen, timeline: timelineOpen,
+          studio: studioOpen, campus: campusOpen,
         });
         props.onReady?.();
       };
@@ -571,6 +643,8 @@ export function createOfficeApp(
       menuRef.current?.update({
         agents: agentsOpen, hud: hudOpen,
         approvals: approvalsOpen, pendingApprovals: approvalCount,
+        commandCenter: commandCenterOpen, timeline: timelineOpen,
+        studio: studioOpen, campus: campusOpen,
       });
     });
 
@@ -996,31 +1070,13 @@ export function createOfficeApp(
       }, MENU_BUTTONS.map((spec: MenuButtonSpec) => {
         const geometry = menuIconGeometry(spec);
         const pressed = spec.id === "agents" ? agentsOpen
-          : spec.id === "hud" ? hudOpen : approvalsOpen;
-        const onActivate = spec.id === "agents"
-          ? () => {
-              setApprovalsOpen(false);
-              setCommandCenterOpen(false);
-              setTimelineOpen(false);
-              setAgentsOpen((v: boolean) => !v);
-            }
-          : spec.id === "hud"
-          ? () => {
-              setApprovalsOpen(false);
-              setCommandCenterOpen(false);
-              setTimelineOpen(false);
-              setControlSeat(null);
-              setHudOpen((v: boolean) => !v);
-            }
-          : () => {
-              setAgentsOpen(false);
-              setHudOpen(false);
-              setWarRoomOpen(false);
-              setCommandCenterOpen(false);
-              setTimelineOpen(false);
-              setControlSeat(null);
-              setApprovalsOpen((v: boolean) => !v);
-            };
+          : spec.id === "hud" ? hudOpen
+          : spec.id === "approvals" ? approvalsOpen
+          : spec.id === "command-center" ? commandCenterOpen
+          : spec.id === "timeline" ? timelineOpen
+          : spec.id === "studio" ? studioOpen
+          : campusOpen;
+        const onActivate = toggleFor(spec.id);
         const label = spec.id === "approvals" && approvalCount > 0
           ? `${spec.label} (${approvalCount} pending)` : spec.label;
         const parts: unknown[] = [R.createElement("svg", {
@@ -1058,29 +1114,8 @@ export function createOfficeApp(
       })));
     }
 
-    // THE COMMAND-CENTER TOGGLE. A visible, labelled shell control (not an
-    // icon-only button) that opens the semantic search region. It is an
-    // overlay so the office iframe keeps its full height and width.
-    const commandCenterToggle = R.createElement("button", {
-      key: "command-center-toggle",
-      type: "button",
-      className: "office-game__btn office-theme-menu-btn office-game__commandCenterToggle",
-      "data-testid": "office-command-center-toggle",
-      "aria-expanded": commandCenterOpen,
-      "aria-controls": "office-game-command-center-dock",
-      "aria-label": "Open the office command center",
-      onClick: () => {
-        setAgentsOpen(false);
-        setHudOpen(false);
-        setWarRoomOpen(false);
-        setApprovalsOpen(false);
-        setEtsyOpen(false);
-        setControlSeat(null);
-        setCommandCenterOpen((v: boolean) => !v);
-      },
-    }, "Command Center");
-
-    // THE COMMAND CENTER. A read-only projection over the real tower, roster,
+    // THE COMMAND CENTER. Opened from the office's own Panels icon. A
+    // read-only projection over the real tower, roster,
     // tasks, sessions and approvals. It is an exclusive side sheet, so it can
     // never cover another dock's close button.
     if (commandCenterOpen) {
@@ -1102,64 +1137,11 @@ export function createOfficeApp(
       ]));
     }
 
-    // THE OPERATOR TIMELINE TOGGLE (P4-07). A visible, labelled shell control
-    // beside the command center. Opening it closes every other sheet so two
-    // side sheets can never overlap the iframe or each other.
-    const timelineToggle = R.createElement("button", {
-      key: "timeline-toggle",
-      type: "button",
-      className: "office-game__btn office-theme-menu-btn office-game__timelineToggle",
-      "data-testid": "office-timeline-toggle",
-      "aria-expanded": timelineOpen,
-      "aria-controls": "office-game-timeline-dock",
-      "aria-label": "Open the operator timeline",
-      onClick: () => {
-        setAgentsOpen(false);
-        setHudOpen(false);
-        setWarRoomOpen(false);
-        setApprovalsOpen(false);
-        setEtsyOpen(false);
-        setCommandCenterOpen(false);
-        setControlSeat(null);
-        setTimelineOpen((v: boolean) => !v);
-      },
-    }, "Timeline");
-
-    const studioToggle = R.createElement("button", {
-      key: "studio-toggle",
-      type: "button",
-      className: "office-game__btn office-theme-menu-btn office-game__studioToggle",
-      "data-testid": "office-studio-toggle",
-      "aria-expanded": studioOpen,
-      "aria-controls": "office-game-studio-dock",
-      "aria-label": "Open the office studio",
-      onClick: () => {
-        setAgentsOpen(false);
-        setHudOpen(false);
-        setWarRoomOpen(false);
-        setApprovalsOpen(false);
-        setEtsyOpen(false);
-        setCommandCenterOpen(false);
-        setTimelineOpen(false);
-        setControlSeat(null);
-        setStudioOpen((v: boolean) => !v);
-      },
-    }, "Studio");
-
-    const campusToggle = R.createElement("button", {
-      key: "campus-toggle",
-      type: "button",
-      className: "office-game__btn office-theme-menu-btn office-game__campusToggle",
-      "data-testid": "office-campus-toggle",
-      "aria-expanded": campusOpen,
-      "aria-controls": "office-game-campus",
-      "aria-label": "Open the floor campus",
-      onClick: () => setCampusOpen((v: boolean) => !v),
-    }, "Campus");
-
-    // P6-05 — a real toolbar landmark groups the persistent shell controls.
-    // It is also the skip target that gets a keyboard user OUT of the canvas
-    // when the vendored client swallows Tab (and the Escape escape hatch).
+    // P6-05 — a real toolbar landmark remains the keyboard escape hatch and
+    // skip target, but it no longer paints text buttons: every panel is opened
+    // from the office's own Panels icon group (or the host fallback below). An
+    // empty landmark is intentionally invisible; its label still announces the
+    // destination when the skip link or Escape focuses it.
     children.push(R.createElement("div", {
       key: "toolbar",
       id: "office-game-controls",
@@ -1168,7 +1150,10 @@ export function createOfficeApp(
       role: "toolbar",
       "aria-label": "Office panels",
       tabIndex: -1,
-    }, [commandCenterToggle, timelineToggle, studioToggle, campusToggle]));
+    }, R.createElement("span", {
+      key: "hint",
+      className: "office-game__sr-only",
+    }, "Office panel buttons are in the office toolbar at the top right.")));
 
     // THE OPERATOR TIMELINE. A read-only, evidence-backed projection over the
     // durable Business OS. It is a Qubit-shell dock: the iframe keeps its full

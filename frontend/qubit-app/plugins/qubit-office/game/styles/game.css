@@ -182,8 +182,11 @@
   left: 50%;
   transform: translateX(-50%);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--office-s1);
+  max-width: calc(100% - (2 * var(--office-s3)));
   padding: var(--office-s1);
   border-radius: var(--office-radius);
   border: var(--office-border);
@@ -2314,4 +2317,425 @@
 .office-game__campusTabs .office-game__btn[aria-pressed="true"] {
   border-color: #e08fb0;
   background: rgba(224, 143, 176, 0.18);
+}
+
+/* --- Studio: panel inventory -------------------------------------------- */
+/* The Studio used to render the inventory as one unstyled text run: every
+   title, authority, permission and badge collapsed into the same paragraph
+   flow. The card layout below gives each panel a surface, a clear hierarchy
+   and spacing without hiding any field the backend declares. */
+.office-game__studioBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--office-s3);
+  background: var(--office-void);
+}
+
+.office-game__studioTab[aria-pressed="true"] {
+  border-color: var(--office-accent);
+  background: rgba(224, 143, 176, 0.18);
+}
+
+.panel-inventory {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s4);
+  font-size: var(--office-fs-sm);
+  color: var(--office-ink);
+}
+
+.panel-inventory--state {
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  padding: var(--office-s4);
+  background: var(--office-ground);
+  color: var(--office-muted);
+}
+
+.panel-inventory--state strong {
+  display: block;
+  color: var(--office-ink);
+  margin-bottom: var(--office-s1);
+}
+
+.panel-inventory__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s1);
+  padding-bottom: var(--office-s3);
+  border-bottom: var(--office-border);
+}
+
+.panel-inventory__eyebrow {
+  margin: 0;
+  color: var(--office-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: var(--office-fs-xs);
+}
+
+.panel-inventory__heading {
+  margin: 0;
+  font-size: var(--office-fs-lg);
+  line-height: 1.25;
+}
+
+.panel-inventory__lead {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--office-muted);
+  line-height: 1.5;
+}
+
+.panel-inventory__count {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-inventory__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s3);
+}
+
+.panel-inventory__groupHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--office-s2);
+  padding-top: var(--office-s2);
+  border-bottom: var(--office-border);
+}
+
+.panel-inventory__groupTitle {
+  margin: 0 0 var(--office-s1);
+  font-size: var(--office-fs-md);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--office-ink);
+}
+
+.panel-inventory__groupCount {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel-inventory__row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+  padding: var(--office-s3);
+  border: var(--office-border);
+  border-left: 3px solid var(--office-accent);
+  border-radius: var(--office-radius);
+  background: var(--office-ground);
+}
+
+.panel-inventory__rowHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--office-s1) var(--office-s3);
+}
+
+.panel-inventory__title {
+  margin: 0;
+  font-size: var(--office-fs-md);
+  color: var(--office-ink);
+}
+
+.panel-inventory__groupTag {
+  margin: 0 0 0 auto;
+  color: var(--office-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--office-fs-xs);
+}
+
+.panel-inventory__description {
+  margin: 0;
+  color: var(--office-dim);
+  line-height: 1.5;
+}
+
+.panel-inventory__authority {
+  margin: 0;
+  color: var(--office-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: var(--office-fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.panel-inventory__label {
+  color: var(--office-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--office-fs-xs);
+}
+
+.panel-inventory__facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: var(--office-s3);
+}
+
+.panel-inventory__fact {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s1);
+  min-width: 0;
+}
+
+.panel-inventory__pills {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s1);
+}
+
+.panel-inventory__pill {
+  padding: 2px 8px;
+  border: var(--office-border);
+  border-radius: 999px;
+  background: var(--office-plate);
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
+}
+
+.panel-inventory__pill--state {
+  border-color: var(--office-line-strong);
+}
+
+.panel-inventory__action {
+  margin: 0;
+  padding: var(--office-s2);
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+  color: var(--office-ink);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.panel-inventory__action--typed_refusal {
+  border-left: 3px solid var(--office-warn);
+}
+
+.panel-inventory__action--real {
+  border-left: 3px solid var(--office-ok);
+}
+
+.panel-inventory__muted {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+  overflow-wrap: anywhere;
+}
+
+.panel-inventory__link {
+  color: var(--office-accent);
+  font-size: var(--office-fs-xs);
+  overflow-wrap: anywhere;
+}
+
+/* --- Business OS setup (Command Center / Timeline first run) ------------- */
+.business-setup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s3);
+  margin: var(--office-s3) 0;
+  padding: var(--office-s4);
+  border: var(--office-border-strong);
+  border-left: 4px solid var(--office-accent);
+  border-radius: var(--office-radius);
+  background: var(--office-ground);
+  color: var(--office-ink);
+}
+
+.business-setup__eyebrow {
+  margin: 0;
+  color: var(--office-accent);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: var(--office-fs-xs);
+}
+
+.business-setup__title {
+  margin: 0;
+  font-size: var(--office-fs-lg);
+  line-height: 1.25;
+}
+
+.business-setup__lead {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.business-setup__note {
+  margin: 0;
+  color: var(--office-muted);
+  line-height: 1.5;
+}
+
+.business-setup__start {
+  align-self: flex-start;
+  appearance: none;
+  min-height: 32px;
+  padding: var(--office-s2) var(--office-s4);
+  border: 1px solid var(--office-accent);
+  border-radius: var(--office-radius);
+  background: var(--office-accent);
+  color: var(--office-void);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.business-setup__start:hover {
+  filter: brightness(1.08);
+}
+
+.business-setup__start:disabled {
+  opacity: 0.65;
+  cursor: progress;
+}
+
+.business-setup__start:focus-visible {
+  outline: 2px solid var(--office-ink);
+  outline-offset: 2px;
+}
+
+.business-setup__error {
+  margin: 0;
+  padding: var(--office-s2);
+  border: 1px solid var(--office-bad);
+  border-radius: var(--office-radius);
+  background: rgba(224, 85, 74, 0.12);
+  line-height: 1.5;
+}
+
+.business-setup__hint {
+  color: var(--office-muted);
+}
+
+.business-setup__ok {
+  margin: 0;
+  color: var(--office-ok);
+  font-weight: 600;
+}
+
+/* --- Command Center / operator timeline: readable base layout ------------ */
+.command-center,
+.timeline {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--office-s2);
+  min-height: 0;
+  overflow: auto;
+  padding: var(--office-s3);
+  font-size: var(--office-fs-sm);
+  color: var(--office-ink);
+}
+
+.command-center__search,
+.timeline__controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s2);
+}
+
+.command-center__filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--office-s2);
+}
+
+.command-center__summary,
+.command-center__state,
+.timeline__state,
+.timeline__summary {
+  margin: 0;
+  padding: var(--office-s2);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  background: var(--office-ground);
+}
+
+.command-center__summary h3 {
+  margin: 0 0 var(--office-s1);
+  font-size: var(--office-fs-md);
+}
+
+.command-center__results,
+.timeline__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--office-s1);
+}
+
+.command-center__item > a,
+.command-center__item > button {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s1) var(--office-s2);
+  width: 100%;
+  padding: var(--office-s2);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.command-center__item > a:hover,
+.command-center__item > button:hover {
+  border-color: var(--office-accent);
+}
+
+.timeline__item {
+  padding: var(--office-s2);
+  border: var(--office-border);
+  border-radius: var(--office-radius);
+  background: var(--office-ground);
+}
+
+.timeline__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--office-s2);
+}
+
+.timeline__title {
+  font-weight: 600;
+}
+
+.timeline__muted {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+
+.timeline__pre {
+  overflow: auto;
+  max-height: 18rem;
+  margin: var(--office-s1) 0 0;
+  padding: var(--office-s2);
+  border-radius: var(--office-radius);
+  background: var(--office-void);
+  color: var(--office-ink);
+  font-size: var(--office-fs-xs);
 }

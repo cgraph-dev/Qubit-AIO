@@ -183,3 +183,57 @@ describe("PanelInventory", () => {
       .toContain("h_business_agents_list");
   });
 });
+
+describe("PanelInventory readable structure", () => {
+  it("groups panels into labelled sections instead of one raw text dump", async () => {
+    const h = await mountOnce({
+      rows: [
+        row(),
+        row({
+          panel_id: "timeline",
+          title: "Operator timeline",
+          group: "operations",
+          description: "Durable run records",
+        }),
+        row({
+          panel_id: "warroom",
+          title: "War Room",
+          group: "work",
+          description: "Idea lab sessions",
+        }),
+      ],
+    });
+    const groups = allByTestId(h, "panel-inventory-group");
+    expect(groups).toHaveLength(2);
+    const groupTitles = groups.map(textOf);
+    expect(groupTitles.join(" ")).toContain("Work");
+    expect(groupTitles.join(" ")).toContain("Operations");
+    // Every declared panel is still a row inside one accessible list.
+    expect(allByTestId(h, "panel-row")).toHaveLength(3);
+    const list = allByTestId(h, "panel-inventory-list")[0];
+    expect(list.props.role).toBe("list");
+    expect(list.props["aria-label"]).toBe("Panels");
+    expect(String(list.props.className)).toContain("panel-inventory__list");
+  });
+
+  it("renders a card header, pills and a muted source line per row", async () => {
+    const h = await mountOnce({ rows: [row()] });
+    const panel = allByTestId(h, "panel-row")[0];
+    expect(String(panel.props.className)).toContain("panel-inventory__row");
+    expect(panel.props["data-authority"]).toBe(
+      "voicebridge.business.agents.AgentControlService");
+    // Headings and labels are real elements, not concatenated text.
+    expect(allByTestId(h, "panel-title")[0].type).toBe("h4");
+    expect(String(allByTestId(h, "panel-title")[0].props.className))
+      .toContain("panel-inventory__title");
+    expect(String(allByTestId(h, "panel-authority")[0].props.className))
+      .toContain("panel-inventory__authority");
+    const badges = allByTestId(h, "panel-state-badge");
+    expect(badges.every((badge) =>
+      String(badge.props.className).includes("panel-inventory__pill"))).toBe(true);
+    const source = allByTestId(h, "panel-source")[0];
+    expect(String(source.props.className)).toContain("panel-inventory__muted");
+    const link = allByTestId(h, "panel-deep-link")[0];
+    expect(String(link.props.className)).toContain("panel-inventory__link");
+  });
+});

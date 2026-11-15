@@ -192661,7 +192661,8 @@ create: function(game) {
 				cols: 27,
 				rows: 14,
 				d: "M5 0h4v1H5zM4 1h6v1H4zM13 1h3v1H13zM3 2h7v1H3zM12 2h5v1H12zM3 3h7v1H3zM12 3h5v1H12zM3 4h7v1H3zM12 4h5v1H12zM24 4h1v1H24zM3 5h7v1H3zM12 5h5v1H12zM24 5h1v1H24zM4 6h5v1H4zM13 6h3v1H13zM22 6h5v1H22zM4 7h5v1H4zM13 7h3v1H13zM24 7h1v1H24zM5 8h3v1H5zM11 8h7v1H11zM24 8h1v1H24zM3 9h7v1H3zM12 9h7v1H12zM1 10h11v1H1zM13 10h6v1H13zM0 11h13v1H0zM0 12h13v1H0zM0 13h13v1H0z"
-			}
+			},
+			controls: "office-game-agents-dock"
 		},
 		{
 			id: "hud",
@@ -192672,7 +192673,8 @@ create: function(game) {
 				cols: 19,
 				rows: 17,
 				d: "M0 0h5v1H0zM17 0h1v1H17zM0 1h1v1H0zM0 2h1v1H0zM0 3h1v1H0zM7 3h2v1H7zM10 3h2v1H10zM18 3h1v1H18zM5 4h8v1H5zM5 5h2v1H5zM9 5h1v1H9zM12 5h2v1H12zM4 6h2v1H4zM13 6h1v1H13zM4 7h1v1H4zM9 7h1v1H9zM13 7h1v1H13zM3 8h3v1H3zM8 8h1v1H8zM10 8h1v1H10zM12 8h3v1H12zM3 9h2v1H3zM9 9h1v1H9zM13 9h2v1H13zM4 10h1v1H4zM13 10h1v1H13zM4 11h2v1H4zM12 11h2v1H12zM5 12h2v1H5zM9 12h1v1H9zM11 12h2v1H11zM0 13h1v1H0zM6 13h6v1H6zM0 14h1v1H0zM9 14h1v1H9zM0 15h1v1H0zM0 16h4v1H0zM11 16h3v1H11z"
-			}
+			},
+			controls: "office-game-hud-dock"
 		},
 		{
 			id: "approvals",
@@ -192683,7 +192685,56 @@ create: function(game) {
 				cols: 13,
 				rows: 11,
 				d: "M12 0h1v1H12zM11 1h1v1H11zM10 2h1v1H10zM1 3h1v1H1zM9 3h1v1H9zM2 4h1v1H2zM8 4h1v1H8zM3 5h1v1H3zM7 5h1v1H7zM4 6h1v1H4zM6 6h1v1H6zM5 7h1v1H5z"
-			}
+			},
+			controls: "office-game-approvals-dock"
+		},
+		{
+			id: "command-center",
+			label: "Command Center",
+			title: "Command Center: search floors, rooms, desks, agents and tasks",
+			testId: "office-menu-command-center",
+			icon: {
+				cols: 16,
+				rows: 16,
+				d: "M6 1h4v1H6zM4 2h2v1H4zM10 2h2v1H10zM3 3h1v1H3zM12 3h1v1H12zM2 4h1v1H2zM13 4h1v1H13zM2 5h1v1H2zM13 5h1v1H13zM2 6h1v1H2zM13 6h1v1H13zM2 7h1v1H2zM13 7h1v1H13zM3 8h1v1H3zM12 8h1v1H12zM4 9h2v1H4zM10 9h2v1H10zM6 10h4v1H6zM10 11h1v1H10zM11 12h1v1H11zM12 13h1v1H12zM13 14h1v1H13zM14 15h1v1H14z"
+			},
+			controls: "office-game-command-center-dock"
+		},
+		{
+			id: "timeline",
+			label: "Timeline",
+			title: "Timeline: the replayable operator record of every run",
+			testId: "office-menu-timeline",
+			icon: {
+				cols: 16,
+				rows: 12,
+				d: "M0 6h16v1H0zM2 3h2v2H2zM7 2h2v2H7zM12 4h2v2H12zM4 8h2v2H4zM9 8h2v2H9zM14 8h2v2H14z"
+			},
+			controls: "office-game-timeline-dock"
+		},
+		{
+			id: "studio",
+			label: "Studio",
+			title: "Studio: panel inventory, room builder and outside world",
+			testId: "office-menu-studio",
+			icon: {
+				cols: 14,
+				rows: 13,
+				d: "M6 0h4v1H6zM3 2h2v1H3zM9 2h2v1H9zM2 3h1v1H2zM11 3h1v1H11zM1 5h1v1H1zM12 5h1v1H12zM1 7h1v1H1zM12 7h1v1H12zM2 9h1v1H2zM11 9h1v1H11zM3 10h2v1H3zM9 10h1v1H9zM6 11h4v1H6zM4 4h2v2H4zM8 4h2v2H8z"
+			},
+			controls: "office-game-studio-dock"
+		},
+		{
+			id: "campus",
+			label: "Campus",
+			title: "Campus: floor scenes and the 100-floor directory",
+			testId: "office-menu-campus",
+			icon: {
+				cols: 16,
+				rows: 16,
+				d: "M1 5h4v11H1zM6 2h4v14H6zM11 7h4v9H11zM2 6h1v1H2zM2 8h1v1H2zM2 10h1v1H2zM2 12h1v1H2zM7 3h1v1H7zM7 5h1v1H7zM7 7h1v1H7zM7 9h1v1H7zM7 11h1v1H7zM12 8h1v1H12zM12 10h1v1H12zM12 12h1v1H12z"
+			},
+			controls: "office-game-campus"
 		}
 	];
 	/** The group the office renders its own panel buttons in. */
@@ -192717,6 +192768,7 @@ create: function(game) {
 		button.setAttribute("aria-label", spec.label);
 		button.setAttribute("title", spec.title);
 		button.setAttribute("aria-pressed", "false");
+		button.setAttribute("aria-controls", spec.controls);
 		button.setAttribute("data-testid", spec.testId);
 		button.setAttribute("data-office-menu", spec.id);
 		button.addEventListener("click", onActivate);
@@ -192747,7 +192799,8 @@ create: function(game) {
 		return button;
 	}
 	/**
-	* Insert the two buttons into the office's panel group, before Settings.
+	* Insert every Qubit panel button into the office's panel group, before
+	* Settings. Existing nodes are never moved, restyled or removed.
 	*
 	* Returns ``null`` only when there is no document to install into. A group
 	* that is missing at call time is not a failure: the observer picks it up when
@@ -192759,12 +192812,31 @@ create: function(game) {
 		const byId = {
 			agents: null,
 			hud: null,
-			approvals: null
+			approvals: null,
+			"command-center": null,
+			timeline: null,
+			studio: null,
+			campus: null
 		};
 		const state = {
 			agents: false,
 			hud: false,
-			approvals: false
+			approvals: false,
+			commandCenter: false,
+			timeline: false,
+			studio: false,
+			campus: false
+		};
+		const activateFor = (id) => {
+			switch (id) {
+				case "agents": return opts.onToggleAgents;
+				case "hud": return opts.onToggleHud;
+				case "approvals": return opts.onToggleApprovals ?? (() => {});
+				case "command-center": return opts.onToggleCommandCenter ?? (() => {});
+				case "timeline": return opts.onToggleTimeline ?? (() => {});
+				case "studio": return opts.onToggleStudio ?? (() => {});
+				case "campus": return opts.onToggleCampus ?? (() => {});
+			}
 		};
 		let fallbackShown = false;
 		let attachedOnce = false;
@@ -192774,6 +192846,17 @@ create: function(game) {
 			if (fallbackShown === show) return;
 			fallbackShown = show;
 			opts.onFallback?.(show);
+		};
+		const stateFor = (id) => {
+			switch (id) {
+				case "agents": return Boolean(state.agents);
+				case "hud": return Boolean(state.hud);
+				case "approvals": return Boolean(state.approvals);
+				case "command-center": return Boolean(state.commandCenter);
+				case "timeline": return Boolean(state.timeline);
+				case "studio": return Boolean(state.studio);
+				case "campus": return Boolean(state.campus);
+			}
 		};
 		const badgeFor = (id) => {
 			if (id !== "approvals") return null;
@@ -192804,9 +192887,8 @@ create: function(game) {
 			for (const spec of MENU_BUTTONS) {
 				const existing = byId[spec.id];
 				if (existing && existing.isConnected) continue;
-				const onActivate = spec.id === "agents" ? opts.onToggleAgents : spec.id === "hud" ? opts.onToggleHud : opts.onToggleApprovals ?? (() => {});
-				const button = buildButton(doc, spec, onActivate);
-				button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
+				const button = buildButton(doc, spec, activateFor(spec.id));
+				button.setAttribute("aria-pressed", stateFor(spec.id) ? "true" : "false");
 				byId[spec.id] = button;
 				insert(group, button);
 			}
@@ -192843,10 +192925,14 @@ create: function(game) {
 				state.agents = Boolean(next.agents);
 				state.hud = Boolean(next.hud);
 				state.approvals = Boolean(next.approvals);
+				state.commandCenter = Boolean(next.commandCenter);
+				state.timeline = Boolean(next.timeline);
+				state.studio = Boolean(next.studio);
+				state.campus = Boolean(next.campus);
 				state.pendingApprovals = Math.max(0, Math.floor(Number(next.pendingApprovals ?? 0) || 0));
 				for (const spec of MENU_BUTTONS) {
 					const button = byId[spec.id];
-					if (button) button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
+					if (button) button.setAttribute("aria-pressed", stateFor(spec.id) ? "true" : "false");
 				}
 				paintApprovals();
 			},
@@ -198626,6 +198712,115 @@ create: function(game) {
 			}, children);
 		};
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/BusinessSetup.tsx
+	/** Whether a read failure means "this profile has no Business OS yet". */
+	function isTenantMissing(code) {
+		return String(code ?? "") === "BUSINESS_NOT_FOUND";
+	}
+	/** The pure surface: same markup for either panel, no hidden state. */
+	function renderBusinessSetup(R, state, surface, onStart, onRetry) {
+		const running = state.kind === "running";
+		const children = [
+			R.createElement("p", {
+				key: "eyebrow",
+				className: "business-setup__eyebrow"
+			}, "First run · setup required"),
+			R.createElement("h3", {
+				key: "title",
+				className: "business-setup__title"
+			}, "The Business OS is not set up yet"),
+			R.createElement("p", {
+				key: "lead",
+				className: "business-setup__lead"
+			}, `The ${surface} reads Qubit's durable Business OS, and this profile has no tenant yet. Set it up once to create the local Personal workspace and import the office seat roster.`),
+			R.createElement("p", {
+				key: "note",
+				className: "business-setup__note"
+			}, "Nothing is created until you press the button. Setup is local, idempotent, and never spends, contacts anyone, or calls a model.")
+		];
+		if (state.kind === "done") {
+			children.push(R.createElement("p", {
+				key: "done",
+				className: "business-setup__ok",
+				"data-testid": "business-setup-done",
+				role: "status",
+				"aria-live": "polite"
+			}, "Business OS is ready. Reloading this panel…"));
+			children.push(R.createElement("button", {
+				key: "retry",
+				type: "button",
+				className: "business-setup__start",
+				"data-testid": "business-setup-retry",
+				"aria-label": `Reload the ${surface} after setup`,
+				onClick: onRetry
+			}, "Reload this panel"));
+		} else children.push(R.createElement("button", {
+			key: "start",
+			type: "button",
+			className: "business-setup__start",
+			"data-testid": "business-setup-start",
+			"aria-label": "Create the Qubit Business OS workspace",
+			disabled: running,
+			onClick: onStart
+		}, running ? "Setting up the Business OS…" : "Set up Business OS"));
+		if (state.kind === "error") children.push(R.createElement("p", {
+			key: "error",
+			className: "business-setup__error",
+			"data-testid": "business-setup-error",
+			"data-code": state.code,
+			role: "alert"
+		}, [
+			R.createElement("strong", { key: "label" }, "Setup could not run. "),
+			R.createElement("span", { key: "detail" }, `${state.code}: ${state.detail}`),
+			R.createElement("span", {
+				key: "hint",
+				className: "business-setup__hint"
+			}, " Check that this dashboard is running with the owner session and that the Business OS bridge is enabled, then try again.")
+		]));
+		return R.createElement("section", {
+			className: "business-setup",
+			"data-testid": "business-setup",
+			"data-state": state.kind,
+			role: "region",
+			"aria-label": `Set up the Business OS for the ${surface}`
+		}, children);
+	}
+	/**
+	* Create the setup hook for one panel factory.
+	*
+	* The hook is called unconditionally at the top of the panel component, so the
+	* hook order stays stable across renders. `start` performs the only write this
+	* surface can cause; it never runs on mount.
+	*/
+	function createBusinessSetup(R, hooks) {
+		return function useBusinessSetup(opts) {
+			const [state, setState] = hooks.useState({ kind: "idle" });
+			const start = () => {
+				if (state.kind === "running") return;
+				setState({ kind: "running" });
+				bootstrapOfficeSeats({}, {
+					base: opts.base,
+					fetchImpl: opts.fetchImpl
+				}).then(() => {
+					setState({ kind: "done" });
+					opts.onBootstrapped?.();
+				}).catch((exc) => {
+					const code = exc instanceof BusinessApiError ? exc.code : "BUSINESS_SETUP_FAILED";
+					const detail = exc instanceof Error ? exc.message : String(exc);
+					setState({
+						kind: "error",
+						code,
+						detail
+					});
+				});
+			};
+			return {
+				state,
+				start,
+				render: () => renderBusinessSetup(R, state, opts.surface, start, () => opts.onBootstrapped?.())
+			};
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/CommandCenter.tsx
 	function jumpTo(entry, href, onJump) {
 		onJump?.(entry, href);
@@ -198633,12 +198828,20 @@ create: function(game) {
 	}
 	function createCommandCenter(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
+		const useBusinessSetup = createBusinessSetup(R, hooks);
 		return function CommandCenter(props) {
 			const [query, setQuery] = useState(String(props.initialQuery ?? ""));
 			const [kindFilter, setKindFilter] = useState(String(props.initialKind ?? "all"));
 			const [statusFilter, setStatusFilter] = useState(String(props.initialStatus ?? "all"));
 			const [read, setRead] = useState({ kind: "loading" });
 			const [activeIndex, setActiveIndex] = useState(-1);
+			const [attempt, setAttempt] = useState(0);
+			const setup = useBusinessSetup({
+				base: props.base,
+				fetchImpl: props.fetchImpl,
+				surface: "command center",
+				onBootstrapped: () => setAttempt((value) => value + 1)
+			});
 			const searchRef = useRef(null);
 			const restoreRef = useRef(null);
 			const itemRefs = useRef([]);
@@ -198677,7 +198880,8 @@ create: function(game) {
 				kindFilter,
 				statusFilter,
 				props.base,
-				props.fetchImpl
+				props.fetchImpl,
+				attempt
 			]);
 			const projection = read.kind === "available" ? read.projection : null;
 			const entries = filterEntries(projection?.entries, {
@@ -198835,7 +199039,8 @@ create: function(game) {
 			else if (read.kind === "error" || read.kind === "unavailable") {
 				const code = read.kind === "unavailable" ? read.code : "COMMAND_CENTER_READ_FAILED";
 				const detail = read.kind === "unavailable" ? read.detail : read.message;
-				children.push(R.createElement("div", {
+				if (isTenantMissing(read.kind === "unavailable" ? read.code : "")) children.push(setup.render());
+				else children.push(R.createElement("div", {
 					key: "state",
 					className: "command-center__state command-center__state--error",
 					"data-testid": "command-center-state",
@@ -199324,6 +199529,7 @@ create: function(game) {
 	}
 	function createTimeline(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
+		const useBusinessSetup = createBusinessSetup(R, hooks);
 		return function Timeline(props) {
 			const [query, setQuery] = useState("");
 			const [kindFilter, setKindFilter] = useState("all");
@@ -199333,6 +199539,12 @@ create: function(game) {
 			const [activeIndex, setActiveIndex] = useState(-1);
 			const [retryToken, setRetryToken] = useState(0);
 			const [reducedMotion, setReducedMotion] = useState(false);
+			const setup = useBusinessSetup({
+				base: props.base,
+				fetchImpl: props.fetchImpl,
+				surface: "operator timeline",
+				onBootstrapped: () => setRetryToken((value) => value + 1)
+			});
 			const restoreRef = useRef(null);
 			const itemRefs = useRef([]);
 			useEffect(() => {
@@ -199501,7 +199713,8 @@ create: function(game) {
 			else if (read.kind === "error" || read.kind === "unavailable") {
 				const code = read.kind === "unavailable" ? read.code : "TIMELINE_READ_FAILED";
 				const detail = read.kind === "unavailable" ? read.detail : read.message;
-				children.push(R.createElement("div", {
+				if (isTenantMissing(read.kind === "unavailable" ? read.code : "")) children.push(setup.render());
+				else children.push(R.createElement("div", {
 					key: "error",
 					className: "timeline__state timeline__state--error",
 					"data-testid": "timeline-error",
@@ -202086,6 +202299,30 @@ create: function(game) {
 		return `${action.label} — refused: ${action.code}`;
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/PanelInventory.tsx
+	function groupPanels(panels) {
+		const order = [];
+		const byName = /* @__PURE__ */ new Map();
+		for (const panel of panels) {
+			const name = String(panel.group ?? "").trim() || "General";
+			let rows = byName.get(name);
+			if (!rows) {
+				rows = [];
+				byName.set(name, rows);
+				order.push(name);
+			}
+			rows.push(panel);
+		}
+		return order.map((name) => ({
+			name,
+			rows: byName.get(name) ?? []
+		}));
+	}
+	/** Turn a machine group id (`work`, `business-os`) into a readable heading. */
+	function groupTitle(name) {
+		const words = String(name || "General").replace(/[_-]+/g, " ").trim().split(/\s+/).filter(Boolean);
+		if (words.length === 0) return "General";
+		return words.map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+	}
 	function createPanelInventoryPanel(R, hooks) {
 		const { useState, useEffect } = hooks;
 		return function PanelInventoryPanel(props) {
@@ -202178,54 +202415,86 @@ create: function(game) {
 				"aria-label": `${panel.title} panel`,
 				className: "panel-inventory__row"
 			}, [
-				R.createElement("h3", {
+				R.createElement("div", {
+					key: "head",
+					className: "panel-inventory__rowHead"
+				}, [R.createElement("h4", {
 					key: "title",
-					"data-testid": "panel-title"
-				}, panel.title),
-				R.createElement("p", {
+					"data-testid": "panel-title",
+					className: "panel-inventory__title"
+				}, panel.title), R.createElement("p", {
 					key: "group",
 					"data-testid": "panel-group",
-					className: "panel-inventory__muted"
-				}, `${panel.group} · ${panel.panel_id}`),
+					className: "panel-inventory__groupTag"
+				}, `${panel.group} · ${panel.panel_id}`)]),
 				panel.description ? R.createElement("p", {
 					key: "description",
-					"data-testid": "panel-description"
+					"data-testid": "panel-description",
+					className: "panel-inventory__description"
 				}, panel.description) : null,
 				R.createElement("p", {
 					key: "authority",
-					"data-testid": "panel-authority"
-				}, `Authority: ${panel.authority.module}.${panel.authority.symbol}` + (panel.authority.route ? ` · ${panel.authority.route_method ?? "GET"} ${panel.authority.route}` : " · module only")),
-				R.createElement("ul", {
+					"data-testid": "panel-authority",
+					className: "panel-inventory__authority"
+				}, [R.createElement("span", {
+					key: "label",
+					className: "panel-inventory__label"
+				}, "Authority "), `${panel.authority.module}.${panel.authority.symbol}` + (panel.authority.route ? ` · ${panel.authority.route_method ?? "GET"} ${panel.authority.route}` : " · module only")]),
+				R.createElement("div", {
+					key: "facts",
+					className: "panel-inventory__facts"
+				}, [R.createElement("div", {
+					key: "permissions-fact",
+					className: "panel-inventory__fact"
+				}, [R.createElement("span", {
+					key: "label",
+					className: "panel-inventory__label"
+				}, "Permissions"), R.createElement("ul", {
 					key: "permissions",
 					"data-testid": "panel-permissions",
-					"aria-label": `${panel.title} permissions`
+					"aria-label": `${panel.title} permissions`,
+					className: "panel-inventory__pills"
 				}, [R.createElement("li", {
 					key: "read",
 					"data-testid": "panel-permission",
-					"data-permission": "read"
+					"data-permission": "read",
+					className: "panel-inventory__pill"
 				}, `Read: ${panel.permissions.read}`), R.createElement("li", {
 					key: "write",
 					"data-testid": "panel-permission",
-					"data-permission": "write"
-				}, `Write: ${panel.permissions.write}`)]),
-				R.createElement("ul", {
+					"data-permission": "write",
+					className: "panel-inventory__pill"
+				}, `Write: ${panel.permissions.write}`)])]), R.createElement("div", {
+					key: "states-fact",
+					className: "panel-inventory__fact"
+				}, [R.createElement("span", {
+					key: "label",
+					className: "panel-inventory__label"
+				}, "Required states"), R.createElement("ul", {
 					key: "states",
 					"data-testid": "panel-states",
-					"aria-label": `${panel.title} required states`
+					"aria-label": `${panel.title} required states`,
+					className: "panel-inventory__pills"
 				}, panel.states.map((state) => R.createElement("li", {
 					key: state,
 					"data-testid": "panel-state-badge",
-					"data-state-badge": state
-				}, stateBadgeLabel(state)))),
+					"data-state-badge": state,
+					className: "panel-inventory__pill panel-inventory__pill--state"
+				}, stateBadgeLabel(state))))])]),
 				R.createElement("p", {
 					key: "action",
 					"data-testid": "panel-action",
 					"data-action-kind": panel.action.kind,
-					"data-action-code": panel.action.kind === "typed_refusal" ? panel.action.code : void 0
-				}, `Action: ${actionSummary(panel.action)}`),
+					"data-action-code": panel.action.kind === "typed_refusal" ? panel.action.code : void 0,
+					className: `panel-inventory__action panel-inventory__action--${panel.action.kind}`
+				}, [R.createElement("span", {
+					key: "label",
+					className: "panel-inventory__label"
+				}, "Action "), actionSummary(panel.action)]),
 				R.createElement("p", {
 					key: "layout",
-					"data-testid": "panel-layout"
+					"data-testid": "panel-layout",
+					className: "panel-inventory__muted"
 				}, `Split: ${panel.layout.split} · Stack: ${panel.layout.stack}`),
 				R.createElement("p", {
 					key: "source",
@@ -202236,27 +202505,65 @@ create: function(game) {
 					key: "link",
 					href: panel.deep_link,
 					"data-testid": "panel-deep-link",
-					"aria-label": `Open ${panel.title}`
+					"aria-label": `Open ${panel.title}`,
+					className: "panel-inventory__link"
 				}, panel.deep_link)
 			]);
+			const groups = groupPanels(panels);
+			const listItems = [];
+			for (const group of groups) {
+				listItems.push(R.createElement("li", {
+					key: `group-${group.name}`,
+					role: "presentation",
+					"data-testid": "panel-inventory-group",
+					"data-group": group.name,
+					className: "panel-inventory__groupHead"
+				}, [R.createElement("h3", {
+					key: "h",
+					className: "panel-inventory__groupTitle"
+				}, groupTitle(group.name)), R.createElement("span", {
+					key: "c",
+					className: "panel-inventory__groupCount",
+					"aria-label": `${group.rows.length} panels`
+				}, String(group.rows.length))]));
+				for (const panel of group.rows) listItems.push(renderRow(panel));
+			}
 			return R.createElement("section", {
 				"data-testid": "panel-inventory",
 				"data-state": "available",
 				"data-panel-count": String(panels.length),
 				"aria-label": "Panel inventory",
 				className: "panel-inventory"
-			}, [R.createElement("p", {
-				key: "count",
-				role: "status",
-				"aria-live": "polite",
-				"data-testid": "panel-inventory-count"
-			}, `${panels.length} panels declared`), R.createElement("ul", {
+			}, [R.createElement("header", {
+				key: "head",
+				className: "panel-inventory__head"
+			}, [
+				R.createElement("p", {
+					key: "eyebrow",
+					className: "panel-inventory__eyebrow"
+				}, "Qubit Office · Studio"),
+				R.createElement("h2", {
+					key: "title",
+					className: "panel-inventory__heading"
+				}, "Panel inventory"),
+				R.createElement("p", {
+					key: "lead",
+					className: "panel-inventory__lead"
+				}, "Every surface the office declares, grouped by the area it belongs to. Each card names its real authority, permissions, required states and one action."),
+				R.createElement("p", {
+					key: "count",
+					role: "status",
+					"aria-live": "polite",
+					"data-testid": "panel-inventory-count",
+					className: "panel-inventory__count"
+				}, `${panels.length} panels declared · ${groups.length} ${groups.length === 1 ? "group" : "groups"}`)
+			]), R.createElement("ul", {
 				key: "list",
 				role: "list",
 				"data-testid": "panel-inventory-list",
 				"aria-label": "Panels",
 				className: "panel-inventory__list"
-			}, panels.map(renderRow))]);
+			}, listItems)]);
 		};
 	}
 	// ../qubit-app/plugins/qubit-office/game/types.ts
@@ -207455,6 +207762,77 @@ create: function(game) {
 			const [campusError, setCampusError] = useState("");
 			const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion());
 			const [highContrast, setHighContrast] = useState(prefersHighContrast());
+			const toggleAgents = () => {
+				setApprovalsOpen(false);
+				setCommandCenterOpen(false);
+				setTimelineOpen(false);
+				setStudioOpen(false);
+				setAgentsOpen((v) => !v);
+			};
+			const toggleHud = () => {
+				setApprovalsOpen(false);
+				setCommandCenterOpen(false);
+				setTimelineOpen(false);
+				setStudioOpen(false);
+				setControlSeat(null);
+				setHudOpen((v) => !v);
+			};
+			const toggleApprovals = () => {
+				setAgentsOpen(false);
+				setHudOpen(false);
+				setWarRoomOpen(false);
+				setCommandCenterOpen(false);
+				setTimelineOpen(false);
+				setStudioOpen(false);
+				setControlSeat(null);
+				setApprovalsOpen((v) => !v);
+			};
+			const toggleCommandCenter = () => {
+				setAgentsOpen(false);
+				setHudOpen(false);
+				setWarRoomOpen(false);
+				setApprovalsOpen(false);
+				setEtsyOpen(false);
+				setTimelineOpen(false);
+				setStudioOpen(false);
+				setControlSeat(null);
+				setCommandCenterOpen((v) => !v);
+			};
+			const toggleTimeline = () => {
+				setAgentsOpen(false);
+				setHudOpen(false);
+				setWarRoomOpen(false);
+				setApprovalsOpen(false);
+				setEtsyOpen(false);
+				setCommandCenterOpen(false);
+				setStudioOpen(false);
+				setControlSeat(null);
+				setTimelineOpen((v) => !v);
+			};
+			const toggleStudio = () => {
+				setAgentsOpen(false);
+				setHudOpen(false);
+				setWarRoomOpen(false);
+				setApprovalsOpen(false);
+				setEtsyOpen(false);
+				setCommandCenterOpen(false);
+				setTimelineOpen(false);
+				setControlSeat(null);
+				setStudioOpen((v) => !v);
+			};
+			const toggleCampus = () => setCampusOpen((v) => !v);
+			const toggleFor = (id) => {
+				switch (id) {
+					case "agents": return toggleAgents;
+					case "hud": return toggleHud;
+					case "approvals": return toggleApprovals;
+					case "command-center": return toggleCommandCenter;
+					case "timeline": return toggleTimeline;
+					case "studio": return toggleStudio;
+					case "campus": return toggleCampus;
+					default: return () => {};
+				}
+			};
 			const requestedTheme = hostThemeRequest();
 			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, FloorCampus, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			useEffect(() => {
@@ -207618,28 +207996,13 @@ create: function(game) {
 					menuRef.current?.dispose();
 					setMenuFallback(false);
 					menuRef.current = installOfficeMenuButtons(win, {
-						onToggleAgents: () => {
-							setApprovalsOpen(false);
-							setCommandCenterOpen(false);
-							setTimelineOpen(false);
-							setAgentsOpen((v) => !v);
-						},
-						onToggleHud: () => {
-							setApprovalsOpen(false);
-							setCommandCenterOpen(false);
-							setTimelineOpen(false);
-							setControlSeat(null);
-							setHudOpen((v) => !v);
-						},
-						onToggleApprovals: () => {
-							setAgentsOpen(false);
-							setHudOpen(false);
-							setWarRoomOpen(false);
-							setCommandCenterOpen(false);
-							setTimelineOpen(false);
-							setControlSeat(null);
-							setApprovalsOpen((v) => !v);
-						},
+						onToggleAgents: toggleAgents,
+						onToggleHud: toggleHud,
+						onToggleApprovals: toggleApprovals,
+						onToggleCommandCenter: toggleCommandCenter,
+						onToggleTimeline: toggleTimeline,
+						onToggleStudio: toggleStudio,
+						onToggleCampus: toggleCampus,
 						onFallback: (show) => setMenuFallback(show),
 						onAttach: () => setMenuFallback(false)
 					});
@@ -207647,7 +208010,11 @@ create: function(game) {
 						agents: agentsOpen,
 						hud: hudOpen,
 						approvals: approvalsOpen,
-						pendingApprovals: approvalCount
+						pendingApprovals: approvalCount,
+						commandCenter: commandCenterOpen,
+						timeline: timelineOpen,
+						studio: studioOpen,
+						campus: campusOpen
 					});
 					props.onReady?.();
 				};
@@ -207681,7 +208048,11 @@ create: function(game) {
 					agents: agentsOpen,
 					hud: hudOpen,
 					approvals: approvalsOpen,
-					pendingApprovals: approvalCount
+					pendingApprovals: approvalCount,
+					commandCenter: commandCenterOpen,
+					timeline: timelineOpen,
+					studio: studioOpen,
+					campus: campusOpen
 				});
 			});
 			useEffect(() => {
@@ -208029,27 +208400,8 @@ create: function(game) {
 				"aria-label": "Office panels"
 			}, MENU_BUTTONS.map((spec) => {
 				const geometry = menuIconGeometry(spec);
-				const pressed = spec.id === "agents" ? agentsOpen : spec.id === "hud" ? hudOpen : approvalsOpen;
-				const onActivate = spec.id === "agents" ? () => {
-					setApprovalsOpen(false);
-					setCommandCenterOpen(false);
-					setTimelineOpen(false);
-					setAgentsOpen((v) => !v);
-				} : spec.id === "hud" ? () => {
-					setApprovalsOpen(false);
-					setCommandCenterOpen(false);
-					setTimelineOpen(false);
-					setControlSeat(null);
-					setHudOpen((v) => !v);
-				} : () => {
-					setAgentsOpen(false);
-					setHudOpen(false);
-					setWarRoomOpen(false);
-					setCommandCenterOpen(false);
-					setTimelineOpen(false);
-					setControlSeat(null);
-					setApprovalsOpen((v) => !v);
-				};
+				const pressed = spec.id === "agents" ? agentsOpen : spec.id === "hud" ? hudOpen : spec.id === "approvals" ? approvalsOpen : spec.id === "command-center" ? commandCenterOpen : spec.id === "timeline" ? timelineOpen : spec.id === "studio" ? studioOpen : campusOpen;
+				const onActivate = toggleFor(spec.id);
 				const label = spec.id === "approvals" && approvalCount > 0 ? `${spec.label} (${approvalCount} pending)` : spec.label;
 				const parts = [R.createElement("svg", {
 					key: "icon",
@@ -208083,24 +208435,6 @@ create: function(game) {
 					onClick: onActivate
 				}, ...parts);
 			})));
-			const commandCenterToggle = R.createElement("button", {
-				key: "command-center-toggle",
-				type: "button",
-				className: "office-game__btn office-theme-menu-btn office-game__commandCenterToggle",
-				"data-testid": "office-command-center-toggle",
-				"aria-expanded": commandCenterOpen,
-				"aria-controls": "office-game-command-center-dock",
-				"aria-label": "Open the office command center",
-				onClick: () => {
-					setAgentsOpen(false);
-					setHudOpen(false);
-					setWarRoomOpen(false);
-					setApprovalsOpen(false);
-					setEtsyOpen(false);
-					setControlSeat(null);
-					setCommandCenterOpen((v) => !v);
-				}
-			}, "Command Center");
 			if (commandCenterOpen) children.push(R.createElement("div", {
 				key: "command-center-dock",
 				id: "office-game-command-center-dock",
@@ -208115,55 +208449,6 @@ create: function(game) {
 				base: props.base,
 				onClose: () => setCommandCenterOpen(false)
 			})]));
-			const timelineToggle = R.createElement("button", {
-				key: "timeline-toggle",
-				type: "button",
-				className: "office-game__btn office-theme-menu-btn office-game__timelineToggle",
-				"data-testid": "office-timeline-toggle",
-				"aria-expanded": timelineOpen,
-				"aria-controls": "office-game-timeline-dock",
-				"aria-label": "Open the operator timeline",
-				onClick: () => {
-					setAgentsOpen(false);
-					setHudOpen(false);
-					setWarRoomOpen(false);
-					setApprovalsOpen(false);
-					setEtsyOpen(false);
-					setCommandCenterOpen(false);
-					setControlSeat(null);
-					setTimelineOpen((v) => !v);
-				}
-			}, "Timeline");
-			const studioToggle = R.createElement("button", {
-				key: "studio-toggle",
-				type: "button",
-				className: "office-game__btn office-theme-menu-btn office-game__studioToggle",
-				"data-testid": "office-studio-toggle",
-				"aria-expanded": studioOpen,
-				"aria-controls": "office-game-studio-dock",
-				"aria-label": "Open the office studio",
-				onClick: () => {
-					setAgentsOpen(false);
-					setHudOpen(false);
-					setWarRoomOpen(false);
-					setApprovalsOpen(false);
-					setEtsyOpen(false);
-					setCommandCenterOpen(false);
-					setTimelineOpen(false);
-					setControlSeat(null);
-					setStudioOpen((v) => !v);
-				}
-			}, "Studio");
-			const campusToggle = R.createElement("button", {
-				key: "campus-toggle",
-				type: "button",
-				className: "office-game__btn office-theme-menu-btn office-game__campusToggle",
-				"data-testid": "office-campus-toggle",
-				"aria-expanded": campusOpen,
-				"aria-controls": "office-game-campus",
-				"aria-label": "Open the floor campus",
-				onClick: () => setCampusOpen((v) => !v)
-			}, "Campus");
 			children.push(R.createElement("div", {
 				key: "toolbar",
 				id: "office-game-controls",
@@ -208172,12 +208457,10 @@ create: function(game) {
 				role: "toolbar",
 				"aria-label": "Office panels",
 				tabIndex: -1
-			}, [
-				commandCenterToggle,
-				timelineToggle,
-				studioToggle,
-				campusToggle
-			]));
+			}, R.createElement("span", {
+				key: "hint",
+				className: "office-game__sr-only"
+			}, "Office panel buttons are in the office toolbar at the top right.")));
 			if (timelineOpen) children.push(R.createElement("div", {
 				key: "timeline-dock",
 				id: "office-game-timeline-dock",
