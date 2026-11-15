@@ -13,7 +13,9 @@
  * It is not a second data source and it is not a business surface. The scene
  * has no agent, desk, run, task or session concept, and it does not place a
  * zone, a chunk or a floor marker the payload did not carry. A chunk whose
- * `zone_id` names no zone is counted as unplaced and is never painted.
+ * `zone_id` names no zone is counted as unplaced and is never painted. No
+ * water, tree, flower or building part is invented: those layers only appear
+ * over a chunk the payload already carries.
  *
  * REAL ART, HONESTLY OPTIONAL
  * ---------------------------
@@ -29,6 +31,17 @@
  * labelled procedural scene below. Nothing is fabricated to look like the
  * pack is present.
  *
+ * COMPOSITION, NOT A REPEATED TILE
+ * --------------------------------
+ * A manifest may declare an additive `composition` block (roles -> tile
+ * specs, including multi-tile frames and edge roles) or name the built-in
+ * `serene-village-16x16` preset. A pack built by the existing theme pipeline
+ * does not carry the block yet, so the loader also recognises the exact
+ * Serene Village 16x16 sheet (304x720, cell 16) and applies the preset
+ * coordinates in code. Those coordinates are pack metadata, not art: the PNG
+ * itself still comes from the local pack. When a role is missing the painter
+ * falls back to the procedural path and the caption says so.
+ *
  * Everything in this module is deterministic: the same layout + options paint
  * the same instruction sequence, which is what the render-evidence test pins.
  */
@@ -39,10 +52,50 @@ import type {
 
 /** The art manifest a local theme pack may carry. */
 export const OUTSIDE_SCENE_ART_SCHEMA = "qubit-office-outside-art/1";
+/** Additive manifest revision: same document plus `composition`/`preset`. */
+export const OUTSIDE_SCENE_ART_SCHEMA_V2 = "qubit-office-outside-art/2";
+/** The one built-in composition preset this module knows by name. */
+export const SERENE_VILLAGE_PRESET = "serene-village-16x16";
+/** The real Serene Village 16x16 sheet this preset's coordinates target. */
+export const SERENE_VILLAGE_SHEET_SIZE = { width: 304, height: 720 } as const;
 /** CSS px per exterior tile. The map is tile-space; this is presentation. */
 export const SCENE_TILE_PX = 8;
 /** Draw order for chunk layers; later layers paint on top. */
 export const SCENE_LAYER_ORDER = ["ground", "floor", "building", "overlay"] as const;
+
+/** Named tile roles a composition manifest may declare. */
+export type OutsideCompositionRole =
+  | "grass" | "road" | "sidewalk" | "path"
+  | "water" | "water_n" | "water_s" | "water_e" | "water_w"
+  | "water_nw" | "water_ne" | "water_sw" | "water_se"
+  | "trees" | "bush" | "flower" | "fence" | "prop"
+  | "building" | "roof" | "wall" | "window" | "door" | "sign";
+
+const COMPOSITION_ROLES: ReadonlySet<string> = new Set<OutsideCompositionRole>([
+  "grass", "road", "sidewalk", "path", "water", "water_n", "water_s",
+  "water_e", "water_w", "water_nw", "water_ne", "water_sw", "water_se",
+  "trees", "bush", "flower", "fence", "prop", "building", "roof", "wall",
+  "window", "door", "sign",
+]);
+
+/** Water edge role for a tile position inside one payload water chunk. */
+export function waterRoleAt(
+  rect: SceneRect, x: number, y: number,
+): OutsideCompositionRole {
+  const left = x <= rect.x;
+  const right = x >= rect.x + rect.width - 1;
+  const top = y <= rect.y;
+  const bottom = y >= rect.y + rect.height - 1;
+  if (top && left) return "water_nw";
+  if (top && right) return "water_ne";
+  if (bottom && left) return "water_sw";
+  if (bottom && right) return "water_se";
+  if (top) return "water_n";
+  if (bottom) return "water_s";
+  if (left) return "water_w";
+  if (right) return "water_e";
+  return "water";
+}
 
 export type OutsideArtKind =
   | "grass" | "road" | "sidewalk" | "path" | "parking" | "garden"
@@ -162,25 +215,53 @@ export interface OutsideArtFrame {
   sw: number;
   sh: number;
   tile: number;
+  /** Animation frame count when the source is a spritesheet row. */
+  frames?: number;
+  fps?: number;
 }
 
 export interface OutsideSceneArt {
   credit: string;
   source: "theme" | "injected";
   tiles: Partial<Record<OutsideArtKind, OutsideArtFrame>>;
+  /** Composition roles (grass variants, water edges, building parts, ...). */
+  frames?: Partial<Record<OutsideCompositionRole, OutsideArtFrame[]>>;
+  /** True when at least one composition role resolved to real art. */
+  composed?: boolean;
+  /** True when any resolved frame carries more than one animation frame. */
+  animated?: boolean;
 }
 
 export interface OutsideArtTileSpec {
   sheet: string;
   col: number;
   row: number;
+  /** Frame width in cells (default 1). */
+  w?: number;
+  /** Frame height in cells (default 1). */
+  h?: number;
+  /** Optional exact source width in pixels (overrides `w * cell`). */
+  sw?: number;
+  /** Optional exact source height in pixels (overrides `h * cell`). */
+  sh?: number;
+  /** Animation frame count (default 1). */
+  frames?: number;
+  /** Animation frames per second (default 6). */
+  fps?: number;
 }
+
+export type OutsideSceneComposition =
+  Partial<Record<OutsideCompositionRole, OutsideArtTileSpec[]>>;
 
 export interface OutsideSceneArtManifest {
   schema: string;
   credit: string;
   cell: number;
   tiles: Partial<Record<OutsideArtKind, OutsideArtTileSpec>>;
+  /** Additive (schema /2 or later): named composition roles. */
+  composition?: OutsideSceneComposition;
+  /** Optional built-in preset id. */
+  preset?: string;
 }
 
 // ----------------------------------------------------------------- helpers
@@ -423,6 +504,25 @@ export function buildOutsideScene(world: OutsideWorld): OutsideSceneLayout {
   };
 }
 
+/**
+ * Painter order: depth first, then the payload's layer, then id.
+ *
+ * The payload's `z_index` is the only per-chunk depth fact. Sorting by layer
+ * first would draw an overlay path (z 0) over a building (z 10) because both
+ * are "overlay" vs "building" layers; depth-first keeps the path on the
+ * ground where it belongs while still respecting the declared layer.
+ */
+export function paintOrderedChunks(
+  layout: OutsideSceneLayout,
+): SceneChunk[] {
+  return [...layout.chunks].sort((a, b) => {
+    if (a.z_index !== b.z_index) return a.z_index - b.z_index;
+    const layer = layerRank(a.layer) - layerRank(b.layer);
+    if (layer !== 0) return layer;
+    return a.chunk_id.localeCompare(b.chunk_id);
+  });
+}
+
 /** Stable ordering so a repaint is byte-identical for identical payloads. */
 export function orderedSceneChunks(
   layout: OutsideSceneLayout,
@@ -447,6 +547,55 @@ function safeSheet(value: unknown): string {
   return sheet;
 }
 
+function tileSpec(entry: unknown): OutsideArtTileSpec | null {
+  if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+    return null;
+  }
+  const spec = entry as Record<string, unknown>;
+  const sheet = safeSheet(spec.sheet);
+  const col = int(spec.col);
+  const row = int(spec.row);
+  if (!sheet || col < 0 || row < 0) return null;
+  const parsed: OutsideArtTileSpec = { sheet, col, row };
+  const w = int(spec.w, 1);
+  const h = int(spec.h, 1);
+  if (w >= 1 && w <= 16) parsed.w = w;
+  if (h >= 1 && h <= 16) parsed.h = h;
+  const sw = int(spec.sw);
+  const sh = int(spec.sh);
+  if (sw > 0 && sw <= 4096) parsed.sw = sw;
+  if (sh > 0 && sh <= 4096) parsed.sh = sh;
+  const frames = int(spec.frames, 1);
+  if (frames >= 1 && frames <= 64) parsed.frames = frames;
+  const fps = int(spec.fps);
+  if (fps > 0 && fps <= 60) parsed.fps = fps;
+  return parsed;
+}
+
+function parseComposition(
+  source: unknown,
+): OutsideSceneComposition | undefined {
+  if (source === null || typeof source !== "object" || Array.isArray(source)) {
+    return undefined;
+  }
+  const composition: OutsideSceneComposition = {};
+  let found = 0;
+  for (const [role, entry] of Object.entries(source as Record<string, unknown>)) {
+    if (!COMPOSITION_ROLES.has(role)) continue;
+    const list = Array.isArray(entry) ? entry : [entry];
+    const specs: OutsideArtTileSpec[] = [];
+    for (const item of list) {
+      const parsed = tileSpec(item);
+      if (parsed) specs.push(parsed);
+    }
+    if (specs.length) {
+      composition[role as OutsideCompositionRole] = specs;
+      found += 1;
+    }
+  }
+  return found ? composition : undefined;
+}
+
 /** Validate an outside-art manifest. Returns null instead of inventing art. */
 export function parseOutsideSceneArtManifest(
   value: unknown,
@@ -455,33 +604,90 @@ export function parseOutsideSceneArtManifest(
     return null;
   }
   const row = value as Record<string, unknown>;
-  if (text(row.schema) !== OUTSIDE_SCENE_ART_SCHEMA) return null;
+  const schema = text(row.schema);
+  if (schema !== OUTSIDE_SCENE_ART_SCHEMA
+      && schema !== OUTSIDE_SCENE_ART_SCHEMA_V2) {
+    return null;
+  }
   const cell = int(row.cell);
   if (cell <= 0 || cell > 128) return null;
   const source = row.tiles;
-  if (source === null || typeof source !== "object" || Array.isArray(source)) {
-    return null;
-  }
   const tiles: Partial<Record<OutsideArtKind, OutsideArtTileSpec>> = {};
-  for (const [kind, entry] of Object.entries(source as Record<string, unknown>)) {
-    if (!ART_KINDS.has(kind)) continue;
-    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
-      continue;
+  if (source !== null && typeof source === "object" && !Array.isArray(source)) {
+    for (const [kind, entry] of Object.entries(
+      source as Record<string, unknown>)) {
+      if (!ART_KINDS.has(kind)) continue;
+      const parsed = tileSpec(entry);
+      if (parsed) tiles[kind as OutsideArtKind] = parsed;
     }
-    const spec = entry as Record<string, unknown>;
-    const sheet = safeSheet(spec.sheet);
-    const col = int(spec.col);
-    const tileRow = int(spec.row);
-    if (!sheet || col < 0 || tileRow < 0) continue;
-    tiles[kind as OutsideArtKind] = { sheet, col, row: tileRow };
   }
-  if (!Object.keys(tiles).length) return null;
-  return {
+  const composition = parseComposition(row.composition);
+  if (!Object.keys(tiles).length && !composition) return null;
+  const parsed: OutsideSceneArtManifest = {
     schema: OUTSIDE_SCENE_ART_SCHEMA,
     credit: text(row.credit, "LimeZu — https://limezu.itch.io"),
     cell,
     tiles,
   };
+  if (composition) parsed.composition = composition;
+  const preset = text(row.preset);
+  if (preset) parsed.preset = preset;
+  return parsed;
+}
+
+/**
+ * Built-in coordinates for the real Serene Village 16x16 sheet (304x720).
+ *
+ * These are pack metadata (which cell holds which role), not art. The PNG is
+ * always read from the local pack; nothing here is a committed sprite.
+ */
+export function sereneVillageComposition(
+  sheet: string,
+): OutsideSceneComposition {
+  const frame = (col: number, row: number, w = 1, h = 1) =>
+    ({ sheet, col, row, w, h });
+  return {
+    grass: [frame(3, 0), frame(4, 0), frame(5, 0), frame(17, 1)],
+    road: [frame(10, 2), frame(6, 3), frame(9, 3)],
+    sidewalk: [frame(17, 3), frame(17, 4), frame(17, 5)],
+    path: [frame(6, 3), frame(9, 3), frame(10, 2)],
+    water: [frame(12, 1)],
+    water_n: [frame(12, 0)],
+    water_s: [frame(12, 2)],
+    water_w: [frame(11, 1)],
+    water_e: [frame(13, 1)],
+    water_nw: [frame(11, 0)],
+    water_ne: [frame(13, 0)],
+    water_sw: [frame(11, 2)],
+    water_se: [frame(13, 2)],
+    trees: [frame(8, 12, 4, 3), frame(11, 12, 4, 3), frame(14, 12, 4, 3)],
+    bush: [frame(5, 12), frame(0, 15), frame(1, 15)],
+    flower: [frame(3, 13), frame(2, 14), frame(4, 14)],
+    fence: [frame(5, 14), frame(5, 15), frame(4, 14)],
+    prop: [frame(0, 13), frame(6, 13), frame(6, 14)],
+    building: [{ sheet, col: 0, row: 25, w: 5, h: 4, sw: 72, sh: 64 }],
+    roof: [frame(2, 26, 1, 1), frame(3, 26, 1, 1)],
+    wall: [frame(0, 27), frame(5, 27)],
+    window: [frame(1, 27), frame(4, 27)],
+    door: [frame(2, 27, 2, 2)],
+    sign: [frame(6, 13, 1, 1), frame(6, 14, 1, 1)],
+  };
+}
+
+function mergeComposition(
+  base: OutsideSceneComposition | undefined,
+  extra: OutsideSceneComposition | undefined,
+): OutsideSceneComposition | undefined {
+  if (!base && !extra) return undefined;
+  const merged: OutsideSceneComposition = { ...(base ?? {}) };
+  if (extra) {
+    for (const [role, specs] of Object.entries(extra)) {
+      if (specs && specs.length) {
+        merged[role as OutsideCompositionRole] = specs;
+      }
+    }
+  }
+  return merged;
 }
 
 export interface OutsideArtLoadInput {
@@ -572,9 +778,14 @@ export async function loadOutsideSceneArt(
     return { status: "error", reason: "outside art manifest is invalid" };
   }
   const loadImage = input.loadImage ?? defaultLoadImage;
+  const specs: OutsideArtTileSpec[] = [
+    ...Object.values(manifest.tiles).filter(Boolean) as OutsideArtTileSpec[],
+    ...Object.values(manifest.composition ?? {}).flat()
+      .filter(Boolean) as OutsideArtTileSpec[],
+  ];
   const sheets = new Map<string, { image: CanvasImageSource; width: number; height: number }>();
   try {
-    for (const spec of Object.values(manifest.tiles)) {
+    for (const spec of specs) {
       if (!spec) continue;
       if (sheets.has(spec.sheet)) continue;
       const url = resolveSheetUrl(spec.sheet, baseUrl);
@@ -591,27 +802,67 @@ export async function loadOutsideSceneArt(
     if (!spec) continue;
     const sheet = sheets.get(spec.sheet);
     if (!sheet) continue;
+    const sw = spec.sw ?? manifest.cell * (spec.w ?? 1);
+    const sh = spec.sh ?? manifest.cell * (spec.h ?? 1);
     const sx = spec.col * manifest.cell;
     const sy = spec.row * manifest.cell;
-    if (sx + manifest.cell > sheet.width || sy + manifest.cell > sheet.height) {
-      continue;
-    }
+    if (sx + sw > sheet.width || sy + sh > sheet.height) continue;
     tiles[kind as OutsideArtKind] = {
-      image: sheet.image,
-      sx,
-      sy,
-      sw: manifest.cell,
-      sh: manifest.cell,
-      tile: manifest.cell,
+      image: sheet.image, sx, sy, sw, sh, tile: manifest.cell,
+      frames: spec.frames, fps: spec.fps,
     };
   }
-  if (!Object.keys(tiles).length) {
+
+  // A pack built by the theme pipeline predates the composition block. When
+  // its only sheet is the exact Serene Village 16x16 sheet, apply the built-in
+  // role coordinates; an explicit composition (or preset) always wins.
+  let composition = manifest.composition;
+  const firstSpec = specs[0];
+  if (manifest.preset === SERENE_VILLAGE_PRESET && firstSpec) {
+    composition = mergeComposition(
+      sereneVillageComposition(firstSpec.sheet), composition);
+  } else if (!manifest.preset && !composition && firstSpec) {
+    const sheet = sheets.get(firstSpec.sheet);
+    if (manifest.cell === 16 && sheet
+        && sheet.width === SERENE_VILLAGE_SHEET_SIZE.width
+        && sheet.height === SERENE_VILLAGE_SHEET_SIZE.height) {
+      composition = sereneVillageComposition(firstSpec.sheet);
+    }
+  }
+  const frames: NonNullable<OutsideSceneArt["frames"]> = {};
+  let animated = false;
+  let composed = false;
+  for (const [role, roleSpecs] of Object.entries(composition ?? {})) {
+    if (!roleSpecs || !roleSpecs.length) continue;
+    const resolved: OutsideArtFrame[] = [];
+    for (const spec of roleSpecs) {
+      const sheet = sheets.get(spec.sheet);
+      if (!sheet) continue;
+      const sw = spec.sw ?? manifest.cell * (spec.w ?? 1);
+      const sh = spec.sh ?? manifest.cell * (spec.h ?? 1);
+      const sx = spec.col * manifest.cell;
+      const sy = spec.row * manifest.cell;
+      if (sx + sw > sheet.width || sy + sh > sheet.height) continue;
+      const frame: OutsideArtFrame = {
+        image: sheet.image, sx, sy, sw, sh, tile: manifest.cell,
+        frames: spec.frames, fps: spec.fps,
+      };
+      if ((spec.frames ?? 1) > 1) animated = true;
+      resolved.push(frame);
+    }
+    if (resolved.length) {
+      frames[role as OutsideCompositionRole] = resolved;
+      composed = true;
+    }
+  }
+  if (!Object.keys(tiles).length && !Object.keys(frames).length) {
     return { status: "error", reason: "outside art has no usable tiles" };
   }
-  return {
-    status: "ready",
-    art: { credit: manifest.credit, source, tiles },
+  const art: OutsideSceneArt = {
+    credit: manifest.credit, source, tiles, composed, animated,
   };
+  if (composed) art.frames = frames;
+  return { status: "ready", art };
 }
 
 // ---------------------------------------------------------------- painter
@@ -837,6 +1088,290 @@ function detailPath(ctx: Ctx, rect: SceneRect, seed: number,
   }
 }
 
+/** One composed building layer placement, derived only from payload chunks. */
+export interface BuildingPlacement {
+  role: "roof" | "wall" | "window" | "door" | "sign";
+  chunk_id: string;
+  /** Tile-space rectangle; the painter tiles/stretches the real frame in it. */
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  variant: number;
+}
+
+const BUILDING_KINDS: ReadonlySet<string> = new Set([
+  "facade", "roof", "windows", "entrance", "signage",
+]);
+
+/** True when a payload chunk kind belongs to the composed building layer. */
+export function isBuildingChunkKind(kind: string): boolean {
+  return BUILDING_KINDS.has(kind);
+}
+
+function buildingChunks(layout: OutsideSceneLayout): SceneChunk[] {
+  return orderedSceneChunks(layout).filter(
+    (chunk) => isBuildingChunkKind(chunk.kind)
+      && chunk.rect.width > 0 && chunk.rect.height > 0);
+}
+
+/**
+ * Plan the composed building from the payload's own building chunks.
+ *
+ * A `roof` chunk becomes a multi-tile roof band, a `facade` chunk a multi-tile
+ * wall band plus a deterministic window grid, an `entrance` chunk a door, and
+ * a `signage` chunk a sign. If the payload has no building chunk, the plan is
+ * empty. Nothing is placed outside its source chunk's rectangle.
+ */
+export function planBuildingPlacements(
+  layout: OutsideSceneLayout,
+): BuildingPlacement[] {
+  const plan: BuildingPlacement[] = [];
+  const hasEntrance = layout.chunks.some(
+    (chunk) => chunk.kind === "entrance"
+      && chunk.rect.width > 0 && chunk.rect.height > 0);
+  for (const chunk of buildingChunks(layout)) {
+    const rect = chunk.rect;
+    const seed = hashString(chunk.chunk_id);
+    if (chunk.kind === "roof" || chunk.kind === "facade") {
+      plan.push({
+        role: chunk.kind === "roof" ? "roof" : "wall",
+        chunk_id: chunk.chunk_id,
+        x: rect.x, y: rect.y, width: rect.width, height: rect.height,
+        variant: seed % 2,
+      });
+      if (chunk.kind === "facade") {
+        // A real window grid inside the facade; no window is invented when
+        // the pack has no window role (the painter falls back per role).
+        const stepX = 4;
+        const stepY = 6;
+        let index = 0;
+        for (let y = rect.y + 2; y <= rect.y + rect.height - 3; y += stepY) {
+          for (let x = rect.x + 2; x <= rect.x + rect.width - 2; x += stepX) {
+            plan.push({
+              role: "window", chunk_id: chunk.chunk_id,
+              x, y, width: 1, height: 1, variant: index % 2,
+            });
+            index += 1;
+          }
+        }
+        if (!hasEntrance && rect.height >= 3) {
+          const doorWidth = Math.min(2, rect.width);
+          plan.push({
+            role: "door", chunk_id: chunk.chunk_id,
+            x: rect.x + (rect.width - doorWidth) / 2,
+            y: rect.y + rect.height - 2,
+            width: doorWidth, height: 2, variant: 0,
+          });
+        }
+      }
+      continue;
+    }
+    if (chunk.kind === "windows") {
+      for (let y = rect.y; y < rect.y + rect.height; y += 2) {
+        for (let x = rect.x; x < rect.x + rect.width; x += 2) {
+          plan.push({
+            role: "window", chunk_id: chunk.chunk_id,
+            x, y, width: 1, height: 1,
+            variant: (x + y) % 2,
+          });
+        }
+      }
+      continue;
+    }
+    if (chunk.kind === "entrance") {
+      const width = Math.min(rect.width, 4);
+      const height = Math.min(rect.height, 3);
+      plan.push({
+        role: "door", chunk_id: chunk.chunk_id,
+        x: rect.x + (rect.width - width) / 2,
+        y: rect.y + rect.height - height,
+        width, height, variant: seed % 2,
+      });
+      continue;
+    }
+    if (chunk.kind === "signage") {
+      const width = Math.min(rect.width, 4);
+      const height = Math.min(rect.height, 2);
+      plan.push({
+        role: "sign", chunk_id: chunk.chunk_id,
+        x: rect.x + (rect.width - width) / 2,
+        y: rect.y + (rect.height - height) / 2,
+        width, height, variant: seed % 2,
+      });
+    }
+  }
+  return plan;
+}
+
+function frameVariant(
+  frames: OutsideArtFrame[] | undefined, variant: number,
+): OutsideArtFrame | null {
+  if (!frames || !frames.length) return null;
+  const index = ((variant % frames.length) + frames.length) % frames.length;
+  return frames[index];
+}
+
+function drawFrameAt(
+  ctx: Ctx, frame: OutsideArtFrame, x: number, y: number,
+  w: number, h: number, tilePx: number, timeMs: number,
+): void {
+  const count = frame.frames && frame.frames > 1 ? frame.frames : 1;
+  const fps = frame.fps && frame.fps > 0 ? frame.fps : 6;
+  const index = count > 1
+    ? Math.floor((timeMs / 1000) * fps) % count : 0;
+  ctx.drawImage(
+    frame.image, frame.sx + index * frame.sw, frame.sy, frame.sw, frame.sh,
+    px(x, tilePx), px(y, tilePx),
+    Math.max(1, px(w, tilePx)), Math.max(1, px(h, tilePx)));
+}
+
+/** Tile one composition role across a payload rectangle. */
+function drawTiledRole(
+  ctx: Ctx, rect: SceneRect, role: OutsideCompositionRole,
+  art: OutsideSceneArt, tilePx: number, seed: number, timeMs: number,
+): boolean {
+  const frames = art.frames?.[role];
+  const first = frameVariant(frames, 0);
+  if (!first || !frames) return false;
+  const stepX = Math.max(1, Math.round(first.sw / first.tile));
+  const stepY = Math.max(1, Math.round(first.sh / first.tile));
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(px(rect.x, tilePx), px(rect.y, tilePx),
+    px(rect.width, tilePx), px(rect.height, tilePx));
+  ctx.clip();
+  ctx.imageSmoothingEnabled = false;
+  for (let y = rect.y; y < rect.y + rect.height; y += stepY) {
+    for (let x = rect.x; x < rect.x + rect.width; x += stepX) {
+      const pick = frameVariant(
+        frames,
+        Math.floor(hash01(seed + x * 31 + y * 17) * frames.length));
+      if (!pick) continue;
+      drawFrameAt(ctx, pick, x, y, pick.sw / pick.tile,
+        pick.sh / pick.tile, tilePx, timeMs);
+    }
+  }
+  ctx.restore();
+  return true;
+}
+
+/** Scatter multi-tile decoration (trees, bushes, flowers, props) in a rect. */
+function drawScatterRole(
+  ctx: Ctx, rect: SceneRect, role: OutsideCompositionRole,
+  art: OutsideSceneArt, tilePx: number, seed: number, count: number,
+  timeMs: number,
+): boolean {
+  const frames = art.frames?.[role];
+  if (!frames || !frames.length || count <= 0) return false;
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  for (let index = 0; index < count; index += 1) {
+    const frame = frameVariant(
+      frames, Math.floor(hash01(seed + index * 13) * frames.length));
+    if (!frame) continue;
+    const w = frame.sw / frame.tile;
+    const h = frame.sh / frame.tile;
+    if (w > rect.width || h > rect.height) continue;
+    const x = rect.x + hash01(seed + index * 7 + 1) * (rect.width - w);
+    const y = rect.y + hash01(seed + index * 7 + 2) * (rect.height - h);
+    drawFrameAt(ctx, frame, Math.round(x), Math.round(y), w, h,
+      tilePx, timeMs);
+  }
+  ctx.restore();
+  return true;
+}
+
+/** Real water with edge tiles chosen by neighbour position. */
+function drawWaterRole(
+  ctx: Ctx, rect: SceneRect, art: OutsideSceneArt, tilePx: number,
+  seed: number, timeMs: number,
+): boolean {
+  const center = art.frames?.water;
+  if (!center || !center.length) return false;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(px(rect.x, tilePx), px(rect.y, tilePx),
+    px(rect.width, tilePx), px(rect.height, tilePx));
+  ctx.clip();
+  ctx.imageSmoothingEnabled = false;
+  for (let y = rect.y; y < rect.y + rect.height; y += 1) {
+    for (let x = rect.x; x < rect.x + rect.width; x += 1) {
+      const role = waterRoleAt(rect, x, y);
+      const frames = art.frames?.[role] ?? center;
+      const frame = frameVariant(
+        frames, Math.floor(hash01(seed + x * 29 + y * 23) * frames.length));
+      if (!frame) continue;
+      drawFrameAt(ctx, frame, x, y, frame.sw / frame.tile,
+        frame.sh / frame.tile, tilePx, timeMs);
+    }
+  }
+  ctx.restore();
+  return true;
+}
+
+/** Draw the whole composed building once, from payload building chunks. */
+function drawBuildingComposition(
+  ctx: Ctx, layout: OutsideSceneLayout, art: OutsideSceneArt,
+  tilePx: number, timeMs: number,
+): boolean {
+  const plan = planBuildingPlacements(layout);
+  if (!plan.length || !art.frames) return false;
+  let painted = false;
+
+  // A whole-building frame (the real Serene Village house) is a multi-tile
+  // facade with its own roof, windows and entrance. It is drawn once over the
+  // union of the payload's roof/facade/windows chunks; no tile is repeated.
+  const whole = frameVariant(art.frames.building, 0);
+  if (whole) {
+    const union = unionRects(buildingChunks(layout)
+      .filter((chunk) => chunk.kind === "roof" || chunk.kind === "facade"
+        || chunk.kind === "windows")
+      .map((chunk) => chunk.rect));
+    if (union) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(px(union.x, tilePx), px(union.y, tilePx),
+        px(union.width, tilePx), px(union.height, tilePx));
+      ctx.clip();
+      ctx.imageSmoothingEnabled = false;
+      drawFrameAt(ctx, whole, union.x, union.y,
+        union.width, union.height, tilePx, timeMs);
+      ctx.restore();
+      painted = true;
+      // Entrance and signage are separate payload chunks, so they stay real
+      // anchors rather than being folded into the house sprite.
+      for (const item of plan) {
+        if (item.role !== "door" && item.role !== "sign") continue;
+        const frames = art.frames[item.role];
+        const frame = frameVariant(frames, item.variant);
+        if (!frame) continue;
+        drawFrameAt(ctx, frame, item.x, item.y, item.width, item.height,
+          tilePx, timeMs);
+      }
+      return true;
+    }
+  }
+
+  for (const item of plan) {
+    const frames = art.frames[item.role];
+    if (!frames || !frames.length) continue;
+    const seed = hashString(item.chunk_id);
+    if (item.role === "roof" || item.role === "wall") {
+      if (drawTiledRole(ctx, {
+        x: item.x, y: item.y, width: item.width, height: item.height,
+      }, item.role, art, tilePx, seed, timeMs)) painted = true;
+      continue;
+    }
+    const frame = frameVariant(frames, item.variant);
+    if (!frame) continue;
+    drawFrameAt(ctx, frame, item.x, item.y, item.width, item.height,
+      tilePx, timeMs);
+    painted = true;
+  }
+  return painted;
+}
+
 function drawChunkArt(ctx: Ctx, chunk: SceneChunk, frame: OutsideArtFrame,
                       tilePx: number): void {
   const rect = chunk.rect;
@@ -857,13 +1392,102 @@ function drawChunkArt(ctx: Ctx, chunk: SceneChunk, frame: OutsideArtFrame,
   ctx.restore();
 }
 
+function dormantWash(ctx: Ctx, chunk: SceneChunk, tilePx: number): void {
+  if (chunk.layer === "ground" || chunk.active || chunk.animated) return;
+  ctx.save();
+  ctx.globalAlpha = 0.18;
+  fill(ctx, "#5a6a86", chunk.rect.x, chunk.rect.y,
+    chunk.rect.width, chunk.rect.height, tilePx);
+  ctx.restore();
+}
+
+/**
+ * Real-art composition for a payload chunk. Returns false when the pack has
+ * no role for this chunk kind, so the caller can use the single-tile frame or
+ * the procedural fallback. It never draws outside the chunk's own rectangle.
+ */
+function drawComposedChunk(
+  ctx: Ctx, chunk: SceneChunk, palette: ScenePalette,
+  art: OutsideSceneArt | null, tilePx: number, timeMs: number,
+): boolean {
+  if (!art?.composed || !art.frames) return false;
+  const rect = chunk.rect;
+  const seed = hashString(chunk.chunk_id);
+  switch (chunk.kind) {
+    case "ground":
+      fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      return drawTiledRole(ctx, rect, "grass", art, tilePx, seed, timeMs);
+    case "road":
+      fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      return drawTiledRole(ctx, rect, "road", art, tilePx, seed, timeMs);
+    case "sidewalk":
+      fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      return drawTiledRole(ctx, rect, "sidewalk", art, tilePx, seed, timeMs);
+    case "parking":
+      fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      return drawTiledRole(ctx, rect, "road", art, tilePx, seed, timeMs)
+        || drawTiledRole(ctx, rect, "sidewalk", art, tilePx, seed, timeMs);
+    case "path":
+      fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      return drawTiledRole(ctx, rect, "path", art, tilePx, seed, timeMs);
+    case "water":
+      fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      return drawWaterRole(ctx, rect, art, tilePx, seed, timeMs);
+    case "trees": {
+      if (!art.frames.trees && !art.frames.bush) return false;
+      if (!drawTiledRole(ctx, rect, "grass", art, tilePx, seed, timeMs)) {
+        fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      }
+      const count = Math.min(8, Math.max(1,
+        Math.round((rect.width * rect.height) / 42)));
+      const trees = drawScatterRole(
+        ctx, rect, "trees", art, tilePx, seed, count, timeMs);
+      const bushes = drawScatterRole(
+        ctx, rect, "bush", art, tilePx, seed + 1, Math.min(4, count), timeMs);
+      return trees || bushes;
+    }
+    case "garden": {
+      if (!art.frames.flower && !art.frames.bush) return false;
+      if (!drawTiledRole(ctx, rect, "grass", art, tilePx, seed, timeMs)) {
+        fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+      }
+      const count = Math.min(18, Math.max(2,
+        Math.round((rect.width * rect.height) / 10)));
+      const flowers = drawScatterRole(
+        ctx, rect, "flower", art, tilePx, seed, count, timeMs);
+      const bushes = drawScatterRole(
+        ctx, rect, "bush", art, tilePx, seed + 2, Math.min(4, count), timeMs);
+      return flowers || bushes;
+    }
+    case "fence":
+      return drawTiledRole(ctx, rect, "fence", art, tilePx, seed, timeMs);
+    case "prop": {
+      const count = Math.min(6, Math.max(1,
+        Math.round((rect.width * rect.height) / 18)));
+      return drawScatterRole(
+        ctx, rect, "prop", art, tilePx, seed, count, timeMs);
+    }
+    case "lobby":
+    case "security":
+      return drawTiledRole(ctx, rect, "sidewalk", art, tilePx, seed, timeMs);
+    default:
+      return false;
+  }
+}
+
 function drawChunk(ctx: Ctx, chunk: SceneChunk, palette: ScenePalette,
-                   art: OutsideSceneArt | null, tilePx: number): void {
+                   art: OutsideSceneArt | null, tilePx: number,
+                   timeMs: number): void {
   const rect = chunk.rect;
   if (rect.width <= 0 || rect.height <= 0) return;
+  if (drawComposedChunk(ctx, chunk, palette, art, tilePx, timeMs)) {
+    dormantWash(ctx, chunk, tilePx);
+    return;
+  }
   const frame = chunk.art ? art?.tiles[chunk.art] ?? null : null;
   if (frame) {
     drawChunkArt(ctx, chunk, frame, tilePx);
+    dormantWash(ctx, chunk, tilePx);
     return;
   }
   const seed = hashString(chunk.chunk_id);
@@ -941,14 +1565,7 @@ function drawChunk(ctx: Ctx, chunk: SceneChunk, palette: ScenePalette,
         px(rect.y + 1, tilePx) + Math.max(7, tilePx));
     }
   }
-  // A dormant zone never animates; the painter has no clock either, so this
-  // only marks the state visually with a cool, low-contrast wash.
-  if (chunk.layer !== "ground" && !chunk.active && !chunk.animated) {
-    ctx.save();
-    ctx.globalAlpha = 0.18;
-    fill(ctx, "#5a6a86", rect.x, rect.y, rect.width, rect.height, tilePx);
-    ctx.restore();
-  }
+  dormantWash(ctx, chunk, tilePx);
 }
 
 function drawWeather(ctx: Ctx, layout: OutsideSceneLayout, tilePx: number,
@@ -1017,8 +1634,20 @@ export function drawOutsideScene(
   fill(ctx, layout.palette.ground, layout.bounds.x, layout.bounds.y,
     layout.width, layout.height, tilePx);
 
-  for (const chunk of orderedSceneChunks(layout)) {
-    drawChunk(ctx, chunk, layout.palette, options.art ?? null, tilePx);
+  const art = options.art ?? null;
+  let buildingAttempted = false;
+  for (const chunk of paintOrderedChunks(layout)) {
+    if (isBuildingChunkKind(chunk.kind) && art?.composed) {
+      if (!buildingAttempted) {
+        buildingAttempted = true;
+        if (drawBuildingComposition(ctx, layout, art, tilePx, timeMs)) {
+          continue;
+        }
+      } else {
+        continue;
+      }
+    }
+    drawChunk(ctx, chunk, layout.palette, art, tilePx, timeMs);
   }
 
   // The selected zone outline is a real payload zone, not a decorative ring.

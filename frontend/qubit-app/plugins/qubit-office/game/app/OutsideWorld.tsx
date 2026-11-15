@@ -25,6 +25,7 @@ import {
   zoneChunks,
 } from "./outside-world";
 import { createOutsideScene } from "./OutsideScene";
+import type { OutsideSceneArt } from "./outside-scene";
 
 export interface OutsideWorldProps {
   /** A pre-built view (tests/host). When absent, it is derived below. */
@@ -38,6 +39,14 @@ export interface OutsideWorldProps {
   initialZoneId?: string | null;
   /** Force reduced motion; otherwise the OS preference is honoured. */
   reducedMotion?: boolean;
+  /** Explicit composition art (tests/host). Otherwise the theme is probed. */
+  art?: OutsideSceneArt | null;
+  /** Explicit theme asset base (tests/host). */
+  assetBase?: string | null;
+  fetchImpl?: typeof fetch;
+  loadImage?: (url: string) => Promise<{
+    image: CanvasImageSource; width: number; height: number;
+  }>;
   onSelectZone?: (zone: OutsideZone) => void;
   onSelectFloor?: (link: OutsideFloorLink) => void;
   onRetry?: () => void;
@@ -407,6 +416,10 @@ export function createOutsideWorld(R: ReactArg, hooks: HooksArg) {
       view,
       selectedZoneId: selectedId,
       reducedMotion,
+      art: props.art,
+      assetBase: props.assetBase,
+      fetchImpl: props.fetchImpl,
+      loadImage: props.loadImage,
       onSelectZone: select,
       onSelectFloor: props.onSelectFloor,
     });

@@ -218,6 +218,29 @@ describe("OutsideScene in a real DOM", () => {
       .toContain("LimeZu");
   });
 
+  it("labels a real composition distinctly from single-tile art", async () => {
+    const image = document.createElement("canvas");
+    const art: OutsideSceneArt = {
+      credit: "LimeZu — https://limezu.itch.io",
+      source: "injected",
+      tiles: {},
+      composed: true,
+      animated: false,
+      frames: {
+        grass: [{ image, sx: 0, sy: 0, sw: 16, sh: 16, tile: 16 }],
+        trees: [{ image, sx: 0, sy: 64, sw: 64, sh: 48, tile: 16 }],
+        roof: [{ image, sx: 32, sy: 0, sw: 32, sh: 16, tile: 16 }],
+      },
+    };
+    await render({ art });
+    const scene = q('[data-testid="outside-scene"]');
+    expect(scene.getAttribute("data-art-status")).toBe("ready");
+    expect(scene.getAttribute("data-art-composed")).toBe("true");
+    expect(scene.getAttribute("data-art-animated")).toBe("false");
+    expect(q('[data-testid="outside-scene-art"]').textContent)
+      .toContain("Serene Village composition");
+  });
+
   it("states the scene is unavailable when a device has no Canvas2D", async () => {
     getContext.mockImplementation(() => null);
     await render();

@@ -4,10 +4,12 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  type OutsideSceneLayout, OUTSIDE_SCENE_ART_SCHEMA, SCENE_TILE_PX,
+  type OutsideSceneLayout, OUTSIDE_SCENE_ART_SCHEMA,
+  OUTSIDE_SCENE_ART_SCHEMA_V2, SCENE_TILE_PX, SERENE_VILLAGE_PRESET,
   artKindForChunk, buildOutsideScene, drawOutsideScene, environmentPalette,
-  hash01, loadOutsideSceneArt, orderedSceneChunks,
-  parseOutsideSceneArtManifest, sceneDescription, sceneFloorLinks,
+  hash01, isBuildingChunkKind, loadOutsideSceneArt, orderedSceneChunks,
+  parseOutsideSceneArtManifest, paintOrderedChunks, planBuildingPlacements,
+  sceneDescription, sceneFloorLinks, sereneVillageComposition, waterRoleAt,
 } from "./outside-scene";
 import {
   OUTSIDE_SCHEMA, outsideWorldView, parseOutsideWorld,
@@ -391,5 +393,382 @@ describe("outsideWorldView integration", () => {
     expect(view.status).toBe("ready");
     expect(buildOutsideScene(view.world!).chunks).toHaveLength(5);
     expect(outsideWorldView({ payload: null }).world).toBeNull();
+  });
+});
+
+// ---------------------------------------------------- real-art composition
+function chunk(
+  chunk_id: string, kind: string, layer: string,
+  x: number, y: number, width: number, height: number,
+  active = true, z_index = 0,
+) {
+  return {
+    chunk_id, zone_id: "zone-campus", kind, layer,
+    bounds: { x, y, width, height },
+    tiles: width * height, active, animated: false, state: "active",
+    assets: [], z_index,
+  };
+}
+
+function buildingWorld() {
+  return world({
+    zones: [{
+      zone_id: "zone-campus", kind: "campus", label: "Campus exterior",
+      state: "active", animated: false, entry_chunk: "c-ground",
+      chunk_ids: ["c-ground", "c-roof", "c-facade", "c-entrance", "c-sign"],
+      bounds: { x: 0, y: 0, width: 24, height: 12 },
+      counts: { chunks: 5, active_chunks: 5, animated_chunks: 0, tiles: 384 },
+    }],
+    chunks: [
+      chunk("c-ground", "ground", "ground", 0, 4, 24, 8),
+      chunk("c-roof", "roof", "building", 4, 0, 10, 2, true, 11),
+      chunk("c-facade", "facade", "building", 4, 2, 10, 6, true, 10),
+      chunk("c-entrance", "entrance", "building", 7, 8, 4, 2, true, 12),
+      chunk("c-sign", "signage", "overlay", 8, 5, 2, 1, true, 9),
+    ],
+    portals: [],
+    floor_links: [],
+    places: [],
+    assets: [],
+    summary: {
+      zones: 1, active_zones: 1, dormant_zones: 0, chunks: 5,
+      active_chunks: 5, dormant_chunks: 0, animated_chunks: 0, portals: 0,
+      elevator_links: 0, stairs_links: 0, places: 0, assets: 0,
+    },
+  });
+}
+
+function waterWorld() {
+  return world({
+    zones: [{
+      zone_id: "zone-campus", kind: "campus", label: "Campus exterior",
+      state: "active", animated: false, entry_chunk: "c-ground",
+      chunk_ids: ["c-ground", "c-water"],
+      bounds: { x: 0, y: 0, width: 8, height: 8 },
+      counts: { chunks: 2, active_chunks: 2, animated_chunks: 1, tiles: 64 },
+    }],
+    chunks: [
+      chunk("c-ground", "ground", "ground", 0, 0, 8, 8),
+      chunk("c-water", "water", "overlay", 2, 2, 4, 4, true, 1),
+    ],
+    portals: [],
+    floor_links: [],
+    places: [],
+    assets: [],
+    summary: {
+      zones: 1, active_zones: 1, dormant_zones: 0, chunks: 2,
+      active_chunks: 2, dormant_chunks: 0, animated_chunks: 1, portals: 0,
+      elevator_links: 0, stairs_links: 0, places: 0, assets: 0,
+    },
+  });
+}
+
+const SERENE_MANIFEST = {
+  schema: OUTSIDE_SCENE_ART_SCHEMA,
+  credit: "LimeZu — https://limezu.itch.io",
+  cell: 16,
+  tiles: {
+    grass: { sheet: "outside/serene.png", col: 3, row: 0 },
+    water: { sheet: "outside/serene.png", col: 12, row: 1 },
+  },
+};
+
+function compositionRecorder() {
+  const calls: Array<[string, ...unknown[]]> = [];
+  const gradient = { addColorStop: vi.fn() };
+  const ctx: Record<string, unknown> = {
+    clearRect: (...args: unknown[]) => calls.push(["clearRect", ...args]),
+    createLinearGradient: (...args: unknown[]) => {
+      calls.push(["createLinearGradient", ...args]);
+      return gradient;
+    },
+    fillRect: (...args: unknown[]) => calls.push(["fillRect", ...args]),
+    strokeRect: (...args: unknown[]) => calls.push(["strokeRect", ...args]),
+    beginPath: () => calls.push(["beginPath"]),
+    moveTo: (...args: unknown[]) => calls.push(["moveTo", ...args]),
+    lineTo: (...args: unknown[]) => calls.push(["lineTo", ...args]),
+    stroke: () => calls.push(["stroke"]),
+    fill: () => calls.push(["fill"]),
+    arc: (...args: unknown[]) => calls.push(["arc", ...args]),
+    save: () => calls.push(["save"]),
+    restore: () => calls.push(["restore"]),
+    translate: (...args: unknown[]) => calls.push(["translate", ...args]),
+    setLineDash: (...args: unknown[]) => calls.push(["setLineDash", ...args]),
+    fillText: (...args: unknown[]) => calls.push(["fillText", ...args]),
+    drawImage: (...args: unknown[]) => calls.push(["drawImage", ...args]),
+    clip: () => calls.push(["clip"]),
+    rect: (...args: unknown[]) => calls.push(["rect", ...args]),
+    imageSmoothingEnabled: true,
+    fillStyle: "", strokeStyle: "", lineWidth: 1, font: "",
+    textAlign: "left", textBaseline: "alphabetic", globalAlpha: 1,
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls };
+}
+
+function loadSereneArt(
+  manifest: Record<string, unknown> = SERENE_MANIFEST,
+  size = { width: 304, height: 720 },
+) {
+  return loadOutsideSceneArt({
+    manifest,
+    loadImage: async () => ({
+      image: {} as CanvasImageSource, width: size.width, height: size.height,
+    }),
+  });
+}
+
+describe("Serene Village composition preset", () => {
+  it("declares real multi-tile roles and water edge roles", () => {
+    const composition = sereneVillageComposition("outside/serene.png");
+    expect(Object.keys(composition).length).toBeGreaterThan(15);
+    const trees = composition.trees ?? [];
+    expect(trees[0].w).toBeGreaterThan(1);
+    expect(trees[0].h).toBeGreaterThan(1);
+    const building = composition.building ?? [];
+    expect(building[0].w).toBeGreaterThan(1);
+    expect(building[0].h).toBeGreaterThan(1);
+    expect(building[0].sw).toBe(72);
+    expect(composition.door?.[0].w).toBeGreaterThan(1);
+    expect(composition.water_n).toBeTruthy();
+    expect(composition.water_se).toBeTruthy();
+  });
+
+  it("maps a water tile position to the correct edge role", () => {
+    const rect = { x: 2, y: 3, width: 4, height: 4 };
+    expect(waterRoleAt(rect, 2, 3)).toBe("water_nw");
+    expect(waterRoleAt(rect, 5, 3)).toBe("water_ne");
+    expect(waterRoleAt(rect, 2, 6)).toBe("water_sw");
+    expect(waterRoleAt(rect, 5, 6)).toBe("water_se");
+    expect(waterRoleAt(rect, 3, 3)).toBe("water_n");
+    expect(waterRoleAt(rect, 3, 6)).toBe("water_s");
+    expect(waterRoleAt(rect, 2, 4)).toBe("water_w");
+    expect(waterRoleAt(rect, 5, 4)).toBe("water_e");
+    expect(waterRoleAt(rect, 3, 4)).toBe("water");
+  });
+
+  it("auto-applies the preset to the real 304x720 Serene sheet", async () => {
+    const result = await loadSereneArt();
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.composed).toBe(true);
+    expect(Object.keys(result.art.frames ?? {}).length).toBeGreaterThan(15);
+    expect(result.art.frames?.grass?.length).toBe(4);
+    expect(result.art.frames?.trees?.[0].sw).toBe(64);
+    expect(result.art.frames?.trees?.[0].sh).toBe(48);
+    expect(result.art.frames?.water_n?.[0].sy).toBe(0);
+  });
+
+  it("does not apply the preset to a different-sized sheet", async () => {
+    const result = await loadSereneArt(SERENE_MANIFEST,
+      { width: 128, height: 128 });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.composed).toBe(false);
+    expect(result.art.frames).toBeUndefined();
+    expect(result.art.tiles.grass).toBeTruthy();
+  });
+
+  it("accepts an explicit /2 composition with multi-tile frames", async () => {
+    const result = await loadSereneArt({
+      schema: OUTSIDE_SCENE_ART_SCHEMA_V2,
+      credit: "LimeZu",
+      cell: 16,
+      preset: SERENE_VILLAGE_PRESET,
+      composition: {
+        grass: [{ sheet: "g.png", col: 0, row: 0 }],
+        roof: [{ sheet: "g.png", col: 1, row: 1, w: 3, h: 2 }],
+      },
+    }, { width: 64, height: 64 });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.composed).toBe(true);
+    expect(result.art.frames?.roof?.[0].sw).toBe(48);
+    expect(result.art.frames?.roof?.[0].sh).toBe(32);
+  });
+
+  it("marks real multi-frame art as animated", async () => {
+    const result = await loadSereneArt({
+      schema: OUTSIDE_SCENE_ART_SCHEMA_V2,
+      credit: "LimeZu", cell: 16,
+      composition: {
+        water: [{
+          sheet: "w.png", col: 0, row: 0, frames: 3, fps: 4,
+        }],
+      },
+    }, { width: 96, height: 16 });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.animated).toBe(true);
+    expect(result.art.frames?.water?.[0].frames).toBe(3);
+  });
+});
+
+describe("composed building plan", () => {
+  it("places multi-tile roof, wall, windows, door and sign only in payload chunks", () => {
+    const layout = buildOutsideScene(buildingWorld());
+    const plan = planBuildingPlacements(layout);
+    const roles = plan.map((item) => item.role);
+    expect(roles).toContain("roof");
+    expect(roles).toContain("wall");
+    expect(roles).toContain("window");
+    expect(roles).toContain("door");
+    expect(roles).toContain("sign");
+
+    const roof = plan.find((item) => item.role === "roof");
+    expect(roof).toMatchObject({ x: 4, y: 0, width: 10, height: 2 });
+    const wall = plan.find((item) => item.role === "wall");
+    expect(wall).toMatchObject({ x: 4, y: 2, width: 10, height: 6 });
+    expect(wall!.width * wall!.height).toBeGreaterThan(1);
+
+    const windows = plan.filter((item) => item.role === "window");
+    expect(windows.length).toBeGreaterThan(1);
+    for (const window of windows) {
+      expect(window.x).toBeGreaterThanOrEqual(4);
+      expect(window.x + window.width).toBeLessThanOrEqual(14);
+      expect(window.y).toBeGreaterThanOrEqual(2);
+      expect(window.y + window.height).toBeLessThanOrEqual(8);
+    }
+
+    const door = plan.find((item) => item.role === "door");
+    expect(door).toMatchObject({ x: 7, y: 8, width: 4, height: 2 });
+    const sign = plan.find((item) => item.role === "sign");
+    expect(sign).toMatchObject({ x: 8, y: 5, width: 2, height: 1 });
+  });
+
+  it("never invents a building when the payload has no building chunks", () => {
+    const layout = buildOutsideScene(world({
+      zones: [{
+        zone_id: "zone-campus", kind: "campus", label: "Campus exterior",
+        state: "active", animated: false, entry_chunk: "c-ground",
+        chunk_ids: ["c-ground", "c-road"],
+        bounds: { x: 0, y: 0, width: 12, height: 6 },
+        counts: { chunks: 2, active_chunks: 2, animated_chunks: 0, tiles: 72 },
+      }],
+      chunks: [
+        chunk("c-ground", "ground", "ground", 0, 0, 12, 4),
+        chunk("c-road", "road", "ground", 0, 4, 12, 2),
+      ],
+      portals: [],
+      floor_links: [],
+      places: [],
+      assets: [],
+      summary: {
+        zones: 1, active_zones: 1, dormant_zones: 0, chunks: 2,
+        active_chunks: 2, dormant_chunks: 0, animated_chunks: 0, portals: 0,
+        elevator_links: 0, stairs_links: 0, places: 0, assets: 0,
+      },
+    }));
+    expect(isBuildingChunkKind("facade")).toBe(true);
+    expect(isBuildingChunkKind("ground")).toBe(false);
+    expect(planBuildingPlacements(layout)).toEqual([]);
+  });
+
+  it("is deterministic for the same payload", () => {
+    const layout = buildOutsideScene(buildingWorld());
+    expect(planBuildingPlacements(layout)).toEqual(planBuildingPlacements(layout));
+  });
+
+  it("paints ground-level paths below the building depth", () => {
+    const layout = {
+      chunks: [
+        chunk("c-path", "path", "overlay", 0, 0, 4, 4, true, 0),
+        chunk("c-facade", "facade", "building", 0, 0, 4, 4, true, 10),
+      ],
+    } as OutsideSceneLayout;
+    const order = paintOrderedChunks(layout).map((item) => item.chunk_id);
+    expect(order).toEqual(["c-path", "c-facade"]);
+  });
+});
+
+describe("composed painting", () => {
+  it("paints the building once from the payload plan, multi-tile", async () => {
+    const result = await loadSereneArt(SERENE_MANIFEST,
+      { width: 304, height: 720 });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    const layout = buildOutsideScene(buildingWorld());
+    const { ctx, calls } = compositionRecorder();
+    drawOutsideScene(ctx, layout, { art: result.art });
+    const images = calls.filter(([name]) => name === "drawImage");
+    expect(images.length).toBeGreaterThan(50);
+    // The whole-house frame is drawn exactly once over the 40x40 building
+    // union (320 CSS px at 8px/tile), never repeated per tile.
+    const building = layout.chunks.filter((item) =>
+      item.kind === "roof" || item.kind === "facade" || item.kind === "windows");
+    const minX = Math.min(...building.map((item) => item.rect.x));
+    const minY = Math.min(...building.map((item) => item.rect.y));
+    const maxX = Math.max(...building.map(
+      (item) => item.rect.x + item.rect.width));
+    const maxY = Math.max(...building.map(
+      (item) => item.rect.y + item.rect.height));
+    const whole = images.filter(([, , , , , , , , dw, dh]) =>
+      Number(dw) === (maxX - minX) * 8 && Number(dh) === (maxY - minY) * 8);
+    expect(whole).toHaveLength(1);
+    // The roof/wall destination sizes are multi-tile (>= 16 CSS px at 8px/tile).
+    const wide = images.some(([, , , , , , , , dw, dh]) =>
+      Number(dw) >= 16 && Number(dh) >= 8);
+    expect(wide).toBe(true);
+  });
+
+  it("uses real water edge tiles, not one repeated centre tile", async () => {
+    const result = await loadSereneArt(SERENE_MANIFEST,
+      { width: 304, height: 720 });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    const layout = buildOutsideScene(waterWorld());
+    const { ctx, calls } = compositionRecorder();
+    drawOutsideScene(ctx, layout, { art: result.art });
+    const sources = new Set(
+      calls.filter(([name]) => name === "drawImage").map((call) => call[3]));
+    // centre (row 1), north (row 0), south (row 2) are distinct source rows.
+    expect(sources.size).toBeGreaterThanOrEqual(3);
+  });
+
+  it("is deterministic for a composed frame", async () => {
+    const result = await loadSereneArt(SERENE_MANIFEST,
+      { width: 304, height: 720 });
+    if (result.status !== "ready") throw new Error("art did not load");
+    const layout = buildOutsideScene(waterWorld());
+    const first = compositionRecorder();
+    const second = compositionRecorder();
+    drawOutsideScene(first.ctx, layout, { art: result.art, timeMs: 0 });
+    drawOutsideScene(second.ctx, layout, { art: result.art, timeMs: 0 });
+    expect(first.calls).toEqual(second.calls);
+  });
+
+  it("falls back per role when the pack has no art for a chunk kind", async () => {
+    const result = await loadSereneArt({
+      schema: OUTSIDE_SCENE_ART_SCHEMA_V2,
+      credit: "LimeZu", cell: 16,
+      composition: { grass: [{ sheet: "g.png", col: 0, row: 0 }] },
+    }, { width: 16, height: 16 });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    const layout = buildOutsideScene(world());
+    const { ctx, calls } = compositionRecorder();
+    drawOutsideScene(ctx, layout, { art: result.art });
+    // Grass tiles use real art; the road/garden/parking chunks fall back to
+    // procedural fills (fillRect/stroke) rather than inventing a tile.
+    expect(calls.filter(([name]) => name === "drawImage").length).toBeGreaterThan(0);
+    expect(calls.filter(([name]) => name === "fillRect").length).toBeGreaterThan(0);
+  });
+
+  it("advances real animation frames with time", async () => {
+    const result = await loadSereneArt({
+      schema: OUTSIDE_SCENE_ART_SCHEMA_V2,
+      credit: "LimeZu", cell: 16,
+      composition: {
+        water: [{ sheet: "w.png", col: 0, row: 0, frames: 3, fps: 4 }],
+      },
+    }, { width: 96, height: 16 });
+    if (result.status !== "ready") throw new Error("art did not load");
+    const layout = buildOutsideScene(waterWorld());
+    const atZero = compositionRecorder();
+    const later = compositionRecorder();
+    drawOutsideScene(atZero.ctx, layout, { art: result.art, timeMs: 0 });
+    drawOutsideScene(later.ctx, layout, { art: result.art, timeMs: 300 });
+    const sx = (calls: Array<[string, ...unknown[]]>) =>
+      calls.filter(([name]) => name === "drawImage").map((call) => call[2]);
+    expect(new Set(sx(atZero.calls))).not.toEqual(new Set(sx(later.calls)));
   });
 });

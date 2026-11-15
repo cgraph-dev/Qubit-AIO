@@ -105,7 +105,12 @@ function artStatusLabel(
   art: OutsideSceneArt | null, reason: string,
 ): string {
   if (status === "ready" && art) {
-    return `LimeZu tiles · ${art.credit || "https://limezu.itch.io"}`;
+    const credit = art.credit || "https://limezu.itch.io";
+    if (art.composed) {
+      const roles = Object.keys(art.frames ?? {}).length;
+      return `Serene Village composition · ${roles} tile roles · ${credit}`;
+    }
+    return `LimeZu tiles (single-tile fallback) · ${credit}`;
   }
   if (status === "loading") return "Loading local outside art…";
   if (status === "error") {
@@ -177,9 +182,9 @@ export function createOutsideScene(R: ReactArg, hooks: HooksArg) {
       return () => { live = false; };
     }, [props.art, props.assetBase, props.fetchImpl, props.loadImage]);
 
-    // Paint one deterministic frame per layout/selection/art change. There is
-    // deliberately no animation frame: weather detail is static and the
-    // semantic panel owns live state, so a paint is reproducible.
+    // Paint one deterministic frame per layout/selection/art change. A static
+    // frame is always painted first; the animation effect below only starts
+    // when the pack carries real animation frames and motion is allowed.
     useEffect(() => {
       if (!layout) return;
       const canvas = canvasRef.current;
@@ -207,6 +212,40 @@ export function createOutsideScene(R: ReactArg, hooks: HooksArg) {
         selectedZoneId: props.selectedZoneId ?? null,
       });
     }, [layout?.digest, layout?.width, layout?.height, art, artStatus,
+      props.reducedMotion, props.selectedZoneId]);
+
+    // Optional animation: only real pack frames (water waves, doors, ...) and
+    // never under reduced motion. The semantic panel remains the live surface.
+    useEffect(() => {
+      if (!layout || !art?.animated || props.reducedMotion) return;
+      const canvas = canvasRef.current;
+      if (!canvas || !canvas2dSupported(canvas)) return;
+      if (typeof requestAnimationFrame !== "function") return;
+      let ctx: CanvasRenderingContext2D | null = null;
+      try {
+        ctx = canvas.getContext("2d");
+      } catch {
+        ctx = null;
+      }
+      if (!ctx) return;
+      let raf = 0;
+      const start = performance.now();
+      const tick = (now: number) => {
+        drawOutsideScene(ctx as CanvasRenderingContext2D, layout, {
+          timeMs: Math.max(0, now - start),
+          reducedMotion: false,
+          art,
+          selectedZoneId: props.selectedZoneId ?? null,
+        });
+        raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+      return () => {
+        if (typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(raf);
+        }
+      };
+    }, [layout?.digest, layout?.width, layout?.height, art,
       props.reducedMotion, props.selectedZoneId]);
 
     if (!world || !layout) return null;
@@ -275,6 +314,8 @@ export function createOutsideScene(R: ReactArg, hooks: HooksArg) {
       "data-testid": "outside-scene",
       "data-art-status": artStatus,
       "data-art-source": art ? art.source : "procedural",
+      "data-art-composed": art?.composed ? "true" : "false",
+      "data-art-animated": art?.animated ? "true" : "false",
       "data-reduced-motion": props.reducedMotion ? "true" : "false",
       "aria-label": "Visual campus outside world",
     }, [
