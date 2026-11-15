@@ -26,7 +26,7 @@ import { createTimeline } from "./Timeline";
 import { createRoomBuilder } from "./RoomBuilder";
 import { createOutsideWorld } from "./OutsideWorld";
 import { createPanelInventoryPanel } from "./PanelInventory";
-import { createFloorCampus } from "./FloorCampus";
+import { createCampusWorld } from "./CampusWorld";
 import { createTowerNavigator } from "./TowerNavigator";
 import { fetchDirectory, type BusinessDirectory } from "./business-api";
 import { fetchWorldTower, type WorldTower } from "./world-tower";
@@ -103,6 +103,8 @@ export interface OfficeAppProps {
    * explicit/test path. See `../loading/config.ts`.
    */
   loading?: OfficeLoadingConfigInput;
+  /** Injected fetch for tests/hosts; the live paths default to `fetch`. */
+  fetchImpl?: typeof fetch;
 }
 
 /**
@@ -151,7 +153,7 @@ type ShellComponents = {
   RoomBuilder: ReturnType<typeof createRoomBuilder>;
   OutsideWorld: ReturnType<typeof createOutsideWorld>;
   PanelInventory: ReturnType<typeof createPanelInventoryPanel>;
-  FloorCampus: ReturnType<typeof createFloorCampus>;
+  CampusWorld: ReturnType<typeof createCampusWorld>;
   TowerNavigator: ReturnType<typeof createTowerNavigator>;
   EtsyConnectPanel: ReturnType<typeof createEtsyConnectPanel>;
   LoadingScreen: ReturnType<typeof createOfficeLoadingScreen>;
@@ -198,7 +200,7 @@ function shellComponents(
     RoomBuilder: createRoomBuilder(R, hooks),
     OutsideWorld: createOutsideWorld(R, hooks),
     PanelInventory: createPanelInventoryPanel(R, hooks),
-    FloorCampus: createFloorCampus(R, hooks),
+    CampusWorld: createCampusWorld(R, hooks),
     TowerNavigator: createTowerNavigator(R, hooks),
     EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
     LoadingScreen: createOfficeLoadingScreen(R, hooks),
@@ -273,8 +275,8 @@ export function createOfficeApp(
       "panels");
     const [outsideView, setOutsideView] = useState<OutsideWorldView | null>(
       null);
-    // The Habblaud office is the primary surface. Campus multiplies it into
-    // one card per real floor; it is not a directory and not a second renderer.
+    // The Habblaud office is the primary surface. Campus places its real
+    // floors on one shared stage; it is not a directory and not a second renderer.
     const [campusOpen, setCampusOpen] = useState(false);
     const [campusTab, setCampusTab] = useState<"floors" | "directory">("floors");
     const [campusDirectory, setCampusDirectory] = useState<
@@ -296,7 +298,7 @@ export function createOfficeApp(
     const {
       HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel,
       ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld,
-      PanelInventory, FloorCampus, TowerNavigator, EtsyConnectPanel,
+      PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel,
       LoadingScreen,
     } = shellComponents(R, hooks, props.base);
     useEffect(() => {
@@ -1281,7 +1283,7 @@ export function createOfficeApp(
             R.createElement("p", {
               key: "counts", "data-testid": "office-campus-counts",
             }, campusTab === "floors"
-              ? "Floor scenes · the Habblaud office repeated per real floor"
+              ? "Campus world · real live floors and unstaffed templates on one camera"
               : "100-floor directory · floors, rooms, desks and occupancy"),
             R.createElement("div", {
               key: "tabs", className: "office-game__campusTabs",
@@ -1292,7 +1294,7 @@ export function createOfficeApp(
                 "data-testid": "office-campus-tab-floors",
                 "aria-pressed": campusTab === "floors",
                 onClick: () => setCampusTab("floors"),
-              }, "Floor scenes"),
+              }, "Campus world"),
               R.createElement("button", {
                 key: "directory", type: "button",
                 className: "office-game__btn",
@@ -1312,9 +1314,11 @@ export function createOfficeApp(
         R.createElement("div", {
           key: "body", className: "office-game__campusBody",
         }, campusTab === "floors"
-          ? R.createElement(FloorCampus as never, {
+          ? R.createElement(CampusWorld as never, {
               base: props.base,
               theme: requestedTheme,
+              fetchImpl: props.fetchImpl,
+              templates: campusDirectory?.floors,
             })
           : directoryBody),
       ]));

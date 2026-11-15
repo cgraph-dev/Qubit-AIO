@@ -197058,7 +197058,7 @@ create: function(game) {
 		}
 	}
 	// ../qubit-app/plugins/qubit-office/game/app/TowerNavigator.tsx
-	function wingTitle(wing) {
+	function wingTitle$1(wing) {
 		if (!wing) return "Unassigned wing";
 		return `${wing.charAt(0).toUpperCase()}${wing.slice(1)} Wing`;
 	}
@@ -197339,7 +197339,7 @@ create: function(game) {
 							key: "title",
 							className: "tower__sceneTitle",
 							"data-testid": "tower-scene-title"
-						}, `Floor ${floorNumber(floor.index)} · ${wingTitle(floor.wing)}`),
+						}, `Floor ${floorNumber(floor.index)} · ${wingTitle$1(floor.wing)}`),
 						R.createElement("span", {
 							key: "cap",
 							className: "tower__sceneMeta",
@@ -197458,7 +197458,7 @@ create: function(game) {
 					key: "rows",
 					className: "tower__detailRows"
 				}, [
-					detailRow("wing", "Wing", wingTitle(selected.wing), "tower-detail-wing"),
+					detailRow("wing", "Wing", wingTitle$1(selected.wing), "tower-detail-wing"),
 					detailRow("departments", "Departments", selected.department_ids.length ? selected.department_ids.join(", ") : "none", "tower-detail-departments"),
 					detailRow("roles", "Role templates", `${selected.role_ids.length} ids — ` + (selected.role_ids.length ? selected.role_ids.join(", ") : "none"), "tower-detail-roles"),
 					detailRow("rooms", "Planned rooms", `${selected.room_count}`, "tower-detail-rooms"),
@@ -197499,7 +197499,7 @@ create: function(game) {
 					key: wing,
 					className: "tower__wing",
 					role: "group",
-					"aria-label": `${wingTitle(wing)} (${group.length} floors)`,
+					"aria-label": `${wingTitle$1(wing)} (${group.length} floors)`,
 					"data-testid": "tower-wing",
 					"data-wing": wing
 				}, [R.createElement("div", {
@@ -197508,7 +197508,7 @@ create: function(game) {
 				}, [R.createElement("span", {
 					key: "n",
 					className: "tower__wingName"
-				}, wingTitle(wing)), R.createElement("span", {
+				}, wingTitle$1(wing)), R.createElement("span", {
 					key: "c",
 					className: "tower__wingCount"
 				}, `${group.length} floors · ${wingActive} active / ${group.length - wingActive} dormant`)]), R.createElement("div", {
@@ -202426,13 +202426,178 @@ create: function(game) {
 			payload: body
 		};
 	}
-	// ../qubit-app/plugins/qubit-office/game/app/FloorCampus.tsx
-	function embedCss(win) {
+	var CAMPUS_MIN_ZOOM = .22;
+	var CAMPUS_MAX_ZOOM = 2.4;
+	var WINGS = [
+		"north",
+		"east",
+		"south",
+		"west",
+		"central"
+	];
+	var EMBED_STYLE_ID = "qubit-campus-world-embed";
+	function clamp$1(value, min, max) {
+		return Math.max(min, Math.min(max, value));
+	}
+	function pad3(value) {
+		return String(Math.max(0, Math.trunc(value))).padStart(3, "0");
+	}
+	function wingIndex(wing) {
+		const index = WINGS.indexOf(String(wing || ""));
+		return index >= 0 ? index : 2;
+	}
+	function wingTitle(wing) {
+		const value = String(wing || "").trim();
+		if (!value) return "Campus";
+		return `${value.charAt(0).toUpperCase()}${value.slice(1)} Wing`;
+	}
+	function finiteNumber(value) {
+		const number = typeof value === "number" ? value : Number(value);
+		return Number.isFinite(number) ? number : null;
+	}
+	function characterName(character) {
+		const slug = typeof character.slug === "string" ? character.slug.trim() : "";
+		if (slug) return slug;
+		const id = character.agent_id;
+		return id === void 0 || id === null ? "" : String(id);
+	}
+	/** Project a tower payload into the live floor rows this world can draw. */
+	function liveFloorsFromSnapshot(payload) {
+		const root = payload && typeof payload === "object" ? payload : null;
+		const floorplan = root?.floorplan && typeof root.floorplan === "object" ? root.floorplan : null;
+		const rawFloors = Array.isArray(floorplan?.floors) ? floorplan.floors : [];
+		const characters = Array.isArray(root?.characters) ? root.characters : [];
+		const byNumber = /* @__PURE__ */ new Map();
+		for (const floor of rawFloors) {
+			const number = finiteNumber(floor?.number);
+			if (number === null || number < 0 || byNumber.has(number)) continue;
+			const people = characters.filter((character) => finiteNumber(character?.position?.floor) === number);
+			byNumber.set(number, {
+				number,
+				name: typeof floor?.name === "string" && floor.name ? floor.name : `Floor ${pad3(number)}`,
+				role: typeof floor?.role === "string" ? floor.role : "",
+				rooms: Array.isArray(floor?.rooms) ? floor.rooms.length : 0,
+				agents: people.length,
+				characters: people.map((character) => characterName(character)).filter((name) => Boolean(name))
+			});
+		}
+		return [...byNumber.values()].sort((a, b) => a.number - b.number);
+	}
+	function liveFloorRow(floor) {
+		return {
+			id: `live:${floor.number}`,
+			number: floor.number,
+			name: floor.name || `Floor ${pad3(floor.number)}`,
+			role: floor.role || "",
+			wing: "central",
+			live: true,
+			active: true,
+			rooms: Math.max(0, floor.rooms),
+			desks: 0,
+			agents: Math.max(0, floor.agents),
+			characters: [...floor.characters],
+			scope: `live:${floor.number}`
+		};
+	}
+	function templateFloorRow(floor) {
+		return {
+			id: floor.floor_id,
+			number: floor.index,
+			name: floor.name || `Floor ${pad3(floor.index)}`,
+			role: wingTitle(floor.wing),
+			wing: floor.wing || "central",
+			live: false,
+			active: floor.active_by_default === true,
+			rooms: Math.max(0, floor.room_count),
+			desks: Math.max(0, floor.desk_capacity),
+			agents: 0,
+			characters: [],
+			scope: floor.floor_id
+		};
+	}
+	function nearestDistance(number, anchors) {
+		let best = Number.POSITIVE_INFINITY;
+		for (const anchor of anchors) best = Math.min(best, Math.abs(anchor - number));
+		return best;
+	}
+	/** Build the bounded, ordered floor window without inventing occupancy. */
+	function buildCampusFloors(live, templates, opts = {}) {
+		const cap = Math.max(1, Math.trunc(opts.maxFloors ?? 9));
+		const liveByNumber = /* @__PURE__ */ new Map();
+		for (const row of live ?? []) {
+			if (!Number.isFinite(row.number) || row.number < 0) continue;
+			if (!liveByNumber.has(row.number)) liveByNumber.set(row.number, row);
+		}
+		const keptLive = [...liveByNumber.values()].sort((a, b) => a.number - b.number).map(liveFloorRow).slice(0, cap);
+		const templateByNumber = /* @__PURE__ */ new Map();
+		for (const floor of templates ?? []) {
+			if (!Number.isFinite(floor.index) || floor.index <= 0) continue;
+			if (liveByNumber.has(floor.index)) continue;
+			if (!templateByNumber.has(floor.index)) templateByNumber.set(floor.index, floor);
+		}
+		const templateFloors = [...templateByNumber.values()].sort((a, b) => a.index - b.index).map(templateFloorRow);
+		const anchors = keptLive.length ? keptLive.map((floor) => floor.number) : templateFloors.length ? [templateFloors[0].number] : [];
+		const remaining = Math.max(0, cap - keptLive.length);
+		const selectedTemplates = templateFloors.slice().sort((a, b) => {
+			const distance = nearestDistance(a.number, anchors) - nearestDistance(b.number, anchors);
+			return distance !== 0 ? distance : a.number - b.number;
+		}).slice(0, remaining);
+		return [...keptLive, ...selectedTemplates].sort((a, b) => a.number - b.number);
+	}
+	/** Place the window as one tower: vertical bands with per-wing lateral offsets. */
+	function layoutCampusFloors(floors) {
+		const placements = floors.map((floor, index) => {
+			return {
+				floor,
+				index,
+				x: (wingIndex(floor.wing) - 2) * 64 + (index % 2 === 0 ? -18 : 18),
+				y: index * 508
+			};
+		});
+		const minX = Math.min(0, ...placements.map((item) => item.x));
+		const maxX = Math.max(720, ...placements.map((item) => item.x + 720));
+		const minY = Math.min(0, ...placements.map((item) => item.y));
+		const maxY = Math.max(420, ...placements.map((item) => item.y + 420));
+		return {
+			floors: placements.map((item) => ({
+				...item,
+				x: item.x - minX,
+				y: item.y - minY
+			})),
+			width: Math.max(1, maxX - minX),
+			height: Math.max(1, maxY - minY)
+		};
+	}
+	/** The shared camera transform that centres one floor in the viewport. */
+	function campusCameraFor(floor, viewport, zoom) {
+		const z = clamp$1(Number.isFinite(zoom) ? zoom : 1, CAMPUS_MIN_ZOOM, CAMPUS_MAX_ZOOM);
+		const width = Math.max(1, viewport.width);
+		const height = Math.max(1, viewport.height);
+		const cx = floor ? floor.x + 360 : 360;
+		const cy = floor ? floor.y + 210 : 210;
+		return {
+			x: width / 2 - cx * z,
+			y: height / 2 - cy * z,
+			zoom: z
+		};
+	}
+	/** The next/previous floor in the world order, clamped at the ends. */
+	function stepCampusFloor(floors, currentId, delta) {
+		if (!floors.length) return null;
+		const current = floors.findIndex((floor) => floor.id === currentId);
+		if (current < 0) return floors[0];
+		return floors[clamp$1(current + (delta || 0), 0, floors.length - 1)] ?? null;
+	}
+	function campusFloorStatus(floor) {
+		if (floor.live) return `Live · ${floor.agents} agent${floor.agents === 1 ? "" : "s"} · ${floor.rooms} room${floor.rooms === 1 ? "" : "s"}`;
+		return `Unstaffed template · ${floor.rooms} room${floor.rooms === 1 ? "" : "s"} · ${floor.desks} desks`;
+	}
+	function embedFloorCss(win) {
 		const doc = win?.document;
 		if (!doc || !doc.head) return;
-		if (doc.getElementById("qubit-campus-embed")) return;
+		if (doc.getElementById(EMBED_STYLE_ID)) return;
 		const style = doc.createElement("style");
-		style.id = "qubit-campus-embed";
+		style.id = EMBED_STYLE_ID;
 		style.textContent = [
 			"html,body{margin:0!important;overflow:hidden!important;background:#0b0a13!important}",
 			".ui-topbar,.ui-panel.ui-sidebar,.ui-panel.ui-feed,.ui-lapse-vignette{display:none!important}",
@@ -202440,95 +202605,397 @@ create: function(game) {
 		].join("");
 		doc.head.appendChild(style);
 	}
-	function createFloorCampus(R, H) {
-		return function FloorCampus(props) {
-			const { useState, useEffect } = H;
-			const [floors, setFloors] = useState([]);
-			const [error, setError] = useState("");
+	function installFloorFrame(win) {
+		try {
+			installOfficeApiBridge(win);
+			installOfficeBrand(win);
+			embedFloorCss(win);
+		} catch {}
+	}
+	function createCampusWorld(R, H) {
+		return function CampusWorld(props) {
+			const { useState, useEffect, useRef } = H;
+			const [live, setLive] = useState(props.liveFloors ?? []);
+			const [templates, setTemplates] = useState(props.templates ?? null);
+			const [liveError, setLiveError] = useState("");
+			const [templateError, setTemplateError] = useState("");
+			const [limit, setLimit] = useState(Math.max(1, props.maxFloors ?? 9));
+			const [focusId, setFocusId] = useState(null);
+			const [zoom, setZoom] = useState(.64);
+			const [camera, setCamera] = useState({
+				x: 0,
+				y: 0,
+				zoom: .64
+			});
+			const [viewport, setViewport] = useState({
+				width: 1280,
+				height: 720
+			});
+			const viewportRef = useRef(null);
+			const dragRef = useRef(null);
 			useEffect(() => {
-				let live = true;
+				if (props.liveFloors !== void 0) {
+					setLive(props.liveFloors);
+					return;
+				}
+				let active = true;
 				const adapter = new OfficeAdapter({
 					baseUrl: props.base ? `${props.base}/agent` : "/agent",
-					intervalMs: 5e3,
+					intervalMs: 4e3,
+					fetchImpl: props.fetchImpl,
 					onSnapshot: (snapshot) => {
-						if (!live) return;
+						if (!active) return;
 						if (!snapshot.payload) {
-							if (snapshot.error) setError(snapshot.error);
+							if (snapshot.error) setLiveError(snapshot.error);
 							return;
 						}
-						const chars = snapshot.payload.characters ?? [];
-						const rows = (snapshot.payload.floorplan?.floors ?? []).map((floor) => ({
-							number: floor.number,
-							name: floor.name,
-							role: floor.role || "",
-							rooms: floor.rooms?.length ?? 0,
-							agents: chars.filter((ch) => Number(ch.position?.floor) === Number(floor.number)).length
-						}));
-						setFloors(rows);
-						setError("");
+						setLive(liveFloorsFromSnapshot(snapshot.payload));
+						setLiveError(snapshot.error ?? "");
 					}
 				});
 				adapter.start();
 				return () => {
-					live = false;
+					active = false;
 					adapter.dispose();
 				};
-			}, [props.base]);
-			const cards = floors.map((floor) => R.createElement("article", {
-				key: floor.number,
-				className: "office-game__floorCard",
-				"data-testid": `office-floor-card-${floor.number}`
-			}, [R.createElement("header", {
-				key: "head",
-				className: "office-game__floorCardHead"
 			}, [
-				R.createElement("strong", { key: "n" }, `Floor ${floor.number}`),
-				R.createElement("span", { key: "r" }, floor.role || floor.name),
-				R.createElement("span", { key: "c" }, `${floor.agents} agent${floor.agents === 1 ? "" : "s"} · ${floor.rooms} room${floor.rooms === 1 ? "" : "s"}`)
-			]), R.createElement("iframe", {
-				key: "frame",
-				title: `Floor ${floor.number} · ${floor.role || floor.name}`,
-				className: "office-game__floorFrame",
-				"data-testid": `office-floor-frame-${floor.number}`,
-				sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
-				allow: "clipboard-read; clipboard-write",
-				src: officeAppSrc({
-					base: props.base,
-					theme: props.theme,
-					floor: `live:${floor.number}`
-				}),
-				onLoad: (ev) => {
-					const win = ev.currentTarget.contentWindow;
-					if (!win) return;
-					try {
-						installOfficeApiBridge(win);
-						installOfficeBrand(win);
-						embedCss(win);
-					} catch {}
+				props.liveFloors,
+				props.base,
+				props.fetchImpl
+			]);
+			useEffect(() => {
+				if (props.templates !== void 0) {
+					setTemplates(props.templates);
+					return;
 				}
-			})]));
-			return R.createElement("div", {
-				className: "office-game__floorCampus",
-				"data-testid": "office-floor-campus"
+				if (props.liveFloors !== void 0) {
+					setTemplates([]);
+					return;
+				}
+				let active = true;
+				const ctl = typeof AbortController === "undefined" ? void 0 : new AbortController();
+				setTemplateError("");
+				fetchDirectory({
+					base: props.base,
+					fetchImpl: props.fetchImpl,
+					signal: ctl?.signal
+				}).then((directory) => {
+					if (active) setTemplates(Array.isArray(directory.floors) ? directory.floors : []);
+				}).catch((exc) => {
+					if (!active) return;
+					setTemplates([]);
+					setTemplateError(exc instanceof Error ? exc.message : String(exc));
+				});
+				return () => {
+					active = false;
+					ctl?.abort();
+				};
 			}, [
-				R.createElement("p", {
-					key: "note",
-					className: "office-game__floorCampusNote"
-				}, "Each card is the Habblaud office rendered for one real floor, using the same LimeZu art and that floor's characters."),
-				error ? R.createElement("p", {
-					key: "error",
-					className: "office-game__campusState",
-					role: "alert"
-				}, `Floor campus unavailable: ${error}`) : null,
-				!floors.length && !error ? R.createElement("p", {
-					key: "loading",
-					className: "office-game__campusState",
-					role: "status"
-				}, "Loading the live floors…") : null,
+				props.templates,
+				props.liveFloors,
+				props.base,
+				props.fetchImpl
+			]);
+			useEffect(() => {
+				const node = viewportRef.current;
+				if (!node) return;
+				const measure = () => {
+					const rect = node.getBoundingClientRect?.();
+					if (rect && rect.width > 1 && rect.height > 1) setViewport({
+						width: rect.width,
+						height: rect.height
+					});
+				};
+				measure();
+				let observer = null;
+				if (typeof ResizeObserver !== "undefined") {
+					observer = new ResizeObserver(measure);
+					observer.observe(node);
+				} else if (typeof window !== "undefined") window.addEventListener("resize", measure);
+				return () => {
+					observer?.disconnect();
+					if (typeof window !== "undefined") window.removeEventListener("resize", measure);
+				};
+			}, []);
+			const floors = buildCampusFloors(live, templates, { maxFloors: limit });
+			const layout = layoutCampusFloors(floors);
+			const floorKey = floors.map((floor) => floor.id).join("|");
+			const layoutKey = layout.floors.map((item) => `${item.floor.id}:${item.x}:${item.y}`).join("|");
+			const knownNumbers = /* @__PURE__ */ new Set();
+			for (const floor of live) if (Number.isFinite(floor.number) && floor.number >= 0) knownNumbers.add(floor.number);
+			for (const floor of templates ?? []) if (Number.isFinite(floor.index) && floor.index > 0) knownNumbers.add(floor.index);
+			const totalFloors = knownNumbers.size;
+			const liveCount = floors.filter((floor) => floor.live).length;
+			useEffect(() => {
+				if (!floors.length) {
+					if (focusId !== null) setFocusId(null);
+					return;
+				}
+				if (focusId && floors.some((floor) => floor.id === focusId)) return;
+				const first = floors.find((floor) => floor.live) ?? floors[0];
+				setFocusId(first.id);
+			}, [floorKey, focusId]);
+			const focused = focusId ? layout.floors.find((item) => item.floor.id === focusId) ?? null : null;
+			useEffect(() => {
+				if (!layout.floors.length) return;
+				const node = viewportRef.current;
+				let width = viewport.width;
+				let height = viewport.height;
+				const rect = node?.getBoundingClientRect?.();
+				if (rect && rect.width > 1 && rect.height > 1) {
+					width = rect.width;
+					height = rect.height;
+				}
+				setCamera(campusCameraFor(focused, {
+					width,
+					height
+				}, zoom));
+			}, [
+				focusId,
+				layoutKey,
+				zoom,
+				viewport.width,
+				viewport.height
+			]);
+			const selectFloor = (floor) => {
+				setFocusId(floor.id);
+				setZoom((value) => Math.max(value, .9));
+				props.onSelectFloor?.(floor);
+			};
+			const step = (delta) => {
+				const next = stepCampusFloor(floors, focusId, delta);
+				if (next) selectFloor(next);
+			};
+			const setZoomBy = (factor) => {
+				setZoom((value) => clamp$1(value * factor, CAMPUS_MIN_ZOOM, CAMPUS_MAX_ZOOM));
+			};
+			const resetView = () => {
+				const first = floors.find((floor) => floor.id === focusId) ?? floors.find((floor) => floor.live) ?? floors[0];
+				if (first) setFocusId(first.id);
+				setZoom(.64);
+			};
+			const onPointerDown = (event) => {
+				if (event.button !== void 0 && event.button !== 0) return;
+				if (event.target?.closest?.("button")) return;
+				dragRef.current = {
+					pointerId: event.pointerId,
+					startX: event.clientX,
+					startY: event.clientY,
+					originX: camera.x,
+					originY: camera.y
+				};
+				event.currentTarget?.setPointerCapture?.(event.pointerId);
+			};
+			const onPointerMove = (event) => {
+				const drag = dragRef.current;
+				if (!drag || drag.pointerId !== event.pointerId) return;
+				setCamera((value) => ({
+					...value,
+					x: drag.originX + (event.clientX - drag.startX),
+					y: drag.originY + (event.clientY - drag.startY)
+				}));
+			};
+			const endDrag = (event) => {
+				if (!dragRef.current) return;
+				dragRef.current = null;
+				event.currentTarget?.releasePointerCapture?.(event.pointerId);
+			};
+			const onKeyDown = (event) => {
+				if (event.key === "ArrowDown") {
+					event.preventDefault?.();
+					step(1);
+				} else if (event.key === "ArrowUp") {
+					event.preventDefault?.();
+					step(-1);
+				} else if (event.key === "+" || event.key === "=") {
+					event.preventDefault?.();
+					setZoomBy(1.2);
+				} else if (event.key === "-") {
+					event.preventDefault?.();
+					setZoomBy(1 / 1.2);
+				} else if (event.key === "0") {
+					event.preventDefault?.();
+					resetView();
+				}
+			};
+			const canLoadMore = floors.length < totalFloors;
+			const canLoadFewer = floors.length > 4 && limit > 4;
+			const controlButton = (key, label, testId, onClick, disabled = false) => R.createElement("button", {
+				key,
+				type: "button",
+				className: "office-game__btn",
+				"data-testid": testId,
+				disabled,
+				onClick
+			}, label);
+			const worldState = () => {
+				if (!floors.length) {
+					if (props.liveFloors === void 0 && !liveError || props.templates === void 0 && templates === null) return R.createElement("p", {
+						key: "state",
+						className: "office-game__campusWorldState",
+						role: "status",
+						"data-testid": "campus-world-state"
+					}, "Loading the campus floors…");
+					return R.createElement("p", {
+						key: "state",
+						className: "office-game__campusWorldState",
+						role: "alert",
+						"data-testid": "campus-world-state"
+					}, "The campus could not read live floors or floor templates. No floors or agents are shown rather than inventing them.");
+				}
+				const notes = [];
+				if (liveError) notes.push(`Live occupancy unavailable (${liveError}). Showing the real unstaffed floor templates.`);
+				if (templateError) notes.push(`Floor templates unavailable (${templateError}).`);
+				if (!notes.length) return null;
+				return R.createElement("p", {
+					key: "state",
+					className: "office-game__campusWorldState",
+					role: "status",
+					"data-testid": "campus-world-state"
+				}, notes.join(" "));
+			};
+			const floorSlab = (item) => {
+				const floor = item.floor;
+				const isFocus = focusId === floor.id;
+				const className = "office-game__campusFloor" + (floor.live ? " is-live" : " is-template") + (isFocus ? " is-focus" : "");
+				return R.createElement("section", {
+					key: floor.id,
+					className,
+					"data-testid": "campus-world-floor",
+					"data-floor": floor.id,
+					"data-floor-number": floor.number,
+					"data-live": floor.live ? "true" : "false",
+					"data-agents": String(floor.agents),
+					"data-focus": isFocus ? "true" : "false",
+					"aria-label": `${floor.live ? "Live" : "Unstaffed"} floor ${floor.number}, ${floor.name}, ${floor.rooms} rooms, ${floor.agents} agents`,
+					style: {
+						left: `${item.x}px`,
+						top: `${item.y}px`,
+						width: `720px`,
+						height: `420px`
+					}
+				}, [R.createElement("button", {
+					key: "label",
+					type: "button",
+					className: "office-game__campusFloorLabel",
+					"data-testid": "campus-world-floor-label",
+					"aria-pressed": isFocus ? "true" : "false",
+					"aria-current": isFocus ? "true" : void 0,
+					"aria-label": `Enter floor ${floor.number}, ${floor.name}`,
+					onClick: () => selectFloor(floor)
+				}, [
+					R.createElement("span", {
+						key: "n",
+						className: "office-game__campusFloorNumber"
+					}, `Floor ${pad3(floor.number)}`),
+					R.createElement("span", {
+						key: "name",
+						className: "office-game__campusFloorName"
+					}, floor.name),
+					R.createElement("span", {
+						key: "s",
+						className: "office-game__campusFloorState"
+					}, campusFloorStatus(floor))
+				]), R.createElement("iframe", {
+					key: "frame",
+					title: `Floor ${pad3(floor.number)} · ${floor.name}`,
+					"data-testid": "campus-world-frame",
+					"data-floor-scope": floor.scope,
+					className: "office-game__campusFloorFrame",
+					sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
+					allow: "clipboard-read; clipboard-write",
+					loading: floor.live || isFocus ? "eager" : "lazy",
+					src: officeAppSrc({
+						base: props.base,
+						theme: props.theme,
+						floor: floor.scope
+					}),
+					onLoad: (event) => {
+						const win = event.currentTarget.contentWindow;
+						if (win) installFloorFrame(win);
+					}
+				})]);
+			};
+			const focusBar = focused ? R.createElement("div", {
+				key: "focus",
+				className: "office-game__campusFocusBar",
+				"data-testid": "campus-world-focus",
+				role: "status"
+			}, [
+				R.createElement("strong", {
+					key: "title",
+					className: "office-game__campusFocusTitle",
+					"data-testid": "campus-world-focus-title"
+				}, `Floor ${pad3(focused.floor.number)} · ${focused.floor.name}`),
+				R.createElement("span", {
+					key: "meta",
+					className: "office-game__campusFocusMeta",
+					"data-testid": "campus-world-focus-meta"
+				}, campusFloorStatus(focused.floor)),
+				focused.floor.characters.length ? R.createElement("span", {
+					key: "people",
+					className: "office-game__campusFocusPeople",
+					title: focused.floor.characters.join(", "),
+					"data-testid": "campus-world-focus-people"
+				}, focused.floor.characters.join(", ")) : null,
 				R.createElement("div", {
-					key: "grid",
-					className: "office-game__floorGrid"
-				}, cards)
+					key: "actions",
+					className: "office-game__campusFocusActions"
+				}, [
+					controlButton("prev", "Floor above", "campus-world-prev", () => step(-1), floors.indexOf(focused.floor) <= 0),
+					controlButton("next", "Floor below", "campus-world-next", () => step(1), floors.indexOf(focused.floor) >= floors.length - 1),
+					controlButton("reset", "Reset view", "campus-world-reset", resetView)
+				])
+			]) : null;
+			return R.createElement("div", {
+				className: "office-game__campusWorld",
+				"data-testid": "office-campus-world",
+				"data-floor-count": String(floors.length),
+				"data-live-floors": String(liveCount)
+			}, [
+				R.createElement("div", {
+					key: "controls",
+					className: "office-game__campusWorldControls",
+					role: "toolbar",
+					"aria-label": "Campus world controls"
+				}, [
+					R.createElement("div", {
+						key: "meta",
+						className: "office-game__campusWorldMeta"
+					}, [R.createElement("strong", { key: "title" }, "Campus world"), R.createElement("span", {
+						key: "counts",
+						"data-testid": "campus-world-counts"
+					}, `${floors.length} of ${totalFloors} floors in view · ${liveCount} live · one shared camera`)]),
+					controlButton("zoom-in", "Zoom in", "campus-world-zoom-in", () => setZoomBy(1.2)),
+					controlButton("zoom-out", "Zoom out", "campus-world-zoom-out", () => setZoomBy(1 / 1.2)),
+					controlButton("more", "Load more floors", "campus-world-more", () => setLimit((value) => value + 6), !canLoadMore),
+					controlButton("fewer", "Load fewer floors", "campus-world-fewer", () => setLimit((value) => Math.max(4, value - 6)), !canLoadFewer)
+				]),
+				worldState(),
+				R.createElement("div", {
+					key: "viewport",
+					ref: viewportRef,
+					className: "office-game__campusViewport",
+					"data-testid": "campus-world-viewport",
+					role: "region",
+					"aria-label": "Campus world floors",
+					tabIndex: 0,
+					onKeyDown,
+					onPointerDown,
+					onPointerMove,
+					onPointerUp: endDrag,
+					onPointerCancel: endDrag,
+					onPointerLeave: endDrag
+				}, [R.createElement("div", {
+					key: "stage",
+					className: "office-game__campusStage",
+					"data-testid": "campus-world-stage",
+					style: {
+						width: `${layout.width}px`,
+						height: `${layout.height}px`,
+						transform: `translate3d(${camera.x}px, ${camera.y}px, 0) scale(${camera.zoom})`
+					}
+				}, layout.floors.map(floorSlab)), focusBar])
 			]);
 		};
 	}
@@ -207413,7 +207880,7 @@ create: function(game) {
 			RoomBuilder: createRoomBuilder(R, hooks),
 			OutsideWorld: createOutsideWorld(R, hooks),
 			PanelInventory: createPanelInventoryPanel(R, hooks),
-			FloorCampus: createFloorCampus(R, hooks),
+			CampusWorld: createCampusWorld(R, hooks),
 			TowerNavigator: createTowerNavigator(R, hooks),
 			EtsyConnectPanel: createEtsyConnectPanel(R, hooks),
 			LoadingScreen: createOfficeLoadingScreen(R, hooks)
@@ -207456,7 +207923,7 @@ create: function(game) {
 			const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion());
 			const [highContrast, setHighContrast] = useState(prefersHighContrast());
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, FloorCampus, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			useEffect(() => {
 				if (!studioOpen || studioTab !== "outside") return;
 				let live = true;
@@ -208274,7 +208741,7 @@ create: function(game) {
 					R.createElement("p", {
 						key: "counts",
 						"data-testid": "office-campus-counts"
-					}, campusTab === "floors" ? "Floor scenes · the Habblaud office repeated per real floor" : "100-floor directory · floors, rooms, desks and occupancy"),
+					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "100-floor directory · floors, rooms, desks and occupancy"),
 					R.createElement("div", {
 						key: "tabs",
 						className: "office-game__campusTabs"
@@ -208285,7 +208752,7 @@ create: function(game) {
 						"data-testid": "office-campus-tab-floors",
 						"aria-pressed": campusTab === "floors",
 						onClick: () => setCampusTab("floors")
-					}, "Floor scenes"), R.createElement("button", {
+					}, "Campus world"), R.createElement("button", {
 						key: "directory",
 						type: "button",
 						className: "office-game__btn",
@@ -208302,9 +208769,11 @@ create: function(game) {
 				}, "Close campus")]), R.createElement("div", {
 					key: "body",
 					className: "office-game__campusBody"
-				}, campusTab === "floors" ? R.createElement(FloorCampus, {
+				}, campusTab === "floors" ? R.createElement(CampusWorld, {
 					base: props.base,
-					theme: requestedTheme
+					theme: requestedTheme,
+					fetchImpl: props.fetchImpl,
+					templates: campusDirectory?.floors
 				}) : directoryBody)]));
 			}
 			children.push(R.createElement(LoadingScreen, {
