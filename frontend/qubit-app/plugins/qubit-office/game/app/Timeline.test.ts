@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTimeline } from "./Timeline";
 import {
+  allByTestId,
   createHarness,
   recordingFetch,
   respond,
@@ -260,6 +261,110 @@ describe("operator timeline panel", () => {
     expect(textOf(partial)).toContain("tasks");
     expect(h.tree.filter(
       (el) => el.props["data-testid"] === "timeline-item")).toHaveLength(1);
+    h.cleanup();
+  });
+});
+
+describe("operator timeline tenant setup", () => {
+  const BOOTSTRAP = {
+    ok: true,
+    schema: "qubit-office-business-bootstrap/1",
+    tenant_id: "ten_personal",
+    business_id: "biz_personal",
+    created_tenant: true,
+    created_business: true,
+    plan_ok: true,
+    total: 283,
+    created: 283,
+    existing: 0,
+    created_slugs: ["ceo"],
+  };
+
+  function tenantBackend() {
+    let reads = 0;
+    return recordingFetch((call) => {
+      if (call.method === "POST" && call.url.endsWith("/bootstrap")) {
+        return respond(200, BOOTSTRAP);
+      }
+      reads += 1;
+      return reads === 1
+        ? respond(409, {
+          ok: false, code: "BUSINESS_NOT_FOUND",
+          detail: "no Business OS tenant exists yet",
+        })
+        : respond(200, {
+          ok: true,
+          schema: "qubit-office-operator-timeline/1",
+          projection: projection(),
+        });
+    });
+  }
+
+  it("reads the timeline, then offers setup without creating a tenant", async () => {
+    const { calls, impl } = tenantBackend();
+    const h = createHarness();
+    const Timeline = createTimeline(h.React as never, h.hooks as never);
+    h.mount(Timeline as never, { base: "", fetchImpl: impl });
+    await h.settle();
+
+    const setup = allByTestId(h, "business-setup")[0];
+    expect(setup).toBeDefined();
+    expect(setup.props["data-state"]).toBe("idle");
+    expect(textOf(setup)).toContain("operator timeline");
+    expect(textOf(setup)).toContain("not set up yet");
+    expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+    h.cleanup();
+  });
+
+  it("bootstraps on press and retries the read", async () => {
+    const { calls, impl } = tenantBackend();
+    const h = createHarness();
+    const Timeline = createTimeline(h.React as never, h.hooks as never);
+    h.mount(Timeline as never, { base: "", fetchImpl: impl });
+    await h.settle();
+
+    // The failure is a typed state, not the generic timeline error.
+    expect(allByTestId(h, "timeline-error")).toHaveLength(0);
+    allByTestId(h, "business-setup-start")[0].props.onClick();
+    await h.settle();
+
+    const posts = calls.filter(
+      (call) => call.method === "POST" && call.url.endsWith("/bootstrap"));
+    expect(posts).toHaveLength(1);
+    expect(posts[0].body).toMatchObject({ owner: true });
+    expect(allByTestId(h, "business-setup")).toHaveLength(0);
+    expect(allByTestId(h, "operator-timeline")[0].props["data-state"])
+      .toBe("available");
+    expect(allByTestId(h, "timeline-item").length).toBeGreaterThan(0);
+    h.cleanup();
+  });
+
+  it("shows a readable typed message when bootstrap is refused", async () => {
+    const { impl } = recordingFetch((call) => {
+      if (call.method === "POST" && call.url.endsWith("/bootstrap")) {
+        return respond(403, {
+          ok: false, code: "OWNER_REQUIRED",
+          detail: "owner intent is required",
+        });
+      }
+      return respond(409, {
+        ok: false, code: "BUSINESS_NOT_FOUND",
+        detail: "no Business OS tenant exists yet",
+      });
+    });
+    const h = createHarness();
+    const Timeline = createTimeline(h.React as never, h.hooks as never);
+    h.mount(Timeline as never, { base: "", fetchImpl: impl });
+    await h.settle();
+    allByTestId(h, "business-setup-start")[0].props.onClick();
+    await h.settle();
+
+    const error = allByTestId(h, "business-setup-error")[0];
+    expect(error).toBeDefined();
+    expect(error.props["data-code"]).toBe("OWNER_REQUIRED");
+    expect(textOf(error)).toContain("OWNER_REQUIRED");
+    expect(textOf(error)).toContain("owner intent is required");
+    expect(allByTestId(h, "business-setup-start")).toHaveLength(1);
     h.cleanup();
   });
 });

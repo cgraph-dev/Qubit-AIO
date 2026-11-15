@@ -1,4 +1,4 @@
-/* The Agents and HUD buttons, INSIDE the office's own panel menu.
+/* The Qubit panel buttons, INSIDE the office's own panel menu.
  *
  * WHY THEY MOVED
  * --------------
@@ -6,7 +6,9 @@
  * the app they control. The owner's ask was to put them where the office's own
  * tools live — the pixel-art icon group in the vendored app's top bar (My day,
  * Session history, New agent, Timelapse, Activity feed, Settings, Help) — and
- * to keep that group untouched apart from the two added icons.
+ * to keep that group untouched apart from the added icons. Every Qubit panel
+ * (Agents, HUD, Approvals, Command Center, Timeline, Studio, Campus) is now an
+ * icon here; the bottom text toolbar is gone.
  *
  * WHY THE HOST INJECTS THEM
  * -------------------------
@@ -65,13 +67,52 @@ export const APPROVALS_ICON: MenuIcon = {
   d: "M12 0h1v1H12zM11 1h1v1H11zM10 2h1v1H10zM1 3h1v1H1zM9 3h1v1H9zM2 4h1v1H2zM8 4h1v1H8zM3 5h1v1H3zM7 5h1v1H7zM4 6h1v1H4zM6 6h1v1H6zM5 7h1v1H5z",
 };
 
+/** Command Center: a pixel magnifier over a small grid. */
+export const COMMAND_CENTER_ICON: MenuIcon = {
+  cols: 16,
+  rows: 16,
+  d: "M6 1h4v1H6zM4 2h2v1H4zM10 2h2v1H10zM3 3h1v1H3zM12 3h1v1H12zM2 4h1v1H2zM13 4h1v1H13zM2 5h1v1H2zM13 5h1v1H13zM2 6h1v1H2zM13 6h1v1H13zM2 7h1v1H2zM13 7h1v1H13zM3 8h1v1H3zM12 8h1v1H12zM4 9h2v1H4zM10 9h2v1H10zM6 10h4v1H6zM10 11h1v1H10zM11 12h1v1H11zM12 13h1v1H12zM13 14h1v1H13zM14 15h1v1H14z",
+};
+
+/** Timeline: a horizontal rail with causal nodes above and below it. */
+export const TIMELINE_ICON: MenuIcon = {
+  cols: 16,
+  rows: 12,
+  d: "M0 6h16v1H0zM2 3h2v2H2zM7 2h2v2H7zM12 4h2v2H12zM4 8h2v2H4zM9 8h2v2H9zM14 8h2v2H14z",
+};
+
+/** Studio: a paint palette with two colour wells. */
+export const STUDIO_ICON: MenuIcon = {
+  cols: 14,
+  rows: 13,
+  d: "M6 0h4v1H6zM3 2h2v1H3zM9 2h2v1H9zM2 3h1v1H2zM11 3h1v1H11zM1 5h1v1H1zM12 5h1v1H12zM1 7h1v1H1zM12 7h1v1H12zM2 9h1v1H2zM11 9h1v1H11zM3 10h2v1H3zM9 10h1v1H9zM6 11h4v1H6zM4 4h2v2H4zM8 4h2v2H8z",
+};
+
+/** Campus: three tower footprints at different heights. */
+export const CAMPUS_ICON: MenuIcon = {
+  cols: 16,
+  rows: 16,
+  d: "M1 5h4v11H1zM6 2h4v14H6zM11 7h4v9H11zM2 6h1v1H2zM2 8h1v1H2zM2 10h1v1H2zM2 12h1v1H2zM7 3h1v1H7zM7 5h1v1H7zM7 7h1v1H7zM7 9h1v1H7zM7 11h1v1H7zM12 8h1v1H12zM12 10h1v1H12zM12 12h1v1H12z",
+};
+
 /** The buttons' outward-facing identity: labels, titles, test ids. */
+export type MenuButtonId =
+  | "agents"
+  | "hud"
+  | "approvals"
+  | "command-center"
+  | "timeline"
+  | "studio"
+  | "campus";
+
 export interface MenuButtonSpec {
-  id: "agents" | "hud" | "approvals";
+  id: MenuButtonId;
   label: string;
   title: string;
   testId: string;
   icon: MenuIcon;
+  /** The dock the icon toggles, so `aria-controls` names the real region. */
+  controls: string;
 }
 
 export const MENU_BUTTONS: readonly MenuButtonSpec[] = [
@@ -81,6 +122,7 @@ export const MENU_BUTTONS: readonly MenuButtonSpec[] = [
     title: "Agents: every seat the office plans, by division",
     testId: "office-menu-agents",
     icon: AGENTS_ICON,
+    controls: "office-game-agents-dock",
   },
   {
     id: "hud",
@@ -88,6 +130,7 @@ export const MENU_BUTTONS: readonly MenuButtonSpec[] = [
     title: "HUD: the office and agent vitals",
     testId: "office-menu-hud",
     icon: HUD_ICON,
+    controls: "office-game-hud-dock",
   },
   {
     id: "approvals",
@@ -95,6 +138,39 @@ export const MENU_BUTTONS: readonly MenuButtonSpec[] = [
     title: "Approvals: pending confirmations on the shared journal",
     testId: "office-menu-approvals",
     icon: APPROVALS_ICON,
+    controls: "office-game-approvals-dock",
+  },
+  {
+    id: "command-center",
+    label: "Command Center",
+    title: "Command Center: search floors, rooms, desks, agents and tasks",
+    testId: "office-menu-command-center",
+    icon: COMMAND_CENTER_ICON,
+    controls: "office-game-command-center-dock",
+  },
+  {
+    id: "timeline",
+    label: "Timeline",
+    title: "Timeline: the replayable operator record of every run",
+    testId: "office-menu-timeline",
+    icon: TIMELINE_ICON,
+    controls: "office-game-timeline-dock",
+  },
+  {
+    id: "studio",
+    label: "Studio",
+    title: "Studio: panel inventory, room builder and outside world",
+    testId: "office-menu-studio",
+    icon: STUDIO_ICON,
+    controls: "office-game-studio-dock",
+  },
+  {
+    id: "campus",
+    label: "Campus",
+    title: "Campus: floor scenes and the 100-floor directory",
+    testId: "office-menu-campus",
+    icon: CAMPUS_ICON,
+    controls: "office-game-campus",
   },
 ];
 
@@ -106,6 +182,10 @@ export interface OfficeMenuState {
   agents: boolean;
   hud: boolean;
   approvals?: boolean;
+  commandCenter?: boolean;
+  timeline?: boolean;
+  studio?: boolean;
+  campus?: boolean;
   /** Pending approvals the button's badge should show (0 hides it). */
   pendingApprovals?: number;
 }
@@ -113,8 +193,12 @@ export interface OfficeMenuState {
 export interface OfficeMenuOptions {
   onToggleAgents: () => void;
   onToggleHud: () => void;
-  /** Optional so existing callers/tests keep the two-button menu. */
+  /** Optional so existing callers/tests keep the older menu. */
   onToggleApprovals?: () => void;
+  onToggleCommandCenter?: () => void;
+  onToggleTimeline?: () => void;
+  onToggleStudio?: () => void;
+  onToggleCampus?: () => void;
   /**
    * How long to wait for the app's own Panels group before telling the shell
    * to render its fallback buttons. Default 1500 ms.
@@ -182,6 +266,9 @@ function buildButton(
   button.setAttribute("aria-label", spec.label);
   button.setAttribute("title", spec.title);
   button.setAttribute("aria-pressed", "false");
+  // Name the region it toggles. The dock may not be mounted yet, but the id is
+  // a stable contract (`OfficeAppShell` renders exactly this id).
+  button.setAttribute("aria-controls", spec.controls);
   button.setAttribute("data-testid", spec.testId);
   button.setAttribute("data-office-menu", spec.id);
   button.addEventListener("click", onActivate);
@@ -216,7 +303,8 @@ function buildButton(
 }
 
 /**
- * Insert the two buttons into the office's panel group, before Settings.
+ * Insert every Qubit panel button into the office's panel group, before
+ * Settings. Existing nodes are never moved, restyled or removed.
  *
  * Returns ``null`` only when there is no document to install into. A group
  * that is missing at call time is not a failure: the observer picks it up when
@@ -229,12 +317,35 @@ export function installOfficeMenuButtons(
   const doc = win.document;
   if (!doc || !doc.body) return null;
 
-  const byId: Record<"agents" | "hud" | "approvals", HTMLButtonElement | null> = {
+  const byId: Record<MenuButtonId, HTMLButtonElement | null> = {
     agents: null,
     hud: null,
     approvals: null,
+    "command-center": null,
+    timeline: null,
+    studio: null,
+    campus: null,
   };
-  const state: OfficeMenuState = { agents: false, hud: false, approvals: false };
+  const state: OfficeMenuState = {
+    agents: false,
+    hud: false,
+    approvals: false,
+    commandCenter: false,
+    timeline: false,
+    studio: false,
+    campus: false,
+  };
+  const activateFor = (id: MenuButtonId): (() => void) => {
+    switch (id) {
+      case "agents": return opts.onToggleAgents;
+      case "hud": return opts.onToggleHud;
+      case "approvals": return opts.onToggleApprovals ?? (() => {});
+      case "command-center": return opts.onToggleCommandCenter ?? (() => {});
+      case "timeline": return opts.onToggleTimeline ?? (() => {});
+      case "studio": return opts.onToggleStudio ?? (() => {});
+      case "campus": return opts.onToggleCampus ?? (() => {});
+    }
+  };
   let fallbackShown = false;
   let attachedOnce = false;
 
@@ -251,7 +362,19 @@ export function installOfficeMenuButtons(
     opts.onFallback?.(show);
   };
 
-  const badgeFor = (id: "agents" | "hud" | "approvals"): HTMLSpanElement | null => {
+  const stateFor = (id: MenuButtonId): boolean => {
+    switch (id) {
+      case "agents": return Boolean(state.agents);
+      case "hud": return Boolean(state.hud);
+      case "approvals": return Boolean(state.approvals);
+      case "command-center": return Boolean(state.commandCenter);
+      case "timeline": return Boolean(state.timeline);
+      case "studio": return Boolean(state.studio);
+      case "campus": return Boolean(state.campus);
+    }
+  };
+
+  const badgeFor = (id: MenuButtonId): HTMLSpanElement | null => {
     if (id !== "approvals") return null;
     return byId.approvals?.querySelector(".office-menu-badge") as
       HTMLSpanElement | null;
@@ -288,11 +411,8 @@ export function installOfficeMenuButtons(
     for (const spec of MENU_BUTTONS) {
       const existing = byId[spec.id];
       if (existing && existing.isConnected) continue;
-      const onActivate = spec.id === "agents" ? opts.onToggleAgents
-        : spec.id === "hud" ? opts.onToggleHud
-        : (opts.onToggleApprovals ?? (() => {}));
-      const button = buildButton(doc, spec, onActivate);
-      button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
+      const button = buildButton(doc, spec, activateFor(spec.id));
+      button.setAttribute("aria-pressed", stateFor(spec.id) ? "true" : "false");
       byId[spec.id] = button;
       insert(group, button);
     }
@@ -334,11 +454,17 @@ export function installOfficeMenuButtons(
       state.agents = Boolean(next.agents);
       state.hud = Boolean(next.hud);
       state.approvals = Boolean(next.approvals);
+      state.commandCenter = Boolean(next.commandCenter);
+      state.timeline = Boolean(next.timeline);
+      state.studio = Boolean(next.studio);
+      state.campus = Boolean(next.campus);
       state.pendingApprovals = Math.max(
         0, Math.floor(Number(next.pendingApprovals ?? 0) || 0));
       for (const spec of MENU_BUTTONS) {
         const button = byId[spec.id];
-        if (button) button.setAttribute("aria-pressed", state[spec.id] ? "true" : "false");
+        if (button) {
+          button.setAttribute("aria-pressed", stateFor(spec.id) ? "true" : "false");
+        }
       }
       paintApprovals();
     },

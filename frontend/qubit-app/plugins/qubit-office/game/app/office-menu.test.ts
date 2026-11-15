@@ -232,7 +232,9 @@ describe("approvals icon and pending badge", () => {
     // app's own utilities.
     expect(group.children[4].getAttribute("data-testid"))
       .toBe("office-menu-approvals");
-    expect(group.children[5].getAttribute("title")).toBe("Settings");
+    const settings = Array.from(group.children)
+      .findIndex((node) => (node as HTMLElement).title === "Settings");
+    expect(settings).toBeGreaterThan(4);
     expect(approvals.querySelector("svg")?.getAttribute("shape-rendering"))
       .toBe("crispEdges");
     approvals.click();
@@ -269,6 +271,91 @@ describe("approvals icon and pending badge", () => {
     expect(approvals.getAttribute("data-pending")).toBe("0");
     expect(badge.textContent).toBe("");
     expect(badge.hidden).toBe(true);
+    menu?.dispose();
+  });
+});
+
+describe("command center, timeline, studio and campus icons", () => {
+  it("adds all four as icon buttons inside the app's Panels group", () => {
+    const group = makeMenu();
+    const onToggleCommandCenter = vi.fn();
+    const onToggleTimeline = vi.fn();
+    const onToggleStudio = vi.fn();
+    const onToggleCampus = vi.fn();
+    const menu = installOfficeMenuButtons(window, {
+      onToggleAgents: () => {},
+      onToggleHud: () => {},
+      onToggleCommandCenter,
+      onToggleTimeline,
+      onToggleStudio,
+      onToggleCampus,
+    });
+
+    const expected = [
+      ["office-menu-command-center", "Command Center", "office-game-command-center-dock", onToggleCommandCenter],
+      ["office-menu-timeline", "Timeline", "office-game-timeline-dock", onToggleTimeline],
+      ["office-menu-studio", "Studio", "office-game-studio-dock", onToggleStudio],
+      ["office-menu-campus", "Campus", "office-game-campus", onToggleCampus],
+    ] as const;
+    for (const [testId, label, controls, callback] of expected) {
+      const button = group.querySelector(
+        `[data-testid="${testId}"]`) as HTMLButtonElement;
+      expect(button).not.toBeNull();
+      expect(button.tagName).toBe("BUTTON");
+      expect(button.getAttribute("aria-label")).toBe(label);
+      expect(button.getAttribute("title")).toContain(label);
+      expect(button.getAttribute("aria-controls")).toBe(controls);
+      expect(button.getAttribute("aria-pressed")).toBe("false");
+      // An icon, not a text button.
+      const svg = button.querySelector("svg");
+      expect(svg?.getAttribute("class")).toBe("ui-px-icon");
+      expect(svg?.getAttribute("shape-rendering")).toBe("crispEdges");
+      expect(svg?.querySelector("path")?.getAttribute("fill"))
+        .toBe("currentColor");
+      expect(button.textContent).toBe("");
+      button.click();
+      expect(callback).toHaveBeenCalledTimes(1);
+    }
+    // Every Qubit icon stays before the app's own Settings/Help utilities.
+    const settings = Array.from(group.children)
+      .findIndex((node) => (node as HTMLElement).title === "Settings");
+    for (const [testId] of expected) {
+      const index = Array.from(group.children)
+        .findIndex((node) => node.getAttribute("data-testid") === testId);
+      expect(index).toBeGreaterThan(0);
+      expect(index).toBeLessThan(settings);
+    }
+    menu?.dispose();
+  });
+
+  it("mirrors every dock's open state onto aria-pressed", () => {
+    const group = makeMenu();
+    const menu = installOfficeMenuButtons(window, {
+      onToggleAgents: () => {},
+      onToggleHud: () => {},
+      onToggleCommandCenter: () => {},
+      onToggleTimeline: () => {},
+      onToggleStudio: () => {},
+      onToggleCampus: () => {},
+    });
+    const read = (id: string) => group.querySelector(
+      `[data-testid="office-menu-${id}"]`)?.getAttribute("aria-pressed");
+    menu?.update({
+      agents: false, hud: false,
+      commandCenter: true, timeline: true, studio: true, campus: true,
+    });
+    expect(read("command-center")).toBe("true");
+    expect(read("timeline")).toBe("true");
+    expect(read("studio")).toBe("true");
+    expect(read("campus")).toBe("true");
+    menu?.update({
+      agents: false, hud: false,
+      commandCenter: false, timeline: false, studio: false, campus: false,
+    });
+    expect(read("command-center")).toBe("false");
+    expect(read("timeline")).toBe("false");
+    expect(read("studio")).toBe("false");
+    expect(read("campus")).toBe("false");
     menu?.dispose();
   });
 });

@@ -450,6 +450,14 @@ describe("host theme + rerender stability", () => {
       (e) => e.props["data-testid"] === "office-menu-hud-fallback");
     expect(agents).toBeDefined();
     expect(hud).toBeDefined();
+    // Every panel stays reachable even when the vendored group is gone.
+    for (const id of [
+      "approvals", "command-center", "timeline", "studio", "campus",
+    ]) {
+      expect(h.tree.find(
+        (e) => e.props["data-testid"] === `office-menu-${id}-fallback`))
+        .toBeDefined();
+    }
     // Same stable theme hooks as the injected controls.
     expect(String(agents?.props.className)).toContain("office-theme-menu-btn");
     expect(String(agents?.props.className)).toContain("office-theme-menu-agents");
@@ -593,21 +601,25 @@ describe("host theme + rerender stability", () => {
       expect(h.tree.find(
         (e) => e.props["data-testid"] === "office-game-agents-dock"))
         .toBeUndefined();
-      // The visible toggle names the dock it controls and reports its state.
-      const toggle = h.tree.find(
-        (e) => e.props["data-testid"] === "office-command-center-toggle");
-      expect(toggle).toBeDefined();
-      expect(toggle?.props["aria-controls"]).toBe("office-game-command-center-dock");
-      expect(toggle?.props["aria-expanded"]).toBe(true);
-      expect(String(toggle?.props.children)).toContain("Command Center");
-      // Closing removes the sheet; the toolbar marker clears with it.
-      (toggle?.props.onClick as () => void)();
-      h.render({});
-      expect(h.tree.find(
-        (e) => e.props["data-testid"] === "office-game-command-center-dock"))
-        .toBeUndefined();
-      const after = h.tree.find((e) => e.props["data-testid"] === "office-app");
-      expect(after?.props["data-office-dock-top"]).toBeUndefined();
+
+      // The four panel controls now live in the office's own Panels icon group
+      // (app/office-menu.ts); the shell must not paint a second text toolbar.
+      for (const id of [
+        "office-command-center-toggle",
+        "office-timeline-toggle",
+        "office-studio-toggle",
+        "office-campus-toggle",
+      ]) {
+        expect(h.tree.find((e) => e.props["data-testid"] === id)).toBeUndefined();
+      }
+      // The toolbar landmark stays as the keyboard escape/skip target, but it
+      // carries no text buttons.
+      const toolbar = h.tree.find(
+        (e) => e.props["data-testid"] === "office-app-toolbar");
+      expect(toolbar).toBeDefined();
+      expect(toolbar?.props.role).toBe("toolbar");
+      expect(String((toolbar?.props.children as unknown[])[0]))
+        .not.toContain("Command Center");
       h.cleanup();
     } finally {
       globalThis.fetch = previous;

@@ -249,3 +249,106 @@ describe("CommandCenter", () => {
     h.cleanup();
   });
 });
+
+describe("Command Center tenant setup", () => {
+  const BOOTSTRAP = {
+    ok: true,
+    schema: "qubit-office-business-bootstrap/1",
+    tenant_id: "ten_personal",
+    business_id: "biz_personal",
+    created_tenant: true,
+    created_business: true,
+    plan_ok: true,
+    total: 283,
+    created: 283,
+    existing: 0,
+    created_slugs: ["ceo"],
+  };
+
+  function tenantBackend() {
+    let reads = 0;
+    return recordingFetch((call) => {
+      if (call.method === "POST" && call.url.endsWith("/bootstrap")) {
+        return respond(200, BOOTSTRAP);
+      }
+      reads += 1;
+      return reads === 1
+        ? respond(409, {
+          ok: false, code: "BUSINESS_NOT_FOUND",
+          detail: "no Business OS tenant exists yet",
+        })
+        : respond(200, { ok: true, projection: PROJECTION() });
+    });
+  }
+
+  it("offers an explicit setup instead of an inert failure, and creates nothing until pressed", async () => {
+    const { calls, impl } = tenantBackend();
+    const h = await mount(impl);
+
+    const setup = allByTestId(h, "business-setup")[0];
+    expect(setup).toBeDefined();
+    expect(setup.props["data-state"]).toBe("idle");
+    expect(setup.props.role).toBe("region");
+    expect(textOf(setup)).toContain("not set up yet");
+    expect(textOf(setup)).toContain("Nothing is created until you press the button");
+    // The panel read is a GET only; opening the panel never bootstraps.
+    expect(calls.filter((call) => call.method === "POST")).toHaveLength(0);
+
+    const start = allByTestId(h, "business-setup-start")[0];
+    expect(start.props["aria-label"]).toBe(
+      "Create the Qubit Business OS workspace");
+    expect(textOf(start)).toBe("Set up Business OS");
+    h.cleanup();
+  });
+
+  it("bootstraps on press, then retries the read and renders the projection", async () => {
+    const { calls, impl } = tenantBackend();
+    const h = await mount(impl);
+    const start = allByTestId(h, "business-setup-start")[0];
+    start.props.onClick();
+    await h.settle();
+
+    const posts = calls.filter(
+      (call) => call.method === "POST" && call.url.endsWith("/bootstrap"));
+    expect(posts).toHaveLength(1);
+    expect(posts[0].body).toMatchObject({ owner: true });
+    // The retry replaced the setup state with the real projection.
+    expect(allByTestId(h, "business-setup")).toHaveLength(0);
+    expect(allByTestId(h, "command-center")[0].props["data-state"])
+      .toBe("available");
+    expect(allByTestId(h, "command-center-entry").length).toBeGreaterThan(0);
+    h.cleanup();
+  });
+
+  it("names a typed bootstrap failure and keeps the setup available", async () => {
+    let reads = 0;
+    const { impl } = recordingFetch((call) => {
+      if (call.method === "POST" && call.url.endsWith("/bootstrap")) {
+        return respond(503, {
+          ok: false, code: "BUSINESS_BRIDGE_ERROR",
+          detail: "the business store is unavailable",
+        });
+      }
+      reads += 1;
+      return respond(409, {
+        ok: false, code: "BUSINESS_NOT_FOUND",
+        detail: "no Business OS tenant exists yet",
+      });
+    });
+    const h = await mount(impl);
+    allByTestId(h, "business-setup-start")[0].props.onClick();
+    await h.settle();
+    expect(reads).toBeGreaterThanOrEqual(1);
+
+    const error = allByTestId(h, "business-setup-error")[0];
+    expect(error).toBeDefined();
+    expect(error.props["data-code"]).toBe("BUSINESS_BRIDGE_ERROR");
+    expect(error.props.role).toBe("alert");
+    expect(textOf(error)).toContain("BUSINESS_BRIDGE_ERROR");
+    expect(textOf(error)).toContain("business store is unavailable");
+    // Still a setup state with a retry button, never a fake projection.
+    expect(allByTestId(h, "business-setup")[0].props["data-state"]).toBe("error");
+    expect(allByTestId(h, "business-setup-start")).toHaveLength(1);
+    h.cleanup();
+  });
+});
