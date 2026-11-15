@@ -38,7 +38,8 @@ Office art: LimeZu — https://limezu.itch.io
 Do **not** describe these packs as CC-BY. Their licence permits commercial and
 non-commercial use, requires credit, and forbids resale/redistribution
 (Modern User Interface additionally forbids NFT minting). CC-BY 4.0 applies only
-to Serene Village, which is not used by the v1 theme.
+to Serene Village, which is not in the committed v1 recipe; the optional
+extended local pack may include it (category `outside`).
 
 ---
 
@@ -52,7 +53,9 @@ locally is written, under `$QUBIT_HOME/office/themes/<id>`.
 |---|---|---|
 | Character Generator 2.0 | `Character Generator 2.0 Linux Build.zip` | `Character Pieces/Bodies/{s}x{s}/Body_01.png` … (9 bodies); `Character Pieces/Outfits/{s}x{s}/Outfit_01_01.png` … (33 outfits); `Character Pieces/Eyes/{s}x{s}/Eyes_01.png` … (7 body eyes); `Character Pieces/Hairstyles/{s}x{s}/Hairstyle_01_01.png` … (29 body hairstyles) |
 | Portrait Generator 1.5.0 | `Portrait_Generator_1.5.0_Linux_Build.zip` | `Portrait Pieces/Portrait_Generator - {s}x{s}/Skins/Skin 1.png` … (9 skins); `Eyes/Eyes 01.png` … (7 portrait eyes); `Hairstyles/Hairstyle 01 1.png` … (29 portrait hairstyles) |
-| Modern User Interface | `modernuserinterface-win.zip` | the sampled UI palette sheet, and the `PG_*` portrait pieces when the Portrait Generator archive is absent |
+| Modern User Interface | `modernuserinterface-win.zip` | the sampled UI palette sheet, the `Modern_UI_Style_*`/`Gamepad` sheets (9-slice/button-icon candidates), and the `PG_*` portrait pieces when the Portrait Generator archive is absent |
+| Modern Interiors | `moderninteriors-win.zip` | extended catalog only: `Theme_Sorter_Singles`, interior/`Theme_Sorter` sheets, `3_Animated_objects` spritesheets and UI element sheets |
+| Serene Village | `Serene_Village_revamped_v1.9.zip` | extended catalog only: outside/world tiles, props and animated objects (CC-BY 4.0) |
 
 `s` is the tier (16, 32 or 48); the default is 32. Portrait sheets measure
 640x192 (a grid of 64x64 cells at the 32 tier); body sheets measure 1792x1280
@@ -61,9 +64,9 @@ atlas; it does not copy a source sheet.
 
 `Character Generator 2.0 Setup.exe`, `Portrait_Generator_Setup.exe`, and the
 Modern Interiors/Serene Village archives are recorded in
-`THIRD_PARTY_NOTICES.md` for provenance. They are not read by the v1 extractor
-except where named above. The full Modern Interiors pack is not a build input;
-the character art comes from the Character Generator archive.
+`THIRD_PARTY_NOTICES.md` for provenance. The full Modern Interiors and Serene
+Village packs are read only by the optional extended catalog; nothing from them
+is committed, and the committed recipe carries no file map.
 
 ---
 
@@ -79,10 +82,11 @@ archives in memory. The recipe — not the tool — is what a person shares.
 
 ---
 
-## Serene Village — CC-BY 4.0 TASL (not used in v1)
+## Serene Village — CC-BY 4.0 TASL (optional extended pack)
 
-Serene Village is not used by the Qubit Office v1 theme. Its TASL is recorded
-here so it is ready if a future theme uses it. Serene Village is CC-BY 4.0 (not
+Serene Village is not in the committed Qubit Office v1 recipe. Its TASL is
+recorded here so the optional extended local pack (`--assets`, category
+`outside`) can carry it. Serene Village is CC-BY 4.0 (not
 CC-BY-SA), so attribution and an indication of changes are required, with no
 source-sharing obligation.
 

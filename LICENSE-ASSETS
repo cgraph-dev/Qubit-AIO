@@ -52,11 +52,12 @@ Therefore:
 **CC-BY is not the licence of the purchased packs.** Describing them as CC-BY
 would be wrong, because CC-BY permits redistribution and these licences forbid
 it. CC-BY 4.0 applies only to Serene Village, below, and Serene Village is not
-used by the Qubit Office v1 theme.
+used by the committed Qubit Office v1 recipe (it may appear in an optional,
+locally built extended pack).
 
-**Serene Village is the CC-BY exception (not used in v1).** Its separate CC-BY
-4.0 terms require attribution and carry no source-sharing obligation (CC-BY,
-not CC-BY-SA):
+**Serene Village is the CC-BY exception (not used in the committed recipe).**
+Its separate CC-BY 4.0 terms require attribution and carry no source-sharing
+obligation (CC-BY, not CC-BY-SA):
 
     Title:   Serene Village
     Author:  LimeZu
@@ -67,7 +68,8 @@ not CC-BY-SA):
 
 If Serene Village is ever used, keep this TASL statement and the changes note;
 the purchased Modern Interiors / Modern User Interface packs still must not be
-described as CC-BY.
+described as CC-BY. The extended local pack (`--assets`, category `outside`)
+is one such use; it stays outside the repository.
 
 Generators are tools, not shipped art
 -------------------------------------

@@ -1088,7 +1088,10 @@ is not used. Credit line: `LimeZu — https://limezu.itch.io`.
 Serene Village is the only CC-BY pack: it carries **no licence file in the
 archive**, and the publisher page states `Asset license: Creative Commons
 Attribution v4.0 International` (CC-BY 4.0, not CC-BY-SA). Serene Village is
-**not used** by the Office v1 theme. Any redistributed Serene Village material
+**not used** by the committed Office v1 theme; the optional extended local pack
+(`office_theme_build.py --assets`, category `outside`) may include it, in which
+case any surface that ships it must carry the TASL in
+`docs/ATTRIBUTION-OFFICE.md`. Any redistributed Serene Village material
 requires attribution, a link to the licence, and an indication of changes.
 
 Local divergence: none yet — no pack file has been added to the tree.

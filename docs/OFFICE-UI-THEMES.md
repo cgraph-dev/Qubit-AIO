@@ -48,6 +48,21 @@ is not served. The default roster has **283 personas**, so the atlas is 20
 columns x 15 rows. The measured real build prints
 `{"files":6,"id":"limezu","ok":true,"recipes":283}`.
 
+When the extended catalog is enabled (the default when the packs are present),
+the pack also carries:
+
+```text
+<id>/assets/manifest.json          category -> index path, count and kind counts
+<id>/assets/<category>/index.json  source sheet, sprite id, frame geometry,
+                                   pixel sha256 + raw source sha256, bytes
+<id>/assets/<category>/<sha>.png   the source sprite/sheet copied byte-for-byte
+```
+
+The categories are `characters`, `furniture`, `animated`, `ui` and `outside`.
+The indexes are machine-readable; the assets they describe live only in the
+local pack. The shareable recipe never includes the index path, sheet names,
+file paths or hashes — only per-category counts and kind counts.
+
 ---
 
 ## 2. Build a local pack from a purchase
@@ -74,6 +89,11 @@ tier; the default is 32.
 The extractor also supports two authoring/read-only actions:
 
 ```bash
+# Inventory the extended packs (characters, furniture, animated, UI, outside)
+# in memory; prints counts/kinds/frames plus a decoded digest and writes nothing.
+python3 scripts/office_theme_extract.py --assets "<purchase dir>" --size 16
+python3 scripts/office_theme_extract.py --assets "<purchase dir>" --size 16 --check
+
 # Sample the purchased Modern UI sheet's dominant colours as validated tokens.
 python3 scripts/office_theme_extract.py --tokens "<sheet.png|zip>" [--member NAME]
 
@@ -116,6 +136,13 @@ python3 scripts/office_theme_build.py --source "<purchase dir>" \
 python3 scripts/office_theme_build.py --source "<purchase dir>" \
   --out "$QUBIT_HOME/office/themes/limezu" --ui-sheet "<modern UI sheet or zip>"
 
+# Catalog the extended packs too (default on when present); --no-assets keeps
+# the original portrait/body/floor-only pack.
+python3 scripts/office_theme_build.py --source "<purchase dir>" \
+  --out /tmp/qubit-office-assets-pack --size 16 --assets
+python3 scripts/office_theme_build.py --source "<purchase dir>" \
+  --out /tmp/qubit-office-assets-pack --size 16 --asset-categories furniture,animated
+
 # Emit ONLY the shareable recipe (the one repo-safe output; no atlas, no art):
 python3 scripts/office_theme_build.py --source "<purchase dir>" \
   --recipe-out frontend/qubit-web/public/plugins/qubit-office/themes/limezu/theme.recipe.json
@@ -138,10 +165,22 @@ this order:
 The portrait generator is preferred for portraits; when it is absent, the
 portrait pieces carried inside the Modern UI pack are used. A missing or
 invalid archive is a typed error naming the file. The **Character Generator
-archive is the build input** for the body-side sheets. The **full Modern
-Interiors archive is not a build input** (it is recorded for provenance in
-`THIRD_PARTY_NOTICES.md`); the Modern UI archive supplies the sampled palette
-and the portrait fallback.
+archive is the build input** for the body-side sheets.
+
+The extended catalog additionally reads, in memory only:
+
+4. `moderninteriors-win.zip` — `Theme_Sorter_Singles`, interior/`Theme_Sorter`
+   sheets, `3_Animated_objects` spritesheets (frame count/timing from the
+   matching GIF preview) and the UI element sheets.
+5. `modernuserinterface-win.zip` — the `Modern_UI_Style_*`/`Gamepad` sheets at
+   16/32/48, flagged as 9-slice/button-icon candidates.
+6. `Serene_Village_revamped_v1.9.zip` — outside/world tiles, props and animated
+   objects (CC-BY 4.0; the TASL must stay with any surface that ships them).
+
+The **full Modern Interiors archive is read only for the extended catalog**;
+it is never copied into the repository, and the committed recipe has no file
+map. The Modern UI archive also supplies the sampled palette and the portrait
+fallback.
 
 ---
 
