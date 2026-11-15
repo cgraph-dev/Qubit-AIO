@@ -658,7 +658,58 @@ def _recipe_from_pack(root: Path, manifest: Dict[str, Any]) -> Dict[str, Any]:
         "parts": dict(parts),
         "agents": {slug: dict(recipe) for slug, recipe in agents.items()},
         **_asset_metadata(manifest),
+        **_rooms_metadata(manifest),
+        **_animations_metadata(manifest),
     }
+
+
+def _rooms_metadata(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    """Metadata-only rooms block for a recipe (count + archetypes)."""
+    rooms = manifest.get("rooms")
+    if not isinstance(rooms, Mapping):
+        return {}
+    count = rooms.get("count")
+    archetypes = rooms.get("archetypes")
+    if not isinstance(count, int) or isinstance(count, bool):
+        return {}
+    if not isinstance(archetypes, list):
+        return {}
+    return {"rooms": {"schema": 1, "count": count,
+                      "archetypes": [str(value) for value in archetypes]}}
+
+
+def _animations_metadata(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    """Metadata-only animation block for a recipe (states + grid, no frames)."""
+    animations = manifest.get("animations")
+    if not isinstance(animations, Mapping):
+        return {}
+    states = animations.get("states")
+    directions = animations.get("directions")
+    if not isinstance(states, list) or not isinstance(directions, list):
+        return {}
+    block: Dict[str, Any] = {
+        "schema": 1,
+        "states": [str(value) for value in states],
+        "directions": [str(value) for value in directions],
+    }
+    characters = manifest.get("characters")
+    if isinstance(characters, Mapping):
+        cell = characters.get("cell")
+        if isinstance(cell, Mapping):
+            block["cell"] = {
+                "w": cell.get("w"), "h": cell.get("h")}
+    portraits = manifest.get("portraits")
+    if isinstance(portraits, Mapping):
+        size = portraits.get("size")
+        cols = portraits.get("cols")
+        rows = portraits.get("rows")
+        if all(isinstance(value, int) and not isinstance(value, bool)
+               for value in (size, cols, rows)):
+            block["portrait"] = {
+                "cell": {"w": size * 2, "h": size * 2},
+                "cols": cols, "rows": rows,
+            }
+    return {"animations": block}
 
 
 def _asset_metadata(manifest: Mapping[str, Any]) -> Dict[str, Any]:

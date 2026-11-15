@@ -161,6 +161,67 @@ ASSET_KINDS: Sequence[str] = (
     "gamepad_sheet",
 )
 
+#: Room archetypes a full local pack may declare. The list is closed so a
+#: typo is refused rather than silently producing an unrenderable room.
+ROOM_ARCHETYPES: Sequence[str] = (
+    "executive",
+    "operations",
+    "meeting",
+    "focus",
+    "reception",
+    "kitchen",
+    "restroom",
+    "lounge",
+)
+
+#: Placement layers, back to front. A room document may only use these.
+ROOM_LAYERS: Sequence[str] = (
+    "floor",
+    "wall",
+    "door",
+    "window",
+    "rug",
+    "furniture",
+    "wall_art",
+    "overlay",
+)
+
+#: Anchors describe where a placement's tile coordinate meets its sprite.
+ROOM_ANCHORS: Sequence[str] = (
+    "top-left",
+    "top-center",
+    "center",
+    "bottom-center",
+    "bottom-left",
+    "bottom-right",
+)
+
+#: Body animation states the character sheets actually provide (measured
+#: against Character Generator 2.0's AnimationSO data). ``type``/``talk`` are
+#: office semantics mapped onto these real states; no dedicated typing or
+#: talking body rows exist in the purchased sheets.
+ANIMATION_STATES: Sequence[str] = (
+    "idle",
+    "walk",
+    "sit",
+    "sit2",
+    "phone",
+    "read",
+)
+
+#: Direction block order, measured from the walk row of the body sheet.
+ANIMATION_DIRECTIONS: Sequence[str] = ("left", "down", "right", "up")
+
+#: Office semantics -> real animation state. The mapping is data, not a
+#: renderer assumption: ``type`` uses the sit row and ``talk`` the phone row.
+OFFICE_ANIMATION_STATES: Mapping[str, str] = {
+    "idle": "idle",
+    "walk": "walk",
+    "sit": "sit",
+    "type": "sit",
+    "talk": "phone",
+}
+
 ALLOWED_SUFFIXES: Set[str] = {".png", ".jpg", ".jpeg", ".webp", ".json", ".txt"}
 WINDOWS_RESERVED: Set[str] = {
     "CON", "PRN", "AUX", "NUL",
@@ -255,6 +316,8 @@ class Theme:
     characters: Mapping[str, Any] = field(default_factory=dict)
     furniture: Mapping[str, Any] = field(default_factory=dict)
     ui: Mapping[str, Any] = field(default_factory=dict)
+    rooms: Mapping[str, Any] = field(default_factory=dict)
+    animations: Mapping[str, Any] = field(default_factory=dict)
     files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     agents: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
@@ -1360,6 +1423,494 @@ def _validate_assets_index(root: Path, files: Mapping[str, Any],
 
 
 # --------------------------------------------------------------------------
+# Room blueprints and character animation metadata
+# --------------------------------------------------------------------------
+def _validate_int(value: Any, label: str, *, minimum: int = 0) -> List[str]:
+    if (not isinstance(value, int) or isinstance(value, bool)
+            or value < minimum):
+        return [f"{label}: must be an integer >= {minimum}"]
+    return []
+
+
+def _validate_tile_ref(value: Any, label: str) -> List[str]:
+    if not isinstance(value, dict):
+        return [f"{label}: must be an object"]
+    problems: List[str] = []
+    for key in ("col", "row"):
+        problems.extend(_validate_int(value.get(key), f"{label}.{key}"))
+    return problems
+
+
+def _validate_room_rect(value: Any, label: str, size: Mapping[str, int]
+                        ) -> List[str]:
+    problems: List[str] = []
+    for key in ("x", "y", "w", "h"):
+        problems.extend(_validate_int(value.get(key), f"{label}.{key}"))
+    for key, bound in (("x", "w"), ("y", "h")):
+        value_key = value.get(key)
+        span_key = value.get(bound)
+        if (isinstance(value_key, int) and not isinstance(value_key, bool)
+                and isinstance(span_key, int) and not isinstance(span_key, bool)
+                and span_key > 0):
+            if value_key + span_key > size.get(bound, 0):
+                problems.append(
+                    f"{label}: {key}+{bound} exceeds the room "
+                    f"{size.get('w')}x{size.get('h')} bounds")
+    return problems
+
+
+def _validate_room_document(doc: Any, *, label: str = "room",
+                            files: Optional[Set[str]] = None) -> List[str]:
+    if not isinstance(doc, dict):
+        return [f"{label}: must be an object"]
+    problems: List[str] = []
+    if doc.get("schema") != "qubit-office-room/1":
+        problems.append(f"{label}.schema: must be 'qubit-office-room/1'")
+    room_id = doc.get("id")
+    if not isinstance(room_id, str) or not _ID_RE.fullmatch(room_id):
+        problems.append(f"{label}.id: invalid room id")
+    if not isinstance(doc.get("label"), str) or not doc["label"].strip():
+        problems.append(f"{label}.label: must be a non-empty string")
+    if doc.get("archetype") not in ROOM_ARCHETYPES:
+        problems.append(f"{label}.archetype: unknown archetype {doc.get('archetype')!r}")
+    problems.extend(_validate_int(doc.get("cell"), f"{label}.cell", minimum=1))
+    size = doc.get("size")
+    if not isinstance(size, dict):
+        problems.append(f"{label}.size: must be an object")
+        size = {}
+    else:
+        for key in ("w", "h"):
+            problems.extend(_validate_int(size.get(key), f"{label}.size.{key}",
+                                          minimum=1))
+    floor = doc.get("floor")
+    if not isinstance(floor, dict):
+        problems.append(f"{label}.floor: must be an object")
+    else:
+        if not isinstance(floor.get("kind"), str) or not floor["kind"].strip():
+            problems.append(f"{label}.floor.kind: must be a non-empty string")
+        problems.extend(_source_label_problems(
+            floor.get("sheet"), f"{label}.floor.sheet"))
+        problems.extend(_validate_tile_ref(floor.get("tile"),
+                                           f"{label}.floor.tile"))
+    for section in ("walls", "openings"):
+        entries = doc.get(section)
+        if not isinstance(entries, list):
+            problems.append(f"{label}.{section}: must be a list")
+            continue
+        for position, entry in enumerate(entries):
+            entry_label = f"{label}.{section}[{position}]"
+            if not isinstance(entry, dict):
+                problems.append(f"{entry_label}: must be an object")
+                continue
+            if section == "walls":
+                if entry.get("edge") not in ("north", "south", "east", "west"):
+                    problems.append(
+                        f"{entry_label}.edge: must be north, south, east, or west")
+            else:
+                if entry.get("kind") not in ("door", "window"):
+                    problems.append(f"{entry_label}.kind: must be door or window")
+                if entry.get("layer") != entry.get("kind"):
+                    problems.append(
+                        f"{entry_label}.layer: must match kind {entry.get('kind')!r}")
+            problems.extend(_source_label_problems(
+                entry.get("sheet"), f"{entry_label}.sheet"))
+            problems.extend(_validate_tile_ref(entry.get("tile"),
+                                               f"{entry_label}.tile"))
+            problems.extend(_validate_room_rect(entry, entry_label, size))
+    placements = doc.get("placements")
+    if not isinstance(placements, list) or not placements:
+        problems.append(f"{label}.placements: must be a non-empty list")
+        placements = []
+    seen: Set[str] = set()
+    for position, entry in enumerate(placements):
+        entry_label = f"{label}.placements[{position}]"
+        if not isinstance(entry, dict):
+            problems.append(f"{entry_label}: must be an object")
+            continue
+        placement_id = entry.get("id")
+        if not isinstance(placement_id, str) or not placement_id:
+            problems.append(f"{entry_label}.id: must be a non-empty string")
+        elif placement_id in seen:
+            problems.append(f"{entry_label}.id: duplicate id {placement_id!r}")
+        else:
+            seen.add(placement_id)
+        if not isinstance(entry.get("kind"), str) or not entry["kind"].strip():
+            problems.append(f"{entry_label}.kind: must be a non-empty string")
+        if entry.get("layer") not in ROOM_LAYERS:
+            problems.append(
+                f"{entry_label}.layer: unknown layer {entry.get('layer')!r}")
+        sprite = entry.get("sprite")
+        if not isinstance(sprite, str) or not _ASSET_ID_RE.fullmatch(sprite):
+            problems.append(f"{entry_label}.sprite: invalid sprite id")
+        room_file = entry.get("file")
+        if not isinstance(room_file, str) or not room_file:
+            problems.append(f"{entry_label}.file: required")
+        else:
+            problems.extend(
+                f"{entry_label}.file: {p}" for p in _path_problems(room_file))
+            if os.path.splitext(room_file)[1].lower() != ".png":
+                problems.append(f"{entry_label}.file: must be a .png file")
+            if files is not None and room_file not in files:
+                problems.append(
+                    f"{entry_label}.file: {room_file!r} is not a declared file")
+        tile = entry.get("tile")
+        if not isinstance(tile, dict):
+            problems.append(f"{entry_label}.tile: must be an object")
+        else:
+            for key in ("x", "y"):
+                problems.extend(
+                    _validate_int(tile.get(key), f"{entry_label}.tile.{key}"))
+        footprint = entry.get("footprint")
+        if not isinstance(footprint, dict):
+            problems.append(f"{entry_label}.footprint: must be an object")
+        else:
+            for key in ("w", "h"):
+                problems.extend(_validate_int(
+                    footprint.get(key), f"{entry_label}.footprint.{key}",
+                    minimum=1))
+            if isinstance(tile, dict):
+                problems.extend(_validate_room_rect(
+                    {**tile, **footprint}, entry_label, size))
+        if entry.get("anchor") not in ROOM_ANCHORS:
+            problems.append(
+                f"{entry_label}.anchor: unknown anchor {entry.get('anchor')!r}")
+        problems.extend(_validate_int(entry.get("z"), f"{entry_label}.z"))
+    return problems
+
+
+def _validate_rooms_full(section: Any, files: Set[str]) -> List[str]:
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["rooms: must be an object"]
+    problems: List[str] = []
+    if section.get("schema") != 1:
+        problems.append("rooms.schema: must be 1")
+    index = section.get("index")
+    if not isinstance(index, str) or not index:
+        problems.append("rooms.index: required")
+    else:
+        problems.extend(f"rooms.index: {p}" for p in _path_problems(index))
+        if os.path.splitext(index)[1].lower() != ".json":
+            problems.append("rooms.index: must be a .json file")
+        if files and index not in files:
+            problems.append(f"rooms.index: {index!r} is not a declared file")
+    problems.extend(_validate_int(section.get("count"), "rooms.count",
+                                  minimum=1))
+    archetypes = section.get("archetypes")
+    if not isinstance(archetypes, list) or not archetypes:
+        problems.append("rooms.archetypes: must be a non-empty list")
+    else:
+        for archetype in archetypes:
+            if archetype not in ROOM_ARCHETYPES:
+                problems.append(f"rooms.archetypes: unknown {archetype!r}")
+        if len(set(archetypes)) != len(archetypes):
+            problems.append("rooms.archetypes: must not repeat")
+    return problems
+
+
+def _validate_rooms_recipe(section: Any) -> List[str]:
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["rooms: must be an object"]
+    problems: List[str] = []
+    extra = sorted(set(section) - {"schema", "count", "archetypes"})
+    if extra:
+        problems.append(
+            f"rooms: recipe metadata may not carry {', '.join(extra)} "
+            "(art and layout are built locally)")
+    if section.get("schema") != 1:
+        problems.append("rooms.schema: must be 1")
+    problems.extend(_validate_int(section.get("count"), "rooms.count",
+                                  minimum=1))
+    archetypes = section.get("archetypes")
+    if not isinstance(archetypes, list) or not archetypes:
+        problems.append("rooms.archetypes: must be a non-empty list")
+    else:
+        for archetype in archetypes:
+            if archetype not in ROOM_ARCHETYPES:
+                problems.append(f"rooms.archetypes: unknown {archetype!r}")
+    return problems
+
+
+def _validate_animations_full(section: Any, files: Set[str]) -> List[str]:
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["animations: must be an object"]
+    problems: List[str] = []
+    if section.get("schema") != 1:
+        problems.append("animations.schema: must be 1")
+    index = section.get("index")
+    if not isinstance(index, str) or not index:
+        problems.append("animations.index: required")
+    else:
+        problems.extend(f"animations.index: {p}" for p in _path_problems(index))
+        if os.path.splitext(index)[1].lower() != ".json":
+            problems.append("animations.index: must be a .json file")
+        if files and index not in files:
+            problems.append(
+                f"animations.index: {index!r} is not a declared file")
+    states = section.get("states")
+    if not isinstance(states, list) or not states:
+        problems.append("animations.states: must be a non-empty list")
+    else:
+        for state in states:
+            if state not in ANIMATION_STATES:
+                problems.append(f"animations.states: unknown {state!r}")
+    directions = section.get("directions")
+    if not isinstance(directions, list) or not directions:
+        problems.append("animations.directions: must be a non-empty list")
+    else:
+        for direction in directions:
+            if direction not in ANIMATION_DIRECTIONS:
+                problems.append(f"animations.directions: unknown {direction!r}")
+    return problems
+
+
+def _validate_animations_recipe(section: Any) -> List[str]:
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["animations: must be an object"]
+    problems: List[str] = []
+    extra = sorted(set(section) - {
+        "schema", "states", "directions", "cell", "portrait"})
+    if extra:
+        problems.append(
+            f"animations: recipe metadata may not carry {', '.join(extra)} "
+            "(frames are built locally)")
+    if section.get("schema") != 1:
+        problems.append("animations.schema: must be 1")
+    states = section.get("states")
+    if not isinstance(states, list) or not states:
+        problems.append("animations.states: must be a non-empty list")
+    else:
+        for state in states:
+            if state not in ANIMATION_STATES:
+                problems.append(f"animations.states: unknown {state!r}")
+    directions = section.get("directions")
+    if not isinstance(directions, list) or not directions:
+        problems.append("animations.directions: must be a non-empty list")
+    else:
+        for direction in directions:
+            if direction not in ANIMATION_DIRECTIONS:
+                problems.append(f"animations.directions: unknown {direction!r}")
+    cell = section.get("cell")
+    if not isinstance(cell, dict):
+        problems.append("animations.cell: must be an object")
+    else:
+        for key in ("w", "h"):
+            problems.extend(_validate_int(cell.get(key), f"animations.cell.{key}",
+                                          minimum=1))
+    portrait = section.get("portrait")
+    if not isinstance(portrait, dict):
+        problems.append("animations.portrait: must be an object")
+    else:
+        for key in ("cols", "rows"):
+            problems.extend(_validate_int(
+                portrait.get(key), f"animations.portrait.{key}", minimum=1))
+        portrait_cell = portrait.get("cell")
+        if not isinstance(portrait_cell, dict):
+            problems.append("animations.portrait.cell: must be an object")
+        else:
+            for key in ("w", "h"):
+                problems.extend(_validate_int(
+                    portrait_cell.get(key),
+                    f"animations.portrait.cell.{key}", minimum=1))
+    return problems
+
+
+def _validate_animations_document(doc: Any, *, label: str = "animations"
+                                  ) -> List[str]:
+    if not isinstance(doc, dict):
+        return [f"{label}: must be an object"]
+    problems: List[str] = []
+    if doc.get("schema") != "qubit-office-character-animations/1":
+        problems.append(
+            f"{label}.schema: must be 'qubit-office-character-animations/1'")
+    cell = doc.get("cell")
+    if not isinstance(cell, dict):
+        problems.append(f"{label}.cell: must be an object")
+    else:
+        for key in ("w", "h"):
+            problems.extend(_validate_int(cell.get(key), f"{label}.cell.{key}",
+                                          minimum=1))
+    directions = doc.get("directions")
+    if not isinstance(directions, list) or not directions:
+        problems.append(f"{label}.directions: must be a non-empty list")
+        directions = []
+    else:
+        for direction in directions:
+            if direction not in ANIMATION_DIRECTIONS:
+                problems.append(f"{label}.directions: unknown {direction!r}")
+        if len(set(directions)) != len(directions):
+            problems.append(f"{label}.directions: must not repeat")
+    states = doc.get("states")
+    if not isinstance(states, dict) or not states:
+        problems.append(f"{label}.states: must be a non-empty object")
+        states = {}
+    for state, spec in states.items():
+        state_label = f"{label}.states.{state}"
+        if state not in ANIMATION_STATES:
+            problems.append(f"{state_label}: unknown state")
+            continue
+        if not isinstance(spec, dict):
+            problems.append(f"{state_label}: must be an object")
+            continue
+        problems.extend(_validate_int(spec.get("row"), f"{state_label}.row"))
+        problems.extend(_validate_int(spec.get("frames"),
+                                      f"{state_label}.frames", minimum=1))
+        problems.extend(_validate_int(
+            spec.get("frames_per_direction"),
+            f"{state_label}.frames_per_direction", minimum=1))
+        state_dirs = spec.get("directions", directions)
+        if not isinstance(state_dirs, list) or not state_dirs:
+            problems.append(f"{state_label}.directions: must be a non-empty list")
+            state_dirs = []
+        for direction in state_dirs:
+            if direction not in directions:
+                problems.append(
+                    f"{state_label}.directions: {direction!r} not in {directions}")
+        frames = spec.get("frames")
+        per = spec.get("frames_per_direction")
+        if (isinstance(frames, int) and not isinstance(frames, bool)
+                and isinstance(per, int) and not isinstance(per, bool)
+                and per > 0 and state_dirs
+                and frames != per * len(state_dirs)):
+            problems.append(
+                f"{state_label}: frames {frames} != frames_per_direction "
+                f"{per} x {len(state_dirs)} directions")
+        fps = spec.get("fps")
+        if (not isinstance(fps, (int, float)) or isinstance(fps, bool)
+                or fps <= 0):
+            problems.append(f"{state_label}.fps: must be a positive number")
+        if not isinstance(spec.get("loop"), bool):
+            problems.append(f"{state_label}.loop: must be a boolean")
+    office = doc.get("office_states")
+    if not isinstance(office, dict):
+        problems.append(f"{label}.office_states: must be an object")
+    else:
+        for semantic in OFFICE_ANIMATION_STATES:
+            target = office.get(semantic)
+            if target not in states:
+                problems.append(
+                    f"{label}.office_states.{semantic}: must name a declared state")
+    portrait = doc.get("portrait")
+    if not isinstance(portrait, dict):
+        problems.append(f"{label}.portrait: must be an object")
+    else:
+        pcell = portrait.get("cell")
+        if not isinstance(pcell, dict):
+            problems.append(f"{label}.portrait.cell: must be an object")
+        else:
+            for key in ("w", "h"):
+                problems.extend(_validate_int(
+                    pcell.get(key), f"{label}.portrait.cell.{key}", minimum=1))
+        cols = portrait.get("cols")
+        rows = portrait.get("rows")
+        problems.extend(_validate_int(cols, f"{label}.portrait.cols", minimum=1))
+        problems.extend(_validate_int(rows, f"{label}.portrait.rows", minimum=1))
+        pdirs = portrait.get("directions")
+        if not isinstance(pdirs, dict) or not pdirs:
+            problems.append(f"{label}.portrait.directions: must be an object")
+        else:
+            for name, frame in pdirs.items():
+                frame_label = f"{label}.portrait.directions.{name}"
+                if not isinstance(frame, dict):
+                    problems.append(f"{frame_label}: must be an object")
+                    continue
+                for key in ("row", "col"):
+                    problems.extend(_validate_int(
+                        frame.get(key), f"{frame_label}.{key}"))
+                row = frame.get("row")
+                col = frame.get("col")
+                if (isinstance(rows, int) and isinstance(row, int)
+                        and not (0 <= row < rows)):
+                    problems.append(f"{frame_label}.row: out of bounds")
+                if (isinstance(cols, int) and isinstance(col, int)
+                        and not (0 <= col < cols)):
+                    problems.append(f"{frame_label}.col: out of bounds")
+        mapping = portrait.get("part_mapping")
+        if not isinstance(mapping, dict) or not mapping:
+            problems.append(f"{label}.portrait.part_mapping: must be an object")
+        else:
+            for part in ("skin", "eyes", "hair", "outfit"):
+                if part not in mapping:
+                    problems.append(
+                        f"{label}.portrait.part_mapping.{part}: required")
+            for part, value in mapping.items():
+                if value not in ("skin", "eyes", "hair", "outfit", "accessory"):
+                    problems.append(
+                        f"{label}.portrait.part_mapping.{part}: unknown part")
+    recipes = doc.get("recipes")
+    if recipes is not None:
+        if not isinstance(recipes, dict):
+            problems.append(f"{label}.recipes: must be an object")
+        else:
+            for slug, recipe in recipes.items():
+                recipe_label = f"{label}.recipes.{slug}"
+                if not isinstance(slug, str) or not slug:
+                    problems.append(f"{recipe_label}: invalid slug")
+                    continue
+                if not isinstance(recipe, dict):
+                    problems.append(f"{recipe_label}: must be an object")
+                    continue
+                for part in ("skin", "eyes", "hair", "outfit"):
+                    if part not in recipe:
+                        problems.append(f"{recipe_label}.{part}: required")
+                    else:
+                        problems.extend(_validate_int(
+                            recipe.get(part), f"{recipe_label}.{part}"))
+                if "accessory" in recipe and recipe["accessory"] is not None:
+                    problems.extend(_validate_int(
+                        recipe.get("accessory"), f"{recipe_label}.accessory"))
+                problems.extend(_validate_shared_recipe_frames(
+                    recipe, recipe_label, portrait))
+    return problems
+
+
+def _validate_shared_recipe_frames(recipe: Mapping[str, Any], label: str,
+                                   portrait: Any) -> List[str]:
+    """A recipe must point at one body frame and one portrait frame.
+
+    The point of the block is that the body and the portrait share the *same*
+    part indices; the frame locators make that share explicit instead of
+    letting two call sites pick independently.
+    """
+    problems: List[str] = []
+    body = recipe.get("body")
+    if not isinstance(body, dict):
+        problems.append(f"{label}.body: must be an object")
+    else:
+        if body.get("state") not in ANIMATION_STATES:
+            problems.append(f"{label}.body.state: unknown state")
+        if body.get("direction") not in ANIMATION_DIRECTIONS:
+            problems.append(f"{label}.body.direction: unknown direction")
+        problems.extend(_validate_int(body.get("frame"),
+                                      f"{label}.body.frame"))
+    frame = recipe.get("portrait")
+    if not isinstance(frame, dict):
+        problems.append(f"{label}.portrait: must be an object")
+    else:
+        problems.extend(_validate_int(frame.get("row"),
+                                      f"{label}.portrait.row"))
+        problems.extend(_validate_int(frame.get("col"),
+                                      f"{label}.portrait.col"))
+        if isinstance(portrait, dict):
+            rows, cols = portrait.get("rows"), portrait.get("cols")
+            row, col = frame.get("row"), frame.get("col")
+            if (isinstance(rows, int) and isinstance(row, int)
+                    and not (0 <= row < rows)):
+                problems.append(f"{label}.portrait.row: out of bounds")
+            if (isinstance(cols, int) and isinstance(col, int)
+                    and not (0 <= col < cols)):
+                problems.append(f"{label}.portrait.col: out of bounds")
+    return problems
+
+
+# --------------------------------------------------------------------------
 # Manifest / recipe / theme validation
 # --------------------------------------------------------------------------
 def _looks_like_path(value: str) -> bool:
@@ -1429,6 +1980,8 @@ def _validate_common(doc: Any, require_files: bool) -> List[str]:
         problems.extend(_validate_characters_recipe(doc.get("characters")))
         problems.extend(_validate_furniture_recipe(doc.get("furniture")))
         problems.extend(_validate_ui_recipe(doc.get("ui")))
+        problems.extend(_validate_rooms_recipe(doc.get("rooms")))
+        problems.extend(_validate_animations_recipe(doc.get("animations")))
     problems.extend(_validate_parts(doc.get("parts")))
     problems.extend(_validate_agents(doc.get("agents"), doc.get("parts")))
 
@@ -1464,6 +2017,8 @@ def validate_manifest(manifest: Any, root: Optional[Path] = None) -> List[str]:
     problems.extend(_validate_characters_full(manifest.get("characters"), declared))
     problems.extend(_validate_furniture_full(manifest.get("furniture"), declared))
     problems.extend(_validate_ui_full(manifest.get("ui"), declared))
+    problems.extend(_validate_rooms_full(manifest.get("rooms"), declared))
+    problems.extend(_validate_animations_full(manifest.get("animations"), declared))
     for section_name in ("portraits", "bodies"):
         problems.extend(_validate_asset_section(
             section_name, manifest.get(section_name), declared))
@@ -1548,6 +2103,103 @@ def _validate_agents_file(root: Path, files: Mapping[str, Any],
     return problems
 
 
+def _validate_rooms_index(root: Path, files: Mapping[str, Any],
+                          section: Any) -> List[str]:
+    if not isinstance(section, dict):
+        return []
+    relative = section.get("index")
+    if not isinstance(relative, str) or not relative:
+        return []
+    path = _inside_root(root, relative)
+    if path is None or not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return [f"rooms.index: invalid JSON ({exc})"]
+    if not isinstance(data, dict):
+        return ["rooms.index: must be an object"]
+    problems: List[str] = []
+    if data.get("schema") != 1:
+        problems.append("rooms.index: schema must be 1")
+    rooms = data.get("rooms")
+    if not isinstance(rooms, list):
+        return problems + ["rooms.index: rooms must be a list"]
+    count = section.get("count")
+    if isinstance(count, int) and not isinstance(count, bool) and count != len(rooms):
+        problems.append(
+            f"rooms.count: {count} != {len(rooms)} index entries")
+    archetypes = section.get("archetypes")
+    declared = set(archetypes) if isinstance(archetypes, list) else set()
+    seen: Set[str] = set()
+    for position, entry in enumerate(rooms):
+        label = f"rooms.index.rooms[{position}]"
+        if not isinstance(entry, dict):
+            problems.append(f"{label}: must be an object")
+            continue
+        room_id = entry.get("id")
+        if not isinstance(room_id, str) or not _ID_RE.fullmatch(room_id):
+            problems.append(f"{label}.id: invalid room id")
+        elif room_id in seen:
+            problems.append(f"{label}.id: duplicate {room_id!r}")
+        else:
+            seen.add(room_id)
+        archetype = entry.get("archetype")
+        if archetype not in ROOM_ARCHETYPES:
+            problems.append(f"{label}.archetype: unknown {archetype!r}")
+        elif declared and archetype not in declared:
+            problems.append(
+                f"{label}.archetype: {archetype!r} not in rooms.archetypes")
+        room_file = entry.get("file")
+        if not isinstance(room_file, str) or not room_file:
+            problems.append(f"{label}.file: required")
+            continue
+        problems.extend(f"{label}.file: {p}" for p in _path_problems(room_file))
+        if room_file not in files:
+            problems.append(f"{label}.file: {room_file!r} is not a declared file")
+        room_path = _inside_root(root, room_file)
+        if room_path is None or not room_path.is_file():
+            continue
+        try:
+            document = json.loads(room_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            problems.append(f"{label}: invalid JSON ({exc})")
+            continue
+        problems.extend(
+            f"{label}: {problem}"
+            for problem in _validate_room_document(
+                document, label=label, files=set(files)))
+        if isinstance(document, dict) and document.get("id") != room_id:
+            problems.append(f"{label}: document id does not match the index")
+    return problems
+
+
+def _validate_animations_index(root: Path, files: Mapping[str, Any],
+                               section: Any) -> List[str]:
+    if not isinstance(section, dict):
+        return []
+    relative = section.get("index")
+    if not isinstance(relative, str) or not relative:
+        return []
+    path = _inside_root(root, relative)
+    if path is None or not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return [f"animations.index: invalid JSON ({exc})"]
+    problems = _validate_animations_document(data, label="animations.index")
+    if isinstance(data, dict):
+        states = data.get("states")
+        declared = section.get("states")
+        if isinstance(states, dict) and isinstance(declared, list):
+            missing = [state for state in declared if state not in states]
+            if missing:
+                problems.append(
+                    f"animations.states: {', '.join(missing)} missing from the index")
+    return problems
+
+
 def validate_theme(root: Any) -> List[str]:
     """Validate a locally built full pack at ``root``."""
     root = Path(root)
@@ -1575,6 +2227,9 @@ def validate_theme(root: Any) -> List[str]:
             if isinstance(config, dict):
                 problems.extend(_validate_assets_index(
                     root, files, category, config))
+    problems.extend(_validate_rooms_index(root, files, manifest.get("rooms")))
+    problems.extend(_validate_animations_index(
+        root, files, manifest.get("animations")))
     return problems
 
 
@@ -1633,6 +2288,8 @@ def load_theme(root: Any) -> Theme:
         characters=dict(manifest.get("characters") or {}),
         furniture=dict(manifest.get("furniture") or {}),
         ui=dict(manifest.get("ui") or {}),
+        rooms=dict(manifest.get("rooms") or {}),
+        animations=dict(manifest.get("animations") or {}),
         files=dict(files),
         agents=dict(agents),
     )

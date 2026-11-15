@@ -984,12 +984,180 @@ def _prepare_assets(assets: Any) -> Tuple[Dict[str, bytes],
 
 
 
+def _asset_file_lookup(assets: Any) -> Dict[str, str]:
+    """Map catalog sprite ids to the pack-relative file ``_prepare_assets`` writes.
+
+    The room extractor records a stable sprite id per placement; the builder
+    must point each one at the deduped pack copy, never at a purchase path.
+    """
+    lookup: Dict[str, str] = {}
+    if not isinstance(assets, Mapping):
+        return lookup
+    categories = assets.get("categories")
+    if not isinstance(categories, Mapping):
+        return lookup
+    for category in theme_contract.ASSET_CATEGORIES:
+        section = categories.get(category)
+        entries = section.get("entries") if isinstance(section, Mapping) else None
+        if not isinstance(entries, (list, tuple)):
+            continue
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            sprite_id = entry.get("id")
+            blob = entry.get("blob")
+            if not isinstance(sprite_id, str) or not isinstance(
+                    blob, (bytes, bytearray)) or not blob:
+                continue
+            raw_sha = _sha(bytes(blob))
+            lookup.setdefault(
+                sprite_id, f"assets/{category}/{raw_sha[:20]}.png")
+    return lookup
+
+
+def _prepare_rooms(rooms: Any, assets: Any
+                   ) -> Tuple[Dict[str, bytes], Optional[Dict[str, Any]],
+                              Optional[Dict[str, Any]]]:
+    """Turn extracted blueprints into ``rooms/<id>.json`` + an index.
+
+    The shareable recipe gets counts and archetype ids only: no files, no
+    coordinates, no sheet names.
+    """
+    if rooms is None:
+        return {}, None, None
+    if not isinstance(rooms, Mapping):
+        raise ThemeBuildError("rooms: must be an object")
+    documents = rooms.get("rooms")
+    if not isinstance(documents, (list, tuple)) or not documents:
+        return {}, None, None
+    lookup = _asset_file_lookup(assets)
+    payloads: Dict[str, bytes] = {}
+    index_rows: List[Dict[str, Any]] = []
+    archetypes: List[str] = []
+    for position, document in enumerate(documents):
+        label = f"rooms.rooms[{position}]"
+        if not isinstance(document, Mapping):
+            raise ThemeBuildError(f"{label}: must be an object")
+        room = dict(document)
+        placements: List[Dict[str, Any]] = []
+        for placement in room.get("placements") or []:
+            if not isinstance(placement, Mapping):
+                raise ThemeBuildError(f"{label}.placements: must be objects")
+            placement = dict(placement)
+            blob = placement.pop("blob", None)
+            if isinstance(blob, (bytes, bytearray)) and blob:
+                relative = f"rooms/sprites/{_sha(bytes(blob))[:20]}.png"
+                payloads[relative] = bytes(blob)
+            else:
+                sprite = placement.get("sprite")
+                relative = lookup.get(sprite) if isinstance(sprite, str) else None
+            if not relative:
+                raise ThemeBuildError(
+                    f"{label}: sprite {placement.get('sprite')!r} has no art")
+            placement["file"] = relative
+            placements.append(placement)
+        room["placements"] = placements
+        problems = theme_contract._validate_room_document(room, label=label)
+        if problems:
+            raise ThemeBuildError(problems)
+        room_id = room["id"]
+        relative = f"rooms/{room_id}.json"
+        payloads[relative] = _json_bytes(room)
+        index_rows.append({
+            "id": room_id,
+            "label": room.get("label"),
+            "archetype": room.get("archetype"),
+            "file": relative,
+            "size": dict(room.get("size") or {}),
+        })
+        archetypes.append(str(room.get("archetype")))
+    index = {
+        "schema": 1,
+        "id": "qubit-office-rooms/1",
+        "count": len(index_rows),
+        "rooms": index_rows,
+    }
+    payloads["rooms/manifest.json"] = _json_bytes(index)
+    manifest_block = {
+        "schema": 1,
+        "index": "rooms/manifest.json",
+        "count": len(index_rows),
+        "archetypes": sorted(set(archetypes)),
+    }
+    recipe_block = {
+        "schema": 1,
+        "count": len(index_rows),
+        "archetypes": sorted(set(archetypes)),
+    }
+    return payloads, manifest_block, recipe_block
+
+
+def _choose_accessory(slug: str, accessories: Any) -> Optional[int]:
+    if not isinstance(accessories, (list, tuple)) or not accessories:
+        return None
+    digest = hashlib.sha256(slug.encode("utf-8")).hexdigest()
+    return int(digest, 16) % len(accessories)
+
+
+def _prepare_animations(animations: Any, recipes: Mapping[str, Mapping[str, int]],
+                        *, size: int
+                        ) -> Tuple[Dict[str, bytes], Optional[Dict[str, Any]],
+                                   Optional[Dict[str, Any]]]:
+    """Write ``characters/animations.json`` with a shared body/portrait recipe."""
+    if animations is None:
+        return {}, None, None
+    if not isinstance(animations, Mapping):
+        raise ThemeBuildError("animations: must be an object")
+    document = dict(animations)
+    accessories = document.get("accessories")
+    shared: Dict[str, Any] = {}
+    for slug, recipe in recipes.items():
+        entry: Dict[str, Any] = {
+            part: int(recipe[part])
+            for part in ("skin", "eyes", "hair", "outfit") if part in recipe
+        }
+        accessory = _choose_accessory(slug, accessories)
+        if accessory is not None:
+            entry["accessory"] = accessory
+        entry["portrait"] = {"row": 0, "col": 0}
+        entry["body"] = {"state": "idle", "direction": "down", "frame": 0}
+        shared[slug] = entry
+    document["recipes"] = shared
+    problems = theme_contract._validate_animations_document(
+        document, label="animations")
+    if problems:
+        raise ThemeBuildError(problems)
+    payloads = {"characters/animations.json": _json_bytes(document)}
+    states = document.get("states") if isinstance(document.get("states"), Mapping) else {}
+    manifest_block = {
+        "schema": 1,
+        "index": "characters/animations.json",
+        "states": sorted(states),
+        "directions": list(document.get("directions") or []),
+    }
+    portrait = document.get("portrait") or {}
+    recipe_block = {
+        "schema": 1,
+        "states": sorted(states),
+        "directions": list(document.get("directions") or []),
+        "cell": dict(document.get("cell") or {}),
+        "portrait": {
+            "cell": dict(portrait.get("cell") or {}),
+            "cols": portrait.get("cols"),
+            "rows": portrait.get("rows"),
+        },
+    }
+    return payloads, manifest_block, recipe_block
+
+
 def shareable_recipe(manifest: Mapping[str, Any],
                      recipes: Mapping[str, Mapping[str, int]],
                      surfaces: Optional[Mapping[str, Any]] = None,
                      assets: Optional[Mapping[str, Any]] = None,
                      furniture: Optional[Mapping[str, Any]] = None,
-                     ui: Optional[Mapping[str, Any]] = None
+                     ui: Optional[Mapping[str, Any]] = None,
+                     rooms: Optional[Mapping[str, Any]] = None,
+                     animations: Optional[Mapping[str, Any]] = None
                      ) -> Dict[str, Any]:
     """The shareable ``theme.recipe.json`` derived from a built manifest.
 
@@ -1021,6 +1189,10 @@ def shareable_recipe(manifest: Mapping[str, Any],
         recipe["furniture"] = dict(furniture)
     if ui is not None:
         recipe["ui"] = dict(ui)
+    if rooms is not None:
+        recipe["rooms"] = dict(rooms)
+    if animations is not None:
+        recipe["animations"] = dict(animations)
     return recipe
 
 
@@ -1034,6 +1206,8 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
                  assets: Any = None,
                  furniture: Optional[Mapping[str, Any]] = None,
                  ui: Optional[Mapping[str, Any]] = None,
+                 rooms: Any = None,
+                 animations: Any = None,
                  label: Optional[str] = None) -> Dict[str, Any]:
     """Write ONLY the shareable ``theme.recipe.json`` for a purchase.
 
@@ -1070,8 +1244,11 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
     normalized = _normalize_layers(layers)
     _require(normalized, ("skin", "eyes", "hair", "outfit", "body"))
     _asset_payloads, _asset_block, asset_metadata = _prepare_assets(assets)
+    _room_payloads, _room_block, room_metadata = _prepare_rooms(rooms, assets)
     slugs = _resolve_personas(personas)
     recipes = {slug: _derive_recipe(slug, normalized) for slug in slugs}
+    _animation_payloads, _animation_block, animation_metadata = (
+        _prepare_animations(animations, recipes, size=size))
     parts = {
         part: len(normalized[part])
         for part in ("skin", "eyes", "hair", "outfit", "accessory")
@@ -1093,7 +1270,8 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
     }
     recipe = shareable_recipe(manifest, recipes, surfaces=surfaces,
                               assets=asset_metadata,
-                              furniture=furniture, ui=ui)
+                              furniture=furniture, ui=ui,
+                              rooms=room_metadata, animations=animation_metadata)
     recipe_problems = theme_contract.validate_recipe(recipe)
     if recipe_problems:
         raise ThemeBuildError(recipe_problems)
@@ -1131,6 +1309,8 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
                 tokens: Optional[Mapping[str, str]] = None,
                 floors: Optional[Mapping[str, bytes]] = None,
                 assets: Any = None,
+                rooms: Any = None,
+                animations: Any = None,
                 extras: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     """Build a local theme pack and return its manifest.
 
@@ -1172,6 +1352,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     _require(normalized, ("skin", "eyes", "hair", "outfit", "body"))
     floor_png = _prepare_floors(floors)
     asset_payloads, asset_block, _asset_metadata = _prepare_assets(assets)
+    room_payloads, room_block, _room_metadata = _prepare_rooms(rooms, assets)
     extra_payloads, extra_manifest, _extra_recipe = _prepare_extras(extras)
     slugs = _resolve_personas(personas)
     cols = DEFAULT_COLS
@@ -1237,6 +1418,9 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     if sheet_problems:
         raise ThemeBuildError(sheet_problems)
 
+    animation_payloads, animation_block, _animation_metadata = (
+        _prepare_animations(animations, recipes, size=size))
+
     payloads: Dict[str, bytes] = {
         portrait_atlas_rel: portrait_data,
         "portraits/index.json": _json_bytes(portrait_index),
@@ -1248,6 +1432,8 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     for kind, data in floor_png.items():
         payloads[f"surfaces/floor_{kind}.png"] = data
     payloads.update(asset_payloads)
+    payloads.update(room_payloads)
+    payloads.update(animation_payloads)
     payloads.update(extra_payloads)
     surfaces_block = _floor_surfaces_block(floor_png)
 
@@ -1296,6 +1482,10 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         manifest["assets"] = asset_block
     if surfaces_block is not None:
         manifest["surfaces"] = surfaces_block
+    if room_block is not None:
+        manifest["rooms"] = room_block
+    if animation_block is not None:
+        manifest["animations"] = animation_block
     manifest["characters"] = {
         "atlas": body_atlas_rel,
         "cell": {"w": size, "h": size * 2},
@@ -1583,6 +1773,40 @@ def _asset_catalog(source: str, size: int,
     return catalog
 
 
+def _room_catalog(source: str) -> Any:
+    """Best-effort room blueprint extraction (absent pack is additive)."""
+    try:
+        import office_theme_extract as extractor  # type: ignore
+    except Exception:  # noqa: BLE001 - optional
+        return None
+    function = getattr(extractor, "extract_room_blueprints", None)
+    if not callable(function):
+        return None
+    try:
+        rooms = function(source, size=16)
+    except ThemeBuildError as exc:
+        print(f"warning: room blueprints skipped: {exc}", file=sys.stderr)
+        return None
+    return rooms if isinstance(rooms, Mapping) and rooms.get("rooms") else None
+
+
+def _animation_catalog(source: str, size: int) -> Any:
+    """Best-effort character animation extraction."""
+    try:
+        import office_theme_extract as extractor  # type: ignore
+    except Exception:  # noqa: BLE001 - optional
+        return None
+    function = getattr(extractor, "extract_character_animations", None)
+    if not callable(function):
+        return None
+    try:
+        animations = function(source, size=size)
+    except ThemeBuildError as exc:
+        print(f"warning: character animations skipped: {exc}", file=sys.stderr)
+        return None
+    return animations if isinstance(animations, Mapping) else None
+
+
 def _floor_inputs(source: str) -> Tuple[Dict[str, bytes],
                                         Optional[Dict[str, Any]]]:
     """Read the measured floor tiles and their recipe coordinates.
@@ -1624,14 +1848,17 @@ def _check(args: argparse.Namespace,
            layers: Mapping[str, List[Sheet]],
            floors: Optional[Mapping[str, bytes]] = None,
            assets: Any = None,
-           extras: Optional[Mapping[str, Any]] = None) -> int:
+           extras: Optional[Mapping[str, Any]] = None,
+           rooms: Any = None,
+           animations: Any = None) -> int:
     out = Path(args.out)
     if not out.is_dir():
         raise ThemeBuildError(f"check: {out} does not exist")
     with tempfile.TemporaryDirectory(prefix="office-theme-check-") as work:
         rebuilt = Path(work) / out.name
         build_theme(DEFAULT_SOURCE, rebuilt, size=args.size, layers=layers,
-                    floors=floors, assets=assets, extras=extras)
+                    floors=floors, assets=assets, extras=extras,
+                    rooms=rooms, animations=animations)
         problems = compare_packs(out, rebuilt)
     if problems:
         for problem in problems:
@@ -1684,6 +1911,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--asset-categories", default=None,
         help="comma-separated subset of characters,furniture,animated,ui,outside "
              "(default: all)")
+    parser.add_argument(
+        "--rooms", action=argparse.BooleanOptionalAction, default=True,
+        help="also build the measured room blueprints (default: enabled)")
+    parser.add_argument(
+        "--animations", action=argparse.BooleanOptionalAction, default=True,
+        help="also build the measured character animation map (default: enabled)")
     args = parser.parse_args(argv)
     if args.calibrate_out and not args.calibrate:
         parser.error("--calibrate-out requires --calibrate")
@@ -1700,11 +1933,17 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         floors: Dict[str, bytes] = {}
         surfaces: Optional[Dict[str, Any]] = None
         assets: Any = None
+        rooms: Any = None
+        animations: Any = None
         extras: Dict[str, Any] = {}
         if not args.calibrate:
             floors, surfaces = _floor_inputs(args.source)
             if args.assets:
                 assets = _asset_catalog(args.source, args.size, asset_categories)
+            if args.rooms:
+                rooms = _room_catalog(args.source)
+            if args.animations:
+                animations = _animation_catalog(args.source, args.size)
             try:
                 import office_theme_extract as extractor  # type: ignore
                 extras = {
@@ -1716,7 +1955,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                       file=sys.stderr)
                 extras = {}
         if args.check:
-            return _check(args, layers, floors, assets, extras)
+            return _check(args, layers, floors, assets, extras,
+                          rooms=rooms, animations=animations)
         if args.calibrate:
             return _calibrate(args, layers)
         tokens = None
@@ -1735,7 +1975,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                                   size=args.size, layers=layers, tokens=tokens,
                                   surfaces=surfaces, assets=assets,
                                   furniture=extra_recipe.get("furniture"),
-                                  ui=extra_recipe.get("ui"))
+                                  ui=extra_recipe.get("ui"),
+                                  rooms=rooms, animations=animations)
             print(json.dumps({
                 "ok": True,
                 "recipe": str(Path(args.recipe_out)),
@@ -1746,7 +1987,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
                                layers=layers, tokens=tokens, floors=floors,
-                               assets=assets, extras=extras)
+                               assets=assets, extras=extras,
+                               rooms=rooms, animations=animations)
         recipes = json.loads(
             (Path(args.out) / "agents.json").read_text(encoding="utf-8")
         )["recipes"]

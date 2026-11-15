@@ -186,6 +186,256 @@ FURNITURE_FILES: Dict[str, str] = {
     "floor_lamp": "2_Living_Room_Singles/Living_Room_Singles_80.png",
 }
 
+#: Measured Room_Builder sub-sheets. Coordinates below are 16px tiles on the
+#: 16x16 tier, read from the purchased pack (never guessed from filenames).
+ROOM_FLOOR_SHEET = FLOOR_SHEET
+ROOM_WALL_SHEET = "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_Walls_16x16.png"
+ROOM_DOOR_SHEET = (
+    "1_Interiors/16x16/Room_Builder_subfiles/"
+    "Room_Builder_Arched_Entryways_16x16.png")
+ROOM_WINDOW_SHEET = (
+    "1_Interiors/16x16/Room_Builder_subfiles/Room_Builder_3d_walls_16x16.png")
+
+#: Wall / opening tiles measured on those sheets. A descriptor is
+#: ``(sheet, col, row, w, h)`` in 16px cells.
+ROOM_WALL_TILES: Dict[str, Tuple[str, int, int, int, int]] = {
+    "plain": (ROOM_WALL_SHEET, 0, 2, 1, 1),
+    "patterned": (ROOM_WALL_SHEET, 0, 0, 1, 1),
+    "panel": (ROOM_WALL_SHEET, 5, 2, 1, 1),
+    "door": (ROOM_DOOR_SHEET, 0, 0, 2, 4),
+    "window": (ROOM_WINDOW_SHEET, 17, 7, 2, 4),
+}
+
+#: Real Theme_Sorter_Singles placements used by the blueprints. ``path`` is a
+#: member of the interior pack; ``kind`` is the semantic object, ``layer`` the
+#: z-band. Footprints are measured from each file's own pixel size.
+ROOM_FURNITURE: Dict[str, Dict[str, str]] = {
+    "desk": {
+        "path": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
+        "layer": "furniture"},
+    "chair": {
+        "path": "13_Conference_Hall_Singles/Conference_Hall_Singles_39.png",
+        "layer": "furniture"},
+    "chair_front": {
+        "path": "13_Conference_Hall_Singles/Conference_Hall_Singles_37.png",
+        "layer": "furniture"},
+    "table": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_29.png",
+        "layer": "furniture"},
+    "coffee_table": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_30.png",
+        "layer": "furniture"},
+    "sofa": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_3.png",
+        "layer": "furniture"},
+    "armchair": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_117.png",
+        "layer": "furniture"},
+    "armchair_right": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_118.png",
+        "layer": "furniture"},
+    "stool": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_119.png",
+        "layer": "furniture"},
+    "plant_small": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_17.png",
+        "layer": "furniture"},
+    "plant_tall": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_21.png",
+        "layer": "furniture"},
+    "bookshelf": {
+        "path": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_66.png",
+        "layer": "furniture"},
+    "whiteboard": {
+        "path": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_39.png",
+        "layer": "wall_art"},
+    "floor_lamp": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_80.png",
+        "layer": "furniture"},
+    "cabinet": {
+        "path": "2_Living_Room_Singles/Living_Room_Singles_1.png",
+        "layer": "furniture"},
+    "counter": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_1.png",
+        "layer": "furniture"},
+    "counter_wide": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_5.png",
+        "layer": "furniture"},
+    "fridge": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_20.png",
+        "layer": "furniture"},
+    "sink": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_40.png",
+        "layer": "furniture"},
+    "stove": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_50.png",
+        "layer": "furniture"},
+    "kitchen_shelf": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_70.png",
+        "layer": "furniture"},
+    "rug": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_60.png",
+        "layer": "rug"},
+    "rug_large": {
+        "path": "12_Kitchen_Singles/Kitchen_Singles_80.png",
+        "layer": "rug"},
+    "toilet": {
+        "path": "3_Bathroom_Singles/Bathroom_Singles_30.png",
+        "layer": "furniture"},
+    "bathtub": {
+        "path": "3_Bathroom_Singles/Bathroom_Singles_20.png",
+        "layer": "furniture"},
+    "bath_sink": {
+        "path": "3_Bathroom_Singles/Bathroom_Singles_5.png",
+        "layer": "furniture"},
+    "mirror": {
+        "path": "3_Bathroom_Singles/Bathroom_Singles_60.png",
+        "layer": "wall_art"},
+    "art": {
+        "path": "7_Art_Singles/Art_Singles_25.png",
+        "layer": "wall_art"},
+}
+
+#: The eight measured room archetypes. Each entry lists the floor kind and
+#: furniture placements (kind, x, y) in 16px tiles. Doors/windows/walls are
+#: added by :func:`extract_room_blueprints` from the measured tile table.
+ROOM_BLUEPRINTS: Dict[str, Dict[str, object]] = {
+    "executive": {
+        "label": "Executive boardroom",
+        "size": (18, 12),
+        "floor": "wood",
+        "placements": [
+            ("table", 6, 4), ("chair", 5, 3), ("chair", 8, 3),
+            ("chair", 5, 6), ("chair", 8, 6), ("chair_front", 6, 6),
+            ("whiteboard", 1, 1), ("bookshelf", 15, 1), ("plant_tall", 16, 8),
+            ("plant_small", 1, 9), ("art", 9, 1),
+        ],
+    },
+    "operations": {
+        "label": "Operations floor",
+        "size": (18, 12),
+        "floor": "carpet",
+        "placements": [
+            ("desk", 2, 3), ("chair", 2, 5), ("desk", 6, 3),
+            ("chair", 6, 5), ("desk", 10, 3), ("chair", 10, 5),
+            ("desk", 14, 3), ("chair", 14, 5), ("cabinet", 1, 8),
+            ("counter_wide", 5, 8), ("plant_small", 16, 9),
+            ("whiteboard", 8, 1), ("rug_large", 6, 7),
+        ],
+    },
+    "meeting": {
+        "label": "Meeting room",
+        "size": (12, 10),
+        "floor": "tile_check",
+        "placements": [
+            ("table", 4, 3), ("chair", 3, 2), ("chair", 6, 2),
+            ("chair", 3, 5), ("chair", 6, 5), ("whiteboard", 1, 1),
+            ("art", 9, 1), ("plant_small", 10, 7), ("cabinet", 1, 7),
+        ],
+    },
+    "focus": {
+        "label": "Focus room",
+        "size": (10, 8),
+        "floor": "wood",
+        "placements": [
+            ("desk", 3, 3), ("chair", 3, 5), ("bookshelf", 1, 1),
+            ("floor_lamp", 7, 2), ("plant_small", 8, 5), ("art", 5, 1),
+        ],
+    },
+    "reception": {
+        "label": "Reception",
+        "size": (14, 10),
+        "floor": "marble",
+        "placements": [
+            ("desk", 5, 3), ("chair", 5, 5), ("sofa", 2, 6),
+            ("armchair", 9, 6), ("plant_tall", 1, 2), ("plant_small", 11, 1),
+            ("art", 6, 1), ("coffee_table", 4, 7),
+        ],
+    },
+    "kitchen": {
+        "label": "Kitchen",
+        "size": (12, 10),
+        "floor": "tile_white",
+        "placements": [
+            ("counter", 1, 1), ("counter_wide", 3, 1), ("stove", 6, 1),
+            ("sink", 7, 1), ("fridge", 9, 1), ("kitchen_shelf", 10, 4),
+            ("table", 4, 5), ("stool", 3, 7), ("stool", 6, 7),
+            ("rug", 4, 8),
+        ],
+    },
+    "restroom": {
+        "label": "Restroom",
+        "size": (10, 8),
+        "floor": "tile_white",
+        "placements": [
+            ("toilet", 1, 2), ("toilet", 7, 2), ("bath_sink", 3, 1),
+            ("mirror", 3, 3), ("bathtub", 3, 5), ("plant_small", 8, 5),
+        ],
+    },
+    "lounge": {
+        "label": "Lounge",
+        "size": (16, 10),
+        "floor": "carpet",
+        "placements": [
+            ("sofa", 2, 3), ("armchair", 7, 3), ("armchair_right", 10, 3),
+            ("coffee_table", 5, 5), ("floor_lamp", 12, 2), ("plant_tall", 1, 6),
+            ("plant_small", 13, 6), ("bookshelf", 14, 6), ("rug_large", 4, 6),
+            ("art", 6, 1),
+        ],
+    },
+}
+
+#: Body-sheet animation rows. Row numbers and total frame counts come from the
+#: Character Generator 2.0 ``AnimationSO`` assets (StartPosition / Offset),
+#: cross-checked against the non-empty frames of ``Body_01.png``.
+ANIMATION_ROWS: Dict[str, Dict[str, object]] = {
+    "idle": {"row": 1, "frames": 24, "frames_per_direction": 6, "fps": 4,
+             "loop": True},
+    "walk": {"row": 2, "frames": 24, "frames_per_direction": 6, "fps": 8,
+             "loop": True},
+    "sit": {"row": 4, "frames": 12, "frames_per_direction": 3, "fps": 2,
+            "loop": True},
+    "sit2": {"row": 5, "frames": 12, "frames_per_direction": 3, "fps": 2,
+             "loop": True},
+    "phone": {"row": 6, "frames": 12, "frames_per_direction": 3, "fps": 3,
+              "loop": True},
+    "read": {"row": 7, "frames": 12, "frames_per_direction": 3, "fps": 3,
+             "loop": True},
+}
+
+#: Direction block order, measured from the walk row: the first six frames
+#: face left, the next six down, then right, then up.
+ANIMATION_DIRECTIONS: Tuple[str, ...] = ("left", "down", "right", "up")
+
+#: Office semantics mapped onto the real states. ``type`` and ``talk`` have no
+#: dedicated body rows in the purchase; they reuse sit and phone honestly.
+OFFICE_ANIMATION_STATES: Dict[str, str] = {
+    "idle": "idle",
+    "walk": "walk",
+    "sit": "sit",
+    "type": "sit",
+    "talk": "phone",
+}
+
+#: Portrait sheet grid: 10 columns x 3 rows of ``size*2`` cells. Row 0 faces
+#: front, row 1 is the side view, row 2 is the back; column 0 is neutral.
+PORTRAIT_GRID: Dict[str, object] = {
+    "cols": 10,
+    "rows": 3,
+    "directions": {
+        "front": {"row": 0, "col": 0},
+        "side": {"row": 1, "col": 0},
+        "back": {"row": 2, "col": 0},
+    },
+    "part_mapping": {
+        "skin": "skin",
+        "eyes": "eyes",
+        "hair": "hair",
+        "outfit": "outfit",
+        "accessory": "accessory",
+    },
+}
+
 #: The Modern UI sheet and the measured 9-slice regions. ``slice`` is
 #: ``[top, right, bottom, left]`` as CSS ``border-image-slice`` expects.
 UI_SHEET = "16x16/Modern_UI_Style_1.png"
@@ -321,6 +571,10 @@ class _Archive:
 
     def __exit__(self, *exc_info: object) -> None:
         self.close()
+
+    def has(self, member: str) -> bool:
+        """Whether ``member`` exists in this archive."""
+        return member in self._names
 
     def match(self, pattern: re.Pattern[str]) -> Dict[int, str]:
         """``{index: member name}`` for every member matching ``pattern``."""
@@ -1225,6 +1479,273 @@ def _furniture_assets(source: str, size: int) -> List[Dict[str, object]]:
     return entries
 
 
+def _require_room_sheets(tree: _AssetTree, size: int) -> None:
+    """Fail closed when a measured blueprint sheet is absent or unreadable."""
+    required = {
+        ROOM_FLOOR_SHEET, ROOM_WALL_SHEET, ROOM_DOOR_SHEET, ROOM_WINDOW_SHEET,
+    }
+    missing = sorted(name for name in required if not tree.has(name))
+    if missing:
+        raise ThemeBuildError(
+            [f"rooms: measured sheet missing from the interior pack: {name}"
+             for name in missing])
+    for sheet, col, row, width, height in ROOM_WALL_TILES.values():
+        image = tree.read_image(sheet)
+        if (col + width) * 16 > image.width or (row + height) * 16 > image.height:
+            raise ThemeBuildError(
+                f"rooms: tile {col},{row} {width}x{height} lies outside "
+                f"{sheet} ({image.width}x{image.height})")
+
+
+def _furniture_sprite_id(relative: str) -> str:
+    return f"furniture-single-{_slug(relative[:-4])}"
+
+
+def _room_placement(tree: _AssetTree, kind: str, x: int, y: int,
+                    *, z: int) -> Dict[str, object]:
+    entry = ROOM_FURNITURE[kind]
+    relative = entry["path"]
+    full = f"1_Interiors/16x16/Theme_Sorter_Singles/{relative}"
+    if not tree.has(full):
+        raise ThemeBuildError(
+            f"rooms: furniture sprite missing from the interior pack: {full}")
+    image = tree.read_image(full)
+    if image.width % 16 or image.height % 16:
+        raise ThemeBuildError(
+            f"rooms: {full} is {image.width}x{image.height}; not a 16px sprite")
+    return {
+        "id": f"{kind}-{x}-{y}",
+        "kind": kind,
+        "layer": entry["layer"],
+        "sprite": _furniture_sprite_id(relative),
+        "sheet": full,
+        "tile": {"x": x, "y": y},
+        "footprint": {"w": image.width // 16, "h": image.height // 16},
+        "anchor": "bottom-center",
+        "z": z,
+        # In-memory copy so the builder can write the local pack even when the
+        # pack's chosen size tier has no Theme_Sorter_Singles directory.
+        "blob": tree.read(full),
+    }
+
+
+_LAYER_Z = {
+    "rug": 5,
+    "furniture": 20,
+    "wall_art": 30,
+    "overlay": 40,
+}
+
+
+def extract_room_blueprints(source: str, *, size: int = 16
+                            ) -> Dict[str, object]:
+    """Read the purchased Room_Builder/Theme_Sorter art into 8 blueprints.
+
+    Returns ``{"schema": 1, "archetypes": [...], "rooms": [document, ...]}``.
+    Every coordinate is a 16px tile on a sheet that exists in the pack; every
+    furniture footprint is the sprite's own measured pixel size. Nothing is
+    written.
+    """
+    if size != 16:
+        raise ThemeBuildError(
+            "rooms: blueprints are measured on the 16x16 tier only")
+    tree = _resolve_asset_tree(source, "interior")
+    if tree is None:
+        return {"schema": 1, "archetypes": [], "rooms": []}
+    rooms: List[Dict[str, object]] = []
+    with tree:
+        _require_room_sheets(tree, size)
+        for archetype, spec in ROOM_BLUEPRINTS.items():
+            width, height = spec["size"]
+            placements = [
+                _room_placement(
+                    tree, kind, x, y,
+                    z=_LAYER_Z[ROOM_FURNITURE[kind]["layer"]])
+                for kind, x, y in spec["placements"]
+            ]
+            wall_sheet, wall_col, wall_row, _, _ = ROOM_WALL_TILES["plain"]
+            door_sheet, door_col, door_row, door_w, door_h = (
+                ROOM_WALL_TILES["door"])
+            window_sheet, win_col, win_row, win_w, win_h = (
+                ROOM_WALL_TILES["window"])
+            document = {
+                "schema": "qubit-office-room/1",
+                "id": archetype,
+                "label": spec["label"],
+                "archetype": archetype,
+                "cell": 16,
+                "size": {"w": width, "h": height},
+                "floor": {
+                    "kind": spec["floor"],
+                    "sheet": ROOM_FLOOR_SHEET,
+                    "tile": dict(zip(
+                        ("col", "row"), FLOOR_MAP[spec["floor"]])),
+                },
+                "walls": [
+                    {"edge": "north", "x": 0, "y": 0, "w": width, "h": 1,
+                     "sheet": wall_sheet,
+                     "tile": {"col": wall_col, "row": wall_row}},
+                    {"edge": "south", "x": 0, "y": height - 1,
+                     "w": width, "h": 1, "sheet": wall_sheet,
+                     "tile": {"col": wall_col, "row": wall_row}},
+                ],
+                "openings": [
+                    {"kind": "door", "layer": "door",
+                     "x": max(1, width // 2 - 1), "y": height - door_h,
+                     "w": door_w, "h": door_h, "sheet": door_sheet,
+                     "tile": {"col": door_col, "row": door_row}},
+                    {"kind": "window", "layer": "window",
+                     "x": 2, "y": 0, "w": win_w, "h": win_h,
+                     "sheet": window_sheet,
+                     "tile": {"col": win_col, "row": win_row}},
+                    {"kind": "window", "layer": "window",
+                     "x": width - win_w - 2, "y": 0, "w": win_w, "h": win_h,
+                     "sheet": window_sheet,
+                     "tile": {"col": win_col, "row": win_row}},
+                ],
+                "placements": placements,
+            }
+            rooms.append(document)
+    return {
+        "schema": 1,
+        "archetypes": list(ROOM_BLUEPRINTS),
+        "rooms": rooms,
+    }
+
+
+def _animation_body_sheet(source: str, size: int) -> Tuple[str, _Archive]:
+    character_path, _portrait_path, _fallback = _resolve_source(source)
+    archive = _Archive(character_path)
+    bodies = archive.match(_body_patterns(size)["body"])
+    if not bodies:
+        archive.close()
+        raise ThemeBuildError(
+            f"animations: body sheets missing from {character_path.name}")
+    member = bodies[min(bodies)]
+    return member, archive
+
+
+def _accessory_pairs(source: str, size: int) -> List[Dict[str, object]]:
+    """Pair body and portrait accessories by numeric id and variant."""
+    try:
+        character_path, portrait_path, _fallback = _resolve_source(source)
+    except ThemeBuildError:
+        return []
+    pairs: List[Dict[str, object]] = []
+    with _Archive(character_path) as character:
+        body = character.members(_body_accessory_pattern(size))
+        with _Archive(portrait_path) as portrait:
+            kind = _portrait_kind(portrait, size)
+            names = portrait.members(_portrait_accessory_pattern(size, kind))
+    # Names are not paired here; the animation document only needs the stable
+    # ids, so the body sheet names are the canonical index.
+    for member in body:
+        stem = member.rsplit("/", 1)[-1][:-4]
+        match = re.match(r"Accessory_(\d+)_(.+?)_(\d+)$", stem)
+        if not match:
+            continue
+        pairs.append({
+            "id": f"accessory-{match.group(1)}-{match.group(3)}",
+            "name": match.group(2),
+            "body_sheet": member,
+            "variant": int(match.group(3)),
+            "portrait_candidates": len(names),
+        })
+    return pairs
+
+
+def extract_character_animations(source: str, *, size: int = 16,
+                                 personas: Optional[Sequence[str]] = None
+                                 ) -> Dict[str, object]:
+    """Measured body frame geometry + portrait grid, shared by both views.
+
+    Returns a ``qubit-office-character-animations/1`` document. Row numbers,
+    frame counts and rates are the Character Generator 2.0 ``AnimationSO``
+    values, verified against the non-empty frames of the body sheet; the
+    portrait grid is the measured 10x3 sheet of ``size*2`` cells.
+    """
+    if size not in _SIZES:
+        raise ThemeBuildError(f"size: must be 16, 32, or 48 (got {size!r})")
+    member, archive = _animation_body_sheet(source, size)
+    with archive:
+        sheet = archive.read_image(member)
+    if sheet.width % size or sheet.height % (size * 2):
+        raise ThemeBuildError(
+            f"animations: {member} is {sheet.width}x{sheet.height}; "
+            f"not a {size}x{size * 2} grid")
+    rows = sheet.height // (size * 2)
+    states: Dict[str, object] = {}
+    for state, spec in ANIMATION_ROWS.items():
+        row = int(spec["row"])
+        if row >= rows:
+            raise ThemeBuildError(
+                f"animations: {state} row {row} is outside {member} "
+                f"({rows} rows)")
+        frames = int(spec["frames"])
+        if (row + 1) * size * 2 > sheet.height:
+            raise ThemeBuildError(f"animations: {state} row {row} is truncated")
+        tile = sheet.crop((0, row * size * 2, size, (row + 1) * size * 2))
+        if tile.getchannel("A").getbbox() is None:
+            raise ThemeBuildError(
+                f"animations: {state} row {row} is blank in {member}")
+        states[state] = {
+            "row": row,
+            "frames": frames,
+            "frames_per_direction": int(spec["frames_per_direction"]),
+            "directions": list(ANIMATION_DIRECTIONS),
+            "fps": spec["fps"],
+            "loop": spec["loop"],
+        }
+    return {
+        "schema": "qubit-office-character-animations/1",
+        "cell": {"w": size, "h": size * 2},
+        "directions": list(ANIMATION_DIRECTIONS),
+        "office_states": dict(OFFICE_ANIMATION_STATES),
+        "states": states,
+        "portrait": {
+            "cell": {"w": size * 2, "h": size * 2},
+            "cols": PORTRAIT_GRID["cols"],
+            "rows": PORTRAIT_GRID["rows"],
+            "directions": {
+                name: dict(frame)
+                for name, frame in PORTRAIT_GRID["directions"].items()
+            },
+            "part_mapping": dict(PORTRAIT_GRID["part_mapping"]),
+        },
+        "accessories": _accessory_pairs(source, size),
+    }
+
+
+def summarize_rooms(rooms: Mapping[str, object]) -> Dict[str, object]:
+    """Counts and bounds only; no art, paths, or coordinates per placement."""
+    documents = rooms.get("rooms") if isinstance(rooms, Mapping) else None
+    if not isinstance(documents, list):
+        return {"count": 0, "archetypes": [], "placements": 0}
+    summary: Dict[str, object] = {
+        "count": len(documents),
+        "archetypes": sorted(
+            str(doc.get("archetype")) for doc in documents
+            if isinstance(doc, Mapping)),
+        "placements": sum(
+            len(doc.get("placements") or []) for doc in documents
+            if isinstance(doc, Mapping)),
+    }
+    return summary
+
+
+def summarize_animations(document: Mapping[str, object]) -> Dict[str, object]:
+    states = document.get("states") if isinstance(document, Mapping) else None
+    if not isinstance(states, Mapping):
+        return {"states": [], "frame_counts": {}}
+    return {
+        "states": sorted(states),
+        "frame_counts": {
+            state: int(spec.get("frames", 0))
+            for state, spec in states.items() if isinstance(spec, Mapping)
+        },
+    }
+
+
 def _animated_assets(source: str, size: int) -> List[Dict[str, object]]:
     tree = _resolve_asset_tree(source, "interior")
     if tree is None:
@@ -1719,6 +2240,14 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         help="read the extended packs (characters, furniture, animated, UI, "
              "outside) in memory and print a category summary + decoded digest; "
              "writes nothing")
+    action.add_argument(
+        "--rooms", metavar="PATH",
+        help="read the Room_Builder/Theme_Sorter art and print the measured "
+             "room blueprint counts; writes nothing")
+    action.add_argument(
+        "--animations", metavar="PATH",
+        help="read the Character Generator sheets and print the measured "
+             "animation frame map; writes nothing")
     parser.add_argument(
         "--check", action="store_true",
         help="with --source or --assets, extract twice and verify the decoded "
@@ -1739,8 +2268,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--ui-grid", type=int, default=16,
                         help="contact-sheet grid step in source pixels (default 16)")
     args = parser.parse_args(argv)
-    if args.check and not (args.source or args.assets):
-        parser.error("--check requires --source or --assets")
+    if args.check and not (args.source or args.assets or args.rooms
+                          or args.animations):
+        parser.error("--check requires --source, --assets, --rooms or --animations")
     categories = None
     if args.categories is not None:
         categories = [item.strip() for item in args.categories.split(",")
@@ -1765,6 +2295,32 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "checked": bool(args.check),
                 **first,
             }, indent=2, sort_keys=True))
+            return 0
+        if args.rooms:
+            first = summarize_rooms(extract_room_blueprints(args.rooms))
+            if args.check:
+                second = summarize_rooms(extract_room_blueprints(args.rooms))
+                if first != second:
+                    print(
+                        "error: room extraction is not reproducible across two "
+                        "reads", file=sys.stderr)
+                    return 1
+            print(json.dumps({"ok": True, "checked": bool(args.check),
+                              **first}, indent=2, sort_keys=True))
+            return 0
+        if args.animations:
+            first = summarize_animations(
+                extract_character_animations(args.animations, size=args.size))
+            if args.check:
+                second = summarize_animations(
+                    extract_character_animations(args.animations, size=args.size))
+                if first != second:
+                    print(
+                        "error: animation extraction is not reproducible across "
+                        "two reads", file=sys.stderr)
+                    return 1
+            print(json.dumps({"ok": True, "checked": bool(args.check),
+                              **first}, indent=2, sort_keys=True))
             return 0
         if args.source:
             first = _summarize_layers(extract_layers(args.source, size=args.size))
@@ -1824,11 +2380,15 @@ __all__ = [
     "SEMANTIC_TOKENS",
     "derive_tokens",
     "extract_assets",
+    "extract_character_animations",
     "extract_floor_tiles",
     "extract_layers",
+    "extract_room_blueprints",
     "load_ui_sheet",
     "main",
     "summarize_assets",
+    "summarize_animations",
+    "summarize_rooms",
     "write_contact_sheet",
 ]
 
