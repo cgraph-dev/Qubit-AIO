@@ -28,6 +28,7 @@ import {
   type OutsideArtLoadResult, type OutsideSceneArt, SCENE_TILE_PX,
   buildOutsideScene, drawOutsideScene, loadOutsideSceneArt,
   orderedSceneChunks, sceneDescription, sceneFloorLinks,
+  selectEnvironmentEffects,
 } from "./outside-scene";
 
 export interface OutsideSceneProps {
@@ -103,12 +104,16 @@ function canvas2dSupported(canvas: HTMLCanvasElement): boolean {
 function artStatusLabel(
   status: "loading" | "ready" | "absent" | "error",
   art: OutsideSceneArt | null, reason: string,
+  effects: readonly string[] = [],
 ): string {
   if (status === "ready" && art) {
     const credit = art.credit || "https://limezu.itch.io";
     if (art.composed) {
       const roles = Object.keys(art.frames ?? {}).length;
-      return `Serene Village composition · ${roles} tile roles · ${credit}`;
+      const ambient = effects.length
+        ? ` · ambient ${effects.join(", ")}` : "";
+      return `Composed outside scene · ${roles} tile roles${ambient} · `
+        + credit;
     }
     return `LimeZu tiles (single-tile fallback) · ${credit}`;
   }
@@ -250,6 +255,8 @@ export function createOutsideScene(R: ReactArg, hooks: HooksArg) {
 
     if (!world || !layout) return null;
 
+    const effects = selectEnvironmentEffects(layout.environment);
+    const effectKinds = effects.map((effect) => effect.kind);
     const environments = currentEnvironment(world);
     const floorLinks = sceneFloorLinks(world, layout);
     const floorByPortal = new Map(
@@ -316,6 +323,7 @@ export function createOutsideScene(R: ReactArg, hooks: HooksArg) {
       "data-art-source": art ? art.source : "procedural",
       "data-art-composed": art?.composed ? "true" : "false",
       "data-art-animated": art?.animated ? "true" : "false",
+      "data-effect-kinds": effectKinds.length ? effectKinds.join(",") : "none",
       "data-reduced-motion": props.reducedMotion ? "true" : "false",
       "aria-label": "Visual campus outside world",
     }, [
@@ -354,7 +362,7 @@ export function createOutsideScene(R: ReactArg, hooks: HooksArg) {
         className: "outside-scene__caption",
         "data-testid": artStatus === "ready"
           ? "outside-scene-art" : "outside-scene-fallback",
-      }, artStatusLabel(artStatus, art, artReason)),
+      }, artStatusLabel(artStatus, art, artReason, effectKinds)),
       R.createElement("p", {
         key: "counts", className: "outside-scene__counts",
         "data-testid": "outside-scene-counts",

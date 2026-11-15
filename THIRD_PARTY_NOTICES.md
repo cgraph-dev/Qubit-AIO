@@ -1145,3 +1145,45 @@ Upstream notices carried forward unchanged:
   MIT License.
 - The Patch Pixel font in upstream `gallery/fonts` is NOT covered by the MIT
   licence and is **not vendored** into Qubit.
+
+## Qubit Office outside scene — Green Forest, Super Pixel Effects, NEW FRAMES
+
+These packs are used only as **local, owner-supplied art for the outside scene**.
+No pack archive, extracted sheet, atlas, or generated sprite is committed to this
+repository. The code ships role **coordinates** (which cell holds which role) and
+the local-only loader; each user must have their own copy of the pack.
+
+### Raven Fantasy — Pixel Art Tileset — Green Forest v2
+
+**Author:** Clockwork Raven Studios (Caio) — https://twitter.com/cwrstudios
+**Pack:** `Raven Fantasy - Pixel Art Tileset - Green Forest v2` (purchased)
+**Licence:** no licence file is included in the archive; treat it as purchased
+paid art. Do not redistribute the pack or its derived sheets. Credit the author
+on any surface that ships the art. The preset in
+`game/app/outside-scene.ts` stores only tile coordinates (grass, dirt, trees,
+water edges, fences, props); the palette file credits Kerrie Lake's
+"Resurrect 64" palette (https://lospec.com/palette-list/resurrect-64).
+**Used for:** the `green-forest-v2` biome preset (terrain, foliage, trees,
+paths, water edges, fences, props) and the animated fire/water frames from
+`RPG Maker MV and MZ/!$Fire and Water.png`.
+
+### Super Pixel Effects Gigapack (Free Version) v3.2.0
+
+**Author:** Will Tice / unTied Games — https://untiedgames.itch.io/super-pixel-effects-gigapack
+**Licence:** `license.txt` in the pack; summary: use in a game/application is
+allowed (commercial and non-commercial), attribution is required, do not
+re-upload the assets as an asset pack, and do not use the assets as AI training
+material. The full licence is at http://untiedgames.com/files/license.txt.
+**Used for:** payload-driven ambient/weather effect frames only — fireflies
+(green sparkle), snow glints (blue sparkle), rain splashes (green splatter) and
+fog wisps (gray smoke). Attribution: "Super Pixel Effects Gigapack - Will Tice /
+unTied Games".
+
+### NEW FRAMES GIF animations
+
+**Source:** `/home/trick/Desktop/NEW FRAMES` (pixellab-generated GIFs)
+**Status:** **not used.** The 16 GIFs are 256x256, 9-frame ornate portal rings,
+not tile-scale exterior props, and no compatible licence/credit text ships with
+them. `outside-scene.ts` does not read, copy, or reference this folder; the
+Green Forest `!$Fire and Water.png` sheet supplies the animated fire/water
+instead.

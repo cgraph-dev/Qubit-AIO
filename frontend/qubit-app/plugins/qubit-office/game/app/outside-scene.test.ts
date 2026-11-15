@@ -4,12 +4,14 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import {
-  type OutsideSceneLayout, OUTSIDE_SCENE_ART_SCHEMA,
-  OUTSIDE_SCENE_ART_SCHEMA_V2, SCENE_TILE_PX, SERENE_VILLAGE_PRESET,
+  type OutsideSceneArt, type OutsideSceneLayout, OUTSIDE_SCENE_ART_SCHEMA,
+  GREEN_FOREST_PRESET, OUTSIDE_SCENE_ART_SCHEMA_V2, SCENE_TILE_PX,
+  SERENE_VILLAGE_PRESET,
   artKindForChunk, buildOutsideScene, drawOutsideScene, environmentPalette,
   hash01, isBuildingChunkKind, loadOutsideSceneArt, orderedSceneChunks,
   parseOutsideSceneArtManifest, paintOrderedChunks, planBuildingPlacements,
-  sceneDescription, sceneFloorLinks, sereneVillageComposition, waterRoleAt,
+  sceneDescription, sceneFloorLinks, selectEnvironmentEffects,
+  sereneVillageComposition, greenForestComposition, waterRoleAt,
 } from "./outside-scene";
 import {
   OUTSIDE_SCHEMA, outsideWorldView, parseOutsideWorld,
@@ -770,5 +772,328 @@ describe("composed painting", () => {
     const sx = (calls: Array<[string, ...unknown[]]>) =>
       calls.filter(([name]) => name === "drawImage").map((call) => call[2]);
     expect(new Set(sx(atZero.calls))).not.toEqual(new Set(sx(later.calls)));
+  });
+});
+
+// --------------------------------------------- Green Forest + effects packs
+const GF_SHEET = "outside/green-forest/16x16.png";
+const SERENE_SHEET = "outside/serene/serene16.png";
+
+function loadWithSizes(
+  manifest: Record<string, unknown>,
+  sizes: Record<string, { width: number; height: number }>,
+) {
+  return loadOutsideSceneArt({
+    manifest,
+    loadImage: async (url) => {
+      const size = sizes[url] ?? { width: 128, height: 128 };
+      return { image: {} as CanvasImageSource, ...size };
+    },
+  });
+}
+
+const GF_MANIFEST = {
+  schema: OUTSIDE_SCENE_ART_SCHEMA,
+  credit: "Raven Fantasy — Green Forest v2 (Clockwork Raven Studios)",
+  cell: 16,
+  tiles: { grass: { sheet: GF_SHEET, col: 8, row: 0 } },
+};
+
+const GF_SIZE = { width: 416, height: 240 };
+const SERENE_SIZE = { width: 304, height: 720 };
+
+function effectArt(
+  role: "fx_rain" | "fx_snow" | "fx_fireflies" | "fx_fog",
+  opts: { frames?: number; frameCols?: number; fps?: number } = {},
+): OutsideSceneArt {
+  const frames = opts.frames ?? 8;
+  return {
+    credit: "Super Pixel Effects Gigapack — Will Tice / unTied Games",
+    source: "injected",
+    tiles: {},
+    composed: true,
+    animated: true,
+    frames: {
+      [role]: [{
+        image: {} as CanvasImageSource,
+        sx: 0, sy: 0, sw: 48, sh: 48, tile: 16,
+        frames, frameCols: opts.frameCols ?? 5, fps: opts.fps ?? 15,
+      }],
+    },
+  };
+}
+
+function environment(overrides: Record<string, string>) {
+  return {
+    weather: "clear", day_night: "day", season: "summer",
+    weather_values: ["clear", "rain", "snow", "fog"],
+    day_night_values: ["dawn", "day", "dusk", "night"],
+    season_values: ["spring", "summer", "autumn", "winter"],
+    events: [],
+    ...overrides,
+  };
+}
+
+describe("Green Forest v2 preset", () => {
+  it("declares a distinct biome: grass, trees, fences, paths and water edges", () => {
+    const composition = greenForestComposition(GF_SHEET);
+    expect(composition.grass?.length).toBeGreaterThan(3);
+    const tree = composition.trees?.[0];
+    expect(tree).toMatchObject({ col: 0, row: 5, w: 3, h: 3 });
+    expect(composition.water_n?.length).toBe(1);
+    expect(composition.water_se?.length).toBe(1);
+    expect(composition.fence?.length).toBeGreaterThan(1);
+    // A pure biome preset does not invent a building.
+    expect(composition.building).toBeUndefined();
+  });
+
+  it("auto-selects Green Forest from the real 416x240 sheet", async () => {
+    const result = await loadWithSizes(GF_MANIFEST, { [GF_SHEET]: GF_SIZE });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.composed).toBe(true);
+    expect(result.art.frames?.trees?.[0]).toMatchObject({
+      sx: 0, sy: 80, sw: 48, sh: 48,
+    });
+    expect(result.art.frames?.water_n?.[0]).toMatchObject({
+      sx: 384, sy: 0,
+    });
+    expect(result.art.frames?.building).toBeUndefined();
+  });
+
+  it("still selects Serene Village for its 304x720 sheet", async () => {
+    const result = await loadWithSizes(SERENE_MANIFEST, {
+      "outside/serene.png": SERENE_SIZE,
+    });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.frames?.trees?.[0].sw).toBe(64);
+    expect(result.art.frames?.building?.[0].sw).toBe(72);
+  });
+
+  it("merges a named Green Forest preset with a Serene building explicitly", async () => {
+    const result = await loadWithSizes({
+      schema: OUTSIDE_SCENE_ART_SCHEMA_V2,
+      credit: "test",
+      cell: 16,
+      preset: GREEN_FOREST_PRESET,
+      composition: {
+        grass: [{ sheet: GF_SHEET, col: 8, row: 0 }],
+        building: [{
+          sheet: SERENE_SHEET, col: 0, row: 25, w: 5, h: 4, sw: 72, sh: 64,
+        }],
+      },
+    }, { [GF_SHEET]: GF_SIZE, [SERENE_SHEET]: SERENE_SIZE });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.frames?.trees?.[0].sw).toBe(48);
+    expect(result.art.frames?.building?.[0].sw).toBe(72);
+    expect(result.art.frames?.water_n).toBeTruthy();
+  });
+
+  it("joins per-pack credits for the caption", async () => {
+    const result = await loadWithSizes({
+      ...SERENE_MANIFEST,
+      credits: ["Pack A", "Pack B — author"],
+    }, { "outside/serene.png": SERENE_SIZE });
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.credits).toEqual(["Pack A", "Pack B — author"]);
+    expect(result.art.credit).toContain("Pack A · Pack B");
+  });
+});
+
+describe("payload-driven environment effects", () => {
+  it("selects only effects the payload environment names", () => {
+    expect(selectEnvironmentEffects(environment({ weather: "rain" }))
+      .map((effect) => effect.kind)).toEqual(["rain"]);
+    expect(selectEnvironmentEffects(environment({ weather: "snow" }))
+      .map((effect) => effect.kind)).toEqual(["snow"]);
+    expect(selectEnvironmentEffects(environment({ weather: "fog" }))
+      .map((effect) => effect.kind)).toEqual(["fog"]);
+    expect(selectEnvironmentEffects(environment({
+      weather: "clear", day_night: "night", season: "winter",
+    })).map((effect) => effect.kind)).toEqual(["fireflies"]);
+    expect(selectEnvironmentEffects(environment({
+      weather: "clear", day_night: "day", season: "summer",
+    })).map((effect) => effect.kind)).toEqual(["fireflies"]);
+    expect(selectEnvironmentEffects(environment({
+      weather: "clear", day_night: "day", season: "winter",
+    }))).toEqual([]);
+    expect(selectEnvironmentEffects(environment({
+      weather: "eclipse", day_night: "noon", season: "monsoon",
+    }))).toEqual([]);
+  });
+
+  it("draws rain only when the payload says rain and the pack supplies it", () => {
+    const rainy = buildOutsideScene(world({
+      environment: environment({ weather: "rain" }),
+    }));
+    const clear = buildOutsideScene(world({
+      environment: environment({ weather: "clear", day_night: "day" }),
+    }));
+    const art = effectArt("fx_rain");
+    const rainCalls = compositionRecorder();
+    drawOutsideScene(rainCalls.ctx, rainy, { art });
+    expect(rainCalls.calls.filter(([name]) => name === "drawImage").length)
+      .toBeGreaterThan(0);
+    const clearCalls = compositionRecorder();
+    drawOutsideScene(clearCalls.ctx, clear, { art });
+    expect(clearCalls.calls.filter(([name]) => name === "drawImage").length)
+      .toBe(0);
+  });
+
+  it("draws fireflies at night from real garden/tree payload chunks", () => {
+    const night = buildOutsideScene(world({
+      environment: environment({ weather: "clear", day_night: "night" }),
+    }));
+    const art = effectArt("fx_fireflies", { frames: 18, frameCols: 18 });
+    const calls = compositionRecorder();
+    drawOutsideScene(calls.ctx, night, { art });
+    expect(calls.calls.filter(([name]) => name === "drawImage").length)
+      .toBeGreaterThan(0);
+  });
+
+  it("skips an effect the pack does not carry instead of inventing it", () => {
+    const rainy = buildOutsideScene(world({
+      environment: environment({ weather: "rain" }),
+    }));
+    const art = effectArt("fx_snow");
+    const calls = compositionRecorder();
+    drawOutsideScene(calls.ctx, rainy, { art });
+    expect(calls.calls.filter(([name]) => name === "drawImage").length)
+      .toBe(0);
+  });
+
+  it("is deterministic for a fixed payload and time", () => {
+    const night = buildOutsideScene(world({
+      environment: environment({ weather: "clear", day_night: "night" }),
+    }));
+    const art = effectArt("fx_fireflies", { frames: 18, frameCols: 18 });
+    const first = compositionRecorder();
+    const second = compositionRecorder();
+    drawOutsideScene(first.ctx, night, { art, timeMs: 1200 });
+    drawOutsideScene(second.ctx, night, { art, timeMs: 1200 });
+    expect(first.calls).toEqual(second.calls);
+  });
+
+  it("advances grid frames across rows, not only columns", () => {
+    const rainy = buildOutsideScene(world({
+      environment: environment({ weather: "rain" }),
+    }));
+    const art = effectArt("fx_rain", { frames: 4, frameCols: 2, fps: 10 });
+    const first = compositionRecorder();
+    const later = compositionRecorder();
+    drawOutsideScene(first.ctx, rainy, { art, timeMs: 0 });
+    drawOutsideScene(later.ctx, rainy, { art, timeMs: 300 });
+    const source = (calls: Array<[string, ...unknown[]]>) =>
+      calls.filter(([name]) => name === "drawImage").map((call) => [
+        call[2], call[3],
+      ]);
+    expect(source(first.calls)).not.toEqual(source(later.calls));
+  });
+});
+
+describe("Green Forest animated water and fire props", () => {
+  const FIRE_WATER_SHEET = "outside/green-forest/fire-water.png";
+
+  function greenArtWithAnims() {
+    return loadWithSizes({
+      schema: OUTSIDE_SCENE_ART_SCHEMA_V2,
+      credit: "Green Forest + effects",
+      cell: 16,
+      preset: GREEN_FOREST_PRESET,
+      composition: {
+        grass: [{ sheet: GF_SHEET, col: 8, row: 0 }],
+        water_anim: [{
+          sheet: FIRE_WATER_SHEET, col: 0, row: 12,
+          w: 1, h: 1, sw: 48, sh: 48,
+          frames: 12, frameCols: 3, fps: 8,
+        }],
+        fire_anim: [{
+          sheet: FIRE_WATER_SHEET, col: 0, row: 0,
+          w: 1, h: 1, sw: 48, sh: 48,
+          frames: 9, frameCols: 3, fps: 8,
+        }],
+      },
+    }, {
+      [GF_SHEET]: GF_SIZE,
+      [FIRE_WATER_SHEET]: { width: 432, height: 384 },
+    });
+  }
+
+  it("loads the 3x4 water grid and 3x3 fire grid from the real sheet", async () => {
+    const result = await greenArtWithAnims();
+    expect(result.status).toBe("ready");
+    if (result.status !== "ready") return;
+    expect(result.art.frames?.water_anim?.[0]).toMatchObject({
+      sx: 0, sy: 192, sw: 48, sh: 48, frames: 12, frameCols: 3,
+    });
+    expect(result.art.frames?.fire_anim?.[0]).toMatchObject({
+      sx: 0, sy: 0, sw: 48, sh: 48, frames: 9, frameCols: 3,
+    });
+  });
+
+  it("draws animated water only over a payload water chunk", async () => {
+    const result = await greenArtWithAnims();
+    if (result.status !== "ready") throw new Error("art did not load");
+    const layout = buildOutsideScene(waterWorld());
+    const calls = compositionRecorder();
+    drawOutsideScene(calls.ctx, layout, { art: result.art, timeMs: 400 });
+    const waterLocal = calls.calls.filter(([name]) => name === "drawImage")
+      .filter((call) => Number(call[4]) === 48 && Number(call[5]) === 48);
+    expect(waterLocal.length).toBeGreaterThan(0);
+  });
+
+  it("draws the animated fire prop only over a payload prop chunk", async () => {
+    const result = await greenArtWithAnims();
+    if (result.status !== "ready") throw new Error("art did not load");
+    const layout = buildOutsideScene(world({
+      zones: [{
+        zone_id: "zone-campus", kind: "campus", label: "Campus",
+        state: "active", animated: false, entry_chunk: "c-prop",
+        chunk_ids: ["c-prop"],
+        bounds: { x: 0, y: 0, width: 4, height: 4 },
+        counts: { chunks: 1, active_chunks: 1, animated_chunks: 1, tiles: 16 },
+      }],
+      chunks: [chunk("c-prop", "prop", "overlay", 1, 1, 2, 2, true, 2)],
+      portals: [], floor_links: [], places: [], assets: [],
+      summary: {
+        zones: 1, active_zones: 1, dormant_zones: 0, chunks: 1,
+        active_chunks: 1, dormant_chunks: 0, animated_chunks: 1, portals: 0,
+        elevator_links: 0, stairs_links: 0, places: 0, assets: 0,
+      },
+    }));
+    const calls = compositionRecorder();
+    drawOutsideScene(calls.ctx, layout, { art: result.art, timeMs: 400 });
+    const fire = calls.calls.filter(([name]) => name === "drawImage")
+      .filter((call) => Number(call[4]) === 48 && Number(call[5]) === 48);
+    expect(fire.length).toBeGreaterThan(0);
+  });
+
+  it("does not draw water/fire art when the payload has no such chunk", async () => {
+    const result = await greenArtWithAnims();
+    if (result.status !== "ready") throw new Error("art did not load");
+    const layout = buildOutsideScene(world({
+      chunks: [chunk("c-ground", "ground", "ground", 0, 0, 8, 8)],
+      zones: [{
+        zone_id: "zone-campus", kind: "campus", label: "Campus",
+        state: "active", animated: false, entry_chunk: "c-ground",
+        chunk_ids: ["c-ground"],
+        bounds: { x: 0, y: 0, width: 8, height: 8 },
+        counts: { chunks: 1, active_chunks: 1, animated_chunks: 0, tiles: 64 },
+      }],
+      portals: [], floor_links: [], places: [], assets: [],
+      summary: {
+        zones: 1, active_zones: 1, dormant_zones: 0, chunks: 1,
+        active_chunks: 1, dormant_chunks: 0, animated_chunks: 0, portals: 0,
+        elevator_links: 0, stairs_links: 0, places: 0, assets: 0,
+      },
+    }));
+    const calls = compositionRecorder();
+    drawOutsideScene(calls.ctx, layout, { art: result.art, timeMs: 400 });
+    const waterOrFire = calls.calls.filter(([name]) => name === "drawImage")
+      .filter((call) => Number(call[4]) === 48 && Number(call[5]) === 48);
+    expect(waterOrFire).toHaveLength(0);
   });
 });

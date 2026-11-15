@@ -160,6 +160,7 @@ describe("OutsideScene in a real DOM", () => {
     const scene = q('[data-testid="outside-scene"]');
     expect(scene.getAttribute("data-art-status")).toBe("absent");
     expect(scene.getAttribute("data-art-source")).toBe("procedural");
+    expect(scene.getAttribute("data-effect-kinds")).toBe("rain");
     const canvas = q<HTMLCanvasElement>('[data-testid="outside-scene-canvas"]');
     expect(canvas.width).toBe(24 * 8);
     expect(canvas.height).toBe(22 * 8);
@@ -237,8 +238,9 @@ describe("OutsideScene in a real DOM", () => {
     expect(scene.getAttribute("data-art-status")).toBe("ready");
     expect(scene.getAttribute("data-art-composed")).toBe("true");
     expect(scene.getAttribute("data-art-animated")).toBe("false");
+    expect(scene.getAttribute("data-effect-kinds")).toBe("rain");
     expect(q('[data-testid="outside-scene-art"]').textContent)
-      .toContain("Serene Village composition");
+      .toContain("Composed outside scene");
   });
 
   it("states the scene is unavailable when a device has no Canvas2D", async () => {
