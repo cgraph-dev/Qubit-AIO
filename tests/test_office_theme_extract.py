@@ -639,6 +639,62 @@ def test_extract_floor_tiles_only_crops_16px_cells(tmp_path):
     assert "16px" in str(info.value)
 
 
+def _make_extras_purchase(tmp_path: Path) -> Path:
+    root = tmp_path / "UI Office"
+    root.mkdir(parents=True)
+    furniture = {}
+    for index, member in enumerate(sorted(set(E.FURNITURE_FILES.values()))):
+        image = Image.new("RGBA", (16, 32), (20 + index, 80, 120, 255))
+        furniture[f"1_Interiors/16x16/Theme_Sorter_Singles/{member}"] = _png(image)
+    _write_zip(root / E.INTERIOR_ZIP_NAMES[0], furniture)
+
+    sheet = Image.new("RGBA", (160, 240), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(sheet)
+    for name, spec in E.UI_SLICES.items():
+        x, y, w, h = spec["x"], spec["y"], spec["w"], spec["h"]
+        draw.rectangle([x, y, x + w - 1, y + h - 1], fill=(180, 140, 90, 255))
+    _write_zip(root / E.FALLBACK_ZIP_NAMES[0], {E.UI_SHEET: _png(sheet)})
+    return root
+
+
+def test_extract_furniture_parts_crops_the_mapped_singles(tmp_path):
+    root = _make_extras_purchase(tmp_path)
+    parts = E.extract_furniture_parts(str(root))
+
+    assert set(parts) == set(E.FURNITURE_FILES)
+    for kind, entry in parts.items():
+        assert isinstance(entry["data"], (bytes, bytearray))
+        assert entry["sheet"] == E.FURNITURE_FILES[kind]
+        with Image.open(io.BytesIO(entry["data"])) as image:
+            assert image.size == (entry["w"], entry["h"])
+
+
+def test_extract_furniture_parts_is_empty_without_the_interior_pack(tmp_path):
+    root = tmp_path / "empty"
+    root.mkdir()
+    assert E.extract_furniture_parts(str(root)) == {}
+
+
+def test_extract_ui_parts_crops_the_mapped_slices(tmp_path):
+    root = _make_extras_purchase(tmp_path)
+    parts = E.extract_ui_parts(str(root))
+
+    assert set(parts) == set(E.UI_SLICES)
+    for name, spec in E.UI_SLICES.items():
+        entry = parts[name]
+        assert entry["slice"] == spec["slice"]
+        assert entry["width"] == spec["width"]
+        assert entry["sheet"] == E.UI_SHEET
+        with Image.open(io.BytesIO(entry["data"])) as image:
+            assert image.size == (spec["w"], spec["h"])
+
+
+def test_extract_ui_parts_is_empty_without_the_ui_pack(tmp_path):
+    root = tmp_path / "empty"
+    root.mkdir()
+    assert E.extract_ui_parts(str(root)) == {}
+
+
 # ------------------------------------------------------------- real purchase
 @pytest.mark.skipif(
     not os.environ.get("QUBIT_UI_OFFICE"),
