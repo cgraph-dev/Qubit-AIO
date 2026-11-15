@@ -201740,10 +201740,14 @@ create: function(game) {
 	// ../qubit-app/plugins/qubit-office/game/app/outside-scene.ts
 	/** The art manifest a local theme pack may carry. */
 	var OUTSIDE_SCENE_ART_SCHEMA = "qubit-office-outside-art/1";
-	/** The real Serene Village 16x16 sheet this preset's coordinates target. */
+	/** The real sheets these presets' coordinates target. */
 	var SERENE_VILLAGE_SHEET_SIZE = {
 		width: 304,
 		height: 720
+	};
+	var GREEN_FOREST_SHEET_SIZE = {
+		width: 416,
+		height: 240
 	};
 	/** Draw order for chunk layers; later layers paint on top. */
 	var SCENE_LAYER_ORDER = [
@@ -201776,7 +201780,13 @@ create: function(game) {
 		"wall",
 		"window",
 		"door",
-		"sign"
+		"sign",
+		"water_anim",
+		"fire_anim",
+		"fx_rain",
+		"fx_snow",
+		"fx_fireflies",
+		"fx_fog"
 	]);
 	/** Water edge role for a tile position inside one payload water chunk. */
 	function waterRoleAt(rect, x, y) {
@@ -201972,6 +201982,43 @@ create: function(game) {
 			seasonKnown: Boolean(SEASON_PALETTES[season])
 		};
 	}
+	/**
+	* Choose ambient/weather effects from the payload's environment only.
+	*
+	* Weather wins (rain/snow/fog are mutually exclusive in the projection);
+	* otherwise night or summer selects fireflies. An unknown environment selects
+	* nothing, so the scene never invents weather.
+	*/
+	function selectEnvironmentEffects(environment) {
+		const effects = [];
+		if (environment.weather === "rain") effects.push({
+			kind: "rain",
+			intensity: 1
+		});
+		else if (environment.weather === "snow") effects.push({
+			kind: "snow",
+			intensity: 1
+		});
+		else if (environment.weather === "fog") effects.push({
+			kind: "fog",
+			intensity: 1
+		});
+		else if (environment.day_night === "night") effects.push({
+			kind: "fireflies",
+			intensity: 1
+		});
+		else if (environment.season === "summer") effects.push({
+			kind: "fireflies",
+			intensity: .6
+		});
+		return effects;
+	}
+	var EFFECT_ROLE = {
+		rain: "fx_rain",
+		snow: "fx_snow",
+		fireflies: "fx_fireflies",
+		fog: "fx_fog"
+	};
 	function placedChunks(world) {
 		const zoneIds = new Set(world.zones.map((zone) => zone.zone_id));
 		return world.chunks.filter((chunk) => zoneIds.has(chunk.zone_id));
@@ -202120,6 +202167,8 @@ create: function(game) {
 		if (sh > 0 && sh <= 4096) parsed.sh = sh;
 		const frames = int(spec.frames, 1);
 		if (frames >= 1 && frames <= 64) parsed.frames = frames;
+		const frameCols = int(spec.frameCols);
+		if (frameCols >= 1 && frameCols <= 64) parsed.frameCols = frameCols;
 		const fps = int(spec.fps);
 		if (fps > 0 && fps <= 60) parsed.fps = fps;
 		return parsed;
@@ -202169,6 +202218,10 @@ create: function(game) {
 		if (composition) parsed.composition = composition;
 		const preset = text$1(row.preset);
 		if (preset) parsed.preset = preset;
+		if (Array.isArray(row.credits)) {
+			const credits = row.credits.filter((item) => typeof item === "string").map((item) => item.trim()).filter(Boolean).slice(0, 12);
+			if (credits.length) parsed.credits = credits;
+		}
 		return parsed;
 	}
 	/**
@@ -202255,6 +202308,76 @@ create: function(game) {
 			window: [frame(1, 27), frame(4, 27)],
 			door: [frame(2, 27, 2, 2)],
 			sign: [frame(6, 13, 1, 1), frame(6, 14, 1, 1)]
+		};
+	}
+	/**
+	* Built-in coordinates for the real Raven Fantasy Green Forest v2 16x16 sheet
+	* (416x240). The pack is paid art; only these role coordinates live in code.
+	* It deliberately has no `building` role: a pack can merge the Serene house
+	* (or another building sheet) through an explicit `composition` block.
+	*/
+	function greenForestComposition(sheet) {
+		const frame = (col, row, w = 1, h = 1) => ({
+			sheet,
+			col,
+			row,
+			w,
+			h
+		});
+		return {
+			grass: [
+				frame(8, 0),
+				frame(9, 0),
+				frame(11, 0),
+				frame(8, 1),
+				frame(10, 2)
+			],
+			road: [
+				frame(18, 1),
+				frame(18, 2),
+				frame(15, 3)
+			],
+			sidewalk: [frame(18, 2), frame(18, 1)],
+			path: [
+				frame(18, 1),
+				frame(18, 2),
+				frame(15, 3)
+			],
+			water: [frame(24, 1)],
+			water_n: [frame(24, 0)],
+			water_s: [frame(24, 2)],
+			water_w: [frame(23, 1)],
+			water_e: [frame(25, 1)],
+			water_nw: [frame(23, 0)],
+			water_ne: [frame(25, 0)],
+			water_sw: [frame(23, 2)],
+			water_se: [frame(25, 2)],
+			trees: [
+				frame(0, 5, 3, 3),
+				frame(3, 5, 3, 3),
+				frame(0, 2, 3, 3)
+			],
+			bush: [
+				frame(7, 1),
+				frame(8, 1),
+				frame(7, 2)
+			],
+			flower: [
+				frame(10, 0),
+				frame(12, 1),
+				frame(11, 2)
+			],
+			fence: [
+				frame(14, 6),
+				frame(15, 6),
+				frame(16, 6),
+				frame(17, 6)
+			],
+			prop: [
+				frame(3, 0),
+				frame(4, 0, 2, 2),
+				frame(1, 0, 2, 2)
+			]
 		};
 	}
 	function mergeComposition(base, extra) {
@@ -202372,15 +202495,25 @@ create: function(game) {
 				sh,
 				tile: manifest.cell,
 				frames: spec.frames,
+				frameCols: spec.frameCols,
 				fps: spec.fps
 			};
 		}
-		let composition = manifest.composition;
+		const sheetBySize = (size) => {
+			for (const [name, sheet] of sheets) if (sheet.width === size.width && sheet.height === size.height) return name;
+			return null;
+		};
 		const firstSpec = specs[0];
-		if (manifest.preset === "serene-village-16x16" && firstSpec) composition = mergeComposition(sereneVillageComposition(firstSpec.sheet), composition);
-		else if (!manifest.preset && !composition && firstSpec) {
-			const sheet = sheets.get(firstSpec.sheet);
-			if (manifest.cell === 16 && sheet && sheet.width === SERENE_VILLAGE_SHEET_SIZE.width && sheet.height === SERENE_VILLAGE_SHEET_SIZE.height) composition = sereneVillageComposition(firstSpec.sheet);
+		let composition = manifest.composition;
+		let presetSheet = null;
+		if (manifest.preset === "serene-village-16x16") presetSheet = sheetBySize(SERENE_VILLAGE_SHEET_SIZE) ?? firstSpec?.sheet ?? null;
+		else if (manifest.preset === "green-forest-v2") presetSheet = sheetBySize(GREEN_FOREST_SHEET_SIZE) ?? firstSpec?.sheet ?? null;
+		if (presetSheet) composition = mergeComposition(manifest.preset === "green-forest-v2" ? greenForestComposition(presetSheet) : sereneVillageComposition(presetSheet), composition);
+		else if (!manifest.preset && !composition) {
+			const serene = sheetBySize(SERENE_VILLAGE_SHEET_SIZE);
+			const green = sheetBySize(GREEN_FOREST_SHEET_SIZE);
+			if (serene) composition = sereneVillageComposition(serene);
+			else if (green) composition = greenForestComposition(green);
 		}
 		const frames = {};
 		let animated = false;
@@ -202404,6 +202537,7 @@ create: function(game) {
 					sh,
 					tile: manifest.cell,
 					frames: spec.frames,
+					frameCols: spec.frameCols,
 					fps: spec.fps
 				};
 				if ((spec.frames ?? 1) > 1) animated = true;
@@ -202418,8 +202552,10 @@ create: function(game) {
 			status: "error",
 			reason: "outside art has no usable tiles"
 		};
+		const credits = manifest.credits?.length ? manifest.credits : void 0;
 		const art = {
-			credit: manifest.credit,
+			credit: credits ? credits.join(" · ") : manifest.credit,
+			credits,
 			source,
 			tiles,
 			composed,
@@ -202705,11 +202841,17 @@ create: function(game) {
 		if (!frames || !frames.length) return null;
 		return frames[(variant % frames.length + frames.length) % frames.length];
 	}
-	function drawFrameAt(ctx, frame, x, y, w, h, tilePx, timeMs) {
+	function drawFrameAt(ctx, frame, x, y, w, h, tilePx, timeMs, alpha = 1) {
 		const count = frame.frames && frame.frames > 1 ? frame.frames : 1;
 		const fps = frame.fps && frame.fps > 0 ? frame.fps : 6;
 		const index = count > 1 ? Math.floor(timeMs / 1e3 * fps) % count : 0;
-		ctx.drawImage(frame.image, frame.sx + index * frame.sw, frame.sy, frame.sw, frame.sh, px(x, tilePx), px(y, tilePx), Math.max(1, px(w, tilePx)), Math.max(1, px(h, tilePx)));
+		const cols = Math.max(1, Math.min(count, frame.frameCols && frame.frameCols > 0 ? frame.frameCols : count));
+		const col = index % cols;
+		const row = Math.floor(index / cols);
+		const previous = ctx.globalAlpha;
+		if (alpha !== 1) ctx.globalAlpha = previous * alpha;
+		ctx.drawImage(frame.image, frame.sx + col * frame.sw, frame.sy + row * frame.sh, frame.sw, frame.sh, px(x, tilePx), px(y, tilePx), Math.max(1, px(w, tilePx)), Math.max(1, px(h, tilePx)));
+		if (alpha !== 1) ctx.globalAlpha = previous;
 	}
 	/** Tile one composition role across a payload rectangle. */
 	function drawTiledRole(ctx, rect, role, art, tilePx, seed, timeMs) {
@@ -202768,6 +202910,117 @@ create: function(game) {
 		}
 		ctx.restore();
 		return true;
+	}
+	/** Real animated water patches inside a payload water chunk. */
+	function drawAnimatedWater(ctx, rect, art, tilePx, seed, timeMs) {
+		const frames = art.frames?.water_anim;
+		if (!frameVariant(frames, 0) || !frames) return false;
+		const inset = {
+			x: rect.x + 1,
+			y: rect.y + 1,
+			width: rect.width - 2,
+			height: rect.height - 2
+		};
+		if (inset.width <= 0 || inset.height <= 0) return false;
+		const patch = Math.min(3, Math.min(inset.width, inset.height));
+		if (patch < 1) return false;
+		const count = Math.min(6, Math.max(1, Math.round(inset.width * inset.height / 36)));
+		for (let index = 0; index < count; index += 1) {
+			const frame = frameVariant(frames, Math.floor(hash01(seed + index * 11) * frames.length));
+			if (!frame) continue;
+			const x = inset.x + hash01(seed + index * 7 + 1) * (inset.width - patch);
+			const y = inset.y + hash01(seed + index * 7 + 2) * (inset.height - patch);
+			drawFrameAt(ctx, frame, Math.round(x), Math.round(y), patch, patch, tilePx, timeMs, .9);
+		}
+		return true;
+	}
+	/** Real animated fire on a payload prop chunk. */
+	function drawAnimatedFire(ctx, rect, art, tilePx, seed, timeMs) {
+		const frames = art.frames?.fire_anim;
+		const frame = frameVariant(frames, Math.floor(hash01(seed) * (frames?.length ?? 1)));
+		if (!frame) return false;
+		const size = Math.max(1, Math.min(3, Math.min(rect.width, rect.height)));
+		drawFrameAt(ctx, frame, rect.x + (rect.width - size) / 2, rect.y + rect.height - size, size, size, tilePx, timeMs, 1);
+		return true;
+	}
+	function effectAnchors(layout, kind) {
+		const kinds = kind === "fireflies" ? /* @__PURE__ */ new Set(["trees", "garden"]) : kind === "fog" ? /* @__PURE__ */ new Set([
+			"ground",
+			"road",
+			"sidewalk",
+			"path",
+			"parking",
+			"garden"
+		]) : /* @__PURE__ */ new Set([
+			"ground",
+			"road",
+			"sidewalk",
+			"path",
+			"parking",
+			"trees",
+			"garden"
+		]);
+		return layout.chunks.filter((chunk) => kinds.has(chunk.kind) && chunk.rect.width > 0 && chunk.rect.height > 0).map((chunk) => chunk.rect);
+	}
+	var EFFECT_STYLE = {
+		rain: {
+			density: 90,
+			max: 24,
+			size: 2,
+			alpha: .55
+		},
+		snow: {
+			density: 120,
+			max: 30,
+			size: 1,
+			alpha: .75
+		},
+		fog: {
+			density: 220,
+			max: 12,
+			size: 4,
+			alpha: .35
+		},
+		fireflies: {
+			density: 60,
+			max: 18,
+			size: 1.5,
+			alpha: .9
+		}
+	};
+	/** Paint the payload-selected ambient/weather effects. Deterministic. */
+	function drawEnvironmentEffects(ctx, layout, art, tilePx, timeMs) {
+		if (!art.frames) return;
+		const effects = selectEnvironmentEffects(layout.environment);
+		if (!effects.length) return;
+		const seed = hashString(`${layout.digest}:${layout.environment.weather}:${layout.environment.day_night}:${layout.environment.season}`);
+		ctx.save();
+		ctx.imageSmoothingEnabled = false;
+		for (const effect of effects) {
+			const frames = art.frames[EFFECT_ROLE[effect.kind]];
+			if (!frameVariant(frames, 0) || !frames) continue;
+			const anchors = effectAnchors(layout, effect.kind);
+			if (!anchors.length) continue;
+			const area = anchors.reduce((sum, rect) => sum + rect.width * rect.height, 0);
+			const style = EFFECT_STYLE[effect.kind];
+			const count = Math.min(style.max, Math.max(1, Math.round(area / style.density * effect.intensity)));
+			const drift = effect.kind === "fireflies" || effect.kind === "fog";
+			for (let index = 0; index < count; index += 1) {
+				const frame = frameVariant(frames, Math.floor(hash01(seed + index * 19) * frames.length));
+				if (!frame) continue;
+				const anchor = anchors[index % anchors.length];
+				let x = anchor.x + hash01(seed + index * 7 + 1) * anchor.width;
+				let y = anchor.y + hash01(seed + index * 7 + 2) * anchor.height;
+				if (drift) {
+					x += Math.sin(timeMs / 2600 + index * 1.7) * 1.2;
+					y += Math.cos(timeMs / 3100 + index * 1.3) * .8;
+					x = Math.max(anchor.x, Math.min(anchor.x + anchor.width, x));
+					y = Math.max(anchor.y, Math.min(anchor.y + anchor.height, y));
+				}
+				drawFrameAt(ctx, frame, Math.round(x), Math.round(y), style.size, style.size, tilePx, timeMs, style.alpha);
+			}
+		}
+		ctx.restore();
 	}
 	/** Draw the whole composed building once, from payload building chunks. */
 	function drawBuildingComposition(ctx, layout, art, tilePx, timeMs) {
@@ -202859,9 +203112,12 @@ create: function(game) {
 			case "path":
 				fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
 				return drawTiledRole(ctx, rect, "path", art, tilePx, seed, timeMs);
-			case "water":
+			case "water": {
 				fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
-				return drawWaterRole(ctx, rect, art, tilePx, seed, timeMs);
+				const painted = drawWaterRole(ctx, rect, art, tilePx, seed, timeMs);
+				if (painted) drawAnimatedWater(ctx, rect, art, tilePx, seed, timeMs);
+				return painted;
+			}
 			case "trees": {
 				if (!art.frames.trees && !art.frames.bush) return false;
 				if (!drawTiledRole(ctx, rect, "grass", art, tilePx, seed, timeMs)) fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
@@ -202879,7 +203135,11 @@ create: function(game) {
 				return flowers || bushes;
 			}
 			case "fence": return drawTiledRole(ctx, rect, "fence", art, tilePx, seed, timeMs);
-			case "prop": return drawScatterRole(ctx, rect, "prop", art, tilePx, seed, Math.min(6, Math.max(1, Math.round(rect.width * rect.height / 18))), timeMs);
+			case "prop": {
+				const props = drawScatterRole(ctx, rect, "prop", art, tilePx, seed, Math.min(6, Math.max(1, Math.round(rect.width * rect.height / 18))), timeMs);
+				const fire = drawAnimatedFire(ctx, rect, art, tilePx, seed, timeMs);
+				return props || fire;
+			}
 			case "lobby":
 			case "security": return drawTiledRole(ctx, rect, "sidewalk", art, tilePx, seed, timeMs);
 			default: return false;
@@ -203031,6 +203291,7 @@ create: function(game) {
 			}
 			drawChunk(ctx, chunk, layout.palette, art, tilePx, timeMs);
 		}
+		if (art) drawEnvironmentEffects(ctx, layout, art, tilePx, timeMs);
 		const selected = layout.zones.find((zone) => zone.zone_id === options.selectedZoneId);
 		if (selected && selected.rect) {
 			ctx.save();
@@ -203109,10 +203370,10 @@ create: function(game) {
 		if (/tryWrapperForImpl/.test(source)) return false;
 		return !/\bnot implemented\b/i.test(source);
 	}
-	function artStatusLabel(status, art, reason) {
+	function artStatusLabel(status, art, reason, effects = []) {
 		if (status === "ready" && art) {
 			const credit = art.credit || "https://limezu.itch.io";
-			if (art.composed) return `Serene Village composition · ${Object.keys(art.frames ?? {}).length} tile roles · ${credit}`;
+			if (art.composed) return `Composed outside scene · ${Object.keys(art.frames ?? {}).length} tile roles${effects.length ? ` · ambient ${effects.join(", ")}` : ""} · ` + credit;
 			return `LimeZu tiles (single-tile fallback) · ${credit}`;
 		}
 		if (status === "loading") return "Loading local outside art…";
@@ -203249,6 +203510,7 @@ create: function(game) {
 				props.selectedZoneId
 			]);
 			if (!world || !layout) return null;
+			const effectKinds = selectEnvironmentEffects(layout.environment).map((effect) => effect.kind);
 			const environments = currentEnvironment(world);
 			const floorLinks = sceneFloorLinks(world, layout);
 			const floorByPortal = new Map(floorLinks.map((link) => [link.portal_id, link]));
@@ -203303,6 +203565,7 @@ create: function(game) {
 				"data-art-source": art ? art.source : "procedural",
 				"data-art-composed": art?.composed ? "true" : "false",
 				"data-art-animated": art?.animated ? "true" : "false",
+				"data-effect-kinds": effectKinds.length ? effectKinds.join(",") : "none",
 				"data-reduced-motion": props.reducedMotion ? "true" : "false",
 				"aria-label": "Visual campus outside world"
 			}, [
@@ -203339,7 +203602,7 @@ create: function(game) {
 					key: "caption",
 					className: "outside-scene__caption",
 					"data-testid": artStatus === "ready" ? "outside-scene-art" : "outside-scene-fallback"
-				}, artStatusLabel(artStatus, art, artReason)),
+				}, artStatusLabel(artStatus, art, artReason, effectKinds)),
 				R.createElement("p", {
 					key: "counts",
 					className: "outside-scene__counts",
