@@ -2888,3 +2888,90 @@
   color: var(--office-ink);
   font-size: var(--office-fs-xs);
 }
+
+/* --- the outside-world visual scene (P6-03) -------------------------------
+   A Canvas2D exterior painted from the same projection the semantic panel
+   reads. It sits inside the Studio "Outside" tab; the floor markers are real
+   anchors over the canvas, so the visual is never the only way to reach a
+   floor. LimeZu tiles are loaded from the active local theme pack when it
+   ships them; otherwise the caption states that the scene is procedural. */
+.outside-scene {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.outside-scene__frame {
+  position: relative;
+  border: 1px solid #2c3550;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0b0a13;
+}
+.outside-scene__canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+.outside-scene__env {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-width: calc(100% - 16px);
+  pointer-events: none;
+}
+.outside-scene__chip {
+  padding: 2px 7px;
+  border: 1px solid rgba(143, 211, 232, 0.55);
+  border-radius: 999px;
+  background: rgba(11, 10, 19, 0.82);
+  color: #dff3fb;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  text-transform: capitalize;
+}
+.outside-scene__chip.is-unknown {
+  border-color: #5a6072;
+  color: #9aa7c7;
+}
+.outside-scene__floor {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  padding: 2px 6px;
+  border: 1px solid #8fd3e8;
+  border-radius: 4px;
+  background: rgba(11, 10, 19, 0.88);
+  color: #eaf7fc;
+  font-size: 10px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.outside-scene__floor[data-kind="stairs"] {
+  border-color: #e08fb0;
+}
+.outside-scene__floor:hover,
+.outside-scene__floor:focus-visible {
+  background: rgba(143, 211, 232, 0.22);
+  outline: none;
+}
+.outside-scene__caption,
+.outside-scene__counts,
+.outside-scene__unavailable {
+  margin: 0;
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
+}
+.outside-scene__caption {
+  color: #c8d3ea;
+}
+.outside-scene[data-art-status="ready"] .outside-scene__caption {
+  color: #8fd3b0;
+}
+.outside-scene[data-art-status="error"] .outside-scene__caption {
+  color: #e0b070;
+}
