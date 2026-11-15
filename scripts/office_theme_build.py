@@ -730,15 +730,145 @@ def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def _pixel_digest(image: Image.Image) -> str:
+    """A stable content hash of decoded pixels (survives PNG re-encoding)."""
+    rgba = image.convert("RGBA")
+    digest = hashlib.sha256()
+    digest.update(f"{rgba.width}x{rgba.height}".encode("ascii"))
+    digest.update(rgba.tobytes())
+    return digest.hexdigest()
+
+
+def _prepare_assets(assets: Any) -> Tuple[Dict[str, bytes],
+                                          Optional[Dict[str, Any]],
+                                          Optional[Dict[str, Any]]]:
+    """Turn an extracted catalog into pack payloads + manifest/recipe blocks.
+
+    The catalog comes from ``office_theme_extract.extract_assets``. Each entry's
+    raw source bytes are copied into ``assets/<category>/<sha>.png`` (deduped by
+    content), and each category gets a JSON index carrying the source sheet,
+    frame geometry and a pixel hash. The shareable recipe block carries only
+    counts/kinds — never files, sheet names or hashes.
+    """
+    if assets is None:
+        return {}, None, None
+    if not isinstance(assets, Mapping):
+        raise ThemeBuildError("assets: must be an object")
+    categories = assets.get("categories")
+    if not isinstance(categories, Mapping):
+        raise ThemeBuildError("assets.categories: must be an object")
+    payloads: Dict[str, bytes] = {}
+    manifest_categories: Dict[str, Any] = {}
+    recipe_categories: Dict[str, Any] = {}
+    seen_ids: set[str] = set()
+    for category in theme_contract.ASSET_CATEGORIES:
+        section = categories.get(category)
+        if section is None:
+            continue
+        if not isinstance(section, Mapping):
+            raise ThemeBuildError(
+                f"assets.categories.{category}: must be an object")
+        entries = section.get("entries")
+        if not isinstance(entries, (list, tuple)):
+            raise ThemeBuildError(
+                f"assets.categories.{category}.entries: must be a list")
+        if not entries:
+            continue
+        index_entries: List[Dict[str, Any]] = []
+        kinds: Dict[str, int] = {}
+        for position, entry in enumerate(entries):
+            label = f"assets.categories.{category}.entries[{position}]"
+            if not isinstance(entry, Mapping):
+                raise ThemeBuildError(f"{label}: must be an object")
+            blob = entry.get("blob")
+            if not isinstance(blob, (bytes, bytearray)) or not blob:
+                raise ThemeBuildError(f"{label}.blob: non-empty bytes required")
+            data = bytes(blob)
+            image = _decode(data)
+            if image is None:
+                raise ThemeBuildError(f"{label}.blob: not a decodable image")
+            sprite_id = entry.get("id")
+            if not isinstance(sprite_id, str) or not sprite_id:
+                raise ThemeBuildError(f"{label}.id: required")
+            base_id = sprite_id[:150]
+            sprite_id = base_id
+            suffix = 2
+            while sprite_id in seen_ids:
+                sprite_id = f"{base_id}-{suffix}"
+                suffix += 1
+            seen_ids.add(sprite_id)
+            kind = entry.get("kind")
+            if kind not in theme_contract.ASSET_KINDS:
+                raise ThemeBuildError(f"{label}.kind: unknown kind {kind!r}")
+            raw_sha = _sha(data)
+            relative = f"assets/{category}/{raw_sha[:20]}.png"
+            payloads[relative] = data
+            index_entry: Dict[str, Any] = {
+                "id": sprite_id,
+                "kind": kind,
+                "sheet": entry.get("sheet"),
+                "file": relative,
+                "sha256": _pixel_digest(image),
+                "source_sha256": raw_sha,
+                "bytes": len(data),
+                "frame": entry.get("frame"),
+            }
+            if entry.get("grid") is not None:
+                index_entry["grid"] = entry.get("grid")
+            if "nine_slice_candidate" in entry:
+                index_entry["nine_slice_candidate"] = bool(
+                    entry.get("nine_slice_candidate"))
+            for key in ("view", "license", "credit", "frame_source"):
+                if entry.get(key) is not None:
+                    index_entry[key] = entry.get(key)
+            index_entries.append(index_entry)
+            kinds[str(kind)] = kinds.get(str(kind), 0) + 1
+        index_doc = {
+            "schema": 1,
+            "category": category,
+            "count": len(index_entries),
+            "sprites": index_entries,
+        }
+        index_relative = f"assets/{category}/index.json"
+        payloads[index_relative] = _json_bytes(index_doc)
+        manifest_categories[category] = {
+            "index": index_relative,
+            "count": len(index_entries),
+            "kinds": dict(sorted(kinds.items())),
+        }
+        recipe_categories[category] = {
+            "count": len(index_entries),
+            "kinds": dict(sorted(kinds.items())),
+        }
+    if not manifest_categories:
+        return payloads, None, None
+    assets_manifest = {
+        "schema": 1,
+        "categories": {
+            category: dict(config)
+            for category, config in manifest_categories.items()
+        },
+    }
+    payloads["assets/manifest.json"] = _json_bytes(assets_manifest)
+    return (
+        payloads,
+        {"schema": 1, "categories": manifest_categories},
+        {"schema": 1, "categories": recipe_categories},
+    )
+
+
+
 def shareable_recipe(manifest: Mapping[str, Any],
                      recipes: Mapping[str, Mapping[str, int]],
-                     surfaces: Optional[Mapping[str, Any]] = None
+                     surfaces: Optional[Mapping[str, Any]] = None,
+                     assets: Optional[Mapping[str, Any]] = None
                      ) -> Dict[str, Any]:
     """The shareable ``theme.recipe.json`` derived from a built manifest.
 
     ``surfaces`` is the *recipe* form (``{cell, floor:{kind:{sheet,col,row}}}``);
     the full pack's file form is never copied into the shareable recipe, which
-    must carry coordinates only (no art, no file map).
+    must carry coordinates only (no art, no file map). ``assets`` is likewise
+    the metadata-only block (counts/kinds), never the pack's index/file map.
     """
     recipe = {
         "format": manifest["format"],
@@ -757,6 +887,8 @@ def shareable_recipe(manifest: Mapping[str, Any],
     }
     if surfaces is not None:
         recipe["surfaces"] = dict(surfaces)
+    if assets is not None:
+        recipe["assets"] = dict(assets)
     return recipe
 
 
@@ -767,6 +899,7 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
                  tokens: Optional[Mapping[str, str]] = None,
                  slices: Optional[Mapping[str, Mapping[str, Any]]] = None,
                  surfaces: Optional[Mapping[str, Any]] = None,
+                 assets: Any = None,
                  label: Optional[str] = None) -> Dict[str, Any]:
     """Write ONLY the shareable ``theme.recipe.json`` for a purchase.
 
@@ -802,6 +935,7 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
 
     normalized = _normalize_layers(layers)
     _require(normalized, ("skin", "eyes", "hair", "outfit", "body"))
+    _asset_payloads, _asset_block, asset_metadata = _prepare_assets(assets)
     slugs = _resolve_personas(personas)
     recipes = {slug: _derive_recipe(slug, normalized) for slug in slugs}
     parts = {
@@ -823,7 +957,8 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
         "slices": dict(slices or {}),
         "parts": parts,
     }
-    recipe = shareable_recipe(manifest, recipes, surfaces=surfaces)
+    recipe = shareable_recipe(manifest, recipes, surfaces=surfaces,
+                              assets=asset_metadata)
     recipe_problems = theme_contract.validate_recipe(recipe)
     if recipe_problems:
         raise ThemeBuildError(recipe_problems)
@@ -859,7 +994,8 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
                 license: str = DEFAULT_LICENSE,
                 credit: str = DEFAULT_CREDIT,
                 tokens: Optional[Mapping[str, str]] = None,
-                floors: Optional[Mapping[str, bytes]] = None) -> Dict[str, Any]:
+                floors: Optional[Mapping[str, bytes]] = None,
+                assets: Any = None) -> Dict[str, Any]:
     """Build a local theme pack and return its manifest.
 
     ``layers`` must be supplied (Task 3's extractor does that for the CLI);
@@ -899,6 +1035,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     normalized = _normalize_layers(layers)
     _require(normalized, ("skin", "eyes", "hair", "outfit", "body"))
     floor_png = _prepare_floors(floors)
+    asset_payloads, asset_block, _asset_metadata = _prepare_assets(assets)
     slugs = _resolve_personas(personas)
     cols = DEFAULT_COLS
     rows = max(1, math.ceil(len(slugs) / cols))
@@ -973,6 +1110,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     }
     for kind, data in floor_png.items():
         payloads[f"surfaces/floor_{kind}.png"] = data
+    payloads.update(asset_payloads)
     surfaces_block = _floor_surfaces_block(floor_png)
 
     label = out_path.name.replace("-", " ").replace("_", " ").title()
@@ -1010,6 +1148,14 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         },
         "limits": {"max_total_bytes": 64 * 1024 * 1024, "max_files": 32},
     }
+    if asset_block is not None:
+        total_bytes = sum(len(data) for data in payloads.values())
+        manifest["limits"] = {
+            "max_total_bytes": max(
+                64 * 1024 * 1024, total_bytes + max(1024 * 1024, total_bytes // 10)),
+            "max_files": len(payloads) + 8,
+        }
+        manifest["assets"] = asset_block
     if surfaces_block is not None:
         manifest["surfaces"] = surfaces_block
 
@@ -1251,6 +1397,42 @@ def extract_layers(source: str, *, size: int = 32) -> Dict[str, List[Sheet]]:
     return function(source, size=size)
 
 
+def extract_assets(source: str, *, size: int = 16,
+                   categories: Any = None) -> Any:
+    """Turn the extended purchased packs into an in-memory asset catalog."""
+    try:
+        import office_theme_extract as extractor  # type: ignore
+    except Exception as exc:  # noqa: BLE001 - missing extractor is a typed error
+        raise ThemeBuildError(
+            "theme asset extraction is supplied by "
+            "scripts/office_theme_extract.py::extract_assets") from exc
+    function = getattr(extractor, "extract_assets", None)
+    if not callable(function):
+        raise ThemeBuildError(
+            "scripts/office_theme_extract.py does not export extract_assets")
+    return function(source, size=size, categories=categories)
+
+
+def _asset_catalog(source: str, size: int,
+                   categories: Any) -> Any:
+    """Best-effort asset extraction for the CLI.
+
+    An absent/partial purchase is not a build failure: the portrait/body pack
+    is the primary artifact and the extended catalog is additive. A present but
+    invalid pack is still reported as a warning with the typed reason.
+    """
+    try:
+        catalog = extract_assets(source, size=size, categories=categories)
+    except ThemeBuildError as exc:
+        print(f"warning: extended assets skipped: {exc}", file=sys.stderr)
+        return None
+    if not isinstance(catalog, Mapping):
+        return None
+    if not catalog.get("categories"):
+        return None
+    return catalog
+
+
 def _floor_inputs(source: str) -> Tuple[Dict[str, bytes],
                                         Optional[Dict[str, Any]]]:
     """Read the measured floor tiles and their recipe coordinates.
@@ -1290,14 +1472,15 @@ def _floor_inputs(source: str) -> Tuple[Dict[str, bytes],
 
 def _check(args: argparse.Namespace,
            layers: Mapping[str, List[Sheet]],
-           floors: Optional[Mapping[str, bytes]] = None) -> int:
+           floors: Optional[Mapping[str, bytes]] = None,
+           assets: Any = None) -> int:
     out = Path(args.out)
     if not out.is_dir():
         raise ThemeBuildError(f"check: {out} does not exist")
     with tempfile.TemporaryDirectory(prefix="office-theme-check-") as work:
         rebuilt = Path(work) / out.name
         build_theme(DEFAULT_SOURCE, rebuilt, size=args.size, layers=layers,
-                    floors=floors)
+                    floors=floors, assets=assets)
         problems = compare_packs(out, rebuilt)
     if problems:
         for problem in problems:
@@ -1342,19 +1525,36 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "--ui-sheet", default=None,
         help="sample the palette from the owner's Modern UI sheet (png or zip) "
              "and use the validated semantic tokens instead of the defaults")
+    parser.add_argument(
+        "--assets", action=argparse.BooleanOptionalAction, default=True,
+        help="also catalog the extended packs (characters, furniture, animated, "
+             "UI, outside) into the local pack (default: enabled)")
+    parser.add_argument(
+        "--asset-categories", default=None,
+        help="comma-separated subset of characters,furniture,animated,ui,outside "
+             "(default: all)")
     args = parser.parse_args(argv)
     if args.calibrate_out and not args.calibrate:
         parser.error("--calibrate-out requires --calibrate")
     args.out = args.out or str(default_out(args.source))
+    asset_categories = None
+    if args.asset_categories is not None:
+        asset_categories = [item.strip() for item in args.asset_categories.split(",")
+                            if item.strip()]
+        if not asset_categories:
+            parser.error("--asset-categories must name at least one category")
 
     try:
         layers = extract_layers(args.source, size=args.size)
         floors: Dict[str, bytes] = {}
         surfaces: Optional[Dict[str, Any]] = None
+        assets: Any = None
         if not args.calibrate:
             floors, surfaces = _floor_inputs(args.source)
+            if args.assets:
+                assets = _asset_catalog(args.source, args.size, asset_categories)
         if args.check:
-            return _check(args, layers, floors)
+            return _check(args, layers, floors, assets)
         if args.calibrate:
             return _calibrate(args, layers)
         tokens = None
@@ -1370,16 +1570,18 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if args.recipe_out:
             recipe = build_recipe(DEFAULT_SOURCE, args.recipe_out,
                                   size=args.size, layers=layers, tokens=tokens,
-                                  surfaces=surfaces)
+                                  surfaces=surfaces, assets=assets)
             print(json.dumps({
                 "ok": True,
                 "recipe": str(Path(args.recipe_out)),
                 "agents": len(recipe["agents"]),
                 "files": 0,
+                "assets": sorted((recipe.get("assets") or {}).get("categories", {})),
             }, indent=2, sort_keys=True))
             return 0
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
-                               layers=layers, tokens=tokens, floors=floors)
+                               layers=layers, tokens=tokens, floors=floors,
+                               assets=assets)
         recipes = json.loads(
             (Path(args.out) / "agents.json").read_text(encoding="utf-8")
         )["recipes"]
@@ -1388,6 +1590,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "id": manifest["id"],
             "files": len(manifest["files"]),
             "recipes": len(recipes),
+            "assets": sorted((manifest.get("assets") or {}).get("categories", {})),
         }, indent=2, sort_keys=True))
         return 0
     except ThemeBuildError as exc:

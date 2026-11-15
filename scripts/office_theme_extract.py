@@ -66,7 +66,27 @@ PARTS RETURNED
 ``accessory`` is deliberately **not** returned in v1: the portrait generators
 carry accessories, but they are not calibrated against the body frame, so a
 body accessory would be mis-aligned art. Add it once a body calibration has
-been measured and reviewed.
+been measured and reviewed. The extended catalog below (``extract_assets``)
+*does* inventory the accessory sheets as source art, without changing the
+composed portrait/body recipes.
+
+EXTENDED ASSET CATALOG
+-----------------------
+``extract_assets(source)`` reads the rest of the purchased packs in memory and
+returns a machine-readable catalog for the local pack builder:
+
+``characters``  body/portrait bodies, outfits, eyes, hair and accessories.
+``furniture``   ``Theme_Sorter_Singles`` sprites plus the interior and
+                ``Theme_Sorter`` static sheets.
+``animated``    ``3_Animated_objects`` spritesheets with frame width/height,
+                frame count and fps taken from the matching GIF preview.
+``ui``          Modern Interiors UI element sheets and Modern User Interface
+                ``Modern_UI_Style_*``/``Gamepad`` sheets at 16/32/48, with
+                9-slice candidate flags.
+``outside``     Serene Village tiles, props and animated objects (CC-BY 4.0).
+
+The catalog never contains filesystem paths of the purchase and nothing is
+written; the builder copies the bytes into the local (never committed) pack.
 
 PALETTE (Task 7)
 ----------------
@@ -93,6 +113,7 @@ import io
 import json
 import os
 import re
+import statistics
 import sys
 import zipfile
 from pathlib import Path
@@ -278,6 +299,10 @@ class _Archive:
             found.setdefault(int(match.group(1)), name)
         return found
 
+    def members(self, pattern: re.Pattern[str]) -> List[str]:
+        """Every member matching ``pattern`` (no capture group required)."""
+        return sorted(name for name in self._names if pattern.search(name))
+
     def read_image(self, member: str) -> Image.Image:
         try:
             data = self._archive.read(member)
@@ -292,6 +317,14 @@ class _Archive:
                 f"{self.path.name}: {member} is not a decodable image "
                 f"({exc})") from exc
         return image if image.mode == "RGBA" else image.convert("RGBA")
+
+    def read_bytes(self, member: str) -> bytes:
+        """Raw bytes of a member, so the builder can copy the source exactly."""
+        try:
+            return self._archive.read(member)
+        except (KeyError, OSError, RuntimeError) as exc:
+            raise ThemeBuildError(
+                f"{self.path.name}: cannot read {member} ({exc})") from exc
 
 
 def _body_patterns(size: int) -> Dict[str, re.Pattern[str]]:
@@ -579,8 +612,616 @@ def extract_floor_tiles(source: str, out_dir: str, *,
 
 
 # ---------------------------------------------------------------------------
-# Modern UI palette (Task 7)
+# Extended asset catalog (characters, furniture, animated, UI, outside)
 # ---------------------------------------------------------------------------
+#: Zip names for the packs the extended catalog reads, in preference order.
+ASSET_ZIP_NAMES: Dict[str, Tuple[str, ...]] = {
+    "interior": ("moderninteriors-win.zip",),
+    "ui": ("modernuserinterface-win.zip",),
+    "outside": ("Serene_Village_revamped_v1.9.zip",),
+}
+
+#: Extracted-directory fallbacks (used only when the zip is absent).
+ASSET_DIR_NAMES: Dict[str, Tuple[str, ...]] = {
+    "interior": ("moderninteriors-win",),
+    "ui": ("modernuserinterface-win",),
+    "outside": ("Serene_Village_revamped_v1.9",),
+}
+
+#: Directory prefix inside the Serene Village archive.
+_SERENE_PREFIX = "SERENE_VILLAGE_REVAMPED"
+
+#: License/credit stamped on outside-world entries (CC-BY 4.0 TASL).
+_OUTSIDE_CREDIT = "LimeZu — https://limezu.itch.io"
+_OUTSIDE_LICENSE = "CC-BY 4.0 (Serene Village, LimeZu)"
+
+
+class _AssetTree:
+    """Read-only access to a purchased pack, from a zip or an extracted tree.
+
+    Member names are normalised to forward slashes and made relative to an
+    optional root prefix (the Serene Village archive nests everything under
+    ``SERENE_VILLAGE_REVAMPED/``). Nothing is ever written.
+    """
+
+    def __init__(self, path: Path, *, prefix: str = ""):
+        self.path = Path(path)
+        self.prefix = prefix.replace("\\", "/").strip("/")
+        self._zip: Optional[zipfile.ZipFile] = None
+        if self.path.is_file():
+            try:
+                self._zip = zipfile.ZipFile(self.path)
+            except (zipfile.BadZipFile, OSError) as exc:
+                raise ThemeBuildError(
+                    f"{self.path.name}: not a valid zip archive ({exc})") from exc
+            raw = [name.replace("\\", "/") for name in self._zip.namelist()]
+        elif self.path.is_dir():
+            raw = [p.relative_to(self.path).as_posix()
+                   for p in self.path.rglob("*") if p.is_file()]
+        else:
+            raise ThemeBuildError(f"{self.path}: asset source not found")
+        if self.prefix:
+            marker = self.prefix + "/"
+            self._names = [name[len(marker):] for name in raw
+                           if name == self.prefix or name.startswith(marker)]
+        else:
+            self._names = raw
+
+    def close(self) -> None:
+        if self._zip is not None:
+            self._zip.close()
+
+    def __enter__(self) -> "_AssetTree":
+        return self
+
+    def __exit__(self, *exc_info: object) -> None:
+        self.close()
+
+    def names(self, *, suffix: Optional[str] = None) -> List[str]:
+        if suffix is None:
+            return sorted(self._names)
+        return sorted(name for name in self._names
+                      if name.lower().endswith(suffix.lower()))
+
+    def has(self, name: str) -> bool:
+        return name in self._names
+
+    def read(self, name: str) -> bytes:
+        if self._zip is not None:
+            member = f"{self.prefix}/{name}" if self.prefix else name
+            try:
+                return self._zip.read(member)
+            except (KeyError, OSError, RuntimeError) as exc:
+                raise ThemeBuildError(
+                    f"{self.path.name}: cannot read {name} ({exc})") from exc
+        target = self.path / self.prefix / name
+        try:
+            return target.read_bytes()
+        except OSError as exc:
+            raise ThemeBuildError(
+                f"{self.path.name}: cannot read {name} ({exc})") from exc
+
+    def read_image(self, name: str) -> Image.Image:
+        data = self.read(name)
+        try:
+            image = Image.open(io.BytesIO(data))
+            image.load()
+        except Exception as exc:  # noqa: BLE001 - any decode failure is typed
+            raise ThemeBuildError(
+                f"{self.path.name}: {name} is not a decodable image ({exc})"
+            ) from exc
+        return image if image.mode == "RGBA" else image.convert("RGBA")
+
+
+def _purchase_dir(source: str) -> Path:
+    path = Path(source).expanduser() if isinstance(source, str) else Path(source)
+    if path.is_file():
+        return path.parent
+    return path
+
+
+def _resolve_asset_tree(source: str, kind: str) -> Optional[_AssetTree]:
+    """Open the requested pack, or return ``None`` when it is not present.
+
+    A malformed present zip is a typed error; an absent pack is simply skipped
+    so a partial purchase still builds the categories it does contain.
+    """
+    path = Path(source).expanduser() if isinstance(source, str) else Path(source)
+    zips = ASSET_ZIP_NAMES[kind]
+    dirs = ASSET_DIR_NAMES[kind]
+    prefix = _SERENE_PREFIX if kind == "outside" else ""
+    if path.is_file() and path.name in zips:
+        return _AssetTree(path, prefix=prefix)
+    search = _purchase_dir(source)
+    for name in zips:
+        candidate = search / name
+        if candidate.is_file():
+            return _AssetTree(candidate, prefix=prefix)
+    for name in dirs:
+        candidate = search / name
+        if candidate.is_dir():
+            # ``Serene_Village_revamped_v1.9`` nests its content one level down;
+            # the tree resolver tolerates a missing/empty prefix either way.
+            actual_prefix = prefix
+            if prefix and not (candidate / prefix).is_dir():
+                actual_prefix = ""
+            return _AssetTree(candidate, prefix=actual_prefix)
+    if path.is_dir() and path.name in dirs:
+        actual_prefix = prefix
+        if prefix and not (path / prefix).is_dir():
+            actual_prefix = ""
+        return _AssetTree(path, prefix=actual_prefix)
+    return None
+
+
+def _slug(value: str, *, fallback: str = "asset") -> str:
+    text = re.sub(r"[^a-z0-9]+", "-", str(value).lower()).strip("-")
+    text = re.sub(r"-+", "-", text)[:140].strip("-")
+    if not text:
+        text = fallback
+    if not text[0].isalnum():
+        text = "x-" + text
+    return text
+
+
+def _grid_for(image: Image.Image, cell_w: int, cell_h: int) -> Tuple[Dict[str, int],
+                                                                    Dict[str, int]]:
+    cols = max(1, image.width // cell_w)
+    rows = max(1, image.height // cell_h)
+    return (
+        {"w": cell_w, "h": cell_h, "count": cols * rows, "fps": None},
+        {"cell": cell_w, "cols": cols, "rows": rows},
+    )
+
+
+def _gif_timing(blob: bytes) -> Tuple[Tuple[int, int], int, Optional[float]]:
+    """``(width, height)``, frame count and fps from a GIF preview."""
+    image = Image.open(io.BytesIO(blob))
+    try:
+        size = image.size
+        count = int(getattr(image, "n_frames", 1))
+        durations: List[int] = []
+        for frame in range(count):
+            image.seek(frame)
+            duration = image.info.get("duration")
+            if isinstance(duration, int) and duration > 0:
+                durations.append(duration)
+        fps = round(1000.0 / statistics.median(durations), 2) if durations else None
+        return size, count, fps
+    finally:
+        try:
+            image.close()
+        except Exception:  # noqa: BLE001 - closing a decoded GIF is best effort
+            pass
+
+
+def _matching_gif(tree: _AssetTree, png_name: str,
+                  gif_dir: Optional[str] = None) -> Optional[str]:
+    """The GIF preview that carries the frame timing for ``png_name``."""
+    stem = png_name.rsplit("/", 1)[-1][:-4]
+    directory = gif_dir if gif_dir is not None else png_name.rsplit("/", 1)[0]
+    prefix = (directory + "/") if directory else ""
+    candidates = {
+        name.lower(): name
+        for name in tree.names(suffix=".gif")
+        if name.startswith(prefix)
+    }
+    for candidate in (f"{prefix}{stem}.gif", f"{prefix}{stem}_16x16.gif",
+                      f"{prefix}{stem}_32x32.gif", f"{prefix}{stem}_48x48.gif"):
+        found = candidates.get(candidate.lower())
+        if found is not None:
+            return found
+    return None
+
+
+def _animated_entry(tree: _AssetTree, png_name: str, size: int,
+                    *, gif_dir: Optional[str] = None,
+                    category: str = "animated",
+                    license: Optional[str] = None,
+                    credit: Optional[str] = None) -> Dict[str, object]:
+    image = tree.read_image(png_name)
+    blob = tree.read(png_name)
+    gif_name = _matching_gif(tree, png_name, gif_dir)
+    fps: Optional[float] = None
+    frame_source = "inferred"
+    if gif_name is not None:
+        gif_size, gif_frames, fps = _gif_timing(tree.read(gif_name))
+        frame_w, frame_h = gif_size
+        if frame_w > 0 and image.width % frame_w == 0:
+            count = max(1, image.width // frame_w)
+            # The GIF preview is authoritative for timing; if its frame count
+            # disagrees the sheet width wins and the discrepancy is recorded.
+            frame_source = "gif" if count == gif_frames else "sheet"
+        else:
+            frame_w, frame_h = size, image.height
+            count = max(1, image.width // size)
+            frame_source = "sheet"
+    else:
+        frame_w, frame_h = size, image.height
+        count = max(1, image.width // size)
+    entry = {
+        "id": f"{category}-{_slug(png_name.rsplit('/', 1)[-1][:-4])}",
+        "kind": "animated",
+        "sheet": png_name,
+        "frame": {"w": frame_w, "h": frame_h, "count": count, "fps": fps},
+        "grid": {"cell": frame_w, "cols": count, "rows": 1},
+        "nine_slice_candidate": False,
+        "frame_source": frame_source,
+        "blob": blob,
+        "image_size": image.size,
+    }
+    if license is not None:
+        entry["license"] = license
+    if credit is not None:
+        entry["credit"] = credit
+    return entry
+
+
+def _sheet_entry(tree: _AssetTree, name: str, size: int, kind: str,
+                 *, category: str, cell: Optional[int] = None,
+                 nine_slice_candidate: bool = False,
+                 view: Optional[str] = "sheet",
+                 license: Optional[str] = None,
+                 credit: Optional[str] = None) -> Dict[str, object]:
+    image = tree.read_image(name)
+    cell = cell or size
+    frame, grid = _grid_for(image, cell, cell)
+    entry = {
+        "id": f"{category}-{_slug(name.rsplit('/', 1)[-1][:-4])}",
+        "kind": kind,
+        "sheet": name,
+        "frame": frame,
+        "grid": grid,
+        "nine_slice_candidate": nine_slice_candidate,
+        "frame_source": "sheet",
+        "blob": tree.read(name),
+        "image_size": image.size,
+    }
+    if view is not None:
+        entry["view"] = view
+    if license is not None:
+        entry["license"] = license
+    if credit is not None:
+        entry["credit"] = credit
+    return entry
+
+
+def _body_accessory_pattern(size: int) -> re.Pattern[str]:
+    tier = re.escape(f"{size}x{size}")
+    return re.compile(
+        rf"(?:^|/)Character Pieces/Accessories/{tier}/Accessory_[0-9]+_[^/]+\.png$")
+
+
+def _portrait_accessory_pattern(size: int, kind: str) -> re.Pattern[str]:
+    if kind == "portrait":
+        base = re.escape(f"Portrait Pieces/Portrait_Generator - {size}x{size}/")
+        return re.compile(rf"{base}Accessories/[^/]+\.png$")
+    if size == 16:
+        base = re.escape("16x16/Portrait_Generator/")
+        return re.compile(rf"{base}Accessories/PG_Accessory_[^/]+\.png$")
+    tier = re.escape(f"{size}x{size}")
+    base = re.escape(f"{size}x{size}/Portrait_Generator_{tier}/")
+    return re.compile(rf"{base}Accessories_{tier}/PG_Accessory_[^/]+\.png$")
+
+
+def _paired_character_entries(entries: List[Dict[str, object]],
+                              part: str, view: str, size: int,
+                              groups: Mapping[str, Mapping[int, str]],
+                              archive: "_Archive") -> None:
+    for index, member in sorted(groups.items()):
+        image = archive.read_image(member)
+        frame, grid = _grid_for(image, size, size * 2)
+        entries.append({
+            "id": f"characters-{view}-{part}-{index:02d}",
+            "kind": "sheet",
+            "sheet": member,
+            "frame": frame,
+            "grid": grid,
+            "nine_slice_candidate": False,
+            "frame_source": "sheet",
+            "view": view,
+            "blob": archive.read_bytes(member),
+            "image_size": image.size,
+        })
+
+
+def _character_assets(source: str, size: int) -> List[Dict[str, object]]:
+    try:
+        character_path, portrait_path, _fallback = _resolve_source(source)
+    except ThemeBuildError as exc:
+        message = " ".join(exc.problems).lower()
+        if "not found" in message:
+            return []
+        raise
+    entries: List[Dict[str, object]] = []
+    body_patterns = _body_patterns(size)
+    with _Archive(character_path) as character:
+        bodies = _required(
+            "body", character.match(body_patterns["body"]),
+            character_path.name, f"Bodies/{size}x{size}/Body_NN.png")
+        outfits = _required(
+            "outfit", character.match(body_patterns["outfit"]),
+            character_path.name, f"Outfits/{size}x{size}/Outfit_NN_01.png")
+        eyes = _required(
+            "eyes", character.match(body_patterns["eyes"]),
+            character_path.name, f"Eyes/{size}x{size}/Eyes_NN.png")
+        hair = _required(
+            "hair", character.match(body_patterns["hair"]),
+            character_path.name, f"Hairstyles/{size}x{size}/Hairstyle_NN_01.png")
+        _paired_character_entries(entries, "body", "body", size, bodies, character)
+        _paired_character_entries(entries, "outfit", "body", size, outfits, character)
+        _paired_character_entries(entries, "eyes", "body", size, eyes, character)
+        _paired_character_entries(entries, "hair", "body", size, hair, character)
+        for member in character.members(_body_accessory_pattern(size)):
+            image = character.read_image(member)
+            frame, grid = _grid_for(image, size, size * 2)
+            entries.append({
+                "id": f"characters-body-accessory-{_slug(member.rsplit('/', 1)[-1][:-4])}",
+                "kind": "sheet",
+                "sheet": member,
+                "frame": frame,
+                "grid": grid,
+                "nine_slice_candidate": False,
+                "frame_source": "sheet",
+                "view": "body",
+                "blob": character.read_bytes(member),
+                "image_size": image.size,
+            })
+    with _Archive(portrait_path) as portrait:
+        kind = _portrait_kind(portrait, size)
+        patterns = _portrait_patterns(size, kind)
+        skins = _required(
+            "skin", portrait.match(patterns["skin"]), portrait_path.name,
+            f"portrait Skins for the {size} tier")
+        portrait_eyes = _required(
+            "eyes", portrait.match(patterns["eyes"]), portrait_path.name,
+            f"portrait Eyes for the {size} tier")
+        portrait_hair = _required(
+            "hair", portrait.match(patterns["hair"]), portrait_path.name,
+            f"portrait Hairstyles for the {size} tier")
+        for part, groups in (("skin", skins), ("eyes", portrait_eyes),
+                             ("hair", portrait_hair)):
+            for index, member in sorted(groups.items()):
+                image = portrait.read_image(member)
+                frame, grid = _grid_for(image, size * 2, size * 2)
+                entries.append({
+                    "id": f"characters-portrait-{part}-{index:02d}",
+                    "kind": "sheet",
+                    "sheet": member,
+                    "frame": frame,
+                    "grid": grid,
+                    "nine_slice_candidate": False,
+                    "frame_source": "sheet",
+                    "view": "portrait",
+                    "blob": portrait.read_bytes(member),
+                    "image_size": image.size,
+                })
+        for member in portrait.members(_portrait_accessory_pattern(size, kind)):
+            image = portrait.read_image(member)
+            frame, grid = _grid_for(image, size * 2, size * 2)
+            entries.append({
+                "id": f"characters-portrait-accessory-{_slug(member.rsplit('/', 1)[-1][:-4])}",
+                "kind": "sheet",
+                "sheet": member,
+                "frame": frame,
+                "grid": grid,
+                "nine_slice_candidate": False,
+                "frame_source": "sheet",
+                "view": "portrait",
+                "blob": portrait.read_bytes(member),
+                "image_size": image.size,
+            })
+    return entries
+
+
+def _furniture_assets(source: str, size: int) -> List[Dict[str, object]]:
+    tree = _resolve_asset_tree(source, "interior")
+    if tree is None:
+        return []
+    tier = f"{size}x{size}"
+    singles = f"1_Interiors/{tier}/Theme_Sorter_Singles/"
+    entries: List[Dict[str, object]] = []
+    with tree:
+        for name in tree.names(suffix=".png"):
+            if not name.startswith(singles):
+                continue
+            image = tree.read_image(name)
+            entries.append({
+                "id": f"furniture-single-{_slug(name[len(singles):-4])}",
+                "kind": "sprite",
+                "sheet": name,
+                "frame": {"w": image.width, "h": image.height,
+                          "count": 1, "fps": None},
+                "nine_slice_candidate": False,
+                "frame_source": "sheet",
+                "blob": tree.read(name),
+                "image_size": image.size,
+            })
+        sheet_names = [
+            f"1_Interiors/{tier}/Interiors_{tier}.png",
+            f"1_Interiors/{tier}/Room_Builder_{tier}.png",
+        ]
+        sorter = f"1_Interiors/{tier}/Theme_Sorter/"
+        sheet_names.extend(name for name in tree.names(suffix=".png")
+                           if name.startswith(sorter))
+        for name in sorted(set(sheet_names)):
+            if not tree.has(name):
+                continue
+            entries.append(_sheet_entry(tree, name, size, "sheet",
+                                        category="furniture"))
+    return entries
+
+
+def _animated_assets(source: str, size: int) -> List[Dict[str, object]]:
+    tree = _resolve_asset_tree(source, "interior")
+    if tree is None:
+        return []
+    tier = f"{size}x{size}"
+    sprites = f"3_Animated_objects/{tier}/spritesheets/"
+    gifs = f"3_Animated_objects/{tier}/gif"
+    entries: List[Dict[str, object]] = []
+    with tree:
+        for name in tree.names(suffix=".png"):
+            if not name.startswith(sprites):
+                continue
+            entries.append(_animated_entry(tree, name, size, gif_dir=gifs))
+    return entries
+
+
+def _ui_assets(source: str, size: int) -> List[Dict[str, object]]:
+    entries: List[Dict[str, object]] = []
+    interior = _resolve_asset_tree(source, "interior")
+    if interior is not None:
+        with interior:
+            for tier in _SIZES:
+                for name, kind, flag in (
+                    (f"4_User_Interface_Elements/UI_{tier}x{tier}.png",
+                     "button_icon_sheet", False),
+                    (f"4_User_Interface_Elements/"
+                     f"UI_thinking_emotes_animation_{tier}x{tier}.png",
+                     "animated", False),
+                ):
+                    if not interior.has(name):
+                        continue
+                    entries.append(_sheet_entry(
+                        interior, name, size, kind, category="ui",
+                        cell=tier, nine_slice_candidate=flag))
+    ui = _resolve_asset_tree(source, "ui")
+    if ui is not None:
+        with ui:
+            for tier in _SIZES:
+                prefix = f"{tier}x{tier}/"
+                for name in ui.names(suffix=".png"):
+                    if not name.startswith(prefix):
+                        continue
+                    base = name.rsplit("/", 1)[-1]
+                    if not base.startswith("Modern_UI_"):
+                        continue
+                    if "Modern_UI_Style" in base:
+                        kind, flag = "nine_slice_sheet", True
+                    elif "Modern_UI_Gamepad" in base:
+                        kind, flag = "gamepad_sheet", False
+                    else:
+                        kind, flag = "button_icon_sheet", False
+                    entries.append(_sheet_entry(
+                        ui, name, size, kind, category="ui",
+                        cell=tier, nine_slice_candidate=flag))
+    return entries
+
+
+def _outside_assets(source: str, size: int) -> List[Dict[str, object]]:
+    tree = _resolve_asset_tree(source, "outside")
+    if tree is None:
+        return []
+    entries: List[Dict[str, object]] = []
+    with tree:
+        for name in tree.names(suffix=".png"):
+            base = name.rsplit("/", 1)[-1]
+            if name.startswith("Animated stuff/"):
+                entries.append(_animated_entry(
+                    tree, name, size, gif_dir="Animated stuff",
+                    category="outside", license=_OUTSIDE_LICENSE,
+                    credit=_OUTSIDE_CREDIT))
+                continue
+            if name.startswith("RPG_MAKER_MV/"):
+                cell = 48
+            elif name.startswith("RPG_MAKER_VX_ACE/") or name.startswith("RPG_MAKER_XP/"):
+                cell = 32
+            elif name.startswith("Construct 3/"):
+                cell = 16
+            else:
+                match = re.search(r"_(\d+)x(\d+)\.png$", base)
+                cell = int(match.group(1)) if match else size
+            entries.append(_sheet_entry(
+                tree, name, size, "sheet", category="outside", cell=cell,
+                license=_OUTSIDE_LICENSE, credit=_OUTSIDE_CREDIT))
+    return entries
+
+
+_ASSET_BUILDERS = {
+    "characters": _character_assets,
+    "furniture": _furniture_assets,
+    "animated": _animated_assets,
+    "ui": _ui_assets,
+    "outside": _outside_assets,
+}
+
+
+def _selected_categories(categories: Optional[Sequence[str]]) -> List[str]:
+    if categories is None:
+        return list(theme_contract.ASSET_CATEGORIES)
+    selected: List[str] = []
+    for category in categories:
+        if category not in theme_contract.ASSET_CATEGORIES:
+            raise ThemeBuildError(
+                f"categories: unknown asset category {category!r} "
+                f"(allowed: {', '.join(theme_contract.ASSET_CATEGORIES)})")
+        if category not in selected:
+            selected.append(category)
+    return selected
+
+
+def extract_assets(source: str, *, size: int = 16,
+                   categories: Optional[Sequence[str]] = None
+                   ) -> Dict[str, object]:
+    """Read the extended purchased packs into a category -> entries catalog.
+
+    Returns ``{"schema": 1, "categories": {name: {"entries": [...]}}}``. Each
+    entry carries the raw source image bytes, the source member name, frame
+    geometry (width/height/count/fps), an optional grid and a 9-slice hint.
+    Nothing is written; the art stays in memory for the builder.
+
+    Absent packs are skipped (a partial purchase still catalogs what it has);
+    a present-but-invalid pack is a typed :class:`ThemeBuildError`.
+    """
+    if size not in _SIZES:
+        raise ThemeBuildError(
+            f"size: must be one of {', '.join(map(str, _SIZES))} (got {size!r})")
+    result: Dict[str, object] = {"schema": 1, "categories": {}}
+    for category in _selected_categories(categories):
+        entries = _ASSET_BUILDERS[category](source, size)
+        if entries:
+            result["categories"][category] = {"entries": entries}
+    return result
+
+
+def summarize_assets(catalog: Mapping[str, object]) -> Dict[str, object]:
+    """Counts, kinds, geometry and a decoded-pixel digest; no art or paths."""
+    categories = catalog.get("categories") if isinstance(catalog, Mapping) else None
+    summary: Dict[str, object] = {}
+    digest = hashlib.sha256()
+    if not isinstance(categories, Mapping):
+        return {"categories": {}, "digest": digest.hexdigest()}
+    for category in sorted(categories):
+        section = categories[category]
+        entries = section.get("entries") if isinstance(section, Mapping) else []
+        kinds: Dict[str, int] = {}
+        frames: Dict[str, int] = {}
+        pixel_digest = hashlib.sha256()
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                continue
+            kind = str(entry.get("kind") or "unknown")
+            kinds[kind] = kinds.get(kind, 0) + 1
+            frame = entry.get("frame") if isinstance(entry.get("frame"), Mapping) else {}
+            geometry = (f"{frame.get('w')}x{frame.get('h')}x{frame.get('count')}"
+                        f"@{frame.get('fps')}")
+            frames[geometry] = frames.get(geometry, 0) + 1
+            blob = entry.get("blob")
+            if isinstance(blob, (bytes, bytearray)):
+                pixel_digest.update(bytes(blob))
+        digest.update(category.encode("utf-8"))
+        digest.update(pixel_digest.digest())
+        summary[category] = {
+            "count": len(entries),
+            "kinds": dict(sorted(kinds.items())),
+            "frames": dict(sorted(frames.items())),
+            "digest": pixel_digest.hexdigest(),
+        }
+    return {"categories": summary, "digest": digest.hexdigest()}
+
+
+
 #: The semantic tokens the palette sampler can derive, in their document order.
 SEMANTIC_TOKENS: Tuple[str, ...] = (
     "color-surface",
@@ -900,13 +1541,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     action.add_argument(
         "--ui-contact-sheet", metavar="SHEET",
         help="write a labelled coordinate grid of the sheet (requires --out)")
+    action.add_argument(
+        "--assets", metavar="PATH",
+        help="read the extended packs (characters, furniture, animated, UI, "
+             "outside) in memory and print a category summary + decoded digest; "
+             "writes nothing")
     parser.add_argument(
         "--check", action="store_true",
-        help="with --source, extract twice and verify the decoded pixels and "
-             "part counts are identical")
+        help="with --source or --assets, extract twice and verify the decoded "
+             "pixels and counts are identical")
     parser.add_argument(
         "--size", type=int, default=32, choices=(16, 32, 48),
-        help="tier to read with --source (default 32)")
+        help="tier to read (default 32)")
+    parser.add_argument(
+        "--categories", default=None,
+        help="comma-separated asset categories for --assets "
+             "(default: all of characters,furniture,animated,ui,outside)")
     parser.add_argument("--out", default=None,
                         help="output directory for --ui-contact-sheet")
     parser.add_argument("--member", default=None,
@@ -916,9 +1566,33 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     parser.add_argument("--ui-grid", type=int, default=16,
                         help="contact-sheet grid step in source pixels (default 16)")
     args = parser.parse_args(argv)
-    if args.check and not args.source:
-        parser.error("--check requires --source")
+    if args.check and not (args.source or args.assets):
+        parser.error("--check requires --source or --assets")
+    categories = None
+    if args.categories is not None:
+        categories = [item.strip() for item in args.categories.split(",")
+                      if item.strip()]
+        if not categories:
+            parser.error("--categories must name at least one category")
     try:
+        if args.assets:
+            first = summarize_assets(extract_assets(
+                args.assets, size=args.size, categories=categories))
+            if args.check:
+                second = summarize_assets(extract_assets(
+                    args.assets, size=args.size, categories=categories))
+                if first != second:
+                    print(
+                        "error: asset extraction is not reproducible across two "
+                        "reads", file=sys.stderr)
+                    return 1
+            print(json.dumps({
+                "ok": True,
+                "size": args.size,
+                "checked": bool(args.check),
+                **first,
+            }, indent=2, sort_keys=True))
+            return 0
         if args.source:
             first = _summarize_layers(extract_layers(args.source, size=args.size))
             if args.check:
@@ -965,6 +1639,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 
 __all__ = [
+    "ASSET_ZIP_NAMES",
     "CHARACTER_ZIP_NAMES",
     "DEFAULT_TOKENS",
     "FALLBACK_ZIP_NAMES",
@@ -975,10 +1650,12 @@ __all__ = [
     "PORTRAIT_ZIP_NAMES",
     "SEMANTIC_TOKENS",
     "derive_tokens",
+    "extract_assets",
     "extract_floor_tiles",
     "extract_layers",
     "load_ui_sheet",
     "main",
+    "summarize_assets",
     "write_contact_sheet",
 ]
 

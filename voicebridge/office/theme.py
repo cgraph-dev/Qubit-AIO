@@ -138,6 +138,29 @@ FLOOR_KINDS: Sequence[str] = (
 #: file through the same confined static route as the atlases.
 SURFACE_SUFFIXES: Set[str] = {".png", ".webp"}
 
+#: Extended asset categories a full local pack may declare. The set is closed so
+#: an unknown category is refused rather than silently ignored. A pack may omit
+#: any category (characters-only, furniture-only, ...).
+ASSET_CATEGORIES: Sequence[str] = (
+    "characters",
+    "furniture",
+    "animated",
+    "ui",
+    "outside",
+)
+
+#: Kind of entry inside an asset index. ``sprite`` is one standalone image,
+#: ``sheet`` is a grid sheet, ``animated`` carries frame timing, and the UI
+#: sheet variants name their intended use.
+ASSET_KINDS: Sequence[str] = (
+    "sprite",
+    "sheet",
+    "animated",
+    "nine_slice_sheet",
+    "button_icon_sheet",
+    "gamepad_sheet",
+)
+
 ALLOWED_SUFFIXES: Set[str] = {".png", ".jpg", ".jpeg", ".webp", ".json", ".txt"}
 WINDOWS_RESERVED: Set[str] = {
     "CON", "PRN", "AUX", "NUL",
@@ -174,6 +197,8 @@ _SLICE_STATE_SELECTORS = {
 _SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _PATH_CHARS_RE = re.compile(r"^[A-Za-z0-9._/-]+$")
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+#: Asset ids are longer than persona slugs (they derive from source filenames).
+_ASSET_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,160}$")
 
 _DANGEROUS_TOKEN_VECTORS = (
     "url(", "image-set(", "src(", "var(", "attr(",
@@ -211,6 +236,7 @@ class Theme:
     portraits: Mapping[str, Any] = field(default_factory=dict)
     bodies: Mapping[str, Any] = field(default_factory=dict)
     surfaces: Mapping[str, Any] = field(default_factory=dict)
+    assets: Mapping[str, Any] = field(default_factory=dict)
     files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     agents: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
@@ -832,6 +858,273 @@ def _validate_surfaces_recipe(surfaces: Any) -> List[str]:
 
 
 # --------------------------------------------------------------------------
+# Extended asset catalog
+# --------------------------------------------------------------------------
+def _source_label_problems(value: Any, label: str) -> List[str]:
+    """Validate a *description* of a source sheet (not a served path).
+
+    Source labels come from the purchased archive's member names, which can
+    contain spaces (``Character Pieces/...``). They are metadata only, so the
+    checks are about safety (no absolute/operator path, traversal, URL or
+    control characters), not the strict asset-path allowlist used for files we
+    actually write and serve.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return [f"{label}: must be a non-empty string"]
+    if len(value) > 400:
+        return [f"{label}: must be at most 400 characters"]
+    if any(ord(ch) < 32 for ch in value):
+        return [f"{label}: must not contain control characters"]
+    if "\\" in value:
+        return [f"{label}: must not contain a backslash"]
+    if "://" in value:
+        return [f"{label}: must not be a URL"]
+    if value.startswith("/") or re.match(r"^[A-Za-z]:", value):
+        return [f"{label}: must be relative"]
+    if _looks_like_path(value):
+        return [f"{label}: must be a source description, not a filesystem path"]
+    return []
+
+
+def _bounded_text_problems(value: Any, label: str) -> List[str]:
+    """A bounded free-text field (credit/licence prose may carry a URL)."""
+    if not isinstance(value, str) or not value.strip():
+        return [f"{label}: must be a non-empty string"]
+    if len(value) > 300:
+        return [f"{label}: must be at most 300 characters"]
+    if any(ord(ch) < 32 for ch in value):
+        return [f"{label}: must not contain control characters"]
+    return []
+
+
+def _validate_frame(frame: Any, label: str) -> List[str]:
+    if not isinstance(frame, dict):
+        return [f"{label}: must be an object"]
+    problems: List[str] = []
+    for key in ("w", "h"):
+        value = frame.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            problems.append(f"{label}.{key}: must be a positive integer")
+    count = frame.get("count")
+    if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+        problems.append(f"{label}.count: must be a positive integer")
+    if "fps" in frame and frame.get("fps") is not None:
+        fps = frame.get("fps")
+        if (not isinstance(fps, (int, float)) or isinstance(fps, bool)
+                or fps <= 0):
+            problems.append(f"{label}.fps: must be a positive number or null")
+    return problems
+
+
+def _validate_grid(grid: Any, label: str) -> List[str]:
+    if grid is None:
+        return []
+    if not isinstance(grid, dict):
+        return [f"{label}: must be an object"]
+    problems: List[str] = []
+    for key in ("cell", "cols", "rows"):
+        value = grid.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            problems.append(f"{label}.{key}: must be a positive integer")
+    return problems
+
+
+def _validate_kind_counts(value: Any, label: str) -> List[str]:
+    if value is None:
+        return []
+    if not isinstance(value, dict):
+        return [f"{label}: must be an object"]
+    problems: List[str] = []
+    for kind, count in value.items():
+        if kind not in ASSET_KINDS:
+            problems.append(f"{label}: unknown kind {kind!r}")
+            continue
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            problems.append(f"{label}.{kind}: must be a non-negative integer")
+    return problems
+
+
+def _validate_assets_recipe(assets: Any) -> List[str]:
+    """Validate the shareable recipe ``assets`` block: metadata only.
+
+    A recipe may state how many sprites of each kind a local build carries. It
+    may **not** carry index paths, sheet names, file paths, or hashes — that
+    would be a file map of the paid art in the repo.
+    """
+    if assets is None:
+        return []
+    if not isinstance(assets, dict):
+        return ["assets: must be an object"]
+    problems: List[str] = []
+    schema = assets.get("schema")
+    if not isinstance(schema, int) or isinstance(schema, bool) or schema != 1:
+        problems.append("assets.schema: must be 1")
+    categories = assets.get("categories")
+    if not isinstance(categories, dict) or not categories:
+        problems.append("assets.categories: must be a non-empty object")
+        return problems
+    for category, config in categories.items():
+        if category not in ASSET_CATEGORIES:
+            problems.append(f"assets.categories: unknown category {category!r}")
+            continue
+        if not isinstance(config, dict):
+            problems.append(f"assets.categories.{category}: must be an object")
+            continue
+        extra = sorted(set(config) - {"count", "kinds"})
+        if extra:
+            problems.append(
+                f"assets.categories.{category}: recipe metadata may not carry "
+                f"{', '.join(extra)} (art is built locally)")
+        count = config.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            problems.append(
+                f"assets.categories.{category}.count: must be a non-negative integer")
+        problems.extend(_validate_kind_counts(
+            config.get("kinds"), f"assets.categories.{category}.kinds"))
+    return problems
+
+
+def _validate_assets_full(assets: Any, files: Set[str]) -> List[str]:
+    """Validate the full-pack ``assets`` block (index files are declared)."""
+    if assets is None:
+        return []
+    if not isinstance(assets, dict):
+        return ["assets: must be an object"]
+    problems: List[str] = []
+    schema = assets.get("schema")
+    if not isinstance(schema, int) or isinstance(schema, bool) or schema != 1:
+        problems.append("assets.schema: must be 1")
+    categories = assets.get("categories")
+    if not isinstance(categories, dict) or not categories:
+        problems.append("assets.categories: must be a non-empty object")
+        return problems
+    for category, config in categories.items():
+        if category not in ASSET_CATEGORIES:
+            problems.append(f"assets.categories: unknown category {category!r}")
+            continue
+        if not isinstance(config, dict):
+            problems.append(f"assets.categories.{category}: must be an object")
+            continue
+        index = config.get("index")
+        if not isinstance(index, str) or not index:
+            problems.append(f"assets.categories.{category}.index: required")
+        else:
+            problems.extend(
+                f"assets.categories.{category}.index: {p}"
+                for p in _path_problems(index))
+            if os.path.splitext(index)[1].lower() != ".json":
+                problems.append(
+                    f"assets.categories.{category}.index: must be a .json file")
+            if files and index not in files:
+                problems.append(
+                    f"assets.categories.{category}.index: {index!r} is not a "
+                    "declared file")
+        count = config.get("count")
+        if not isinstance(count, int) or isinstance(count, bool) or count < 0:
+            problems.append(
+                f"assets.categories.{category}.count: must be a non-negative "
+                "integer")
+        problems.extend(_validate_kind_counts(
+            config.get("kinds"), f"assets.categories.{category}.kinds"))
+    return problems
+
+
+def _validate_assets_index(root: Path, files: Mapping[str, Any],
+                           category: str, config: Mapping[str, Any]) -> List[str]:
+    """Validate one category index against the declared file map."""
+    relative = config.get("index")
+    if not isinstance(relative, str) or not relative:
+        return []
+    path = _inside_root(root, relative)
+    if path is None or not path.is_file():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return [f"assets.categories.{category}.index: invalid JSON ({exc})"]
+    if not isinstance(data, dict):
+        return [f"assets.categories.{category}.index: must be an object"]
+    problems: List[str] = []
+    schema = data.get("schema")
+    if not isinstance(schema, int) or isinstance(schema, bool) or schema != 1:
+        problems.append(f"assets.categories.{category}.index: schema must be 1")
+    declared_category = data.get("category")
+    if declared_category != category:
+        problems.append(
+            f"assets.categories.{category}.index: category "
+            f"{declared_category!r} != {category!r}")
+    sprites = data.get("sprites")
+    if not isinstance(sprites, list):
+        return problems + [
+            f"assets.categories.{category}.index: sprites must be a list"]
+    count = config.get("count")
+    if isinstance(count, int) and not isinstance(count, bool) and count != len(sprites):
+        problems.append(
+            f"assets.categories.{category}: count {count} != {len(sprites)} "
+            "index entries")
+    seen_ids: Set[str] = set()
+    for position, entry in enumerate(sprites):
+        label = f"assets.categories.{category}.index.sprites[{position}]"
+        if not isinstance(entry, dict):
+            problems.append(f"{label}: must be an object")
+            continue
+        sprite_id = entry.get("id")
+        if not isinstance(sprite_id, str) or not _ASSET_ID_RE.fullmatch(sprite_id):
+            problems.append(f"{label}.id: invalid asset id")
+        elif sprite_id in seen_ids:
+            problems.append(f"{label}.id: duplicate asset id {sprite_id!r}")
+        else:
+            seen_ids.add(sprite_id)
+        kind = entry.get("kind")
+        if kind not in ASSET_KINDS:
+            problems.append(f"{label}.kind: unknown kind {kind!r}")
+        problems.extend(_source_label_problems(
+            entry.get("sheet"), f"{label}.sheet"))
+        sprite_file = entry.get("file")
+        if not isinstance(sprite_file, str) or not sprite_file:
+            problems.append(f"{label}.file: required")
+        else:
+            problems.extend(
+                f"{label}.file: {p}" for p in _path_problems(sprite_file))
+            if sprite_file not in files:
+                problems.append(
+                    f"{label}.file: {sprite_file!r} is not a declared file")
+        sha = entry.get("sha256")
+        if not isinstance(sha, str) or not _SHA256_RE.fullmatch(sha):
+            problems.append(f"{label}.sha256: must be 64 hex characters")
+        source_sha = entry.get("source_sha256")
+        if not isinstance(source_sha, str) or not _SHA256_RE.fullmatch(source_sha):
+            problems.append(
+                f"{label}.source_sha256: must be 64 hex characters")
+        elif isinstance(sprite_file, str) and isinstance(files.get(sprite_file), dict):
+            declared_sha = files[sprite_file].get("sha256")
+            if isinstance(declared_sha, str) and declared_sha.lower() != source_sha.lower():
+                problems.append(
+                    f"{label}.source_sha256: does not match the declared file")
+        size = entry.get("bytes")
+        if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+            problems.append(f"{label}.bytes: must be a non-negative integer")
+        problems.extend(_validate_frame(entry.get("frame"), f"{label}.frame"))
+        problems.extend(_validate_grid(entry.get("grid"), f"{label}.grid"))
+        if "nine_slice_candidate" in entry and not isinstance(
+                entry.get("nine_slice_candidate"), bool):
+            problems.append(f"{label}.nine_slice_candidate: must be a boolean")
+        frame_source = entry.get("frame_source")
+        if frame_source is not None and frame_source not in (
+                "gif", "sheet", "inferred", "static"):
+            problems.append(
+                f"{label}.frame_source: must be gif, sheet, inferred, or static")
+        view = entry.get("view")
+        if view is not None and view not in ("body", "portrait", "sheet"):
+            problems.append(f"{label}.view: must be body, portrait, or sheet")
+        for key in ("license", "credit"):
+            if key in entry and entry.get(key) is not None:
+                problems.extend(_bounded_text_problems(
+                    entry.get(key), f"{label}.{key}"))
+    return problems
+
+
+# --------------------------------------------------------------------------
 # Manifest / recipe / theme validation
 # --------------------------------------------------------------------------
 def _looks_like_path(value: str) -> bool:
@@ -897,6 +1190,7 @@ def _validate_common(doc: Any, require_files: bool) -> List[str]:
     if not require_files:
         problems.extend(_validate_slices(doc.get("slices"), None))
         problems.extend(_validate_surfaces_recipe(doc.get("surfaces")))
+        problems.extend(_validate_assets_recipe(doc.get("assets")))
     problems.extend(_validate_parts(doc.get("parts")))
     problems.extend(_validate_agents(doc.get("agents"), doc.get("parts")))
 
@@ -928,6 +1222,7 @@ def validate_manifest(manifest: Any, root: Optional[Path] = None) -> List[str]:
     declared = set(files) if isinstance(files, dict) else set()
     problems.extend(_validate_slices(manifest.get("slices"), declared))
     problems.extend(_validate_surfaces_full(manifest.get("surfaces"), declared))
+    problems.extend(_validate_assets_full(manifest.get("assets"), declared))
     for section_name in ("portraits", "bodies"):
         problems.extend(_validate_asset_section(
             section_name, manifest.get(section_name), declared))
@@ -1033,6 +1328,12 @@ def validate_theme(root: Any) -> List[str]:
         problems.extend(_validate_index(root, section_name,
                                         manifest.get(section_name)))
     problems.extend(_validate_agents_file(root, files, manifest))
+    assets = manifest.get("assets")
+    if isinstance(assets, dict) and isinstance(assets.get("categories"), dict):
+        for category, config in assets["categories"].items():
+            if isinstance(config, dict):
+                problems.extend(_validate_assets_index(
+                    root, files, category, config))
     return problems
 
 
@@ -1087,6 +1388,7 @@ def load_theme(root: Any) -> Theme:
         portraits=dict(manifest.get("portraits") or {}),
         bodies=dict(manifest.get("bodies") or {}),
         surfaces=dict(manifest.get("surfaces") or {}),
+        assets=dict(manifest.get("assets") or {}),
         files=dict(files),
         agents=dict(agents),
     )
@@ -1120,6 +1422,7 @@ def _classic_payload(reason: Optional[str]) -> Dict[str, Any]:
         "tokens": {},
         "slices": {},
         "surfaces": None,
+        "assets": None,
         "reason": reason or "",
     }
 
@@ -1145,6 +1448,22 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
                 if isinstance(relative, str) and relative
             },
         }
+    raw_assets = theme.assets or {}
+    assets_payload: Optional[Dict[str, Any]] = None
+    if raw_assets:
+        categories = raw_assets.get("categories") or {}
+        assets_payload = {
+            "schema": raw_assets.get("schema"),
+            "categories": {
+                category: {
+                    "index": url(config.get("index")),
+                    "count": config.get("count"),
+                    "kinds": dict(config.get("kinds") or {}),
+                }
+                for category, config in categories.items()
+                if isinstance(config, dict)
+            },
+        }
     return {
         "id": theme.id,
         "label": theme.label,
@@ -1165,6 +1484,7 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
         "tokens": dict(theme.tokens),
         "slices": dict(theme.slices),
         "surfaces": surfaces_payload,
+        "assets": assets_payload,
         "reason": "",
     }
 

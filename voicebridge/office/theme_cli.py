@@ -37,7 +37,7 @@ import tempfile
 import unicodedata
 import zipfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from . import theme as T
 
@@ -657,7 +657,37 @@ def _recipe_from_pack(root: Path, manifest: Dict[str, Any]) -> Dict[str, Any]:
         "slices": dict(manifest.get("slices") or {}),
         "parts": dict(parts),
         "agents": {slug: dict(recipe) for slug, recipe in agents.items()},
+        **_asset_metadata(manifest),
     }
+
+
+def _asset_metadata(manifest: Mapping[str, Any]) -> Dict[str, Any]:
+    """The metadata-only asset block for a recipe (no file/index map)."""
+    assets = manifest.get("assets")
+    if not isinstance(assets, Mapping):
+        return {}
+    categories = assets.get("categories")
+    if not isinstance(categories, Mapping) or not categories:
+        return {}
+    metadata: Dict[str, Any] = {}
+    for category, config in categories.items():
+        if not isinstance(config, Mapping):
+            continue
+        entry: Dict[str, Any] = {}
+        count = config.get("count")
+        if isinstance(count, int) and not isinstance(count, bool):
+            entry["count"] = count
+        kinds = config.get("kinds")
+        if isinstance(kinds, Mapping):
+            entry["kinds"] = {
+                str(kind): value for kind, value in kinds.items()
+                if isinstance(value, int) and not isinstance(value, bool)
+            }
+        if entry:
+            metadata[str(category)] = entry
+    if not metadata:
+        return {}
+    return {"assets": {"schema": 1, "categories": metadata}}
 
 
 def _command_export(cfg: Any, theme_id: str, out: str,
