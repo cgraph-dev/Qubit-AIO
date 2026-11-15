@@ -1303,9 +1303,10 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
         "rows": rows,
         "count": len(slugs),
         "anchor": {"x": size // 2, "y": size * 2},
-        # Habblaud's world is 16px+; the 32-tier body frame reads best at half
-        # size there. The shell's Agents panel still uses the 32px atlas.
-        "scale": 0.5,
+        # The 32-tier body frame reads at half size in Habblaud's 16px world.
+        # A pack built at the 16px tier is already at world scale; applying
+        # 0.5 there made every agent 8x16 px and effectively invisible.
+        "scale": 0.5 if size >= 32 else 1.0,
     }
     manifest.update(extra_manifest)
 
