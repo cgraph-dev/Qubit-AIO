@@ -170,8 +170,9 @@ FLOOR_MAP: Dict[str, Tuple[int, int]] = {
 #: region (x/y 0, w/h its own size). Only this first slice is mapped; every
 #: other Habblaud kind keeps its procedural sprite.
 FURNITURE_FILES: Dict[str, str] = {
-    "desk": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
-    "desk_back": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
+    # Desk/desk_back are deliberately NOT themed: the procedural Habblaud
+    # desk owns the monitor casing + animated screen rects. Replacing it with a
+    # static LimeZu desk removed the computer and its animation.
     "reception_desk": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
     "meeting_table": "2_Living_Room_Singles/Living_Room_Singles_29.png",
     "office_chair": "13_Conference_Hall_Singles/Conference_Hall_Singles_39.png",
