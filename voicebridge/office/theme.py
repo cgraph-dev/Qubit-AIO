@@ -536,6 +536,9 @@ def _validate_slices(slices: Any, files: Optional[Set[str]] = None) -> List[str]
         if repeat not in _SLICE_REPEAT:
             problems.append(
                 f"slice {name}: repeat must be stretch, round, or repeat")
+        ink = descriptor.get("ink")
+        if ink is not None and ink not in ("light", "dark"):
+            problems.append(f"slice {name}: ink must be light or dark")
     return problems
 
 
@@ -955,6 +958,118 @@ def _validate_furniture_recipe(section: Any) -> List[str]:
     return problems
 
 
+def _validate_ui_licensed_asset(
+    descriptor: Any,
+    files: Optional[Set[str]],
+    label: str,
+    *,
+    width_key: Optional[str] = "width",
+    height_key: Optional[str] = "height",
+) -> List[str]:
+    """Validate one licensed UI asset (icon / frame / effect / ornament / font).
+
+    The licence gate is explicit data: ``license`` and ``credit`` must be
+    recorded and ``license_ok`` must be a boolean. A missing/unreadable file
+    invalidates the whole pack (the loader then falls back to classic), never a
+    dangling URL.
+    """
+    problems: List[str] = []
+    if not isinstance(descriptor, dict):
+        return [f"{label}: must be an object"]
+    src = descriptor.get("src")
+    if not isinstance(src, str) or not src:
+        problems.append(f"{label}.src: required")
+    else:
+        problems.extend(f"{label}.src: {p}" for p in _path_problems(src))
+        if files is not None and src not in files:
+            problems.append(f"{label}.src: {src!r} is not a declared file")
+    for key in (width_key, height_key):
+        if not key:
+            continue
+        value = descriptor.get(key)
+        if (not isinstance(value, int) or isinstance(value, bool)
+                or value <= 0):
+            problems.append(f"{label}.{key}: must be a positive integer")
+    for key in ("credit", "license"):
+        value = descriptor.get(key)
+        if not isinstance(value, str) or not value.strip():
+            problems.append(f"{label}.{key}: must be a non-empty string")
+    if not isinstance(descriptor.get("license_ok"), bool):
+        problems.append(f"{label}.license_ok: must be a boolean")
+    pack = descriptor.get("pack")
+    if pack is not None and (not isinstance(pack, str) or not pack):
+        problems.append(f"{label}.pack: must be a non-empty string")
+    return problems
+
+
+def _validate_ui_font(descriptor: Any, files: Optional[Set[str]]) -> List[str]:
+    problems = _validate_ui_licensed_asset(
+        descriptor, files, "ui.font", width_key=None, height_key=None)
+    if not isinstance(descriptor, dict):
+        return problems
+    for key in ("cell", "cols", "rows"):
+        value = descriptor.get(key)
+        if (not isinstance(value, int) or isinstance(value, bool)
+                or value <= 0):
+            problems.append(f"ui.font.{key}: must be a positive integer")
+    glyphs = descriptor.get("glyphs")
+    if not isinstance(glyphs, str) or not glyphs:
+        problems.append("ui.font.glyphs: must be a non-empty string")
+    else:
+        cols = descriptor.get("cols")
+        rows = descriptor.get("rows")
+        if (isinstance(cols, int) and isinstance(rows, int)
+                and len(glyphs) > cols * rows):
+            problems.append(
+                "ui.font.glyphs: more glyphs than cols * rows")
+    scale = descriptor.get("scale")
+    if scale is not None and (
+            not isinstance(scale, (int, float)) or isinstance(scale, bool)
+            or not (0 < float(scale) <= 2)):
+        problems.append("ui.font.scale: must be a number in (0, 2]")
+    return problems
+
+
+def _validate_ui_effect(descriptor: Any, files: Optional[Set[str]]) -> List[str]:
+    problems = _validate_ui_licensed_asset(
+        descriptor, files, "ui.effects")
+    if not isinstance(descriptor, dict):
+        return problems
+    for key in ("frames", "fps"):
+        value = descriptor.get(key)
+        if (not isinstance(value, int) or isinstance(value, bool)
+                or value <= 0):
+            problems.append(f"ui.effects.{key}: must be a positive integer")
+    fpr = descriptor.get("frames_per_row")
+    if fpr is not None and (
+            not isinstance(fpr, int) or isinstance(fpr, bool) or fpr <= 0):
+        problems.append("ui.effects.frames_per_row: must be a positive integer")
+    return problems
+
+
+def _validate_ui_packs(packs: Any) -> List[str]:
+    if packs is None:
+        return []
+    if not isinstance(packs, list):
+        return ["ui.packs: must be an array"]
+    problems: List[str] = []
+    for index, pack in enumerate(packs):
+        label = f"ui.packs[{index}]"
+        if not isinstance(pack, dict):
+            problems.append(f"{label}: must be an object")
+            continue
+        for key in ("id", "label", "author", "credit", "license"):
+            value = pack.get(key)
+            if not isinstance(value, str) or not value.strip():
+                problems.append(f"{label}.{key}: must be a non-empty string")
+        url = pack.get("url")
+        if url is not None and not isinstance(url, str):
+            problems.append(f"{label}.url: must be a string")
+        if not isinstance(pack.get("license_ok"), bool):
+            problems.append(f"{label}.license_ok: must be a boolean")
+    return problems
+
+
 def _validate_ui_full(section: Any, files: Optional[Set[str]]) -> List[str]:
     """Validate the full-pack ``ui`` block (Modern UI 9-slice backgrounds)."""
     if section is None:
@@ -967,6 +1082,39 @@ def _validate_ui_full(section: Any, files: Optional[Set[str]]) -> List[str]:
         problems.extend(
             f"ui.{p}" if not p.startswith("slices") else p
             for p in _validate_slices(slices, files))
+    for key in ("icons", "frames"):
+        mapping = section.get(key)
+        if mapping is None:
+            continue
+        if not isinstance(mapping, dict):
+            problems.append(f"ui.{key}: must be an object")
+            continue
+        for name, descriptor in mapping.items():
+            if not isinstance(name, str) or not _SLICE_NAME_RE.fullmatch(name):
+                problems.append(f"ui.{key} {name!r}: invalid name")
+                continue
+            problems.extend(
+                _validate_ui_licensed_asset(
+                    descriptor, files, f"ui.{key}.{name}"))
+    ornament = section.get("ornament")
+    if ornament is not None:
+        problems.extend(
+            _validate_ui_licensed_asset(ornament, files, "ui.ornament"))
+    font = section.get("font")
+    if font is not None:
+        problems.extend(_validate_ui_font(font, files))
+    effects = section.get("effects")
+    if effects is not None:
+        if not isinstance(effects, dict):
+            problems.append("ui.effects: must be an object")
+        else:
+            for name, descriptor in effects.items():
+                if not isinstance(name, str) or not _SLICE_NAME_RE.fullmatch(name):
+                    problems.append(f"ui.effects {name!r}: invalid name")
+                    continue
+                problems.extend(
+                    _validate_ui_effect(descriptor, files))
+    problems.extend(_validate_ui_packs(section.get("packs")))
     return problems
 
 
@@ -1797,11 +1945,38 @@ def _furniture_payload(theme: Theme) -> Dict[str, Any]:
 
 
 def _ui_payload(theme: Theme) -> Dict[str, Any]:
-    """Modern UI 9-slice backgrounds for Habblaud's own panels/buttons."""
+    """Modern UI 9-slice backgrounds + licensed icons/font/effects."""
     base = f"{ASSET_BASE}/{theme.id}"
     suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
-    slices = (theme.ui or {}).get("slices")
-    out: Dict[str, Any] = {}
+    ui = theme.ui or {}
+
+    def url(relative: Any) -> Optional[str]:
+        return f"{base}/{relative}{suffix}" if isinstance(relative, str) and relative else None
+
+    def licensed(descriptor: Any, *keys: str) -> Optional[Dict[str, Any]]:
+        if not isinstance(descriptor, dict):
+            return None
+        # The gate is evaluated server-side as well: a pack the builder marked
+        # not loadable never reaches the shell.
+        if descriptor.get("license_ok") is False:
+            return None
+        src = url(descriptor.get("src"))
+        if not src:
+            return None
+        out: Dict[str, Any] = {"src": src}
+        key_map = {"frames_per_row": "framesPerRow"}
+        for key in keys:
+            if key in descriptor:
+                out[key_map.get(key, key)] = descriptor.get(key)
+        for key in ("pack", "credit", "license"):
+            if key in descriptor:
+                out[key] = descriptor.get(key)
+        if "license_ok" in descriptor:
+            out["licenseOk"] = bool(descriptor.get("license_ok"))
+        return out
+
+    slices = ui.get("slices")
+    slice_out: Dict[str, Any] = {}
     if isinstance(slices, dict):
         for name, descriptor in slices.items():
             if not isinstance(descriptor, dict):
@@ -1809,13 +1984,52 @@ def _ui_payload(theme: Theme) -> Dict[str, Any]:
             src = descriptor.get("src")
             if not isinstance(src, str) or not src:
                 continue
-            out[name] = {
+            slice_out[name] = {
                 "src": f"{base}/{src}{suffix}",
                 "slice": list(descriptor.get("slice") or []),
                 "width": descriptor.get("width"),
                 "repeat": descriptor.get("repeat"),
+                "ink": descriptor.get("ink"),
+                "pack": descriptor.get("pack"),
             }
-    return {"slices": out}
+    out: Dict[str, Any] = {"slices": slice_out}
+    for key in ("icons", "frames"):
+        mapping = ui.get(key)
+        if isinstance(mapping, dict):
+            entries: Dict[str, Any] = {}
+            for name, descriptor in mapping.items():
+                entry = licensed(descriptor, "width", "height")
+                if entry is not None:
+                    entries[str(name)] = entry
+            out[key] = entries
+    ornament = licensed(ui.get("ornament"), "width", "height")
+    if ornament is not None:
+        out["ornament"] = ornament
+    font = licensed(ui.get("font"), "cell", "cols", "rows", "glyphs", "scale")
+    if font is not None:
+        out["font"] = font
+    effects = ui.get("effects")
+    if isinstance(effects, dict):
+        effect_out: Dict[str, Any] = {}
+        for name, descriptor in effects.items():
+            entry = licensed(
+                descriptor, "frames", "fps", "width", "height",
+                "frames_per_row")
+            if entry is not None:
+                effect_out[str(name)] = entry
+        out["effects"] = effect_out
+    packs = ui.get("packs")
+    if isinstance(packs, list):
+        pack_out: List[Dict[str, Any]] = []
+        for pack in packs:
+            if not isinstance(pack, dict):
+                continue
+            entry = dict(pack)
+            if "license_ok" in entry:
+                entry["licenseOk"] = bool(entry.pop("license_ok"))
+            pack_out.append(entry)
+        out["packs"] = pack_out
+    return out
 
 
 def theme_payload(cfg: Any, requested: Optional[str] = None) -> Dict[str, Any]:

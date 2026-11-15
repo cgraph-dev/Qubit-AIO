@@ -193892,6 +193892,21 @@ create: function(game) {
 		],
 		dialog: ["dialog", "panel"],
 		button: ["button", "panel"],
+		"button-secondary": [
+			"button-secondary",
+			"button",
+			"panel"
+		],
+		"icon-button": [
+			"icon-button",
+			"button",
+			"panel"
+		],
+		hud: [
+			"hud",
+			"panel",
+			"dialog"
+		],
 		tab: [
 			"tab",
 			"button",
@@ -193909,6 +193924,9 @@ create: function(game) {
 		"card",
 		"dialog",
 		"button",
+		"button-secondary",
+		"icon-button",
+		"hud",
 		"tab",
 		"input"
 	];
@@ -193925,6 +193943,12 @@ create: function(game) {
 		const chain = OFFICE_UI_SLICE_CHAIN[role] || [];
 		for (const candidate of chain) if (slices[candidate]) return candidate;
 	}
+	/** The resolved descriptor for a role, or undefined when classic/absent. */
+	function officeUiSliceDescriptor(theme, role) {
+		const name = officeUiSliceName(theme, role);
+		if (!name || !theme || !theme.ui || !theme.ui.slices) return void 0;
+		return theme.ui.slices[name];
+	}
 	/**
 	* The data attributes one shell element should carry for a role.
 	*
@@ -193937,7 +193961,41 @@ create: function(game) {
 		if (!officeUiSliceName(theme, role)) return {};
 		const attrs = { "data-office-ui-slice": role };
 		if (filled) attrs["data-office-ui-filled"] = "true";
+		const descriptor = officeUiSliceDescriptor(theme, role);
+		if (descriptor && (descriptor.ink === "light" || descriptor.ink === "dark")) attrs["data-office-ui-ink"] = descriptor.ink;
 		return attrs;
+	}
+	function licensedUi(entry) {
+		if (!entry || typeof entry !== "object" || !entry.src) return void 0;
+		if (entry.licenseOk === false) return void 0;
+		return entry;
+	}
+	function officeUiIcon(theme, name) {
+		if (!theme || !theme.active || !theme.ui) return void 0;
+		return licensedUi(theme.ui.icons && theme.ui.icons[name]);
+	}
+	function officeUiFrame(theme, name) {
+		if (!theme || !theme.active || !theme.ui) return void 0;
+		return licensedUi(theme.ui.frames && theme.ui.frames[name]);
+	}
+	function officeUiOrnament(theme) {
+		if (!theme || !theme.active || !theme.ui) return void 0;
+		return licensedUi(theme.ui.ornament);
+	}
+	function officeUiFont(theme) {
+		if (!theme || !theme.active || !theme.ui) return void 0;
+		const font = licensedUi(theme.ui.font);
+		if (!font) return void 0;
+		if (!(font.cell > 0) || !(font.cols > 0) || !(font.rows > 0)) return void 0;
+		if (typeof font.glyphs !== "string" || !font.glyphs) return void 0;
+		return font;
+	}
+	function officeUiEffect(theme, name) {
+		if (!theme || !theme.active || !theme.ui) return void 0;
+		const effect = licensedUi(theme.ui.effects && theme.ui.effects[name]);
+		if (!effect) return void 0;
+		if (!(effect.frames > 0) || !(effect.width > 0) || !(effect.height > 0)) return;
+		return effect;
 	}
 	function cssString(value) {
 		return String(value).replace(/\\/g, "\\\\").replace(/"/g, "\\\"");
@@ -193961,7 +194019,8 @@ create: function(game) {
 			slice: numbers,
 			width,
 			repeat,
-			src
+			src,
+			ink: descriptor.ink
 		};
 	}
 	/**
@@ -193996,7 +194055,7 @@ create: function(game) {
 			lines.push("}");
 			lines.push(`${target}[data-office-ui-filled="true"] {`);
 			lines.push(`  border-image-slice: ${descriptor.slice.join(" ")} fill;`);
-			lines.push("  color: #2a1a12;");
+			lines.push(`  color: ${descriptor.ink === "light" ? "#f6ecdd" : "#2a1a12"};`);
 			lines.push("}");
 		}
 		return lines.length ? `${lines.join("\n")}\n` : "";
@@ -194150,9 +194209,118 @@ create: function(game) {
 			if (root && root.getAttribute("data-office-theme") === id && !doc.querySelector("link[data-office-theme]")) root.removeAttribute("data-office-theme");
 		};
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/PixelText.tsx
+	/**
+	* The glyph layout for a string, or null when the font is absent or any
+	* non-space character is outside the pack's declared glyph order.
+	*/
+	function pixelGlyphs(text, font, size) {
+		if (!font || !(size > 0)) return null;
+		const cell = Number(font.cell);
+		const cols = Number(font.cols);
+		if (!(cell > 0) || !(cols > 0) || !font.glyphs) return null;
+		const glyphIndex = /* @__PURE__ */ new Map();
+		for (let i = 0; i < font.glyphs.length; i += 1) if (!glyphIndex.has(font.glyphs[i])) glyphIndex.set(font.glyphs[i], i);
+		const scale = size / cell;
+		const glyphSize = cell * scale;
+		const backgroundSize = `${font.cols * cell * scale}px ${font.rows * cell * scale}px`;
+		const glyphs = [];
+		for (const char of Array.from(String(text || ""))) {
+			if (char === " ") {
+				glyphs.push({
+					char,
+					index: null,
+					col: 0,
+					row: 0,
+					style: {
+						width: `${glyphSize * .5}px`,
+						height: `${glyphSize}px`
+					}
+				});
+				continue;
+			}
+			const index = glyphIndex.get(char);
+			if (index === void 0) return null;
+			const col = index % font.cols;
+			const row = Math.floor(index / font.cols);
+			glyphs.push({
+				char,
+				index,
+				col,
+				row,
+				style: {
+					width: `${glyphSize}px`,
+					height: `${glyphSize}px`,
+					backgroundImage: `url("${font.src}")`,
+					backgroundSize,
+					backgroundPosition: `-${col * glyphSize}px -${row * glyphSize}px`
+				}
+			});
+		}
+		return glyphs;
+	}
+	function createPixelText(R) {
+		return function PixelText(props) {
+			const font = officeUiFont(props.theme);
+			const size = props.size ?? (font ? font.cell * (font.scale ?? .5) : 16);
+			const glyphs = pixelGlyphs(props.text, font, size);
+			const common = {
+				className: "office-pixel-text" + (props.className ? ` ${props.className}` : ""),
+				"data-testid": props["data-testid"],
+				"data-office-font": font ? "pixel" : "fallback"
+			};
+			if (!glyphs) return R.createElement("span", {
+				...common,
+				"data-office-font": "fallback"
+			}, props.text);
+			return R.createElement("span", {
+				...common,
+				role: "img",
+				"aria-label": props.text,
+				title: props.text
+			}, glyphs.map((glyph, index) => R.createElement("span", {
+				key: `${glyph.char}:${index}`,
+				className: "office-pixel-text__glyph",
+				"aria-hidden": "true",
+				style: glyph.style
+			})));
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/ThemeIcon.tsx
+	function createThemeIcon(R) {
+		return function ThemeIcon(props) {
+			const icon = officeUiIcon(props.theme, props.name);
+			if (!icon) return null;
+			return R.createElement("img", {
+				className: "office-theme-icon" + (props.className ? ` ${props.className}` : ""),
+				src: icon.src,
+				width: icon.width,
+				height: icon.height,
+				alt: "",
+				"aria-hidden": "true",
+				"data-office-ui-icon": props.name,
+				loading: "lazy",
+				decoding: "async"
+			});
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/AgentsPanel.tsx
 	/** The panel portrait box. The payload's portrait tier is 32px (see Task 4). */
 	var PORTRAIT_PX = 32;
+	var THEME_COMPONENTS = /* @__PURE__ */ new WeakMap();
+	/** Stable component identities per host React, so a re-render reconciles. */
+	function themeComponents(R) {
+		const key = R;
+		let entry = THEME_COMPONENTS.get(key);
+		if (!entry) {
+			entry = {
+				PixelText: createPixelText(R),
+				ThemeIcon: createThemeIcon(R)
+			};
+			THEME_COMPONENTS.set(key, entry);
+		}
+		return entry;
+	}
 	function seatMeta(seat) {
 		const meta = [seatTypeLabel(seat.seat_type)];
 		if (seat.room) meta.push(seat.room === "boardroom" ? "Boardroom" : seat.room);
@@ -194249,7 +194417,12 @@ create: function(game) {
 					event.stopPropagation?.();
 					interaction.onTalk?.(seat);
 				}
-			}, "Talk") : null
+			}, [R.createElement(themeComponents(R).ThemeIcon, {
+				key: "i",
+				theme,
+				name: "talk",
+				className: "office-theme-btn-icon"
+			}), R.createElement("span", { key: "t" }, "Talk")]) : null
 		]);
 	}
 	/**
@@ -194294,7 +194467,12 @@ create: function(game) {
 			}, [R.createElement("span", {
 				key: "n",
 				className: "agents-panel__cardName"
-			}, seat.name), R.createElement("span", {
+			}, R.createElement(themeComponents(R).PixelText, {
+				key: "p",
+				theme,
+				text: seat.name,
+				size: 12
+			})), R.createElement("span", {
 				key: "m",
 				className: "agents-panel__cardMeta"
 			}, seatMeta(seat).join(" · "))]),
@@ -194318,7 +194496,12 @@ create: function(game) {
 				"aria-label": `Talk with ${seat.name}`,
 				onClick: () => onTalk(seat),
 				...officeUiSliceAttrs(theme, "button", true)
-			}, "Talk") : null
+			}, [R.createElement(themeComponents(R).ThemeIcon, {
+				key: "i",
+				theme,
+				name: "talk",
+				className: "office-theme-btn-icon"
+			}), R.createElement("span", { key: "t" }, "Talk")]) : null
 		]);
 	}
 	/** One division: a heading with its REAL headcount, then its seats. */
@@ -194803,15 +194986,22 @@ create: function(game) {
 	}
 	function createTalkPanel(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
+		const PixelText = createPixelText(R);
+		const ThemeIcon = createThemeIcon(R);
 		return function TalkPanel(props) {
 			const [state, setState] = useState({ kind: "loading" });
 			const [draft, setDraft] = useState("");
 			const [sending, setSending] = useState(false);
 			const [notice, setNotice] = useState("");
+			const [effectPlaying, setEffectPlaying] = useState(false);
+			const effectTimer = useRef(null);
 			const listRef = useRef(null);
 			const seat = props.seat;
 			const sessionId = talkSessionId(seat);
 			const theme = props.theme ?? null;
+			const ornament = officeUiOrnament(theme);
+			const avatarFrame = officeUiFrame(theme, "avatar");
+			const successEffect = officeUiEffect(theme, "success");
 			useEffect(() => {
 				let live = true;
 				setState({ kind: "loading" });
@@ -194830,6 +195020,9 @@ create: function(game) {
 				seat.name,
 				props.base
 			]);
+			useEffect(() => () => {
+				if (effectTimer.current !== null && typeof window !== "undefined") window.clearTimeout(effectTimer.current);
+			}, []);
 			useEffect(() => {
 				if (state.kind !== "ready") return;
 				const node = listRef.current;
@@ -194870,6 +195063,12 @@ create: function(game) {
 					return;
 				}
 				setDraft("");
+				if (successEffect && typeof window !== "undefined") {
+					setEffectPlaying(true);
+					if (effectTimer.current !== null) window.clearTimeout(effectTimer.current);
+					const duration = Math.max(400, Math.round(successEffect.frames / Math.max(1, successEffect.fps) * 1e3));
+					effectTimer.current = window.setTimeout(() => setEffectPlaying(false), duration);
+				}
 				const next = await fetchTalkTranscript(seat, {
 					base: props.base,
 					fetchImpl: props.fetchImpl
@@ -194882,7 +195081,13 @@ create: function(game) {
 				event.preventDefault?.();
 				onSubmit({ preventDefault: () => {} });
 			};
-			const portrait = seatAvatar(R, seat, theme);
+			const avatar = seatAvatar(R, seat, theme);
+			const portrait = avatarFrame ? R.createElement("span", {
+				key: "portraitFrame",
+				className: "office-talk__portraitFrame",
+				"data-testid": "talk-portrait-frame",
+				style: { backgroundImage: `url("${avatarFrame.src}")` }
+			}, avatar) : avatar;
 			const role = seatTypeLabel(seat.seat_type);
 			const room = seat.room ? seat.room === "boardroom" ? "Boardroom" : seat.room : "No room";
 			const visible = state.kind === "ready" ? visibleTalkMessages(state.messages) : [];
@@ -194905,11 +195110,28 @@ create: function(game) {
 						key: "who",
 						className: "office-talk__who"
 					}, [
+						ornament ? R.createElement("span", {
+							key: "ornament",
+							className: "office-talk__ornament",
+							"aria-hidden": "true",
+							style: { backgroundImage: `url("${ornament.src}")` }
+						}) : null,
 						R.createElement("h2", {
 							key: "n",
 							className: "office-talk__name",
 							"data-testid": "talk-name"
-						}, seat.name),
+						}, [R.createElement(ThemeIcon, {
+							key: "i",
+							theme,
+							name: "talk",
+							className: "office-talk__headIcon"
+						}), R.createElement(PixelText, {
+							key: "t",
+							theme,
+							text: seat.name,
+							size: 18,
+							"data-testid": "talk-name-pixel"
+						})]),
 						R.createElement("p", {
 							key: "r",
 							className: "office-talk__meta",
@@ -194935,8 +195157,13 @@ create: function(game) {
 						"data-testid": "talk-close",
 						"aria-label": `Close conversation with ${seat.name}`,
 						onClick: () => props.onClose(),
-						...officeUiSliceAttrs(theme, "panel", true)
-					}, "Close")
+						...officeUiSliceAttrs(theme, "icon-button", true)
+					}, [R.createElement(ThemeIcon, {
+						key: "i",
+						theme,
+						name: "close",
+						className: "office-talk__btnIcon"
+					}), R.createElement("span", { key: "t" }, "Close")])
 				]),
 				R.createElement("div", {
 					key: "body",
@@ -194969,8 +195196,13 @@ create: function(game) {
 						onClick: () => {
 							onStart();
 						},
-						...officeUiSliceAttrs(theme, "panel", true)
-					}, "Start conversation")]) : null,
+						...officeUiSliceAttrs(theme, "button", true)
+					}, [R.createElement(ThemeIcon, {
+						key: "i",
+						theme,
+						name: "talk",
+						className: "office-talk__btnIcon"
+					}), R.createElement("span", { key: "t" }, "Start conversation")])]) : null,
 					state.kind === "ready" ? emptyTranscript ? R.createElement("p", {
 						key: "empty-transcript",
 						className: "office-talk__note",
@@ -195007,7 +195239,7 @@ create: function(game) {
 						placeholder: canStart ? "Start the conversation to write a message." : state.kind === "unavailable" ? "Conversation unavailable." : "Write a message…",
 						onChange: (event) => setDraft(event.target.value),
 						onKeyDown: onComposerKeyDown,
-						...officeUiSliceAttrs(theme, "panel", true)
+						...officeUiSliceAttrs(theme, "input", true)
 					}),
 					R.createElement("div", {
 						key: "actions",
@@ -195019,8 +195251,28 @@ create: function(game) {
 						"data-testid": "talk-send",
 						disabled: !canCompose || !String(draft).trim(),
 						"aria-busy": sending ? "true" : void 0,
-						...officeUiSliceAttrs(theme, "panel", true)
-					}, sending ? "Sending…" : "Send")]),
+						...officeUiSliceAttrs(theme, "button", true)
+					}, [R.createElement(ThemeIcon, {
+						key: "i",
+						theme,
+						name: "send",
+						className: "office-talk__btnIcon"
+					}), R.createElement("span", { key: "t" }, sending ? "Sending…" : "Send")]), successEffect && effectPlaying ? R.createElement("span", {
+						key: "effect",
+						className: "office-talk__effect",
+						"data-testid": "talk-effect",
+						"data-office-effect": "success",
+						"aria-hidden": "true",
+						style: {
+							backgroundImage: `url("${successEffect.src}")`,
+							width: `${successEffect.width}px`,
+							height: `${successEffect.height}px`,
+							animationDuration: `${(successEffect.frames / Math.max(1, successEffect.fps)).toFixed(3)}s`,
+							animationTimingFunction: `steps(${successEffect.frames})`,
+							"--office-effect-frames": String(successEffect.frames),
+							"--office-effect-width": `${successEffect.width}px`
+						}
+					}) : null]),
 					R.createElement("p", {
 						key: "note",
 						id: "talk-composer-note",
@@ -209960,6 +210212,8 @@ create: function(game) {
 			}),
 			AgentsPanel: createAgentsPanel(R, hooks),
 			TalkPanel: createTalkPanel(R, hooks),
+			PixelText: createPixelText(R),
+			ThemeIcon: createThemeIcon(R),
 			SeatModelPanel: createSeatModelPanel(R, hooks),
 			AgentControlDrawer: createAgentControlDrawer(R, hooks),
 			WarRoomPanel: createWarRoomPanel(R, hooks),
@@ -210105,7 +210359,7 @@ create: function(game) {
 				}
 			};
 			const requestedTheme = hostThemeRequest();
-			const { HudDock, AgentsPanel, TalkPanel, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
+			const { HudDock, AgentsPanel, TalkPanel, PixelText, ThemeIcon, SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder, OutsideWorld, PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel, LoadingScreen } = shellComponents(R, hooks, props.base);
 			useEffect(() => {
 				if (!studioOpen || studioTab !== "outside") return;
 				let live = true;
@@ -210392,7 +210646,22 @@ create: function(game) {
 			const dockUiAttrs = officeUiSliceAttrs(officeTheme, "dock");
 			const buttonUiAttrs = officeUiSliceAttrs(officeTheme, "button", true);
 			const tabUiAttrs = officeUiSliceAttrs(officeTheme, "tab");
-			const panelUiAttrs = officeUiSliceAttrs(officeTheme, "panel", true);
+			const dialogUiAttrs = officeUiSliceAttrs(officeTheme, "dialog", true);
+			const title = (key, label, icon) => R.createElement("span", {
+				key,
+				className: "office-theme-dock-title office-theme-dock-title--icon"
+			}, [R.createElement(ThemeIcon, {
+				key: "i",
+				theme: officeTheme,
+				name: icon,
+				className: "office-theme-dock-icon"
+			}), R.createElement(PixelText, {
+				key: "t",
+				theme: officeTheme,
+				text: label,
+				size: 12
+			})]);
+			const packCredits = (officeTheme?.ui?.packs || []).map((pack) => pack.credit).filter((credit) => Boolean(credit));
 			const children = [
 				R.createElement("a", {
 					key: "skip-main",
@@ -210440,17 +210709,27 @@ create: function(game) {
 					className: "office-game__credits",
 					"data-testid": "office-app-credits",
 					role: "note",
-					"aria-label": "Art credit"
-				}, R.createElement("a", {
-					key: "limezu",
-					href: OFFICE_ART_CREDIT_URL,
-					target: "_blank",
-					rel: "noopener noreferrer"
-				}, OFFICE_ART_CREDIT), R.createElement("span", { key: "sep" }, " · "), R.createElement("a", {
-					key: "legal",
-					href: OFFICE_BRAND.legalUrl,
-					title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`
-				}, OFFICE_BRAND.legalLabel))
+					"aria-label": "Art credit",
+					"data-office-packs": (officeTheme?.ui?.packs || []).map((pack) => pack.id).join(","),
+					title: packCredits.join(" · ")
+				}, ...[
+					R.createElement("a", {
+						key: "limezu",
+						href: OFFICE_ART_CREDIT_URL,
+						target: "_blank",
+						rel: "noopener noreferrer"
+					}, OFFICE_ART_CREDIT),
+					R.createElement("span", { key: "sep" }, " · "),
+					R.createElement("a", {
+						key: "legal",
+						href: OFFICE_BRAND.legalUrl,
+						title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`
+					}, OFFICE_BRAND.legalLabel),
+					packCredits.length ? R.createElement("span", {
+						key: "packs",
+						className: "office-game__creditsPacks"
+					}, ` · UI packs: ${packCredits.join(" · ")}`) : null
+				])
 			];
 			children.push(R.createElement("div", {
 				key: "announcer",
@@ -210540,10 +210819,7 @@ create: function(game) {
 				key: "head",
 				className: "office-game__dockHead office-theme-dock-head"
 			}, [
-				R.createElement("span", {
-					key: "t",
-					className: "office-theme-dock-title"
-				}, "Agents"),
+				title("t", "Agents", "agents"),
 				R.createElement("button", {
 					key: "warroom",
 					type: "button",
@@ -210559,7 +210835,12 @@ create: function(game) {
 						setControlSeat(null);
 						setWarRoomOpen(true);
 					}
-				}, "War Room"),
+				}, [R.createElement(ThemeIcon, {
+					key: "i",
+					theme: officeTheme,
+					name: "warroom",
+					className: "office-theme-btn-icon"
+				}), R.createElement("span", { key: "t" }, "War Room")]),
 				R.createElement("button", {
 					key: "etsy",
 					type: "button",
@@ -210587,7 +210868,12 @@ create: function(game) {
 					"data-office-slice": buttonSlice,
 					...buttonUiAttrs,
 					onClick: () => setAgentsOpen(false)
-				}, "Close")
+				}, [R.createElement(ThemeIcon, {
+					key: "i",
+					theme: officeTheme,
+					name: "close",
+					className: "office-theme-btn-icon"
+				}), R.createElement("span", { key: "t" }, "Close")])
 			]), R.createElement(AgentsPanel, {
 				key: "body",
 				base: props.base,
@@ -210607,7 +210893,7 @@ create: function(game) {
 				"data-testid": "office-game-talk-dock",
 				"data-office-dock": "talk",
 				"data-office-slice": dockSlice,
-				...panelUiAttrs,
+				...dialogUiAttrs,
 				role: "region",
 				"aria-label": `Talk with ${talkSeat.name}`
 			}, [R.createElement(TalkPanel, {
@@ -210663,10 +210949,7 @@ create: function(game) {
 				key: "head",
 				className: "office-game__dockHead office-theme-dock-head"
 			}, [
-				R.createElement("span", {
-					key: "t",
-					className: "office-theme-dock-title"
-				}, "Approvals"),
+				title("t", "Approvals", "approvals"),
 				R.createElement("span", {
 					key: "count",
 					className: "office-game__approvalsCount",
@@ -210682,7 +210965,12 @@ create: function(game) {
 					"data-office-slice": buttonSlice,
 					...buttonUiAttrs,
 					onClick: () => setApprovalsOpen(false)
-				}, "Close")
+				}, [R.createElement(ThemeIcon, {
+					key: "i",
+					theme: officeTheme,
+					name: "close",
+					className: "office-theme-btn-icon"
+				}), R.createElement("span", { key: "t" }, "Close")])
 			]), R.createElement(ApprovalsPanel, {
 				key: "body",
 				base: props.base,
@@ -210718,10 +211006,7 @@ create: function(game) {
 				key: "head",
 				className: "office-game__dockHead office-theme-dock-head"
 			}, [
-				R.createElement("span", {
-					key: "t",
-					className: "office-theme-dock-title"
-				}, "HUD"),
+				title("t", "HUD", "agents"),
 				R.createElement("a", {
 					key: "open",
 					className: "office-game__hudLink office-theme-dock-link",
@@ -210737,7 +211022,12 @@ create: function(game) {
 					"data-office-slice": buttonSlice,
 					...buttonUiAttrs,
 					onClick: () => setHudOpen(false)
-				}, "Close")
+				}, [R.createElement(ThemeIcon, {
+					key: "i",
+					theme: officeTheme,
+					name: "close",
+					className: "office-theme-btn-icon"
+				}), R.createElement("span", { key: "t" }, "Close")])
 			]), R.createElement(HudDock, { key: "body" })]));
 			if (menuFallback) children.push(R.createElement("div", {
 				key: "menu-fallback",
@@ -210857,10 +211147,7 @@ create: function(game) {
 					key: "head",
 					className: "office-game__dockHead office-theme-dock-head"
 				}, [
-					R.createElement("span", {
-						key: "t",
-						className: "office-theme-dock-title"
-					}, "Studio"),
+					title("t", "Studio", "studio"),
 					tab("panels", "Panels"),
 					tab("rooms", "Rooms"),
 					tab("outside", "Outside"),
@@ -210871,7 +211158,12 @@ create: function(game) {
 						"data-testid": "office-game-studio-close",
 						"aria-label": "Close studio",
 						onClick: () => setStudioOpen(false)
-					}, "Close")
+					}, [R.createElement(ThemeIcon, {
+						key: "i",
+						theme: officeTheme,
+						name: "close",
+						className: "office-theme-btn-icon"
+					}), R.createElement("span", { key: "t" }, "Close")])
 				]), R.createElement("div", {
 					key: "body",
 					className: "office-game__studioBody"
@@ -210918,7 +211210,17 @@ create: function(game) {
 					key: "head",
 					className: "office-game__campusHead"
 				}, [R.createElement("div", { key: "title" }, [
-					R.createElement("h2", { key: "h" }, "Qubit Campus"),
+					R.createElement("h2", { key: "h" }, [R.createElement(ThemeIcon, {
+						key: "i",
+						theme: officeTheme,
+						name: "campus",
+						className: "office-theme-dock-icon"
+					}), R.createElement(PixelText, {
+						key: "t",
+						theme: officeTheme,
+						text: "Qubit Campus",
+						size: 16
+					})]),
 					R.createElement("p", {
 						key: "counts",
 						"data-testid": "office-campus-counts"

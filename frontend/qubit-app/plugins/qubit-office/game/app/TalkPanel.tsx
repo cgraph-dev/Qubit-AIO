@@ -23,10 +23,15 @@ import { seatTypeLabel, type AgentSeat } from "./agents-panel";
 import {
   type OfficeTheme,
   initialsFor,
+  officeUiEffect,
+  officeUiFrame,
+  officeUiOrnament,
   officeUiSliceAttrs,
   portraitCellStyle,
   themeAtlasUrls,
 } from "./office-theme";
+import { createPixelText } from "./PixelText";
+import { createThemeIcon } from "./ThemeIcon";
 import {
   type TalkMessage,
   type TalkState,
@@ -155,16 +160,23 @@ export function createTalkPanel(
   hooks: OfficeGameShellProps["hooks"],
 ) {
   const { useState, useEffect, useRef } = hooks;
+  const PixelText = createPixelText(R);
+  const ThemeIcon = createThemeIcon(R);
 
   return function TalkPanel(props: TalkPanelProps) {
     const [state, setState] = useState<TalkState>({ kind: "loading" });
     const [draft, setDraft] = useState("");
     const [sending, setSending] = useState(false);
     const [notice, setNotice] = useState("");
+    const [effectPlaying, setEffectPlaying] = useState(false);
+    const effectTimer = useRef<number | null>(null);
     const listRef = useRef<HTMLOListElement | null>(null);
     const seat = props.seat;
     const sessionId = talkSessionId(seat);
     const theme = props.theme ?? null;
+    const ornament = officeUiOrnament(theme);
+    const avatarFrame = officeUiFrame(theme, "avatar");
+    const successEffect = officeUiEffect(theme, "success");
 
     // Read the canonical transcript whenever the seat changes. The guard is
     // the seat identity, not a timer: no polling, no invented live updates.
@@ -177,6 +189,14 @@ export function createTalkPanel(
       }).then((next) => { if (live) setState(next); });
       return () => { live = false; };
     }, [seat.slug, seat.name, props.base]);
+
+    // A feedback effect is a one-shot acknowledgement of a REAL completed
+    // action; it is never started on open, on render, or on a failure.
+    useEffect(() => () => {
+      if (effectTimer.current !== null && typeof window !== "undefined") {
+        window.clearTimeout(effectTimer.current);
+      }
+    }, []);
 
     // Keep the newest real row visible after a load or a completed send.
     useEffect(() => {
@@ -226,6 +246,16 @@ export function createTalkPanel(
         return;
       }
       setDraft("");
+      if (successEffect && typeof window !== "undefined") {
+        setEffectPlaying(true);
+        if (effectTimer.current !== null) {
+          window.clearTimeout(effectTimer.current);
+        }
+        const duration = Math.max(
+          400, Math.round((successEffect.frames / Math.max(1, successEffect.fps)) * 1000));
+        effectTimer.current = window.setTimeout(
+          () => setEffectPlaying(false), duration);
+      }
       // Re-read the canonical store instead of appending an optimistic copy:
       // the real rows (including the just-completed turn) are the transcript.
       const next = await fetchTalkTranscript(seat, {
@@ -243,7 +273,15 @@ export function createTalkPanel(
       void onSubmit({ preventDefault: () => {} });
     };
 
-    const portrait = seatAvatar(R, seat, theme);
+    const avatar = seatAvatar(R, seat, theme);
+    const portrait = avatarFrame
+      ? R.createElement("span", {
+          key: "portraitFrame",
+          className: "office-talk__portraitFrame",
+          "data-testid": "talk-portrait-frame",
+          style: { backgroundImage: `url("${avatarFrame.src}")` },
+        }, avatar)
+      : avatar;
     const role = seatTypeLabel(seat.seat_type);
     const room = seat.room
       ? (seat.room === "boardroom" ? "Boardroom" : seat.room)
@@ -266,10 +304,25 @@ export function createTalkPanel(
       }, [
         portrait,
         R.createElement("div", { key: "who", className: "office-talk__who" }, [
+          ornament
+            ? R.createElement("span", {
+                key: "ornament", className: "office-talk__ornament",
+                "aria-hidden": "true",
+                style: { backgroundImage: `url("${ornament.src}")` },
+              })
+            : null,
           R.createElement("h2", {
             key: "n", className: "office-talk__name",
             "data-testid": "talk-name",
-          }, seat.name),
+          }, [
+            R.createElement(ThemeIcon as never, {
+              key: "i", theme, name: "talk", className: "office-talk__headIcon",
+            }),
+            R.createElement(PixelText as never, {
+              key: "t", theme, text: seat.name, size: 18,
+              "data-testid": "talk-name-pixel",
+            }),
+          ]),
           R.createElement("p", {
             key: "r", className: "office-talk__meta",
             "data-testid": "talk-role",
@@ -292,8 +345,13 @@ export function createTalkPanel(
           "data-testid": "talk-close",
           "aria-label": `Close conversation with ${seat.name}`,
           onClick: () => props.onClose(),
-          ...officeUiSliceAttrs(theme, "panel", true),
-        }, "Close"),
+          ...officeUiSliceAttrs(theme, "icon-button", true),
+        }, [
+          R.createElement(ThemeIcon as never, {
+            key: "i", theme, name: "close", className: "office-talk__btnIcon",
+          }),
+          R.createElement("span", { key: "t" }, "Close"),
+        ]),
       ]),
       R.createElement("div", {
         key: "body", className: "office-talk__body",
@@ -326,8 +384,13 @@ export function createTalkPanel(
                 className: "office-game__btn office-talk__start",
                 "data-testid": "talk-start",
                 onClick: () => { void onStart(); },
-                ...officeUiSliceAttrs(theme, "panel", true),
-              }, "Start conversation"),
+                ...officeUiSliceAttrs(theme, "button", true),
+              }, [
+                R.createElement(ThemeIcon as never, {
+                  key: "i", theme, name: "talk", className: "office-talk__btnIcon",
+                }),
+                R.createElement("span", { key: "t" }, "Start conversation"),
+              ]),
             ])
           : null,
         state.kind === "ready"
@@ -371,7 +434,7 @@ export function createTalkPanel(
           onChange: (event: { target: { value: string } }) =>
             setDraft(event.target.value),
           onKeyDown: onComposerKeyDown,
-          ...officeUiSliceAttrs(theme, "panel", true),
+          ...officeUiSliceAttrs(theme, "input", true),
         }),
         R.createElement("div", {
           key: "actions", className: "office-talk__actions",
@@ -382,8 +445,32 @@ export function createTalkPanel(
             "data-testid": "talk-send",
             disabled: !canCompose || !String(draft).trim(),
             "aria-busy": sending ? "true" : undefined,
-            ...officeUiSliceAttrs(theme, "panel", true),
-          }, sending ? "Sending…" : "Send"),
+            ...officeUiSliceAttrs(theme, "button", true),
+          }, [
+            R.createElement(ThemeIcon as never, {
+              key: "i", theme, name: "send", className: "office-talk__btnIcon",
+            }),
+            R.createElement("span", { key: "t" }, sending ? "Sending…" : "Send"),
+          ]),
+          successEffect && effectPlaying
+            ? R.createElement("span", {
+                key: "effect",
+                className: "office-talk__effect",
+                "data-testid": "talk-effect",
+                "data-office-effect": "success",
+                "aria-hidden": "true",
+                style: {
+                  backgroundImage: `url("${successEffect.src}")`,
+                  width: `${successEffect.width}px`,
+                  height: `${successEffect.height}px`,
+                  animationDuration:
+                    `${(successEffect.frames / Math.max(1, successEffect.fps)).toFixed(3)}s`,
+                  animationTimingFunction: `steps(${successEffect.frames})`,
+                  "--office-effect-frames": String(successEffect.frames),
+                  "--office-effect-width": `${successEffect.width}px`,
+                },
+              })
+            : null,
         ]),
         R.createElement("p", {
           key: "note", id: "talk-composer-note",

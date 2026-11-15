@@ -116,3 +116,22 @@ remain under their paid-art licence and must never be described as CC-BY.
   own purchase.
 - The attribution is persistent in the Qubit shell, so it does not depend on
   the owner having a theme pack installed.
+
+---
+
+## Owner-supplied UI packs (local build only)
+
+The additive UI layer can read six further owner-supplied packs through
+`scripts/office_theme_ui_packs.py`: **Dark Ages UI** (Hypnobius), **Dragon
+HUDs** and **Free Medieval Fantasy UI** (Kibyra), **Free - Raven Fantasy Icons**
+(Clockwork Raven Studios / Caio), **UI Fonts** (Kibyra), and **Super Pixel
+Effects Gigapack** (Will Tice / unTied Games). The exact archives, sha256s,
+licence terms, role mapping and redistribution posture are recorded in
+`THIRD_PARTY_NOTICES.md` §"Owner-supplied UI packs".
+
+None of that art is committed. A local pack is augmented outside the checkout;
+the payload carries `ui.packs` credit/licence entries and the shell shows the
+pack list in its persistent credits footer. The Raven archive ships no separate
+licence text and is recorded as owner-supplied, project-use-only and not
+redistributable. The Super Pixel Effects strip is used only for a real
+completed-send acknowledgement, never as fake progress.

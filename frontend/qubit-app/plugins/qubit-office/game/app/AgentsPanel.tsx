@@ -42,6 +42,8 @@ import {
   preloadThemeAtlases,
   themeAtlasUrls,
 } from "./office-theme";
+import { createPixelText } from "./PixelText";
+import { createThemeIcon } from "./ThemeIcon";
 
 export interface AgentsPanelProps {
   /** An explicit base path (a test); otherwise the host's injected global. */
@@ -68,6 +70,25 @@ export interface AgentsPanelProps {
 
 /** The panel portrait box. The payload's portrait tier is 32px (see Task 4). */
 const PORTRAIT_PX = 32;
+
+type PanelThemeComponents = {
+  PixelText: ReturnType<typeof createPixelText>;
+  ThemeIcon: ReturnType<typeof createThemeIcon>;
+};
+const THEME_COMPONENTS = new WeakMap<object, PanelThemeComponents>();
+
+/** Stable component identities per host React, so a re-render reconciles. */
+function themeComponents(
+  R: OfficeGameShellProps["React"],
+): PanelThemeComponents {
+  const key = R as unknown as object;
+  let entry = THEME_COMPONENTS.get(key);
+  if (!entry) {
+    entry = { PixelText: createPixelText(R), ThemeIcon: createThemeIcon(R) };
+    THEME_COMPONENTS.set(key, entry);
+  }
+  return entry;
+}
 
 /** The bit of a React keyboard event the card's navigation needs. */
 interface SeatKeyEvent {
@@ -207,7 +228,12 @@ function seatRow(
             event.stopPropagation?.();
             interaction.onTalk?.(seat);
           },
-        }, "Talk")
+        }, [
+          R.createElement(themeComponents(R).ThemeIcon as never, {
+            key: "i", theme, name: "talk", className: "office-theme-btn-icon",
+          }),
+          R.createElement("span", { key: "t" }, "Talk"),
+        ])
       : null,
   ]);
 }
@@ -269,7 +295,9 @@ function agentCard(
     }, [
       R.createElement("span", {
         key: "n", className: "agents-panel__cardName",
-      }, seat.name),
+      }, R.createElement(themeComponents(R).PixelText as never, {
+        key: "p", theme, text: seat.name, size: 12,
+      })),
       R.createElement("span", {
         key: "m", className: "agents-panel__cardMeta",
       }, seatMeta(seat).join(" \u00b7 ")),
@@ -293,7 +321,12 @@ function agentCard(
           "aria-label": `Talk with ${seat.name}`,
           onClick: () => onTalk(seat),
           ...officeUiSliceAttrs(theme, "button", true),
-        }, "Talk")
+        }, [
+          R.createElement(themeComponents(R).ThemeIcon as never, {
+            key: "i", theme, name: "talk", className: "office-theme-btn-icon",
+          }),
+          R.createElement("span", { key: "t" }, "Talk"),
+        ])
       : null,
   ]);
 }

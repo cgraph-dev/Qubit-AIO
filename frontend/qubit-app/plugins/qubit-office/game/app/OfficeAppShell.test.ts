@@ -450,7 +450,7 @@ describe("host theme + rerender stability", () => {
       (e) => e.props["data-testid"] === "office-game-talk-dock");
     expect(dock).toBeDefined();
     expect(dock?.props["data-office-dock"]).toBe("talk");
-    expect(dock?.props["data-office-ui-slice"]).toBe("panel");
+    expect(dock?.props["data-office-ui-slice"]).toBe("dialog");
     expect(dock?.props["data-office-ui-filled"]).toBe("true");
     expect(dock?.props["aria-label"]).toBe("Talk with Ada Lovelace");
     const root = h.tree.find((e) => e.props["data-testid"] === "office-app");

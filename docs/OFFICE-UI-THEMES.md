@@ -529,3 +529,65 @@ cd frontend/qubit-web && npx vitest run --config vitest.office-app.config.ts
 
 The exact counts and the real-build output are recorded in `docs/STATUS.md`
 and in the Task 1-10 lane reports, not guessed here.
+
+---
+
+## 12. Additive UI packs — Dark Ages, Dragon HUDs, Medieval, Raven, fonts, effects
+
+The Modern UI layer can also consume the owner's later UI packs without
+changing the base `qubit-office-theme/1` fields. A second, local build step
+writes their extracted files into an existing full pack and merges an additive
+`ui` block:
+
+```text
+ui.slices    panel/dialog/button/button-secondary/icon-button/input/tab/hud
+ui.frames    avatar (HUD frame)
+ui.ornament  ornament strip / crest
+ui.icons     talk/agents/warroom/timeline/studio/campus/command-center/
+             approvals/close/send
+ui.font      bitmap sheet, cell/cols/rows, glyph order, scale
+ui.effects   success sprite strip (frames/fps/width/height)
+ui.packs     per-pack credit + licence + licenceOk
+```
+
+Every entry is optional. The server validates that every `src` is a declared
+file in the pack's `files` map; an absent/blocked entry is omitted from the
+payload and the shell renders its built-in fallback (text/initial/no icon).
+`licenseOk:false` entries are dropped server-side **and** re-checked in the
+shell.
+
+Build the augmented local pack (outside the checkout):
+
+```bash
+python3 scripts/office_theme_ui_packs.py \
+  --source "/home/trick/Desktop/UI Office" \
+  --theme "$QUBIT_HOME/office/themes/limezu" \
+  --out /tmp/limezu-with-ui-packs
+python3 scripts/office_theme_ui_packs.py \
+  --source "/home/trick/Desktop/UI Office" \
+  --theme /tmp/limezu-with-ui-packs --check
+```
+
+`--check` prints the exact pack -> role map without writing. The extraction is
+deliberately fail-closed:
+
+- an absent optional pack is skipped (the shell keeps the existing frame);
+- a present pack missing a declared file raises `UIPackError`, so the manifest
+  is never written with a dangling `src`;
+- a pack whose recorded licence entry is not `allowed` is skipped;
+- the output directory must be outside the repository checkout.
+
+Role mapping in this build:
+
+| Role | Pack |
+|---|---|
+| `panel`, `dialog`, `button`, `button-secondary`, `icon-button`, `input`, `tab` | Dark Ages UI |
+| `hud` slice, `avatar` frame, close/confirm/map/quest/options/home icons | Dragon HUDs |
+| `talk` icon | Free Medieval Fantasy UI |
+| `warroom`, `timeline` icons | Raven Fantasy Icons |
+| heading/chrome bitmap font | UI Fonts (uı-1 yellow) |
+| `success` feedback effect | Super Pixel Effects (free version) |
+
+Licence/credit text for each pack is recorded in `THIRD_PARTY_NOTICES.md` and
+carried in the payload's `ui.packs`; no pack art is committed. The same
+`validate_theme` path the server uses validates the augmented pack.

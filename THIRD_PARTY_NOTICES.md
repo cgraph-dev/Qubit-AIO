@@ -1120,6 +1120,30 @@ Interiors archive is recorded here for provenance but is not read by the v1
 build. The build slices, positions and composites pixels; it does not train or
 generate art, and no art is minted as an NFT.
 
+## Owner-supplied UI packs — Qubit Office Modern UI layer (local build only)
+
+These packs are read from the owner's purchase folder
+(`/home/trick/Desktop/UI Office`) by
+`scripts/office_theme_ui_packs.py`. The script writes only into a **local**
+theme pack (`$QUBIT_HOME/office/themes/<id>` or an outside-the-checkout path);
+no image from these packs is committed, and every derived file is listed in the
+local pack's `files` map. Credit/licence text is carried into the payload's
+`ui.packs` block and shown by the shell.
+
+| Pack | Archive / sha256 | Licence / use | Role in Qubit |
+|---|---|---|---|
+| Dark Ages UI v1.0 (Hypnobius) | `DarkAgesUi_v1.0.zip` / `a66df9c2af0e8867f55a12955a94aa790aef26c5ab85c8c61d8b8c6960bea360` | Commercial/personal use allowed; modification allowed; **resale/redistribution prohibited**; no NFTs or AI training | `panel`, `dialog`, `button`, `button-secondary`, `icon-button`, `input`, `tab` 9-slice crops; ornament |
+| Dragon HUDs (Kibyra) | `dragon-huds.zip` / `75439a2b50ca6b554f41e3c377a649a53f465634200386de68b59c6d5aed91d4` | Personal/commercial use allowed; **redistribution/resale prohibited** | HUD avatar frame, `hud` status slice, close/confirm/map/quest/options/home icons |
+| Free Medieval Fantasy UI Pack (Kibyra) | `Free_Medieval_Fantasy_UI_Pack.zip` / `cb9de5447044ad68f71133c64ac7a8aea9f1297c9e71d7142564e0b5523db16b` | Free personal/commercial use; credit appreciated; **redistribution as-is prohibited** | Talk (speech-bubble) toolbar icon |
+| Free - Raven Fantasy Icons (Clockwork Raven Studios / Caio) | `Free - Raven Fantasy Icons.zip` / `3656dc0db6c4a3f9ddf38a24fb12c00988379b0dfe24e44cc3b2a36ae0539e13` | Owner-supplied free pack. **No separate licence text ships in the archive**; use is limited to this project and the art must not be redistributed. Recorded by owner direction | War Room and Timeline icons (`fc100`, `fc10`) |
+| UI Fonts (Kibyra) | `uı-fonts.zip` / `0a5116ac076d05b71d2ab916ed8ef52b55a529fa4faccc435cfb21ecd20c5b34` | Personal/commercial use allowed; **redistribution/resale prohibited** | 8x8-cell 32x32 bitmap font for headings/chrome only (not body paragraphs) |
+| Super Pixel Effects Gigapack, Free Version v3.2.0 (Will Tice / unTied Games) | `Super Pixel Effects Gigapack (Free Version) v3.2.0.zip` / `b52ad8d2a6460c9a54469a6750f3d779703faf51fa32ffb25fc2c7c616fffcdb` | Commercial/non-commercial use allowed with attribution; **redistribution of the pack prohibited**; AI training prohibited; full terms `http://untiedgames.com/files/license.txt` | One real `success` feedback sprite strip, played only after a completed chat send |
+
+The module refuses to include a pack whose `allowed` gate is false or whose
+recorded licence/credit is empty, skips a wholly absent optional pack, and
+**raises** if a present pack is missing a declared file. The theme loader then
+falls back to classic rather than serving a dangling asset.
+
 ## pixelfx — Qubit voice orb (`ghost` theme)
 
 **Upstream:** https://github.com/patch-gg/pixelfx

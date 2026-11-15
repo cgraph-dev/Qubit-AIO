@@ -2,8 +2,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   applyOfficeUiSlices,
+  officeUiEffect,
+  officeUiFont,
+  officeUiFrame,
+  officeUiIcon,
+  officeUiOrnament,
   officeUiSliceAttrs,
   officeUiSliceCss,
+  officeUiSliceInk,
   officeUiSliceName,
   type OfficeTheme,
 } from "./office-theme";
@@ -175,5 +181,119 @@ describe("applying the Modern UI stylesheet", () => {
     applyOfficeUiSlices(document, classic());
     expect(document.head.querySelectorAll("style[data-office-ui-slices]"))
       .toHaveLength(0);
+  });
+});
+
+// ======================================================================
+// Licensed icons / font / effects (additive UI pack blocks)
+// ======================================================================
+
+function licensedTheme(over: Partial<OfficeTheme> = {}): OfficeTheme {
+  const base = theme();
+  return {
+    ...base,
+    ui: {
+      slices: base.ui?.slices,
+      icons: {
+        talk: {
+          src: "/plugins/qubit-office/themes/limezu/ui/packs/icons/talk.png",
+          width: 32, height: 32, pack: "medieval",
+          credit: "Raven", license: "test", licenseOk: true,
+        },
+        blocked: {
+          src: "/plugins/qubit-office/themes/limezu/ui/packs/icons/blocked.png",
+          width: 32, height: 32, license: "test", licenseOk: false,
+        },
+      },
+      frames: {
+        avatar: {
+          src: "/plugins/qubit-office/themes/limezu/ui/packs/frames/avatar.png",
+          width: 80, height: 80, license: "test", licenseOk: true,
+        },
+      },
+      ornament: {
+        src: "/plugins/qubit-office/themes/limezu/ui/packs/ornament.png",
+        width: 192, height: 64, license: "test", licenseOk: true,
+      },
+      font: {
+        src: "/plugins/qubit-office/themes/limezu/ui/packs/fonts/ui-font.png",
+        cell: 32, cols: 8, rows: 8, glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz",
+        pack: "fonts", license: "test", licenseOk: true,
+      },
+      effects: {
+        success: {
+          src: "/plugins/qubit-office/themes/limezu/ui/packs/effects/success.png",
+          frames: 60, fps: 15, width: 40, height: 40,
+          framesPerRow: 60, license: "test", licenseOk: true,
+        },
+        blocked: {
+          src: "/plugins/qubit-office/themes/limezu/ui/packs/effects/blocked.png",
+          frames: 10, fps: 10, width: 16, height: 16, licenseOk: false,
+        },
+      },
+      packs: [{
+        id: "darkages", label: "Dark Ages", author: "Hypnobius",
+        credit: "Dark Ages — Hypnobius", license: "test", licenseOk: true,
+      }],
+    },
+    ...over,
+  };
+}
+
+describe("licensed UI assets", () => {
+  it("selects an allowed icon and drops a blocked/missing one", () => {
+    const t = licensedTheme();
+    expect(officeUiIcon(t, "talk")?.src).toContain("icons/talk.png");
+    expect(officeUiIcon(t, "blocked")).toBeUndefined();
+    expect(officeUiIcon(t, "missing")).toBeUndefined();
+    expect(officeUiIcon(classic(), "talk")).toBeUndefined();
+  });
+
+  it("selects frames/ornament/font/effect only when allowed", () => {
+    const t = licensedTheme();
+    expect(officeUiFrame(t, "avatar")?.width).toBe(80);
+    expect(officeUiOrnament(t)?.width).toBe(192);
+    expect(officeUiFont(t)?.cell).toBe(32);
+    expect(officeUiEffect(t, "success")?.frames).toBe(60);
+    expect(officeUiEffect(t, "blocked")).toBeUndefined();
+    expect(officeUiEffect(t, "missing")).toBeUndefined();
+    const blocked = licensedTheme();
+    if (blocked.ui) {
+      blocked.ui.font = { ...blocked.ui.font!, licenseOk: false };
+      blocked.ui.ornament = { ...blocked.ui.ornament!, licenseOk: false };
+    }
+    expect(officeUiFont(blocked)).toBeUndefined();
+    expect(officeUiOrnament(blocked)).toBeUndefined();
+  });
+
+  it("emits slice selectors for the new roles and the ink-aware colour", () => {
+    const t = licensedTheme();
+    const css = officeUiSliceCss(t);
+    expect(css).toContain(
+      '[data-office-ui-slice="button-secondary"]');
+    expect(css).toContain('[data-office-ui-slice="icon-button"]');
+    expect(css).toContain('[data-office-ui-slice="hud"]');
+    expect(officeUiSliceAttrs(t, "button-secondary", true))
+      .toMatchObject({
+        "data-office-ui-slice": "button-secondary",
+        "data-office-ui-filled": "true",
+      });
+  });
+
+  it("uses the declared light ink for dark slice centres", () => {
+    const t = licensedTheme();
+    const dialog = t.ui?.slices?.dialog;
+    if (!dialog) throw new Error("fixture missing dialog");
+    dialog.ink = "light";
+    const css = officeUiSliceCss(t);
+    expect(css).toContain("color: #f6ecdd;");
+    expect(officeUiSliceInk(t, "dialog")).toBe("light");
+    expect(officeUiSliceAttrs(t, "dialog", true)["data-office-ui-ink"])
+      .toBe("light");
+  });
+
+  it("defaults to dark ink for a legacy payload without ink metadata", () => {
+    const t = theme();
+    expect(officeUiSliceInk(t, "dialog")).toBe("dark");
   });
 });

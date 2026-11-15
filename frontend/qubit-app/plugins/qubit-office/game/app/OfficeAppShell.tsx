@@ -19,6 +19,8 @@ import { createSeatModelPanel } from "./SeatModelPanel";
 import { isEditableTarget } from "./command-center";
 import { createAgentsPanel } from "./AgentsPanel";
 import { createTalkPanel } from "./TalkPanel";
+import { createPixelText } from "./PixelText";
+import { createThemeIcon } from "./ThemeIcon";
 import { createAgentControlDrawer } from "./AgentControlDrawer";
 import { createWarRoomPanel } from "./WarRoomPanel";
 import { createApprovalsPanel } from "./ApprovalsPanel";
@@ -151,6 +153,8 @@ type ShellComponents = {
   HudDock: ReturnType<typeof createHudDock>;
   AgentsPanel: ReturnType<typeof createAgentsPanel>;
   TalkPanel: ReturnType<typeof createTalkPanel>;
+  PixelText: ReturnType<typeof createPixelText>;
+  ThemeIcon: ReturnType<typeof createThemeIcon>;
   SeatModelPanel: ReturnType<typeof createSeatModelPanel>;
   AgentControlDrawer: ReturnType<typeof createAgentControlDrawer>;
   WarRoomPanel: ReturnType<typeof createWarRoomPanel>;
@@ -199,6 +203,8 @@ function shellComponents(
     HudDock: createHudDock({ React: R, hooks, base }),
     AgentsPanel: createAgentsPanel(R, hooks),
     TalkPanel: createTalkPanel(R, hooks),
+    PixelText: createPixelText(R),
+    ThemeIcon: createThemeIcon(R),
     SeatModelPanel: createSeatModelPanel(R, hooks),
     AgentControlDrawer: createAgentControlDrawer(R, hooks),
     WarRoomPanel: createWarRoomPanel(R, hooks),
@@ -413,9 +419,9 @@ export function createOfficeApp(
     const requestedTheme = hostThemeRequest();
     // Stable across renders — see shellComponents().
     const {
-      HudDock, AgentsPanel, TalkPanel, SeatModelPanel, AgentControlDrawer,
-      WarRoomPanel, ApprovalsPanel, CommandCenter, Timeline, RoomBuilder,
-      OutsideWorld,
+      HudDock, AgentsPanel, TalkPanel, PixelText, ThemeIcon,
+      SeatModelPanel, AgentControlDrawer, WarRoomPanel, ApprovalsPanel,
+      CommandCenter, Timeline, RoomBuilder, OutsideWorld,
       PanelInventory, CampusWorld, TowerNavigator, EtsyConnectPanel,
       LoadingScreen,
     } = shellComponents(R, hooks, props.base);
@@ -767,8 +773,23 @@ export function createOfficeApp(
     const dockUiAttrs = officeUiSliceAttrs(officeTheme, "dock");
     const buttonUiAttrs = officeUiSliceAttrs(officeTheme, "button", true);
     const tabUiAttrs = officeUiSliceAttrs(officeTheme, "tab");
-    const panelUiAttrs = officeUiSliceAttrs(officeTheme, "panel", true);
+    const dialogUiAttrs = officeUiSliceAttrs(officeTheme, "dialog", true);
+    const title = (key: string, label: string, icon: string) =>
+      R.createElement("span", {
+        key, className: "office-theme-dock-title office-theme-dock-title--icon",
+      }, [
+        R.createElement(ThemeIcon as never, {
+          key: "i", theme: officeTheme, name: icon,
+          className: "office-theme-dock-icon",
+        }),
+        R.createElement(PixelText as never, {
+          key: "t", theme: officeTheme, text: label, size: 12,
+        }),
+      ]);
 
+    const packCredits = (officeTheme?.ui?.packs || [])
+      .map((pack) => pack.credit)
+      .filter((credit): credit is string => Boolean(credit));
     const children: unknown[] = [
       // P6-05 — the first focusable thing on the page is a skip link, so a
       // keyboard user is never forced through the canvas to reach the shell.
@@ -828,18 +849,28 @@ export function createOfficeApp(
         "data-testid": "office-app-credits",
         role: "note",
         "aria-label": "Art credit",
-      }, R.createElement("a", {
-        key: "limezu",
+        "data-office-packs": (officeTheme?.ui?.packs || [])
+          .map((pack) => pack.id).join(","),
+        title: packCredits.join(" · "),
+      }, ...[
+        R.createElement("a", {
+          key: "limezu",
         href: OFFICE_ART_CREDIT_URL,
         target: "_blank",
         rel: "noopener noreferrer",
       }, OFFICE_ART_CREDIT),
-      R.createElement("span", { key: "sep" }, " · "),
-      R.createElement("a", {
-        key: "legal",
-        href: OFFICE_BRAND.legalUrl,
-        title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`,
-      }, OFFICE_BRAND.legalLabel)),
+        R.createElement("span", { key: "sep" }, " · "),
+        R.createElement("a", {
+          key: "legal",
+          href: OFFICE_BRAND.legalUrl,
+          title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`,
+        }, OFFICE_BRAND.legalLabel),
+        packCredits.length
+          ? R.createElement("span", {
+              key: "packs", className: "office-game__creditsPacks",
+            }, ` · UI packs: ${packCredits.join(" · ")}`)
+          : null,
+      ]),
     ];
 
     // P6-05 — one polite live region carries loading, connection and dock
@@ -959,7 +990,7 @@ export function createOfficeApp(
         "aria-label": "Office agents",
       }, [
         R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
-          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Agents"),
+          title("t", "Agents", "agents"),
           R.createElement("button", {
             key: "warroom", type: "button",
             className: "office-game__btn office-theme-dock-link",
@@ -974,7 +1005,13 @@ export function createOfficeApp(
               setControlSeat(null);
               setWarRoomOpen(true);
             },
-          }, "War Room"),
+          }, [
+            R.createElement(ThemeIcon as never, {
+              key: "i", theme: officeTheme, name: "warroom",
+              className: "office-theme-btn-icon",
+            }),
+            R.createElement("span", { key: "t" }, "War Room"),
+          ]),
           R.createElement("button", {
             key: "etsy", type: "button",
             className: "office-game__btn office-theme-dock-link",
@@ -998,7 +1035,13 @@ export function createOfficeApp(
             "data-office-slice": buttonSlice,
             ...buttonUiAttrs,
             onClick: () => setAgentsOpen(false),
-          }, "Close"),
+          }, [
+            R.createElement(ThemeIcon as never, {
+              key: "i", theme: officeTheme, name: "close",
+              className: "office-theme-btn-icon",
+            }),
+            R.createElement("span", { key: "t" }, "Close"),
+          ]),
         ]),
         R.createElement(AgentsPanel as never, {
           key: "body", base: props.base, theme: officeTheme,
@@ -1024,7 +1067,7 @@ export function createOfficeApp(
         "data-testid": "office-game-talk-dock",
         "data-office-dock": "talk",
         "data-office-slice": dockSlice,
-        ...panelUiAttrs,
+        ...dialogUiAttrs,
         role: "region",
         "aria-label": `Talk with ${talkSeat.name}`,
       }, [
@@ -1101,7 +1144,7 @@ export function createOfficeApp(
         "aria-label": "Office approvals",
       }, [
         R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
-          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Approvals"),
+          title("t", "Approvals", "approvals"),
           R.createElement("span", {
             key: "count",
             className: "office-game__approvalsCount",
@@ -1114,7 +1157,13 @@ export function createOfficeApp(
             "data-office-slice": buttonSlice,
             ...buttonUiAttrs,
             onClick: () => setApprovalsOpen(false),
-          }, "Close"),
+          }, [
+            R.createElement(ThemeIcon as never, {
+              key: "i", theme: officeTheme, name: "close",
+              className: "office-theme-btn-icon",
+            }),
+            R.createElement("span", { key: "t" }, "Close"),
+          ]),
         ]),
         R.createElement(ApprovalsPanel as never, {
           key: "body", base: props.base,
@@ -1165,7 +1214,7 @@ export function createOfficeApp(
         "aria-label": "HUD",
       }, [
         R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
-          R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "HUD"),
+          title("t", "HUD", "agents"),
           R.createElement("a", {
             key: "open",
             className: "office-game__hudLink office-theme-dock-link",
@@ -1178,7 +1227,13 @@ export function createOfficeApp(
             "data-office-slice": buttonSlice,
             ...buttonUiAttrs,
             onClick: () => setHudOpen(false),
-          }, "Close"),
+          }, [
+            R.createElement(ThemeIcon as never, {
+              key: "i", theme: officeTheme, name: "close",
+              className: "office-theme-btn-icon",
+            }),
+            R.createElement("span", { key: "t" }, "Close"),
+          ]),
         ]),
         R.createElement(HudDock as never, { key: "body" }),
       ]));
@@ -1344,9 +1399,7 @@ export function createOfficeApp(
         R.createElement("div", {
           key: "head", className: "office-game__dockHead office-theme-dock-head",
         }, [
-          R.createElement("span", {
-            key: "t", className: "office-theme-dock-title",
-          }, "Studio"),
+          title("t", "Studio", "studio"),
           tab("panels", "Panels"),
           tab("rooms", "Rooms"),
           tab("outside", "Outside"),
@@ -1356,7 +1409,13 @@ export function createOfficeApp(
             "data-testid": "office-game-studio-close",
             "aria-label": "Close studio",
             onClick: () => setStudioOpen(false),
-          }, "Close"),
+          }, [
+            R.createElement(ThemeIcon as never, {
+              key: "i", theme: officeTheme, name: "close",
+              className: "office-theme-btn-icon",
+            }),
+            R.createElement("span", { key: "t" }, "Close"),
+          ]),
         ]),
         R.createElement("div", {
           key: "body", className: "office-game__studioBody",
@@ -1413,7 +1472,15 @@ export function createOfficeApp(
           key: "head", className: "office-game__campusHead",
         }, [
           R.createElement("div", { key: "title" }, [
-            R.createElement("h2", { key: "h" }, "Qubit Campus"),
+            R.createElement("h2", { key: "h" }, [
+              R.createElement(ThemeIcon as never, {
+                key: "i", theme: officeTheme, name: "campus",
+                className: "office-theme-dock-icon",
+              }),
+              R.createElement(PixelText as never, {
+                key: "t", theme: officeTheme, text: "Qubit Campus", size: 16,
+              }),
+            ]),
             R.createElement("p", {
               key: "counts", "data-testid": "office-campus-counts",
             }, campusTab === "floors"

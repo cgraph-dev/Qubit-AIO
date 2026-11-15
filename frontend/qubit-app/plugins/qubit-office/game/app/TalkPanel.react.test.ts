@@ -314,11 +314,160 @@ describe("TalkPanel accessibility and close behaviour", () => {
     });
     await flush();
     const input = q<HTMLTextAreaElement>("[data-testid='talk-input']");
-    expect(input.getAttribute("data-office-ui-slice")).toBe("panel");
+    expect(input.getAttribute("data-office-ui-slice")).toBe("input");
     expect(input.getAttribute("data-office-ui-filled")).toBe("true");
     expect(q("[data-testid='talk-send']").getAttribute("data-office-ui-slice"))
-      .toBe("panel");
+      .toBe("button");
     expect(q("[data-testid='talk-close']").getAttribute("data-office-ui-slice"))
-      .toBe("panel");
+      .toBe("icon-button");
+  });
+});
+
+// ======================================================================
+// Licensed UI pack assets (icons, pixel heading, real success effect)
+// ======================================================================
+
+function packedTheme(over: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    id: "limezu", label: "LimeZu", version: "1.0.0",
+    credit: "LimeZu", license: "LimeZu", active: true, assetBase: "",
+    atlas: null, index: null,
+    bodies: { atlas: null, index: null, size: null, frame: null },
+    tokens: {}, slices: {},
+    ui: {
+      slices: {
+        panel: { src: "/panel.png", slice: [8, 8, 8, 8], width: "8px", repeat: "stretch" },
+        dialog: { src: "/dialog.png", slice: [8, 8, 8, 8], width: "8px", repeat: "stretch", ink: "light" },
+        button: { src: "/button.png", slice: [8, 8, 8, 8], width: "6px", repeat: "stretch" },
+        input: { src: "/input.png", slice: [8, 8, 8, 8], width: "6px", repeat: "stretch", ink: "dark" },
+      },
+      icons: {
+        talk: { src: "/talk.png", width: 32, height: 32, licenseOk: true },
+        close: { src: "/close.png", width: 64, height: 64, licenseOk: true },
+        send: { src: "/send.png", width: 64, height: 64, licenseOk: true },
+      },
+      font: {
+        src: "/font.png", cell: 32, cols: 8, rows: 8,
+        glyphs: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzñÇ",
+        licenseOk: true,
+      },
+      effects: {
+        success: {
+          src: "/success.png", frames: 2, fps: 20, width: 16, height: 16,
+          framesPerRow: 2, licenseOk: true,
+        },
+      },
+      packs: [],
+    },
+    ...over,
+  };
+}
+
+async function renderReady(fetchImpl: typeof fetch, theme: unknown) {
+  await act(async () => {
+    root.render(React.createElement(TalkPanel as never, {
+      seat: SEAT, base: "", fetchImpl, onClose: vi.fn(), theme,
+    }));
+  });
+  await flush();
+}
+
+describe("licensed pack UI in the talk panel", () => {
+  it("uses the pack's talk icon and pixel heading", async () => {
+    const f = vi.fn(async () => respond(200, {
+      session: { id: "office-talk-lead-quality" },
+      messages: [{ role: "user", content: "hello" }],
+    }));
+    await renderReady(f as unknown as typeof fetch, packedTheme());
+    expect(q("[data-office-ui-icon='talk']")).toBeDefined();
+    expect(q("[data-testid='talk-name-pixel']").getAttribute("data-office-font"))
+      .toBe("pixel");
+    expect(q("[data-testid='talk-name-pixel']").getAttribute("aria-label"))
+      .toBe("Lead Quality");
+    expect(q("[data-testid='talk-panel']")).toBeDefined();
+  });
+
+  it("falls back to text and no icon when the licence blocks the asset", async () => {
+    const theme = packedTheme();
+    const ui = theme.ui as Record<string, any>;
+    ui.icons = {
+      talk: { src: "/talk.png", width: 32, height: 32, licenseOk: false },
+    };
+    ui.font = { ...ui.font, licenseOk: false };
+    const f = vi.fn(async () => respond(200, {
+      session: { id: "office-talk-lead-quality" },
+      messages: [{ role: "user", content: "hello" }],
+    }));
+    await renderReady(f as unknown as typeof fetch, theme);
+    expect(container.querySelector("[data-office-ui-icon='talk']")).toBeNull();
+    expect(q("[data-testid='talk-name-pixel']").getAttribute("data-office-font"))
+      .toBe("fallback");
+  });
+
+  it("plays the success effect only after a real completed send", async () => {
+    let sent = false;
+    const f = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        sent = true;
+        return respond(200, { ok: true, reply: "Done." });
+      }
+      return respond(200, {
+        session: { id: "office-talk-lead-quality" },
+        messages: sent
+          ? [
+              { role: "user", content: "hello" },
+              { role: "assistant", content: "Done." },
+            ]
+          : [{ role: "user", content: "hello" }],
+      });
+    });
+    await renderReady(f as unknown as typeof fetch, packedTheme());
+    expect(container.querySelector("[data-testid='talk-effect']")).toBeNull();
+    const input = q<HTMLTextAreaElement>("[data-testid='talk-input']");
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(input, "do the thing");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      q<HTMLButtonElement>("[data-testid='talk-send']").click();
+    });
+    await flush();
+    expect(q("[data-testid='talk-effect']").getAttribute("data-office-effect"))
+      .toBe("success");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 520));
+    });
+    expect(container.querySelector("[data-testid='talk-effect']")).toBeNull();
+  });
+
+  it("never plays the effect on a typed refusal", async () => {
+    const f = vi.fn(async (_url: string, init?: RequestInit) => {
+      if (init?.method === "POST") {
+        return respond(502, {
+          ok: false, code: "MODEL_NOT_ALLOWED", detail: "no model",
+        });
+      }
+      return respond(200, {
+        session: { id: "office-talk-lead-quality" },
+        messages: [{ role: "user", content: "hello" }],
+      });
+    });
+    await renderReady(f as unknown as typeof fetch, packedTheme());
+    const input = q<HTMLTextAreaElement>("[data-testid='talk-input']");
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLTextAreaElement.prototype, "value")?.set;
+    await act(async () => {
+      setter?.call(input, "do the thing");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    await act(async () => {
+      q<HTMLButtonElement>("[data-testid='talk-send']").click();
+    });
+    await flush();
+    expect(container.querySelector("[data-testid='talk-effect']")).toBeNull();
+    expect(q("[data-testid='talk-error']").textContent)
+      .toContain("[MODEL_NOT_ALLOWED]");
   });
 });

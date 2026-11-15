@@ -78,11 +78,11 @@ export interface OfficeTheme {
   tokens: Record<string, string>;
   slices: Record<string, OfficeThemeSlice>;
   /**
-   * Full-pack Modern UI 9-slice backgrounds. The trimmed payload carries
-   * ``{slices: {...}}`` with absolute asset URLs. Older/classic payloads omit
-   * it or carry an empty map, which is why every reader treats it as optional.
+   * Full-pack Modern UI 9-slice backgrounds + licensed icons/font/effects.
+   * Older/classic payloads omit the block or carry only slices, which is why
+   * every reader treats each sub-block as optional.
    */
-  ui?: { slices?: Record<string, OfficeThemeUiSlice> };
+  ui?: OfficeThemeUi;
   reason?: string;
 }
 
@@ -92,6 +92,86 @@ export interface OfficeThemeUiSlice {
   slice: [number, number, number, number];
   width: string;
   repeat: "stretch" | "round" | "repeat";
+  /** Text colour the pack's slice centre was authored for. */
+  ink?: "light" | "dark";
+  /** Provenance of the art (the shell only uses licensed entries). */
+  pack?: string;
+  credit?: string;
+  license?: string;
+  licenseOk?: boolean;
+}
+
+/** One licensed UI icon (toolbar/panel). */
+export interface OfficeThemeIcon {
+  src: string;
+  width: number;
+  height: number;
+  pack?: string;
+  credit?: string;
+  license?: string;
+  licenseOk?: boolean;
+}
+
+/** A non-slice frame / ornament image (background image). */
+export interface OfficeThemeFrame {
+  src: string;
+  width: number;
+  height: number;
+  pack?: string;
+  credit?: string;
+  license?: string;
+  licenseOk?: boolean;
+}
+
+/** The bitmap pixel font used for headings/chrome (not body paragraphs). */
+export interface OfficeThemeFont {
+  src: string;
+  cell: number;
+  cols: number;
+  rows: number;
+  glyphs: string;
+  scale?: number;
+  pack?: string;
+  credit?: string;
+  license?: string;
+  licenseOk?: boolean;
+}
+
+/** A real feedback effect played after a completed UI action. */
+export interface OfficeThemeEffect {
+  src: string;
+  frames: number;
+  fps: number;
+  width: number;
+  height: number;
+  framesPerRow?: number;
+  pack?: string;
+  credit?: string;
+  license?: string;
+  licenseOk?: boolean;
+}
+
+/** One pack's credit/licence, carried for attribution and the load gate. */
+export interface OfficeThemePackCredit {
+  id: string;
+  label: string;
+  author: string;
+  credit: string;
+  license: string;
+  url?: string;
+  licenseOk?: boolean;
+}
+
+/** The optional, additive Modern UI extension block. */
+export interface OfficeThemeUi {
+  slices?: Record<string, OfficeThemeUiSlice>;
+  icons?: Record<string, OfficeThemeIcon>;
+  frames?: Record<string, OfficeThemeFrame>;
+  ornament?: OfficeThemeFrame | null;
+  font?: OfficeThemeFont | null;
+  effects?: Record<string, OfficeThemeEffect>;
+  packs?: OfficeThemePackCredit[];
+  skipped?: string[];
 }
 
 /** Both atlas URLs, or ``null`` per kind when the payload has none. */
@@ -370,12 +450,15 @@ export type OfficeUiRole =
   | "card"
   | "dialog"
   | "button"
+  | "button-secondary"
+  | "icon-button"
+  | "hud"
   | "tab"
   | "input";
 
 /** Roles whose caller opts into the filled centre. */
 export const OFFICE_UI_FILLED_ROLES: readonly OfficeUiRole[] = [
-  "dialog", "button", "tab", "input",
+  "dialog", "button", "button-secondary", "icon-button", "tab", "input",
 ];
 
 /**
@@ -395,12 +478,16 @@ const OFFICE_UI_SLICE_CHAIN: Record<OfficeUiRole, string[]> = {
   card: ["card", "panel", "dialog"],
   dialog: ["dialog", "panel"],
   button: ["button", "panel"],
+  "button-secondary": ["button-secondary", "button", "panel"],
+  "icon-button": ["icon-button", "button", "panel"],
+  hud: ["hud", "panel", "dialog"],
   tab: ["tab", "button", "panel"],
   input: ["input", "dialog", "panel"],
 };
 
 const OFFICE_UI_ROLES: readonly OfficeUiRole[] = [
-  "panel", "dock", "card", "dialog", "button", "tab", "input",
+  "panel", "dock", "card", "dialog", "button", "button-secondary",
+  "icon-button", "hud", "tab", "input",
 ];
 
 /**
@@ -423,6 +510,25 @@ export function officeUiSliceName(
   return undefined;
 }
 
+/** The resolved descriptor for a role, or undefined when classic/absent. */
+export function officeUiSliceDescriptor(
+  theme: OfficeTheme | null | undefined,
+  role: OfficeUiRole,
+): OfficeThemeUiSlice | undefined {
+  const name = officeUiSliceName(theme, role);
+  if (!name || !theme || !theme.ui || !theme.ui.slices) return undefined;
+  return theme.ui.slices[name];
+}
+
+/** The text colour a role's slice centre expects (default: dark ink). */
+export function officeUiSliceInk(
+  theme: OfficeTheme | null | undefined,
+  role: OfficeUiRole,
+): "light" | "dark" {
+  const descriptor = officeUiSliceDescriptor(theme, role);
+  return descriptor && descriptor.ink === "light" ? "light" : "dark";
+}
+
 /**
  * The data attributes one shell element should carry for a role.
  *
@@ -439,7 +545,76 @@ export function officeUiSliceAttrs(
   if (!officeUiSliceName(theme, role)) return {};
   const attrs: Record<string, string> = { "data-office-ui-slice": role };
   if (filled) attrs["data-office-ui-filled"] = "true";
+  const descriptor = officeUiSliceDescriptor(theme, role);
+  if (descriptor && (descriptor.ink === "light" || descriptor.ink === "dark")) {
+    attrs["data-office-ui-ink"] = descriptor.ink;
+  }
   return attrs;
+}
+
+/* ======================================================================
+ * LICENSED UI ASSETS
+ * ======================================================================
+ * Icons, the bitmap font, HUD frames and feedback effects arrive in the same
+ * additive `ui` block. Every descriptor carries its pack credit/licence and an
+ * explicit `licenseOk` gate; the helpers below return undefined for an absent
+ * or blocked asset so the component renders its built-in fallback instead of a
+ * broken image. The server applies the same gate when building the payload.
+ */
+
+function licensedUi<T extends { src?: string; licenseOk?: boolean }>(
+  entry: T | null | undefined,
+): T | undefined {
+  if (!entry || typeof entry !== "object" || !entry.src) return undefined;
+  if (entry.licenseOk === false) return undefined;
+  return entry;
+}
+
+export function officeUiIcon(
+  theme: OfficeTheme | null | undefined,
+  name: string,
+): OfficeThemeIcon | undefined {
+  if (!theme || !theme.active || !theme.ui) return undefined;
+  return licensedUi(theme.ui.icons && theme.ui.icons[name]);
+}
+
+export function officeUiFrame(
+  theme: OfficeTheme | null | undefined,
+  name: string,
+): OfficeThemeFrame | undefined {
+  if (!theme || !theme.active || !theme.ui) return undefined;
+  return licensedUi(theme.ui.frames && theme.ui.frames[name]);
+}
+
+export function officeUiOrnament(
+  theme: OfficeTheme | null | undefined,
+): OfficeThemeFrame | undefined {
+  if (!theme || !theme.active || !theme.ui) return undefined;
+  return licensedUi(theme.ui.ornament);
+}
+
+export function officeUiFont(
+  theme: OfficeTheme | null | undefined,
+): OfficeThemeFont | undefined {
+  if (!theme || !theme.active || !theme.ui) return undefined;
+  const font = licensedUi(theme.ui.font);
+  if (!font) return undefined;
+  if (!(font.cell > 0) || !(font.cols > 0) || !(font.rows > 0)) return undefined;
+  if (typeof font.glyphs !== "string" || !font.glyphs) return undefined;
+  return font;
+}
+
+export function officeUiEffect(
+  theme: OfficeTheme | null | undefined,
+  name: string,
+): OfficeThemeEffect | undefined {
+  if (!theme || !theme.active || !theme.ui) return undefined;
+  const effect = licensedUi(theme.ui.effects && theme.ui.effects[name]);
+  if (!effect) return undefined;
+  if (!(effect.frames > 0) || !(effect.width > 0) || !(effect.height > 0)) {
+    return undefined;
+  }
+  return effect;
 }
 
 function cssString(value: string): string {
@@ -454,7 +629,8 @@ function cssUrl(value: string): string {
 function validSlice(
   descriptor: OfficeThemeUiSlice | undefined,
 ): { slice: [number, number, number, number]; width: string;
-     repeat: "stretch" | "round" | "repeat"; src: string } | null {
+     repeat: "stretch" | "round" | "repeat"; src: string;
+     ink?: "light" | "dark" } | null {
   if (!descriptor || typeof descriptor !== "object") return null;
   const raw = descriptor.slice;
   if (!Array.isArray(raw) || raw.length !== 4) return null;
@@ -479,6 +655,7 @@ function validSlice(
     width,
     repeat,
     src,
+    ink: descriptor.ink,
   };
 }
 
@@ -522,7 +699,8 @@ export function officeUiSliceCss(
     lines.push(`${target}[data-office-ui-filled="true"] {`);
     lines.push(
       `  border-image-slice: ${descriptor.slice.join(" ")} fill;`);
-    lines.push("  color: #2a1a12;");
+    lines.push(
+      `  color: ${descriptor.ink === "light" ? "#f6ecdd" : "#2a1a12"};`);
     lines.push("}");
   }
   return lines.length ? `${lines.join("\n")}\n` : "";

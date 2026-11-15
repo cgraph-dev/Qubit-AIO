@@ -212,8 +212,10 @@
   border-radius: var(--office-radius, 6px);
   background: rgba(11, 15, 22, 0.78);
   color: var(--office-ink);
+  max-width: min(92%, 64rem);
   font-size: var(--office-fs-xs);
   line-height: 1.2;
+  text-align: center;
   pointer-events: none;
 }
 
@@ -3351,4 +3353,161 @@
   color: #8a2418;
   font-size: var(--office-fs-xs);
   overflow-wrap: anywhere;
+}
+
+/* -------------------------------------------------------------------------
+   LICENSED UI PACKS — pixel headings, icons, HUD frames, feedback effects
+   The images come from the active local theme pack (ui.icons / ui.font /
+   ui.frames / ui.effects); none is committed. Missing or licence-blocked
+   assets simply render no node, leaving the text fallback.
+   ------------------------------------------------------------------------- */
+.office-pixel-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.office-pixel-text__glyph {
+  display: inline-block;
+  flex: 0 0 auto;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+.office-pixel-text[data-office-font="fallback"] {
+  display: inline;
+  font: inherit;
+}
+
+.office-theme-icon {
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.office-theme-dock-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+}
+
+.office-theme-btn-icon {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+}
+
+.office-theme-dock-title--icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.office-game .office-talk__headIcon {
+  width: 18px;
+  height: 18px;
+  margin-right: 6px;
+}
+
+.office-game .office-talk__btnIcon {
+  width: 14px;
+  height: 14px;
+  margin-right: 3px;
+}
+
+.office-game .office-game__talkDock[data-office-ui-ink="light"] {
+  --talk-ink: #f6ecdd;
+  --talk-muted: #d8c7a8;
+  --talk-line: #b48a54;
+  --talk-paper: rgba(20, 14, 9, 0.55);
+  --talk-own-paper: rgba(64, 108, 145, 0.30);
+}
+
+.office-game .office-game__talkDock[data-office-ui-ink="dark"] {
+  --talk-ink: #2a1a12;
+  --talk-muted: #5a4634;
+  --talk-line: #8a6a4a;
+  --talk-paper: rgba(255, 255, 255, 0.50);
+  --talk-own-paper: rgba(168, 95, 70, 0.18);
+}
+
+.office-game .office-talk__portraitFrame {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background-repeat: no-repeat;
+  background-size: 100% 100%;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+}
+
+.office-game .office-talk__ornament {
+  display: block;
+  width: 96px;
+  height: 32px;
+  margin: 0 auto 2px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  image-rendering: pixelated;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.office-game .office-talk__status[data-office-ui-slice] {
+  display: inline-block;
+  padding: 0 10px;
+  color: #f6ecdd;
+  text-shadow: 0 1px 0 #2a1a12;
+}
+
+.office-game .office-talk__effect {
+  position: absolute;
+  top: 54px;
+  right: 18px;
+  z-index: 2;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+  animation-name: office-effect-strip;
+  animation-fill-mode: forwards;
+  animation-iteration-count: 1;
+}
+
+@keyframes office-effect-strip {
+  from { background-position: 0 0; }
+  to {
+    background-position:
+      calc(-1 * var(--office-effect-width) * var(--office-effect-frames)) 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .office-game .office-talk__effect {
+    display: none;
+  }
+}
+
+/* Licensed UI-pack attribution: a compact second line in the always-mounted
+   credits footer; it never depends on the Talk panel being open. */
+.office-game .office-game__creditsPacks {
+  display: block;
+  overflow-wrap: anywhere;
+  margin-top: 1px;
+  color: var(--office-muted, #c9b69c);
+  font-size: 10px;
+  line-height: 1.25;
+  opacity: 0.85;
 }
