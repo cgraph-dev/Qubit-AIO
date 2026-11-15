@@ -24,6 +24,7 @@ import {
   currentEnvironment, floorHref, orderedZones, outsideWorldView, stateLabel,
   zoneChunks,
 } from "./outside-world";
+import { createOutsideScene } from "./OutsideScene";
 
 export interface OutsideWorldProps {
   /** A pre-built view (tests/host). When absent, it is derived below. */
@@ -61,6 +62,7 @@ function environmentText(
 
 export function createOutsideWorld(R: ReactArg, hooks: HooksArg) {
   const { useState, useEffect, useRef } = hooks;
+  const OutsideScene = createOutsideScene(R, hooks);
 
   return function OutsideWorld(props: OutsideWorldProps) {
     const view: OutsideWorldView = props.view ?? outsideWorldView({
@@ -400,9 +402,18 @@ export function createOutsideWorld(R: ReactArg, hooks: HooksArg) {
       ]);
     };
 
+    const scene = () => R.createElement(OutsideScene as never, {
+      key: "scene",
+      view,
+      selectedZoneId: selectedId,
+      reducedMotion,
+      onSelectZone: select,
+      onSelectFloor: props.onSelectFloor,
+    });
+
     const ready = () => R.createElement("div", {
       key: "ready", className: "outside-world__body",
-    }, [environment(), zoneList(), zoneDetail(), floorLinks()]);
+    }, [scene(), environment(), zoneList(), zoneDetail(), floorLinks()]);
 
     return R.createElement("section", {
       className: "outside-world",

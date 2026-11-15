@@ -190980,7 +190980,7 @@ create: function(game) {
 		});
 		ctx.closePath();
 	}
-	function fill(f, pts, colour) {
+	function fill$1(f, pts, colour) {
 		poly(f, pts);
 		f.ctx.fillStyle = colour;
 		f.ctx.fill();
@@ -190998,9 +190998,9 @@ create: function(game) {
 		const faces = wallFaces(gx, gy, height);
 		const ctx = f.ctx;
 		if (opts.alpha !== void 0) ctx.globalAlpha = opts.alpha;
-		fill(f, faces.west, r.base);
-		fill(f, faces.east, shade(r.base, -.14));
-		fill(f, faces.top, opts.topColour ?? mix$1(r.hi, "#ffffff", .05));
+		fill$1(f, faces.west, r.base);
+		fill$1(f, faces.east, shade(r.base, -.14));
+		fill$1(f, faces.top, opts.topColour ?? mix$1(r.hi, "#ffffff", .05));
 		if (opts.alpha !== void 0) ctx.globalAlpha = 1;
 	}
 	/** A wide bench (desk, counter): a box spanning several tiles on X. */
@@ -191140,8 +191140,8 @@ create: function(game) {
 		f.ctx;
 		withCam(f, () => {
 			const r = ramp$1(base, .1);
-			for (let i = 0; i < tiles; i++) for (let j = 0; j < tiles; j++) fill(f, tileDiamond(gx + i, gy + j), i === 0 || j === 0 || i === tiles - 1 || j === tiles - 1 ? r.dk : (i + j) % 3 === 0 ? r.lt : r.base);
-			for (let i = 0; i < tiles; i++) fill(f, tileDiamond(gx + i, gy + Math.floor(tiles / 2)), mix$1(r.hi, "#ffffff", .1));
+			for (let i = 0; i < tiles; i++) for (let j = 0; j < tiles; j++) fill$1(f, tileDiamond(gx + i, gy + j), i === 0 || j === 0 || i === tiles - 1 || j === tiles - 1 ? r.dk : (i + j) % 3 === 0 ? r.lt : r.base);
+			for (let i = 0; i < tiles; i++) fill$1(f, tileDiamond(gx + i, gy + Math.floor(tiles / 2)), mix$1(r.hi, "#ffffff", .1));
 		});
 	}
 	// ../qubit-app/plugins/qubit-office/game/scenes.ts
@@ -191164,7 +191164,7 @@ create: function(game) {
 		trim: "#453f5e",
 		accent: "#e08fb0"
 	};
-	function text$2(ctx, s, x, y, size, colour, align = "left", weight = "400") {
+	function text$3(ctx, s, x, y, size, colour, align = "left", weight = "400") {
 		ctx.save();
 		ctx.font = `${weight} ${size}px ui-sans-serif, system-ui, sans-serif`;
 		ctx.textAlign = align;
@@ -191214,7 +191214,7 @@ create: function(game) {
 		ctx.arc(x, top + h * .13, w * .31, Math.PI * 1.05, Math.PI * 1.95);
 		ctx.fill();
 		ctx.restore();
-		if (c.stalled) text$2(ctx, "!", x, top - 12 * scale, 12 * scale, "#ff7a6a", "center", "700");
+		if (c.stalled) text$3(ctx, "!", x, top - 12 * scale, 12 * scale, "#ff7a6a", "center", "700");
 	}
 	/** The payload's own animation vocabulary, as base colours. */
 	var ANIM_COLOUR = {
@@ -191312,9 +191312,9 @@ create: function(game) {
 		spill.addColorStop(1, "rgba(111,211,166,0)");
 		ctx.fillStyle = spill;
 		ctx.fillRect(width / 2 - 140, dy - 30, 280, 174);
-		text$2(ctx, world.building.name, width / 2, by - 24, 17, PALETTE.ink, "center", "600");
-		text$2(ctx, world.building.floors.length + " floors", width / 2, by - 6, 11, PALETTE.muted, "center");
-		text$2(ctx, "Enter", width / 2, dy + dh + 20, 12, PALETTE.doorway, "center", "600");
+		text$3(ctx, world.building.name, width / 2, by - 24, 17, PALETTE.ink, "center", "600");
+		text$3(ctx, world.building.floors.length + " floors", width / 2, by - 6, 11, PALETTE.muted, "center");
+		text$3(ctx, "Enter", width / 2, dy + dh + 20, 12, PALETTE.doorway, "center", "600");
 	}
 	function drawEntranceHall(a) {
 		const { ctx, width, height, world } = a;
@@ -191360,11 +191360,11 @@ create: function(game) {
 				ctx.fill();
 			}
 		}
-		text$2(ctx, world.building.name, width * .04 + 18, fy + 22, 16, PALETTE.ink, "left", "600");
-		text$2(ctx, "You are inside.", width * .04 + 18, fy + 44, 12, PALETTE.muted);
-		text$2(ctx, "To reception →", width * .96 - 18, fy + 22, 12, PALETTE.accent, "right", "600");
-		text$2(ctx, "Back outside", width * .5, dy + dh + 20, 11, PALETTE.doorway, "center");
-		text$2(ctx, world.building.floors.length + " floors above", width / 2, fy + fh - 14, 11, PALETTE.muted, "center");
+		text$3(ctx, world.building.name, width * .04 + 18, fy + 22, 16, PALETTE.ink, "left", "600");
+		text$3(ctx, "You are inside.", width * .04 + 18, fy + 44, 12, PALETTE.muted);
+		text$3(ctx, "To reception →", width * .96 - 18, fy + 22, 12, PALETTE.accent, "right", "600");
+		text$3(ctx, "Back outside", width * .5, dy + dh + 20, 11, PALETTE.doorway, "center");
+		text$3(ctx, world.building.floors.length + " floors above", width / 2, fy + fh - 14, 11, PALETTE.muted, "center");
 	}
 	function drawLobby(a) {
 		const { ctx, width, height, world } = a;
@@ -191397,8 +191397,8 @@ create: function(game) {
 		plant(f, 13, 1);
 		rug(f, 5, 6, 3, "#7c5f86");
 		chair(f, 5, 8);
-		text$2(ctx, "Reception", 18, 24, 14, PALETTE.ink, "left", "600");
-		text$2(ctx, world.building.name + "  ·  " + world.building.floors.length + " floors", 18, 44, 11, PALETTE.muted);
+		text$3(ctx, "Reception", 18, 24, 14, PALETTE.ink, "left", "600");
+		text$3(ctx, world.building.name + "  ·  " + world.building.floors.length + " floors", 18, 44, 11, PALETTE.muted);
 	}
 	/** Who the payload seats on the ground floor — the lobby's own crowd. */
 	function lobbyOccupants(world) {
@@ -191418,13 +191418,13 @@ create: function(game) {
 		paintFloor(ctx, toIsoFloor(floor), width, height, null);
 		for (const room of floor.rooms) {
 			room.occupants.length;
-			text$2(ctx, room.slug, width / 2, height - 46 + 0, 0, PALETTE.ink);
+			text$3(ctx, room.slug, width / 2, height - 46 + 0, 0, PALETTE.ink);
 			break;
 		}
 		const here = floor.rooms.reduce((n, r) => n + r.occupants.length, 0);
-		text$2(ctx, floor.name + "  ·  floor " + floor.number, 18, 24, 14, PALETTE.ink, "left", "600");
-		text$2(ctx, floor.role + "  ·  " + floor.rooms.length + " rooms  ·  " + here + " seated", 18, 44, 11, PALETTE.muted);
-		if (floor.rooms.length === 0) text$2(ctx, "No rooms on this floor", width / 2, height / 2, 13, PALETTE.muted, "center");
+		text$3(ctx, floor.name + "  ·  floor " + floor.number, 18, 24, 14, PALETTE.ink, "left", "600");
+		text$3(ctx, floor.role + "  ·  " + floor.rooms.length + " rooms  ·  " + here + " seated", 18, 44, 11, PALETTE.muted);
+		if (floor.rooms.length === 0) text$3(ctx, "No rooms on this floor", width / 2, height / 2, 13, PALETTE.muted, "center");
 	}
 	function drawRoom(a, floor) {
 		const { ctx, width, height, world } = a;
@@ -191434,7 +191434,7 @@ create: function(game) {
 		const fh = height * .74;
 		const fy = height * .13;
 		if (!room) {
-			text$2(ctx, "This room is not in the tower report", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
+			text$3(ctx, "This room is not in the tower report", width / 2, fy + fh / 2, 13, PALETTE.muted, "center");
 			return;
 		}
 		const theme = roomTheme(room.id + floor.number * 3);
@@ -191468,12 +191468,12 @@ create: function(game) {
 			ctx.fillStyle = mix$1(anim, "#ffffff", .15);
 			ctx.fillRect(dx + dwid / 2 - 14, dy - 22, 28, 18);
 			if (worldChar) figure(ctx, worldChar, dx + dwid / 2, dy + 24, 1.7, false);
-			text$2(ctx, c.slug, dx + dwid / 2, dy + dhei + 34, 11, PALETTE.ink, "center", "600");
-			text$2(ctx, c.animation + (c.stalled ? " · stalled" : ""), dx + dwid / 2, dy + dhei + 48, 10, c.stalled ? "#ff7a6a" : PALETTE.muted, "center");
+			text$3(ctx, c.slug, dx + dwid / 2, dy + dhei + 34, 11, PALETTE.ink, "center", "600");
+			text$3(ctx, c.animation + (c.stalled ? " · stalled" : ""), dx + dwid / 2, dy + dhei + 48, 10, c.stalled ? "#ff7a6a" : PALETTE.muted, "center");
 		});
-		if (occ.length === 0) text$2(ctx, "Nobody is seated here", width / 2, floorY + 40, 13, PALETTE.muted, "center");
-		text$2(ctx, room.slug, width * .05 + 18, fy + 22, 14, PALETTE.ink, "left", "600");
-		text$2(ctx, room.kind + "  ·  " + occ.length + " seated", width * .05 + 18, fy + 42, 11, PALETTE.muted);
+		if (occ.length === 0) text$3(ctx, "Nobody is seated here", width / 2, floorY + 40, 13, PALETTE.muted, "center");
+		text$3(ctx, room.slug, width * .05 + 18, fy + 22, 14, PALETTE.ink, "left", "600");
+		text$3(ctx, room.kind + "  ·  " + occ.length + " seated", width * .05 + 18, fy + 42, 11, PALETTE.muted);
 	}
 	/** Paint the current place. The one entry point the hosts call. */
 	function drawPlace(a) {
@@ -191496,7 +191496,7 @@ create: function(game) {
 				if (!f) {
 					a.ctx.fillStyle = PALETTE.void;
 					a.ctx.fillRect(0, 0, a.width, a.height);
-					text$2(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+					text$3(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 					return;
 				}
 				return drawFloor(a, f);
@@ -191506,7 +191506,7 @@ create: function(game) {
 				if (!f) {
 					a.ctx.fillStyle = PALETTE.void;
 					a.ctx.fillRect(0, 0, a.width, a.height);
-					text$2(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+					text$3(a.ctx, "That floor is not in the tower report", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 					return;
 				}
 				return drawRoom(a, f);
@@ -191514,7 +191514,7 @@ create: function(game) {
 			default:
 				a.ctx.fillStyle = PALETTE.void;
 				a.ctx.fillRect(0, 0, a.width, a.height);
-				text$2(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
+				text$3(a.ctx, "Unknown place", a.width / 2, a.height / 2, 13, PALETTE.muted, "center");
 		}
 	}
 	// ../qubit-app/plugins/qubit-office/game/InteractionController.ts
@@ -196657,7 +196657,7 @@ create: function(game) {
 		const raw = base === void 0 ? hostBasePath() : base;
 		return `${raw.endsWith("/") ? raw.slice(0, -1) : raw}${API_PREFIX}${WORLD_PATH}${path.startsWith("/") ? path : `/${path}`}`;
 	}
-	function int$1(value, fallback = 0) {
+	function int$2(value, fallback = 0) {
 		const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
 		return Number.isFinite(n) ? Math.trunc(n) : fallback;
 	}
@@ -196670,13 +196670,13 @@ create: function(game) {
 	function tile(value, fallback) {
 		const row = record$2(value);
 		return {
-			x: Math.max(0, Math.min(15, int$1(row?.x, fallback[0]))),
-			y: Math.max(0, Math.min(11, int$1(row?.y, fallback[1])))
+			x: Math.max(0, Math.min(15, int$2(row?.x, fallback[0]))),
+			y: Math.max(0, Math.min(11, int$2(row?.y, fallback[1])))
 		};
 	}
 	/** Plan fixed 16x12 cells for an exact desk count. Never stretches a cell. */
 	function planCellCluster(roomId, desks) {
-		const safeDesks = Math.max(0, int$1(desks));
+		const safeDesks = Math.max(0, int$2(desks));
 		const count = Math.max(1, Math.ceil(safeDesks / 6));
 		const base = Math.floor(safeDesks / count);
 		const extra = safeDesks % count;
@@ -196720,8 +196720,8 @@ create: function(game) {
 	}
 	/** Derive labeled template rooms from a floor's room/desk counts. */
 	function templateRooms(floorId, roomCount, capacity, active, roleIds = []) {
-		const count = Math.max(0, int$1(roomCount));
-		const desksTotal = Math.max(0, int$1(capacity));
+		const count = Math.max(0, int$2(roomCount));
+		const desksTotal = Math.max(0, int$2(capacity));
 		const base = count > 0 ? Math.floor(desksTotal / count) : 0;
 		const extra = count > 0 ? desksTotal % count : 0;
 		return Array.from({ length: count }, (_, index) => {
@@ -196799,7 +196799,7 @@ create: function(game) {
 		return {
 			schema: typeof row.schema === "string" ? row.schema : "",
 			staffed: row.staffed === true,
-			counts: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, int$1(value, 0)])),
+			counts: Object.fromEntries(Object.entries(counts).map(([key, value]) => [key, int$2(value, 0)])),
 			unplaced: normalizeUnplaced(row.unplaced),
 			truncated: {
 				placed: truncated.placed === true,
@@ -196824,8 +196824,8 @@ create: function(game) {
 				seat_id: seatId,
 				tile: tile(row.tile ?? seat?.tile, fallback),
 				footprint: {
-					w: Math.max(1, int$1(footprint?.w, 2)),
-					h: Math.max(1, int$1(footprint?.h, 1))
+					w: Math.max(1, int$2(footprint?.w, 2)),
+					h: Math.max(1, int$2(footprint?.h, 1))
 				},
 				occupied_by: occupied
 			};
@@ -196840,12 +196840,12 @@ create: function(game) {
 			const origin = record$2(row.origin);
 			return {
 				cell_id: typeof row.cell_id === "string" && row.cell_id ? row.cell_id : `c${index}`,
-				index: int$1(row.index, index),
-				cols: int$1(row.cols, 16),
-				rows: int$1(row.rows, 12),
+				index: int$2(row.index, index),
+				cols: int$2(row.cols, 16),
+				rows: int$2(row.rows, 12),
 				origin: {
-					x: int$1(origin?.x, index % 2 * 18),
-					y: int$1(origin?.y, Math.floor(index / 2) * 14)
+					x: int$2(origin?.x, index % 2 * 18),
+					y: int$2(origin?.y, Math.floor(index / 2) * 14)
 				},
 				desk_slots: slots
 			};
@@ -196861,7 +196861,7 @@ create: function(game) {
 		const archetype = typeof row.archetype === "string" && row.archetype ? row.archetype : kind;
 		const state = typeof row.state === "string" ? row.state : "template";
 		const active = typeof row.active === "boolean" ? row.active : state.toUpperCase() !== "DORMANT" && floorActive;
-		const declared = int$1(row.capacity ?? row.desk_count ?? row.desks, 0);
+		const declared = int$2(row.capacity ?? row.desk_count ?? row.desks, 0);
 		const cells = normalizeCells(row.cells, roomId, declared);
 		const slots = cells.reduce((sum, cell) => sum + cell.desk_slots.length, 0);
 		const capacity = slots > 0 ? slots : Math.max(0, declared);
@@ -196885,14 +196885,14 @@ create: function(game) {
 		const wing = typeof row.wing === "string" && row.wing ? row.wing : "central";
 		const active = row.active_by_default === true || row.active_by_default === void 0 && row.active === true;
 		const roomsRaw = Array.isArray(row.rooms) ? row.rooms : [];
-		const expectedRooms = int$1(row.room_count ?? record$2(row.capacity)?.rooms, 0);
-		const expectedDesks = int$1(row.desk_capacity ?? record$2(row.capacity)?.desks, 0);
+		const expectedRooms = int$2(row.room_count ?? record$2(row.capacity)?.rooms, 0);
+		const expectedDesks = int$2(row.desk_capacity ?? record$2(row.capacity)?.desks, 0);
 		const rooms = roomsRaw.length ? roomsRaw.map((room, i) => normalizeRoom(room, active, i)) : expectedRooms > 0 ? templateRooms(floorId, expectedRooms, expectedDesks, active, strings$1(row.role_ids)) : [];
 		const cells = rooms.reduce((sum, room) => sum + room.cell_count, 0);
 		const desks = rooms.reduce((sum, room) => sum + room.capacity, 0);
 		return {
 			floor_id: floorId,
-			index: int$1(row.index, index + 1),
+			index: int$2(row.index, index + 1),
 			wing,
 			wing_name: typeof row.wing_name === "string" && row.wing_name ? row.wing_name : `${wing.charAt(0).toUpperCase()}${wing.slice(1)} Wing`,
 			name: typeof row.name === "string" && row.name ? row.name : `Floor ${String(index + 1).padStart(3, "0")}`,
@@ -201204,11 +201204,11 @@ create: function(game) {
 	function record$1(value) {
 		return value !== null && typeof value === "object" && !Array.isArray(value) ? value : null;
 	}
-	function int(value, fallback = 0) {
+	function int$1(value, fallback = 0) {
 		const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
 		return Number.isFinite(n) ? Math.trunc(n) : fallback;
 	}
-	function text$1(value, fallback = "") {
+	function text$2(value, fallback = "") {
 		return typeof value === "string" ? value : fallback;
 	}
 	function strings(value) {
@@ -201220,10 +201220,10 @@ create: function(game) {
 	function bounds(value) {
 		const row = record$1(value) ?? {};
 		return {
-			x: int(row.x),
-			y: int(row.y),
-			width: Math.max(0, int(row.width)),
-			height: Math.max(0, int(row.height))
+			x: int$1(row.x),
+			y: int$1(row.y),
+			width: Math.max(0, int$1(row.width)),
+			height: Math.max(0, int$1(row.height))
 		};
 	}
 	/** Walk every object key; used to refuse a payload that grew business truth. */
@@ -201244,8 +201244,8 @@ create: function(game) {
 	function parseOutsideWorld(value) {
 		const root = record$1(value);
 		if (!root) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", "The outside world payload is not an object.");
-		if (text$1(root.schema) !== "qubit-office-world-outside/1") throw new OutsideWorldError("OUTSIDE_WORLD_UNSUPPORTED_VERSION", `Expected ${OUTSIDE_SCHEMA}, got ${text$1(root.schema) || "(none)"}.`);
-		if (int(root.version, 0) !== 1) throw new OutsideWorldError("OUTSIDE_WORLD_UNSUPPORTED_VERSION", `Unsupported outside world version ${int(root.version, 0)}.`);
+		if (text$2(root.schema) !== "qubit-office-world-outside/1") throw new OutsideWorldError("OUTSIDE_WORLD_UNSUPPORTED_VERSION", `Expected ${OUTSIDE_SCHEMA}, got ${text$2(root.schema) || "(none)"}.`);
+		if (int$1(root.version, 0) !== 1) throw new OutsideWorldError("OUTSIDE_WORLD_UNSUPPORTED_VERSION", `Unsupported outside world version ${int$1(root.version, 0)}.`);
 		if (root.mode !== "presentation" || root.business_truth !== false) throw new OutsideWorldError("OUTSIDE_WORLD_TRUTH_VIOLATION", "The outside world is presentation only; it may not claim business truth.");
 		const truth = findTruthKeys(root);
 		if (truth.size) throw new OutsideWorldError("OUTSIDE_WORLD_TRUTH_VIOLATION", `The outside world carried business-truth keys: ${[...truth].sort().join(", ")}.`);
@@ -201255,66 +201255,66 @@ create: function(game) {
 		if (!zones || !chunks) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", "The outside world needs zones and chunks.");
 		const parsedZones = zones.map((item, index) => {
 			const row = record$1(item) ?? {};
-			const zoneId = text$1(row.zone_id);
+			const zoneId = text$2(row.zone_id);
 			if (!zoneId) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", `Zone ${index} has no zone_id.`);
-			const state = text$1(row.state) === "dormant" ? "dormant" : "active";
+			const state = text$2(row.state) === "dormant" ? "dormant" : "active";
 			const counts = record$1(row.counts) ?? {};
 			return {
 				zone_id: zoneId,
-				kind: text$1(row.kind),
-				label: text$1(row.label, zoneId),
+				kind: text$2(row.kind),
+				label: text$2(row.label, zoneId),
 				state,
 				animated: bool(row.animated) && state === "active",
-				entry_chunk: text$1(row.entry_chunk),
+				entry_chunk: text$2(row.entry_chunk),
 				chunk_ids: strings(row.chunk_ids),
 				bounds: bounds(row.bounds),
 				counts: {
-					chunks: int(counts.chunks),
-					active_chunks: int(counts.active_chunks),
-					animated_chunks: int(counts.animated_chunks),
-					tiles: int(counts.tiles)
+					chunks: int$1(counts.chunks),
+					active_chunks: int$1(counts.active_chunks),
+					animated_chunks: int$1(counts.animated_chunks),
+					tiles: int$1(counts.tiles)
 				}
 			};
 		});
 		const parsedChunks = chunks.map((item, index) => {
 			const row = record$1(item) ?? {};
-			const chunkId = text$1(row.chunk_id);
+			const chunkId = text$2(row.chunk_id);
 			if (!chunkId) throw new OutsideWorldError("OUTSIDE_WORLD_MALFORMED", `Chunk ${index} has no chunk_id.`);
-			const state = text$1(row.state) === "dormant" ? "dormant" : "active";
+			const state = text$2(row.state) === "dormant" ? "dormant" : "active";
 			return {
 				chunk_id: chunkId,
-				zone_id: text$1(row.zone_id),
-				kind: text$1(row.kind),
-				layer: text$1(row.layer),
+				zone_id: text$2(row.zone_id),
+				kind: text$2(row.kind),
+				layer: text$2(row.layer),
 				bounds: bounds(row.bounds),
-				tiles: int(row.tiles),
+				tiles: int$1(row.tiles),
 				active: bool(row.active) && state === "active",
 				animated: bool(row.animated) && state === "active",
 				state,
 				assets: strings(row.assets),
-				z_index: int(row.z_index)
+				z_index: int$1(row.z_index)
 			};
 		});
 		const events = (Array.isArray(env.events) ? env.events : []).map((item, index) => {
 			const row = record$1(item) ?? {};
 			return {
-				event_id: text$1(row.event_id, `event-${index}`),
-				kind: text$1(row.kind),
-				value: text$1(row.value),
-				label: text$1(row.label),
-				cue: text$1(row.cue),
-				still_cue: text$1(row.still_cue, text$1(row.cue)),
+				event_id: text$2(row.event_id, `event-${index}`),
+				kind: text$2(row.kind),
+				value: text$2(row.value),
+				label: text$2(row.label),
+				cue: text$2(row.cue),
+				still_cue: text$2(row.still_cue, text$2(row.cue)),
 				animated: bool(row.animated)
 			};
 		});
 		const places = (Array.isArray(root.places) ? root.places : []).map((item, index) => {
 			const row = record$1(item) ?? {};
 			return {
-				place_id: text$1(row.place_id, `place-${index}`),
-				kind: text$1(row.kind),
-				label: text$1(row.label),
-				zone_id: text$1(row.zone_id),
-				chunk_id: text$1(row.chunk_id),
+				place_id: text$2(row.place_id, `place-${index}`),
+				kind: text$2(row.kind),
+				label: text$2(row.label),
+				zone_id: text$2(row.zone_id),
+				chunk_id: text$2(row.chunk_id),
 				active: bool(row.active),
 				animated: bool(row.animated)
 			};
@@ -201322,64 +201322,64 @@ create: function(game) {
 		const portals = (Array.isArray(root.portals) ? root.portals : []).map((item, index) => {
 			const row = record$1(item) ?? {};
 			return {
-				portal_id: text$1(row.portal_id, `portal-${index}`),
-				kind: text$1(row.kind),
-				from_chunk: text$1(row.from_chunk),
-				to_chunk: text$1(row.to_chunk),
-				to_floor: text$1(row.to_floor),
-				label: text$1(row.label),
+				portal_id: text$2(row.portal_id, `portal-${index}`),
+				kind: text$2(row.kind),
+				from_chunk: text$2(row.from_chunk),
+				to_chunk: text$2(row.to_chunk),
+				to_floor: text$2(row.to_floor),
+				label: text$2(row.label),
 				bidirectional: bool(row.bidirectional, true),
-				capacity: int(row.capacity, 1),
+				capacity: int$1(row.capacity, 1),
 				locked: bool(row.locked)
 			};
 		});
 		const floorLinks = (Array.isArray(root.floor_links) ? root.floor_links : []).map((item, index) => {
 			const row = record$1(item) ?? {};
 			return {
-				kind: text$1(row.kind),
-				floor_id: text$1(row.floor_id),
-				portal_id: text$1(row.portal_id, `portal-${index}`),
-				label: text$1(row.label)
+				kind: text$2(row.kind),
+				floor_id: text$2(row.floor_id),
+				portal_id: text$2(row.portal_id, `portal-${index}`),
+				label: text$2(row.label)
 			};
 		});
 		const assets = (Array.isArray(root.assets) ? root.assets : []).map((item, index) => {
 			const row = record$1(item) ?? {};
 			return {
-				asset_id: text$1(row.asset_id, `asset-${index}`),
-				feature: text$1(row.feature),
-				pack: text$1(row.pack),
+				asset_id: text$2(row.asset_id, `asset-${index}`),
+				feature: text$2(row.feature),
+				pack: text$2(row.pack),
 				paid: bool(row.paid),
 				local_only: bool(row.local_only),
 				redistribution_allowed: bool(row.redistribution_allowed),
-				license_status: text$1(row.license_status),
-				credit: text$1(row.credit)
+				license_status: text$2(row.license_status),
+				credit: text$2(row.credit)
 			};
 		});
 		const summaryRow = record$1(root.summary) ?? {};
 		const summary = {
-			zones: int(summaryRow.zones, parsedZones.length),
-			active_zones: int(summaryRow.active_zones, parsedZones.filter((z) => z.state === "active").length),
-			dormant_zones: int(summaryRow.dormant_zones, parsedZones.filter((z) => z.state === "dormant").length),
-			chunks: int(summaryRow.chunks, parsedChunks.length),
-			active_chunks: int(summaryRow.active_chunks, parsedChunks.filter((c) => c.active).length),
-			dormant_chunks: int(summaryRow.dormant_chunks, parsedChunks.filter((c) => c.state === "dormant").length),
-			animated_chunks: int(summaryRow.animated_chunks, parsedChunks.filter((c) => c.animated).length),
-			portals: int(summaryRow.portals, portals.length),
-			elevator_links: int(summaryRow.elevator_links, floorLinks.filter((f) => f.kind === "elevator").length),
-			stairs_links: int(summaryRow.stairs_links, floorLinks.filter((f) => f.kind === "stairs").length),
-			places: int(summaryRow.places, places.length),
-			assets: int(summaryRow.assets, assets.length)
+			zones: int$1(summaryRow.zones, parsedZones.length),
+			active_zones: int$1(summaryRow.active_zones, parsedZones.filter((z) => z.state === "active").length),
+			dormant_zones: int$1(summaryRow.dormant_zones, parsedZones.filter((z) => z.state === "dormant").length),
+			chunks: int$1(summaryRow.chunks, parsedChunks.length),
+			active_chunks: int$1(summaryRow.active_chunks, parsedChunks.filter((c) => c.active).length),
+			dormant_chunks: int$1(summaryRow.dormant_chunks, parsedChunks.filter((c) => c.state === "dormant").length),
+			animated_chunks: int$1(summaryRow.animated_chunks, parsedChunks.filter((c) => c.animated).length),
+			portals: int$1(summaryRow.portals, portals.length),
+			elevator_links: int$1(summaryRow.elevator_links, floorLinks.filter((f) => f.kind === "elevator").length),
+			stairs_links: int$1(summaryRow.stairs_links, floorLinks.filter((f) => f.kind === "stairs").length),
+			places: int$1(summaryRow.places, places.length),
+			assets: int$1(summaryRow.assets, assets.length)
 		};
 		const constraintRow = record$1(root.constraints) ?? {};
 		const constraints = {
 			presentation_only: bool(constraintRow.presentation_only, true),
 			business_truth: bool(constraintRow.business_truth, false),
 			only_active_zones_animate: bool(constraintRow.only_active_zones_animate, true),
-			max_chunks: int(constraintRow.max_chunks),
-			max_active_chunks: int(constraintRow.max_active_chunks),
-			max_chunk_tiles: int(constraintRow.max_chunk_tiles),
-			lru_capacity: int(constraintRow.lru_capacity),
-			preload_depth: int(constraintRow.preload_depth),
+			max_chunks: int$1(constraintRow.max_chunks),
+			max_active_chunks: int$1(constraintRow.max_active_chunks),
+			max_chunk_tiles: int$1(constraintRow.max_chunk_tiles),
+			lru_capacity: int$1(constraintRow.lru_capacity),
+			preload_depth: int$1(constraintRow.preload_depth),
 			lazy_load: bool(constraintRow.lazy_load, true),
 			reduced_motion_supported: bool(constraintRow.reduced_motion_supported, true)
 		};
@@ -201388,13 +201388,13 @@ create: function(game) {
 			version: 1,
 			mode: "presentation",
 			business_truth: false,
-			map_digest: text$1(root.map_digest),
-			digest: text$1(root.digest),
-			credit: text$1(root.credit),
+			map_digest: text$2(root.map_digest),
+			digest: text$2(root.digest),
+			credit: text$2(root.credit),
 			environment: {
-				weather: text$1(env.weather),
-				day_night: text$1(env.day_night),
-				season: text$1(env.season),
+				weather: text$2(env.weather),
+				day_night: text$2(env.day_night),
+				season: text$2(env.season),
 				weather_values: strings(env.weather_values),
 				day_night_values: strings(env.day_night_values),
 				season_values: strings(env.season_values),
@@ -201524,6 +201524,1030 @@ create: function(game) {
 	function stateLabel(state) {
 		return state === "active" ? "active" : "dormant";
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/outside-scene.ts
+	/** The art manifest a local theme pack may carry. */
+	var OUTSIDE_SCENE_ART_SCHEMA = "qubit-office-outside-art/1";
+	/** Draw order for chunk layers; later layers paint on top. */
+	var SCENE_LAYER_ORDER = [
+		"ground",
+		"floor",
+		"building",
+		"overlay"
+	];
+	var ART_KINDS = /* @__PURE__ */ new Set([
+		"grass",
+		"road",
+		"sidewalk",
+		"path",
+		"parking",
+		"garden",
+		"trees",
+		"fence",
+		"prop",
+		"facade",
+		"roof",
+		"entrance",
+		"windows",
+		"signage",
+		"lobby",
+		"security",
+		"elevator",
+		"stairs",
+		"water"
+	]);
+	/** Chunk kind -> art sheet kind. Unknown kinds stay procedural. */
+	var CHUNK_ART_KIND = {
+		ground: "grass",
+		road: "road",
+		sidewalk: "sidewalk",
+		parking: "parking",
+		path: "path",
+		trees: "trees",
+		garden: "garden",
+		fence: "fence",
+		prop: "prop",
+		facade: "facade",
+		roof: "roof",
+		entrance: "entrance",
+		windows: "windows",
+		signage: "signage",
+		lobby: "lobby",
+		elevator_bank: "elevator",
+		security: "security"
+	};
+	function int(value, fallback = 0) {
+		const n = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+		return Number.isFinite(n) ? Math.trunc(n) : fallback;
+	}
+	function text$1(value, fallback = "") {
+		return typeof value === "string" ? value : fallback;
+	}
+	function rectOf(value) {
+		return {
+			x: int(value.x),
+			y: int(value.y),
+			width: Math.max(0, int(value.width)),
+			height: Math.max(0, int(value.height))
+		};
+	}
+	function unionRects(rects) {
+		if (!rects.length) return null;
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const rect of rects) {
+			if (rect.width <= 0 || rect.height <= 0) continue;
+			minX = Math.min(minX, rect.x);
+			minY = Math.min(minY, rect.y);
+			maxX = Math.max(maxX, rect.x + rect.width);
+			maxY = Math.max(maxY, rect.y + rect.height);
+		}
+		if (!Number.isFinite(minX) || maxX <= minX || maxY <= minY) return null;
+		return {
+			x: minX,
+			y: minY,
+			width: maxX - minX,
+			height: maxY - minY
+		};
+	}
+	/** A stable 32-bit hash for deterministic decorative detail. */
+	function hashString(value) {
+		let hash = 2166136261;
+		for (let index = 0; index < value.length; index += 1) {
+			hash ^= value.charCodeAt(index);
+			hash = Math.imul(hash, 16777619);
+		}
+		return hash >>> 0;
+	}
+	/** Deterministic 0..1 from an integer seed (no platform RNG). */
+	function hash01(seed) {
+		let x = (seed ^ 2654435769) >>> 0;
+		x = Math.imul(x ^ x >>> 16, 2246822507) >>> 0;
+		x = Math.imul(x ^ x >>> 13, 3266489909) >>> 0;
+		return ((x ^ x >>> 16) >>> 0) / 4294967296;
+	}
+	/** Payload chunk kind -> the matching art sheet kind (or null). */
+	function artKindForChunk(kind) {
+		return CHUNK_ART_KIND[kind] ?? null;
+	}
+	function layerRank(layer) {
+		const index = SCENE_LAYER_ORDER.indexOf(layer);
+		return index < 0 ? SCENE_LAYER_ORDER.length : index;
+	}
+	var DAY_PALETTES = {
+		dawn: {
+			skyTop: "#7aa0c8",
+			skyBottom: "#f2c9a0",
+			tint: "#f7b57a",
+			tintAlpha: .06
+		},
+		day: {
+			skyTop: "#8fc7e8",
+			skyBottom: "#d9edf7",
+			tint: "#ffffff",
+			tintAlpha: 0
+		},
+		dusk: {
+			skyTop: "#5a4a7a",
+			skyBottom: "#e58b6b",
+			tint: "#ff8f5a",
+			tintAlpha: .12
+		},
+		night: {
+			skyTop: "#0b1030",
+			skyBottom: "#1c2946",
+			tint: "#101a35",
+			tintAlpha: .34
+		}
+	};
+	var SEASON_PALETTES = {
+		spring: {
+			ground: "#7fc471",
+			groundLine: "#68ad5c",
+			foliage: "#4f9a55",
+			foliageAlt: "#8fd07f"
+		},
+		summer: {
+			ground: "#6fb862",
+			groundLine: "#579b4d",
+			foliage: "#3f8449",
+			foliageAlt: "#7cc06f"
+		},
+		autumn: {
+			ground: "#b9a25f",
+			groundLine: "#9c8547",
+			foliage: "#b56b2f",
+			foliageAlt: "#d69a45"
+		},
+		winter: {
+			ground: "#dfe8ee",
+			groundLine: "#c2d0da",
+			foliage: "#6f8b7f",
+			foliageAlt: "#adc3bd"
+		}
+	};
+	/** Map the payload's three environment axes to a deterministic palette. */
+	function environmentPalette(dayNight, season, weather) {
+		const day = DAY_PALETTES[dayNight] ?? DAY_PALETTES.day;
+		const seasonPalette = SEASON_PALETTES[season] ?? SEASON_PALETTES.summer;
+		const weatherKnown = [
+			"clear",
+			"rain",
+			"snow",
+			"fog"
+		].includes(weather);
+		const tintAlpha = day.tintAlpha + (weather === "fog" ? .08 : weather === "rain" ? .05 : 0);
+		return {
+			skyTop: day.skyTop,
+			skyBottom: day.skyBottom,
+			ground: seasonPalette.ground,
+			groundLine: seasonPalette.groundLine,
+			tint: day.tint,
+			tintAlpha: Math.min(.5, tintAlpha),
+			foliage: seasonPalette.foliage,
+			foliageAlt: seasonPalette.foliageAlt,
+			weatherKnown,
+			dayNightKnown: Boolean(DAY_PALETTES[dayNight]),
+			seasonKnown: Boolean(SEASON_PALETTES[season])
+		};
+	}
+	function placedChunks(world) {
+		const zoneIds = new Set(world.zones.map((zone) => zone.zone_id));
+		return world.chunks.filter((chunk) => zoneIds.has(chunk.zone_id));
+	}
+	function floorMarkers(world, chunks) {
+		const byId = new Map(chunks.map((chunk) => [chunk.chunk_id, chunk]));
+		const portals = new Map(world.portals.map((portal) => [portal.portal_id, portal]));
+		const markers = [];
+		for (const link of world.floor_links) {
+			const portal = portals.get(link.portal_id);
+			if (!portal) continue;
+			const chunk = byId.get(portal.from_chunk);
+			if (!chunk || chunk.rect.width <= 0 || chunk.rect.height <= 0) continue;
+			markers.push({
+				kind: link.kind,
+				floor_id: link.floor_id,
+				portal_id: link.portal_id,
+				label: link.label,
+				chunk_id: chunk.chunk_id,
+				x: chunk.rect.x + chunk.rect.width / 2,
+				y: chunk.rect.y + chunk.rect.height / 2
+			});
+		}
+		const groups = /* @__PURE__ */ new Map();
+		for (const marker of markers) {
+			const list = groups.get(marker.chunk_id) ?? [];
+			list.push(marker);
+			groups.set(marker.chunk_id, list);
+		}
+		for (const group of groups.values()) {
+			if (group.length < 2) continue;
+			for (let index = 0; index < group.length; index += 1) group[index].x += (index - (group.length - 1) / 2) * 3.2;
+		}
+		return markers;
+	}
+	/**
+	* Turn the parsed projection into the one scene model the painter consumes.
+	*
+	* The map extent is the union of the PAYLOAD's chunk bounds. If it is empty,
+	* the union of the payload's zone bounds is used instead. A 1x1 canvas is the
+	* honest answer for a payload with no geometry, never a fabricated campus.
+	*/
+	function buildOutsideScene(world) {
+		const placed = placedChunks(world);
+		const chunks = placed.map((chunk) => ({
+			chunk_id: chunk.chunk_id,
+			zone_id: chunk.zone_id,
+			kind: chunk.kind,
+			layer: chunk.layer,
+			rect: rectOf(chunk.bounds),
+			z_index: chunk.z_index,
+			active: chunk.active,
+			animated: chunk.animated,
+			art: artKindForChunk(chunk.kind)
+		}));
+		const zoneRows = world.zones.map((zone) => {
+			const members = chunks.filter((chunk) => chunk.zone_id === zone.zone_id);
+			return {
+				zone_id: zone.zone_id,
+				kind: zone.kind,
+				label: zone.label,
+				state: zone.state,
+				animated: zone.animated,
+				rect: unionRects(members.map((chunk) => chunk.rect)) ?? unionRects([rectOf(zone.bounds)]),
+				chunks: members.length
+			};
+		});
+		const bounds = unionRects(chunks.map((chunk) => chunk.rect)) ?? unionRects(world.zones.map((zone) => rectOf(zone.bounds))) ?? {
+			x: 0,
+			y: 0,
+			width: 1,
+			height: 1
+		};
+		return {
+			width: Math.max(1, bounds.width),
+			height: Math.max(1, bounds.height),
+			tileSize: 16,
+			bounds,
+			zones: zoneRows,
+			chunks,
+			floors: floorMarkers(world, chunks),
+			unplacedChunks: world.chunks.length - placed.length,
+			environment: {
+				weather: world.environment.weather,
+				day_night: world.environment.day_night,
+				season: world.environment.season,
+				events: world.environment.events
+			},
+			palette: environmentPalette(world.environment.day_night, world.environment.season, world.environment.weather),
+			summary: world.summary,
+			digest: world.digest
+		};
+	}
+	/** Stable ordering so a repaint is byte-identical for identical payloads. */
+	function orderedSceneChunks(layout) {
+		return [...layout.chunks].sort((a, b) => {
+			const layer = layerRank(a.layer) - layerRank(b.layer);
+			if (layer !== 0) return layer;
+			if (a.z_index !== b.z_index) return a.z_index - b.z_index;
+			return a.chunk_id.localeCompare(b.chunk_id);
+		});
+	}
+	function safeSheet(value) {
+		const sheet = text$1(value);
+		if (!sheet) return "";
+		const lower = sheet.trim().toLowerCase();
+		if (lower.startsWith("javascript:") || lower.startsWith("vbscript:")) return "";
+		if (lower.includes("..")) return "";
+		return sheet;
+	}
+	/** Validate an outside-art manifest. Returns null instead of inventing art. */
+	function parseOutsideSceneArtManifest(value) {
+		if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+		const row = value;
+		if (text$1(row.schema) !== "qubit-office-outside-art/1") return null;
+		const cell = int(row.cell);
+		if (cell <= 0 || cell > 128) return null;
+		const source = row.tiles;
+		if (source === null || typeof source !== "object" || Array.isArray(source)) return null;
+		const tiles = {};
+		for (const [kind, entry] of Object.entries(source)) {
+			if (!ART_KINDS.has(kind)) continue;
+			if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+			const spec = entry;
+			const sheet = safeSheet(spec.sheet);
+			const col = int(spec.col);
+			const tileRow = int(spec.row);
+			if (!sheet || col < 0 || tileRow < 0) continue;
+			tiles[kind] = {
+				sheet,
+				col,
+				row: tileRow
+			};
+		}
+		if (!Object.keys(tiles).length) return null;
+		return {
+			schema: OUTSIDE_SCENE_ART_SCHEMA,
+			credit: text$1(row.credit, "LimeZu — https://limezu.itch.io"),
+			cell,
+			tiles
+		};
+	}
+	function resolveSheetUrl(sheet, baseUrl) {
+		if (/^[a-z][a-z0-9+.-]*:/i.test(sheet)) return sheet;
+		if (!baseUrl) return sheet;
+		try {
+			return new URL(sheet, baseUrl).toString();
+		} catch {
+			return sheet;
+		}
+	}
+	function defaultLoadImage(url) {
+		return new Promise((resolve, reject) => {
+			if (typeof Image !== "function") {
+				reject(/* @__PURE__ */ new Error("no Image implementation"));
+				return;
+			}
+			const img = new Image();
+			img.onload = () => {
+				const width = img.naturalWidth || img.width;
+				const height = img.naturalHeight || img.height;
+				if (!(width > 0) || !(height > 0)) {
+					reject(/* @__PURE__ */ new Error("image has no pixels"));
+					return;
+				}
+				resolve({
+					image: img,
+					width,
+					height
+				});
+			};
+			img.onerror = () => reject(/* @__PURE__ */ new Error("image failed to load"));
+			img.src = url;
+		});
+	}
+	/**
+	* Resolve an optional outside art pack.
+	*
+	* A missing manifest is `absent` (the normal case), never an error banner. A
+	* present-but-invalid manifest is a typed `error`, so the badge can say the
+	* art was rejected instead of silently pretending it loaded.
+	*/
+	async function loadOutsideSceneArt(input) {
+		const source = input.source ?? "theme";
+		let raw = input.manifest;
+		let baseUrl = input.manifestUrl ?? null;
+		if (raw === void 0 && input.manifestUrl) {
+			const fetchImpl = input.fetchImpl ?? fetch;
+			try {
+				const response = await fetchImpl(input.manifestUrl, {
+					credentials: "same-origin",
+					headers: { Accept: "application/json" }
+				});
+				if (!response || response.ok === false) return {
+					status: "absent",
+					reason: "no local outside manifest"
+				};
+				raw = await response.json().catch(() => void 0);
+			} catch {
+				return {
+					status: "absent",
+					reason: "local outside manifest unreachable"
+				};
+			}
+		}
+		if (raw === void 0 || raw === null) return {
+			status: "absent",
+			reason: "no local outside manifest"
+		};
+		const manifest = parseOutsideSceneArtManifest(raw);
+		if (!manifest) return {
+			status: "error",
+			reason: "outside art manifest is invalid"
+		};
+		const loadImage = input.loadImage ?? defaultLoadImage;
+		const sheets = /* @__PURE__ */ new Map();
+		try {
+			for (const spec of Object.values(manifest.tiles)) {
+				if (!spec) continue;
+				if (sheets.has(spec.sheet)) continue;
+				const url = resolveSheetUrl(spec.sheet, baseUrl);
+				sheets.set(spec.sheet, await loadImage(url));
+			}
+		} catch (exc) {
+			return {
+				status: "error",
+				reason: exc instanceof Error ? exc.message : "outside art failed to load"
+			};
+		}
+		const tiles = {};
+		for (const [kind, spec] of Object.entries(manifest.tiles)) {
+			if (!spec) continue;
+			const sheet = sheets.get(spec.sheet);
+			if (!sheet) continue;
+			const sx = spec.col * manifest.cell;
+			const sy = spec.row * manifest.cell;
+			if (sx + manifest.cell > sheet.width || sy + manifest.cell > sheet.height) continue;
+			tiles[kind] = {
+				image: sheet.image,
+				sx,
+				sy,
+				sw: manifest.cell,
+				sh: manifest.cell,
+				tile: manifest.cell
+			};
+		}
+		if (!Object.keys(tiles).length) return {
+			status: "error",
+			reason: "outside art has no usable tiles"
+		};
+		return {
+			status: "ready",
+			art: {
+				credit: manifest.credit,
+				source,
+				tiles
+			}
+		};
+	}
+	function px(value, tilePx) {
+		return value * tilePx;
+	}
+	function fill(ctx, colour, x, y, w, h, tilePx) {
+		ctx.fillStyle = colour;
+		ctx.fillRect(px(x, tilePx), px(y, tilePx), Math.max(0, px(w, tilePx)), Math.max(0, px(h, tilePx)));
+	}
+	function detailGrass(ctx, rect, palette, seed, tilePx) {
+		const count = Math.min(160, Math.max(4, Math.round(rect.width * rect.height / 12)));
+		ctx.strokeStyle = palette.groundLine;
+		ctx.lineWidth = Math.max(1, tilePx / 8);
+		for (let index = 0; index < count; index += 1) {
+			const x = rect.x + hash01(seed + index * 3) * rect.width;
+			const y = rect.y + hash01(seed + index * 3 + 1) * rect.height;
+			const height = .6 + hash01(seed + index * 3 + 2) * 1.4;
+			ctx.beginPath();
+			ctx.moveTo(px(x, tilePx), px(y, tilePx));
+			ctx.lineTo(px(x, tilePx), px(y - height, tilePx));
+			ctx.stroke();
+		}
+	}
+	function detailRoad(ctx, rect, tilePx) {
+		ctx.fillStyle = "#e6e2c8";
+		const dash = 2;
+		if (rect.width >= rect.height) {
+			const y = rect.y + rect.height / 2;
+			for (let x = rect.x + 1; x < rect.x + rect.width - 1; x += 4) ctx.fillRect(px(x, tilePx), px(y - .25, tilePx), px(dash, tilePx), px(.5, tilePx));
+		} else {
+			const x = rect.x + rect.width / 2;
+			for (let y = rect.y + 1; y < rect.y + rect.height - 1; y += 4) ctx.fillRect(px(x - .25, tilePx), px(y, tilePx), px(.5, tilePx), px(dash, tilePx));
+		}
+	}
+	function detailPaving(ctx, rect, colour, tilePx) {
+		ctx.strokeStyle = colour;
+		ctx.lineWidth = Math.max(1, tilePx / 10);
+		for (let x = rect.x + 2; x < rect.x + rect.width; x += 2) {
+			ctx.beginPath();
+			ctx.moveTo(px(x, tilePx), px(rect.y, tilePx));
+			ctx.lineTo(px(x, tilePx), px(rect.y + rect.height, tilePx));
+			ctx.stroke();
+		}
+		for (let y = rect.y + 2; y < rect.y + rect.height; y += 2) {
+			ctx.beginPath();
+			ctx.moveTo(px(rect.x, tilePx), px(y, tilePx));
+			ctx.lineTo(px(rect.x + rect.width, tilePx), px(y, tilePx));
+			ctx.stroke();
+		}
+	}
+	function detailParking(ctx, rect, tilePx) {
+		ctx.strokeStyle = "#f0f0e6";
+		ctx.lineWidth = Math.max(1, tilePx / 8);
+		for (let x = rect.x + 2; x < rect.x + rect.width; x += 3) {
+			ctx.beginPath();
+			ctx.moveTo(px(x, tilePx), px(rect.y + 1, tilePx));
+			ctx.lineTo(px(x, tilePx), px(rect.y + rect.height - 1, tilePx));
+			ctx.stroke();
+		}
+	}
+	function detailTrees(ctx, rect, palette, seed, tilePx) {
+		const count = Math.min(7, Math.max(2, Math.round(rect.width / 3)));
+		for (let index = 0; index < count; index += 1) {
+			const x = rect.x + .8 + hash01(seed + index * 2) * Math.max(.1, rect.width - 1.6);
+			const y = rect.y + .8 + hash01(seed + index * 2 + 1) * Math.max(.1, rect.height - 1.6);
+			ctx.fillStyle = "#6b4a2f";
+			ctx.fillRect(px(x - .15, tilePx), px(y, tilePx), px(.3, tilePx), px(.8, tilePx));
+			ctx.fillStyle = index % 2 ? palette.foliageAlt : palette.foliage;
+			ctx.beginPath();
+			ctx.arc(px(x, tilePx), px(y - .2, tilePx), px(.9, tilePx), 0, Math.PI * 2);
+			ctx.fill();
+		}
+	}
+	function detailGarden(ctx, rect, seed, tilePx) {
+		fill(ctx, "#7a5d3c", rect.x, rect.y, rect.width, rect.height, tilePx);
+		const colours = [
+			"#e46b8a",
+			"#f2c14e",
+			"#d96fd0",
+			"#f5f5f5"
+		];
+		const count = Math.min(28, Math.max(3, Math.round(rect.width * rect.height / 6)));
+		for (let index = 0; index < count; index += 1) {
+			const x = rect.x + .3 + hash01(seed + index * 2) * Math.max(.1, rect.width - .6);
+			const y = rect.y + .3 + hash01(seed + index * 2 + 1) * Math.max(.1, rect.height - .6);
+			ctx.fillStyle = colours[index % colours.length];
+			ctx.fillRect(px(x, tilePx), px(y, tilePx), Math.max(1, px(.22, tilePx)), Math.max(1, px(.22, tilePx)));
+		}
+	}
+	function detailFence(ctx, rect, tilePx) {
+		ctx.fillStyle = "#4a4c55";
+		if (rect.width >= rect.height) for (let x = rect.x; x < rect.x + rect.width; x += 1) ctx.fillRect(px(x, tilePx), px(rect.y, tilePx), Math.max(1, px(.18, tilePx)), px(rect.height, tilePx));
+		else for (let y = rect.y; y < rect.y + rect.height; y += 1) ctx.fillRect(px(rect.x, tilePx), px(y, tilePx), px(rect.width, tilePx), Math.max(1, px(.18, tilePx)));
+	}
+	function detailFacade(ctx, rect, seed, tilePx) {
+		fill(ctx, "#9a5f4b", rect.x, rect.y, rect.width, rect.height, tilePx);
+		ctx.fillStyle = "#7d4939";
+		for (let y = rect.y; y < rect.y + rect.height; y += 1) ctx.fillRect(px(rect.x, tilePx), px(y, tilePx), px(rect.width, tilePx), Math.max(1, px(.16, tilePx)));
+		const step = 2.2;
+		for (let y = rect.y + 1.2; y < rect.y + rect.height - 1; y += step) for (let x = rect.x + 1; x < rect.x + rect.width - 1; x += step) {
+			ctx.fillStyle = hash01(seed + Math.round(x * 17 + y * 31)) > .38 ? "#f6d98a" : "#3b4f66";
+			ctx.fillRect(px(x, tilePx), px(y, tilePx), Math.max(1, px(1, tilePx)), Math.max(1, px(1, tilePx)));
+		}
+	}
+	function detailRoof(ctx, rect, tilePx) {
+		fill(ctx, "#3d4358", rect.x, rect.y, rect.width, rect.height, tilePx);
+		ctx.strokeStyle = "#555d78";
+		ctx.lineWidth = Math.max(1, tilePx / 9);
+		for (let y = rect.y; y < rect.y + rect.height; y += 1.5) {
+			ctx.beginPath();
+			ctx.moveTo(px(rect.x, tilePx), px(y, tilePx));
+			ctx.lineTo(px(rect.x + rect.width, tilePx), px(y, tilePx));
+			ctx.stroke();
+		}
+	}
+	function detailEntrance(ctx, rect, tilePx) {
+		fill(ctx, "#2f3644", rect.x, rect.y, rect.width, rect.height, tilePx);
+		const doorW = Math.max(1, rect.width * .32);
+		const doorX = rect.x + (rect.width - doorW) / 2;
+		fill(ctx, "#8fd3e8", doorX, rect.y + .6, doorW, Math.max(0, rect.height - .9), tilePx);
+		ctx.strokeStyle = "#e7f5fb";
+		ctx.lineWidth = Math.max(1, tilePx / 8);
+		ctx.strokeRect(px(doorX, tilePx), px(rect.y + .6, tilePx), px(doorW, tilePx), px(Math.max(0, rect.height - .9), tilePx));
+	}
+	function detailSignage(ctx, rect, tilePx) {
+		fill(ctx, "#1f2430", rect.x, rect.y, rect.width, rect.height, tilePx);
+		ctx.fillStyle = "#e08fb0";
+		ctx.fillRect(px(rect.x + .8, tilePx), px(rect.y + .9, tilePx), px(Math.max(.2, rect.width - 1.6), tilePx), Math.max(1, px(.35, tilePx)));
+	}
+	function detailLobby(ctx, rect, tilePx) {
+		fill(ctx, "#b9b3a4", rect.x, rect.y, rect.width, rect.height, tilePx);
+		ctx.strokeStyle = "#8f8a7d";
+		ctx.lineWidth = Math.max(1, tilePx / 12);
+		for (let x = rect.x + 1; x < rect.x + rect.width; x += 1) {
+			ctx.beginPath();
+			ctx.moveTo(px(x, tilePx), px(rect.y, tilePx));
+			ctx.lineTo(px(x, tilePx), px(rect.y + rect.height, tilePx));
+			ctx.stroke();
+		}
+	}
+	function detailElevator(ctx, rect, tilePx) {
+		fill(ctx, "#4a4f63", rect.x, rect.y, rect.width, rect.height, tilePx);
+		const gap = .3;
+		const half = rect.width / 2;
+		fill(ctx, "#8fa3bf", rect.x + gap, rect.y + gap, Math.max(0, half - gap * 2), Math.max(0, rect.height - gap * 2), tilePx);
+		fill(ctx, "#8fa3bf", rect.x + half + gap, rect.y + gap, Math.max(0, half - gap * 2), Math.max(0, rect.height - gap * 2), tilePx);
+	}
+	function detailSecurity(ctx, rect, tilePx) {
+		fill(ctx, "#8a8f9c", rect.x, rect.y, rect.width, rect.height, tilePx);
+		fill(ctx, "#5d6270", rect.x + 1, rect.y + 1, Math.max(0, rect.width - 2), Math.max(0, rect.height - 2), tilePx);
+	}
+	function detailPath(ctx, rect, seed, tilePx) {
+		fill(ctx, "#c9b58c", rect.x, rect.y, rect.width, rect.height, tilePx);
+		const count = Math.min(60, Math.max(3, Math.round(rect.width * rect.height / 8)));
+		ctx.fillStyle = "#a8946d";
+		for (let index = 0; index < count; index += 1) {
+			const x = rect.x + hash01(seed + index * 2) * rect.width;
+			const y = rect.y + hash01(seed + index * 2 + 1) * rect.height;
+			ctx.fillRect(px(x, tilePx), px(y, tilePx), Math.max(1, px(.2, tilePx)), Math.max(1, px(.2, tilePx)));
+		}
+	}
+	function drawChunkArt(ctx, chunk, frame, tilePx) {
+		const rect = chunk.rect;
+		ctx.save();
+		ctx.beginPath();
+		ctx.rect(px(rect.x, tilePx), px(rect.y, tilePx), px(rect.width, tilePx), px(rect.height, tilePx));
+		ctx.clip();
+		ctx.imageSmoothingEnabled = false;
+		const destTile = Math.max(1, px(frame.tile / 16, tilePx));
+		for (let y = rect.y; y < rect.y + rect.height; y += frame.tile / 16) for (let x = rect.x; x < rect.x + rect.width; x += frame.tile / 16) ctx.drawImage(frame.image, frame.sx, frame.sy, frame.sw, frame.sh, px(x, tilePx), px(y, tilePx), destTile, destTile);
+		ctx.restore();
+	}
+	function drawChunk(ctx, chunk, palette, art, tilePx) {
+		const rect = chunk.rect;
+		if (rect.width <= 0 || rect.height <= 0) return;
+		const frame = chunk.art ? art?.tiles[chunk.art] ?? null : null;
+		if (frame) {
+			drawChunkArt(ctx, chunk, frame, tilePx);
+			return;
+		}
+		const seed = hashString(chunk.chunk_id);
+		switch (chunk.kind) {
+			case "ground":
+				fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+				detailGrass(ctx, rect, palette, seed, tilePx);
+				break;
+			case "road":
+				fill(ctx, "#3d4048", rect.x, rect.y, rect.width, rect.height, tilePx);
+				detailRoad(ctx, rect, tilePx);
+				break;
+			case "sidewalk":
+				fill(ctx, "#b9b9b2", rect.x, rect.y, rect.width, rect.height, tilePx);
+				detailPaving(ctx, rect, "#9a9a92", tilePx);
+				break;
+			case "parking":
+				fill(ctx, "#454852", rect.x, rect.y, rect.width, rect.height, tilePx);
+				detailParking(ctx, rect, tilePx);
+				break;
+			case "path":
+				detailPath(ctx, rect, seed, tilePx);
+				break;
+			case "trees":
+				fill(ctx, palette.ground, rect.x, rect.y, rect.width, rect.height, tilePx);
+				detailTrees(ctx, rect, palette, seed, tilePx);
+				break;
+			case "garden":
+				detailGarden(ctx, rect, seed, tilePx);
+				break;
+			case "fence":
+				detailFence(ctx, rect, tilePx);
+				break;
+			case "prop":
+				fill(ctx, "#7a5d3c", rect.x + .6, rect.y + .8, Math.max(.2, rect.width - 1.2), Math.max(.2, rect.height - 1.6), tilePx);
+				fill(ctx, "#5b4329", rect.x + .8, rect.y + 1, Math.max(.1, rect.width - 1.6), Math.max(.1, rect.height - 2), tilePx);
+				break;
+			case "facade":
+			case "windows":
+				detailFacade(ctx, rect, seed, tilePx);
+				break;
+			case "roof":
+				detailRoof(ctx, rect, tilePx);
+				break;
+			case "entrance":
+				detailEntrance(ctx, rect, tilePx);
+				break;
+			case "signage":
+				detailSignage(ctx, rect, tilePx);
+				break;
+			case "lobby":
+				detailLobby(ctx, rect, tilePx);
+				break;
+			case "elevator_bank":
+				detailElevator(ctx, rect, tilePx);
+				break;
+			case "security":
+				detailSecurity(ctx, rect, tilePx);
+				break;
+			default:
+				fill(ctx, "#5a6072", rect.x, rect.y, rect.width, rect.height, tilePx);
+				ctx.strokeStyle = "#9aa3b8";
+				ctx.lineWidth = Math.max(1, tilePx / 10);
+				ctx.strokeRect(px(rect.x, tilePx), px(rect.y, tilePx), px(rect.width, tilePx), px(rect.height, tilePx));
+				ctx.fillStyle = "#e8edf7";
+				ctx.font = `${Math.max(7, tilePx)}px monospace`;
+				ctx.fillText(chunk.kind, px(rect.x + .3, tilePx), px(rect.y + 1, tilePx) + Math.max(7, tilePx));
+		}
+		if (chunk.layer !== "ground" && !chunk.active && !chunk.animated) {
+			ctx.save();
+			ctx.globalAlpha = .18;
+			fill(ctx, "#5a6a86", rect.x, rect.y, rect.width, rect.height, tilePx);
+			ctx.restore();
+		}
+	}
+	function drawWeather(ctx, layout, tilePx, timeMs) {
+		const weather = layout.environment.weather;
+		if (weather !== "rain" && weather !== "snow" && weather !== "fog") return;
+		const width = px(layout.width, tilePx);
+		const height = px(layout.height, tilePx);
+		if (weather === "fog") {
+			ctx.save();
+			ctx.globalAlpha = .16;
+			ctx.fillStyle = "#dfe8f0";
+			ctx.fillRect(0, 0, width, height);
+			for (let index = 0; index < 4; index += 1) {
+				const y = height * (.16 + index * .22);
+				ctx.fillStyle = "#f4f8fb";
+				ctx.fillRect(0, y, width, Math.max(2, px(1.2, tilePx)));
+			}
+			ctx.restore();
+			return;
+		}
+		ctx.save();
+		const seed = hashString(weather);
+		const count = Math.round(layout.width * layout.height / 3);
+		const offset = timeMs / 14 % height;
+		for (let index = 0; index < count; index += 1) {
+			const x = hash01(seed + index * 3) * width;
+			const y = (hash01(seed + index * 3 + 1) * height + offset) % height;
+			if (weather === "rain") {
+				ctx.strokeStyle = "rgba(205,225,245,0.42)";
+				ctx.lineWidth = 1;
+				ctx.beginPath();
+				ctx.moveTo(x, y);
+				ctx.lineTo(x - 2, y + px(1.8, tilePx));
+				ctx.stroke();
+			} else {
+				ctx.fillStyle = "rgba(245,250,255,0.72)";
+				ctx.fillRect(x, y, Math.max(1, px(.3, tilePx)), Math.max(1, px(.3, tilePx)));
+			}
+		}
+		ctx.restore();
+	}
+	/** Paint one deterministic scene frame. */
+	function drawOutsideScene(ctx, layout, options = {}) {
+		const tilePx = 8;
+		const timeMs = options.timeMs ?? 0;
+		const width = px(layout.width, tilePx);
+		const height = px(layout.height, tilePx);
+		ctx.clearRect(0, 0, width, height);
+		const sky = ctx.createLinearGradient(0, 0, 0, height);
+		sky.addColorStop(0, layout.palette.skyTop);
+		sky.addColorStop(1, layout.palette.skyBottom);
+		ctx.fillStyle = sky;
+		ctx.fillRect(0, 0, width, height);
+		ctx.save();
+		ctx.translate(-px(layout.bounds.x, tilePx), -px(layout.bounds.y, tilePx));
+		fill(ctx, layout.palette.ground, layout.bounds.x, layout.bounds.y, layout.width, layout.height, tilePx);
+		for (const chunk of orderedSceneChunks(layout)) drawChunk(ctx, chunk, layout.palette, options.art ?? null, tilePx);
+		const selected = layout.zones.find((zone) => zone.zone_id === options.selectedZoneId);
+		if (selected && selected.rect) {
+			ctx.save();
+			ctx.strokeStyle = "rgba(224,143,176,0.95)";
+			ctx.lineWidth = 2;
+			ctx.setLineDash([6, 4]);
+			ctx.strokeRect(px(selected.rect.x, tilePx), px(selected.rect.y, tilePx), px(selected.rect.width, tilePx), px(selected.rect.height, tilePx));
+			ctx.restore();
+		}
+		for (const floor of layout.floors) {
+			const x = px(floor.x, tilePx);
+			const y = px(floor.y, tilePx);
+			ctx.save();
+			ctx.fillStyle = "rgba(12,16,28,0.78)";
+			ctx.fillRect(x - 12, y - 8, 24, 16);
+			ctx.strokeStyle = floor.kind === "stairs" ? "#8fd3e8" : "#e08fb0";
+			ctx.lineWidth = 1.5;
+			ctx.strokeRect(x - 12, y - 8, 24, 16);
+			ctx.fillStyle = "#eef4fb";
+			ctx.font = "8px monospace";
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(floor.kind === "stairs" ? "ST" : "EL", x, y);
+			ctx.restore();
+		}
+		ctx.restore();
+		drawWeather(ctx, layout, tilePx, timeMs);
+		if (layout.palette.tintAlpha > 0) {
+			ctx.save();
+			ctx.globalAlpha = layout.palette.tintAlpha;
+			ctx.fillStyle = layout.palette.tint;
+			ctx.fillRect(0, 0, width, height);
+			ctx.restore();
+		}
+	}
+	/** One-line accessible description of what the canvas is showing. */
+	function sceneDescription(layout) {
+		return `Campus exterior scene: ${layout.zones.filter((zone) => zone.state === "active").length} active of ${layout.zones.length} zones, ${layout.chunks.length} visible chunks, ${layout.floors.length} floor links. Weather ${layout.environment.weather || "unknown"}, ${layout.environment.day_night || "unknown"} time, ${layout.environment.season || "unknown"} season.`;
+	}
+	/** Floor link rows for the scene's accessible overlay (payload order). */
+	function sceneFloorLinks(world, layout) {
+		const allowed = new Set(layout.floors.map((floor) => floor.portal_id));
+		return world.floor_links.filter((link) => allowed.has(link.portal_id));
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/OutsideScene.tsx
+	var THEME_ID_RE = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/;
+	function hostWindow() {
+		return typeof window === "undefined" ? null : window;
+	}
+	function activeThemeId(win) {
+		const raw = (win?.document)?.documentElement?.getAttribute("data-office-theme") || "";
+		return THEME_ID_RE.test(raw) ? raw : "";
+	}
+	/** The same host path the theme payload uses (`/plugins/qubit-office/themes/<id>`). */
+	function activeThemeAssetBase(win) {
+		const id = activeThemeId(win === void 0 ? hostWindow() : win);
+		if (!id) return null;
+		return `${hostBasePath()}/plugins/qubit-office/themes/${encodeURIComponent(id)}`;
+	}
+	function injectedArtManifest(win) {
+		if (!win) return void 0;
+		return win.__QUBIT_OFFICE_OUTSIDE_ART__;
+	}
+	/**
+	* jsdom ships a `getContext` that only logs "Not implemented" and returns
+	* null. Detect it before calling so the accessible fallback is stated once
+	* instead of emitting a console error on every mount. A real browser's native
+	* implementation (or an explicit test stub) is accepted.
+	*/
+	function canvas2dSupported(canvas) {
+		const get = ((canvas.ownerDocument?.defaultView)?.HTMLCanvasElement?.prototype ?? (typeof HTMLCanvasElement === "undefined" ? null : HTMLCanvasElement.prototype))?.getContext;
+		if (typeof get !== "function") return false;
+		const source = String(get);
+		if (/tryWrapperForImpl/.test(source)) return false;
+		return !/\bnot implemented\b/i.test(source);
+	}
+	function artStatusLabel(status, art, reason) {
+		if (status === "ready" && art) return `LimeZu tiles · ${art.credit || "https://limezu.itch.io"}`;
+		if (status === "loading") return "Loading local outside art…";
+		if (status === "error") return `Procedural scene — local LimeZu art was rejected (${reason}).`;
+		return "Procedural scene — local LimeZu pack not detected.";
+	}
+	function createOutsideScene(R, hooks) {
+		const { useState, useEffect, useRef } = hooks;
+		return function OutsideScene(props) {
+			const world = props.view.status === "ready" ? props.view.world : null;
+			const layout = world ? buildOutsideScene(world) : null;
+			const canvasRef = useRef(null);
+			const [art, setArt] = useState(props.art ?? null);
+			const [artStatus, setArtStatus] = useState(props.art ? "ready" : "loading");
+			const [artReason, setArtReason] = useState("");
+			const [canvasUnavailable, setCanvasUnavailable] = useState(false);
+			useEffect(() => {
+				if (props.art !== void 0) {
+					setArt(props.art);
+					setArtStatus(props.art ? "ready" : "absent");
+					setArtReason("");
+					return;
+				}
+				const win = hostWindow();
+				const injected = injectedArtManifest(win);
+				const assetBase = props.assetBase ?? activeThemeAssetBase(win);
+				if (!assetBase && injected === void 0) {
+					setArt(null);
+					setArtStatus("absent");
+					setArtReason("");
+					return;
+				}
+				let live = true;
+				setArtStatus("loading");
+				const origin = win?.location?.origin || "";
+				loadOutsideSceneArt({
+					manifest: injected,
+					manifestUrl: assetBase ? `${origin}${assetBase}/outside/scene.json` : null,
+					fetchImpl: props.fetchImpl ?? (win && typeof win.fetch === "function" ? win.fetch.bind(win) : void 0),
+					loadImage: props.loadImage,
+					source: injected === void 0 ? "theme" : "injected"
+				}).then((result) => {
+					if (!live) return;
+					if (result.status === "ready") {
+						setArt(result.art);
+						setArtStatus("ready");
+						setArtReason("");
+						return;
+					}
+					setArt(null);
+					setArtStatus(result.status);
+					setArtReason(result.reason);
+				});
+				return () => {
+					live = false;
+				};
+			}, [
+				props.art,
+				props.assetBase,
+				props.fetchImpl,
+				props.loadImage
+			]);
+			useEffect(() => {
+				if (!layout) return;
+				const canvas = canvasRef.current;
+				if (!canvas) return;
+				if (!canvas2dSupported(canvas)) {
+					setCanvasUnavailable(true);
+					return;
+				}
+				let ctx = null;
+				try {
+					ctx = canvas.getContext("2d");
+				} catch {
+					ctx = null;
+				}
+				if (!ctx) {
+					setCanvasUnavailable(true);
+					return;
+				}
+				setCanvasUnavailable(false);
+				canvas.width = Math.max(1, Math.ceil(layout.width * 8));
+				canvas.height = Math.max(1, Math.ceil(layout.height * 8));
+				drawOutsideScene(ctx, layout, {
+					reducedMotion: Boolean(props.reducedMotion),
+					art,
+					selectedZoneId: props.selectedZoneId ?? null
+				});
+			}, [
+				layout?.digest,
+				layout?.width,
+				layout?.height,
+				art,
+				artStatus,
+				props.reducedMotion,
+				props.selectedZoneId
+			]);
+			if (!world || !layout) return null;
+			const environments = currentEnvironment(world);
+			const floorLinks = sceneFloorLinks(world, layout);
+			const floorByPortal = new Map(floorLinks.map((link) => [link.portal_id, link]));
+			const onCanvasClick = (event) => {
+				const canvas = canvasRef.current;
+				if (!canvas || !props.onSelectZone) return;
+				const rect = canvas.getBoundingClientRect();
+				if (!(rect.width > 0) || !(rect.height > 0)) return;
+				const x = layout.bounds.x + (event.clientX - rect.left) / rect.width * layout.width;
+				const y = layout.bounds.y + (event.clientY - rect.top) / rect.height * layout.height;
+				const hit = [...orderedSceneChunks(layout)].reverse().find((chunk) => chunk.rect.width > 0 && chunk.rect.height > 0 && x >= chunk.rect.x && x <= chunk.rect.x + chunk.rect.width && y >= chunk.rect.y && y <= chunk.rect.y + chunk.rect.height);
+				if (!hit) return;
+				const zone = world.zones.find((row) => row.zone_id === hit.zone_id);
+				if (zone) props.onSelectZone?.(zone);
+			};
+			const floorButton = (floor) => {
+				const link = floorByPortal.get(floor.portal_id);
+				if (!link) return null;
+				const left = (floor.x - layout.bounds.x) / layout.width * 100;
+				const top = (floor.y - layout.bounds.y) / layout.height * 100;
+				return R.createElement("a", {
+					key: floor.portal_id,
+					href: floorHref(floor.floor_id),
+					className: "outside-scene__floor",
+					"data-testid": "outside-scene-floor",
+					"data-floor": floor.floor_id,
+					"data-kind": floor.kind,
+					"aria-label": link.label,
+					style: {
+						left: `${left}%`,
+						top: `${top}%`
+					},
+					onClick: (event) => {
+						if (props.onSelectFloor) {
+							event.preventDefault?.();
+							props.onSelectFloor(link);
+						}
+					}
+				}, `${floor.kind === "stairs" ? "Stairs" : "Elevator"} ${floor.floor_id}`);
+			};
+			const envChip = (event) => R.createElement("span", {
+				key: event.event_id,
+				className: "outside-scene__chip",
+				"data-testid": "outside-scene-env",
+				"data-kind": event.kind,
+				"data-value": event.value
+			}, event.label || event.value);
+			return R.createElement("section", {
+				className: "outside-scene",
+				"data-testid": "outside-scene",
+				"data-art-status": artStatus,
+				"data-art-source": art ? art.source : "procedural",
+				"data-reduced-motion": props.reducedMotion ? "true" : "false",
+				"aria-label": "Visual campus outside world"
+			}, [
+				R.createElement("div", {
+					key: "frame",
+					className: "outside-scene__frame"
+				}, [
+					R.createElement("canvas", {
+						key: "canvas",
+						ref: canvasRef,
+						className: "outside-scene__canvas",
+						role: "img",
+						"aria-label": sceneDescription(layout),
+						"data-testid": "outside-scene-canvas",
+						onClick: onCanvasClick
+					}),
+					...layout.floors.map(floorButton).filter(Boolean),
+					R.createElement("div", {
+						key: "env",
+						className: "outside-scene__env",
+						"aria-label": "Current outside environment"
+					}, environments.length ? environments.map(envChip) : R.createElement("span", {
+						key: "none",
+						className: "outside-scene__chip is-unknown",
+						"data-testid": "outside-scene-env"
+					}, "Environment status unavailable"))
+				]),
+				canvasUnavailable ? R.createElement("p", {
+					key: "unavailable",
+					className: "outside-scene__unavailable",
+					"data-testid": "outside-scene-unavailable"
+				}, "Visual scene unavailable on this device. The semantic panel below still shows every zone and floor link.") : null,
+				R.createElement("p", {
+					key: "caption",
+					className: "outside-scene__caption",
+					"data-testid": artStatus === "ready" ? "outside-scene-art" : "outside-scene-fallback"
+				}, artStatusLabel(artStatus, art, artReason)),
+				R.createElement("p", {
+					key: "counts",
+					className: "outside-scene__counts",
+					"data-testid": "outside-scene-counts"
+				}, `${layout.summary.active_zones} active of ${layout.summary.zones} zones · ${layout.chunks.length} visible chunks · ${layout.floors.length} floor links. Presentation only — no agents or occupancy are drawn.`)
+			]);
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/OutsideWorld.tsx
 	var TRUTHY_CREDIT_URL = "https://limezu.itch.io";
 	function environmentText(events, reducedMotion) {
@@ -201535,6 +202559,7 @@ create: function(game) {
 	}
 	function createOutsideWorld(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
+		const OutsideScene = createOutsideScene(R, hooks);
 		return function OutsideWorld(props) {
 			const view = props.view ?? outsideWorldView({
 				payload: props.payload,
@@ -201823,10 +202848,19 @@ create: function(game) {
 					"data-testid": "outside-world-floors-empty"
 				}, "No elevator or stair links are configured.")]);
 			};
+			const scene = () => R.createElement(OutsideScene, {
+				key: "scene",
+				view,
+				selectedZoneId: selectedId,
+				reducedMotion,
+				onSelectZone: select,
+				onSelectFloor: props.onSelectFloor
+			});
 			const ready = () => R.createElement("div", {
 				key: "ready",
 				className: "outside-world__body"
 			}, [
+				scene(),
 				environment(),
 				zoneList(),
 				zoneDetail(),
