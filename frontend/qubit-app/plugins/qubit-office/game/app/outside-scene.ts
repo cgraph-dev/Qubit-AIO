@@ -487,6 +487,8 @@ export function parseOutsideSceneArtManifest(
 export interface OutsideArtLoadInput {
   manifest?: unknown;
   manifestUrl?: string | null;
+  /** Theme asset base; sheet paths are relative to this, not the manifest. */
+  assetBase?: string | null;
   fetchImpl?: typeof fetch;
   loadImage?: (url: string) => Promise<{
     image: CanvasImageSource; width: number; height: number;
@@ -543,7 +545,10 @@ export async function loadOutsideSceneArt(
 ): Promise<OutsideArtLoadResult> {
   const source = input.source ?? "theme";
   let raw = input.manifest;
-  let baseUrl = input.manifestUrl ?? null;
+  let baseUrl = input.assetBase ?? input.manifestUrl ?? null;
+  if (input.assetBase) {
+    baseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
+  }
   if (raw === undefined && input.manifestUrl) {
     const fetchImpl = input.fetchImpl ?? fetch;
     try {

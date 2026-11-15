@@ -202110,7 +202110,8 @@ create: function(game) {
 	async function loadOutsideSceneArt(input) {
 		const source = input.source ?? "theme";
 		let raw = input.manifest;
-		let baseUrl = input.manifestUrl ?? null;
+		let baseUrl = input.assetBase ?? input.manifestUrl ?? null;
+		if (input.assetBase) baseUrl = baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`;
 		if (raw === void 0 && input.manifestUrl) {
 			const fetchImpl = input.fetchImpl ?? fetch;
 			try {
@@ -202540,6 +202541,8 @@ create: function(game) {
 		return typeof window === "undefined" ? null : window;
 	}
 	function activeThemeId(win) {
+		const global = win?.__QUBIT_OFFICE_THEME__?.id;
+		if (typeof global === "string" && THEME_ID_RE.test(global)) return global;
 		const raw = (win?.document)?.documentElement?.getAttribute("data-office-theme") || "";
 		return THEME_ID_RE.test(raw) ? raw : "";
 	}
@@ -202601,10 +202604,13 @@ create: function(game) {
 				let live = true;
 				setArtStatus("loading");
 				const origin = win?.location?.origin || "";
+				const manifestUrl = assetBase ? `${origin}${assetBase}/outside/scene.json` : null;
+				const fetchImpl = props.fetchImpl ?? (win && typeof win.fetch === "function" ? win.fetch.bind(win) : void 0);
 				loadOutsideSceneArt({
 					manifest: injected,
-					manifestUrl: assetBase ? `${origin}${assetBase}/outside/scene.json` : null,
-					fetchImpl: props.fetchImpl ?? (win && typeof win.fetch === "function" ? win.fetch.bind(win) : void 0),
+					manifestUrl,
+					assetBase: assetBase ? `${origin}${assetBase}` : null,
+					fetchImpl,
 					loadImage: props.loadImage,
 					source: injected === void 0 ? "theme" : "injected"
 				}).then((result) => {

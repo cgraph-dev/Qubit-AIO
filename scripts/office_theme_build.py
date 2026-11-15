@@ -949,6 +949,33 @@ def _prepare_assets(assets: Any) -> Tuple[Dict[str, bytes],
         },
     }
     payloads["assets/manifest.json"] = _json_bytes(assets_manifest)
+    if "outside" in manifest_categories:
+        sheet_entry = None
+        for entry in (assets.get("categories", {}).get("outside", {})
+                      .get("entries", []) if isinstance(assets, Mapping) else []):
+            if (entry.get("id") == "outside-serene-village-16x16"
+                    and entry.get("kind") == "sheet"):
+                sheet_entry = entry
+                break
+        if sheet_entry is not None:
+            relative = f"assets/outside/{_sha(bytes(sheet_entry['blob']))[:20]}.png"
+            payloads["outside/scene.json"] = _json_bytes({
+                "schema": "qubit-office-outside-art/1",
+                "credit": "LimeZu — https://limezu.itch.io",
+                "cell": 16,
+                "tiles": {
+                    "grass": {"sheet": relative, "col": 8, "row": 0},
+                    "road": {"sheet": relative, "col": 4, "row": 0},
+                    "sidewalk": {"sheet": relative, "col": 3, "row": 0},
+                    "path": {"sheet": relative, "col": 3, "row": 0},
+                    "parking": {"sheet": relative, "col": 3, "row": 0},
+                    "garden": {"sheet": relative, "col": 2, "row": 6},
+                    "trees": {"sheet": relative, "col": 10, "row": 7},
+                    "fence": {"sheet": relative, "col": 12, "row": 2},
+                    "prop": {"sheet": relative, "col": 2, "row": 5},
+                    "water": {"sheet": relative, "col": 12, "row": 0},
+                },
+            })
     return (
         payloads,
         {"schema": 1, "categories": manifest_categories},

@@ -56,6 +56,10 @@ function hostWindow(): Window | null {
 }
 
 function activeThemeId(win: Window | null): string {
+  const global = (win as Window & {
+    __QUBIT_OFFICE_THEME__?: { id?: unknown };
+  } | null)?.__QUBIT_OFFICE_THEME__?.id;
+  if (typeof global === "string" && THEME_ID_RE.test(global)) return global;
   const doc = win?.document;
   const raw = doc?.documentElement?.getAttribute("data-office-theme") || "";
   return THEME_ID_RE.test(raw) ? raw : "";
@@ -154,6 +158,7 @@ export function createOutsideScene(R: ReactArg, hooks: HooksArg) {
       loadOutsideSceneArt({
         manifest: injected,
         manifestUrl,
+        assetBase: assetBase ? `${origin}${assetBase}` : null,
         fetchImpl,
         loadImage: props.loadImage,
         source: injected === undefined ? "theme" : "injected",
