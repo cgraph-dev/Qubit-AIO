@@ -2239,66 +2239,215 @@
 .office-game__campusBody { padding: 0 18px 24px; }
 .office-game__campusState { padding: 24px; opacity: .8; }
 
-/* --- the floor campus: multiple Habblaud offices, one per real floor ------
-   This is the owner's request: the same office art multiplied and placed next
-   to each other as floors, not a directory grid and not a second renderer. */
+/* --- the campus world: the real floors on one shared camera stage ---------
+   The owner rejected isolated cards, a floor picker, a text directory and the
+   bare vector shell. Each floor below is still the real Habblaud renderer, but
+   the floors share one stage, one pan/zoom camera and a label plaque instead of
+   unrelated card chrome. */
 .office-game__campus--floors {
-  background: #0b0a13;
+  background: #070a10;
 }
-.office-game__floorCampus {
+.office-game__campusWorld {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  min-height: 70vh;
 }
-.office-game__floorCampusNote {
-  margin: 0;
-  color: var(--office-muted);
-  font-size: var(--office-fs-xs);
-}
-.office-game__floorGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
-  gap: 14px;
-  align-items: stretch;
-}
-.office-game__floorCard {
-  display: flex;
-  flex-direction: column;
-  min-height: 430px;
-  border: 1px solid #2c3550;
-  border-radius: 8px;
-  overflow: hidden;
-  background: #0b0a13;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-}
-.office-game__floorCardHead {
+.office-game__campusWorldControls {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 8px 14px;
+  align-items: center;
+  gap: 6px 8px;
   padding: 8px 12px;
-  background: #111522;
-  border-bottom: 1px solid #2c3550;
-  color: #e7eef7;
-  font-size: 12px;
+  border: 1px solid #2c3550;
+  border-radius: 8px;
+  background: rgba(13, 19, 32, 0.86);
+  color: #c9d4ea;
+  font-size: var(--office-fs-sm);
 }
-.office-game__floorCardHead strong {
+.office-game__campusWorldControls .office-game__btn {
+  padding: 3px 9px;
+  font-size: var(--office-fs-sm);
+}
+.office-game__campusWorldMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+  min-width: 12rem;
+}
+.office-game__campusWorldMeta strong {
   font-size: 13px;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.05em;
   text-transform: uppercase;
 }
-.office-game__floorCardHead span:last-child {
-  margin-left: auto;
-  color: #9aa7c7;
+.office-game__campusWorldMeta span {
+  color: var(--office-muted);
+  font-size: var(--office-fs-xs);
   font-variant-numeric: tabular-nums;
 }
-.office-game__floorFrame {
+.office-game__campusViewport {
+  position: relative;
   flex: 1 1 auto;
-  width: 100%;
-  min-height: 390px;
-  border: 0;
-  display: block;
+  min-height: 440px;
+  height: clamp(440px, 64vh, 820px);
+  overflow: hidden;
+  border: 1px solid #22304c;
+  border-radius: 10px;
+  background:
+    radial-gradient(1200px 640px at 18% 0%, rgba(72, 104, 172, 0.24), transparent 68%),
+    radial-gradient(900px 520px at 82% 100%, rgba(160, 64, 120, 0.16), transparent 70%),
+    linear-gradient(180deg, #0b1220 0%, #070a10 72%);
+  cursor: grab;
+  touch-action: none;
+}
+.office-game__campusViewport:active {
+  cursor: grabbing;
+}
+.office-game__campusStage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+.office-game__campusFloor {
+  position: absolute;
+  overflow: visible;
+  border: 1px solid #2b3856;
+  border-radius: 10px;
   background: #0b0a13;
+  box-shadow: 0 26px 60px rgba(0, 0, 0, 0.55);
+  transition:
+    border-color var(--office-dur-fast) var(--office-ease),
+    box-shadow var(--office-dur-fast) var(--office-ease);
+}
+.office-game__campusFloor.is-live {
+  border-color: #3f6f8f;
+  box-shadow:
+    0 0 0 1px rgba(111, 211, 166, 0.18),
+    0 26px 60px rgba(0, 0, 0, 0.55);
+}
+.office-game__campusFloor.is-focus {
+  z-index: 2;
+  border-color: var(--office-accent);
+  box-shadow:
+    0 0 0 2px rgba(224, 143, 176, 0.45),
+    0 30px 70px rgba(0, 0, 0, 0.6);
+}
+.office-game__campusFloorFrame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 9px;
+  background: #0b0a13;
+}
+.office-game__campusFloorLabel {
+  position: absolute;
+  left: 10px;
+  top: -18px;
+  z-index: 3;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: calc(100% - 20px);
+  padding: 4px 10px;
+  border: 1px solid #33425f;
+  border-radius: 999px;
+  background: rgba(13, 19, 32, 0.95);
+  color: #dbe5f7;
+  font-size: var(--office-fs-xs);
+  line-height: 1.2;
+  cursor: pointer;
+}
+.office-game__campusFloorLabel:hover,
+.office-game__campusFloorLabel:focus-visible {
+  border-color: var(--office-accent);
+  outline: none;
+}
+.office-game__campusFloorLabel[aria-pressed="true"] {
+  border-color: var(--office-accent);
+  background: rgba(42, 21, 34, 0.95);
+}
+.office-game__campusFloorNumber {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.office-game__campusFloorName {
+  max-width: 20rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #9fb0d0;
+}
+.office-game__campusFloorState {
+  color: #7fd6ae;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.office-game__campusFloor.is-template .office-game__campusFloorState {
+  color: #8b97ad;
+}
+.office-game__campusFocusBar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 4;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 8px 12px;
+  border: 1px solid #33425f;
+  border-radius: 8px;
+  background: rgba(13, 19, 32, 0.9);
+  color: #dbe5f7;
+  font-size: var(--office-fs-sm);
+}
+.office-game__campusFocusTitle {
+  letter-spacing: 0.03em;
+}
+.office-game__campusFocusMeta {
+  color: #9fb0d0;
+  font-variant-numeric: tabular-nums;
+}
+.office-game__campusFocusPeople {
+  max-width: 28%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #7fd6ae;
+}
+.office-game__campusFocusActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
+.office-game__campusWorldState {
+  margin: 0;
+  padding: 8px 2px;
+  color: var(--office-muted);
+  font-size: var(--office-fs-sm);
+}
+.office-game__campusWorldState[role="alert"] {
+  color: var(--office-warn);
+}
+@media (max-width: 680px) {
+  .office-game__campusFloorName {
+    display: none;
+  }
+  .office-game__campusViewport {
+    height: 56vh;
+    min-height: 320px;
+  }
+  .office-game__campusFocusPeople {
+    display: none;
+  }
 }
 
 /* Campus has two real surfaces: the Habblaud floor copies and the 100-floor

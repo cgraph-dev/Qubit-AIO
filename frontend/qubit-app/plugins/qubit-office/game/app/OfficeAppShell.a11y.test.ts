@@ -175,6 +175,23 @@ describe("office shell accessibility landmarks", () => {
     expect(document.activeElement?.id).toBe("office-game-main");
   });
 
+  it("opens the singular campus world instead of the old per-floor cards", async () => {
+    stubFetch();
+    await act(async () => { render({}); });
+    const toggle = document.querySelector(
+      '[data-testid="office-campus-toggle"]') as HTMLButtonElement;
+    expect(toggle).not.toBeNull();
+    await act(async () => { toggle.click(); });
+    expect(document.querySelector('[data-testid="office-campus-world"]'))
+      .not.toBeNull();
+    expect(document.querySelector('[data-testid="office-floor-campus"]'))
+      .toBeNull();
+    expect(document.querySelector('[data-testid="office-floor-card-1"]'))
+      .toBeNull();
+    expect(document.querySelector('[data-testid="campus-world-viewport"]'))
+      .not.toBeNull();
+  });
+
   it("offers Escape inside the office frame as an escape from the canvas", async () => {
     stubFetch();
     await act(async () => { render({}); });
