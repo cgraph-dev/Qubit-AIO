@@ -144,6 +144,39 @@ FLOOR_MAP: Dict[str, Tuple[int, int]] = {
     "concrete": (12, 17),
 }
 
+#: Individual furniture singles inside the interior archive (16px tier). Each
+#: member is one complete object, so the recipe records it as a whole-file
+#: region (x/y 0, w/h its own size). Only this first slice is mapped; every
+#: other Habblaud kind keeps its procedural sprite.
+FURNITURE_FILES: Dict[str, str] = {
+    "desk": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
+    "desk_back": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
+    "reception_desk": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
+    "meeting_table": "2_Living_Room_Singles/Living_Room_Singles_29.png",
+    "office_chair": "13_Conference_Hall_Singles/Conference_Hall_Singles_39.png",
+    "office_chair_front": "13_Conference_Hall_Singles/Conference_Hall_Singles_37.png",
+    "bookshelf": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_66.png",
+    "whiteboard": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_39.png",
+    "plant_small": "2_Living_Room_Singles/Living_Room_Singles_17.png",
+    "plant_tall": "2_Living_Room_Singles/Living_Room_Singles_21.png",
+    "sofa": "2_Living_Room_Singles/Living_Room_Singles_3.png",
+    "armchair": "2_Living_Room_Singles/Living_Room_Singles_117.png",
+    "coffee_table": "2_Living_Room_Singles/Living_Room_Singles_30.png",
+    "floor_lamp": "2_Living_Room_Singles/Living_Room_Singles_80.png",
+}
+
+#: The Modern UI sheet and the measured 9-slice regions. ``slice`` is
+#: ``[top, right, bottom, left]`` as CSS ``border-image-slice`` expects.
+UI_SHEET = "16x16/Modern_UI_Style_1.png"
+UI_SLICES: Dict[str, Dict[str, object]] = {
+    "panel": {"x": 8, "y": 8, "w": 32, "h": 32,
+              "slice": [8, 8, 8, 8], "width": "8px", "repeat": "stretch"},
+    "button": {"x": 8, "y": 176, "w": 36, "h": 32,
+               "slice": [8, 8, 8, 8], "width": "6px", "repeat": "stretch"},
+    "dialog": {"x": 56, "y": 176, "w": 48, "h": 32,
+               "slice": [8, 8, 8, 8], "width": "8px", "repeat": "stretch"},
+}
+
 
 # ---------------------------------------------------------------------------
 # Source resolution
@@ -576,6 +609,145 @@ def extract_floor_tiles(source: str, out_dir: str, *,
         tile.save(path, format="PNG")
         written[kind] = path
     return written
+
+
+# ---------------------------------------------------------------------------
+# Furniture / UI / character extras
+# ---------------------------------------------------------------------------
+def _resolve_member(source: str, member_path: str,
+                    preferred: Sequence[str] = (),
+                    description: str = "asset") -> Tuple[Path, str]:
+    """Return ``(archive, member)`` for ``member_path`` in the purchase."""
+    if not isinstance(source, str) or not source.strip():
+        raise ThemeBuildError("source: a purchase directory or zip path is required")
+    path = Path(source).expanduser()
+    search_dir: Path
+    if path.is_file():
+        if path.suffix.lower() != ".zip":
+            raise ThemeBuildError(
+                f"{path.name}: expected a .zip purchase archive, got "
+                f"{path.suffix or 'no extension'}")
+        names = _archive_names(path)
+        if names is None:
+            raise ThemeBuildError(f"{path.name}: not a valid zip archive")
+        for name in names:
+            normal = name.replace("\\", "/")
+            if normal == member_path or normal.endswith("/" + member_path):
+                return path, name
+        search_dir = path.parent
+    elif path.is_dir():
+        search_dir = path
+    else:
+        raise ThemeBuildError(f"{path}: source not found")
+
+    candidates: List[Path] = []
+    for name in preferred:
+        candidate = search_dir / name
+        if candidate.is_file():
+            candidates.append(candidate)
+    for candidate in sorted(search_dir.glob("*.zip"), key=lambda p: p.name):
+        if candidate.is_file() and candidate not in candidates:
+            candidates.append(candidate)
+    basename = member_path.rsplit("/", 1)[-1]
+    for candidate in candidates:
+        names = _archive_names(candidate)
+        if names is None:
+            continue
+        for name in names:
+            normal = name.replace("\\", "/")
+            if normal == member_path or normal.endswith("/" + member_path):
+                return candidate, name
+        for name in names:
+            if name.replace("\\", "/").rsplit("/", 1)[-1] == basename:
+                return candidate, name
+    raise ThemeBuildError(
+        f"{member_path}: not found under {search_dir} "
+        f"({description} supplies it)")
+
+
+def _read_rgba(archive_path: Path, member: str) -> Image.Image:
+    try:
+        with zipfile.ZipFile(archive_path) as archive:
+            data = archive.read(member)
+    except (KeyError, OSError, RuntimeError, zipfile.BadZipFile) as exc:
+        raise ThemeBuildError(
+            f"{archive_path.name}: cannot read {member} ({exc})") from exc
+    try:
+        image = Image.open(io.BytesIO(data))
+        image.load()
+    except Exception as exc:  # noqa: BLE001 - any decode failure is typed
+        raise ThemeBuildError(
+            f"{archive_path.name}: {member} is not a decodable image "
+            f"({exc})") from exc
+    return image.convert("RGBA")
+
+
+def _png_bytes(image: Image.Image) -> bytes:
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+def extract_furniture_parts(source: str) -> Dict[str, Dict[str, object]]:
+    """Read the mapped furniture singles from the interior purchase, in memory.
+
+    Returns ``{kind: {"data": png_bytes, "w", "h", "sheet"}}``. ``sheet`` is
+    the archive member for the shareable recipe (a whole-file region). A
+    purchase without the interior archive yields ``{}`` so the builder keeps
+    the procedural furniture.
+    """
+    try:
+        archive_path, _ = _resolve_member(
+            source, next(iter(FURNITURE_FILES.values())),
+            INTERIOR_ZIP_NAMES, "the interior pack")
+    except ThemeBuildError:
+        return {}
+    out: Dict[str, Dict[str, object]] = {}
+    for kind, member in FURNITURE_FILES.items():
+        try:
+            found_archive, found = _resolve_member(
+                source, member, INTERIOR_ZIP_NAMES, "the interior pack")
+            image = _read_rgba(found_archive, found)
+        except ThemeBuildError:
+            continue
+        out[kind] = {
+            "data": _png_bytes(image),
+            "w": image.width,
+            "h": image.height,
+            "sheet": member,
+        }
+    return out
+
+
+def extract_ui_parts(source: str) -> Dict[str, Dict[str, object]]:
+    """Read the mapped Modern UI 9-slice regions, in memory.
+
+    Returns ``{name: {"data", "slice", "width", "repeat", "sheet", "x", "y",
+    "w", "h"}}``. A purchase without the UI archive yields ``{}`` and the
+    office keeps its own chrome.
+    """
+    try:
+        archive_path, member = _resolve_member(
+            source, UI_SHEET, FALLBACK_ZIP_NAMES, "the Modern UI pack")
+    except ThemeBuildError:
+        return {}
+    sheet = _read_rgba(archive_path, member)
+    out: Dict[str, Dict[str, object]] = {}
+    for name, spec in UI_SLICES.items():
+        x, y = int(spec["x"]), int(spec["y"])
+        w, h = int(spec["w"]), int(spec["h"])
+        if x + w > sheet.width or y + h > sheet.height:
+            continue
+        tile = sheet.crop((x, y, x + w, y + h))
+        out[name] = {
+            "data": _png_bytes(tile),
+            "slice": list(spec["slice"]),
+            "width": spec["width"],
+            "repeat": spec["repeat"],
+            "sheet": UI_SHEET,
+            "x": x, "y": y, "w": w, "h": h,
+        }
+    return out
 
 
 # ---------------------------------------------------------------------------

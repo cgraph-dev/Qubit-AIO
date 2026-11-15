@@ -447,6 +447,40 @@ def test_build_includes_surface_tiles_and_manifest(tmp_path):
     assert T.validate_theme(out) == []
 
 
+def test_build_includes_characters_furniture_and_ui(tmp_path):
+    extras = {
+        "furniture": {
+            "desk": {"data": _floor_png((120, 90, 60, 255)),
+                     "sheet": "objects.png"},
+        },
+        "ui": {
+            "panel": {
+                "data": _floor_png((200, 180, 140, 255)),
+                "slice": [8, 8, 8, 8], "width": "8px", "repeat": "stretch",
+                "sheet": "ui.png", "x": 8, "y": 8, "w": 32, "h": 32,
+            },
+        },
+    }
+    out, manifest = _build(tmp_path, extras=extras)
+
+    assert manifest["characters"]["atlas"] == "bodies/atlas32.webp"
+    assert manifest["characters"]["cell"] == {"w": 32, "h": 64}
+    assert manifest["characters"]["scale"] == 0.5
+    assert manifest["characters"]["count"] == len(PERSONAS)
+    assert manifest["furniture"]["desk"]["src"] == "furniture/desk.png"
+    assert manifest["furniture"]["desk"]["ay"] == 16
+    assert manifest["ui"]["slices"]["panel"]["src"] == "ui/panel.png"
+    assert manifest["ui"]["slices"]["panel"]["width"] == "8px"
+    assert (out / "furniture/desk.png").is_file()
+    assert (out / "ui/panel.png").is_file()
+    assert T.validate_theme(out) == []
+
+    payload = T._active_payload(T.load_theme(out))
+    assert payload["characters"]["scale"] == 0.5
+    assert payload["furniture"]["desk"]["src"].endswith("/furniture/desk.png?v=1.0.0")
+    assert payload["ui"]["slices"]["panel"]["src"].endswith("/ui/panel.png?v=1.0.0")
+
+
 def test_build_rejects_unknown_and_wrong_size_floors(tmp_path):
     with pytest.raises(B.ThemeBuildError) as info:
         _build(tmp_path / "unknown", floors={"lava": _floor_png()})

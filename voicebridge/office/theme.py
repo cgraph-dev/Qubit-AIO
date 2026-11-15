@@ -158,6 +158,21 @@ _COLOR_RE = re.compile(r"^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$")
 _LENGTH_RE = re.compile(r"^(0|[1-9][0-9]{0,3})(px|rem|em)$")
 _VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+-]{0,63}$")
 _SLICE_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
+_ASSET_KIND_RE = re.compile(r"^[a-z][a-z0-9_-]{0,39}$")
+
+#: The Habblaud ``FurnitureKind`` values a theme may replace with pack art.
+#: Any other kind (or an absent one) keeps the procedural Habblaud sprite.
+FURNITURE_KINDS: Sequence[str] = (
+    "desk", "desk_back", "office_chair", "office_chair_front", "bookshelf",
+    "filing_cabinet", "printer", "trash_bin", "plant_small", "plant_tall",
+    "glass_partition", "binder_shelf", "meeting_table", "stool",
+    "floor_lamp", "water_cooler", "whiteboard", "window", "clock", "poster",
+    "painting", "tv", "light_switch", "elevator", "door_frame", "sign",
+    "mirror", "shelf_wall", "counter", "counter_sink", "coffee_machine",
+    "microwave", "fridge", "vending_machine", "cafe_table", "cafe_chair",
+    "sofa", "armchair", "coffee_table", "pingpong_table", "beanbag", "arcade",
+    "toilet_stall", "sink", "reception_desk", "bench",
+)
 _SLICE_WIDTH_RE = re.compile(r"^[1-9][0-9]{0,3}px$")
 _SLICE_REPEAT = {"stretch", "round", "repeat"}
 
@@ -211,6 +226,9 @@ class Theme:
     portraits: Mapping[str, Any] = field(default_factory=dict)
     bodies: Mapping[str, Any] = field(default_factory=dict)
     surfaces: Mapping[str, Any] = field(default_factory=dict)
+    characters: Mapping[str, Any] = field(default_factory=dict)
+    furniture: Mapping[str, Any] = field(default_factory=dict)
+    ui: Mapping[str, Any] = field(default_factory=dict)
     files: Mapping[str, Mapping[str, Any]] = field(default_factory=dict)
     agents: Mapping[str, Mapping[str, int]] = field(default_factory=dict)
 
@@ -757,6 +775,223 @@ def _validate_asset_section(name: str, section: Any,
 
 
 # --------------------------------------------------------------------------
+# Characters / furniture / UI (optional, additive to the floor surfaces)
+# --------------------------------------------------------------------------
+def _number(value: Any) -> bool:
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and value >= 0)
+
+
+def _validate_characters_full(section: Any,
+                              files: Optional[Set[str]]) -> List[str]:
+    """Validate the full-pack ``characters`` block (one atlas of body frames)."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["characters: must be an object"]
+    problems: List[str] = []
+    atlas = section.get("atlas")
+    if not isinstance(atlas, str) or not atlas:
+        problems.append("characters.atlas: path is required")
+    else:
+        problems.extend(f"characters.atlas: {p}" for p in _path_problems(atlas))
+        if files is not None and atlas not in files:
+            problems.append(
+                f"characters.atlas: {atlas!r} is not a declared file")
+    cell = section.get("cell")
+    if not isinstance(cell, dict):
+        problems.append("characters.cell: must be an object")
+    else:
+        for key in ("w", "h"):
+            value = cell.get(key)
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                problems.append(
+                    f"characters.cell.{key}: must be a positive integer")
+    for key in ("cols", "rows"):
+        value = section.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+            problems.append(f"characters.{key}: must be a positive integer")
+    count = section.get("count")
+    if count is not None:
+        cols = section.get("cols")
+        rows = section.get("rows")
+        if not isinstance(count, int) or isinstance(count, bool) or count <= 0:
+            problems.append("characters.count: must be a positive integer")
+        elif (isinstance(cols, int) and isinstance(rows, int)
+              and not isinstance(cols, bool) and not isinstance(rows, bool)
+              and count > cols * rows):
+            problems.append("characters.count: exceeds cols*rows")
+    anchor = section.get("anchor")
+    if anchor is not None:
+        if not isinstance(anchor, dict):
+            problems.append("characters.anchor: must be an object")
+        else:
+            for key in ("x", "y"):
+                if not _number(anchor.get(key)):
+                    problems.append(
+                        f"characters.anchor.{key}: must be a non-negative number")
+    scale = section.get("scale")
+    if scale is not None and (not isinstance(scale, (int, float))
+                              or isinstance(scale, bool) or scale <= 0
+                              or scale > 4):
+        problems.append("characters.scale: must be a number in (0, 4]")
+    return problems
+
+
+def _validate_characters_recipe(section: Any) -> List[str]:
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["characters: must be an object"]
+    problems: List[str] = []
+    sheet = section.get("sheet")
+    if not isinstance(sheet, str) or not sheet:
+        problems.append("characters.sheet: is required")
+    else:
+        problems.extend(f"characters.sheet: {p}" for p in _path_problems(sheet))
+    for key in ("x", "y", "w", "h"):
+        value = section.get(key)
+        if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+            problems.append(
+                f"characters.{key}: must be a non-negative integer")
+    for key in ("cols", "rows", "count"):
+        value = section.get(key)
+        if value is not None and (not isinstance(value, int)
+                                  or isinstance(value, bool) or value <= 0):
+            problems.append(f"characters.{key}: must be a positive integer")
+    return problems
+
+
+def _validate_furniture_full(section: Any,
+                             files: Optional[Set[str]]) -> List[str]:
+    """Validate the full-pack ``furniture`` map (kind -> declared image)."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["furniture: must be an object"]
+    problems: List[str] = []
+    for kind, descriptor in section.items():
+        if not isinstance(kind, str) or kind not in FURNITURE_KINDS:
+            problems.append(
+                f"furniture: unknown furniture kind {kind!r}")
+            continue
+        if not isinstance(descriptor, dict):
+            problems.append(f"furniture.{kind}: must be an object")
+            continue
+        src = descriptor.get("src")
+        if not isinstance(src, str) or not src:
+            problems.append(f"furniture.{kind}.src: path is required")
+        else:
+            problems.extend(
+                f"furniture.{kind}.src: {p}" for p in _path_problems(src))
+            if files is not None and src not in files:
+                problems.append(
+                    f"furniture.{kind}.src: {src!r} is not a declared file")
+        for key in ("ax", "ay"):
+            value = descriptor.get(key)
+            if value is not None and not _number(value):
+                problems.append(
+                    f"furniture.{kind}.{key}: must be a non-negative number")
+        scale = descriptor.get("scale")
+        if scale is not None and (not isinstance(scale, (int, float))
+                                  or isinstance(scale, bool) or scale <= 0
+                                  or scale > 4):
+            problems.append(
+                f"furniture.{kind}.scale: must be a number in (0, 4]")
+    return problems
+
+
+def _validate_furniture_recipe(section: Any) -> List[str]:
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["furniture: must be an object"]
+    problems: List[str] = []
+    for kind, descriptor in section.items():
+        if not isinstance(kind, str) or kind not in FURNITURE_KINDS:
+            problems.append(f"furniture: unknown furniture kind {kind!r}")
+            continue
+        if not isinstance(descriptor, dict):
+            problems.append(f"furniture.{kind}: must be an object")
+            continue
+        sheet = descriptor.get("sheet")
+        if not isinstance(sheet, str) or not sheet:
+            problems.append(f"furniture.{kind}.sheet: is required")
+        else:
+            problems.extend(
+                f"furniture.{kind}.sheet: {p}" for p in _path_problems(sheet))
+        for key in ("x", "y", "w", "h"):
+            value = descriptor.get(key)
+            if (not isinstance(value, int) or isinstance(value, bool)
+                    or value < 0):
+                problems.append(
+                    f"furniture.{kind}.{key}: must be a non-negative integer")
+    return problems
+
+
+def _validate_ui_full(section: Any, files: Optional[Set[str]]) -> List[str]:
+    """Validate the full-pack ``ui`` block (Modern UI 9-slice backgrounds)."""
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["ui: must be an object"]
+    problems: List[str] = []
+    slices = section.get("slices")
+    if slices is not None:
+        problems.extend(
+            f"ui.{p}" if not p.startswith("slices") else p
+            for p in _validate_slices(slices, files))
+    return problems
+
+
+def _validate_ui_recipe(section: Any) -> List[str]:
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["ui: must be an object"]
+    slices = section.get("slices")
+    if slices is None:
+        return []
+    if not isinstance(slices, dict):
+        return ["ui.slices: must be an object"]
+    problems: List[str] = []
+    for name, descriptor in slices.items():
+        if not isinstance(name, str) or not _SLICE_NAME_RE.fullmatch(name):
+            problems.append(f"ui.slices {name!r}: invalid name")
+            continue
+        if not isinstance(descriptor, dict):
+            problems.append(f"ui.slices.{name}: must be an object")
+            continue
+        sheet = descriptor.get("sheet")
+        if not isinstance(sheet, str) or not sheet:
+            problems.append(f"ui.slices.{name}.sheet: is required")
+        else:
+            problems.extend(
+                f"ui.slices.{name}.sheet: {p}" for p in _path_problems(sheet))
+        for key in ("x", "y", "w", "h"):
+            value = descriptor.get(key)
+            if (not isinstance(value, int) or isinstance(value, bool)
+                    or value < 0):
+                problems.append(
+                    f"ui.slices.{name}.{key}: must be a non-negative integer")
+        cell = descriptor.get("slice")
+        if (not isinstance(cell, (list, tuple)) or len(cell) != 4
+                or any(not isinstance(v, int) or isinstance(v, bool) or v <= 0
+                       for v in cell)):
+            problems.append(
+                f"ui.slices.{name}.slice: must be 4 positive integers")
+        width = descriptor.get("width")
+        if not isinstance(width, str) or not _SLICE_WIDTH_RE.fullmatch(width):
+            problems.append(
+                f"ui.slices.{name}.width: must be a positive px length")
+        repeat = descriptor.get("repeat")
+        if repeat not in _SLICE_REPEAT:
+            problems.append(
+                f"ui.slices.{name}.repeat: must be stretch, round, or repeat")
+    return problems
+
+
+# --------------------------------------------------------------------------
 # Floor surfaces
 # --------------------------------------------------------------------------
 def _validate_surfaces_full(surfaces: Any, files: Optional[Set[str]]) -> List[str]:
@@ -897,6 +1132,9 @@ def _validate_common(doc: Any, require_files: bool) -> List[str]:
     if not require_files:
         problems.extend(_validate_slices(doc.get("slices"), None))
         problems.extend(_validate_surfaces_recipe(doc.get("surfaces")))
+        problems.extend(_validate_characters_recipe(doc.get("characters")))
+        problems.extend(_validate_furniture_recipe(doc.get("furniture")))
+        problems.extend(_validate_ui_recipe(doc.get("ui")))
     problems.extend(_validate_parts(doc.get("parts")))
     problems.extend(_validate_agents(doc.get("agents"), doc.get("parts")))
 
@@ -928,6 +1166,9 @@ def validate_manifest(manifest: Any, root: Optional[Path] = None) -> List[str]:
     declared = set(files) if isinstance(files, dict) else set()
     problems.extend(_validate_slices(manifest.get("slices"), declared))
     problems.extend(_validate_surfaces_full(manifest.get("surfaces"), declared))
+    problems.extend(_validate_characters_full(manifest.get("characters"), declared))
+    problems.extend(_validate_furniture_full(manifest.get("furniture"), declared))
+    problems.extend(_validate_ui_full(manifest.get("ui"), declared))
     for section_name in ("portraits", "bodies"):
         problems.extend(_validate_asset_section(
             section_name, manifest.get(section_name), declared))
@@ -1087,6 +1328,9 @@ def load_theme(root: Any) -> Theme:
         portraits=dict(manifest.get("portraits") or {}),
         bodies=dict(manifest.get("bodies") or {}),
         surfaces=dict(manifest.get("surfaces") or {}),
+        characters=dict(manifest.get("characters") or {}),
+        furniture=dict(manifest.get("furniture") or {}),
+        ui=dict(manifest.get("ui") or {}),
         files=dict(files),
         agents=dict(agents),
     )
@@ -1120,6 +1364,9 @@ def _classic_payload(reason: Optional[str]) -> Dict[str, Any]:
         "tokens": {},
         "slices": {},
         "surfaces": None,
+        "characters": None,
+        "furniture": {},
+        "ui": {"slices": {}},
         "reason": reason or "",
     }
 
@@ -1165,8 +1412,90 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
         "tokens": dict(theme.tokens),
         "slices": dict(theme.slices),
         "surfaces": surfaces_payload,
+        "characters": _characters_payload(theme),
+        "furniture": _furniture_payload(theme),
+        "ui": _ui_payload(theme),
         "reason": "",
     }
+
+
+def _characters_payload(theme: Theme) -> Optional[Dict[str, Any]]:
+    """The body atlas as the in-scene character source, when the pack has one.
+
+    A pack may declare an explicit ``characters`` block; otherwise the proven
+    ``bodies`` atlas is reused (same cells, same frame size), which is what the
+    builder emits. Classic/absent packs return ``None`` so the renderer keeps
+    its procedural characters.
+    """
+    section = dict(theme.characters or {})
+    if not section:
+        bodies = theme.bodies or {}
+        if not bodies.get("atlas"):
+            return None
+        section = {
+            "atlas": bodies.get("atlas"),
+            "cell": bodies.get("frame"),
+            "cols": bodies.get("cols"),
+            "rows": bodies.get("rows"),
+        }
+    atlas = section.get("atlas")
+    if not isinstance(atlas, str) or not atlas:
+        return None
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+    payload: Dict[str, Any] = {
+        "atlas": f"{base}/{atlas}{suffix}",
+        "cell": dict(section.get("cell") or {}),
+        "cols": section.get("cols"),
+        "rows": section.get("rows"),
+        "anchor": dict(section.get("anchor") or {}),
+    }
+    if isinstance(section.get("count"), int):
+        payload["count"] = section["count"]
+    if isinstance(section.get("scale"), (int, float)):
+        payload["scale"] = section["scale"]
+    return payload
+
+
+def _furniture_payload(theme: Theme) -> Dict[str, Any]:
+    """Per-kind furniture image URLs (only the kinds the pack replaces)."""
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+    out: Dict[str, Any] = {}
+    for kind, descriptor in (theme.furniture or {}).items():
+        if not isinstance(descriptor, dict):
+            continue
+        src = descriptor.get("src")
+        if not isinstance(src, str) or not src:
+            continue
+        entry: Dict[str, Any] = {"src": f"{base}/{src}{suffix}"}
+        for key in ("ax", "ay", "scale"):
+            if key in descriptor:
+                entry[key] = descriptor[key]
+        out[kind] = entry
+    return out
+
+
+def _ui_payload(theme: Theme) -> Dict[str, Any]:
+    """Modern UI 9-slice backgrounds for Habblaud's own panels/buttons."""
+    base = f"{ASSET_BASE}/{theme.id}"
+    suffix = f"?v={_safe_version(theme.version)}" if _safe_version(theme.version) else ""
+    slices = (theme.ui or {}).get("slices")
+    out: Dict[str, Any] = {}
+    if isinstance(slices, dict):
+        for name, descriptor in slices.items():
+            if not isinstance(descriptor, dict):
+                continue
+            src = descriptor.get("src")
+            if not isinstance(src, str) or not src:
+                continue
+            out[name] = {
+                "src": f"{base}/{src}{suffix}",
+                "slice": list(descriptor.get("slice") or []),
+                "width": descriptor.get("width"),
+                "repeat": descriptor.get("repeat"),
+            }
+    return {"slices": out}
 
 
 def theme_payload(cfg: Any, requested: Optional[str] = None) -> Dict[str, Any]:

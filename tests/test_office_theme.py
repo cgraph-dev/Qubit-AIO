@@ -270,6 +270,106 @@ def test_classic_payload_has_no_surfaces():
     assert T.theme_payload({}, requested="nope")["surfaces"] is None
 
 
+def _add_theme_assets(pack):
+    """Declare characters + furniture + UI on an already-written pack."""
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["files"]["characters/atlas32.png"] = _write(
+        pack, "characters/atlas32.png", b"PNG-CHARACTERS")
+    manifest["characters"] = {
+        "atlas": "characters/atlas32.png",
+        "cell": {"w": 32, "h": 64},
+        "cols": 20, "rows": 15, "count": 2,
+        "anchor": {"x": 16, "y": 64}, "scale": 0.5,
+    }
+    manifest["furniture"] = {}
+    for kind in ("desk", "office_chair"):
+        rel = f"furniture/{kind}.png"
+        manifest["files"][rel] = _write(pack, rel, f"PNG-{kind}".encode())
+        manifest["furniture"][kind] = {"src": rel, "ax": 8, "ay": 16}
+    manifest["ui"] = {"slices": {}}
+    for name in ("panel", "button"):
+        rel = f"ui/{name}.png"
+        manifest["files"][rel] = _write(pack, rel, f"PNG-{name}".encode())
+        manifest["ui"]["slices"][name] = {
+            "src": rel, "slice": [8, 8, 8, 8],
+            "width": "8px", "repeat": "stretch",
+        }
+    (pack / "theme.json").write_text(json.dumps(manifest))
+    return pack
+
+
+def test_characters_furniture_and_ui_validate_and_payload(tmp_path, monkeypatch):
+    pack = _add_theme_assets(_pack(tmp_path))
+    assert T.validate_theme(pack) == []
+    theme = T.load_theme(pack)
+    assert theme.characters["cell"] == {"w": 32, "h": 64}
+    assert theme.furniture["desk"]["ax"] == 8
+    assert theme.ui["slices"]["panel"]["width"] == "8px"
+
+    monkeypatch.setattr(T, "theme_roots", lambda: [tmp_path])
+    monkeypatch.delenv("QUBIT_OFFICE_THEME", raising=False)
+    payload = T.theme_payload({}, requested="demo")
+    assert payload["characters"]["atlas"].endswith("characters/atlas32.png?v=1.0.0")
+    assert payload["characters"]["scale"] == 0.5
+    assert payload["furniture"]["desk"]["src"].endswith("furniture/desk.png?v=1.0.0")
+    assert payload["furniture"]["desk"]["ay"] == 16
+    assert payload["ui"]["slices"]["panel"]["src"].endswith("ui/panel.png?v=1.0.0")
+    assert "files" not in payload
+
+
+def test_characters_may_be_derived_from_the_bodies_atlas(tmp_path, monkeypatch):
+    pack = _pack(tmp_path)
+    manifest = json.loads((pack / "theme.json").read_text())
+    assert "characters" not in manifest
+    theme = T.load_theme(pack)
+    characters = T._characters_payload(theme)
+    assert characters["atlas"].endswith("bodies/atlas32.png?v=1.0.0")
+    assert characters["cell"] == {"w": 32, "h": 64}
+
+
+def test_furniture_unknown_kind_and_undeclared_file_are_refused(tmp_path):
+    pack = _add_theme_assets(_pack(tmp_path))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["furniture"]["lava_lamp"] = {"src": "furniture/desk.png"}
+    assert any("unknown furniture kind" in p
+               for p in T.validate_manifest(manifest))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["furniture"]["desk"]["src"] = "furniture/missing.png"
+    assert any("declared file" in p for p in T.validate_manifest(manifest))
+
+
+def test_ui_slice_must_be_four_positive_integers(tmp_path):
+    pack = _add_theme_assets(_pack(tmp_path))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["ui"]["slices"]["panel"]["slice"] = [8, 0, 8, 8]
+    assert T.validate_manifest(manifest)
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["ui"]["slices"]["panel"]["repeat"] = "tile"
+    assert T.validate_manifest(manifest)
+
+
+def test_recipe_furniture_and_ui_accept_coordinates_only():
+    recipe = _recipe(
+        furniture={"desk": {"sheet": "objects.png", "x": 0, "y": 0,
+                            "w": 16, "h": 32}},
+        ui={"slices": {"panel": {"sheet": "ui.png", "x": 8, "y": 8,
+                                 "w": 32, "h": 32,
+                                 "slice": [8, 8, 8, 8],
+                                 "width": "8px", "repeat": "stretch"}}},
+        characters={"sheet": "bodies.png", "x": 0, "y": 0, "w": 32, "h": 64,
+                    "cols": 20, "rows": 15, "count": 283},
+    )
+    assert T.validate_recipe(recipe) == []
+    assert "files" not in recipe
+
+
+def test_classic_payload_has_no_character_furniture_or_ui_art():
+    payload = T._classic_payload(None)
+    assert payload["characters"] is None
+    assert payload["furniture"] == {}
+    assert payload["ui"] == {"slices": {}}
+
+
 def test_office_document_script_emits_classic_and_escapes(monkeypatch):
     script = T.office_document_script(None)
     match = re.search(

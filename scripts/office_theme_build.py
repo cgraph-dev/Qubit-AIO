@@ -722,6 +722,105 @@ def _floor_surfaces_block(floors: Mapping[str, bytes]) -> Optional[Dict[str, Any
     }
 
 
+def _trim_alpha(image: Image.Image) -> Tuple[Image.Image, Tuple[int, int, int, int]]:
+    """Crop transparent padding, returning the cropped image and the bbox."""
+    bbox = image.getbbox()
+    if bbox is None:
+        return image, (0, 0, image.width, image.height)
+    return image.crop(bbox), bbox
+
+
+def _prepare_extras(extras: Optional[Mapping[str, Any]]
+                    ) -> Tuple[Dict[str, bytes], Dict[str, Any], Dict[str, Any]]:
+    """Prepare optional furniture/UI extras.
+
+    ``extras`` carries ``furniture`` (kind -> decoded single) and ``ui``
+    (name -> cropped 9-slice). Returns ``(payloads, manifest_blocks,
+    recipe_blocks)``; every block is empty when the purchase lacks the art, so
+    a pack without extras is byte-identical to before.
+    """
+    payloads: Dict[str, bytes] = {}
+    manifest: Dict[str, Any] = {}
+    recipe: Dict[str, Any] = {}
+    if not extras:
+        return payloads, manifest, recipe
+
+    furniture = extras.get("furniture") or {}
+    if isinstance(furniture, Mapping):
+        out: Dict[str, Any] = {}
+        rec: Dict[str, Any] = {}
+        for kind, entry in furniture.items():
+            if not isinstance(kind, str) or kind not in theme_contract.FURNITURE_KINDS:
+                continue
+            if not isinstance(entry, Mapping):
+                continue
+            data = entry.get("data")
+            if not isinstance(data, (bytes, bytearray)) or not data:
+                continue
+            decoded = _decode(bytes(data))
+            if decoded is None:
+                continue
+            image, box = _trim_alpha(decoded.convert("RGBA"))
+            if image.width <= 0 or image.height <= 0:
+                continue
+            relative = f"furniture/{kind}.png"
+            payloads[relative] = _encode_png(image)
+            out[kind] = {
+                "src": relative,
+                "ax": image.width // 2,
+                "ay": image.height,
+            }
+            if isinstance(entry.get("sheet"), str):
+                rec[kind] = {
+                    "sheet": entry["sheet"],
+                    "x": box[0], "y": box[1],
+                    "w": image.width, "h": image.height,
+                }
+        if out:
+            manifest["furniture"] = out
+            recipe["furniture"] = rec
+
+    ui = extras.get("ui") or {}
+    if isinstance(ui, Mapping):
+        slices: Dict[str, Any] = {}
+        rec: Dict[str, Any] = {}
+        for name, entry in ui.items():
+            if not isinstance(name, str) or not _UI_NAME_RE.fullmatch(name):
+                continue
+            if not isinstance(entry, Mapping):
+                continue
+            data = entry.get("data")
+            if not isinstance(data, (bytes, bytearray)) or not data:
+                continue
+            image = _decode(bytes(data))
+            if image is None:
+                continue
+            relative = f"ui/{name}.png"
+            payloads[relative] = _encode_png(image.convert("RGBA"))
+            slices[name] = {
+                "src": relative,
+                "slice": list(entry.get("slice") or []),
+                "width": entry.get("width"),
+                "repeat": entry.get("repeat"),
+            }
+            if isinstance(entry.get("sheet"), str):
+                rec[name] = {
+                    "sheet": entry["sheet"],
+                    "x": entry.get("x", 0), "y": entry.get("y", 0),
+                    "w": image.width, "h": image.height,
+                    "slice": list(entry.get("slice") or []),
+                    "width": entry.get("width"),
+                    "repeat": entry.get("repeat"),
+                }
+        if slices:
+            manifest["ui"] = {"slices": slices}
+            recipe["ui"] = {"slices": rec}
+    return payloads, manifest, recipe
+
+
+_UI_NAME_RE = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
+
+
 def _json_bytes(document: Any) -> bytes:
     return (json.dumps(document, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
@@ -732,7 +831,9 @@ def _sha(data: bytes) -> str:
 
 def shareable_recipe(manifest: Mapping[str, Any],
                      recipes: Mapping[str, Mapping[str, int]],
-                     surfaces: Optional[Mapping[str, Any]] = None
+                     surfaces: Optional[Mapping[str, Any]] = None,
+                     furniture: Optional[Mapping[str, Any]] = None,
+                     ui: Optional[Mapping[str, Any]] = None
                      ) -> Dict[str, Any]:
     """The shareable ``theme.recipe.json`` derived from a built manifest.
 
@@ -757,6 +858,10 @@ def shareable_recipe(manifest: Mapping[str, Any],
     }
     if surfaces is not None:
         recipe["surfaces"] = dict(surfaces)
+    if furniture is not None:
+        recipe["furniture"] = dict(furniture)
+    if ui is not None:
+        recipe["ui"] = dict(ui)
     return recipe
 
 
@@ -767,6 +872,8 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
                  tokens: Optional[Mapping[str, str]] = None,
                  slices: Optional[Mapping[str, Mapping[str, Any]]] = None,
                  surfaces: Optional[Mapping[str, Any]] = None,
+                 furniture: Optional[Mapping[str, Any]] = None,
+                 ui: Optional[Mapping[str, Any]] = None,
                  label: Optional[str] = None) -> Dict[str, Any]:
     """Write ONLY the shareable ``theme.recipe.json`` for a purchase.
 
@@ -823,7 +930,8 @@ def build_recipe(source: str, out: os.PathLike | str, *, size: int = 32,
         "slices": dict(slices or {}),
         "parts": parts,
     }
-    recipe = shareable_recipe(manifest, recipes, surfaces=surfaces)
+    recipe = shareable_recipe(manifest, recipes, surfaces=surfaces,
+                              furniture=furniture, ui=ui)
     recipe_problems = theme_contract.validate_recipe(recipe)
     if recipe_problems:
         raise ThemeBuildError(recipe_problems)
@@ -859,7 +967,8 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
                 license: str = DEFAULT_LICENSE,
                 credit: str = DEFAULT_CREDIT,
                 tokens: Optional[Mapping[str, str]] = None,
-                floors: Optional[Mapping[str, bytes]] = None) -> Dict[str, Any]:
+                floors: Optional[Mapping[str, bytes]] = None,
+                extras: Optional[Mapping[str, Any]] = None) -> Dict[str, Any]:
     """Build a local theme pack and return its manifest.
 
     ``layers`` must be supplied (Task 3's extractor does that for the CLI);
@@ -899,6 +1008,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     normalized = _normalize_layers(layers)
     _require(normalized, ("skin", "eyes", "hair", "outfit", "body"))
     floor_png = _prepare_floors(floors)
+    extra_payloads, extra_manifest, _extra_recipe = _prepare_extras(extras)
     slugs = _resolve_personas(personas)
     cols = DEFAULT_COLS
     rows = max(1, math.ceil(len(slugs) / cols))
@@ -973,6 +1083,7 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     }
     for kind, data in floor_png.items():
         payloads[f"surfaces/floor_{kind}.png"] = data
+    payloads.update(extra_payloads)
     surfaces_block = _floor_surfaces_block(floor_png)
 
     label = out_path.name.replace("-", " ").replace("_", " ").title()
@@ -1012,6 +1123,18 @@ def build_theme(source: str, out: os.PathLike | str, *, size: int = 32,
     }
     if surfaces_block is not None:
         manifest["surfaces"] = surfaces_block
+    manifest["characters"] = {
+        "atlas": body_atlas_rel,
+        "cell": {"w": size, "h": size * 2},
+        "cols": cols,
+        "rows": rows,
+        "count": len(slugs),
+        "anchor": {"x": size // 2, "y": size * 2},
+        # Habblaud's world is 16px+; the 32-tier body frame reads best at half
+        # size there. The shell's Agents panel still uses the 32px atlas.
+        "scale": 0.5,
+    }
+    manifest.update(extra_manifest)
 
     structural = theme_contract.validate_manifest(manifest)
     if structural:
@@ -1290,14 +1413,15 @@ def _floor_inputs(source: str) -> Tuple[Dict[str, bytes],
 
 def _check(args: argparse.Namespace,
            layers: Mapping[str, List[Sheet]],
-           floors: Optional[Mapping[str, bytes]] = None) -> int:
+           floors: Optional[Mapping[str, bytes]] = None,
+           extras: Optional[Mapping[str, Any]] = None) -> int:
     out = Path(args.out)
     if not out.is_dir():
         raise ThemeBuildError(f"check: {out} does not exist")
     with tempfile.TemporaryDirectory(prefix="office-theme-check-") as work:
         rebuilt = Path(work) / out.name
         build_theme(DEFAULT_SOURCE, rebuilt, size=args.size, layers=layers,
-                    floors=floors)
+                    floors=floors, extras=extras)
         problems = compare_packs(out, rebuilt)
     if problems:
         for problem in problems:
@@ -1351,10 +1475,21 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         layers = extract_layers(args.source, size=args.size)
         floors: Dict[str, bytes] = {}
         surfaces: Optional[Dict[str, Any]] = None
+        extras: Dict[str, Any] = {}
         if not args.calibrate:
             floors, surfaces = _floor_inputs(args.source)
+            try:
+                import office_theme_extract as extractor  # type: ignore
+                extras = {
+                    "furniture": extractor.extract_furniture_parts(args.source),
+                    "ui": extractor.extract_ui_parts(args.source),
+                }
+            except ThemeBuildError as exc:
+                print(f"warning: furniture/ui assets skipped: {exc}",
+                      file=sys.stderr)
+                extras = {}
         if args.check:
-            return _check(args, layers, floors)
+            return _check(args, layers, floors, extras)
         if args.calibrate:
             return _calibrate(args, layers)
         tokens = None
@@ -1368,9 +1503,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 for reason in sampled["reasons"]:
                     print(f"warning: palette fallback: {reason}", file=sys.stderr)
         if args.recipe_out:
+            _payloads, _manifest, extra_recipe = _prepare_extras(extras)
             recipe = build_recipe(DEFAULT_SOURCE, args.recipe_out,
                                   size=args.size, layers=layers, tokens=tokens,
-                                  surfaces=surfaces)
+                                  surfaces=surfaces,
+                                  furniture=extra_recipe.get("furniture"),
+                                  ui=extra_recipe.get("ui"))
             print(json.dumps({
                 "ok": True,
                 "recipe": str(Path(args.recipe_out)),
@@ -1379,7 +1517,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             }, indent=2, sort_keys=True))
             return 0
         manifest = build_theme(DEFAULT_SOURCE, args.out, size=args.size,
-                               layers=layers, tokens=tokens, floors=floors)
+                               layers=layers, tokens=tokens, floors=floors,
+                               extras=extras)
         recipes = json.loads(
             (Path(args.out) / "agents.json").read_text(encoding="utf-8")
         )["recipes"]
