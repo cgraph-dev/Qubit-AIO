@@ -57,6 +57,7 @@ export function renderBusinessSetup(
   state: BusinessSetupState,
   surface: string,
   onStart: () => void,
+  onRetry: () => void,
 ): unknown {
   const running = state.kind === "running";
   const children: unknown[] = [
@@ -89,6 +90,16 @@ export function renderBusinessSetup(
       role: "status",
       "aria-live": "polite",
     }, "Business OS is ready. Reloading this panel…"));
+    // If the retried read still cannot see the tenant (a slow/foreign store),
+    // the operator gets an explicit re-read rather than a dead end.
+    children.push(R.createElement("button", {
+      key: "retry",
+      type: "button",
+      className: "business-setup__start",
+      "data-testid": "business-setup-retry",
+      "aria-label": `Reload the ${surface} after setup`,
+      onClick: onRetry,
+    }, "Reload this panel"));
   } else {
     children.push(R.createElement("button", {
       key: "start",
@@ -164,7 +175,8 @@ export function createBusinessSetup(
     return {
       state,
       start,
-      render: () => renderBusinessSetup(R, state, opts.surface, start),
+      render: () => renderBusinessSetup(
+        R, state, opts.surface, start, () => opts.onBootstrapped?.()),
     };
   };
 }

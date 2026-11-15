@@ -320,6 +320,32 @@ describe("Command Center tenant setup", () => {
     h.cleanup();
   });
 
+  it("offers an explicit re-read if the retry still cannot see the tenant", async () => {
+    const { calls, impl } = recordingFetch((call) => {
+      if (call.method === "POST" && call.url.endsWith("/bootstrap")) {
+        return respond(200, BOOTSTRAP);
+      }
+      return respond(409, {
+        ok: false, code: "BUSINESS_NOT_FOUND",
+        detail: "no Business OS tenant exists yet",
+      });
+    });
+    const h = await mount(impl);
+    allByTestId(h, "business-setup-start")[0].props.onClick();
+    await h.settle();
+    expect(allByTestId(h, "business-setup-done")).toHaveLength(1);
+    const retry = allByTestId(h, "business-setup-retry")[0];
+    expect(retry).toBeDefined();
+    expect(retry.props["aria-label"]).toBe(
+      "Reload the command center after setup");
+    const readsBefore = calls.filter((call) => call.method === "GET").length;
+    retry.props.onClick();
+    await h.settle();
+    expect(calls.filter((call) => call.method === "GET").length)
+      .toBeGreaterThan(readsBefore);
+    h.cleanup();
+  });
+
   it("names a typed bootstrap failure and keeps the setup available", async () => {
     let reads = 0;
     const { impl } = recordingFetch((call) => {

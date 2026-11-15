@@ -198718,7 +198718,7 @@ create: function(game) {
 		return String(code ?? "") === "BUSINESS_NOT_FOUND";
 	}
 	/** The pure surface: same markup for either panel, no hidden state. */
-	function renderBusinessSetup(R, state, surface, onStart) {
+	function renderBusinessSetup(R, state, surface, onStart, onRetry) {
 		const running = state.kind === "running";
 		const children = [
 			R.createElement("p", {
@@ -198738,14 +198738,23 @@ create: function(game) {
 				className: "business-setup__note"
 			}, "Nothing is created until you press the button. Setup is local, idempotent, and never spends, contacts anyone, or calls a model.")
 		];
-		if (state.kind === "done") children.push(R.createElement("p", {
-			key: "done",
-			className: "business-setup__ok",
-			"data-testid": "business-setup-done",
-			role: "status",
-			"aria-live": "polite"
-		}, "Business OS is ready. Reloading this panel…"));
-		else children.push(R.createElement("button", {
+		if (state.kind === "done") {
+			children.push(R.createElement("p", {
+				key: "done",
+				className: "business-setup__ok",
+				"data-testid": "business-setup-done",
+				role: "status",
+				"aria-live": "polite"
+			}, "Business OS is ready. Reloading this panel…"));
+			children.push(R.createElement("button", {
+				key: "retry",
+				type: "button",
+				className: "business-setup__start",
+				"data-testid": "business-setup-retry",
+				"aria-label": `Reload the ${surface} after setup`,
+				onClick: onRetry
+			}, "Reload this panel"));
+		} else children.push(R.createElement("button", {
 			key: "start",
 			type: "button",
 			className: "business-setup__start",
@@ -198808,7 +198817,7 @@ create: function(game) {
 			return {
 				state,
 				start,
-				render: () => renderBusinessSetup(R, state, opts.surface, start)
+				render: () => renderBusinessSetup(R, state, opts.surface, start, () => opts.onBootstrapped?.())
 			};
 		};
 	}
