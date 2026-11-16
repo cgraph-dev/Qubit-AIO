@@ -137,6 +137,13 @@ ANIMATIONS: Dict[str, Dict[str, int]] = {
 #: Direction order inside an animation row (measured: left, up, right, down).
 ANIMATION_DIRECTIONS: Tuple[str, ...] = ("left", "up", "right", "down")
 
+#: The eye sheet is a separate face layer, not aligned to the body frame grid.
+#: Measured against the Character Generator's composed preview: cell (row 1,
+#: col 3) holds the front eye pair and must be pasted at y=size//2 on the body.
+EYE_CELL_ROW = 1
+EYE_CELL_COL = 3
+EYE_OFFSET_FRAC = 0.5
+
 #: Animation atlases are always composed at the 16px world tier.
 ANIMATION_TILE = 16
 
@@ -391,11 +398,15 @@ def _compose_body(recipe: Mapping[str, int], layers: Mapping[str, List[Sheet]],
         if tile is not None:
             canvas.alpha_composite(tile)
 
-    for part, row in (("eyes", 0), ("hair", 3)):
-        sheet = _sheet_image(layers[part][recipe[part]], "body")
-        canvas.alpha_composite(_crop_frame(
-            sheet, row=row, col=0, width=frame_w, height=frame_h,
-            part=part, empty_ok=False))
+    hair_sheet = _sheet_image(layers["hair"][recipe["hair"]], "body")
+    canvas.alpha_composite(_crop_frame(
+        hair_sheet, row=3, col=0, width=frame_w, height=frame_h,
+        part="hair", empty_ok=False))
+    eye_sheet = _sheet_image(layers["eyes"][recipe["eyes"]], "body")
+    eye = _crop_frame(
+        eye_sheet, row=EYE_CELL_ROW, col=EYE_CELL_COL,
+        width=frame_w, height=size, part="eyes", empty_ok=False)
+    canvas.alpha_composite(eye, (0, int(size * EYE_OFFSET_FRAC)))
     return canvas
 
 
@@ -422,15 +433,30 @@ def _compose_animation_frame(recipe: Mapping[str, int], layers: Mapping[str, Lis
     if body is None:
         return None
     canvas.alpha_composite(body)
-    for part in ("outfit", "eyes", "hair"):
-        index = recipe.get(part)
-        if not isinstance(index, int) or index < 0 or index >= len(layers[part]):
-            continue
-        sheet = _sheet_image(layers[part][index], "body")
+    # The outfit is part of the animated body sheet, so it advances with the
+    # frame. Eyes and hair are separate static face layers: their animation
+    # rows are empty, and cropping them at (row, col) produced faceless bodies.
+    outfit_index = recipe.get("outfit")
+    if isinstance(outfit_index, int) and 0 <= outfit_index < len(layers["outfit"]):
+        sheet = _sheet_image(layers["outfit"][outfit_index], "body")
         tile = _crop_frame(sheet, row=row, col=col, width=frame_w, height=frame_h,
-                           part=part, empty_ok=True)
+                           part="outfit", empty_ok=True)
         if tile is not None:
             canvas.alpha_composite(tile)
+    hair_index = recipe.get("hair")
+    if isinstance(hair_index, int) and 0 <= hair_index < len(layers["hair"]):
+        sheet = _sheet_image(layers["hair"][hair_index], "body")
+        tile = _crop_frame(sheet, row=3, col=0, width=frame_w, height=frame_h,
+                           part="hair", empty_ok=True)
+        if tile is not None:
+            canvas.alpha_composite(tile)
+    eye_index = recipe.get("eyes")
+    if isinstance(eye_index, int) and 0 <= eye_index < len(layers["eyes"]):
+        sheet = _sheet_image(layers["eyes"][eye_index], "body")
+        eye = _crop_frame(sheet, row=EYE_CELL_ROW, col=EYE_CELL_COL,
+                          width=frame_w, height=size, part="eyes", empty_ok=True)
+        if eye is not None:
+            canvas.alpha_composite(eye, (0, int(size * EYE_OFFSET_FRAC)))
     return canvas
 
 
