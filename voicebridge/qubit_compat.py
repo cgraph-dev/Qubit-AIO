@@ -5986,11 +5986,12 @@ def h_office_tower(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
         # so tests and previews stay exact. The store (db + WAL) is part of the
         # key, so an event written by the office runtime is reflected at once.
         try:
+            from .office import characters as OCH
             db = TWR.store.db_path(cfg)
             wal = db.with_name(db.name + "-wal")
             cache_key = _rc.cfg_key(
                 cfg, "office_tower", bool(motion), bool(preview),
-                _rc.stamp_of(db, wal))
+                _rc.stamp_of(db, wal, OCH.path(cfg)))
             cached = _rc.get(cache_key)
             if cached is not None:
                 return cached
@@ -7097,6 +7098,7 @@ def h_office_habblaud_character(cfg: Any, q: Dict[str, str],
     aid = str((p or {}).get("id", "") or "").strip()
     try:
         row = OCH.save(cfg, aid, b or {})
+        _rc.invalidate("office_tower")
     except OCH.CharacterError as exc:
         return exc.status, {"ok": False, "code": exc.code,
                             "detail": exc.detail}
@@ -7114,6 +7116,7 @@ def h_office_habblaud_character_reset(cfg: Any, q: Dict[str, str],
     aid = str((p or {}).get("id", "") or "").strip()
     try:
         removed = OCH.reset(cfg, aid)
+        _rc.invalidate("office_tower")
     except OCH.CharacterError as exc:
         return exc.status, {"ok": False, "code": exc.code,
                             "detail": exc.detail}

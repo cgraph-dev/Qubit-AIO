@@ -63,3 +63,27 @@ def test_snapshot_forwards_saved_name_seed_and_parts():
     assert a["seed"] == 99
     assert a["parts"] == {"top": "#112233"}
     assert a["custom"] is True
+
+
+def test_tower_cache_key_tracks_the_character_file(tmp_path: Path, monkeypatch):
+    """A save from another process must not stay hidden behind the tower cache."""
+    from voicebridge import read_cache as RC
+    from voicebridge import qubit_compat as HC
+    from voicebridge.office import tower as TWR
+
+    cfg = Cfg(tmp_path)
+    RC.invalidate()
+    monkeypatch.setenv("QUBIT_READ_CACHE", "1")
+    monkeypatch.setenv("QUBIT_READ_CACHE_TTL_OFFICE_TOWER", "60")
+    monkeypatch.setattr(TWR, "state", lambda cfg, now=None, preview=False: {
+        "characters": [{"slug": "lead",
+                        "display_name": (CH.load(cfg).get("1") or {}).get("name", "lead")}],
+    })
+    CH.save(cfg, "1", {"name": "Ada", "seed": 1})
+    code, first = HC.h_office_tower(cfg, {}, {}, {})
+    assert code == 200 and first["characters"][0]["display_name"] == "Ada"
+    # Direct writer = another process; no handler invalidation runs.
+    CH.save(cfg, "1", {"name": "Bea", "seed": 2})
+    code, second = HC.h_office_tower(cfg, {}, {}, {})
+    assert code == 200 and second["characters"][0]["display_name"] == "Bea"
+    RC.invalidate()
