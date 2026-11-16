@@ -681,12 +681,10 @@ def state(cfg: Any, *, now: Optional[float] = None,
             "agent_id": aid, "slug": seat["slug"], "seat_type": seat["seat_type"],
             "department_id": seat["department_id"],
             "supervisor_id": seat["supervisor_id"],
-            # Mixed bodies: managers keep Habblaud's articulated/action bodies;
-            # worker seats use the precomposed LimeZu body. Explicit metadata,
-            # not a renderer guess.
-            "body_style": ("habblaud" if seat["seat_type"] in
-                           ("ceo", "manager", "lead", "director")
-                           else "limezu"),
+            # Habblaud characters are the product baseline: they own the
+            # articulated body, actions and the Habblaud customization parts.
+            # LimeZu remains the source for portraits, furniture, rooms and UI.
+            "body_style": "habblaud",
             "seated": pos is not None,
             "position": position,
             "facing": walk.get("facing", "down"),
