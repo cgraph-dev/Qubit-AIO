@@ -1,16 +1,9 @@
 {
   "source": "https://github.com/marmottajr/habblaud",
-  "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
+  "commit": "4ccce2537472",
   "local_commit": "55606fe08522ab238380a7496dd1c5cde7801b9c",
   "local_changes": [
-    "theme floor surface provider (client/src/art/theme-assets.ts; floor.ts hook)",
-    "optional theme characters/furniture + Modern UI 9-slice chrome (client/src/art/theme-assets.ts, art/index.ts, ui/theme-skin.ts, world/render/renderer.ts, app.ts)",
-    "theme room blueprints: wall/door/window tiles and all-kind LimeZu furniture catalog (client/src/art/theme-assets.ts, art/index.ts, world/render/scene.ts, world/render/renderer.ts)",
-    "theme character animation atlases (idle/walk/sit/read/talk) and synchronized portraits (client/src/art/theme-assets.ts, art/index.ts, ui/avatar.ts, ui/feed.ts)",
-    "DarkAges UI 9-slices + Medieval Fantasy toolbar icons (client/src/art/theme-assets.ts, ui/theme-skin.ts, ui/topbar.ts)",
-    "Green Forest exterior grass/tree props (client/src/art/theme-assets.ts, world/render/props.ts)",
-    "event-driven Super Pixel Effects FX (client/src/art/theme-assets.ts, world/render/renderer.ts)",
-    "NEW FRAMES metadata catalog only, not character art (theme pack builder)"
+    "mixed Habblaud/LimeZu bodies via AgentInfo.bodyStyle"
   ],
   "licence": "MIT",
   "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to en by scripts/vendor_habblaud.py (English-only authoring ruling). This tree carries documented local changes on top of the upstream pin: `commit` names the upstream commit it was built from, `local_commit` names the source checkout HEAD that added them, and `local_changes` lists them.",
@@ -231,13 +224,13 @@
       "bytes": 128520
     },
     {
-      "path": "bundle/app-Cdb5AwxB.js",
-      "sha256": "f3d02497978c526ce46ff61940356781d30895b56f813c54bb3a5af7e9d3675a",
-      "bytes": 697762
+      "path": "bundle/app-Btf5GY8L.js",
+      "sha256": "5607f7a1cd6088fe866ae7f06856317977bf08cc589ec09b068fa99de7199571",
+      "bytes": 697868
     },
     {
-      "path": "bundle/daystats-ZC2aMclC.js",
-      "sha256": "edd50c3be1c4b6f0afd1dd7469e8778229227ac4d9aca1910671bf5b14e6e8e4",
+      "path": "bundle/daystats-BL3pMsou.js",
+      "sha256": "d61b84a5c7c3c860d7243ff0bd4db7ee2b88370b7fe7bffe87f948490c880607",
       "bytes": 36986
     },
     {
@@ -256,8 +249,8 @@
       "bytes": 203518
     },
     {
-      "path": "bundle/main-B3UOlp5W.js",
-      "sha256": "047b0eda67b16e40347b520357320486a8c983c61ca7506a27b058fcf118bead",
+      "path": "bundle/main-CsLq2xsy.js",
+      "sha256": "2b08a8385169feab1886920ce45e360dde5bc45c8189b53ea74e783b5ff2eeb4",
       "bytes": 21366
     },
     {
@@ -386,13 +379,13 @@
       "bytes": 3939
     },
     {
-      "path": "bundle/ptypane-CzylVonK.js",
-      "sha256": "07b14765513fc625c1766bd7477c4b92a37ee25765a8fca2649c67a26dac38da",
+      "path": "bundle/ptypane-pKWfZJ4D.js",
+      "sha256": "9a5113177b86136ec22a673532c2e10fd84211f99c3ab748446e57aa688bb3eb",
       "bytes": 334656
     },
     {
       "path": "index.html",
-      "sha256": "8dac86a6eda4702a355e48bf11cbd1002bcaf01ad0a1c76a4f5cc589ddbeb947",
+      "sha256": "c3919d7a2fb52a4927e02b2ae71d45daf2b78c920d8c0b3af31db6688ac09436",
       "bytes": 2796
     },
     {
@@ -401,6 +394,6 @@
       "bytes": 820
     }
   ],
-  "total_bytes": 2164306,
+  "total_bytes": 2164412,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }
