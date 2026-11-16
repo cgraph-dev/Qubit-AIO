@@ -192718,7 +192718,9 @@ create: function(game) {
 				".ui-chip"
 			]),
 			...sliceRule(slices.button, [".ui-btn"]),
-			`.ui-root { image-rendering: pixelated; }`
+			`.ui-root { image-rendering: pixelated; }`,
+			`.ui-feed, .ui-sidebar, .ui-panel, .ui-drawer, .ui-dialog, .ui-settings, .ui-spawn, .ui-perm, .ui-history, .ui-timelapse, .ui-daystats, .ui-deliveries { padding: 8px 10px; }`,
+			`.ui-feed .ui-feed__head, .ui-sidebar .ui-sidebar__head { margin-top: 2px; }`
 		];
 	}
 	var ICON_SELECTORS = {
