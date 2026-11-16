@@ -1682,7 +1682,7 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
         return f"{base}/{relative}{suffix}" if relative else None
 
     portraits = theme.portraits or {}
-    bodies = theme.bodies or {}
+    bodies = theme.bodies if (theme.characters or {}) else {}
     raw_surfaces = theme.surfaces or {}
     surfaces_payload: Optional[Dict[str, Any]] = None
     if raw_surfaces:
@@ -1740,24 +1740,17 @@ def _active_payload(theme: Theme) -> Dict[str, Any]:
 
 
 def _characters_payload(theme: Theme) -> Optional[Dict[str, Any]]:
-    """The body atlas as the in-scene character source, when the pack has one.
+    """The explicit character atlas, or ``None`` for Habblaud's procedural body.
 
-    A pack may declare an explicit ``characters`` block; otherwise the proven
-    ``bodies`` atlas is reused (same cells, same frame size), which is what the
-    builder emits. Classic/absent packs return ``None`` so the renderer keeps
-    its procedural characters.
+    ``bodies`` is an art catalog used by the pack builder, not an implicit
+    character override. The 2026-11-16 owner decision is Habblaud bodies, so a
+    pack without an explicit ``characters`` block must keep the procedural
+    renderer -- deriving characters from ``bodies`` was exactly the bug that
+    produced the faceless LimeZu preview.
     """
     section = dict(theme.characters or {})
     if not section:
-        bodies = theme.bodies or {}
-        if not bodies.get("atlas"):
-            return None
-        section = {
-            "atlas": bodies.get("atlas"),
-            "cell": bodies.get("frame"),
-            "cols": bodies.get("cols"),
-            "rows": bodies.get("rows"),
-        }
+        return None
     atlas = section.get("atlas")
     if not isinstance(atlas, str) or not atlas:
         return None

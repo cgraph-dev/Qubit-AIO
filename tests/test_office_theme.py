@@ -317,14 +317,12 @@ def test_characters_furniture_and_ui_validate_and_payload(tmp_path, monkeypatch)
     assert "files" not in payload
 
 
-def test_characters_may_be_derived_from_the_bodies_atlas(tmp_path, monkeypatch):
+def test_bodies_atlas_is_not_an_implicit_character_override(tmp_path, monkeypatch):
     pack = _pack(tmp_path)
     manifest = json.loads((pack / "theme.json").read_text())
     assert "characters" not in manifest
     theme = T.load_theme(pack)
-    characters = T._characters_payload(theme)
-    assert characters["atlas"].endswith("bodies/atlas32.png?v=1.0.0")
-    assert characters["cell"] == {"w": 32, "h": 64}
+    assert T._characters_payload(theme) is None
 
 
 def test_furniture_unknown_kind_and_undeclared_file_are_refused(tmp_path):
@@ -793,7 +791,7 @@ def test_payload_is_trimmed_and_versioned(tmp_path, monkeypatch):
     assert "files" not in payload
     assert payload["atlas"].endswith("portraits/atlas32.png?v=1.0.0")
     assert payload["index"].endswith("portraits/index.json?v=1.0.0")
-    assert payload["bodies"]["atlas"].endswith("bodies/atlas32.png?v=1.0.0")
+    assert payload["bodies"]["atlas"] is None
     assert payload["credit"].startswith("LimeZu")
 
 
