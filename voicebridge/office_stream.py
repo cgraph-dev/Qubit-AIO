@@ -310,6 +310,8 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
             "startedAt": at_ms,
             "lastEventAt": at_ms,
             "statusSince": at_ms,
+            # Which body the renderer should use. Absent means Habblaud.
+            "bodyStyle": ch.get("body_style") or "habblaud",
             # The raw age, in seconds, of this agent's most recent event, or
             # null when the agent has NEVER produced one. Sent alongside the
             # derived `lastEventAt` because the two disagree in a way that
