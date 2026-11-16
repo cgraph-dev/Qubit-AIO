@@ -170,21 +170,11 @@ FLOOR_MAP: Dict[str, Tuple[int, int]] = {
 #: region (x/y 0, w/h its own size). Only this first slice is mapped; every
 #: other Habblaud kind keeps its procedural sprite.
 FURNITURE_FILES: Dict[str, str] = {
-    # Desk/desk_back are deliberately NOT themed: the procedural Habblaud
-    # desk owns the monitor casing + animated screen rects. Replacing it with a
-    # static LimeZu desk removed the computer and its animation.
-    "reception_desk": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_6.png",
-    "meeting_table": "2_Living_Room_Singles/Living_Room_Singles_29.png",
-    "office_chair": "13_Conference_Hall_Singles/Conference_Hall_Singles_39.png",
-    "office_chair_front": "13_Conference_Hall_Singles/Conference_Hall_Singles_37.png",
-    "bookshelf": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_66.png",
-    "whiteboard": "5_Classroom_and_Library_Singles/Classroom_and_Library_Singles_39.png",
-    "plant_small": "2_Living_Room_Singles/Living_Room_Singles_17.png",
-    "plant_tall": "2_Living_Room_Singles/Living_Room_Singles_21.png",
-    "sofa": "2_Living_Room_Singles/Living_Room_Singles_3.png",
-    "armchair": "2_Living_Room_Singles/Living_Room_Singles_117.png",
-    "coffee_table": "2_Living_Room_Singles/Living_Room_Singles_30.png",
-    "floor_lamp": "2_Living_Room_Singles/Living_Room_Singles_80.png",
+    # Deliberately empty until a mapping is visually calibrated. The previous
+    # guessed singles replaced toilets, sinks, tables and windows with unrelated
+    # decor (a bed for a meeting table, a desk for a tall plant), breaking the
+    # kitchen/restroom and the window light. Functional room objects stay
+    # procedural; add a kind back only with a before/after visual golden.
 }
 
 #: The Modern UI sheet and the measured 9-slice regions. ``slice`` is
@@ -731,13 +721,17 @@ def extract_furniture_parts(source: str) -> Dict[str, Dict[str, object]]:
     purchase without the interior archive yields ``{}`` so the builder keeps
     the procedural furniture.
     """
+    out: Dict[str, Dict[str, object]] = {}
+    if not FURNITURE_FILES:
+        # Functional room objects stay procedural until a mapping is
+        # visually calibrated (see the table comment above).
+        return out
     try:
         archive_path, _ = _resolve_member(
             source, next(iter(FURNITURE_FILES.values())),
             INTERIOR_ZIP_NAMES, "the interior pack")
     except ThemeBuildError:
-        return {}
-    out: Dict[str, Dict[str, object]] = {}
+        return out
     for kind, member in FURNITURE_FILES.items():
         try:
             found_archive, found = _resolve_member(

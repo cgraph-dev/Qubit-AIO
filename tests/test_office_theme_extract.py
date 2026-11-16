@@ -669,6 +669,11 @@ def test_extract_furniture_parts_crops_the_mapped_singles(tmp_path):
             assert image.size == (entry["w"], entry["h"])
 
 
+def test_no_uncalibrated_furniture_mapping_is_shipped():
+    """A guessed single broke toilets, kitchen tables and windows once."""
+    assert E.FURNITURE_FILES == {}
+
+
 def test_extract_furniture_parts_is_empty_without_the_interior_pack(tmp_path):
     root = tmp_path / "empty"
     root.mkdir()
