@@ -47,19 +47,21 @@ export function installOfficeApiBridge(
       return "";
     }
   };
-  const bridge: typeof win.fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const bridge: typeof win.fetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     if (!state.active || activeBridges.get(win) !== state) return originalFetch(input, init);
     try {
       const probe = new Request(input, init);
       const probeUrl = new URL(probe.url, win.location.href);
       if (probeUrl.origin === win.location.origin && probeUrl.pathname.startsWith("/api/")) {
         const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
-        if (method !== "GET") {
-          return Promise.resolve(new Response(JSON.stringify({
+        const characterWrite = (method === "PUT" || method === "DELETE")
+          && /^\/api\/agents\/[^/]+\/character$/.test(probeUrl.pathname);
+        if (method !== "GET" && !characterWrite) {
+          return new Response(JSON.stringify({
             error: "This office capability is unavailable in Qubit Office.",
             capability: probeUrl.pathname,
             disabled: true,
-          }), { status: 501, headers: { "Content-Type": "application/json" } }));
+          }), { status: 501, headers: { "Content-Type": "application/json" } });
         }
       }
     } catch {
@@ -96,14 +98,18 @@ export function installOfficeApiBridge(
                && path.slice("/api/agents/".length).indexOf("/") < 0) {
       const id = path.slice("/api/agents/".length);
       target = `${prefix}agents/${encodeURIComponent(decodeURIComponent(id))}`;
+    } else if ((method === "PUT" || method === "DELETE")
+               && /^\/api\/agents\/[^/]+\/character$/.test(path)) {
+      const id = path.slice("/api/agents/".length, -"/character".length);
+      target = `${prefix}agents/${encodeURIComponent(decodeURIComponent(id))}/character`;
     }
     if (!target) {
       if (path.startsWith("/api/")) {
-        return Promise.resolve(new Response(JSON.stringify({
+        return new Response(JSON.stringify({
           error: "This office capability is unavailable in Qubit Office.",
           capability: path,
           disabled: true,
-        }), { status: 501, headers: { "Content-Type": "application/json" } }));
+        }), { status: 501, headers: { "Content-Type": "application/json" } });
       }
       return originalFetch(input, init);
     }
@@ -114,8 +120,12 @@ export function installOfficeApiBridge(
     }
     const rewritten = new URL(target, win.location.href);
     rewritten.search = url.search;
+    const body = method === "GET" || method === "HEAD"
+      ? undefined
+      : await request.clone().text();
     return originalFetch(new Request(rewritten, {
-      method: "GET",
+      method,
+      body: body || undefined,
       credentials: "same-origin",
       headers,
       signal: request.signal,

@@ -192580,20 +192580,22 @@ create: function(game) {
 				return "";
 			}
 		};
-		const bridge = (input, init) => {
+		const bridge = async (input, init) => {
 			if (!state.active || activeBridges.get(win) !== state) return originalFetch(input, init);
 			try {
 				const probe = new Request(input, init);
 				const probeUrl = new URL(probe.url, win.location.href);
 				if (probeUrl.origin === win.location.origin && probeUrl.pathname.startsWith("/api/")) {
-					if ((init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase() !== "GET") return Promise.resolve(new Response(JSON.stringify({
+					const method = (init?.method ?? (input instanceof Request ? input.method : "GET")).toUpperCase();
+					const characterWrite = (method === "PUT" || method === "DELETE") && /^\/api\/agents\/[^/]+\/character$/.test(probeUrl.pathname);
+					if (method !== "GET" && !characterWrite) return new Response(JSON.stringify({
 						error: "This office capability is unavailable in Qubit Office.",
 						capability: probeUrl.pathname,
 						disabled: true
 					}), {
 						status: 501,
 						headers: { "Content-Type": "application/json" }
-					}));
+					});
 				}
 			} catch {}
 			let request;
@@ -192618,16 +192620,19 @@ create: function(game) {
 			else if (method === "GET" && path.startsWith("/api/agents/") && path.slice(12).indexOf("/") < 0) {
 				const id = path.slice(12);
 				target = `${prefix}agents/${encodeURIComponent(decodeURIComponent(id))}`;
+			} else if ((method === "PUT" || method === "DELETE") && /^\/api\/agents\/[^/]+\/character$/.test(path)) {
+				const id = path.slice(12, -10);
+				target = `${prefix}agents/${encodeURIComponent(decodeURIComponent(id))}/character`;
 			}
 			if (!target) {
-				if (path.startsWith("/api/")) return Promise.resolve(new Response(JSON.stringify({
+				if (path.startsWith("/api/")) return new Response(JSON.stringify({
 					error: "This office capability is unavailable in Qubit Office.",
 					capability: path,
 					disabled: true
 				}), {
 					status: 501,
 					headers: { "Content-Type": "application/json" }
-				}));
+				});
 				return originalFetch(input, init);
 			}
 			const headers = new Headers(request.headers);
@@ -192635,8 +192640,10 @@ create: function(game) {
 			if (token && !headers.has("X-Qubit-Session-Token")) headers.set("X-Qubit-Session-Token", token);
 			const rewritten = new URL(target, win.location.href);
 			rewritten.search = url.search;
+			const body = method === "GET" || method === "HEAD" ? void 0 : await request.clone().text();
 			return originalFetch(new Request(rewritten, {
-				method: "GET",
+				method,
+				body: body || void 0,
 				credentials: "same-origin",
 				headers,
 				signal: request.signal

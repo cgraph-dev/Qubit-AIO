@@ -7086,16 +7086,40 @@ def h_office_habblaud_message_send(cfg: Any, q: Dict[str, str],
 def h_office_habblaud_character(cfg: Any, q: Dict[str, str],
                                 b: Dict[str, Any], p: Dict[str, str]
                                 ) -> Tuple[int, Dict[str, Any]]:
-    """POST /api/office/habblaud/agents/<id>/character -> C4 staged refusal.
+    """PUT /api/office/habblaud/agents/<id>/character -> save customization.
 
-    Editing an agent's appearance mutates the office org; it must settle
-    through the Qubit confirmation authority, never a direct POST.
+    The Habblaud editor's write is local presentation state (name/seed/parts),
+    not an org mutation, so it is stored next to the office database and read by
+    the tower fold. The renderer then receives it as AgentInfo.parts/seed/name.
     """
+    from .office import characters as OCH
+
     aid = str((p or {}).get("id", "") or "").strip()
-    return _staged(
-        f"Editing agent {aid!r}'s appearance mutates the office org and must go "
-        "through the Qubit confirmation authority (C4).",
-        f"office-habblaud-character:{aid}")
+    try:
+        row = OCH.save(cfg, aid, b or {})
+    except OCH.CharacterError as exc:
+        return exc.status, {"ok": False, "code": exc.code,
+                            "detail": exc.detail}
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    return 200, {"ok": True, "agent_id": aid, "character": row}
+
+
+def h_office_habblaud_character_reset(cfg: Any, q: Dict[str, str],
+                                      b: Dict[str, Any], p: Dict[str, str]
+                                      ) -> Tuple[int, Dict[str, Any]]:
+    """DELETE /api/office/habblaud/agents/<id>/character -> back to the seed."""
+    from .office import characters as OCH
+
+    aid = str((p or {}).get("id", "") or "").strip()
+    try:
+        removed = OCH.reset(cfg, aid)
+    except OCH.CharacterError as exc:
+        return exc.status, {"ok": False, "code": exc.code,
+                            "detail": exc.detail}
+    except Exception as exc:  # noqa: BLE001
+        return _fail(exc)
+    return 200, {"ok": True, "agent_id": aid, "reset": removed}
 
 
 def _office_pick_spawn_seat(cfg: Any, wanted: Any) -> Optional[Dict[str, Any]]:
@@ -12229,8 +12253,10 @@ _r("GET", r"/api/office/habblaud/deliveries/file/(?P<id>[^/]+)",
 # character edit, sessions terminal, spawn + attachments, permission decision,
 # message send, dictation write. All are typed refusals (or C4-staged for the
 # org mutations), matched last so the specific reads above win.
-_r("POST", r"/api/office/habblaud/agents/(?P<id>[^/]+)/character",
+_r("PUT", r"/api/office/habblaud/agents/(?P<id>[^/]+)/character",
    "h_office_habblaud_character")
+_r("DELETE", r"/api/office/habblaud/agents/(?P<id>[^/]+)/character",
+   "h_office_habblaud_character_reset")
 _r("POST", r"/api/office/habblaud/agents/(?P<id>[^/]+)/(?P<sub>[^/]+)",
    "h_office_habblaud_refuse")
 _r("POST", r"/api/office/habblaud/sessions/(?P<a>[^/]+)/(?P<b>[^/]+)/terminal",
@@ -20728,6 +20754,7 @@ HANDLERS: Dict[str, Handler] = {
         h_office_habblaud_permission_decision,
     "h_office_habblaud_message_send": h_office_habblaud_message_send,
     "h_office_habblaud_character": h_office_habblaud_character,
+    "h_office_habblaud_character_reset": h_office_habblaud_character_reset,
     "h_office_habblaud_deliveries": h_office_habblaud_deliveries,
     "h_curator_run": h_curator_run, "h_env": h_env, "h_ops": h_ops,
     "h_ops_catalog": h_ops_catalog,

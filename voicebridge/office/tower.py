@@ -30,6 +30,7 @@ from __future__ import annotations
 import time
 from typing import Any, Dict, List, Optional
 
+from . import characters as CHARS
 from . import store
 
 SCHEMA = "qubit-office-tower/1"
@@ -646,6 +647,7 @@ def state(cfg: Any, *, now: Optional[float] = None,
     from . import agent_memory as _mem
 
     dossiers = _mem.dossiers(cfg, [int(s["id"]) for s in seats])
+    custom_characters = CHARS.load(cfg)
     for seat in seats:
         aid = int(seat["id"])
         pos = placed.get(aid)
@@ -677,6 +679,7 @@ def state(cfg: Any, *, now: Optional[float] = None,
         animation = (act or {}).get("animation", "idle")
         if walk.get("walking"):
             animation = "walking"
+        custom_character = custom_characters.get(str(aid)) or {}
         characters.append({
             "agent_id": aid, "slug": seat["slug"], "seat_type": seat["seat_type"],
             "department_id": seat["department_id"],
@@ -685,6 +688,11 @@ def state(cfg: Any, *, now: Optional[float] = None,
             # articulated body, actions and the Habblaud customization parts.
             # LimeZu remains the source for portraits, furniture, rooms and UI.
             "body_style": "habblaud",
+            # Habblaud editor customization, persisted by office.characters.
+            "display_name": custom_character.get("name") or seat["slug"],
+            "seed": custom_character.get("seed"),
+            "parts": custom_character.get("parts") or None,
+            "custom": bool(custom_character),
             "seated": pos is not None,
             "position": position,
             "facing": walk.get("facing", "down"),

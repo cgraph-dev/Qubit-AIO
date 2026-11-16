@@ -50,6 +50,35 @@ describe("installOfficeApiBridge", () => {
     restore();
   });
 
+  it("forwards the Habblaud character editor's PUT/DELETE with body and method", async () => {
+    const calls: { url: string; method: string; body: string }[] = [];
+    const fake = {
+      location: { href: APP_HREF, origin: ORIGIN },
+      __QUBIT_SESSION_TOKEN__: "character-token",
+      fetch: vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const request = new Request(input, init);
+        calls.push({ url: request.url, method: request.method,
+                     body: await request.text() });
+        return new Response("{}", { status: 200 });
+      }),
+    } as unknown as Window;
+    const restore = installOfficeApiBridge(fake);
+
+    await fake.fetch(abs("/api/agents/7/character"), {
+      method: "PUT", body: JSON.stringify({ name: "Ada", seed: 9, parts: {} }),
+      headers: { "Content-Type": "application/json" },
+    });
+    await fake.fetch(abs("/api/agents/7/character"), { method: "DELETE" });
+
+    expect(calls).toEqual([
+      { url: `${ORIGIN}/agent/api/office/habblaud/agents/7/character`,
+        method: "PUT", body: JSON.stringify({ name: "Ada", seed: 9, parts: {} }) },
+      { url: `${ORIGIN}/agent/api/office/habblaud/agents/7/character`,
+        method: "DELETE", body: "" },
+    ]);
+    restore();
+  });
+
   it("installs the bridge synchronously before iframe navigation can dispatch startup fetch", async () => {
     const calls: string[] = [];
     const original = async (input: RequestInfo | URL) => {

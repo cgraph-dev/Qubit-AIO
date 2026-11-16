@@ -247,7 +247,7 @@ def _office_routes():
     """The office habblaud route table, in registration order."""
     src = pathlib.Path(__file__).resolve().parents[1].joinpath(
         "voicebridge", "qubit_compat.py").read_text()
-    routes = re.findall(r'_r\("(GET|POST|DELETE)",\s*r"([^"]+)"', src)
+    routes = re.findall(r'_r\("(GET|POST|PUT|DELETE)",\s*r"([^"]+)"', src)
     return [(m, p) for m, p in routes if "/api/office/habblaud" in p]
 
 
@@ -277,5 +277,7 @@ def test_existing_agent_routes_still_resolve():
 
     assert winner("GET", "/api/office/habblaud/agents/7") == \
         "/api/office/habblaud/agents/(?P<id>[^/]+)"
-    assert winner("POST", "/api/office/habblaud/agents/7/character") == \
+    assert winner("PUT", "/api/office/habblaud/agents/7/character") == \
+        "/api/office/habblaud/agents/(?P<id>[^/]+)/character"
+    assert winner("DELETE", "/api/office/habblaud/agents/7/character") == \
         "/api/office/habblaud/agents/(?P<id>[^/]+)/character"

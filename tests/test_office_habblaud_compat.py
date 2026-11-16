@@ -358,12 +358,16 @@ def test_unknown_mutations_are_typed_refusals_not_fabricated_success(
                           body={"text": "hello"})
     assert code == 400 and out["ok"] is False, (code, out)
     code, out = _dispatch(
-        cfg, "POST", "/api/office/habblaud/agents/1/character",
-        body={"name": "x"})
-    assert code == 409, (code, out)
-    assert out["ok"] is False
-    assert out["state"] == "NEEDS_CONFIRMATION"
-    assert out["code"] == "CONFIRM_REQUIRED"
+        cfg, "PUT", "/api/office/habblaud/agents/1/character",
+        body={"name": "Ada", "seed": 9, "parts": {"top": "#112233"}})
+    assert code == 200 and out["ok"] is True, (code, out)
+    assert out["character"]["name"] == "Ada"
+    from voicebridge.office import characters as OCH
+    assert OCH.load(cfg)["1"]["seed"] == 9
+    code, out = _dispatch(
+        cfg, "DELETE", "/api/office/habblaud/agents/1/character")
+    assert code == 200 and out["ok"] is True and out["reset"] is True, (code, out)
+    assert OCH.load(cfg) == {}
 
 
 def test_message_send_delivers_a_real_seat_task(tmp_path, monkeypatch):
