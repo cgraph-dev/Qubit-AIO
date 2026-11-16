@@ -69,28 +69,12 @@ describe("Qubit Office embedding", () => {
     expect(h.frame.removeEventListener).toHaveBeenCalledWith("load", expect.any(Function));
   });
 
-  it("always names the LimeZu art credit, independent of a theme", () => {
+  it("does not paint a persistent credit bar over the office", () => {
     const h = createHarness();
-    const App = createOfficeApp(h.React as never, h.hooks as never);
-    App({});
+    createOfficeApp({ base: "/qubit-office", theme: "limezu" }, h.React);
     const credits = h.tree.find(
       (e) => e.props["data-testid"] === "office-app-credits");
-    expect(credits).toBeDefined();
-    const children = credits?.props.children as Array<{
-      props: Record<string, unknown>;
-    }>;
-    const link = children.find(
-      (child) => child.props.href === "https://limezu.itch.io");
-    expect(link).toBeDefined();
-    expect(String((link?.props.children as unknown[])[0]))
-      .toBe(OFFICE_ART_CREDIT);
-    const legal = children.find(
-      (child) => String(child.props.href).endsWith("/habblaud/LICENSE"));
-    expect(legal).toBeDefined();
-    expect(String((legal?.props.children as unknown[])[0]))
-      .toContain("MIT");
-    // Classic payload: no theme class and still the same persistent credit.
-    expect(h.tree.find((e) => e.props["data-office-theme"])).toBeUndefined();
+    expect(credits).toBeUndefined();
   });
 
   it("has no seat-model control when no seat is named", () => {

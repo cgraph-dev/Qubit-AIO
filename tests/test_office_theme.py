@@ -325,6 +325,17 @@ def test_bodies_atlas_is_not_an_implicit_character_override(tmp_path, monkeypatc
     assert T._characters_payload(theme) is None
 
 
+def test_ui_icons_are_served_with_payload_urls(tmp_path, monkeypatch):
+    pack = _add_theme_assets(_pack(tmp_path))
+    manifest = json.loads((pack / "theme.json").read_text())
+    manifest["ui"]["icons"] = {"overview": {"src": "ui/panel.png", "w": 64, "h": 64}}
+    (pack / "theme.json").write_text(json.dumps(manifest), encoding="utf-8")
+    monkeypatch.setattr(T, "theme_roots", lambda: [tmp_path])
+    payload = T.theme_payload({}, requested="demo")
+    assert payload["ui"]["icons"]["overview"]["src"].endswith("ui/panel.png?v=1.0.0")
+    assert payload["ui"]["icons"]["overview"]["w"] == 64
+
+
 def test_furniture_unknown_kind_and_undeclared_file_are_refused(tmp_path):
     pack = _add_theme_assets(_pack(tmp_path))
     manifest = json.loads((pack / "theme.json").read_text())
@@ -365,7 +376,7 @@ def test_classic_payload_has_no_character_furniture_or_ui_art():
     payload = T._classic_payload(None)
     assert payload["characters"] is None
     assert payload["furniture"] == {}
-    assert payload["ui"] == {"slices": {}}
+    assert payload["ui"] == {"slices": {}, "icons": {}}
 
 
 def test_office_document_script_emits_classic_and_escapes(monkeypatch):

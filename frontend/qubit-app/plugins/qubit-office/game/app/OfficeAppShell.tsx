@@ -11,6 +11,7 @@ import { installOfficeBrand } from "./brand-patch";
 import { createHudDock, hudFrameSrc } from "../ui/HudPanel";
 import { OFFICE_APP_PATH, officeAppSrc } from "./office-app";
 import { installOfficeApiBridge } from "./api-bridge";
+import { installOfficeUiSkin } from "./office-ui-skin";
 import {
   installOfficeMenuButtons, menuIconGeometry, MENU_BUTTONS,
   type MenuButtonSpec, type OfficeMenuController,
@@ -590,10 +591,13 @@ export function createOfficeApp(
       // The vendored client owns its document and may swallow Tab. Give a
       // keyboard user a guaranteed escape back to the shell controls.
       let restoreEscape: (() => void) | undefined;
+      let restoreUiSkin: (() => void) | undefined;
       const onLoad = () => {
         setLoaded(true);
         setFailed(null);
         installOfficeBrand(win);
+        restoreUiSkin?.();
+        restoreUiSkin = installOfficeUiSkin(win);
         restoreEscape?.();
         // Resolve the frame window AT LOAD, not from the pre-navigation
         // closure: on a navigation the earlier window wrapper can still be
@@ -646,6 +650,8 @@ export function createOfficeApp(
         frame.removeEventListener("error", onError);
         menuRef.current?.dispose();
         menuRef.current = null;
+        restoreUiSkin?.();
+        restoreUiSkin = undefined;
         restoreEscape?.();
         restoreBridge?.();
       };
@@ -781,27 +787,7 @@ export function createOfficeApp(
           + `Every critical status is also shown as text, so muting audio never hides it. `
           + `On touch screens the shell controls are at least 24 by 24 pixels.`),
       ]),
-      // The persistent Credits/About surface. It is part of the Qubit shell,
-      // not the vendored client and not the theme, so the LimeZu attribution
-      // stays visible with `classic` and after a theme is removed.
-      R.createElement("div", {
-        key: "credits",
-        className: "office-game__credits",
-        "data-testid": "office-app-credits",
-        role: "note",
-        "aria-label": "Art credit",
-      }, R.createElement("a", {
-        key: "limezu",
-        href: OFFICE_ART_CREDIT_URL,
-        target: "_blank",
-        rel: "noopener noreferrer",
-      }, OFFICE_ART_CREDIT),
-      R.createElement("span", { key: "sep" }, " · "),
-      R.createElement("a", {
-        key: "legal",
-        href: OFFICE_BRAND.legalUrl,
-        title: `${OFFICE_BRAND.upstream} @ ${OFFICE_BRAND.upstreamCommit}`,
-      }, OFFICE_BRAND.legalLabel)),
+
     ];
 
     // P6-05 — one polite live region carries loading, connection and dock

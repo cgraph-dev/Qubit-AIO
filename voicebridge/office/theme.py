@@ -1669,7 +1669,7 @@ def _classic_payload(reason: Optional[str]) -> Dict[str, Any]:
         "assets": None,
         "characters": None,
         "furniture": {},
-        "ui": {"slices": {}},
+        "ui": {"slices": {}, "icons": {}},
         "reason": reason or "",
     }
 
@@ -1808,7 +1808,23 @@ def _ui_payload(theme: Theme) -> Dict[str, Any]:
                 "width": descriptor.get("width"),
                 "repeat": descriptor.get("repeat"),
             }
-    return {"slices": out}
+    icons_out: Dict[str, Any] = {}
+    raw_icons = (theme.ui or {}).get("icons")
+    if isinstance(raw_icons, dict):
+        for name, descriptor in raw_icons.items():
+            if not isinstance(name, str) or not _SLICE_NAME_RE.fullmatch(name):
+                continue
+            if not isinstance(descriptor, dict):
+                continue
+            src = descriptor.get("src")
+            if not isinstance(src, str) or not src:
+                continue
+            icons_out[name] = {
+                "src": f"{base}/{src}{suffix}",
+                "w": descriptor.get("w"),
+                "h": descriptor.get("h"),
+            }
+    return {"slices": out, "icons": icons_out}
 
 
 def theme_payload(cfg: Any, requested: Optional[str] = None) -> Dict[str, Any]:
