@@ -5,7 +5,7 @@ import {
 } from "@qubit/shared";
 import { Clock, Pause, Pencil, Play, Trash2, X, Zap } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button, Checkbox, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, Checkbox, Input, NumberField, Select, Textarea, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api, ConfirmRequiredError } from "@/lib/api";
@@ -340,12 +340,13 @@ function CronAdvancedFields({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-1">
             <Label htmlFor={`${idPrefix}-context-from`}>context_from job IDs</Label>
-            <textarea
+            <Textarea
+              label=""
               id={`${idPrefix}-context-from`}
-              className="flex min-h-[64px] w-full border border-border bg-background/40 px-3 py-2 text-xs font-courier shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
+              rows={3}
               placeholder="one job id per line"
               value={form.context_from}
-              onChange={(e) => update("context_from", e.target.value)}
+              onChange={(v) => update("context_from", v)}
             />
           </div>
           <div className="grid gap-1">
@@ -417,12 +418,13 @@ function CronJobFormFields({
 
       <div className="grid gap-2">
         <Label htmlFor={`${idPrefix}-prompt`}>{t.cron.prompt}</Label>
-        <textarea
+        <Textarea
+          label=""
           id={`${idPrefix}-prompt`}
-          className="flex min-h-[80px] w-full border border-border bg-background/40 px-3 py-2 text-sm font-courier shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
+          rows={4}
           placeholder={t.cron.promptPlaceholder}
           value={form.prompt}
-          onChange={(e) => update("prompt", e.target.value)}
+          onChange={(v) => update("prompt", v)}
         />
       </div>
 
@@ -450,14 +452,13 @@ function CronJobFormFields({
 
       <div className="grid gap-2">
         <Label htmlFor={`${idPrefix}-repeat`}>{t.cron.repeat}</Label>
-        <input
+        <NumberField
+          label=""
           id={`${idPrefix}-repeat`}
-          type="number"
           min={1}
-          className="accent-foreground"
-          placeholder={t.cron.repeatPlaceholder}
           value={form.repeat}
-          onChange={(e) => update("repeat", e.target.value)}
+          description={t.cron.repeatPlaceholder}
+          onChange={(v) => update("repeat", typeof v === "number" ? String(v) : v)}
         />
         <p className="text-xs text-muted-foreground">{t.cron.repeatHint}</p>
       </div>

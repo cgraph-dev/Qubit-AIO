@@ -339,9 +339,9 @@ describe("VoiceEditPage", () => {
       await Promise.resolve();
       await Promise.resolve();
     });
-    const ta = container.querySelector(
-      '[data-testid="voice-edit-original-input"]',
-    ) as HTMLTextAreaElement;
+    const ta = container
+      .querySelector('[data-testid="voice-edit-original-input"]')
+      ?.querySelector("textarea") as HTMLTextAreaElement;
     expect(ta.value).toBe("typed by voice");
     expect(mocks.transform).toHaveBeenCalled();
   });

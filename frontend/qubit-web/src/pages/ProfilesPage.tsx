@@ -35,7 +35,7 @@ import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn, themedBody } from "@/lib/utils";
-import { Button, Checkbox, Input, Select, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, Textarea, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Mirrors qubit_cli/profiles.py::_PROFILE_ID_RE so we can reject obviously
 // invalid names (uppercase, spaces, …) before round-tripping a doomed POST.
@@ -869,12 +869,13 @@ export default function ProfilesPage() {
                   {L.descriptionOptional}
                 </Label>
 
-                <textarea
+                <Textarea
+                  label=""
                   id="profile-description"
-                  className="flex min-h-[64px] w-full border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  rows={3}
                   placeholder={L.descriptionPlaceholder}
                   value={newDescription}
-                  onChange={(e) => setNewDescription(e.target.value)}
+                  onChange={(v) => setNewDescription(v)}
                 />
               </div>
 
@@ -1304,12 +1305,13 @@ export default function ProfilesPage() {
                     </Button>
                   </div>
 
-                  <textarea
+                  <Textarea
+                    label=""
                     id="profile-desc-editor"
-                    className="flex min-h-[96px] w-full border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    rows={4}
                     placeholder={L.descriptionPlaceholder}
                     value={descText}
-                    onChange={(e) => setDescText(e.target.value)}
+                    onChange={(v) => setDescText(v)}
                   />
 
                   <div className="flex justify-end">
@@ -1333,12 +1335,13 @@ export default function ProfilesPage() {
                     {t.profiles.soulSection}
                   </Label>
 
-                  <textarea
+                  <Textarea
+                    label=""
                     id="profile-soul-editor"
-                    className="flex min-h-[280px] w-full border border-input bg-transparent px-3 py-2 text-sm font-mono shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    rows={13}
                     placeholder={t.profiles.soulPlaceholder}
                     value={soulText}
-                    onChange={(e) => setSoulText(e.target.value)}
+                    onChange={(v) => setSoulText(v)}
                   />
 
                   <div className="flex justify-end">

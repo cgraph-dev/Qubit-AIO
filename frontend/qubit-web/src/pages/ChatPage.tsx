@@ -12,7 +12,7 @@
  * and the sessions switcher.
  */
 
-import { Button, Checkbox, Select, SakugaLoading, emitFx, emitFxAt } from "@/sakuga/ui";
+import { Button, Checkbox, HoverTooltip, Select, SakugaLoading, emitFx, emitFxAt } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import {
@@ -2250,45 +2250,53 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
             </div>
 
             <div className="flex items-center gap-1">
-              <Button
-                variant="secondary"
-                onClick={() => setTerminalNoticeOpen((open) => !open)}
-                {...{ "aria-expanded": String(terminalNoticeOpen) }}
-                aria-label="Terminal input"
-                title="Terminal input (Qubit policy)"
+              <HoverTooltip content="Terminal input (Qubit policy)">
+                <Button
+                  variant="secondary"
+                  onClick={() => setTerminalNoticeOpen((open) => !open)}
+                  {...{ "aria-expanded": String(terminalNoticeOpen) }}
+                  aria-label="Terminal input"
+                  title="Terminal input (Qubit policy)"
+                >
+                  <Terminal className="h-4 w-4" />
+                </Button>
+              </HoverTooltip>
+              <HoverTooltip content="Debug overlay (runtime + logs)">
+                <Button
+                  variant="secondary"
+                  onClick={() => setDebugOpen((open) => !open)}
+                  {...{ "aria-expanded": String(debugOpen) }}
+                  aria-label={debugOpen ? "Hide debug overlay" : "Show debug overlay"}
+                  title="Debug overlay (runtime + logs)"
+                >
+                  <Bug className="h-4 w-4" />
+                </Button>
+              </HoverTooltip>
+              <HoverTooltip
+                content={sidePanelOpen ? "Collapse chat side panel" : "Show chat side panel"}
               >
-                <Terminal className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setDebugOpen((open) => !open)}
-                {...{ "aria-expanded": String(debugOpen) }}
-                aria-label={debugOpen ? "Hide debug overlay" : "Show debug overlay"}
-                title="Debug overlay (runtime + logs)"
-              >
-                <Bug className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setSidePanelOpen((open) => !open)}
-                {...{ "aria-expanded": String(sidePanelOpen), "aria-controls": "chat-side-panel" }}
-                aria-label={
-                  sidePanelOpen
-                    ? "Collapse chat side panel"
-                    : "Show chat side panel"
-                }
-                title={
-                  sidePanelOpen
-                    ? "Collapse chat side panel"
-                    : "Show chat side panel"
-                }
-              >
-                {sidePanelOpen ? (
-                  <PanelRightClose className="h-4 w-4" />
-                ) : (
-                  <PanelRightOpen className="h-4 w-4" />
-                )}
-              </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setSidePanelOpen((open) => !open)}
+                  {...{ "aria-expanded": String(sidePanelOpen), "aria-controls": "chat-side-panel" }}
+                  aria-label={
+                    sidePanelOpen
+                      ? "Collapse chat side panel"
+                      : "Show chat side panel"
+                  }
+                  title={
+                    sidePanelOpen
+                      ? "Collapse chat side panel"
+                      : "Show chat side panel"
+                  }
+                >
+                  {sidePanelOpen ? (
+                    <PanelRightClose className="h-4 w-4" />
+                  ) : (
+                    <PanelRightOpen className="h-4 w-4" />
+                  )}
+                </Button>
+              </HoverTooltip>
             </div>
           </div>
 

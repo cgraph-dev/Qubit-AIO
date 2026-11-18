@@ -38,7 +38,7 @@ import {
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
-import { Button, Input, emitFx } from "@/sakuga/ui";
+import { Button, Input, NumberField, emitFx} from "@/sakuga/ui";
 
 import {
   approveDevicePairing,
@@ -481,14 +481,11 @@ export default function DevicesPage() {
                   className="settings-input"
                 />
               </div>
-              <input
-                type="number"
+              <NumberField
+                label="Setup code TTL seconds"
                 min={1}
                 value={mintTtl}
-                onChange={(e) => setMintTtl(e.target.value)}
-                placeholder="TTL seconds"
-                aria-label="Setup code TTL seconds"
-                className="settings-input"
+                onChange={(v) => setMintTtl(typeof v === "number" ? String(v) : v)}
               />
               <Button variant="secondary"
                 type="button"

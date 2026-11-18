@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { Label } from "@nous-research/ui/ui/components/label";
-import { Button, Input, Select } from "@/sakuga/ui";
+import { Button, DateField, Input, NumberField, Select, TimeField } from "@/sakuga/ui";
 import { useI18n } from "@/i18n";
 import {
   buildScheduleString,
@@ -83,18 +83,14 @@ export function ScheduleBuilder({ onChange, value }: ScheduleBuilderProps) {
       {value.mode === "interval" && (
         <div className="grid grid-cols-[1fr_1.4fr] gap-3">
           <div className="grid gap-2">
-            <Label htmlFor="cron-interval-value">
-              {modeStrings.intervalEvery}
-            </Label>
-            <input
+            <NumberField
+              label={modeStrings.intervalEvery}
               id="cron-interval-value"
-              type="number"
               min={1}
               max={9999}
-              className="qsk-field"
-              value={String(value.intervalValue)}
-              onChange={(e) => {
-                const n = parseInt(e.target.value, 10);
+              value={value.intervalValue}
+              onChange={(v) => {
+                const n = typeof v === "number" ? v : parseInt(v, 10);
                 update({
                   intervalValue: Number.isFinite(n) && n > 0 ? n : 1,
                 });
@@ -164,16 +160,14 @@ export function ScheduleBuilder({ onChange, value }: ScheduleBuilderProps) {
       {value.mode === "monthly" && (
         <div className="grid grid-cols-[1fr_1fr] gap-3">
           <div className="grid gap-2">
-            <Label htmlFor="cron-month-day">{modeStrings.dayOfMonth}</Label>
-            <input
+            <NumberField
+              label={modeStrings.dayOfMonth}
               id="cron-month-day"
-              type="number"
               min={1}
               max={31}
-              className="qsk-field"
-              value={String(value.dayOfMonth)}
-              onChange={(e) => {
-                const n = parseInt(e.target.value, 10);
+              value={value.dayOfMonth}
+              onChange={(v) => {
+                const n = typeof v === "number" ? v : parseInt(v, 10);
                 update({
                   dayOfMonth:
                     Number.isFinite(n) && n >= 1 && n <= 31 ? n : 1,
@@ -193,15 +187,28 @@ export function ScheduleBuilder({ onChange, value }: ScheduleBuilderProps) {
       {value.mode === "once" && (
         <div className="grid gap-2">
           <Label htmlFor="cron-once-at">{modeStrings.onceAt}</Label>
-          {/* Native datetime-local — emits the exact "YYYY-MM-DDTHH:MM"
-              shape ``parse_schedule`` accepts on the backend. */}
-          <input
-            id="cron-once-at"
-            type="datetime-local"
-            className="flex h-9 w-full border border-border bg-background/40 px-3 py-2 text-sm font-courier shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
-            value={value.onceAt}
-            onChange={(e) => update({ onceAt: e.target.value })}
-          />
+          {/* Date + time in the Sakuga frame; the pair still emits the exact
+              "YYYY-MM-DDTHH:MM" shape ``parse_schedule`` accepts. */}
+          <div className="grid grid-cols-[1.2fr_1fr] gap-3">
+            <DateField
+              label={modeStrings.onceAt}
+              id="cron-once-at"
+              value={value.onceAt.slice(0, 10)}
+              onChange={(date) =>
+                update({ onceAt: `${date}T${value.onceAt.slice(11, 16) || "00:00"}` })
+              }
+            />
+            <TimeField
+              label="Time"
+              id="cron-once-at-time"
+              value={value.onceAt.slice(11, 16)}
+              onChange={(time) =>
+                update({
+                  onceAt: `${value.onceAt.slice(0, 10) || new Date().toISOString().slice(0, 10)}T${time}`,
+                })
+              }
+            />
+          </div>
         </div>
       )}
 
@@ -244,16 +251,11 @@ function TimeOfDayField({
   return (
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
-      {/* Native time picker is the right tool for "HH:MM" — saves us
-          two separate hour/minute selects, respects user locale's
-          AM/PM preference, and round-trips with ``buildScheduleString``
-          without parsing. */}
-      <input
+      <TimeField
+        label={label}
         id={id}
-        type="time"
-        className="flex h-9 w-full border border-border bg-background/40 px-3 py-2 text-sm font-courier shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(next) => onChange(next)}
       />
     </div>
   );

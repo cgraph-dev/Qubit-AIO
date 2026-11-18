@@ -18,7 +18,7 @@ import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Database, FolderUp } from "lucide-react";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button, Input, Tabs, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Input, Tabs, Textarea, emitFx, showSakugaToast } from "@/sakuga/ui";
 import {
   SettingsEmpty,
   SettingsPageIntro,
@@ -236,12 +236,12 @@ export default function OpenVikingUploadsPage() {
               title="Memory text"
               description="A single fact or preference worth remembering."
               control={
-                <textarea
+                <Textarea
+                  label="Memory text"
                   id="viking-memory-text"
-                  className="min-h-28 w-full border border-midground/15 bg-background/40 px-3 py-2 font-courier text-sm transition-colors placeholder:text-midground/50 focus-visible:border-midground/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-midground/30 disabled:cursor-not-allowed disabled:opacity-50"
+                  rows={4}
                   value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  aria-label="Memory text"
+                  onChange={(v) => setText(v)}
                 />
               }
             />

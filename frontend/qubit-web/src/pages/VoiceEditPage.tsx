@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VoiceEditPreview } from "@/components/VoiceEditPreview";
 import { copyTextToClipboard } from "@/lib/clipboard";
-import { Button, Checkbox, Input, Select, Slider, emitFx } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, Slider, Textarea, emitFx } from "@/sakuga/ui";
 import {
   voiceEdit,
   VOICE_EDIT_ACTIONS,
@@ -2162,11 +2162,11 @@ export default function VoiceEditPage() {
                   </div>
                   {editing === row.action ? (
                     <div className="mt-2">
-                      <textarea
-                        className="h-40 w-full rounded border border-border bg-background p-2 text-xs"
-                        aria-label={`Edit prompt ${row.action}`}
+                      <Textarea
+                        label={`Edit prompt ${row.action}`}
+                        rows={9}
                         value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
+                        onChange={(v) => setDraft(v)}
                       />
                       <Button variant="secondary"
                         className="mt-2 rounded bg-primary px-3 py-1 text-xs text-primary-foreground"
@@ -2218,16 +2218,15 @@ export default function VoiceEditPage() {
 
           <section className="rounded-lg border border-border p-4">
             <h2 className="mb-3 text-sm font-semibold">Try it (this page)</h2>
-            <label className="text-sm">
-              Original / selected text
-              <textarea
+            <div className="text-sm" data-testid="voice-edit-original-input">
+              <Textarea
+                label="Original / selected text"
                 ref={originalRef}
-                className="mt-1 h-24 w-full rounded border border-border bg-background p-2 text-sm"
-                data-testid="voice-edit-original-input"
+                rows={5}
                 value={original}
-                onChange={(e) => setOriginal(e.target.value)}
+                onChange={(v) => setOriginal(v)}
               />
-            </label>
+            </div>
             <label className="mt-2 block text-sm">
               Spoken command
               <Input
@@ -2355,11 +2354,11 @@ export default function VoiceEditPage() {
                 Import settings
               </Button>
             </div>
-            <textarea
-              className="mt-2 h-32 w-full rounded border border-border bg-background p-2 font-mono text-xs"
-              aria-label="Settings JSON"
+            <Textarea
+              label="Settings JSON"
+              rows={7}
               value={importJson}
-              onChange={(e) => setImportJson(e.target.value)}
+              onChange={(v) => setImportJson(v)}
             />
           </section>
         </>

@@ -40,7 +40,7 @@ import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { AutoField } from "@/components/AutoField";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
-import { ListItem, Button, Checkbox, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { ListItem, Button, Checkbox, HoverTooltip, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { useI18n } from "@/i18n";
@@ -639,22 +639,26 @@ export default function ConfigPage() {
           </code>
         </div>
         <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
-          <Button
-            variant="secondary"
-            onClick={handleExport}
-            title={t.config.exportConfig}
-            aria-label={t.config.exportConfig}
-          >
-            <Download />
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => fileInputRef.current?.click()}
-            title={t.config.importConfig}
-            aria-label={t.config.importConfig}
-          >
-            <Upload />
-          </Button>
+          <HoverTooltip content={t.config.exportConfig}>
+            <Button
+              variant="secondary"
+              onClick={handleExport}
+              title={t.config.exportConfig}
+              aria-label={t.config.exportConfig}
+            >
+              <Download />
+            </Button>
+          </HoverTooltip>
+          <HoverTooltip content={t.config.importConfig}>
+            <Button
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              title={t.config.importConfig}
+              aria-label={t.config.importConfig}
+            >
+              <Upload />
+            </Button>
+          </HoverTooltip>
           <input
             ref={fileInputRef}
             type="file"
@@ -671,14 +675,16 @@ export default function ConfigPage() {
               resetScopeLabel,
             );
             return (
-              <Button
-                variant="secondary"
-                onClick={handleReset}
-                title={resetTitle}
-                aria-label={resetTitle}
-              >
-                <RotateCcw />
-              </Button>
+              <HoverTooltip content={resetTitle}>
+                <Button
+                  variant="secondary"
+                  onClick={handleReset}
+                  title={resetTitle}
+                  aria-label={resetTitle}
+                >
+                  <RotateCcw />
+                </Button>
+              </HoverTooltip>
             );
           })()}
 

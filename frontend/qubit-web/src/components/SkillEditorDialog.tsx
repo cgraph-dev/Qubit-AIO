@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button, Input } from "@/sakuga/ui";
+import { Button, Input, Textarea } from "@/sakuga/ui";
 import {
   Dialog,
   DialogContent,
@@ -181,12 +181,12 @@ function EditorBody({
               <Spinner className="text-xl text-primary" />
             </div>
           ) : (
-            <textarea
+            <Textarea
+              label=""
               id="skill-editor-content"
-              spellCheck={false}
-              className="min-h-[320px] max-h-[55vh] w-full resize-y border border-border bg-background/40 px-3 py-2 font-mono text-xs leading-relaxed shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
+              rows={16}
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(v) => setContent(v)}
             />
           )}
         </div>

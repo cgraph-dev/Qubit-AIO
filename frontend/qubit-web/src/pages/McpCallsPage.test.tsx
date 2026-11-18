@@ -55,6 +55,8 @@ function byTestId(id: string): HTMLElement | null {
 
 function setInput(el: HTMLElement | null, value: string) {
   if (!el) throw new Error("missing input");
+  if (el.tagName === "DIV") el = el.querySelector("textarea, input") as HTMLElement | null;
+  if (!el) throw new Error("missing input");
   act(() => {
     if (el.tagName === "SAKUGA-INPUT") {
       typeIntoSakuga(el, value);

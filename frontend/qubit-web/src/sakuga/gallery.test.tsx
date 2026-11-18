@@ -69,6 +69,7 @@ describe("Sakuga gallery", () => {
       "SakugaMultiSelect",
       "SakugaFormRow",
       "SakugaPagination",
+      "Hover tooltip",
       "Disabled states",
       "Effect bus (emitFx)",
     ];

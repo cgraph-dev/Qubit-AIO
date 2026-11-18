@@ -4,7 +4,7 @@
  *  Every action is reported to the caller, which owns the side effects.
  */
 import { useMemo, useState } from "react";
-import { Button } from "@/sakuga/ui";
+import { Button, Textarea } from "@/sakuga/ui";
 import { wordDiff } from "@/lib/voiceDiff";
 import type { TransformPreview } from "@/lib/voiceEdit";
 
@@ -106,13 +106,14 @@ export function VoiceEditPreview({
             Proposed
           </h3>
           {editing ? (
-            <textarea
-              className="h-56 w-full rounded border border-border bg-background p-2 text-xs"
-              aria-label="Edit proposed text"
-              data-testid="voice-edit-edit-box"
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
+            <div data-testid="voice-edit-edit-box">
+              <Textarea
+                label="Edit proposed text"
+                rows={12}
+                value={draft}
+                onChange={(v) => setDraft(v)}
+              />
+            </div>
           ) : (
             <pre
               className="max-h-56 overflow-auto whitespace-pre-wrap rounded bg-muted/40 p-2 text-xs"

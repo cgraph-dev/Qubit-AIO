@@ -54,7 +54,7 @@ import {
 } from "@nous-research/ui/ui/components/dialog";
 import { cn } from "@/lib/utils";
 import { rebrand, rebrandOptional } from "@/lib/rebrand";
-import { ListItem, Button, Input, Toggle, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { ListItem, Button, Input, Textarea, Toggle, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
@@ -722,11 +722,12 @@ export default function SkillsPage() {
                 Anything else — describe the workflow, paste notes, or say
                 "what we just did"
               </label>
-              <textarea
-                className="min-h-[90px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              <Textarea
+                label=""
+                rows={4}
                 placeholder="e.g. how I file an expense report: open the portal, …"
                 value={learnText}
-                onChange={(e) => setLearnText(e.target.value)}
+                onChange={(v) => setLearnText(v)}
               />
             </div>
           </div>

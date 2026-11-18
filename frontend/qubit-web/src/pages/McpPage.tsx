@@ -8,7 +8,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, Input, Select, Textarea, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
@@ -777,12 +777,13 @@ export default function McpPage() {
                     <Label htmlFor="mcp-env">
                       Environment (KEY=VALUE per line)
                     </Label>
-                    <textarea
+                    <Textarea
+                      label=""
                       id="mcp-env"
-                      className="flex min-h-[80px] w-full border border-border bg-background/40 px-3 py-2 text-sm font-courier shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
+                      rows={4}
                       placeholder={"API_KEY=secret\nDEBUG=1"}
                       value={env}
-                      onChange={(e) => setEnv(e.target.value)}
+                      onChange={(v) => setEnv(v)}
                     />
                   </div>
                 </>
@@ -955,12 +956,13 @@ export default function McpPage() {
 
               <div className="grid gap-2">
                 <Label htmlFor="invoke-args">Arguments (JSON object)</Label>
-                <textarea
+                <Textarea
+                  label=""
                   id="invoke-args"
-                  className="flex min-h-[100px] w-full border border-border bg-background/40 px-3 py-2 text-sm font-courier shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30 focus-visible:border-foreground/25"
+                  rows={5}
                   placeholder="{}"
                   value={invokeArgs}
-                  onChange={(e) => setInvokeArgs(e.target.value)}
+                  onChange={(v) => setInvokeArgs(v)}
                 />
               </div>
 

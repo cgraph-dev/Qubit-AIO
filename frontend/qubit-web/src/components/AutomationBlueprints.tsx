@@ -4,7 +4,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Input, Select, TimeField, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { api } from "@/lib/api";
 import type { AutomationBlueprint, AutomationBlueprintField } from "@/lib/api";
 import { cn, themedBody } from "@/lib/utils";
@@ -108,12 +108,10 @@ function FieldInput({
   }
   if (field.type === "time") {
     return (
-      <input
-        type="time"
-        className="qsk-field"
-        aria-label={field.label}
+      <TimeField
+        label={field.label}
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(next) => onChange(next)}
       />
     );
   }

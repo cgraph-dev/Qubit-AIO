@@ -23,7 +23,7 @@ import {
   type McpResourcesResponse,
 } from "@/lib/ocFamilyAdminApi";
 import { refusalOrError } from "@/lib/policy-refusal";
-import { Button, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, Input, Textarea, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
@@ -222,14 +222,15 @@ export default function McpCallsPage() {
         <label htmlFor="mc-args" className="text-xs text-muted-foreground">
           Arguments (JSON object)
         </label>
-        <textarea
-          id="mc-args"
-          data-testid="mc-args"
-          rows={6}
-          className="min-h-[80px] border border-border bg-background px-2 py-1 font-mono text-xs"
-          value={argsText}
-          onChange={(e) => setArgsText(e.target.value)}
-        />
+        <div data-testid="mc-args">
+          <Textarea
+            label=""
+            id="mc-args"
+            rows={6}
+            value={argsText}
+            onChange={(v) => setArgsText(v)}
+          />
+        </div>
         <div>
           <Button variant="secondary"
             type="button"

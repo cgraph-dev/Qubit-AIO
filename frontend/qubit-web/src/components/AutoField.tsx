@@ -1,5 +1,5 @@
 import { Label } from "@nous-research/ui/ui/components/label";
-import { Input, Select, Toggle } from "@/sakuga/ui";
+import { Input, NumberField, Select, Textarea, Toggle } from "@/sakuga/ui";
 
 import { rebrandOptional } from "@/lib/rebrand";
 
@@ -81,16 +81,13 @@ function NestedValueEditor({
     // Number inputs are outside the upstream component set; keep the native
     // control and preserve the scalar's numeric type across a round trip.
     return (
-      <input
-        aria-label={fieldKey}
-        type="number"
-        value={formatScalar(value)}
-        onChange={(e) => {
-          const raw = e.target.value;
-          const parsed = raw === "" ? 0 : Number(raw);
+      <NumberField
+        label={fieldKey}
+        value={value}
+        onChange={(next) => {
+          const parsed = next === "" ? 0 : typeof next === "number" ? next : Number(next);
           if (!Number.isNaN(parsed)) onChange(parsed);
         }}
-        className="qsk-field text-xs"
       />
     );
   }
@@ -167,18 +164,16 @@ export function AutoField({
       <div className="grid gap-1.5">
         <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
-        <input
+        <NumberField
+          label=""
           id={fieldId}
-          type="number"
-          className="qsk-field"
           value={value === undefined || value === null ? "" : String(value)}
-          onChange={(e) => {
-            const raw = e.target.value;
-            if (raw === "") {
+          onChange={(next) => {
+            if (next === "") {
               onChange(0);
               return;
             }
-            const n = Number(raw);
+            const n = typeof next === "number" ? next : Number(next);
             if (!Number.isNaN(n)) {
               onChange(n);
             }
@@ -193,11 +188,12 @@ export function AutoField({
       <div className="grid gap-1.5">
         <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
-        <textarea
+        <Textarea
+          label=""
           id={fieldId}
-          className="flex min-h-[80px] w-full border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          rows={4}
           value={String(value ?? "")}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={(v) => onChange(v)}
         />
       </div>
     );

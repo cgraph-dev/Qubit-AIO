@@ -107,9 +107,9 @@ describe("VoiceEditPreview", () => {
       '[data-testid="voice-edit-edit"]',
     ) as HTMLButtonElement;
     await act(async () => editBtn.click());
-    const box = container.querySelector(
-      '[data-testid="voice-edit-edit-box"]',
-    ) as HTMLTextAreaElement;
+    const box = container
+      .querySelector('[data-testid="voice-edit-edit-box"]')
+      ?.querySelector("textarea") as HTMLTextAreaElement;
     await act(async () => {
       const setter = Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,

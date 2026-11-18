@@ -18,7 +18,7 @@ import {
   type McpTransport,
 } from "@/lib/mcp-server-create";
 
-import { Button, Checkbox, Input, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Textarea, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Profile name rule mirrors the backend (`^[a-z0-9][a-z0-9_-]{0,63}$`).
 const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -655,14 +655,13 @@ export default function ProfileBuilderPage() {
                       <Label htmlFor="pb-mcp-env">
                         Environment (KEY=VALUE per line)
                       </Label>
-                      <textarea
+                      <Textarea
+                        label=""
                         id="pb-mcp-env"
-                        className="flex min-h-[80px] w-full border border-border bg-background/40 px-3 py-2 text-sm font-courier shadow-sm placeholder:text-muted-foreground focus-visible:border-foreground/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/30"
+                        rows={4}
                         placeholder={"API_KEY=secret\nDEBUG=1"}
                         value={mcpDraft.env}
-                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                          setMcpDraft({ ...mcpDraft, env: e.target.value })
-                        }
+                        onChange={(v) => setMcpDraft({ ...mcpDraft, env: v })}
                       />
                     </div>
                   </>

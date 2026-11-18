@@ -22,7 +22,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
-import { Button, Input } from "@/sakuga/ui";
+import { Button, Input, NumberField, Textarea } from "@/sakuga/ui";
 
 /* ------------------------------------------------------------- geometry */
 
@@ -135,7 +135,7 @@ export function OmField({
   autoCapitalize,
   ariaLabel,
   disabled = false,
-  minHeight,
+  minHeight: _minHeight,
   type = "text",
 }: {
   label: string;
@@ -150,41 +150,26 @@ export function OmField({
   minHeight?: number;
   type?: "text" | "url" | "number";
 }) {
-  const shared = {
-    value,
-    placeholder,
-    disabled,
-    onChange: (
-      e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
-    ) => onChange(e.target.value),
-    "aria-label": ariaLabel ?? label,
-    autoCapitalize,
-    className: cn(
-      "w-full border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary",
-      mono && "font-mono text-[13px]",
-    ),
-    style: {
-      borderRadius: OM.inputRadius,
-      paddingInline: 16,
-      paddingBlock: 12,
-      minHeight: minHeight ?? OM.inputMinHeight,
-    },
-  } as const;
   if (multiline) {
     return (
-      <label className="flex flex-col gap-[7px]">
-        <span className="text-[11px] font-semibold text-foreground">{label}</span>
-        <textarea {...shared} rows={4} />
-      </label>
+      <Textarea
+        label={label}
+        value={value}
+        placeholder={placeholder}
+        disabled={disabled}
+        rows={4}
+        onChange={onChange}
+      />
     );
   }
   if (type === "number") {
-    // Number inputs are outside the upstream component set.
     return (
-      <label className="flex flex-col gap-[7px]">
-        <span className="text-[11px] font-semibold text-foreground">{label}</span>
-        <input {...shared} type="number" />
-      </label>
+      <NumberField
+        label={label}
+        value={value}
+        disabled={disabled}
+        onChange={(next) => onChange(String(next))}
+      />
     );
   }
   return (

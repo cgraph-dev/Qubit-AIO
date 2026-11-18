@@ -23,7 +23,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
-import { Button, Input, Select, emitFx } from "@/sakuga/ui";
+import { Button, Input, Select, Textarea, emitFx } from "@/sakuga/ui";
 
 import {
   CANVAS_ROOT_LABEL,
@@ -427,13 +427,12 @@ export default function CanvasPage() {
             title="Content"
             description="The file body to write."
             control={
-              <textarea
-                aria-label="New canvas file content"
-                className="settings-input"
+              <Textarea
+                label="Content"
                 rows={4}
                 value={addContent}
                 placeholder="<!doctype html>…"
-                onChange={(e) => setAddContent(e.target.value)}
+                onChange={(v) => setAddContent(v)}
               />
             }
           />

@@ -165,7 +165,7 @@ describe("CanvasPage confirm-gated add (staged-then-settle)", () => {
       "hello.html",
     );
     await setTextarea(
-      container.querySelector('[aria-label="New canvas file content"]') as HTMLTextAreaElement,
+      container.querySelector("textarea") as HTMLTextAreaElement,
       "<h1>hi</h1>",
     );
     const add = container.querySelector('[aria-label="Add canvas file"]') as HTMLButtonElement;

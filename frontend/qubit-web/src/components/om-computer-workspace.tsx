@@ -43,7 +43,7 @@ import {
 } from "lucide-react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button, Tabs } from "@/sakuga/ui";
+import { Button, Tabs, Textarea } from "@/sakuga/ui";
 
 import {
   getComputerStatus,
@@ -793,12 +793,11 @@ function ComputerFiles() {
         {editPath !== null ? (
           <div className="flex flex-col gap-2 border-t border-border pt-3">
             <p className="font-mono text-[12px]">{editPath}</p>
-            <textarea
-              className="min-h-[180px] w-full whitespace-pre-wrap rounded-[10px] bg-secondary p-3 font-mono text-[12px]"
+            <Textarea
+              label={`Contents of ${editPath}`}
+              rows={10}
               value={editText}
-              spellCheck={false}
-              onChange={(e) => setEditText(e.target.value)}
-              aria-label={`Contents of ${editPath}`}
+              onChange={(v) => setEditText(v)}
             />
             <div className="flex flex-wrap gap-2">
               <OmButton primary busy={wsBusy} onClick={saveWs}>

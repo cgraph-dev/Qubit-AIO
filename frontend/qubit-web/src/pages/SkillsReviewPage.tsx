@@ -35,7 +35,7 @@ import {
   type SkillProposal,
 } from "@/lib/ocFamilyAdminApi";
 import { refusalOrError } from "@/lib/policy-refusal";
-import { Button, Input, Tabs, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, Input, Textarea, Tabs, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
@@ -427,13 +427,15 @@ export default function SkillsReviewPage() {
                 </p>
               </div>
               <div className="settings-row__control">
-                <textarea
-                  id="sr-payload"
-                  data-testid="sr-payload"
-                  className="min-h-[80px] w-full border border-border bg-background px-2 py-1 font-mono text-xs"
-                  value={revisePayload}
-                  onChange={(e) => setRevisePayload(e.target.value)}
-                />
+                <div data-testid="sr-payload">
+                  <Textarea
+                    label="Revise payload"
+                    id="sr-payload"
+                    rows={4}
+                    value={revisePayload}
+                    onChange={(v) => setRevisePayload(v)}
+                  />
+                </div>
               </div>
             </div>
 

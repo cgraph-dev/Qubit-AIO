@@ -20,6 +20,7 @@ import {
   type PaletteItem,
 } from "@/lib/commandPalette";
 import { cn } from "@/lib/utils";
+import { Input, ListItem } from "@/sakuga/ui";
 
 const KIND_LABEL: Record<PaletteItem["kind"], string> = {
   action: "action",
@@ -54,7 +55,7 @@ export function CommandPalette({
 }: CommandPaletteProps) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLElement | null>(null);
 
   // Reset the query/selection each time the palette opens, and focus the
   // input so the operator can type immediately.
@@ -102,21 +103,17 @@ export function CommandPalette({
       >
         <div className="flex items-center gap-2 border-b border-border px-3 py-2">
           <Search className="h-4 w-4 shrink-0 text-text-tertiary" />
-          <input
+          <Input
             ref={inputRef}
-            type="text"
+            label=""
             value={query}
             data-testid="command-palette-input"
             placeholder="Run an action, open a session, insert a command…"
             aria-label="Search commands"
-            aria-controls="command-palette-listbox"
-            aria-activedescendant={
-              visible[activeIndex] ? `palette-${visible[activeIndex].id}` : undefined
-            }
             autoComplete="off"
             spellCheck={false}
-            className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-text-tertiary"
-            onChange={(event) => setQuery(event.target.value)}
+            className="qsk-field min-w-0 flex-1"
+            onChange={(value) => setQuery(value)}
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") {
                 event.preventDefault();
@@ -157,20 +154,15 @@ export function CommandPalette({
             </p>
           ) : (
             visible.map((item, i) => (
-              <button
+              <ListItem
                 key={`${item.kind}:${item.id}:${i}`}
                 id={`palette-${item.id}`}
                 type="button"
                 role="option"
-                aria-selected={i === activeIndex}
+                active={i === activeIndex}
                 data-testid="command-palette-item"
-                data-kind={item.kind}
                 onMouseEnter={() => setActive(i)}
-                onMouseDown={(event) => {
-                  // Commit before blur; `commit` closes the palette.
-                  event.preventDefault();
-                  commit(item);
-                }}
+                onClick={() => commit(item)}
                 className={cn(
                   "flex w-full items-center gap-2 px-3 py-1.5 text-left",
                   i === activeIndex && "bg-accent/10",
@@ -185,7 +177,7 @@ export function CommandPalette({
                     {item.detail}
                   </span>
                 ) : null}
-              </button>
+              </ListItem>
             ))
           )}
         </div>

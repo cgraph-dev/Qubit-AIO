@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   Database,
   ListFilter,
@@ -54,7 +53,7 @@ import { Markdown } from "@/components/Markdown";
 import { StructuredReasoning } from "@/components/StructuredReasoning";
 import { shouldRenderStructuredReasoning } from "@/lib/reasoning-markup";
 import { PlatformsCard } from "@/components/PlatformsCard";
-import { ListItem, Button, Input as SakugaInput, Checkbox, SakugaLoading, showSakugaToast, emitFx } from "@/sakuga/ui";
+import { ListItem, Button, Input as SakugaInput, Checkbox, HoverTooltip, Pagination, SakugaLoading, showSakugaToast, emitFx } from "@/sakuga/ui";
 import { SakugaSegmented } from "@/components/sakuga-segmented";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Badge } from "@nous-research/ui/ui/components/badge";
@@ -699,53 +698,59 @@ function SessionRow({
       )}
 
       {resumeInChatEnabled && !session.archived && (
-        <Button
-          variant="secondary"
-          className="text-muted-foreground hover:text-success"
-          aria-label={t.sessions.resumeInChat}
-          title={t.sessions.resumeInChat}
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(sessionResumeHref(session.id, session.profile));
-          }}
-        >
-          <Play />
-        </Button>
+        <HoverTooltip content={t.sessions.resumeInChat}>
+          <Button
+            variant="secondary"
+            className="text-muted-foreground hover:text-success"
+            aria-label={t.sessions.resumeInChat}
+            title={t.sessions.resumeInChat}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(sessionResumeHref(session.id, session.profile));
+            }}
+          >
+            <Play />
+          </Button>
+        </HoverTooltip>
       )}
 
       {!session.archived && (
-        <Button
-          variant="secondary"
-          className="text-muted-foreground hover:text-foreground"
-          aria-label="Rename session"
-          title="Rename session"
-          onClick={(e) => {
-            e.stopPropagation();
-            setRenameValue(
-              session.title && session.title !== "Untitled"
-                ? session.title
-                : "",
-            );
-            setRenaming(true);
-          }}
-        >
-          <Pencil />
-        </Button>
+        <HoverTooltip content="Rename session">
+          <Button
+            variant="secondary"
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Rename session"
+            title="Rename session"
+            onClick={(e) => {
+              e.stopPropagation();
+              setRenameValue(
+                session.title && session.title !== "Untitled"
+                  ? session.title
+                  : "",
+              );
+              setRenaming(true);
+            }}
+          >
+            <Pencil />
+          </Button>
+        </HoverTooltip>
       )}
 
       {!session.archived && (
-        <Button
-          variant="secondary"
-          className="text-muted-foreground hover:text-foreground"
-          aria-label="Export session"
-          title="Export session JSON"
-          onClick={(e) => {
-            e.stopPropagation();
-            onExport(session.id);
-          }}
-        >
-          <Download />
-        </Button>
+        <HoverTooltip content="Export session JSON">
+          <Button
+            variant="secondary"
+            className="text-muted-foreground hover:text-foreground"
+            aria-label="Export session"
+            title="Export session JSON"
+            onClick={(e) => {
+              e.stopPropagation();
+              onExport(session.id);
+            }}
+          >
+            <Download />
+          </Button>
+        </HoverTooltip>
       )}
 
       {session.archived ? (
@@ -762,16 +767,18 @@ function SessionRow({
           <ArchiveRestore />
         </Button>
       ) : (
-        <Button
-          variant="primary"
-          aria-label={t.sessions.deleteSession}
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-        >
-          <Trash2 />
-        </Button>
+        <HoverTooltip content={t.sessions.deleteSession}>
+          <Button
+            variant="primary"
+            aria-label={t.sessions.deleteSession}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+          >
+            <Trash2 />
+          </Button>
+        </HoverTooltip>
       )}
     </>
   );
@@ -968,27 +975,12 @@ function SessionsPagination({
         </span>
       )}
 
-      <div className="flex items-center gap-1">
-        <Button
-          variant="secondary"
-          disabled={page === 0}
-          onClick={() => onPageChange(page - 1)}
-          aria-label={t.sessions.previousPage}
-        >
-          <ChevronLeft />
-        </Button>
-        <span className="px-2 text-xs text-muted-foreground">
-          {t.common.page} {page + 1} {t.common.of} {pageCount}
-        </span>
-        <Button
-          variant="secondary"
-          disabled={(page + 1) * PAGE_SIZE >= total}
-          onClick={() => onPageChange(page + 1)}
-          aria-label={t.sessions.nextPage}
-        >
-          <ChevronRight />
-        </Button>
-      </div>
+      <Pagination
+        page={page + 1}
+        pageCount={pageCount}
+        onChange={(next) => onPageChange(next - 1)}
+        label={t.common.page}
+      />
     </div>
   );
 }

@@ -43,7 +43,7 @@ import type { ManagedFileEntry, ManagedFilesResponse } from "@/lib/api";
 import { refusalOrError } from "@/lib/policy-refusal";
 import { isAbortError } from "@/lib/api-error";
 import { PluginSlot } from "@/plugins";
-import { Button, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
+import { Button, HoverTooltip, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -197,15 +197,17 @@ export default function FilesPage() {
     );
     setEnd(
       <div className="flex items-center gap-2">
-        <Button
-          variant="secondary"
-          type="button"
-          onClick={() => void load()}
-          disabled={loading}
-          aria-label="Refresh files"
-        >
-          {loading ? <Spinner /> : <RefreshCw />}
-        </Button>
+        <HoverTooltip content="Refresh files">
+          <Button
+            variant="secondary"
+            type="button"
+            onClick={() => void load()}
+            disabled={loading}
+            aria-label="Refresh files"
+          >
+            {loading ? <Spinner /> : <RefreshCw />}
+          </Button>
+        </HoverTooltip>
       </div>,
     );
     return () => {
@@ -569,24 +571,28 @@ export default function FilesPage() {
                       <FolderOpen />
                     </Button>
                   ) : (
+                    <HoverTooltip content={`Download ${entry.name}`}>
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => void downloadFile(entry)}
+                        aria-label={`Download ${entry.name}`}
+                      >
+                        <Download />
+                      </Button>
+                    </HoverTooltip>
+                  )}
+                  <HoverTooltip content={`Delete ${entry.name}`}>
                     <Button
                       variant="secondary"
                       type="button"
-                      onClick={() => void downloadFile(entry)}
-                      aria-label={`Download ${entry.name}`}
+                      onClick={() => setPendingDelete(entry)}
+                      aria-label={`Delete ${entry.name}`}
+                      className="text-destructive hover:text-destructive"
                     >
-                      <Download />
+                      <Trash2 />
                     </Button>
-                  )}
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => setPendingDelete(entry)}
-                    aria-label={`Delete ${entry.name}`}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 />
-                  </Button>
+                  </HoverTooltip>
                 </span>
               </div>
             ))
