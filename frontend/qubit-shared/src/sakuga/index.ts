@@ -76,6 +76,25 @@ export {
 } from './select';
 
 export {
+  SakugaDate,
+  SakugaFile,
+  SakugaFormRow,
+  SakugaMultiSelect,
+  SakugaNumber,
+  SakugaPagination,
+  SakugaTextarea,
+  SakugaTime,
+  type SakugaDateTimeProps,
+  type SakugaFileProps,
+  type SakugaFormRowProps,
+  type SakugaMultiSelectOption,
+  type SakugaMultiSelectProps,
+  type SakugaNumberProps,
+  type SakugaPaginationProps,
+  type SakugaTextareaProps,
+} from './extras';
+
+export {
   clickSakuga,
   sakugaInner,
   sakugaInnerAll,
