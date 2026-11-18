@@ -3,6 +3,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { clickSakuga, sakugaInnerAll, typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 import type { VoiceEditSettings } from "@/lib/voiceEdit";
 
 const CATALOG = {
@@ -160,11 +162,10 @@ describe("VoiceEditPage", () => {
     const { default: VoiceEditPage } = await import("./VoiceEditPage");
     await act(async () => root.render(<VoiceEditPage />));
     await flush();
-    const box = container.querySelector(
-      '[data-testid="voice-edit-enabled"]',
-    ) as HTMLInputElement;
+    const box = container.querySelector('[data-testid="voice-edit-enabled"]');
+    await waitForSakuga(box);
     await act(async () => {
-      box.click();
+      clickSakuga(box, "input");
       await Promise.resolve();
     });
     expect(mocks.saveSettings).toHaveBeenCalledWith({ enabled: true });
@@ -182,19 +183,18 @@ describe("VoiceEditPage", () => {
     const { default: VoiceEditPage } = await import("./VoiceEditPage");
     await act(async () => root.render(<VoiceEditPage />));
     await flush();
-    const mode = container.querySelector(
-      '[data-testid="voice-edit-stt-mode"]',
-    ) as HTMLSelectElement;
-    const model = container.querySelector(
-      '[data-testid="voice-edit-stt-model"]',
-    ) as HTMLSelectElement;
-    const router = container.querySelector(
-      '[data-testid="voice-edit-router"]',
-    ) as HTMLSelectElement;
-    expect(mode.value).toBe("streaming");
-    expect(model.value).toBe("medium");
-    expect(router.value).toBe("brain");
-    expect(container.textContent).toContain("small ≈ 0.5 GB RAM/VRAM");
+    const mode = container.querySelector('[data-testid="voice-edit-stt-mode"]');
+    const model = container.querySelector('[data-testid="voice-edit-stt-model"]');
+    const router = container.querySelector('[data-testid="voice-edit-router"]');
+    expect(mode?.textContent).toContain("Streaming (live interim)");
+    expect(model?.textContent).toContain("medium ≈ 1.5 GB RAM/VRAM");
+    expect(router?.textContent).toContain("Brain (local model)");
+    const modelTrigger = model?.querySelector<HTMLButtonElement>('button[role="combobox"]');
+    await act(async () => modelTrigger?.click());
+    const modelList = document.querySelector("sakuga-radio");
+    await waitForSakuga(modelList);
+    expect(modelList?.shadowRoot?.textContent).toContain("small ≈ 0.5 GB RAM/VRAM");
+    await act(async () => modelTrigger?.click());
     expect(container.textContent).toContain(
       "never bypasses confirmation or e-stop",
     );
@@ -208,14 +208,8 @@ describe("VoiceEditPage", () => {
     const { default: VoiceEditPage } = await import("./VoiceEditPage");
     await act(async () => root.render(<VoiceEditPage />));
     await flush();
-    const mode = container.querySelector(
-      '[data-testid="voice-edit-stt-mode"]',
-    ) as HTMLSelectElement;
-    await act(async () => {
-      mode.value = "streaming";
-      mode.dispatchEvent(new Event("change", { bubbles: true }));
-      await Promise.resolve();
-    });
+    const mode = container.querySelector('[data-testid="voice-edit-stt-mode"]');
+    await chooseOption(mode, "streaming");
     expect(mocks.saveSettings).toHaveBeenCalledWith({ stt_mode: "streaming" });
   });
 
@@ -227,14 +221,8 @@ describe("VoiceEditPage", () => {
     const { default: VoiceEditPage } = await import("./VoiceEditPage");
     await act(async () => root.render(<VoiceEditPage />));
     await flush();
-    const router = container.querySelector(
-      '[data-testid="voice-edit-router"]',
-    ) as HTMLSelectElement;
-    await act(async () => {
-      router.value = "brain";
-      router.dispatchEvent(new Event("change", { bubbles: true }));
-      await Promise.resolve();
-    });
+    const router = container.querySelector('[data-testid="voice-edit-router"]');
+    await chooseOption(router, "brain");
     expect(mocks.saveSettings).toHaveBeenCalledWith({ router: "brain" });
   });
 
@@ -249,13 +237,25 @@ describe("VoiceEditPage", () => {
     expect(container.textContent).toContain("open youtube");
   });
 
-  function setInput(el: HTMLInputElement, value: string) {
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype,
-      "value",
-    )?.set;
-    setter?.call(el, value);
-    el.dispatchEvent(new Event("input", { bubbles: true }));
+  async function setInput(el: Element | null, value: string) {
+    if (!el) throw new Error("missing input");
+    await waitForSakuga(el);
+    typeIntoSakuga(el, value);
+  }
+
+  async function chooseOption(host: Element | null, value: string) {
+    if (!host) throw new Error("missing select");
+    const trigger = host.querySelector<HTMLButtonElement>('button[role="combobox"]');
+    if (!trigger) throw new Error("missing select trigger");
+    await act(async () => trigger.click());
+    const radio = document.querySelector("sakuga-radio");
+    await waitForSakuga(radio);
+    const option = sakugaInnerAll<HTMLInputElement>(radio, "input").find((i) => i.value === value);
+    if (!option) throw new Error(`missing option ${value}`);
+    await act(async () => {
+      option.click();
+      await Promise.resolve();
+    });
   }
 
   it("adds a custom shortcut through the settings PUT", async () => {
@@ -264,15 +264,11 @@ describe("VoiceEditPage", () => {
     const { default: VoiceEditPage } = await import("./VoiceEditPage");
     await act(async () => root.render(<VoiceEditPage />));
     await flush();
-    const phrase = container.querySelector(
-      '[data-testid="voice-edit-alias-phrase"]',
-    ) as HTMLInputElement;
-    const target = container.querySelector(
-      '[data-testid="voice-edit-alias-target"]',
-    ) as HTMLInputElement;
+    const phrase = container.querySelector('[data-testid="voice-edit-alias-phrase"]');
+    const target = container.querySelector('[data-testid="voice-edit-alias-target"]');
     await act(async () => {
-      setInput(phrase, "open my dashboard");
-      setInput(target, "https://example.com");
+      await setInput(phrase, "open my dashboard");
+      await setInput(target, "https://example.com");
       await Promise.resolve();
     });
     const add = container.querySelector(

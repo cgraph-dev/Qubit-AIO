@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { VoiceEditPreview } from "@/components/VoiceEditPreview";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { Button, Checkbox, Input, Select, Slider, emitFx } from "@/sakuga/ui";
 import {
   voiceEdit,
   VOICE_EDIT_ACTIONS,
@@ -173,22 +174,12 @@ function ModelSelect({
   return (
     <label className="text-sm">
       {label}
-      <select
-        className="mt-1 w-full rounded border border-border bg-background p-1"
-        data-testid={testId}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">{autoLabel}</option>
-        {value && !installed ? (
-          <option value={value}>{value} (not installed on this machine)</option>
-        ) : null}
-        {opts.map((m) => (
-          <option key={m.name} value={m.name}>
-            {m.name} ({formatModelSize(m.size_bytes)})
-          </option>
-        ))}
-      </select>
+      <Select
+  label={label}
+  value={value}
+  onChange={(value) => onChange(value)}
+  options={[{ value: "", label: autoLabel }, ...(value && !installed ? [{ value, label: `${value} (not installed on this machine)` }] : []), ...opts.map((m) => ({ value: m.name, label: `${m.name} (${formatModelSize(m.size_bytes)})` }))]}
+/>
       <span className="mt-0.5 block text-xs text-muted-foreground">{help}</span>
     </label>
   );
@@ -325,15 +316,13 @@ function VoiceCommandsSection({
                 <span className="text-muted-foreground">
                   → {a.action} ({a.target})
                 </span>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-0.5 text-xs"
+                <Button variant="secondary"
                   data-testid={`voice-edit-alias-delete-${i}`}
                   disabled={busy}
                   onClick={() => onDelete(a.phrase)}
                 >
                   Delete
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -341,42 +330,37 @@ function VoiceCommandsSection({
         <div className="flex flex-wrap items-end gap-2">
           <label className="text-sm">
             Say
-            <input
-              className="mt-1 w-44 rounded border border-border bg-background p-1"
+            <Input
+  label="Phrase"
+  className="qsk-field"
               data-testid="voice-edit-alias-phrase"
               placeholder="e.g. open my dashboard"
               value={aliasPhrase}
-              onChange={(e) => setAliasPhrase(e.target.value)}
+              onChange={(value) => setAliasPhrase(value)}
             />
           </label>
           <label className="text-sm">
             Do
-            <select
-              className="mt-1 rounded border border-border bg-background p-1"
-              data-testid="voice-edit-alias-action"
-              value={aliasAction}
-              onChange={(e) => setAliasAction(e.target.value)}
-            >
-              {actions.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </select>
+            <Select
+  label="Action"
+  data-testid="voice-edit-alias-action"
+  value={aliasAction}
+  onChange={(value) => setAliasAction(value)}
+  options={actions.map((a) => ({ value: a, label: a }))}
+/>
           </label>
           <label className="text-sm">
             Target
-            <input
-              className="mt-1 w-44 rounded border border-border bg-background p-1"
+            <Input
+  label="Target"
+  className="qsk-field"
               data-testid="voice-edit-alias-target"
               placeholder="URL, app, song, note…"
               value={aliasTarget}
-              onChange={(e) => setAliasTarget(e.target.value)}
+              onChange={(value) => setAliasTarget(value)}
             />
           </label>
-          <button
-            type="button"
-            className="rounded border border-border px-3 py-1 text-xs"
+          <Button variant="secondary"
             data-testid="voice-edit-alias-add"
             disabled={!canAdd}
             onClick={() =>
@@ -388,7 +372,7 @@ function VoiceCommandsSection({
             }
           >
             Add shortcut
-          </button>
+          </Button>
         </div>
       </div>
     </details>
@@ -586,8 +570,10 @@ export default function VoiceEditPage() {
         setSettings(out.settings);
         setStatus(note);
         setError("");
+        emitFx("success");
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e));
+        emitFx("error");
       } finally {
         setBusy(false);
       }
@@ -898,23 +884,22 @@ export default function VoiceEditPage() {
               stays off until you enable it here.
             </p>
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                data-testid="voice-edit-enabled"
-                checked={settings.enabled}
-                onChange={(e) => void update({ enabled: e.target.checked })}
-              />
+              <Checkbox
+  label="Enabled"
+  data-testid="voice-edit-enabled"
+  checked={settings.enabled}
+  onChange={(checked) => void update({ enabled: checked })}
+/>
               Enable system-wide voice typing / editing
             </label>
             <label className="mt-2 flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                data-testid="voice-edit-wake"
-                checked={Boolean(settings.wake?.enabled)}
-                onChange={(e) =>
-                  void update({ wake: { enabled: e.target.checked } })
-                }
-              />
+              <Checkbox
+  label="Wake"
+  data-testid="voice-edit-wake"
+  checked={Boolean(settings.wake?.enabled)}
+  onChange={(checked) =>
+                  void update({ wake: { enabled: checked } })}
+/>
               Hands-free wake command
             </label>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -925,12 +910,13 @@ export default function VoiceEditPage() {
             <div className="mt-3 grid gap-3 sm:grid-cols-2" data-testid="voice-edit-wake-settings">
               <label className="text-sm">
                 Wake phrase
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="Wake phrase"
+  className="qsk-field"
                   data-testid="voice-edit-wake-phrase"
                   placeholder="hey qubit"
                   value={wakePhrase}
-                  onChange={(e) => setWakePhrase(e.target.value)}
+                  onChange={(value) => setWakePhrase(value)}
                 />
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Spoken phrase that triggers a command (max 60 chars).
@@ -938,16 +924,13 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Wake engine
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-wake-engine"
-                  value={wakeEngine}
-                  onChange={(e) => setWakeEngine(e.target.value)}
-                >
-                  <option value="auto">auto</option>
-                  <option value="kws">kws (keyword spotter)</option>
-                  <option value="asr">asr (transcript match)</option>
-                </select>
+                <Select
+  label="Wake engine"
+  data-testid="voice-edit-wake-engine"
+  value={wakeEngine}
+  onChange={(value) => setWakeEngine(value)}
+  options={[{ value: "auto", label: "auto" }, { value: "kws", label: "kws (keyword spotter)" }, { value: "asr", label: "asr (transcript match)" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Auto picks the spotter when its model bundle is present.
                 </span>
@@ -1005,13 +988,12 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 ASR fallback for spotter misses
-                <input
-                  type="checkbox"
-                  className="mt-1 block"
-                  data-testid="voice-edit-wake-asr-fallback"
-                  checked={wakeAsrFallback}
-                  onChange={(e) => setWakeAsrFallback(e.target.checked)}
-                />
+                <Checkbox
+  label="Wake asr fallback"
+  data-testid="voice-edit-wake-asr-fallback"
+  checked={wakeAsrFallback}
+  onChange={(checked) => setWakeAsrFallback(checked)}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   When the spotter misses, transcribe short utterances once
                   and match the wake phrase (local only).
@@ -1035,17 +1017,13 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Segmentation (VAD)
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-wake-vad"
-                  value={wakeVad}
-                  onChange={(e) => setWakeVad(e.target.value)}
-                >
-                  <option value="auto">auto (neural when available)</option>
-                  <option value="silero">silero (neural)</option>
-                  <option value="webrtc">webrtc</option>
-                  <option value="energy">energy (legacy gate)</option>
-                </select>
+                <Select
+  label="Segmentation (VAD)"
+  data-testid="voice-edit-wake-vad"
+  value={wakeVad}
+  onChange={(value) => setWakeVad(value)}
+  options={[{ value: "auto", label: "auto (neural when available)" }, { value: "silero", label: "silero (neural)" }, { value: "webrtc", label: "webrtc" }, { value: "energy", label: "energy (legacy gate)" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Neural segmentation ignores fan/machine drone; energy hears it.
                 </span>
@@ -1067,15 +1045,13 @@ export default function VoiceEditPage() {
                 </span>
               </label>
             </div>
-            <button
-              type="button"
-              className="mt-2 rounded border border-border px-3 py-1 text-xs"
+            <Button variant="secondary"
               data-testid="voice-edit-wake-save"
               disabled={busy}
               onClick={() => void saveWake()}
             >
               Save wake settings
-            </button>
+            </Button>
             <p className="mt-1 text-xs text-muted-foreground">
               Wake-word changes take effect after the desktop helper restarts.
             </p>
@@ -1101,9 +1077,7 @@ export default function VoiceEditPage() {
                       data-testid={`wake-word-row-${word}`}
                     >
                       <code className="rounded bg-muted px-1">{word}</code>
-                      <button
-                        type="button"
-                        className="rounded border border-border px-2 py-0.5 text-xs"
+                      <Button variant="secondary"
                         aria-label={`Remove wake word ${word}`}
                         data-testid={`wake-word-remove-${word}`}
                         disabled={busy}
@@ -1115,7 +1089,7 @@ export default function VoiceEditPage() {
                         }
                       >
                         ×
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -1123,13 +1097,14 @@ export default function VoiceEditPage() {
               <div className="flex flex-wrap items-end gap-2">
                 <label className="text-sm">
                   Add a wake word
-                  <input
-                    className="mt-1 w-44 rounded border border-border bg-background p-1"
+                  <Input
+  label="Wake word"
+  className="qsk-field"
                     data-testid="wake-word-input"
                     placeholder="e.g. computer"
                     value={wakeWordDraft}
-                    onChange={(e) => setWakeWordDraft(e.target.value)}
-                    onKeyDown={(e) => {
+                    onChange={(value) => setWakeWordDraft(value)}
+                    onKeyDown={(value) => {
                       if (e.key === "Enter" && wakeWordDraft.trim() && !busy) {
                         const word = wakeWordDraft.trim();
                         setWakeWordDraft("");
@@ -1138,9 +1113,7 @@ export default function VoiceEditPage() {
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  className="rounded border border-border px-3 py-1 text-xs"
+                <Button variant="secondary"
                   data-testid="wake-word-add"
                   disabled={busy || !wakeWordDraft.trim()}
                   onClick={() => {
@@ -1151,16 +1124,14 @@ export default function VoiceEditPage() {
                   }}
                 >
                   Add
-                </button>
-                <button
-                  type="button"
-                  className="rounded border border-border px-3 py-1 text-xs"
+                </Button>
+                <Button variant="secondary"
                   data-testid="wake-words-reset"
                   disabled={busy}
                   onClick={() => void resetWakeWords()}
                 >
                   Reset to defaults
-                </button>
+                </Button>
               </div>
             </div>
             <div className="mt-4" data-testid="voice-edit-wake-routing">
@@ -1188,9 +1159,7 @@ export default function VoiceEditPage() {
                       <span className="text-muted-foreground">
                         → {formatWakeRouteTarget(route.target)}
                       </span>
-                      <button
-                        type="button"
-                        className="rounded border border-border px-2 py-0.5 text-xs"
+                      <Button variant="secondary"
                         aria-label={`Remove route ${route.trigger}`}
                         data-testid={`wake-route-remove-${route.trigger}`}
                         disabled={busy}
@@ -1202,7 +1171,7 @@ export default function VoiceEditPage() {
                         }
                       >
                         ×
-                      </button>
+                      </Button>
                     </li>
                   ))}
                 </ul>
@@ -1210,42 +1179,39 @@ export default function VoiceEditPage() {
               <div className="flex flex-wrap items-end gap-2">
                 <label className="text-sm">
                   Trigger
-                  <input
-                    className="mt-1 w-40 rounded border border-border bg-background p-1"
+                  <Input
+  label="Trigger"
+  className="qsk-field"
                     data-testid="wake-route-trigger"
                     placeholder="e.g. hey qubit"
                     value={routeTrigger}
-                    onChange={(e) => setRouteTrigger(e.target.value)}
+                    onChange={(value) => setRouteTrigger(value)}
                   />
                 </label>
                 <label className="text-sm">
                   Target
-                  <select
-                    className="mt-1 rounded border border-border bg-background p-1"
-                    data-testid="wake-route-target-mode"
-                    value={routeMode}
-                    onChange={(e) => setRouteMode(e.target.value)}
-                  >
-                    <option value="current">current</option>
-                    <option value="agentId">agent id</option>
-                    <option value="sessionKey">session key</option>
-                  </select>
+                  <Select
+  label="Target mode"
+  data-testid="wake-route-target-mode"
+  value={routeMode}
+  onChange={(value) => setRouteMode(value)}
+  options={[{ value: "current", label: "current" }, { value: "agentId", label: "agent id" }, { value: "url", label: "URL" }]}
+/>
                 </label>
                 {routeMode !== "current" ? (
                   <label className="text-sm">
                     Value
-                    <input
-                      className="mt-1 w-40 rounded border border-border bg-background p-1"
+                    <Input
+  label="Target value"
+  className="qsk-field"
                       data-testid="wake-route-target-value"
                       placeholder={routeMode === "agentId" ? "agent id" : "session key"}
                       value={routeValue}
-                      onChange={(e) => setRouteValue(e.target.value)}
+                      onChange={(value) => setRouteValue(value)}
                     />
                   </label>
                 ) : null}
-                <button
-                  type="button"
-                  className="rounded border border-border px-3 py-1 text-xs"
+                <Button variant="secondary"
                   data-testid="wake-route-add"
                   disabled={
                     busy ||
@@ -1267,40 +1233,39 @@ export default function VoiceEditPage() {
                   }}
                 >
                   Add route
-                </button>
+                </Button>
               </div>
             </div>
             <label className="mt-2 flex items-center gap-2 text-sm">
               Brain routing (local model decides ambiguous commands)
-              <input
-                type="checkbox"
-                data-testid="voice-edit-brain"
-                checked={settings.brain_router !== false}
-                onChange={(e) => void update({ brain_router: e.target.checked })}
-              />
+              <Checkbox
+  label="Brain"
+  data-testid="voice-edit-brain"
+  checked={settings.brain_router !== false}
+  onChange={(checked) => void update({ brain_router: checked })}
+/>
             </label>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 Insertion method
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  value={settings.insertion_method}
-                  onChange={(e) => void update({ insertion_method: e.target.value })}
-                >
-                  <option value="clipboard_paste">clipboard paste</option>
-                  <option value="typed">simulated typing</option>
-                </select>
+                <Select
+  label="Insertion method"
+  value={settings.insertion_method}
+  onChange={(value) => void update({ insertion_method: value })}
+  options={[{ value: "clipboard_paste", label: "clipboard paste" }, { value: "typed", label: "simulated typing" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   How dictated text is placed into the focused app.
                 </span>
               </label>
               <label className="text-sm">
                 Local profile
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="Local profile"
+  className="qsk-field"
                   data-testid="voice-edit-local-profile"
                   value={settings.local_profile}
-                  onChange={(e) => void update({ local_profile: e.target.value })}
+                  onChange={(value) => void update({ local_profile: value })}
                 />
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Named local brain profile used for on-machine work.
@@ -1308,14 +1273,12 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Hotkey mode
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  value={settings.hotkey_mode ?? "hold"}
-                  onChange={(e) => void update({ hotkey_mode: e.target.value })}
-                >
-                  <option value="hold">hold Right-Ctrl</option>
-                  <option value="toggle">toggle Right-Ctrl</option>
-                </select>
+                <Select
+  label="Hotkey mode"
+  value={settings.hotkey_mode ?? "hold"}
+  onChange={(value) => void update({ hotkey_mode: value })}
+  options={[{ value: "hold", label: "hold Right-Ctrl" }, { value: "toggle", label: "toggle Right-Ctrl" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Hold to talk, or press once to start and stop. Takes effect
                   after the helper restarts.
@@ -1323,15 +1286,13 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Command router
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-router"
-                  value={settings.router ?? "deterministic"}
-                  onChange={(e) => void update({ router: e.target.value })}
-                >
-                  <option value="deterministic">Deterministic</option>
-                  <option value="brain">Brain (local model)</option>
-                </select>
+                <Select
+  label="Router"
+  data-testid="voice-edit-router"
+  value={settings.router ?? "deterministic"}
+  onChange={(value) => void update({ router: value })}
+  options={[{ value: "deterministic", label: "Deterministic" }, { value: "brain", label: "Brain (local model)" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Brain uses the local model only to disambiguate an uncertain
                   command; it never bypasses confirmation or e-stop.
@@ -1340,51 +1301,49 @@ export default function VoiceEditPage() {
             </div>
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-confirm"
-                  checked={settings.confirm_before_replace}
-                  onChange={(e) => void update({ confirm_before_replace: e.target.checked })}
-                />
+                <Checkbox
+  label="Confirm"
+  data-testid="voice-edit-confirm"
+  checked={settings.confirm_before_replace}
+  onChange={(checked) => void update({ confirm_before_replace: checked })}
+/>
                 Confirm before replacing selected text
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={settings.auto_send}
-                  onChange={(e) => void update({ auto_send: e.target.checked })}
-                />
+                <Checkbox
+  label="Option"
+  checked={settings.auto_send}
+  onChange={(checked) => void update({ auto_send: checked })}
+/>
                 Auto-send after dictation (never presses Enter unless enabled)
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-block-fullscreen"
-                  checked={settings.block_fullscreen !== false}
-                  onChange={(e) =>
-                    void update({ block_fullscreen: e.target.checked })
-                  }
-                />
+                <Checkbox
+  label="Block fullscreen"
+  data-testid="voice-edit-block-fullscreen"
+  checked={settings.block_fullscreen !== false}
+  onChange={(checked) =>
+                    void update({ block_fullscreen: checked })}
+/>
                 Never type into a full-screen app (games/video)
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-beep"
-                  checked={settings.beep !== false}
-                  onChange={(e) => void update({ beep: e.target.checked })}
-                />
+                <Checkbox
+  label="Beep"
+  data-testid="voice-edit-beep"
+  checked={settings.beep !== false}
+  onChange={(checked) => void update({ beep: checked })}
+/>
                 Beep when it hears the wake word / is ready
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-noise"
-                  checked={settings.noise_suppression === true}
-                  onChange={(e) =>
-                    void update({ noise_suppression: e.target.checked })
-                  }
-                />
+                <Checkbox
+  label="Noise"
+  data-testid="voice-edit-noise"
+  checked={settings.noise_suppression === true}
+  onChange={(checked) =>
+                    void update({ noise_suppression: checked })}
+/>
                 Noise suppression (applies on next helper start)
               </label>
             </div>
@@ -1398,19 +1357,16 @@ export default function VoiceEditPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 Session grouping
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-session-mode"
-                  value={sessionMode}
-                  onChange={(e) =>
+                <Select
+  label="Session mode"
+  data-testid="voice-session-mode"
+  value={sessionMode}
+  onChange={(value) =>
                     setSessionMode(
-                      e.target.value === "per_command" ? "per_command" : "single",
-                    )
-                  }
-                >
-                  <option value="single">Single (one shared voice-chat conversation)</option>
-                  <option value="per_command">One session per command</option>
-                </select>
+                      value === "per_command" ? "per_command" : "single",
+                    )}
+  options={[{ value: "single", label: "Single (one shared voice-chat conversation)" }, { value: "per_command", label: "One session per command" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {sessionMode === "per_command"
                     ? "Every command is fully isolated in its own session."
@@ -1467,15 +1423,13 @@ export default function VoiceEditPage() {
                 </span>
               </label>
             </div>
-            <button
-              type="button"
-              className="mt-2 rounded border border-border px-3 py-1 text-xs"
+            <Button variant="secondary"
               data-testid="voice-session-save"
               disabled={busy}
               onClick={() => void saveVoiceSessions()}
             >
               Save voice session settings
-            </button>
+            </Button>
             <p className="mt-1 text-xs text-muted-foreground">
               Pruning runs automatically on the voice path; the live
               voice-chat session is never reclaimed.
@@ -1488,12 +1442,12 @@ export default function VoiceEditPage() {
             intro="After an answer, keep the mic armed for a short follow-up window so a second command needs no fresh wake phrase."
           >
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                data-testid="continuous-mode"
-                checked={continuousMode}
-                onChange={(e) => void update({ continuous_mode: e.target.checked })}
-              />
+              <Checkbox
+  label="Continuous mode"
+  data-testid="continuous-mode"
+  checked={continuousMode}
+  onChange={(checked) => void update({ continuous_mode: checked })}
+/>
               Keep listening for a follow-up after each turn
             </label>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -1530,15 +1484,13 @@ export default function VoiceEditPage() {
                 </span>
               </label>
             </div>
-            <button
-              type="button"
-              className="mt-2 rounded border border-border px-3 py-1 text-xs"
+            <Button variant="secondary"
               data-testid="continuous-save"
               disabled={busy}
               onClick={() => void saveContinuous()}
             >
               Save continuous listening
-            </button>
+            </Button>
           </Section>
 
           <section
@@ -1567,9 +1519,7 @@ export default function VoiceEditPage() {
                     >
                       <code className="rounded bg-muted px-1">{app}</code>
                       <span className="text-muted-foreground">→ {action}</span>
-                      <button
-                        type="button"
-                        className="rounded border border-border px-2 py-0.5 text-xs"
+                      <Button variant="secondary"
                         data-testid={`voice-edit-per-app-delete-${app}`}
                         disabled={busy}
                         onClick={() =>
@@ -1580,7 +1530,7 @@ export default function VoiceEditPage() {
                         }
                       >
                         Delete
-                      </button>
+                      </Button>
                     </li>
                   ))}
               </ul>
@@ -1588,32 +1538,26 @@ export default function VoiceEditPage() {
             <div className="flex flex-wrap items-end gap-2">
               <label className="text-sm">
                 App class
-                <input
-                  className="mt-1 w-40 rounded border border-border bg-background p-1"
+                <Input
+  label="Application"
+  className="qsk-field"
                   data-testid="voice-edit-per-app-new-app"
                   placeholder="e.g. firefox"
                   value={newApp}
-                  onChange={(e) => setNewApp(e.target.value)}
+                  onChange={(value) => setNewApp(value)}
                 />
               </label>
               <label className="text-sm">
                 Action
-                <select
-                  className="mt-1 rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-per-app-new-action"
-                  value={newAction}
-                  onChange={(e) => setNewAction(e.target.value)}
-                >
-                  {VOICE_EDIT_ACTIONS.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
+                <Select
+  label="Action"
+  data-testid="voice-edit-per-app-new-action"
+  value={newAction}
+  onChange={(value) => setNewAction(value)}
+  options={VOICE_EDIT_ACTIONS.map((a) => ({ value: a, label: a }))}
+/>
               </label>
-              <button
-                type="button"
-                className="rounded border border-border px-3 py-1 text-xs"
+              <Button variant="secondary"
                 data-testid="voice-edit-per-app-add"
                 disabled={busy || !newApp.trim()}
                 onClick={() => {
@@ -1627,16 +1571,14 @@ export default function VoiceEditPage() {
                 }}
               >
                 Add pin
-              </button>
-              <button
-                type="button"
-                className="rounded border border-border px-3 py-1 text-xs"
+              </Button>
+              <Button variant="secondary"
                 data-testid="voice-edit-per-app-clear"
                 disabled={busy}
                 onClick={() => void update({ per_app: {} }, "cleared all per-app pins")}
               >
                 Clear all
-              </button>
+              </Button>
             </div>
           </section>
 
@@ -1648,15 +1590,13 @@ export default function VoiceEditPage() {
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 Speech engine
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-stt-mode"
-                  value={settings.stt_mode ?? "accurate"}
-                  onChange={(e) => void update({ stt_mode: e.target.value })}
-                >
-                  <option value="accurate">Accurate (whole-utterance, best quality)</option>
-                  <option value="streaming">Streaming (live interim)</option>
-                </select>
+                <Select
+  label="STT mode"
+  data-testid="voice-edit-stt-mode"
+  value={settings.stt_mode ?? "accurate"}
+  onChange={(value) => void update({ stt_mode: value })}
+  options={[{ value: "accurate", label: "Accurate (whole-utterance, best quality)" }, { value: "streaming", label: "Streaming (live interim)" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {sttMode === "streaming"
                     ? "Streaming decodes live partials through the streaming engine."
@@ -1665,18 +1605,13 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Accurate model (faster-whisper)
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-stt-model"
-                  value={settings.stt_model ?? "small"}
-                  onChange={(e) => void update({ stt_model: e.target.value })}
-                >
-                  <option value="tiny">tiny ≈ 0.1 GB RAM/VRAM</option>
-                  <option value="base">base ≈ 0.2 GB RAM/VRAM</option>
-                  <option value="small">small ≈ 0.5 GB RAM/VRAM</option>
-                  <option value="medium">medium ≈ 1.5 GB RAM/VRAM</option>
-                  <option value="large-v3">large-v3 ≈ 3.1 GB RAM/VRAM</option>
-                </select>
+                <Select
+  label="STT model"
+  data-testid="voice-edit-stt-model"
+  value={settings.stt_model ?? "small"}
+  onChange={(value) => void update({ stt_model: value })}
+  options={[{ value: "tiny", label: "tiny ≈ 0.1 GB RAM/VRAM" }, { value: "base", label: "base ≈ 0.2 GB RAM/VRAM" }, { value: "small", label: "small ≈ 0.5 GB RAM/VRAM" }, { value: "medium", label: "medium ≈ 1.5 GB RAM/VRAM" }, { value: "large-v3", label: "large-v3 ≈ 3.1 GB RAM/VRAM" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {sttMode === "streaming"
                     ? "Not used while Streaming is selected; used when Accurate is chosen."
@@ -1685,11 +1620,12 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Microphone / audio source
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="Audio device"
+  className="qsk-field"
                   placeholder="system default"
                   value={settings.asr_device ?? ""}
-                  onChange={(e) => void update({ asr_device: e.target.value })}
+                  onChange={(value) => void update({ asr_device: value })}
                 />
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   PulseAudio/PipeWire source name; blank uses the system default.
@@ -1697,16 +1633,13 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Capture source
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-capture-source"
-                  value={captureSource}
-                  onChange={(e) => void update({ capture_source: e.target.value })}
-                >
-                  <option value="auto">Auto (default source)</option>
-                  <option value="raw">Raw device input</option>
-                  <option value="aec">Echo cancellation</option>
-                </select>
+                <Select
+  label="Capture source"
+  data-testid="voice-edit-capture-source"
+  value={captureSource}
+  onChange={(value) => void update({ capture_source: value })}
+  options={[{ value: "auto", label: "Auto (default source)" }, { value: "raw", label: "Raw device input" }, { value: "aec", label: "Echo cancellation" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   {CAPTURE_SOURCE_HELP[captureSource] ?? CAPTURE_SOURCE_HELP.auto}
                 </span>
@@ -1714,23 +1647,22 @@ export default function VoiceEditPage() {
             </div>
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-verbatim"
-                  checked={Boolean(settings.verbatim_transcript)}
-                  onChange={(e) =>
-                    void update({ verbatim_transcript: e.target.checked })
-                  }
-                />
+                <Checkbox
+  label="Verbatim"
+  data-testid="voice-edit-verbatim"
+  checked={Boolean(settings.verbatim_transcript)}
+  onChange={(checked) =>
+                    void update({ verbatim_transcript: checked })}
+/>
                 Verbatim transcripts (lowercase, no punctuation — exactly what was heard)
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-agc"
-                  checked={Boolean(settings.agc)}
-                  onChange={(e) => void update({ agc: e.target.checked })}
-                />
+                <Checkbox
+  label="Agc"
+  data-testid="voice-edit-agc"
+  checked={Boolean(settings.agc)}
+  onChange={(checked) => void update({ agc: checked })}
+/>
                 Automatic gain control (level out quiet and loud speech)
               </label>
               <label className="flex items-center gap-2">
@@ -1789,14 +1721,15 @@ export default function VoiceEditPage() {
               />
               <label className="text-sm">
                 Detail cues
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="Detail cues"
+  className="qsk-field"
                   data-testid="voice-edit-detail-cues"
                   placeholder="more detail, explain further"
                   value={detailCues}
-                  onChange={(e) => setDetailCues(e.target.value)}
+                  onChange={(value) => setDetailCues(value)}
                   onBlur={() => void update({ detail_cues: splitCues(detailCues) })}
-                  onKeyDown={(e) => {
+                  onKeyDown={(value) => {
                     if (e.key === "Enter") {
                       void update({ detail_cues: splitCues(detailCues) });
                     }
@@ -1827,17 +1760,14 @@ export default function VoiceEditPage() {
               <label className="text-sm">
                 Temperature
                 <div className="mt-1 flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    className="flex-1"
+                  <Slider
+                    label="Temperature"
+                    min={0}
+                    max={2}
+                    step={0.1}
                     data-testid="voice-edit-local-temperature"
                     value={settings.local_temperature ?? 0.7}
-                    onChange={(e) =>
-                      void update({ local_temperature: Number(e.target.value) })
-                    }
+                    onChange={(value) => void update({ local_temperature: value })}
                   />
                   <span className="w-10 text-right text-xs text-muted-foreground">
                     {(settings.local_temperature ?? 0.7).toFixed(1)}
@@ -1849,16 +1779,13 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Routing
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-routing"
-                  value={settings.routing}
-                  onChange={(e) => void update({ routing: e.target.value })}
-                >
-                  <option value="local">Local-first</option>
-                  <option value="auto">Auto</option>
-                  <option value="api">API only</option>
-                </select>
+                <Select
+  label="Routing"
+  data-testid="voice-edit-routing"
+  value={settings.routing}
+  onChange={(value) => void update({ routing: value })}
+  options={[{ value: "local", label: "Local-first" }, { value: "auto", label: "Auto" }, { value: "api", label: "API only" }]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Local-first keeps answers on this machine; API only uses your API
                   profile; Auto chooses per request.
@@ -1866,11 +1793,12 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 API profile
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="API profile"
+  className="qsk-field"
                   data-testid="voice-edit-api-profile"
                   value={settings.api_profile}
-                  onChange={(e) => void update({ api_profile: e.target.value })}
+                  onChange={(value) => void update({ api_profile: value })}
                 />
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Named provider profile used when routing to the API.
@@ -1879,21 +1807,21 @@ export default function VoiceEditPage() {
             </div>
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-allow-api"
-                  checked={settings.allow_api}
-                  onChange={(e) => void update({ allow_api: e.target.checked })}
-                />
+                <Checkbox
+  label="Allow api"
+  data-testid="voice-edit-allow-api"
+  checked={settings.allow_api}
+  onChange={(checked) => void update({ allow_api: checked })}
+/>
                 Allow API transformations (may send text off this machine)
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-local-think"
-                  checked={Boolean(settings.local_think)}
-                  onChange={(e) => void update({ local_think: e.target.checked })}
-                />
+                <Checkbox
+  label="Local think"
+  data-testid="voice-edit-local-think"
+  checked={Boolean(settings.local_think)}
+  onChange={(checked) => void update({ local_think: checked })}
+/>
                 Let the local model “think” before answering (slower, more careful)
               </label>
             </div>
@@ -1905,29 +1833,24 @@ export default function VoiceEditPage() {
             intro="Spoken answers use a text-to-speech provider. Pick one that fits your machine and privacy needs."
           >
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                data-testid="voice-edit-speak-answers"
-                checked={Boolean(settings.speak_answers)}
-                onChange={(e) => void update({ speak_answers: e.target.checked })}
-              />
+              <Checkbox
+  label="Speak answers"
+  data-testid="voice-edit-speak-answers"
+  checked={Boolean(settings.speak_answers)}
+  onChange={(checked) => void update({ speak_answers: checked })}
+/>
               Speak answers aloud instead of only showing them
             </label>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-sm">
                 Voice provider
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-tts-provider"
-                  value={ttsProvider}
-                  onChange={(e) => void update({ tts_provider: e.target.value })}
-                >
-                  <option value="piper">piper — fast, local</option>
-                  <option value="kokoro">kokoro — natural, slower, local</option>
-                  <option value="edge">edge — natural, fast, needs internet</option>
-                  <option value="hybrid">hybrid — local first, API fallback</option>
-                  <option value="openai">openai — cloud voices</option>
-                </select>
+                <Select
+  label="TTS provider"
+  data-testid="voice-edit-tts-provider"
+  value={ttsProvider}
+  onChange={(value) => void update({ tts_provider: value })}
+  options={[{ value: "piper", label: "piper — fast, local" }, { value: "kokoro", label: "kokoro — natural, slower, local" }, { value: "edge", label: "edge — natural, fast, needs internet" }, { value: "hybrid", label: "hybrid — local first, API fallback" }, { value: "openai", label: "openai — cloud voices" }]}
+/>
                 <span
                   className="mt-0.5 block text-xs text-muted-foreground"
                   data-testid="voice-edit-tts-provider-help"
@@ -1937,12 +1860,13 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Voice
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="TTS voice"
+  className="qsk-field"
                   data-testid="voice-edit-tts-voice"
                   placeholder="en_US-amy-medium"
                   value={settings.tts_voice ?? ""}
-                  onChange={(e) => void update({ tts_voice: e.target.value })}
+                  onChange={(value) => void update({ tts_voice: value })}
                 />
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Provider-specific voice name; blank uses the provider default.
@@ -1979,30 +1903,30 @@ export default function VoiceEditPage() {
             intro="Control the on-screen panel and local debugging. Nothing here is sent anywhere."
           >
             <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                data-testid="voice-edit-history-panel"
-                checked={Boolean(settings.history_panel)}
-                onChange={(e) => void update({ history_panel: e.target.checked })}
-              />
+              <Checkbox
+  label="History panel"
+  data-testid="voice-edit-history-panel"
+  checked={Boolean(settings.history_panel)}
+  onChange={(checked) => void update({ history_panel: checked })}
+/>
               Show the on-screen voice history panel
             </label>
             <label className="mt-2 flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                data-testid="voice-edit-waveform-ingame"
-                checked={settings.waveform_ingame === true}
-                onChange={(e) => void update({ waveform_ingame: e.target.checked })}
-              />
+              <Checkbox
+  label="Waveform ingame"
+  data-testid="voice-edit-waveform-ingame"
+  checked={settings.waveform_ingame === true}
+  onChange={(checked) => void update({ waveform_ingame: checked })}
+/>
               Show orb over fullscreen games
             </label>
             <label className="mt-2 flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                data-testid="voice-edit-debug-log"
-                checked={Boolean(settings.debug_log)}
-                onChange={(e) => void update({ debug_log: e.target.checked })}
-              />
+              <Checkbox
+  label="Debug log"
+  data-testid="voice-edit-debug-log"
+  checked={Boolean(settings.debug_log)}
+  onChange={(checked) => void update({ debug_log: checked })}
+/>
               Record full spoken transcripts in the log (local, for debugging)
             </label>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -2107,14 +2031,15 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 STT engine override
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="STT engine"
+  className="qsk-field"
                   data-testid="voice-edit-stt_engine"
                   placeholder="blank = configured default"
                   value={sttEngine}
-                  onChange={(e) => setSttEngine(e.target.value)}
+                  onChange={(value) => setSttEngine(value)}
                   onBlur={() => void update({ stt_engine: sttEngine })}
-                  onKeyDown={(e) => {
+                  onKeyDown={(value) => {
                     if (e.key === "Enter") {
                       void update({ stt_engine: sttEngine });
                     }
@@ -2126,35 +2051,28 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Default action
-                <select
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
-                  data-testid="voice-edit-default_prompt"
-                  value={settings.default_prompt ?? ""}
-                  onChange={(e) => void update({ default_prompt: e.target.value })}
-                >
-                  {!(settings.default_prompt ?? "") ? (
-                    <option value="">—</option>
-                  ) : null}
-                  {VOICE_EDIT_ACTIONS.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
+                <Select
+  label="Default prompt"
+  data-testid="voice-edit-default_prompt"
+  value={settings.default_prompt ?? ""}
+  onChange={(value) => void update({ default_prompt: value })}
+  options={[{ value: "", label: "—" }, ...VOICE_EDIT_ACTIONS.map((a) => ({ value: a, label: a }))]}
+/>
                 <span className="mt-0.5 block text-xs text-muted-foreground">
                   Fallback action when no command is recognized.
                 </span>
               </label>
               <label className="text-sm">
                 Helper service URL
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="Service URL"
+  className="qsk-field"
                   data-testid="voice-edit-service-url"
                   placeholder="blank = built-in default"
                   value={serviceUrl}
-                  onChange={(e) => setServiceUrl(e.target.value)}
+                  onChange={(value) => setServiceUrl(value)}
                   onBlur={() => void update({ service_url: serviceUrl })}
-                  onKeyDown={(e) => {
+                  onKeyDown={(value) => {
                     if (e.key === "Enter") {
                       void update({ service_url: serviceUrl });
                     }
@@ -2167,14 +2085,15 @@ export default function VoiceEditPage() {
               </label>
               <label className="text-sm">
                 Helper STT socket URL
-                <input
-                  className="mt-1 w-full rounded border border-border bg-background p-1"
+                <Input
+  label="STT WebSocket URL"
+  className="qsk-field"
                   data-testid="voice-edit-stt-ws-url"
                   placeholder="blank = built-in default"
                   value={sttWsUrl}
-                  onChange={(e) => setSttWsUrl(e.target.value)}
+                  onChange={(value) => setSttWsUrl(value)}
                   onBlur={() => void update({ stt_ws_url: sttWsUrl })}
-                  onKeyDown={(e) => {
+                  onKeyDown={(value) => {
                     if (e.key === "Enter") {
                       void update({ stt_ws_url: sttWsUrl });
                     }
@@ -2188,25 +2107,23 @@ export default function VoiceEditPage() {
             </div>
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-disable_key_repeat"
-                  checked={Boolean(settings.disable_key_repeat)}
-                  onChange={(e) =>
-                    void update({ disable_key_repeat: e.target.checked })
-                  }
-                />
+                <Checkbox
+  label="Disable key repeat"
+  data-testid="voice-edit-disable_key_repeat"
+  checked={Boolean(settings.disable_key_repeat)}
+  onChange={(checked) =>
+                    void update({ disable_key_repeat: checked })}
+/>
                 Ignore OS key-repeat while Right-Ctrl is held
               </label>
               <label className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  data-testid="voice-edit-text_commands"
-                  checked={Boolean(settings.text_commands)}
-                  onChange={(e) =>
-                    void update({ text_commands: e.target.checked })
-                  }
-                />
+                <Checkbox
+  label="Text commands"
+  data-testid="voice-edit-text_commands"
+  checked={Boolean(settings.text_commands)}
+  onChange={(checked) =>
+                    void update({ text_commands: checked })}
+/>
                 Treat bare speech without a selection as dictation
               </label>
             </div>
@@ -2225,16 +2142,12 @@ export default function VoiceEditPage() {
                       ) : null}
                     </span>
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="rounded border border-border px-2 py-0.5 text-xs"
+                      <Button variant="secondary"
                         onClick={() => setPrompt(row)}
                       >
                         {editing === row.action ? "Close" : "Edit copy"}
-                      </button>
-                      <button
-                        type="button"
-                        className="rounded border border-border px-2 py-0.5 text-xs"
+                      </Button>
+                      <Button variant="secondary"
                         disabled={!row.customized}
                         onClick={async () => {
                           await voiceEdit.restore(row.action);
@@ -2243,7 +2156,7 @@ export default function VoiceEditPage() {
                         }}
                       >
                         Restore default
-                      </button>
+                      </Button>
                     </div>
                   </div>
                   {editing === row.action ? (
@@ -2254,24 +2167,21 @@ export default function VoiceEditPage() {
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                       />
-                      <button
-                        type="button"
+                      <Button variant="secondary"
                         className="mt-2 rounded bg-primary px-3 py-1 text-xs text-primary-foreground"
                         onClick={() =>
                           void update({ prompts: { [row.action]: draft } }, "prompt saved")
                         }
                       >
                         Save personal copy
-                      </button>
+                      </Button>
                     </div>
                   ) : null}
                 </li>
               ))}
             </ul>
             <div className="mt-3">
-              <button
-                type="button"
-                className="rounded border border-border px-3 py-1 text-xs"
+              <Button variant="secondary"
                 disabled={busy}
                 onClick={async () => {
                   setBusy(true);
@@ -2288,7 +2198,7 @@ export default function VoiceEditPage() {
                 }}
               >
                 Restore all defaults
-              </button>
+              </Button>
             </div>
           </section>
 
@@ -2319,22 +2229,22 @@ export default function VoiceEditPage() {
             </label>
             <label className="mt-2 block text-sm">
               Spoken command
-              <input
-                className="mt-1 w-full rounded border border-border bg-background p-2 text-sm"
+              <Input
+  label="Command"
+  className="qsk-field"
                 data-testid="voice-edit-command-input"
                 value={command}
-                onChange={(e) => setCommand(e.target.value)}
+                onChange={(value) => setCommand(value)}
               />
             </label>
-            <button
-              type="button"
+            <Button variant="secondary"
               className="mt-2 rounded bg-primary px-3 py-1 text-sm text-primary-foreground disabled:opacity-50"
               data-testid="voice-edit-run"
               disabled={busy}
               onClick={() => void runPreview()}
             >
               Capture selection &amp; preview
-            </button>
+            </Button>
             {preview ? (
               <div className="mt-3">
                 <VoiceEditPreview
@@ -2376,13 +2286,11 @@ export default function VoiceEditPage() {
                     {logErrors} errors
                   </span>
                 </span>
-                <button
-                  type="button"
-                  className="rounded border border-border px-2 py-0.5 text-xs"
+                <Button variant="secondary"
                   onClick={() => void copyTextToClipboard(JSON.stringify(logEvents, null, 2))}
                 >
                   Copy log
-                </button>
+                </Button>
               </div>
             </div>
             <p className="mb-2 text-xs text-muted-foreground">
@@ -2421,19 +2329,15 @@ export default function VoiceEditPage() {
           <section className="rounded-lg border border-border p-4">
             <h2 className="mb-3 text-sm font-semibold">Export / import</h2>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded border border-border px-3 py-1 text-xs"
+              <Button variant="secondary"
                 onClick={async () => {
                   const out = await voiceEdit.exportSettings();
                   setImportJson(JSON.stringify(out.export, null, 2));
                 }}
               >
                 Export settings
-              </button>
-              <button
-                type="button"
-                className="rounded border border-border px-3 py-1 text-xs"
+              </Button>
+              <Button variant="secondary"
                 disabled={!importJson.trim()}
                 onClick={async () => {
                   try {
@@ -2448,7 +2352,7 @@ export default function VoiceEditPage() {
                 }}
               >
                 Import settings
-              </button>
+              </Button>
             </div>
             <textarea
               className="mt-2 h-32 w-full rounded border border-border bg-background p-2 font-mono text-xs"
