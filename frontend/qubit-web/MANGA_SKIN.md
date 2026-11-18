@@ -125,6 +125,12 @@ proxying the live `:8890` backend, with the real session token). Checked at 1440
 suite runs together; the originating test passes alone and no assertion fails. It is not caused
 by this change.
 
+Hosted GitHub Actions jobs on this repository currently fail before starting (1–4 s, zero steps,
+no logs) because of the known account/billing startup block recorded in `docs/STATUS.md`; that is
+infrastructure, not this branch. The repo-local blob-size gate also flags a pre-existing Habblaud
+bundle already on the branch (`frontend/qubit-app/plugins/qubit-office/habblaud/bundle/app-D_Gc15aD.js`,
+682 KiB). Every screenshot added here is under 200 KiB.
+
 ### Route coverage
 
 **Verified** = opened with the skin ON and OFF/eligible marker checks, screenshot captured.
