@@ -2,7 +2,7 @@ import type { ComponentProps, ReactNode } from 'react'
 import { createContext, useContext } from 'react'
 
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Skeleton } from '@/components/ui/skeleton'
 import { triggerHaptic } from '@/lib/haptics'
 import type { IconComponent } from '@/lib/icons'

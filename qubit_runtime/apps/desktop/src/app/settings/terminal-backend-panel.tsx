@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import type { ProfileScope } from '@/api/client'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { getTerminalBackends, selectTerminalBackend } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { AlertTriangle, Check, Loader2, RefreshCw } from '@/lib/icons'
@@ -140,7 +140,7 @@ export function TerminalBackendPanel({ onConfiguredChange, profile }: TerminalBa
       </div>
       <div className="grid gap-1">
         {data.backends.map(backend => (
-          <button
+          <Button variant="secondary"
             aria-pressed={backend.active}
             className={cn(
               'grid gap-0.5 rounded-lg border px-2.5 py-2 text-left transition',
@@ -172,7 +172,7 @@ export function TerminalBackendPanel({ onConfiguredChange, profile }: TerminalBa
                 {backend.active && ` ${copy.needsSetupHint}`}
               </span>
             )}
-          </button>
+          </Button>
         ))}
       </div>
     </div>

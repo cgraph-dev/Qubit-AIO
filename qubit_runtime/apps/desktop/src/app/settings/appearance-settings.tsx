@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
@@ -294,7 +295,7 @@ function MarketplaceThemeResults({
           const done = installs.has(item.extensionId)
 
           return (
-            <button
+            <Button variant="secondary"
               className={cn(
                 'flex items-center gap-2.5 px-2.5 py-2 text-left disabled:opacity-60',
                 selectableCardClass({ prominent: done })
@@ -323,7 +324,7 @@ function MarketplaceThemeResults({
                   <Download className="size-4" />
                 )}
               </span>
-            </button>
+            </Button>
           )
         })}
       </div>
@@ -611,7 +612,7 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
 
                           return (
                             <div className="group relative" key={theme.name}>
-                              <button
+                              <Button variant="secondary"
                                 className={cn('w-full p-2 text-left', selectableCardClass({ active, prominent: true }))}
                                 onClick={() => {
                                   triggerHaptic('crisp')
@@ -628,9 +629,9 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
                                     {theme.description}
                                   </div>
                                 </div>
-                              </button>
+                              </Button>
                               {removable && (
-                                <button
+                                <Button variant="secondary"
                                   aria-label={a.removeTheme}
                                   className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-md bg-(--ui-bg-elevated)/80 text-(--ui-text-tertiary) opacity-0 backdrop-blur-sm transition hover:text-(--ui-red) focus-visible:opacity-100 group-hover:opacity-100"
                                   onClick={() => {
@@ -645,7 +646,7 @@ export function AppearanceSettings({ subpage }: AppearanceSettingsProps = {}) {
                                   type="button"
                                 >
                                   <Trash2 className="size-3.5" />
-                                </button>
+                                </Button>
                               )}
                             </div>
                           )

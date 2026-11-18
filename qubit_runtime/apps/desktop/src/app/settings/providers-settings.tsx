@@ -13,7 +13,7 @@ import {
   providerTitle,
   sortProviders
 } from '@/components/onboarding'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { RowButton } from '@/components/ui/row-button'
 import { SearchField } from '@/components/ui/search-field'
 import { Tip } from '@/components/ui/tooltip'

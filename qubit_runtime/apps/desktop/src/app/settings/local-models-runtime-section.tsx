@@ -1,7 +1,7 @@
 import { useIsMutating } from '@tanstack/react-query'
 import { type ReactElement, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { CheckCircle2, Download, Loader2, Pause, StopFilled, Zap } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import { localModelsKey, runningRuntimeInstall, startLocalRuntimeInstall } from '@/store/local-runtime-jobs'

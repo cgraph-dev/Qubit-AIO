@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useEffect } from 'react'
 
@@ -26,7 +27,7 @@ export function settingsScopeLabel(profile: Pick<ProfileInfo, 'bot_title' | 'dis
 // chip is a concrete profile whose config the page edits.
 export function ScopeChip({ active, label, onSelect }: { active: boolean; label: string; onSelect: () => void }) {
   return (
-    <button
+    <Button variant="secondary"
       className={cn(
         'rounded-full border px-3 py-1 text-[length:var(--conversation-caption-font-size)] transition',
         active
@@ -37,7 +38,7 @@ export function ScopeChip({ active, label, onSelect }: { active: boolean; label:
       type="button"
     >
       {label}
-    </button>
+    </Button>
   )
 }
 

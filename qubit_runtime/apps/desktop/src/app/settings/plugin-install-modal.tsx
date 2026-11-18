@@ -4,8 +4,7 @@ import { useLocation, useNavigate } from 'react-router'
 
 import { useGatewayRequest } from '@/app/gateway/hooks/use-gateway-request'
 import { NEW_CHAT_ROUTE, SETTINGS_ROUTE } from '@/app/routes'
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Button, Toggle, Checkbox } from '@/sakuga/ui'
 import {
   Dialog,
   DialogContent,
@@ -17,7 +16,6 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Switch } from '@/components/ui/switch'
 import { discoverRuntimePlugins } from '@/contrib/runtime-loader'
 import { useI18n } from '@/i18n'
 import { ExternalLink } from '@/lib/external-link'
@@ -463,9 +461,10 @@ export function PluginInstallModal() {
                   <div className="space-y-2 rounded-lg border border-(--ui-stroke-tertiary) px-3 py-2">
                     <label className="flex items-start gap-3">
                       <Checkbox
+                        aria-label={m.agentLabel}
                         checked={installAgent}
                         disabled={busy}
-                        onCheckedChange={value => setInstallAgent(value === true)}
+                        onChange={value => setInstallAgent(value === true)}
                       />
                       <span className="min-w-0">
                         <span className="block font-medium text-foreground">{m.agentLabel}</span>
@@ -498,9 +497,10 @@ export function PluginInstallModal() {
                 {probe.desktop && (
                   <label className="flex items-start gap-3 rounded-lg border border-(--ui-stroke-tertiary) px-3 py-2">
                     <Checkbox
+                      aria-label={m.desktopLabel}
                       checked={installDesktop}
                       disabled={busy}
-                      onCheckedChange={value => setInstallDesktop(value === true)}
+                      onChange={value => setInstallDesktop(value === true)}
                     />
                     <span className="min-w-0">
                       <span className="block font-medium text-foreground">{m.desktopLabel}</span>
@@ -537,7 +537,9 @@ export function PluginInstallModal() {
                     <span className="text-[length:var(--conversation-caption-font-size)] text-foreground">
                       {m.enableAgent}
                     </span>
-                    <Switch checked={enableAgent} disabled={busy || !installAgent} onCheckedChange={setEnableAgent} />
+                    <Toggle checked={enableAgent} disabled={busy || !installAgent} onChange={setEnableAgent}
+          label={m.enableAgent}
+        />
                   </label>
                 )}
 
@@ -546,7 +548,9 @@ export function PluginInstallModal() {
                     <span className="text-[length:var(--conversation-caption-font-size)] text-foreground">
                       {m.forceReinstall}
                     </span>
-                    <Switch checked={forceReinstall} disabled={busy} onCheckedChange={setForceReinstall} />
+                    <Toggle checked={forceReinstall} disabled={busy} onChange={setForceReinstall}
+          label={m.forceReinstall}
+        />
                   </label>
                 )}
 

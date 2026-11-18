@@ -3,11 +3,10 @@ import { DEFAULT_REASONING_EFFORT, isReasoningEffort, REASONING_EFFORT_VALUES } 
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import {  Button, Toggle } from '@/sakuga/ui'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Switch } from '@/components/ui/switch'
 import {
   getAuxiliaryModels,
   getGlobalModelInfo,
@@ -1045,12 +1044,12 @@ export function ModelSettings({ onMainModelChanged, scopeProfile, subpage }: Mod
               {fastSupported && (
                 <label className="flex items-center gap-2 text-xs">
                   {t.shell.modelOptions.fast}
-                  <Switch
+                  <Toggle
                     checked={fastOn}
-                    onCheckedChange={checked =>
+                    label={t.shell.modelOptions.fast}
+                    onChange={checked =>
                       void writeAgentDefault('agent.service_tier', checked ? 'fast' : 'normal')
                     }
-                    size="xs"
                   />
                 </label>
               )}
@@ -1251,11 +1250,11 @@ export function ModelSettings({ onMainModelChanged, scopeProfile, subpage }: Mod
             </Select>
             <label className="flex items-center gap-2 rounded-sm border border-border px-2 py-1 text-xs">
               {m.moaEnabled}
-              <Switch
+              <Toggle
                 checked={currentMoaPreset.enabled !== false}
                 disabled={applying}
-                onCheckedChange={checked => updateMoaPreset(prev => ({ ...prev, enabled: checked }))}
-                size="xs"
+                label={m.moaEnabled}
+                onChange={checked => updateMoaPreset(prev => ({ ...prev, enabled: checked }))}
               />
             </label>
             <Button
@@ -1335,11 +1334,12 @@ export function ModelSettings({ onMainModelChanged, scopeProfile, subpage }: Mod
             {currentMoaPreset.reference_models.map((slot, index) => (
               <ListRow
                 action={
-                  <Switch
+                  <Toggle
                     aria-label={m.moaReferenceToggle(slot.enabled !== false, index + 1)}
                     checked={slot.enabled !== false}
                     disabled={applying}
-                    onCheckedChange={checked =>
+                    label={m.moaReferenceToggle(slot.enabled !== false, index + 1)}
+                    onChange={checked =>
                       updateMoaPreset(prev => ({
                         ...prev,
                         reference_models: prev.reference_models.map((s, i) =>

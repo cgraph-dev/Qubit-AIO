@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { RemoteSetupFields } from '@/components/remote-setup/fields'
 import { useRemoteSetup } from '@/components/remote-setup/use-remote-setup'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -135,7 +135,7 @@ function ModeCard({
   title: string
 }) {
   return (
-    <button
+    <Button variant="secondary"
       className={cn(
         'flex h-full min-h-0 w-full flex-col p-3 text-left disabled:cursor-not-allowed disabled:opacity-50',
         selectableCardClass({ active, prominent: true })
@@ -162,7 +162,7 @@ function ModeCard({
       <p className="mt-1.5 flex-1 text-[length:var(--conversation-caption-font-size)] leading-(--conversation-caption-line-height) text-(--ui-text-tertiary)">
         {description}
       </p>
-    </button>
+    </Button>
   )
 }
 

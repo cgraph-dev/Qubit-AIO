@@ -1,7 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useContext } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import type { DesktopRegistryConnection } from '@/global'
 import { useI18n } from '@/i18n'
 import { Download, Loader2 } from '@/lib/icons'

@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { CheckCircle2, Cpu, Loader2, Pause, Zap } from '@/lib/icons'
 import { cn } from '@/lib/utils'
 import type { LocalCatalogModel, LocalRuntimeJob } from '@/types/hermes'

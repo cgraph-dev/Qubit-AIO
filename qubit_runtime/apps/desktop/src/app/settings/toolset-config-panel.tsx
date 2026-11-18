@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 
 import { SETTINGS_ROUTE } from '@/app/routes'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Input } from '@/components/ui/input'
 import {
   deleteEnvVar,
@@ -485,7 +485,7 @@ function ModelCatalogPicker({ toolset, providerName, isActiveBackend, profile }:
           const isDefault = catalog.default === model.id
 
           return (
-            <button
+            <Button variant="secondary"
               aria-pressed={isSelected}
               className={cn(
                 'grid gap-0.5 rounded-lg border px-2.5 py-2 text-left transition',
@@ -515,7 +515,7 @@ function ModelCatalogPicker({ toolset, providerName, isActiveBackend, profile }:
                 {model.strengths && <span>{model.strengths}</span>}
                 {model.price && <span className="font-mono">{model.price}</span>}
               </span>
-            </button>
+            </Button>
           )
         })}
       </div>
@@ -795,7 +795,7 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
 
         return (
           <div className="overflow-hidden rounded-xl bg-background/60" key={provider.name}>
-            <button
+            <Button variant="secondary"
               aria-expanded={isExpanded}
               className={cn(
                 'flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left transition hover:bg-accent/50',
@@ -831,7 +831,7 @@ export function ToolsetConfigPanel({ toolset, onConfiguredChange, profile }: Too
                 {isExtractBackend && <Pill tone="primary">{copy.webUsedForExtract}</Pill>}
               </span>
               {selecting === provider.name && <Loader2 className="size-3.5 shrink-0 animate-spin" />}
-            </button>
+            </Button>
 
             {isExpanded && (
               <div className="grid gap-2 bg-muted/20 p-3">

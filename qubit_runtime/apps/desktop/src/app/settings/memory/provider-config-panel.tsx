@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import { PageLoader } from '@/components/page-loader'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { getMemoryProviderConfig, saveMemoryProviderConfig } from '@/hermes'
 import { SlidersHorizontal } from '@/lib/icons'
@@ -106,7 +106,7 @@ export function ProviderConfigPanel({ profile, provider }: { profile?: string; p
   return (
     <section className="py-1">
       <div className="flex items-center gap-2 py-2">
-        <button
+        <Button variant="secondary"
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-2 text-left"
           onClick={() => setExpanded(open => !open)}
@@ -119,7 +119,7 @@ export function ProviderConfigPanel({ profile, provider }: { profile?: string; p
           {secretFields.map(field => (
             <Pill key={field.key}>{field.is_set ? `${field.label} set` : `${field.label} not set`}</Pill>
           ))}
-        </button>
+        </Button>
         {hasFullConfig && (
           <Button onClick={() => setShowModal(true)} size="sm" type="button" variant="secondary">
             <SlidersHorizontal className="size-3.5" />

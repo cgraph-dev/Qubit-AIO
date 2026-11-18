@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { useI18n } from '@/i18n'
 import { Download, Search } from '@/lib/icons'
 import type { LocalCatalogModel, LocalModelsStatus, LocalRuntimeJob } from '@/types/hermes'

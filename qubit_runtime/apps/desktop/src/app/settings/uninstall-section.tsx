@@ -1,6 +1,6 @@
 import { type ReactElement, useContext, useEffect, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import type { DesktopUninstallMode, DesktopUninstallResult, DesktopUninstallSummary } from '@/global'
 import { useI18n } from '@/i18n'
 import { AlertTriangle, Loader2, Trash2 } from '@/lib/icons'
@@ -150,7 +150,7 @@ export function UninstallSection(): ReactElement | null {
             <p className="text-xs text-muted-foreground">{u.chooseHowMuch}</p>
             <div className="mt-1 flex flex-col gap-2">
               {visibleOptions.map((opt: ModeOption): ReactElement => (
-                <button
+                <Button variant="secondary"
                   className={cn(
                     'flex items-start gap-3 rounded-lg border border-border/60 bg-background/40 px-3 py-2.5 text-left transition',
                     'hover:border-destructive/40 hover:bg-destructive/5'
@@ -167,7 +167,7 @@ export function UninstallSection(): ReactElement | null {
                     <span className="block text-sm font-medium text-foreground">{opt.title}</span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">{opt.description}</span>
                   </span>
-                </button>
+                </Button>
               ))}
             </div>
           </div>

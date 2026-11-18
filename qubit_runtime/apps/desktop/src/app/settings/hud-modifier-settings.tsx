@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { ErrorBanner } from '@/components/ui/error-state'
 import { useI18n } from '@/i18n'
 

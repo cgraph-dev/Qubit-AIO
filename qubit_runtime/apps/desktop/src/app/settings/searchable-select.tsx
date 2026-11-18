@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import { useCallback, useRef, useState } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -79,7 +80,7 @@ export function SearchableSelect({
   return (
     <Popover onOpenChange={setOpen} open={open}>
       <PopoverTrigger asChild>
-        <button
+        <Button variant="secondary"
           aria-expanded={open}
           aria-haspopup="listbox"
           className={cn(
@@ -100,7 +101,7 @@ export function SearchableSelect({
         >
           <span className="truncate">{displayValue}</span>
           <Codicon className="shrink-0 opacity-60" name={open ? 'chevron-up' : 'chevron-down'} size="1rem" />
-        </button>
+        </Button>
       </PopoverTrigger>
       {/* min-w, not w: the trigger shrink-wraps to its current value inside the
           settings grid, so a width pinned to it clipped every IANA row after

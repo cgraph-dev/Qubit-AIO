@@ -1,8 +1,7 @@
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
+import { Button, Checkbox } from '@/sakuga/ui'
 import { Input } from '@/components/ui/input'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import {
@@ -351,7 +350,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
             {endpoints.length ? (
               endpoints.map(endpoint => (
                 <div className="grid gap-3 p-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center" key={endpoint.id}>
-                  <button
+                  <Button variant="secondary"
                     className="min-w-0 text-left"
                     onClick={() => {
                       setForm(formFromEndpoint(endpoint))
@@ -377,7 +376,7 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
                       <span>{endpoint.model}</span>
                       {endpoint.has_api_key && <span>{endpoint.api_key_preview ?? ce.apiKeySet}</span>}
                     </div>
-                  </button>
+                  </Button>
                   <div className="flex items-center gap-2 sm:justify-end">
                     <Button
                       disabled={endpoint.is_current || activating === endpoint.id}
@@ -482,15 +481,17 @@ export function CustomEndpointsSettings({ onConfigSaved, onMainModelChanged }: C
             <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
               <label className="flex items-center gap-2">
                 <Checkbox
+                  aria-label={ce.fields.useNewChats}
                   checked={form.makeDefault}
-                  onCheckedChange={checked => setForm(current => ({ ...current, makeDefault: checked === true }))}
+                  onChange={checked => setForm(current => ({ ...current, makeDefault: checked === true }))}
                 />
                 {ce.fields.useNewChats}
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
+                  aria-label={ce.fields.discoverModels}
                   checked={form.discoverModels}
-                  onCheckedChange={checked => setForm(current => ({ ...current, discoverModels: checked === true }))}
+                  onChange={checked => setForm(current => ({ ...current, discoverModels: checked === true }))}
                 />
                 {ce.fields.discoverModels}
               </label>

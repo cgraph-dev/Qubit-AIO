@@ -1,6 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { pauseLocalDownload, resumeLocalDownload } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { Loader2, Pause, Play } from '@/lib/icons'

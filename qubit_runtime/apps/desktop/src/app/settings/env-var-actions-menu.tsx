@@ -7,7 +7,7 @@ import {
   type MenuKit,
   renderActionItem
 } from '@/components/ui/actions-menu'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
 import { openExternalLink } from '@/lib/external-link'
