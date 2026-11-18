@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button } from "@/sakuga/ui";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 
 import { api } from "@/lib/api";
@@ -159,8 +160,7 @@ export function TaskCard({
   );
   const waiting = ["waiting_input", "waiting_approval"].includes(task.state);
   return (
-    <button
-      type="button"
+    <Button variant="secondary"
       aria-label={`Open task: ${task.title || task.id}`}
       onClick={() => onOpen?.()}
       className="w-full text-left"
@@ -198,7 +198,7 @@ export function TaskCard({
           </p>
         ) : terminal ? null : null}
       </div>
-    </button>
+    </Button>
   );
 }
 
@@ -802,9 +802,8 @@ export function SavingsGoalControl({
               </OmChip>
             </div>
             {(goal.milestones ?? []).map((m, i) => (
-              <button
+              <Button variant="secondary"
                 key={m.id ?? i}
-                type="button"
                 onClick={() => toggleMilestone(goal, i)}
                 disabled={busy}
                 className="flex items-center gap-2 text-left text-[12px]"
@@ -817,7 +816,7 @@ export function SavingsGoalControl({
                 >
                   {m.title}
                 </span>
-              </button>
+              </Button>
             ))}
             <div className="flex items-center gap-2">
               <OmButton
@@ -870,8 +869,7 @@ function FinanceArtifact({ artifact }: { artifact: AgentArtifactView }) {
       className="flex w-full max-w-[440px] flex-col gap-3 border border-border bg-secondary"
       style={{ borderRadius: OM_CARD_RADIUS, padding: 10 }}
     >
-      <button
-        type="button"
+      <Button variant="secondary"
         aria-label={`Open finance tracker: ${artifact.title}`}
         aria-expanded={details}
         onClick={() => setDetails(!details)}
@@ -933,7 +931,7 @@ function FinanceArtifact({ artifact }: { artifact: AgentArtifactView }) {
             ›
           </span>
         </div>
-      </button>
+      </Button>
       {details ? (
         <div className="flex flex-col gap-4 p-[10px]">
           <p className="text-[10px] font-semibold uppercase tracking-[1.4px] text-muted-foreground">
@@ -1329,8 +1327,7 @@ function IdeaCard({
             : "💡";
   return (
     <div className="flex flex-col border-b border-border py-[18px]">
-      <button
-        type="button"
+      <Button variant="secondary"
         aria-label={`View idea: ${idea.title}`}
         aria-expanded={expanded}
         onClick={() => setExpanded(!expanded)}
@@ -1347,7 +1344,7 @@ function IdeaCard({
             {idea.reason}
           </span>
         </span>
-      </button>
+      </Button>
       {expanded ? (
         <div className="mt-[18px] flex flex-col gap-4 pl-12">
           {idea.prompt ? (

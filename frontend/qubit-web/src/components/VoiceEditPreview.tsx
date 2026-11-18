@@ -4,6 +4,7 @@
  *  Every action is reported to the caller, which owns the side effects.
  */
 import { useMemo, useState } from "react";
+import { Button } from "@/sakuga/ui";
 import { wordDiff } from "@/lib/voiceDiff";
 import type { TransformPreview } from "@/lib/voiceEdit";
 
@@ -140,78 +141,68 @@ export function VoiceEditPreview({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {editing ? (
           <>
-            <button
-              type="button"
-              className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground"
+            <Button
               onClick={() => {
                 setEditing(false);
                 onEdit?.(draft);
               }}
             >
               Save edit
-            </button>
-            <button
-              type="button"
-              className="rounded border border-border px-3 py-1 text-xs"
+            </Button>
+            <Button
+              variant="secondary"
               onClick={() => {
                 setDraft(preview.proposed);
                 setEditing(false);
               }}
             >
               Discard edit
-            </button>
+            </Button>
           </>
         ) : (
           <>
-            <button
-              type="button"
+            <Button
               data-testid="voice-edit-apply"
               disabled={busy}
-              className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
               onClick={onApply}
             >
               Apply
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
               data-testid="voice-edit-copy"
-              className="rounded border border-border px-3 py-1 text-xs"
               onClick={onCopy}
             >
               Copy
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
               data-testid="voice-edit-edit"
-              className="rounded border border-border px-3 py-1 text-xs"
               onClick={() => setEditing(true)}
             >
               Edit
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
               data-testid="voice-edit-retry"
-              className="rounded border border-border px-3 py-1 text-xs"
               onClick={onRetry}
             >
               Retry
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
               data-testid="voice-edit-revert"
-              className="rounded border border-border px-3 py-1 text-xs"
               onClick={onRevert}
             >
               Revert
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="secondary"
               data-testid="voice-edit-cancel"
-              className="rounded border border-border px-3 py-1 text-xs"
               onClick={onCancel}
             >
               Cancel
-            </button>
+            </Button>
           </>
         )}
       </div>

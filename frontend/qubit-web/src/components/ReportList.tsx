@@ -10,6 +10,7 @@
 import { FileText, Terminal } from "lucide-react";
 
 import { collectReports, type ReportSourceMessage } from "@/lib/reports";
+import { Button } from "@/sakuga/ui";
 
 export interface ReportListProps {
   /** The current transcript render messages. */
@@ -44,8 +45,8 @@ export function ReportList({ messages, onOpen, className }: ReportListProps) {
         <ul className="flex list-none flex-col gap-1">
           {reports.map((report) => (
             <li key={report.id}>
-              <button
-                type="button"
+              <Button
+                variant="secondary"
                 data-testid={`report-row-${report.index}`}
                 data-kind={report.kind}
                 aria-label={`Open report: ${report.title}`}
@@ -64,7 +65,7 @@ export function ReportList({ messages, onOpen, className }: ReportListProps) {
                     </span>
                   ) : null}
                 </span>
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

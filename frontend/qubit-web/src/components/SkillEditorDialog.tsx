@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button, Input } from "@/sakuga/ui";
 import {
   Dialog,
   DialogContent,
@@ -154,19 +153,22 @@ function EditorBody({
               <Label htmlFor="skill-editor-name">Name</Label>
               <Input
                 id="skill-editor-name"
-                autoFocus
+                label="Name"
                 placeholder="my-skill"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={setName}
+                className="qsk-field"
               />
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="skill-editor-category">Category (optional)</Label>
               <Input
                 id="skill-editor-category"
+                label="Category (optional)"
                 placeholder="devops"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={setCategory}
+                className="qsk-field"
               />
             </div>
           </div>
@@ -196,16 +198,15 @@ function EditorBody({
         )}
 
         <div className="flex items-center justify-end gap-2">
-          <Button ghost size="sm" onClick={onClose} disabled={saving}>
+          <Button variant="secondary" onClick={onClose} disabled={saving}>
             Cancel
           </Button>
           <Button
-            size="sm"
             className="uppercase"
             onClick={handleSave}
             disabled={saving || loading}
-            prefix={saving ? <Spinner /> : undefined}
           >
+            {saving ? <Spinner /> : null}
             {saving ? "Saving…" : isEdit ? "Save changes" : "Create skill"}
           </Button>
         </div>

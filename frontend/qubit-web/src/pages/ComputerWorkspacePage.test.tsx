@@ -10,6 +10,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -129,7 +130,7 @@ afterEach(async () => {
 describe("ComputerWorkspacePage", () => {
   it("renders the live actuator status", async () => {
     await renderComputer();
-    const terminal = [...container.querySelectorAll("button")].find((b) =>
+    const terminal = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
       b.textContent?.includes("Terminal"),
     ) as HTMLButtonElement;
     await act(async () => terminal.click());
@@ -141,7 +142,7 @@ describe("ComputerWorkspacePage", () => {
 
   it("states the interactive shell gap instead of faking a command run", async () => {
     await renderComputer();
-    const terminal = [...container.querySelectorAll("button")].find((b) =>
+    const terminal = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
       b.textContent?.includes("Terminal"),
     ) as HTMLButtonElement;
     expect(terminal).toBeTruthy();
@@ -178,14 +179,14 @@ describe("ComputerWorkspacePage", () => {
       if (url.includes("agent-workspace/list")) return jsonResponse(ROSTER);
       return jsonResponse({ state: "OK" });
     });
-    const terminal = [...container.querySelectorAll("button")].find((b) =>
+    const terminal = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
       b.textContent?.includes("Terminal"),
     ) as HTMLButtonElement;
     await act(async () => terminal.click());
     await waitFor(() =>
       (container.textContent ?? "").includes("Present desktop"),
     );
-    const present = [...container.querySelectorAll("button")].find((b) =>
+    const present = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
       b.textContent?.includes("Present desktop"),
     ) as HTMLButtonElement;
     await act(async () => present.click());
@@ -196,7 +197,7 @@ describe("ComputerWorkspacePage", () => {
 
   it("never renders a fake browser-session create button as live", async () => {
     await renderComputer();
-    const open = [...container.querySelectorAll("button")].find((b) =>
+    const open = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
       b.textContent?.includes("Open a browser session"),
     ) as HTMLButtonElement;
     expect(open).toBeTruthy();
@@ -206,7 +207,7 @@ describe("ComputerWorkspacePage", () => {
 
   it("browses the real agent workspace roster on the Files tab", async () => {
     await renderComputer();
-    const files = [...container.querySelectorAll("button")].find((b) =>
+    const files = [...container.querySelectorAll("button, sakuga-button")].find((b) =>
       b.textContent?.includes("Files"),
     ) as HTMLButtonElement;
     await act(async () => files.click());

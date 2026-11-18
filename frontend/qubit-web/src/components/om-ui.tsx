@@ -22,6 +22,7 @@
 import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
+import { Button, Input } from "@/sakuga/ui";
 
 /* ------------------------------------------------------------- geometry */
 
@@ -98,34 +99,16 @@ export function OmButton({
   ariaLabel?: string;
 }) {
   const inert = disabled || busy;
-  const tone = danger
-    ? "text-destructive border-destructive/40"
-    : primary
-      ? "text-primary-foreground bg-primary border-transparent"
-      : "text-foreground bg-secondary border-border";
   return (
-    <button
+    <Button
+      variant={primary && !danger ? "primary" : "secondary"}
       type={type}
       onClick={inert ? undefined : onClick}
       disabled={inert}
-      aria-disabled={inert || undefined}
-      aria-busy={busy || undefined}
       aria-label={ariaLabel}
       title={title}
       data-state={inert ? "disabled" : "ready"}
-      className={cn(
-        "inline-flex items-center justify-center gap-2 border font-semibold transition-opacity",
-        small ? "text-[11px]" : "text-[13px]",
-        tone,
-        inert ? "cursor-not-allowed opacity-50" : "hover:opacity-90",
-        className,
-      )}
-      style={{
-        borderRadius: OM.buttonRadius,
-        minHeight: small ? OM.buttonSmallMinHeight : OM.buttonMinHeight,
-        paddingInline: small ? 13 : 17,
-        paddingBlock: small ? 7 : 10,
-      }}
+      className={cn("gap-2 font-semibold", small ? "text-[11px]" : "text-[13px]", className)}
     >
       {busy ? (
         <span
@@ -136,7 +119,7 @@ export function OmButton({
         <Icon size={15} />
       ) : null}
       <span>{children}</span>
-    </button>
+    </Button>
   );
 }
 
@@ -187,17 +170,35 @@ export function OmField({
       minHeight: minHeight ?? OM.inputMinHeight,
     },
   } as const;
-  return (
-    <label className="flex flex-col gap-[7px]">
-      <span className="text-[11px] font-semibold text-foreground">
-        {label}
-      </span>
-      {multiline ? (
+  if (multiline) {
+    return (
+      <label className="flex flex-col gap-[7px]">
+        <span className="text-[11px] font-semibold text-foreground">{label}</span>
         <textarea {...shared} rows={4} />
-      ) : (
-        <input {...shared} type={type} />
-      )}
-    </label>
+      </label>
+    );
+  }
+  if (type === "number") {
+    // Number inputs are outside the upstream component set.
+    return (
+      <label className="flex flex-col gap-[7px]">
+        <span className="text-[11px] font-semibold text-foreground">{label}</span>
+        <input {...shared} type="number" />
+      </label>
+    );
+  }
+  return (
+    <Input
+      label={label}
+      aria-label={ariaLabel ?? label}
+      type={type === "url" ? "url" : "text"}
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled}
+      onChange={onChange}
+      className={cn("qsk-field", mono && "font-mono text-[13px]")}
+      autoComplete={autoCapitalize === "none" ? "off" : undefined}
+    />
   );
 }
 
@@ -319,12 +320,11 @@ export function OmLinkRow({
   disabledReason?: string;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      variant="secondary"
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       title={disabled ? disabledReason : undefined}
-      aria-disabled={disabled || undefined}
       className={cn(
         "flex w-full items-center gap-[14px] rounded-[10px] px-0 py-[13px] text-left",
         disabled ? "cursor-not-allowed opacity-55" : "hover:bg-secondary",
@@ -351,7 +351,7 @@ export function OmLinkRow({
       <span aria-hidden="true" className="text-muted-foreground">
         ›
       </span>
-    </button>
+    </Button>
   );
 }
 

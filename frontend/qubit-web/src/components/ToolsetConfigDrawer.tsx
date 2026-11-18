@@ -7,14 +7,10 @@ import type {
   ToolsetInfo,
   ToolsetProvider,
 } from "@/lib/api";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Toast } from "@nous-research/ui/ui/components/toast";
+import { Button, Input, Toggle, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { cn, themedBody } from "@/lib/utils";
 
 interface Props {
@@ -35,7 +31,10 @@ interface Props {
  * post-setup install hook (npm/pip/binary) with a live log tail.
  */
 export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Props) {
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
   const [config, setConfig] = useState<ToolsetConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [enabled, setEnabled] = useState(toolset.enabled);
@@ -227,8 +226,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
         )}
       >
         <Button
-          ghost
-          size="xs"
+          variant="secondary"
           className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
           onClick={onClose}
           aria-label="Close"
@@ -250,11 +248,11 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
             {toolset.description}
           </p>
           <div className="mt-3 flex items-center gap-2">
-            <Switch
+            <Toggle
+              label={`Enable toolset for ${platformText}`}
               checked={enabled}
-              onCheckedChange={(v) => void handleToggle(v)}
+              onChange={(v) => void handleToggle(v)}
               disabled={toggling}
-              aria-label={`Enable toolset for ${platformText}`}
             />
             <span className="text-xs text-muted-foreground">
               {enabled
@@ -312,8 +310,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                       </Badge>
                     ) : (
                       <Button
-                        size="sm"
-                        outlined
+                        variant="secondary"
                         onClick={() => void handleSelectProvider(provider)}
                         disabled={selecting !== null}
                       >
@@ -351,18 +348,19 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                           </div>
                           <Input
                             id={`env-${ev.key}`}
+                            label={ev.key}
                             type="password"
-                            className="h-8 rounded-none text-xs font-mono"
+                            className="qsk-field text-xs font-mono"
                             placeholder={
                               isSet[ev.key]
                                 ? "•••••••• (saved — leave blank to keep)"
                                 : ev.prompt || ev.key
                             }
                             value={drafts[ev.key] ?? ""}
-                            onChange={(e) =>
+                            onChange={(value) =>
                               setDrafts((prev) => ({
                                 ...prev,
-                                [ev.key]: e.target.value,
+                                [ev.key]: value,
                               }))
                             }
                           />
@@ -379,7 +377,6 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                         </div>
                       ))}
                       <Button
-                        size="sm"
                         onClick={() => void handleSaveKeys(provider)}
                         disabled={savingProvider !== null}
                       >
@@ -404,8 +401,7 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                         . Runs on this host — may take a few minutes.
                       </p>
                       <Button
-                        size="sm"
-                        outlined
+                        variant="secondary"
                         className={cn(
                           postSetupRunning &&
                             postSetupKey === provider.post_setup &&
@@ -413,15 +409,12 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
                         )}
                         onClick={() => void handleRunPostSetup(provider)}
                         disabled={postSetupRunning}
-                        prefix={
-                          postSetupRunning &&
-                          postSetupKey === provider.post_setup ? (
-                            <Loader2 />
-                          ) : (
-                            <Terminal />
-                          )
-                        }
                       >
+                        {postSetupRunning && postSetupKey === provider.post_setup ? (
+                          <Loader2 aria-hidden />
+                        ) : (
+                          <Terminal aria-hidden />
+                        )}
                         {postSetupRunning &&
                         postSetupKey === provider.post_setup
                           ? "Installing…"
@@ -453,7 +446,6 @@ export function ToolsetConfigDrawer({ toolset, profile, onClose, onChanged }: Pr
           )}
         </div>
       </div>
-      <Toast toast={toast} />
     </div>,
     document.body,
   );

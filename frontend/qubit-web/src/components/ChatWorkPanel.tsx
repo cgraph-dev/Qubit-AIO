@@ -13,6 +13,7 @@
  * transcript or the composer.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/sakuga/ui";
 import type { AgentActivity } from "@/hooks/useChatActivity";
 import "./ChatWorkPanel.css";
 
@@ -96,8 +97,8 @@ export function ChatWorkPanel({
     >
       <div className="qubit-work-panel__head">
         {canExpand ? (
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             className="qubit-work-panel__toggle"
             onClick={() => setMinimised((m) => !m)}
             aria-expanded={expanded}
@@ -105,7 +106,7 @@ export function ChatWorkPanel({
             title={expanded ? "Minimise work status" : "Expand work status"}
           >
             {expanded ? "\u25BE" : "\u25B8"}
-          </button>
+          </Button>
         ) : (
           <span className="qubit-work-panel__toggle qubit-work-panel__toggle--static" aria-hidden="true">
             {busy ? "\u25BE" : "\u25B8"}

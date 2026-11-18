@@ -2,6 +2,7 @@ import { useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
 import type { StatusResponse } from "@/lib/api";
 import { useI18n } from "@/i18n";
+import { Button } from "@/sakuga/ui";
 
 /**
  * A multi-profile host whose gateway came up STANDALONE on a boot guard: every other
@@ -53,14 +54,14 @@ export function MultiplexStandaloneBanner({
     >
       <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1">{message}</span>
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         aria-label={t.app.dismiss ?? "Dismiss"}
         onClick={dismiss}
         className="shrink-0 opacity-70 hover:opacity-100"
       >
         <X className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }

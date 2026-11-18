@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
+import { Button } from "@/sakuga/ui";
 
 interface PageErrorBoundaryProps {
   children: ReactNode;
@@ -53,13 +54,9 @@ export class PageErrorBoundary extends Component<
           <p className="mt-1 text-xs text-muted-foreground break-words">
             {error.message}
           </p>
-          <button
-            type="button"
-            className="mt-3 text-xs text-primary underline"
-            onClick={this.reset}
-          >
+          <Button variant="secondary" className="mt-3" onClick={this.reset}>
             Try again
-          </button>
+          </Button>
         </div>
       );
     }

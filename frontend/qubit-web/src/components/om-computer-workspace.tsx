@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button } from "@/sakuga/ui";
 
 import {
   getComputerStatus,
@@ -106,8 +107,7 @@ export function ComputerEntry({
   const available = status?.controlState === "AVAILABLE";
   const active = status?.atspiReachable === true && available;
   return (
-    <button
-      type="button"
+    <Button variant="secondary"
       onClick={onOpen}
       aria-label="Agent computer — take control"
       className="inline-flex items-center gap-[6px] border border-border bg-secondary px-3 py-[7px] text-[12px] text-muted-foreground hover:opacity-90"
@@ -131,7 +131,7 @@ export function ComputerEntry({
           available ? "bg-[#57AD85]" : "bg-[#ACB0B5]",
         )}
       />
-    </button>
+    </Button>
   );
 }
 

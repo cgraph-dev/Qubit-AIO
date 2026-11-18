@@ -3,6 +3,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "../pages/sakuga-test-dom";
 import { VoiceEditPreview } from "./VoiceEditPreview";
 import type { TransformPreview } from "@/lib/voiceEdit";
 
@@ -117,7 +118,7 @@ describe("VoiceEditPreview", () => {
       setter?.call(box, "manually edited text");
       box.dispatchEvent(new Event("input", { bubbles: true }));
     });
-    const save = Array.from(container.querySelectorAll("button")).find((b) =>
+    const save = Array.from(container.querySelectorAll("button, sakuga-button")).find((b) =>
       b.textContent?.includes("Save edit"),
     ) as HTMLButtonElement;
     await act(async () => save.click());

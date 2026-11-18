@@ -16,6 +16,7 @@
  * An always-rendered wrapper around nothing is the "extra empty panel" defect.
  */
 import type { ReactNode } from "react";
+import { Button } from "@/sakuga/ui";
 
 /* ------------------------------------------------------------------ page */
 
@@ -199,7 +200,7 @@ export function SettingsNavRow({
   meta?: ReactNode;
 }) {
   return (
-    <button type="button" className="settings-row settings-row--nav" onClick={onClick}>
+    <Button variant="secondary" className="settings-row settings-row--nav" onClick={onClick}>
       <div className="settings-row__text">
         <span className="settings-row__title">{title}</span>
         {description ? (
@@ -209,7 +210,7 @@ export function SettingsNavRow({
       {meta !== undefined && meta !== null ? (
         <div className="settings-row__control">{meta}</div>
       ) : null}
-    </button>
+    </Button>
   );
 }
 
