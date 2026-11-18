@@ -216,3 +216,80 @@ sakuga-input.qsk-select-filter {
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+/* ── SakugaHoverTooltip ─────────────────────────────────────────────────
+ * The upstream help bubble, attached to any trigger. Same paper card, ink
+ * border, lavender shadow and manga ink; it opens on hover/focus/tap and
+ * closes on Escape. It never wraps the trigger in a button, so the trigger
+ * keeps its own semantics. */
+.qsk-hover-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.qsk-hover-tip__bubble {
+  position: absolute;
+  z-index: 2147482500;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  transform: translateX(-50%);
+  display: grid;
+  gap: 3px;
+  width: max-content;
+  max-width: min(260px, 86vw);
+  padding: 9px 13px;
+  border: 2.5px solid var(--sk-ink, #1d1a4a);
+  border-radius: 12px;
+  background: var(--sk-card, #fff);
+  color: var(--sk-ink, #1d1a4a);
+  box-shadow: 5px 6px 0 var(--sk-soft, #b8b3ff);
+  font: 500 13px/1.35 var(--sk-font, -apple-system, "Segoe UI", system-ui, sans-serif);
+  text-align: left;
+  pointer-events: none;
+  animation: qsk-hover-tip-in 180ms cubic-bezier(.2, 1.6, .4, 1);
+}
+
+.qsk-hover-tip__bubble[data-placement="bottom"] {
+  top: calc(100% + 12px);
+  bottom: auto;
+}
+
+.qsk-hover-tip__bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: 11px;
+  height: 11px;
+  margin-left: -7px;
+  border-right: 2.5px solid var(--sk-ink, #1d1a4a);
+  border-bottom: 2.5px solid var(--sk-ink, #1d1a4a);
+  background: var(--sk-card, #fff);
+  transform: rotate(45deg) translateY(-5px);
+}
+
+.qsk-hover-tip__bubble[data-placement="bottom"]::after {
+  top: auto;
+  bottom: 100%;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 2.5px solid var(--sk-ink, #1d1a4a);
+  border-top: 2.5px solid var(--sk-ink, #1d1a4a);
+  transform: rotate(45deg) translate(-2px, 6px);
+}
+
+.qsk-hover-tip__label {
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.qsk-hover-tip__text {
+  color: var(--sk-ink, #1d1a4a);
+}
+
+@keyframes qsk-hover-tip-in {
+  0% { opacity: 0; transform: translateX(-50%) scale(.88) translateY(4px); }
+  70% { opacity: 1; transform: translateX(-50%) scale(1.04) translateY(0); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1); }
+}

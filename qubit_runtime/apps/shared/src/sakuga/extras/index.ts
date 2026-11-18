@@ -41,3 +41,8 @@ export {
   SakugaPagination,
   type SakugaPaginationProps,
 } from './pagination';
+
+export {
+  SakugaHoverTooltip,
+  type SakugaHoverTooltipProps,
+} from './hover-tooltip';

@@ -92,6 +92,8 @@ export {
   type SakugaNumberProps,
   type SakugaPaginationProps,
   type SakugaTextareaProps,
+  SakugaHoverTooltip,
+  type SakugaHoverTooltipProps,
 } from './extras';
 
 export {

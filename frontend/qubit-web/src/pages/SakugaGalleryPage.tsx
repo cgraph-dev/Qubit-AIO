@@ -44,6 +44,7 @@ import {
   TimeField,
   Toggle,
   Tooltip,
+  HoverTooltip,
   emitFx,
   fireFx,
   loadSakugaComponent,
@@ -509,6 +510,26 @@ function TooltipDemo() {
   );
 }
 
+function HoverTooltipDemo() {
+  return (
+    <DemoCard
+      title="Hover tooltip"
+      tag="qsk-hover-tip"
+      how="The same paper bubble, attached to any trigger: hover, focus or tap opens it, Escape closes it, and a click lands a small pop."
+      qubit="Icon buttons, help labels and dense settings rows where a hover hint is better than a permanent paragraph. The trigger keeps its own element and handler."
+      said="Hover the button, then click it."
+      tall
+    >
+      <HoverTooltip label="Hover me" content="This is the upstream bubble attached to a normal Sakuga button.">
+        <Button variant="secondary">Hover or click</Button>
+      </HoverTooltip>
+      <HoverTooltip label="Settings" placement="bottom" content="Hover hints sit above by default; placement='bottom' flips them.">
+        <Toggle label="Hover the switch" checked={false} onChange={() => {}} />
+      </HoverTooltip>
+    </DemoCard>
+  );
+}
+
 function SelectDemo() {
   const [value, setValue] = useState("openai");
   const [rows, setRows] = useState("sessions");
@@ -810,6 +831,7 @@ export default function SakugaGalleryPage() {
         <ProgressDemos />
         <ToastDemo />
         <TooltipDemo />
+        <HoverTooltipDemo />
         <SelectDemo />
         <TextareaDemo />
         <NumberDemo />

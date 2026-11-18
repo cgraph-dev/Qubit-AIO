@@ -44,6 +44,8 @@ export {
   type SakugaNumberProps,
   type SakugaPaginationProps,
   type SakugaTextareaProps,
+  SakugaHoverTooltip as HoverTooltip,
+  type SakugaHoverTooltipProps,
   type SakugaLoadingProps,
   type SakugaProgressProps,
   type SakugaRadioOption,

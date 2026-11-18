@@ -16,6 +16,7 @@ import {
   SakugaDate,
   SakugaFile,
   SakugaFormRow,
+  SakugaHoverTooltip,
   SakugaInput,
   SakugaMultiSelect,
   SakugaNumber,
@@ -296,5 +297,34 @@ describe("SakugaPagination", () => {
       input.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, composed: true }));
     });
     expect(input.value).toBe("12");
+  });
+});
+
+
+describe("SakugaHoverTooltip", () => {
+  it("opens on hover, closes on Escape and bumps on click", () => {
+    const tree = mount(
+      <SakugaHoverTooltip label="Help" content="Short hint">
+        <button type="button">Trigger</button>
+      </SakugaHoverTooltip>,
+    );
+    const tip = tree.querySelector(".qsk-hover-tip") as HTMLElement;
+    expect(tree.querySelector('[role="tooltip"]')).toBeNull();
+
+    act(() => {
+      tip.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+    });
+    expect(tree.textContent).toContain("Short hint");
+    expect(tree.querySelector(".qsk-hover-tip__label")?.textContent).toBe("Help");
+
+    act(() => {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    });
+    expect(tree.querySelector('[role="tooltip"]')).toBeNull();
+
+    act(() => {
+      tip.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(tree.querySelector('[role="tooltip"]')).not.toBeNull();
   });
 });
