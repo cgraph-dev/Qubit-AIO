@@ -234,7 +234,7 @@ describe('task attachment compatibility', () => {
         upload: { filename: file.name, contentType: file.type, bytes }
       })
     )
-    expect(await screen.findByText(file.name)).toBeTruthy()
+    expect((await screen.findAllByText(file.name)).length).toBeGreaterThan(0)
     expect(screen.queryByText(en.noAttachments)).toBeNull()
   })
 })

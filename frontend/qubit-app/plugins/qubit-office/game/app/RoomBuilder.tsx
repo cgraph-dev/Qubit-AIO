@@ -12,6 +12,7 @@
  * React and hooks come from the HOST, exactly like the other office panels.
  */
 import { officeFx, sakugaButton } from "./sakuga";
+import { OfficeInput, OfficeSelect } from "./sakuga-form";
 import {
   type BuilderRoom,
   type BuilderState,
@@ -193,8 +194,8 @@ export function createRoomBuilder(
       className: "room-builder__field",
     }, [
       R.createElement("span", { key: "text" }, label),
-      R.createElement("select", {
-        key: "select",
+      R.createElement(OfficeSelect, {
+        key: "select", label: "",
         "data-testid": testId,
         "aria-label": label,
         value,
@@ -212,9 +213,8 @@ export function createRoomBuilder(
       className: "room-builder__field",
     }, [
       R.createElement("span", { key: "text" }, label),
-      R.createElement("input", {
-        key: "input",
-        type: "text",
+      R.createElement(OfficeInput, {
+        key: "input", type: "text", label: "",
         "data-testid": testId,
         "aria-label": label,
         value,
@@ -477,8 +477,8 @@ export function createRoomBuilder(
             key: "signage-label", className: "room-builder__field",
           }, [
             R.createElement("span", { key: "text" }, "Signage"),
-            R.createElement("input", {
-              key: "input", type: "text",
+            R.createElement(OfficeInput, {
+              key: "input", type: "text", label: "",
               "data-testid": "room-builder-signage",
               "aria-label": "Signage slug",
               value: room.style.signage,
@@ -509,8 +509,8 @@ export function createRoomBuilder(
             key: "dept-style-label", className: "room-builder__field",
           }, [
             R.createElement("span", { key: "text" }, "Department style"),
-            R.createElement("input", {
-              key: "input", type: "text",
+            R.createElement(OfficeInput, {
+              key: "input", type: "text", label: "",
               "data-testid": "room-builder-department-style",
               "aria-label": "Department style signature",
               value: departmentStyle,

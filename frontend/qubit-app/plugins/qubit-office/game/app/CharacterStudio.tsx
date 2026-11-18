@@ -16,6 +16,7 @@ type HooksLike = {
   useState: <T>(value: T) => [T, (next: T | ((prev: T) => T)) => void];
 };
 import { sakugaButton } from "./sakuga";
+import { OfficeInput, OfficeTooltip } from "./sakuga-form";
 import {
   ANIMATIONS,
   type AnimationName,
@@ -444,16 +445,20 @@ export function createCharacterStudio(
       ]),
 
       R.createElement("div", { key: "toolbar", className: "character-studio__toolbar" }, [
-        R.createElement("input", {
+        R.createElement(OfficeTooltip, {
+          key: "search-tip",
+          content: "Filter the character parts by name.",
+        }, R.createElement(OfficeInput, {
           key: "search",
           type: "search",
+          label: "",
           value: state.search,
           placeholder: "Search parts",
           "data-testid": "character-search",
           "aria-label": "Search parts",
           onChange: (event: { target: { value: string } }) =>
             update((current) => setSearch(current, event.target.value)),
-        }),
+        })),
         sakugaButton(R, {
           key: "randomize",
           type: "button",

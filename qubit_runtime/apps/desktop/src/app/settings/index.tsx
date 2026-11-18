@@ -1,11 +1,10 @@
-import { Button } from '@/sakuga/ui'
+import { Button, HoverTooltip } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useCallback, useEffect, useMemo, useRef } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router'
 
 import { codiconIcon } from '@/components/ui/codicon'
 import { KbdCombo } from '@/components/ui/kbd'
-import { Tip } from '@/components/ui/tooltip'
 import { getHermesConfigDefaults, getHermesConfigRecord, saveHermesConfig } from '@/hermes'
 import { useI18n } from '@/i18n'
 import { triggerHaptic } from '@/lib/haptics'
@@ -487,12 +486,12 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
 
   const navFooter = (
     <>
-      <Tip label={t.settings.exportConfig}>
+      <HoverTooltip content={t.settings.exportConfig}>
         <OverlayIconButton onClick={() => void exportConfig()}>
           <Download />
         </OverlayIconButton>
-      </Tip>
-      <Tip label={t.settings.importConfig}>
+      </HoverTooltip>
+      <HoverTooltip content={t.settings.importConfig}>
         <OverlayIconButton
           onClick={() => {
             triggerHaptic('open')
@@ -501,8 +500,8 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         >
           <Upload />
         </OverlayIconButton>
-      </Tip>
-      <Tip label={t.settings.resetToDefaults}>
+      </HoverTooltip>
+      <HoverTooltip content={t.settings.resetToDefaults}>
         <OverlayIconButton
           className="hover:text-destructive"
           onClick={() => {
@@ -512,7 +511,7 @@ export function SettingsView({ onClose, onConfigSaved, onMainModelChanged }: Set
         >
           <RefreshCw />
         </OverlayIconButton>
-      </Tip>
+      </HoverTooltip>
     </>
   )
 

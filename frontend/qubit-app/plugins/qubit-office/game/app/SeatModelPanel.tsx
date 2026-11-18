@@ -9,6 +9,7 @@
  * than a green tick. It never claims a save it did not make.
  */
 import { sakugaButton } from "./sakuga";
+import { OfficeSelect, OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type SeatModelState,
@@ -98,8 +99,11 @@ export function createSeatModelPanel(
     } else {
       children.push(R.createElement("label", { key: "prov-label", className: "seat-model__label" },
         "Provider",
-        R.createElement("select", {
-          key: "prov",
+        R.createElement(OfficeTooltip, {
+          key: "prov-tip",
+          content: "Choose the provider this seat inherits or overrides.",
+        }, R.createElement(OfficeSelect, {
+          key: "prov", label: "",
           "data-testid": "seat-model-provider",
           value: provider,
           disabled: saving,
@@ -113,13 +117,13 @@ export function createSeatModelPanel(
           ...providers.map((p) =>
             R.createElement("option", { key: p.slug, value: p.slug },
               p.name || p.slug)),
-        ]),
+        ])),
       ));
 
       children.push(R.createElement("label", { key: "model-label", className: "seat-model__label" },
         "Model",
-        R.createElement("select", {
-          key: "model",
+        R.createElement(OfficeSelect, {
+          key: "model", label: "",
           "data-testid": "seat-model-model",
           value: model,
           disabled: saving || !provider,

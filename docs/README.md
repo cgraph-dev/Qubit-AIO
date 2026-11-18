@@ -117,6 +117,9 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 | `REBRAND_MODULE_MIGRATION_PLAN.md` | REBRAND — MODULE-TREE MIGRATION PLAN |
 | `RETRY_STORM_ROOT_CAUSE_2026-10-17.md` | Retry storm in the inference path — root cause |
 | `SESSION_FIX_VERIFICATION_2026-10-09.md` | Session-Fix Verification + Regression Sweep (2026-10-09) |
+| `sakuga-migration-desktop.md` | Sakuga migration — the Electron desktop renderer |
+| `sakuga-migration-office.md` | Sakuga migration — the Qubit Office host shell |
+| `sakuga-migration-web.md` | Sakuga migration — the web dashboard |
 | `SESSION_ROUTE_POLICY.md` | Conversation-only fallback opt-out |
 | `SHELL-TEST-RECONCILIATION.md` | SHELL-TEST-RECONCILIATION |
 | `SIDEBAR_UX_AUDIT_2026-10-11.md` | Web dashboard sidebar and page information architecture audit |
