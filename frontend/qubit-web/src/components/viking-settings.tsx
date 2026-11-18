@@ -21,6 +21,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Button } from "@/sakuga/ui";
 
 /** The five Open Viking console routes, in nav order. Shared so every page
  *  renders the same sibling switcher. */
@@ -215,10 +216,10 @@ export function SettingsRow({
 
   if (as === "button") {
     return (
-      <button
-        type="button"
+      <Button
+        variant="secondary"
         className={cn("settings-row settings-row--nav", stacked && "settings-row--stacked", className)}
-        onClick={onClick}
+        onClick={() => onClick?.()}
         data-testid={testId}
         disabled={disabled}
         aria-label={ariaLabel}
@@ -229,7 +230,7 @@ export function SettingsRow({
             <path d="m9 18 6-6-6-6" />
           </svg>
         </span>
-      </button>
+      </Button>
     );
   }
 

@@ -30,7 +30,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import {
   SettingsPage,
   SettingsPageHeader,
@@ -203,8 +203,8 @@ export default function OpenVikingStudioPage() {
           title="Actions"
           control={
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" outlined onClick={() => void probe()}>
-                <RefreshCw className="mr-1 h-3.5 w-3.5" /> Recheck
+              <Button onClick={() => void probe()}>
+                <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden /> Recheck
               </Button>
               {/* A plain anchor, not a Button: ButtonProps has no `asChild`
                   (see button.d.ts), and the repo idiom for a link action is a
@@ -234,17 +234,14 @@ export default function OpenVikingStudioPage() {
                 {group.items.map((item) => {
                   const active = route.endsWith(item.path);
                   return (
-                    <button
+                    <Button
                       key={item.path}
-                      type="button"
+                      variant="secondary"
                       onClick={() => setRoute(`${STUDIO_ORIGIN}${item.path}`)}
-                      className={
-                        "text-left text-xs hover:underline " +
-                        (active ? "font-semibold" : "opacity-80")
-                      }
+                      className={"text-left text-xs " + (active ? "font-semibold" : "opacity-80")}
                     >
                       {item.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -279,8 +276,8 @@ export default function OpenVikingStudioPage() {
             <span className="text-xs opacity-60">
               Showing {route.replace(STUDIO_ORIGIN, "")}
             </span>
-            <Button size="sm" ghost onClick={() => setNonce((n) => n + 1)}>
-              <RefreshCw className="mr-1 h-3.5 w-3.5" /> Reload frame
+            <Button variant="secondary" onClick={() => setNonce((n) => n + 1)}>
+              <RefreshCw className="mr-1 h-3.5 w-3.5" aria-hidden /> Reload frame
             </Button>
           </div>
         ) : null}

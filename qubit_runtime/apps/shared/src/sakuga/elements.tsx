@@ -452,7 +452,12 @@ export const SakugaTabs = forwardRef<HTMLElement, SakugaTabsProps>(function Saku
     role: rest.role ?? 'tablist',
     'aria-label': label,
     onChange: (event: Event) => {
-      const detail = (event as CustomEvent<{ index: number; value: string; label: string }>).detail;
+      // React wraps the native `change` in a synthetic event on a custom host,
+      // so the CustomEvent payload lives on `nativeEvent.detail`.
+      const custom = event as CustomEvent<{ index: number; value: string; label: string }>;
+      const detail = custom.detail
+        ?? (custom as unknown as { nativeEvent?: CustomEvent<{ index: number; value: string; label: string }> })
+          .nativeEvent?.detail;
       if (detail) onChange?.(detail);
     },
   }, options.map((option) => createElement('option', { key: option.value, value: option.value }, option.label)));

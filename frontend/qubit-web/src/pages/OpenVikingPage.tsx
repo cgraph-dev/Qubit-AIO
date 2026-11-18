@@ -37,7 +37,7 @@ import {
   Search,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Tabs } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { PageHeaderContext } from "@/contexts/page-header-context";
 import {
@@ -364,20 +364,15 @@ export default function OpenVikingPage() {
               )
             }
             control={
-              <span className="flex gap-1" role="tablist" aria-label="Viewer mode">
-                {(["preview", "source"] as const).map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    role="tab"
-                    aria-selected={viewerMode === mode}
-                    onClick={() => setViewerMode(mode)}
-                    className={`btn btn--xs uppercase ${viewerMode === mode ? "active" : "btn--ghost"}`}
-                  >
-                    {mode}
-                  </button>
-                ))}
-              </span>
+              <Tabs
+                label="Viewer mode"
+                options={[
+                  { value: "preview", label: "Preview" },
+                  { value: "source", label: "Source" },
+                ]}
+                selected={viewerMode === "source" ? 1 : 0}
+                onChange={(detail) => setViewerMode(detail.value === "source" ? "source" : "preview")}
+              />
             }
           />
           <div className="p-4" data-testid="viking-viewer-body">
@@ -413,13 +408,10 @@ export default function OpenVikingPage() {
               description="Ingest a document or URI into the context store."
               control={
                 <Button
-                  size="sm"
-                  outlined
                   className="uppercase"
                   onClick={() => void navigate("/open-viking/uploads")}
-                  prefix={<Plus className="h-4 w-4" />}
                 >
-                  Add
+                  <Plus className="h-4 w-4" aria-hidden /> Add
                 </Button>
               }
             />
@@ -428,13 +420,10 @@ export default function OpenVikingPage() {
               description="Stage a note into user memory (confirm-gated)."
               control={
                 <Button
-                  size="sm"
-                  outlined
                   className="uppercase"
                   onClick={() => void navigate("/open-viking/uploads?tab=memory")}
-                  prefix={<Database className="h-4 w-4" />}
                 >
-                  Add
+                  <Database className="h-4 w-4" aria-hidden /> Add
                 </Button>
               }
             />
@@ -450,19 +439,11 @@ export default function OpenVikingPage() {
               }
               control={
                 <Button
-                  size="sm"
-                  outlined
                   className="uppercase"
                   disabled={!selectedPath || relatedState === "unavailable"}
                   onClick={() => void onFindRelated()}
-                  prefix={
-                    relatedState === "loading" ? (
-                      <Spinner />
-                    ) : (
-                      <Link2 className="h-4 w-4" />
-                    )
-                  }
                 >
+                  {relatedState === "loading" ? <Spinner /> : <Link2 className="h-4 w-4" aria-hidden />}
                   {relatedState === "loading" ? "Finding…" : "Find related"}
                 </Button>
               }

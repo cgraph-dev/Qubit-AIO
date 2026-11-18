@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Bot, Database, FileText, FolderUp, Search, Wrench } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 import {
   SettingsEmpty,
   SettingsLoadingSkeleton,
@@ -89,6 +89,7 @@ export default function OpenVikingRetrievalPage() {
       const payload = await searchVikingRetrieval(q, 25);
       setHits(normalizeSearchHits(payload));
       setState("done");
+      emitFx("success");
     } catch (e) {
       if (isBridgeRowMissing(e)) {
         setHits([]);
@@ -97,6 +98,7 @@ export default function OpenVikingRetrievalPage() {
         setState("error");
         setError(e instanceof Error ? e.message : "search failed");
       }
+      emitFx("error");
     }
   }, [query]);
 
@@ -134,26 +136,21 @@ export default function OpenVikingRetrievalPage() {
             title="Query"
             description="Matches file paths and contents in the context store."
             control={
-              <input
+              <Input
                 id="viking-retrieval-q"
-                className="settings-input font-courier"
+                label="Search the context store"
+                className="qsk-field font-courier"
                 placeholder="Find related context…"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                aria-label="Search the context store"
+                onChange={setQuery}
               />
             }
           />
           <SettingsRow
             className="settings-row--actions"
             control={
-              <Button
-                type="submit"
-                size="sm"
-                className="uppercase"
-                prefix={<Search className="h-4 w-4" />}
-              >
-                Find
+              <Button type="submit" className="uppercase">
+                <Search className="h-4 w-4" aria-hidden /> Find
               </Button>
             }
           />

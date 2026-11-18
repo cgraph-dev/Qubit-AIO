@@ -8,6 +8,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { sakugaInnerAll, typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const vikingMocks = vi.hoisted(() => ({
   addVikingResource: vi.fn(),
@@ -45,12 +47,6 @@ afterEach(async () => {
   vi.unstubAllGlobals();
 });
 
-function setInputValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 describe("OpenVikingUploadsPage", () => {
   it("stages a resource through the confirm-gated bridge", async () => {
     await act(async () => {
@@ -60,10 +56,11 @@ describe("OpenVikingUploadsPage", () => {
         </MemoryRouter>,
       );
     });
-    const uri = container.querySelector("#viking-upload-uri") as HTMLInputElement;
+    const uri = container.querySelector("#viking-upload-uri");
     expect(uri).not.toBeNull();
+    await waitForSakuga(uri);
     await act(async () => {
-      setInputValue(uri, "viking://resources/guide.md");
+      typeIntoSakuga(uri, "viking://resources/guide.md");
     });
     await act(async () => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -82,11 +79,14 @@ describe("OpenVikingUploadsPage", () => {
         </MemoryRouter>,
       );
     });
-    const memoryTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
-      t.textContent?.includes("Add memory"),
-    ) as HTMLElement;
+    const tabs = container.querySelector("sakuga-tabs");
+    await waitForSakuga(tabs);
+    const memoryTab = sakugaInnerAll<HTMLButtonElement>(tabs, "button").find((b) =>
+      b.textContent?.includes("Add memory"),
+    );
+    expect(memoryTab).toBeDefined();
     await act(async () => {
-      memoryTab.click();
+      memoryTab?.click();
     });
     const area = container.querySelector("#viking-memory-text") as HTMLTextAreaElement;
     expect(area).not.toBeNull();
@@ -110,9 +110,10 @@ describe("OpenVikingUploadsPage", () => {
         </MemoryRouter>,
       );
     });
-    const uri = container.querySelector("#viking-upload-uri") as HTMLInputElement;
+    const uri = container.querySelector("#viking-upload-uri");
+    await waitForSakuga(uri);
     await act(async () => {
-      setInputValue(uri, "viking://resources/guide.md");
+      typeIntoSakuga(uri, "viking://resources/guide.md");
     });
     await act(async () => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));

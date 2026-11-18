@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { Blocks, BookOpen, ChevronRight, Code, FolderUp, Info, Search } from "lucide-react";
+import { Button } from "@/sakuga/ui";
 import {
   SettingsEmpty,
   SettingsPageIntro,
@@ -144,13 +145,9 @@ export default function OpenVikingResourcesPage() {
             }
             description={section.body}
             control={
-              <button
-                type="button"
-                className="btn btn--ghost btn--sm"
-                onClick={() => void navigate(section.to)}
-              >
+              <Button variant="secondary" onClick={() => void navigate(section.to)}>
                 {section.cta} <ChevronRight className="h-4 w-4" aria-hidden />
-              </button>
+              </Button>
             }
             testId={`viking-resource-${section.key}`}
           />

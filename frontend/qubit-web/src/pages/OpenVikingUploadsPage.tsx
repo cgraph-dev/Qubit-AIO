@@ -17,12 +17,8 @@
 import { useCallback, useState } from "react";
 import { useSearchParams } from "react-router";
 import { Database, FolderUp } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Toast } from "@nous-research/ui/ui/components/toast";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { Button, Input, Tabs, emitFx, showSakugaToast } from "@/sakuga/ui";
 import {
   SettingsEmpty,
   SettingsPageIntro,
@@ -62,7 +58,6 @@ export default function OpenVikingUploadsPage() {
   const [failed, setFailed] = useState("");
   const [busy, setBusy] = useState(false);
   const [staged, setStaged] = useState<StagedWrite[]>([]);
-  const { toast, showToast } = useToast();
 
   // Staged confirm gate: the write is refused unless the operator approves
   // it explicitly. Uses the platform confirm primitive so the gate is a real
@@ -93,7 +88,8 @@ export default function OpenVikingUploadsPage() {
       if (!ok) return;
       await addVikingResource(input, () => true);
       setNotice("Resource staged and confirmed.");
-      showToast("Resource staged and confirmed.", "success");
+      showSakugaToast("Resource staged and confirmed.");
+      emitFx("success");
       recordStaged("resource", title.trim() || value);
       setUri("");
       setTitle("");
@@ -104,7 +100,8 @@ export default function OpenVikingUploadsPage() {
           ? e.message
           : "resource add failed";
       setFailed(message);
-      showToast(message, "error");
+      showSakugaToast(message);
+        emitFx("error");
     } finally {
       setBusy(false);
     }
@@ -123,7 +120,8 @@ export default function OpenVikingUploadsPage() {
       if (!ok) return;
       await addVikingMemory({ text: value }, () => true);
       setNotice("Memory staged and confirmed.");
-      showToast("Memory staged and confirmed.", "success");
+      showSakugaToast("Memory staged and confirmed.");
+      emitFx("success");
       recordStaged("memory", value.length > 60 ? `${value.slice(0, 57)}…` : value);
       setText("");
     } catch (e) {
@@ -133,7 +131,8 @@ export default function OpenVikingUploadsPage() {
           ? e.message
           : "memory add failed";
       setFailed(message);
-      showToast(message, "error");
+      showSakugaToast(message);
+        emitFx("error");
     } finally {
       setBusy(false);
     }
@@ -141,8 +140,6 @@ export default function OpenVikingUploadsPage() {
 
   return (
     <div className="qb-upstream viking-settings settings-page settings-page--wide" data-testid="open-viking-uploads-page">
-      <Toast toast={toast} />
-
       <SettingsPageIntro currentPath="/open-viking/uploads" showSubnav>
         Stage a resource or a memory into the local context engine. Every write
         asks for confirmation first — nothing sends silently.
@@ -153,20 +150,12 @@ export default function OpenVikingUploadsPage() {
         description="Pick what this session is staging. Both writes are confirm-gated."
         ariaLabel="Upload type"
       >
-        <div className="viking-subnav" role="tablist">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={cn("btn btn--sm", tab === t.key && "active")}
-            >
-              <t.icon className="h-4 w-4" aria-hidden /> {t.label}
-            </button>
-          ))}
-        </div>
+        <Tabs
+          label="Write mode"
+          options={TABS.map((t) => ({ value: t.key, label: t.label }))}
+          selected={tab === "memory" ? 1 : 0}
+          onChange={(detail) => setTab(detail.value === "memory" ? "memory" : "resource")}
+        />
       </SettingsSection>
 
       {notice && (
@@ -203,11 +192,11 @@ export default function OpenVikingUploadsPage() {
               control={
                 <Input
                   id="viking-upload-uri"
-                  className="font-courier"
+                  label="Resource URI"
+                  className="qsk-field font-courier"
                   placeholder="viking://… or https://…"
                   value={uri}
-                  onChange={(e) => setUri(e.target.value)}
-                  aria-label="Resource URI"
+                  onChange={setUri}
                 />
               }
             />
@@ -218,22 +207,18 @@ export default function OpenVikingUploadsPage() {
               control={
                 <Input
                   id="viking-upload-title"
+                  label="Resource title"
+                  className="qsk-field"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  aria-label="Resource title"
+                  onChange={setTitle}
                 />
               }
             />
             <SettingsRow
               className="settings-row--actions"
               control={
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="uppercase"
-                  disabled={busy}
-                  prefix={busy ? <Spinner /> : <FolderUp className="h-4 w-4" />}
-                >
+                <Button type="submit" className="uppercase" disabled={busy}>
+                  {busy ? <Spinner /> : <FolderUp className="h-4 w-4" aria-hidden />}
                   {busy ? "Staging…" : "Add resource"}
                 </Button>
               }
@@ -263,13 +248,8 @@ export default function OpenVikingUploadsPage() {
             <SettingsRow
               className="settings-row--actions"
               control={
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="uppercase"
-                  disabled={busy}
-                  prefix={busy ? <Spinner /> : <Database className="h-4 w-4" />}
-                >
+                <Button type="submit" className="uppercase" disabled={busy}>
+                  {busy ? <Spinner /> : <Database className="h-4 w-4" aria-hidden />}
                   {busy ? "Staging…" : "Add memory"}
                 </Button>
               }

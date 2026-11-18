@@ -15,8 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 import { Bot, Search, Wrench } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
+import { Button, Input } from "@/sakuga/ui";
 import {
   SettingsEmpty,
   SettingsLoadingSkeleton,
@@ -144,12 +143,7 @@ export default function OpenVikingAgentHubPage() {
             description="Conversation sessions recorded by the local engine."
             count={sessionsMissing ? undefined : sessions.length}
             actions={
-              <Button
-                size="sm"
-                outlined
-                className="uppercase"
-                onClick={() => void navigate("/open-viking")}
-              >
+              <Button className="uppercase" onClick={() => void navigate("/open-viking")}>
                 Open Playground
               </Button>
             }
@@ -193,11 +187,11 @@ export default function OpenVikingAgentHubPage() {
                 <div className="flex items-center gap-2">
                   <Search className="h-4 w-4 text-muted" aria-hidden />
                   <Input
-                    className="settings-input"
+                    label="Filter skills"
+                    className="qsk-field"
                     placeholder="Filter skills…"
                     value={skillFilter}
-                    onChange={(e) => setSkillFilter(e.target.value)}
-                    aria-label="Filter skills"
+                    onChange={setSkillFilter}
                   />
                 </div>
               )
@@ -244,12 +238,7 @@ export default function OpenVikingAgentHubPage() {
                   <SettingsRow
                     className="settings-row--actions"
                     control={
-                      <Button
-                        size="sm"
-                        outlined
-                        className="uppercase"
-                        onClick={() => setSkillLimit((n) => n + SKILL_PAGE)}
-                      >
+                      <Button className="uppercase" onClick={() => setSkillLimit((n) => n + SKILL_PAGE)}>
                         Show more ({filteredSkills.length - visibleSkills.length} remaining)
                       </Button>
                     }
@@ -273,12 +262,7 @@ export default function OpenVikingAgentHubPage() {
                 }
                 description={selectedSkill.description || "No description provided."}
                 control={
-                  <Button
-                    size="sm"
-                    outlined
-                    className="uppercase"
-                    onClick={() => void copyTextToClipboard(selectedSkill.id)}
-                  >
+                  <Button className="uppercase" onClick={() => void copyTextToClipboard(selectedSkill.id)}>
                     Copy id
                   </Button>
                 }

@@ -9,6 +9,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { sakugaInnerAll, waitForSakuga } from "@qubit/shared/sakuga";
 
 const vikingMocks = vi.hoisted(() => ({
   getVikingStatus: vi.fn(),
@@ -109,7 +111,7 @@ describe("OpenVikingPage", () => {
   it("opens a tree node into the viewer with Preview/Source toggle and viking:// uri", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("favorite editor") ?? false);
-    const nodeButton = Array.from(container.querySelectorAll("button")).find((b) =>
+    const nodeButton = Array.from(container.querySelectorAll("button, sakuga-button")).find((b) =>
       b.textContent?.includes("favorite editor"),
     );
     expect(nodeButton).toBeDefined();
@@ -120,11 +122,13 @@ describe("OpenVikingPage", () => {
     expect(container.querySelector('[data-testid="viking-uri"]')?.textContent).toBe(
       "viking://memories/m1.md",
     );
-    const sourceTab = Array.from(container.querySelectorAll('[role="tab"]')).find((t) =>
+    const tabs = container.querySelector("sakuga-tabs");
+    await waitForSakuga(tabs);
+    const sourceTab = sakugaInnerAll<HTMLButtonElement>(tabs, "button").find((t) =>
       t.textContent?.includes("Source"),
     );
     await act(async () => {
-      (sourceTab as HTMLElement)?.click();
+      sourceTab?.click();
     });
     expect(container.querySelector('[data-testid="viking-viewer-body"]')?.textContent).toContain(
       "editor: qubit",

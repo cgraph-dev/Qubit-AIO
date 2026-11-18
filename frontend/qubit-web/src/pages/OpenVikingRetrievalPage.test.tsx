@@ -8,6 +8,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const vikingMocks = vi.hoisted(() => ({
   searchVikingRetrieval: vi.fn(),
@@ -36,12 +38,6 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
   }
 }
 
-function setInputValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 beforeEach(() => {
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -68,10 +64,11 @@ describe("OpenVikingRetrievalPage", () => {
         </MemoryRouter>,
       );
     });
-    const input = container.querySelector("#viking-retrieval-q") as HTMLInputElement;
+    const input = container.querySelector("#viking-retrieval-q");
     expect(input).not.toBeNull();
+    await waitForSakuga(input);
     await act(async () => {
-      setInputValue(input, "dark mode");
+      typeIntoSakuga(input, "dark mode");
     });
     await act(async () => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
@@ -90,9 +87,10 @@ describe("OpenVikingRetrievalPage", () => {
         </MemoryRouter>,
       );
     });
-    const input = container.querySelector("#viking-retrieval-q") as HTMLInputElement;
+    const input = container.querySelector("#viking-retrieval-q");
+    await waitForSakuga(input);
     await act(async () => {
-      setInputValue(input, "anything");
+      typeIntoSakuga(input, "anything");
     });
     await act(async () => {
       container.querySelector("form")?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
