@@ -2,6 +2,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
 
 const apiMocks = vi.hoisted(() => ({ fetchJSON: vi.fn() }));
 
@@ -27,7 +28,7 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 }
 
 function click(label: string) {
-  const el = document.querySelector(`button[aria-label="${label}"]`);
+  const el = document.querySelector(`button[aria-label="${label}"], sakuga-button[aria-label="${label}"]`);
   if (!el) throw new Error(`button not rendered: ${label}`);
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 }
