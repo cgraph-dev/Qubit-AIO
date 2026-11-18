@@ -1,0 +1,547 @@
+/* Stage 8/9 — Office ambient motion (repo-aware, zero control motion).
+ *
+ * WHAT THIS IS
+ * ------------
+ * Non-control atmosphere and panel choreography for Qubit Office, bound to
+ * selectors that exist in this tree:
+ *   - Qubit host: `.office-game`, `.office-game__main`, `.office-game__dock`,
+ *     `.office-game__modal`, `.office-game__campus`, `.office-game__scrim`,
+ *     `.office-game__agentsDock`, `.office-game__warRoomDock`, `.tower__roomName`
+ *   - vendored Habblaud (when this sheet is injected into its document):
+ *     `.ui-root`, `.ui-topbar`, `.ui-sidebar`, `.ui-drawer`, `.ui-feed`,
+ *     `.ui-feed__ticker`, `.ui-dialog`, `.ui-popover`, `.ui-scrim`
+ *   - our own SVG nodes: `svg[data-fx-layer="ambient"]` and its children
+ *
+ * WHAT THIS IS NOT
+ * ----------------
+ * Stage 9's zero-control-motion rule removes every interactive animation. This
+ * file therefore contains NO rule for:
+ *   buttons (including `.ui-feed__row`, `.ui-agent`), icon buttons, close
+ *   controls, tabs / tab underlines, toggles, checkboxes, radio/segmented
+ *   controls, counters, room/division headers, inputs/selects, tooltips
+ *   (`.ui-tip`), toasts (`.ui-toast`, which wraps `<button>`), interactive
+ *   cards/seats, or the feed row's `<li>` wrapper (`.ui-feed__item`, whose
+ *   only child is the feed button). `motion-audit.test.ts` enforces this.
+ *
+ * All colours are `--office-*` tokens from `tokens.css`; durations and easing
+ * come from `--office-dur-*` / `--office-ease`. The only literals are geometry
+ * (px) and the fixed 9600ms/3400ms ambient periods, which the Stage 8 spec
+ * calibrates against the reference layout.
+ *
+ * There is no frame loop here either: petals, moon, lanterns and camera drift
+ * are CSS keyframes driven by per-element custom properties.
+ */
+
+/* --------------------------------------------------------------------------
+   1. Token bridge (real tokens only)
+   -------------------------------------------------------------------------- */
+.office-game,
+html body .ui-root {
+  --office-fx-dur-fast: var(--office-dur-fast, 120ms);
+  --office-fx-dur-med: var(--office-dur-med, 220ms);
+  --office-fx-dur-slow: calc(var(--office-fx-dur-med, 220ms) * 1.9);
+  --office-fx-ease: var(--office-ease, cubic-bezier(0.2, 0.8, 0.2, 1));
+  --office-fx-lantern-alpha: 0.94;
+  --office-fx-moon-alpha: 0.88;
+  --office-fx-z-ambient: 1;
+  --office-fx-radius-pill: 9998px;
+}
+
+/* --------------------------------------------------------------------------
+   2. Ambient SVG overlay (moon, lanterns, petals, camera drift)
+      `pointer-events: none`; z-index 1 sits under the docks (4), scrim (20)
+      and topbar. It never wraps or transforms the room canvas.
+   -------------------------------------------------------------------------- */
+.office-game__main > svg[data-fx-layer="ambient"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--office-fx-z-ambient);
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  animation:
+    office-fx-drift-x 28s ease-in-out infinite alternate,
+    office-fx-drift-y 37s ease-in-out infinite alternate;
+}
+
+html body .ui-root > svg[data-fx-layer="ambient"] {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: var(--office-fx-z-ambient);
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  animation:
+    office-fx-drift-x 28s ease-in-out infinite alternate,
+    office-fx-drift-y 37s ease-in-out infinite alternate;
+}
+
+/* Coprime periods keep the two axes from locking in a corner. */
+@keyframes office-fx-drift-x {
+  from {
+    translate: calc(-1 * var(--office-s1, 4px)) 0;
+  }
+  to {
+    translate: var(--office-s1, 4px) 0;
+  }
+}
+
+@keyframes office-fx-drift-y {
+  from {
+    transform: translateY(calc(-0.5 * var(--office-s1, 4px)));
+  }
+  to {
+    transform: translateY(calc(0.5 * var(--office-s1, 4px)));
+  }
+}
+
+/* A panning/dragging operator pauses the drift; it resumes on release. */
+svg[data-fx-layer="ambient"][data-office-fx-paused="1"] {
+  animation-play-state: paused;
+}
+
+/* --------------------------------------------------------------------------
+   3. Moon halo (calm 9600ms breathing)
+   -------------------------------------------------------------------------- */
+@keyframes office-fx-moon-breathe {
+  0%,
+  100% {
+    opacity: 0.78;
+    transform: scale(0.985);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.025);
+  }
+}
+
+svg[data-fx-layer="ambient"] g[data-fx-node="moon"] {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: var(--office-fx-moon-alpha);
+  filter: drop-shadow(
+    0 0 28px color-mix(in srgb, var(--office-warn) 58%, transparent)
+  );
+  animation: office-fx-moon-breathe 9600ms ease-in-out infinite;
+}
+
+/* Skyline aura above the vendored topbar, sitting behind its content. */
+html body .ui-root .ui-topbar {
+  position: relative;
+}
+
+html body .ui-root .ui-topbar::before {
+  content: "";
+  position: absolute;
+  top: calc(-1 * var(--office-s5));
+  right: 18%;
+  width: 168px;
+  height: 84px;
+  pointer-events: none;
+  border-radius: var(--office-fx-radius-pill);
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--office-warn) 34%, transparent) 0%,
+    color-mix(in srgb, var(--office-accent) 14%, transparent) 48%,
+    transparent 74%
+  );
+  box-shadow: 0 0 28px color-mix(in srgb, var(--office-warn) 42%, transparent);
+  opacity: var(--office-fx-moon-alpha);
+  animation: office-fx-moon-breathe 9600ms ease-in-out infinite;
+}
+
+/* --------------------------------------------------------------------------
+   4. Lantern pools (warm shimmer well under the flash threshold)
+   -------------------------------------------------------------------------- */
+@keyframes office-fx-lantern-flicker {
+  0%,
+  100% {
+    opacity: 0.9;
+    transform: scale(0.99);
+  }
+  23% {
+    opacity: 0.98;
+    transform: scale(1.01);
+  }
+  47% {
+    opacity: 0.86;
+    transform: scale(0.985);
+  }
+  74% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
+svg[data-fx-layer="ambient"] g[data-fx-node="lantern"] {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: var(--office-fx-lantern-alpha);
+  filter: drop-shadow(
+    0 0 18px color-mix(in srgb, var(--office-warn) 55%, transparent)
+  );
+  animation: office-fx-lantern-flicker 3400ms ease-in-out infinite;
+  animation-delay: var(--fx-lantern-delay, 0s);
+}
+
+/* --------------------------------------------------------------------------
+   5. Sakura petals (two compositor animations: fall + sway/roll)
+   -------------------------------------------------------------------------- */
+@keyframes office-fx-petal-fall {
+  0% {
+    transform:
+      translate3d(var(--fx-petal-x, 0px), -24px, 0)
+      scale(var(--fx-petal-scale, 1));
+    opacity: 0;
+  }
+  8% {
+    opacity: var(--fx-petal-opacity, 0.6);
+  }
+  90% {
+    opacity: var(--fx-petal-opacity, 0.6);
+  }
+  100% {
+    transform:
+      translate3d(
+        calc(var(--fx-petal-x, 0px) - var(--fx-petal-breeze, 76px)),
+        calc(var(--fx-petal-height, 959px) + 24px),
+        0
+      )
+      scale(var(--fx-petal-scale, 1));
+    opacity: 0;
+  }
+}
+
+@keyframes office-fx-petal-sway {
+  0% {
+    translate: calc(-0.5 * var(--fx-petal-sway, 14px)) 0;
+    rotate: -28deg;
+  }
+  100% {
+    translate: calc(0.5 * var(--fx-petal-sway, 14px)) 0;
+    rotate: 28deg;
+  }
+}
+
+svg[data-fx-layer="ambient"] g[data-fx-node="petal"][data-fx-part="fall"] {
+  will-change: transform, opacity;
+  animation:
+    office-fx-petal-fall var(--fx-petal-fall, 14000ms) linear infinite;
+  animation-delay: var(--fx-petal-delay, 0ms);
+}
+
+svg[data-fx-layer="ambient"] g[data-fx-node="petal"] > g[data-fx-part="sway"] {
+  will-change: transform;
+  animation:
+    office-fx-petal-sway var(--fx-petal-sway-dur, 4400ms) ease-in-out infinite
+    alternate;
+  animation-delay: var(--fx-petal-delay, 0ms);
+}
+
+/* --------------------------------------------------------------------------
+   6. Collapsed activity ticker (a `<span>`, never a button wrapper)
+      `.ui-feed__item` is deliberately absent: its only child is the feed
+      button, so a row flash would be control motion.
+   -------------------------------------------------------------------------- */
+@keyframes office-fx-ticker-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--office-s2));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+html body .ui-root:not(.has-feed) .ui-feed__ticker[data-fx-tick="1"] {
+  display: inline-block;
+  color: var(--office-muted);
+  font-size: var(--office-fs-sm);
+  animation:
+    office-fx-ticker-in var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+/* --------------------------------------------------------------------------
+   7. Room label reveal (static text, not a control)
+      No positional transform on the container: Stage 7 anchors room cards with
+      transforms, so a label-only fade+rise is used.
+   -------------------------------------------------------------------------- */
+@keyframes office-fx-room-label {
+  from {
+    opacity: 0;
+    transform: translateY(var(--office-s1));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.office-game .tower__roomName {
+  animation:
+    office-fx-room-label var(--office-fx-dur-med) var(--office-fx-ease) both;
+}
+
+/* --------------------------------------------------------------------------
+   8. Panel open/close choreography (containers only, no control children)
+   -------------------------------------------------------------------------- */
+html body .ui-root .ui-sidebar {
+  opacity: 0;
+  transition:
+    transform var(--office-fx-dur-slow) var(--office-fx-ease),
+    opacity var(--office-fx-dur-med) var(--office-fx-ease),
+    visibility 0s linear var(--office-fx-dur-slow);
+}
+
+html body .ui-root.has-sidebar .ui-sidebar {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    transform var(--office-fx-dur-slow) var(--office-fx-ease),
+    opacity var(--office-fx-dur-med) var(--office-fx-ease),
+    visibility 0s linear 0s;
+}
+
+html.has-sidebar body .ui-root .ui-sidebar {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    transform var(--office-fx-dur-slow) var(--office-fx-ease),
+    opacity var(--office-fx-dur-med) var(--office-fx-ease),
+    visibility 0s linear 0s;
+}
+
+html body .ui-root .ui-drawer {
+  opacity: 0;
+  transition:
+    transform var(--office-fx-dur-slow) var(--office-fx-ease),
+    opacity var(--office-fx-dur-med) var(--office-fx-ease),
+    visibility 0s linear var(--office-fx-dur-slow);
+}
+
+html body .ui-root .ui-drawer.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    transform var(--office-fx-dur-slow) var(--office-fx-ease),
+    opacity var(--office-fx-dur-med) var(--office-fx-ease),
+    visibility 0s linear 0s;
+}
+
+html body .ui-root .ui-drawer.is-floating {
+  transition:
+    opacity var(--office-fx-dur-fast) var(--office-fx-ease);
+}
+
+html body .ui-root .ui-feed {
+  transition:
+    height var(--office-fx-dur-slow) var(--office-fx-ease),
+    left var(--office-fx-dur-slow) var(--office-fx-ease),
+    width var(--office-fx-dur-slow) var(--office-fx-ease),
+    box-shadow var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+/* --------------------------------------------------------------------------
+   9. Dialog / dock / modal / campus / scrim entrance
+   -------------------------------------------------------------------------- */
+@keyframes office-fx-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--office-s3)) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes office-fx-dock-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(var(--office-s4));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes office-fx-dock-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--office-s4)));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes office-fx-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+html body .ui-root .ui-dialog[open] {
+  animation:
+    office-fx-dialog-in var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+html body .ui-root .ui-popover {
+  animation:
+    office-fx-dialog-in var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+.office-game .office-game__modal {
+  animation:
+    office-fx-dialog-in var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+.office-game .office-game__campus {
+  animation:
+    office-fx-dialog-in var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+.office-game .office-game__scrim {
+  animation:
+    office-fx-scrim-in var(--office-fx-dur-fast) var(--office-fx-ease);
+}
+
+.office-game > .office-game__dock {
+  animation:
+    office-fx-dock-in-right var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+.office-game > .office-game__dock.office-game__agentsDock {
+  animation:
+    office-fx-dock-in-left var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+.office-game > .office-game__dock.office-game__warRoomDock {
+  animation:
+    office-fx-dock-in-left var(--office-fx-dur-med) var(--office-fx-ease);
+}
+
+/* --------------------------------------------------------------------------
+   10. Reduced motion — OS query (exact selectors so the audit can match them)
+   -------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  .office-game,
+  html body .ui-root {
+    --office-fx-lantern-alpha: 0.92;
+    --office-fx-moon-alpha: 0.88;
+  }
+
+  svg[data-fx-layer="ambient"] g[data-fx-node="petal"] {
+    display: none;
+  }
+
+  .office-game__main > svg[data-fx-layer="ambient"],
+  html body .ui-root > svg[data-fx-layer="ambient"],
+  svg[data-fx-layer="ambient"] g[data-fx-node="moon"],
+  html body .ui-root .ui-topbar::before,
+  svg[data-fx-layer="ambient"] g[data-fx-node="lantern"],
+  svg[data-fx-layer="ambient"] g[data-fx-node="petal"][data-fx-part="fall"],
+  svg[data-fx-layer="ambient"] g[data-fx-node="petal"] > g[data-fx-part="sway"],
+  html body .ui-root:not(.has-feed) .ui-feed__ticker[data-fx-tick="1"],
+  .office-game .tower__roomName,
+  html body .ui-root .ui-dialog[open],
+  html body .ui-root .ui-popover,
+  .office-game .office-game__modal,
+  .office-game .office-game__campus,
+  .office-game .office-game__scrim,
+  .office-game > .office-game__dock,
+  .office-game > .office-game__dock.office-game__agentsDock,
+  .office-game > .office-game__dock.office-game__warRoomDock {
+    animation: none;
+  }
+
+  html body .ui-root .ui-sidebar,
+  html body .ui-root.has-sidebar .ui-sidebar,
+  html.has-sidebar body .ui-root .ui-sidebar,
+  html body .ui-root .ui-drawer,
+  html body .ui-root .ui-drawer.is-open,
+  html body .ui-root .ui-drawer.is-floating,
+  html body .ui-root .ui-feed {
+    transition: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   11. Reduced motion — explicit shell attribute (same freeze, attribute form)
+   -------------------------------------------------------------------------- */
+.office-game[data-office-reduced-motion="1"],
+html[data-office-reduced-motion="1"] body .ui-root {
+  --office-fx-lantern-alpha: 0.92;
+  --office-fx-moon-alpha: 0.88;
+}
+
+.office-game[data-office-reduced-motion="1"] svg[data-fx-layer="ambient"]
+  g[data-fx-node="petal"],
+html[data-office-reduced-motion="1"] body .ui-root svg[data-fx-layer="ambient"]
+  g[data-fx-node="petal"] {
+  display: none;
+}
+
+.office-game[data-office-reduced-motion="1"]
+  .office-game__main > svg[data-fx-layer="ambient"],
+.office-game[data-office-reduced-motion="1"]
+  svg[data-fx-layer="ambient"] g[data-fx-node="moon"],
+.office-game[data-office-reduced-motion="1"]
+  svg[data-fx-layer="ambient"] g[data-fx-node="lantern"],
+.office-game[data-office-reduced-motion="1"]
+  svg[data-fx-layer="ambient"] g[data-fx-node="petal"][data-fx-part="fall"],
+.office-game[data-office-reduced-motion="1"]
+  svg[data-fx-layer="ambient"] g[data-fx-node="petal"] > g[data-fx-part="sway"],
+.office-game[data-office-reduced-motion="1"] .tower__roomName,
+.office-game[data-office-reduced-motion="1"] > .office-game__dock,
+.office-game[data-office-reduced-motion="1"]
+  > .office-game__dock.office-game__agentsDock,
+.office-game[data-office-reduced-motion="1"]
+  > .office-game__dock.office-game__warRoomDock,
+.office-game[data-office-reduced-motion="1"] .office-game__modal,
+.office-game[data-office-reduced-motion="1"] .office-game__campus,
+.office-game[data-office-reduced-motion="1"] .office-game__scrim {
+  animation: none;
+}
+
+html[data-office-reduced-motion="1"] body .ui-root
+  > svg[data-fx-layer="ambient"],
+html[data-office-reduced-motion="1"] body .ui-root
+  svg[data-fx-layer="ambient"] g[data-fx-node="moon"],
+html[data-office-reduced-motion="1"] body .ui-root
+  svg[data-fx-layer="ambient"] g[data-fx-node="lantern"],
+html[data-office-reduced-motion="1"] body .ui-root
+  svg[data-fx-layer="ambient"] g[data-fx-node="petal"][data-fx-part="fall"],
+html[data-office-reduced-motion="1"] body .ui-root
+  svg[data-fx-layer="ambient"] g[data-fx-node="petal"] > g[data-fx-part="sway"],
+html[data-office-reduced-motion="1"] body .ui-root
+  .ui-topbar::before,
+html[data-office-reduced-motion="1"] body .ui-root
+  :not(.has-feed) .ui-feed__ticker[data-fx-tick="1"],
+html[data-office-reduced-motion="1"] body .ui-root
+  .ui-dialog[open],
+html[data-office-reduced-motion="1"] body .ui-root
+  .ui-popover {
+  animation: none;
+}
+
+html[data-office-reduced-motion="1"] body .ui-root .ui-sidebar,
+html[data-office-reduced-motion="1"] body .ui-root .ui-drawer,
+html[data-office-reduced-motion="1"] body .ui-root .ui-drawer.is-open,
+html[data-office-reduced-motion="1"] body .ui-root .ui-drawer.is-floating,
+html[data-office-reduced-motion="1"] body .ui-root .ui-feed {
+  transition: none;
+}
