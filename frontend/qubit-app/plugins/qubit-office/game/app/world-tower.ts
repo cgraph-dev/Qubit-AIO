@@ -1,4 +1,4 @@
-/* Typed client for the 100-floor tower scene.
+/* Typed client for the five-floor tower scene.
  *
  * ONE DOOR, ONE FALLBACK
  * ----------------------

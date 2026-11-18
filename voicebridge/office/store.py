@@ -41,7 +41,7 @@ DIVISION_KINDS = ("product", "content", "service", "trading", "intelligence",
 AGENT_STATUS = ("active", "suspended", "terminated")
 
 MAX_SPAN = 7          # D34: a manager carries at most 7 direct reports
-MAX_FLOORS = 60       # D13 (revised)
+MAX_FLOORS = 5        # product cap: five floors
 CHAIN_MAX_HOPS = 8    # the chain must terminate at the CEO well inside this
 
 def db_path(cfg: Any) -> Path:

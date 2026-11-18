@@ -62,6 +62,24 @@ def test_one_hundred_floors_across_five_wings(plan, registry):
     assert sum(w.floor_count for w in plan.wings) == 100
 
 
+def test_product_default_is_five_floors():
+    plan = TP.build_tower_plan()
+    assert plan.floor_count == 5
+    assert plan.wing_count == 5
+    assert [f.index for f in plan.floors] == [1, 2, 3, 4, 5]
+    assert plan.counts() == {
+        "floors": 5,
+        "wings": 5,
+        "active_floors": 5,
+        "dormant_floors": 0,
+        "rooms": 15,
+        "cells": 28,
+        "desks": 147,
+        "staffed_agents": 0,
+    }
+    assert TP.validate_tower_plan(plan) == []
+
+
 def test_active_and_dormant_split_comes_from_the_templates(plan, registry):
     by_id = {f.floor_id: f for f in plan.floors}
     for template in registry.floors:
@@ -226,7 +244,7 @@ def test_dispatch_serves_the_projection_without_a_store(tmp_path):
     code, payload = _call(cfg, "GET", "/api/office/world/tower-plan")
     assert code == 200
     assert payload["ok"] is True
-    assert payload["tower"]["floors"] == 100
+    assert payload["tower"]["floors"] == 5
     assert payload["tower"]["wings"] == 5
     assert payload["counts"]["desks"] > 0
     # No store was opened or created by the read.
@@ -280,4 +298,4 @@ def test_read_needs_no_network(tmp_path, monkeypatch):
     cfg = _Cfg(tmp_path / "state")
     code, payload = _call(cfg, "GET", "/api/office/world/tower-plan")
     assert code == 200
-    assert payload["tower"]["floors"] == 100
+    assert payload["tower"]["floors"] == 5
