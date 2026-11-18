@@ -6,6 +6,7 @@
  * success.
  */
 import { act, type ReactNode } from "react";
+import "./sakuga-test-dom";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -66,7 +67,7 @@ async function renderPage() {
 
 function buttonByLabel(label: string): HTMLButtonElement | null {
   return container.querySelector<HTMLButtonElement>(
-    `button[aria-label="${label}"]`,
+    `[aria-label="${label}"]`,
   );
 }
 
@@ -163,14 +164,14 @@ describe("WebhooksPage create validation", () => {
     await waitFor(() => apiMocks.getWebhooks.mock.calls.length > 0);
 
     const newBtn = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
+      container.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
     ).find((b) => /New subscription/.test(b.textContent ?? ""));
     expect(newBtn).not.toBeUndefined();
     await act(async () => newBtn?.click());
     await waitFor(() => document.getElementById("webhook-name") !== null);
 
     const create = Array.from(
-      document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button'),
+      document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button, [role="dialog"] sakuga-button'),
     ).find((b) => (b.textContent ?? "").trim() === "Create");
     expect(create).not.toBeUndefined();
     await act(async () => create?.click());

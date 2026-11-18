@@ -11,7 +11,6 @@ import {
   Download,
   FileText,
   RefreshCw,
-  Search,
   X,
 } from "lucide-react";
 import { useSearchParams } from "react-router";
@@ -33,13 +32,11 @@ type LogsPageResponse = LogsResponse & {
   next_offset?: number | null;
 };
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { FilterGroup, Segmented } from "@nous-research/ui/ui/components/segmented";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Switch } from "@nous-research/ui/ui/components/switch";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { Label } from "@nous-research/ui/ui/components/label";
+import { Button, Input, Toggle } from "@/sakuga/ui";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
@@ -222,8 +219,7 @@ export default function LogsPage() {
         </Badge>
         <Button
           type="button"
-          ghost
-          size="icon"
+          variant="secondary"
           className="text-muted-foreground hover:text-foreground"
           onClick={exportLogs}
           disabled={lines.length === 0}
@@ -238,8 +234,7 @@ export default function LogsPage() {
         </Button>
         <Button
           type="button"
-          ghost
-          size="icon"
+          variant="secondary"
           className="text-muted-foreground hover:text-foreground"
           onClick={fetchLogs}
           disabled={loading}
@@ -255,9 +250,10 @@ export default function LogsPage() {
           <Label htmlFor="logs-auto-refresh" className="text-xs cursor-pointer">
             {t.logs.autoRefresh}
           </Label>
-          <Switch
+          <Toggle
+            label={t.logs.autoRefresh}
             checked={autoRefresh}
-            onCheckedChange={setAutoRefresh}
+            onChange={setAutoRefresh}
             id="logs-auto-refresh"
           />
           {autoRefresh && (
@@ -348,19 +344,16 @@ export default function LogsPage() {
 
         <FilterGroup label="Search" className={filterGroupClass}>
           <div className="relative flex w-full min-w-0 items-center sm:w-64">
-            <Search className="pointer-events-none absolute left-2 h-3.5 w-3.5 text-text-tertiary" />
             <Input
+              label="Search log lines"
               value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
+              onChange={(value) => setSearchInput(value)}
               placeholder="Filter lines…"
-              aria-label="Search log lines"
-              className="h-9 min-w-0 pl-7 pr-7 font-mono text-xs"
             />
             {searchInput && (
               <Button
                 type="button"
-                ghost
-                size="icon"
+                variant="secondary"
                 aria-label="Clear search"
                 onClick={() => setSearchInput("")}
                 className="absolute right-0 h-8 w-8 text-text-tertiary hover:text-foreground"
@@ -387,8 +380,7 @@ export default function LogsPage() {
             <div className="flex items-center gap-1">
               <Button
                 type="button"
-                ghost
-                size="sm"
+                variant="secondary"
                 disabled={offset === 0 || loading}
                 onClick={() => setOffset(Math.max(0, offset - lineCount))}
                 aria-label="Load newer lines"
@@ -399,8 +391,7 @@ export default function LogsPage() {
               </Button>
               <Button
                 type="button"
-                ghost
-                size="sm"
+                variant="secondary"
                 disabled={!hasMore || loading}
                 onClick={() => {
                   if (nextOffset !== null) setOffset(nextOffset);

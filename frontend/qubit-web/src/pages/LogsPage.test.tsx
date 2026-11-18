@@ -10,6 +10,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   fetchJSON: vi.fn(),
@@ -93,18 +95,13 @@ describe("LogsPage search", () => {
     // default request must not send a `level` param at all.
     expect(requestedUrls().every((u) => !u.includes("level="))).toBe(true);
 
-    const input = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Search log lines"]',
+    const input = container.querySelector<HTMLElement>(
+      'sakuga-input[aria-label="Search log lines"]',
     );
     expect(input).not.toBeNull();
 
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )?.set;
-      setter?.call(input, "timeout");
-      input?.dispatchEvent(new Event("input", { bubbles: true }));
+      typeIntoSakuga(input, "timeout");
       // Let the 300ms debounce fire.
       await new Promise((resolve) => setTimeout(resolve, 400));
     });
@@ -135,7 +132,7 @@ describe("LogsPage pagination", () => {
     expect(container.textContent).toContain("line-newest");
 
     const older = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Load older lines"]',
+      '[aria-label="Load older lines"]',
     );
     expect(older).not.toBeNull();
     expect(older?.disabled).toBe(false);
@@ -166,7 +163,7 @@ describe("LogsPage export disabled reason", () => {
     await waitFor(() => apiMocks.fetchJSON.mock.calls.length > 0);
 
     const exportBtn = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Export log lines"]',
+      '[aria-label="Export log lines"]',
     );
     expect(exportBtn).not.toBeNull();
     expect(exportBtn?.disabled).toBe(true);

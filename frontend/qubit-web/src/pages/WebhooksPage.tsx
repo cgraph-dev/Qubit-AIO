@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   Check,
   Copy,
   History,
   KeyRound,
-  Plus,
   RefreshCw,
   RotateCw,
   Send,
@@ -14,7 +13,6 @@ import {
   X,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
@@ -30,7 +28,7 @@ import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
+import { Button, Input } from "@/sakuga/ui";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn, themedBody } from "@/lib/utils";
@@ -61,8 +59,7 @@ function CopyButton({ value }: { value: string }) {
   }, [value]);
   return (
     <Button
-      ghost
-      size="icon"
+      variant="secondary"
       title="Copy"
       aria-label="Copy"
       onClick={handleCopy}
@@ -96,6 +93,7 @@ export default function WebhooksPage() {
   // New subscription modal state (canonical webhook contract: id/url/events/
   // secret_ref — the same record the CLI/voice write).
   const [createModalOpen, setCreateModalOpen] = useState(false);
+  const nameHostRef = useRef<HTMLElement | null>(null);
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [events, setEvents] = useState("");
@@ -149,6 +147,29 @@ export default function WebhooksPage() {
   useEffect(() => {
     loadWebhooks();
   }, [loadWebhooks]);
+
+  // The wrapper renders a real input inside an open shadow root, so the
+  // browser's `autoFocus` cannot reach it. Focus it once the element has
+  // upgraded; the retry covers the lazy component load.
+  useEffect(() => {
+    if (!createModalOpen) return;
+    let tries = 0;
+    let timer = 0;
+    const attempt = () => {
+      const host =
+        nameHostRef.current ?? document.getElementById("webhook-name");
+      const input = host?.shadowRoot?.querySelector("input");
+      if (input) {
+        input.focus();
+        window.clearInterval(timer);
+      } else if (++tries > 40) {
+        window.clearInterval(timer);
+      }
+    };
+    attempt();
+    timer = window.setInterval(attempt, 10);
+    return () => window.clearInterval(timer);
+  }, [createModalOpen]);
 
   const watchRestartOutcome = useCallback(async () => {
     for (let i = 0; i < 20; i++) {
@@ -422,9 +443,7 @@ export default function WebhooksPage() {
     setEnd(
       <Button
         className="uppercase"
-        size="sm"
         disabled={!enabled || enabling}
-        prefix={<Plus />}
         onClick={() => {
           setCreated(null);
           setCreateModalOpen(true);
@@ -477,8 +496,7 @@ export default function WebhooksPage() {
         >
           <div className={cn(themedBody, "relative w-full max-w-lg border border-border bg-card shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto")}>
             <Button
-              ghost
-              size="icon"
+              variant="secondary"
               onClick={closeCreateModal}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
@@ -524,7 +542,6 @@ export default function WebhooksPage() {
                 <div className="flex justify-end">
                   <Button
                     className="uppercase"
-                    size="sm"
                     onClick={closeCreateModal}
                   >
                     Done
@@ -536,16 +553,17 @@ export default function WebhooksPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="webhook-name">Name</Label>
                   <Input
+                    ref={nameHostRef}
+                    label="Name"
                     id="webhook-name"
-                    autoFocus
                     placeholder="e.g. github-push"
                     value={name}
-                    aria-invalid={formErrors.name ? true : undefined}
+                    aria-invalid={formErrors.name ? "true" : undefined}
                     aria-describedby={
                       formErrors.name ? "webhook-name-error" : undefined
                     }
-                    onChange={(e) => {
-                      setName(e.target.value);
+                    onChange={(value) => {
+                      setName(value);
                       if (formErrors.name)
                         setFormErrors((prev) => ({ ...prev, name: undefined }));
                     }}
@@ -556,15 +574,16 @@ export default function WebhooksPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="webhook-url">Delivery URL</Label>
                   <Input
+                    label="Delivery URL"
                     id="webhook-url"
                     placeholder="https://hooks.example.com/agent"
                     value={url}
-                    aria-invalid={formErrors.url ? true : undefined}
+                    aria-invalid={formErrors.url ? "true" : undefined}
                     aria-describedby={
                       formErrors.url ? "webhook-url-error" : undefined
                     }
-                    onChange={(e) => {
-                      setUrl(e.target.value);
+                    onChange={(value) => {
+                      setUrl(value);
                       if (formErrors.url)
                         setFormErrors((prev) => ({ ...prev, url: undefined }));
                     }}
@@ -575,15 +594,16 @@ export default function WebhooksPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="webhook-events">Events</Label>
                   <Input
+                    label="Events"
                     id="webhook-events"
                     placeholder="comma-separated, e.g. task.completed"
                     value={events}
-                    aria-invalid={formErrors.events ? true : undefined}
+                    aria-invalid={formErrors.events ? "true" : undefined}
                     aria-describedby={
                       formErrors.events ? "webhook-events-error" : undefined
                     }
-                    onChange={(e) => {
-                      setEvents(e.target.value);
+                    onChange={(value) => {
+                      setEvents(value);
                       if (formErrors.events)
                         setFormErrors((prev) => ({ ...prev, events: undefined }));
                     }}
@@ -597,15 +617,16 @@ export default function WebhooksPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="webhook-secret-ref">Signing secret reference</Label>
                   <Input
+                    label="Signing secret reference"
                     id="webhook-secret-ref"
                     placeholder="env:WEBHOOK_SIGNING_SECRET or file:/run/secrets/hook"
                     value={secretRef}
-                    aria-invalid={formErrors.secretRef ? true : undefined}
+                    aria-invalid={formErrors.secretRef ? "true" : undefined}
                     aria-describedby={
                       formErrors.secretRef ? "webhook-secret-ref-error" : undefined
                     }
-                    onChange={(e) => {
-                      setSecretRef(e.target.value);
+                    onChange={(value) => {
+                      setSecretRef(value);
                       if (formErrors.secretRef)
                         setFormErrors((prev) => ({
                           ...prev,
@@ -622,10 +643,8 @@ export default function WebhooksPage() {
                 <div className="flex justify-end">
                   <Button
                     className="uppercase"
-                    size="sm"
                     onClick={handleCreate}
                     disabled={creating}
-                    prefix={creating ? <Spinner /> : undefined}
                   >
                     {creating ? "Creating…" : "Create"}
                   </Button>
@@ -653,8 +672,7 @@ export default function WebhooksPage() {
             )}
           >
             <Button
-              ghost
-              size="icon"
+              variant="secondary"
               onClick={closeDeliveries}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
               aria-label="Close"
@@ -749,11 +767,9 @@ export default function WebhooksPage() {
           </div>
           {!enabled && (
             <Button
-              size="sm"
               className="uppercase shrink-0"
               onClick={handleEnableWebhooks}
               disabled={enabling}
-              prefix={enabling ? <Spinner /> : <Webhook className="h-4 w-4" />}
             >
               {enabling ? "Enabling…" : "Enable webhooks"}
             </Button>
@@ -781,11 +797,9 @@ export default function WebhooksPage() {
               </span>
             </div>
             <Button
-              size="sm"
               className="uppercase shrink-0"
               onClick={handleRestart}
               disabled={restarting}
-              prefix={restarting ? <Spinner /> : <RotateCw className="h-4 w-4" />}
             >
               {restarting ? "Restarting…" : "Restart gateway"}
             </Button>
@@ -858,8 +872,7 @@ export default function WebhooksPage() {
 
               <div className="flex items-center gap-1 shrink-0">
                 <Button
-                  ghost
-                  size="icon"
+                  variant="secondary"
                   title="Rotate signing secret"
                   aria-label="Rotate signing secret"
                   disabled={actionBusy === `${sub.name}:rotate`}
@@ -872,8 +885,7 @@ export default function WebhooksPage() {
                   )}
                 </Button>
                 <Button
-                  ghost
-                  size="icon"
+                  variant="secondary"
                   title="Send test delivery"
                   aria-label="Send test delivery"
                   disabled={actionBusy === `${sub.name}:test` || !sub.enabled}
@@ -882,8 +894,7 @@ export default function WebhooksPage() {
                   {actionBusy === `${sub.name}:test` ? <Spinner /> : <Send />}
                 </Button>
                 <Button
-                  ghost
-                  size="icon"
+                  variant="secondary"
                   title="Delivery history"
                   aria-label="Delivery history"
                   onClick={() => openDeliveries(sub)}
@@ -891,8 +902,7 @@ export default function WebhooksPage() {
                   <History />
                 </Button>
                 <Button
-                  ghost
-                  size="icon"
+                  variant="secondary"
                   title="Retry last failed delivery"
                   aria-label="Retry last failed delivery"
                   disabled={actionBusy === `${sub.name}:retry` || !sub.enabled}
@@ -905,8 +915,7 @@ export default function WebhooksPage() {
                   )}
                 </Button>
                 <Button
-                  ghost
-                  size="sm"
+                  variant="secondary"
                   className="uppercase"
                   disabled={togglingName === sub.name}
                   onClick={() => handleToggleEnabled(sub.name, !sub.enabled)}
@@ -914,9 +923,7 @@ export default function WebhooksPage() {
                   {sub.enabled ? "Disable" : "Enable"}
                 </Button>
                 <Button
-                  ghost
-                  destructive
-                  size="icon"
+                  variant="secondary"
                   title="Delete"
                   aria-label="Delete"
                   onClick={() => webhookDelete.requestDelete(sub.name)}

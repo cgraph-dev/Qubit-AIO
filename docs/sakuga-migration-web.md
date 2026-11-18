@@ -17,6 +17,8 @@ original palette, no recolouring. This file records only the controls that were
 | `src/pages/FilesPage.tsx`, `src/pages/ConfigPage.tsx`, `src/pages/SystemPage.tsx` | hidden `<input type=file>` | hidden file inputs are proxied by a Sakuga Button (owner exception) |
 | `src/components/AutoField.tsx` (rendered by Config) | auto-generated config fields | component owned by another lane; documented rather than edited |
 | `src/components/DeleteConfirmDialog.tsx`, `ConfirmDialog.tsx` | confirm dialogs | component-owned; their buttons are outside this file scope |
+| `src/pages/LogsPage.tsx` (`Log line N detail` rows) | per-line disclosure | dense monospace text rows, not an action affordance; a Sakuga button per line would add panel chrome to log output. Toolbar controls are Sakuga. |
+| `src/components/CommandBlock.tsx` `CopyButton` (Webhooks) | copy-to-clipboard | component-owned |
 
 _(This table grows as pages are swept; every entry names file:line, control and reason.)_
 
