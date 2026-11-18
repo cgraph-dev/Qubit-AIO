@@ -492,8 +492,9 @@ served `frontend/qubit-web/public/plugins/qubit-achievements/dist/`):
 - **Busy states** — Analytics' settings skeleton and WebChat's opening session are
   `SakugaLoading`; Agents/Models/Sessions/Config/System already were.
 - **More tooltips** — icon/refresh/action hints added on Analytics, Models, Agents,
-  Profiles, Files upload, Chat attach/voice, plus the Config and Channels surfaces
-  that already had them. Hover/focus/tap/Escape verified on Models (`Refresh`).
+  Profiles, Files upload, Chat attach/voice, and Channel Test/Configure; Config
+  already used them. Hover/focus/tap/Escape verified on Models (`Refresh`) and the
+  Achievements tier badge.
 
 ### Evidence
 
