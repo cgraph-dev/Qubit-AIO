@@ -25,8 +25,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button, Checkbox, Input, Select, emitFx } from "@/sakuga/ui";
 
 import {
   DISABLED_SCHEDULER_ACTIONS,
@@ -50,10 +50,6 @@ const CONFIRM_YES = () => true;
 function errText(e: unknown, fallback: string): string {
   return refusalOrError(e, fallback);
 }
-
-/** Shared input styling that reads as a settings control. */
-const INPUT_CLASS =
-  "settings-input min-w-0 border border-border bg-background-base px-2 py-1 font-mono text-xs";
 
 export default function SchedulerMediaPage() {
   const [cronId, setCronId] = useState("");
@@ -103,8 +99,10 @@ export default function SchedulerMediaPage() {
     try {
       await fn();
       setNotice(`${verb} settled ✓`);
+      emitFx("success");
     } catch (e) {
       setError(errText(e, `${verb} failed`));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -183,8 +181,7 @@ export default function SchedulerMediaPage() {
           </div>
           <div className="settings-section__actions">
             <Button
-              ghost
-              size="sm"
+              variant="secondary"
               onClick={() => void loadPower()}
               disabled={powerState === "loading"}
               aria-label="Refresh power state"
@@ -238,14 +235,12 @@ export default function SchedulerMediaPage() {
               <p className="settings-row__desc">Numeric id of the schedule to toggle.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
-                inputMode="numeric"
+              <Input
+                label="Schedule job id"
                 value={cronId}
-                onChange={(e) => setCronId(e.target.value)}
+                onChange={setCronId}
                 placeholder="job id"
-                aria-label="Schedule job id"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
             </div>
           </div>
@@ -255,15 +250,13 @@ export default function SchedulerMediaPage() {
               <p className="settings-row__desc">Pause or resume the schedule.</p>
             </div>
             <div className="settings-row__control">
-              <label className="settings-toggle text-xs text-text-secondary">
-                <input
-                  type="checkbox"
-                  checked={cronEnabled}
-                  onChange={(e) => setCronEnabled(e.target.checked)}
-                  aria-label="Schedule enabled"
-                />
+              <Checkbox
+                checked={cronEnabled}
+                onChange={setCronEnabled}
+                aria-label="Schedule enabled"
+              >
                 enabled
-              </label>
+              </Checkbox>
             </div>
           </div>
           <div className="settings-row settings-row--actions">
@@ -272,8 +265,6 @@ export default function SchedulerMediaPage() {
             </div>
             <div className="settings-row__control">
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleCronToggle()}
                 disabled={busy !== null || !Number.isInteger(cronIdNum)}
                 aria-label="Apply schedule enabled toggle"
@@ -301,21 +292,13 @@ export default function SchedulerMediaPage() {
               <p className="settings-row__desc">Active speech-out provider.</p>
             </div>
             <div className="settings-row__control">
-              <select
+              <Select
+                label="TTS provider"
+                options={TTS_PROVIDERS.map((p) => ({ value: p, label: p }))}
                 value={ttsProvider}
-                onChange={(e) => setTtsProviderChoice(e.target.value)}
-                aria-label="TTS provider"
-                className="settings-select border border-border bg-background-base px-2 py-1 font-mono text-xs"
-              >
-                {TTS_PROVIDERS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
+                onChange={setTtsProviderChoice}
+              />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleTtsProvider()}
                 disabled={busy !== null}
                 aria-label="Set TTS provider"
@@ -332,17 +315,14 @@ export default function SchedulerMediaPage() {
               </p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Speech-out profile id"
                 value={ttsProfile}
-                onChange={(e) => setTtsProfile(e.target.value)}
+                onChange={setTtsProfile}
                 placeholder="speech-out profile id"
-                aria-label="Speech-out profile id"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleTtsEnable()}
                 disabled={busy !== null || !ttsProfile.trim()}
                 aria-label="Enable TTS profile"
@@ -350,8 +330,7 @@ export default function SchedulerMediaPage() {
                 {busy === "tts.enable" ? <Spinner /> : "enable"}
               </Button>
               <Button
-                ghost
-                size="sm"
+                variant="secondary"
                 onClick={() => void handleTtsDisable()}
                 disabled={busy !== null || !ttsProfile.trim()}
                 aria-label="Disable TTS profile"
@@ -368,25 +347,21 @@ export default function SchedulerMediaPage() {
               </p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="TTS persona"
                 value={ttsPersona}
-                onChange={(e) => setTtsPersonaInput(e.target.value)}
+                onChange={setTtsPersonaInput}
                 placeholder="persona (speech-out profile id)"
-                aria-label="TTS persona"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
-              <input
-                type="text"
+              <Input
+                label="TTS persona session"
                 value={ttsSession}
-                onChange={(e) => setTtsSession(e.target.value)}
+                onChange={setTtsSession}
                 placeholder="session (optional)"
-                aria-label="TTS persona session"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleTtsPersona()}
                 disabled={busy !== null || !ttsPersona.trim()}
                 aria-label="Set TTS persona"
@@ -455,25 +430,21 @@ export default function SchedulerMediaPage() {
               <p className="settings-row__desc">Receipt id or session.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Cancel receipt id"
                 value={cancelRef}
-                onChange={(e) => setCancelRef(e.target.value)}
+                onChange={setCancelRef}
                 placeholder="receipt id"
-                aria-label="Cancel receipt id"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
-              <input
-                type="text"
+              <Input
+                label="Cancel session"
                 value={cancelSession}
-                onChange={(e) => setCancelSession(e.target.value)}
+                onChange={setCancelSession}
                 placeholder="session (alternative)"
-                aria-label="Cancel session"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleCancel()}
                 disabled={busy !== null || (!cancelRef.trim() && !cancelSession.trim())}
                 aria-label="Cancel task"
@@ -488,25 +459,21 @@ export default function SchedulerMediaPage() {
               <p className="settings-row__desc">Receipt id or session.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Retry receipt id"
                 value={retryRef}
-                onChange={(e) => setRetryRef(e.target.value)}
+                onChange={setRetryRef}
                 placeholder="receipt id"
-                aria-label="Retry receipt id"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
-              <input
-                type="text"
+              <Input
+                label="Retry session"
                 value={retrySession}
-                onChange={(e) => setRetrySession(e.target.value)}
+                onChange={setRetrySession}
                 placeholder="session (alternative)"
-                aria-label="Retry session"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleRetry()}
                 disabled={busy !== null || (!retryRef.trim() && !retrySession.trim())}
                 aria-label="Retry task"

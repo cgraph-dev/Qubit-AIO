@@ -8,6 +8,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { sakugaInnerAll, typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const tasksMocks = vi.hoisted(() => ({
   listBackgroundTasks: vi.fn(),
@@ -68,20 +70,27 @@ async function renderPage() {
   await act(async () => root.render(ui));
 }
 
-function setNativeValue(el: HTMLInputElement, value: string) {
-  const proto = window.HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+async function setNativeValue(el: HTMLElement | null, value: string) {
+  if (!el) throw new Error("missing input");
+  await waitForSakuga(el);
+  typeIntoSakuga(el, value);
 }
 
-function setNativeSelect(el: HTMLSelectElement, value: string) {
-  el.value = value;
-  el.dispatchEvent(new Event("change", { bubbles: true }));
+async function setNativeSelect(host: HTMLElement | null, value: string) {
+  if (!host) throw new Error("missing select");
+  const trigger = host.querySelector<HTMLButtonElement>('button[role="combobox"]');
+  if (!trigger) throw new Error("missing select trigger");
+  await act(async () => trigger.click());
+  const radio = document.querySelector("sakuga-radio");
+  await waitForSakuga(radio);
+  const option = sakugaInnerAll<HTMLInputElement>(radio, "input").find((i) => i.value === value);
+  if (!option) throw new Error(`missing option ${value}`);
+  option.click();
 }
 
 function buttonInScope(scope: ParentNode, text: string): HTMLButtonElement | null {
   return (
-    [...scope.querySelectorAll("button")].find(
+    [...scope.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
     ) ?? null
   );
@@ -142,13 +151,11 @@ describe("TasksPage", () => {
     expect(container.textContent).toContain("Nightly digest");
     expect(container.textContent).toContain("40%");
     expect(container.textContent).toContain("drafting");
-    const filter = container.querySelector(
-      "#background-tasks-state",
-    ) as HTMLSelectElement;
+    const filter = container.querySelector("#background-tasks-state") as HTMLElement;
     expect(filter).not.toBeNull();
     expect(tasksMocks.listBackgroundTasks).toHaveBeenCalledWith(undefined);
     await act(async () => {
-      setNativeSelect(filter, "running");
+      await setNativeSelect(filter, "running");
     });
     await waitFor(() => tasksMocks.listBackgroundTasks.mock.calls.length >= 2);
     expect(tasksMocks.listBackgroundTasks).toHaveBeenLastCalledWith({ state: "running" });
@@ -166,10 +173,7 @@ describe("TasksPage", () => {
     });
     await renderPage();
     await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
-    setNativeValue(
-      container.querySelector("#background-tasks-lookup") as HTMLInputElement,
-      "run-9",
-    );
+    await setNativeValue(container.querySelector("#background-tasks-lookup"), "run-9");
     await act(async () => buttonInScope(container, "Look up")!.click());
     await waitFor(
       () => container.querySelector('[data-testid="background-task-detail"]') !== null,
@@ -193,10 +197,7 @@ describe("TasksPage", () => {
     expect(buttonInScope(container, "Cancel")!.disabled).toBe(true);
     expect(buttonInScope(container, "Retry")!.disabled).toBe(true);
 
-    setNativeValue(
-      container.querySelector("#background-tasks-receipt") as HTMLInputElement,
-      "rc-9",
-    );
+    await setNativeValue(container.querySelector("#background-tasks-receipt"), "rc-9");
     await waitFor(() => buttonInScope(container, "Cancel")!.disabled === false);
     await act(async () => buttonInScope(container, "Cancel")!.click());
     // Staged: the broker confirm dialog opens with the staged detail.
@@ -229,7 +230,7 @@ describe("TasksPage", () => {
       "Qubit keeps no detached-task completion-delivery registry; nothing is dismissed",
     );
     expect(row!.querySelector('a[href="/qubit-task-inbox"]')).not.toBeNull();
-    const button = row!.querySelector("button") as HTMLButtonElement;
+    const button = row!.querySelector("button, sakuga-button") as HTMLElement;
     expect(button.disabled).toBe(true);
     await act(async () => button.click());
     expect(tasksMocks.cancelBackgroundTask).not.toHaveBeenCalled();

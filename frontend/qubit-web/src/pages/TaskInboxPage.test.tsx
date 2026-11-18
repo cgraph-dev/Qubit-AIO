@@ -9,6 +9,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { clickSakuga, sakugaInnerAll, typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const taskMocks = vi.hoisted(() => ({
   getTaskLedger: vi.fn(),
@@ -77,16 +79,23 @@ async function renderPage() {
   await act(async () => root.render(ui));
 }
 
-function setNativeValue(el: HTMLInputElement, value: string) {
-  const proto = window.HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+async function setNativeValue(el: HTMLElement | null, value: string) {
+  if (!el) throw new Error("missing input");
+  await waitForSakuga(el);
+  typeIntoSakuga(el, value);
 }
 
-function setSelectValue(el: HTMLSelectElement, value: string) {
-  const proto = window.HTMLSelectElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-  el.dispatchEvent(new Event("change", { bubbles: true }));
+async function chooseView(value: string) {
+  const host = container.querySelector("#task-inbox-view");
+  if (!host) throw new Error("missing view select");
+  const trigger = host.querySelector<HTMLButtonElement>('button[role="combobox"]');
+  if (!trigger) throw new Error("missing view trigger");
+  await act(async () => trigger.click());
+  const radio = document.querySelector("sakuga-radio");
+  await waitForSakuga(radio);
+  const option = sakugaInnerAll<HTMLInputElement>(radio, "input").find((i) => i.value === value);
+  if (!option) throw new Error(`missing view option ${value}`);
+  option.click();
 }
 
 function columnTitles(): string[] {
@@ -97,7 +106,7 @@ function columnTitles(): string[] {
 
 function buttonByText(text: string): HTMLButtonElement | null {
   return (
-    [...document.querySelectorAll("button")].find(
+    [...document.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
     ) ?? null
   );
@@ -157,10 +166,7 @@ describe("TaskInboxPage", () => {
     expect((buttonByText("Cancel") as HTMLButtonElement).disabled).toBe(true);
     expect((buttonByText("Retry") as HTMLButtonElement).disabled).toBe(true);
 
-    setNativeValue(
-      container.querySelector("#task-inbox-receipt") as HTMLInputElement,
-      "rc-9",
-    );
+    await setNativeValue(container.querySelector("#task-inbox-receipt"), "rc-9");
     await waitFor(
       () => (buttonByText("Cancel") as HTMLButtonElement).disabled === false,
     );
@@ -201,15 +207,12 @@ describe("TaskInboxPage", () => {
   it("search filters rows and shows the upstream empty state", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
-    setNativeValue(
-      container.querySelector("#task-inbox-search") as HTMLInputElement,
-      "zzz-no-match",
-    );
+    await setNativeValue(container.querySelector("#task-inbox-search"), "zzz-no-match");
     await waitFor(() => container.querySelector(".workboard-empty-state") !== null);
     expect(container.querySelector(".workboard-empty-state")!.textContent).toContain(
       "No inbox entries match this filter",
     );
-    setNativeValue(container.querySelector("#task-inbox-search") as HTMLInputElement, "");
+    await setNativeValue(container.querySelector("#task-inbox-search"), "");
     await waitFor(() => container.querySelector(".workboard-empty-state") === null);
     expect(container.textContent).toContain("Summarize inbox");
   });
@@ -217,10 +220,7 @@ describe("TaskInboxPage", () => {
   it("view preset and health strip narrow the data columns", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
-    setSelectValue(
-      container.querySelector("#task-inbox-view") as HTMLSelectElement,
-      "suggestions",
-    );
+    await chooseView("suggestions");
     await waitFor(() => {
       const titles = columnTitles();
       return titles.includes("Ideas") && !titles.includes("Task ledger");
@@ -241,12 +241,11 @@ describe("TaskInboxPage", () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("Summarize inbox") ?? false);
     // "weekly" matches only the suggestion row.
-    setNativeValue(
-      container.querySelector("#task-inbox-search") as HTMLInputElement,
-      "weekly",
-    );
+    await setNativeValue(container.querySelector("#task-inbox-search"), "weekly");
     await waitFor(() => container.textContent?.includes("Re-run Weekly review") ?? false);
-    await act(async () => (container.querySelector("#task-inbox-hide-empty") as HTMLInputElement).click());
+    const hideEmpty = container.querySelector("#task-inbox-hide-empty");
+    await waitForSakuga(hideEmpty);
+    await act(async () => clickSakuga(hideEmpty, "input"));
     await waitFor(() => {
       const titles = columnTitles();
       return titles.includes("Ideas") && !titles.includes("Task ledger");
@@ -264,7 +263,7 @@ describe("TaskInboxPage", () => {
       const row = container.querySelector(`[data-testid="refusal-${code}"]`);
       expect(row).not.toBeNull();
       expect(row!.textContent).toContain(detail);
-      const button = row!.querySelector("button") as HTMLButtonElement;
+      const button = row!.querySelector("button, sakuga-button") as HTMLElement;
       expect(button.disabled).toBe(true);
       await act(async () => button.click());
       expect(taskMocks.cancelTask).not.toHaveBeenCalled();

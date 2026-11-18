@@ -23,7 +23,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
 import {
@@ -53,11 +53,6 @@ function errText(e: unknown, fallback: string): string {
 function asText(value: unknown): string {
   return typeof value === "string" ? value : "";
 }
-
-const INPUT_CLASS =
-  "settings-input min-w-0 border border-border bg-background-base px-2 py-1 text-xs";
-const MONO_INPUT_CLASS =
-  "settings-input min-w-0 border border-border bg-background-base px-2 py-1 font-mono text-xs";
 
 export default function TalkPage() {
   const [mode, setMode] = useState<TalkModeResponse | null>(null);
@@ -130,8 +125,10 @@ export default function TalkPage() {
       const res = await fn();
       const detail = (res as { detail?: unknown }).detail;
       setNotice(`${verb} settled ✓${asText(detail) ? ` — ${asText(detail)}` : ""}`);
+      emitFx("success");
     } catch (e) {
       setError(errText(e, `${verb} failed`));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -189,8 +186,10 @@ export default function TalkPage() {
       const res = await speakTalk(speakText.trim(), CONFIRM_YES);
       if (res.data_url) setSpeakUrl(res.data_url);
       setNotice(`talk.speak settled ✓${res.provider ? ` via ${res.provider}` : ""}`);
+      emitFx("success");
     } catch (e) {
       setError(errText(e, "talk.speak failed"));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -268,8 +267,7 @@ export default function TalkPage() {
           </div>
           <div className="settings-section__actions">
             <Button
-              ghost
-              size="sm"
+              variant="secondary"
               onClick={() => {
                 void load();
                 void loadWake();
@@ -298,15 +296,14 @@ export default function TalkPage() {
               <p className="settings-row__desc">Optional override, applied on read.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Requested talk mode"
                 value={requestedMode}
-                onChange={(e) => setRequestedMode(e.target.value)}
+                onChange={setRequestedMode}
                 placeholder="requested mode (optional)"
-                aria-label="Requested talk mode"
-                className={MONO_INPUT_CLASS}
+                className="qsk-field"
               />
-              <Button ghost size="sm" onClick={() => void load()} aria-label="Read talk mode">
+              <Button variant="secondary" onClick={() => void load()} aria-label="Read talk mode">
                 read
               </Button>
             </div>
@@ -494,13 +491,12 @@ export default function TalkPage() {
               <p className="settings-row__desc">Target session for the writes below.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Session key"
                 value={sessionKey}
-                onChange={(e) => setSessionKey(e.target.value)}
+                onChange={setSessionKey}
                 placeholder="session key"
-                aria-label="Session key"
-                className={MONO_INPUT_CLASS}
+                className="qsk-field"
               />
             </div>
           </div>
@@ -510,17 +506,14 @@ export default function TalkPage() {
               <p className="settings-row__desc">Recorded for the next turn.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Steer text"
                 value={steerText}
-                onChange={(e) => setSteerText(e.target.value)}
+                onChange={setSteerText}
                 placeholder="steer text (recorded for the next turn)"
-                aria-label="Steer text"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleSteer()}
                 disabled={busy !== null || !sessionKey.trim() || !steerText.trim()}
                 aria-label="Send talk steer"
@@ -535,25 +528,21 @@ export default function TalkPage() {
               <p className="settings-row__desc">Append a finalized transcript row.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Transcript role"
                 value={transcriptRole}
-                onChange={(e) => setTranscriptRole(e.target.value)}
+                onChange={setTranscriptRole}
                 placeholder="role"
-                aria-label="Transcript role"
-                className="settings-input w-24 border border-border bg-background-base px-2 py-1 font-mono text-xs"
+                className="qsk-field"
               />
-              <input
-                type="text"
+              <Input
+                label="Transcript text"
                 value={transcriptText}
-                onChange={(e) => setTranscriptText(e.target.value)}
+                onChange={setTranscriptText}
                 placeholder="finalized transcript text"
-                aria-label="Transcript text"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleTranscript()}
                 disabled={busy !== null || !sessionKey.trim() || !transcriptText.trim()}
                 aria-label="Append transcript"
@@ -568,25 +557,21 @@ export default function TalkPage() {
               <p className="settings-row__desc">Invoke a bound tool on the session.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Tool name"
                 value={toolName}
-                onChange={(e) => setToolName(e.target.value)}
+                onChange={setToolName}
                 placeholder="tool name"
-                aria-label="Tool name"
-                className={MONO_INPUT_CLASS}
+                className="qsk-field"
               />
-              <input
-                type="text"
+              <Input
+                label="Tool args JSON"
                 value={toolArgs}
-                onChange={(e) => setToolArgs(e.target.value)}
+                onChange={setToolArgs}
                 placeholder='args JSON, e.g. {"path": "notes.txt"}'
-                aria-label="Tool args JSON"
-                className={MONO_INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleToolCall()}
                 disabled={busy !== null || !toolName.trim()}
                 aria-label="Run talk tool call"
@@ -601,17 +586,14 @@ export default function TalkPage() {
               <p className="settings-row__desc">Render spoken audio via the local TTS chain.</p>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
+              <Input
+                label="Speak text"
                 value={speakText}
-                onChange={(e) => setSpeakText(e.target.value)}
+                onChange={setSpeakText}
                 placeholder="text to speak via local TTS"
-                aria-label="Speak text"
-                className={INPUT_CLASS}
+                className="qsk-field"
               />
               <Button
-                ghost
-                size="sm"
                 onClick={() => void handleSpeak()}
                 disabled={busy !== null || !speakText.trim()}
                 aria-label="Speak text"

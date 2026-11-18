@@ -20,11 +20,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Toast } from "@nous-research/ui/ui/components/toast";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import {
   QUBIT_TASK_STATES,
   TASKS_DISMISS_REFUSAL,
@@ -38,9 +35,7 @@ import {
   type GatewayRefusal,
 } from "@/lib/ocFamilyTasksApi";
 import { refusalOrError } from "@/lib/policy-refusal";
-
-const INPUT_CLASS =
-  "settings-input border border-border bg-background-base px-2 py-1 text-sm";
+import { Button, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 function DismissRefusalRow({ refusal }: { refusal: GatewayRefusal }) {
   return (
@@ -94,7 +89,6 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const { toast, showToast } = useToast();
 
   const [receiptId, setReceiptId] = useState("");
   const [session, setSession] = useState("");
@@ -131,11 +125,12 @@ export default function TasksPage() {
     } catch (e) {
       const message = refusalOrError(e, "Failed to load background tasks.");
       setError(message);
-      showToast(message, "error");
+      showSakugaToast(message);
+      emitFx("error");
     } finally {
       setLoading(false);
     }
-  }, [showToast, stateFilter]);
+  }, [stateFilter]);
 
   useEffect(() => {
     load();
@@ -159,11 +154,12 @@ export default function TasksPage() {
     } catch (e) {
       const message = refusalOrError(e, "Task lookup failed.");
       setError(message);
-      showToast(message, "error");
+      showSakugaToast(message);
+      emitFx("error");
     } finally {
       setBusy(false);
     }
-  }, [busy, lookup, showToast]);
+  }, [busy, lookup]);
 
   const target = {
     receiptId: receiptId.trim(),
@@ -188,12 +184,14 @@ export default function TasksPage() {
                 askBrokerConfirm(`${title} background task`, detailText),
               );
         await call;
-        showToast(`${title} accepted`, "success");
+        showSakugaToast(`${title} accepted`);
+      emitFx("success");
         await load();
       } catch (e) {
         const message = refusalOrError(e, `${title} failed.`);
         setError(message);
-        showToast(message, "error");
+        showSakugaToast(message);
+      emitFx("error");
       } finally {
         setBusy(false);
       }
@@ -227,7 +225,7 @@ export default function TasksPage() {
             </p>
           </div>
           <div className="settings-section__actions">
-            <Button outlined size="sm" onClick={() => load()} disabled={loading}>
+            <Button variant="secondary" onClick={() => load()} disabled={loading}>
               Reload
             </Button>
           </div>
@@ -240,19 +238,16 @@ export default function TasksPage() {
               </label>
             </div>
             <div className="settings-row__control">
-              <select
+              <Select
                 id="background-tasks-state"
-                className="settings-select border border-border bg-background-base px-2 py-1 text-sm"
+                label="State filter"
                 value={stateFilter}
-                onChange={(e) => setStateFilter(e.target.value)}
-              >
-                <option value="">all states</option>
-                {QUBIT_TASK_STATES.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+                onChange={setStateFilter}
+                options={[
+                  { value: "", label: "all states" },
+                  ...QUBIT_TASK_STATES.map((s) => ({ value: s, label: s })),
+                ]}
+              />
             </div>
           </div>
           {tasks.length === 0 && !loading ? (
@@ -301,11 +296,11 @@ export default function TasksPage() {
               </label>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
                 id="background-tasks-lookup"
-                className={INPUT_CLASS}
+                label="Receipt / session id"
                 value={lookup}
-                onChange={(e) => setLookup(e.target.value)}
+                onChange={setLookup}
                 placeholder="task, run, or session id"
               />
               <Button disabled={busy || !lookup.trim()} onClick={() => lookUp()}>
@@ -427,11 +422,11 @@ export default function TasksPage() {
               </label>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
                 id="background-tasks-receipt"
-                className={INPUT_CLASS}
+                label="Receipt id"
                 value={receiptId}
-                onChange={(e) => setReceiptId(e.target.value)}
+                onChange={setReceiptId}
                 placeholder="action receipt"
               />
             </div>
@@ -443,11 +438,11 @@ export default function TasksPage() {
               </label>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
                 id="background-tasks-session"
-                className={INPUT_CLASS}
+                label="Session"
                 value={session}
-                onChange={(e) => setSession(e.target.value)}
+                onChange={setSession}
                 placeholder="chat session"
               />
             </div>
@@ -460,11 +455,11 @@ export default function TasksPage() {
               <p className="settings-row__desc">Read-only target.</p>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
                 id="background-tasks-task"
-                className={INPUT_CLASS}
+                label="Ledger id"
                 value={taskId}
-                onChange={(e) => setTaskId(e.target.value)}
+                onChange={setTaskId}
                 placeholder="task id"
               />
             </div>
@@ -482,7 +477,7 @@ export default function TasksPage() {
               <Button disabled={busy || !hasTarget} onClick={() => runControl("cancel")}>
                 Cancel
               </Button>
-              <Button outlined disabled={busy || !hasTarget} onClick={() => runControl("retry")}>
+              <Button variant="secondary" disabled={busy || !hasTarget} onClick={() => runControl("retry")}>
                 Retry
               </Button>
             </div>
@@ -515,7 +510,6 @@ export default function TasksPage() {
           "The task backend staged this change for confirmation."
         }
       />
-      {toast ? <Toast toast={toast} /> : null}
     </div>
   );
 }

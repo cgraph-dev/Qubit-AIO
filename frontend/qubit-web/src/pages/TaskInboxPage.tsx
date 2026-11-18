@@ -31,14 +31,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { Link } from "react-router";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Toast } from "@nous-research/ui/ui/components/toast";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import {
   MENTIONS_REFUSAL,
   TASKS_DISMISS_REFUSAL,
@@ -55,6 +51,7 @@ import {
   type TaskRow,
 } from "@/lib/ocFamilyBoardApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 type InboxViewPreset = "all" | "tasks" | "suggestions";
 
@@ -116,7 +113,6 @@ export default function TaskInboxPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const { toast, showToast } = useToast();
 
   // Toolbar-local view state only (mirrors the upstream workboard toolbar:
   // search, view preset, hide-empty, refresh status). Never sent to the
@@ -161,11 +157,12 @@ export default function TaskInboxPage() {
     } catch (e) {
       const message = refusalOrError(e, "Failed to load the task inbox.");
       setError(message);
-      showToast(message, "error");
+      showSakugaToast(message);
+        emitFx("error");
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -190,12 +187,14 @@ export default function TaskInboxPage() {
             ? cancelTask(target, (detail) => askBrokerConfirm(`${title} task`, detail))
             : retryTask(target, (detail) => askBrokerConfirm(`${title} task`, detail));
         await call;
-        showToast(`${title} accepted`, "success");
+        showSakugaToast(`${title} accepted`);
+        emitFx("success");
         await load();
       } catch (e) {
         const message = refusalOrError(e, `${title} failed.`);
         setError(message);
-        showToast(message, "error");
+        showSakugaToast(message);
+        emitFx("error");
       } finally {
         setBusy(false);
       }
@@ -219,17 +218,19 @@ export default function TaskInboxPage() {
                 askBrokerConfirm(`Dismiss “${row.title || row.id}”`, detail),
               );
         await call;
-        showToast(`${verb} accepted`, "success");
+        showSakugaToast(`${verb} accepted`);
+        emitFx("success");
         await load();
       } catch (e) {
         const message = refusalOrError(e, `${verb} failed.`);
         setError(message);
-        showToast(message, "error");
+        showSakugaToast(message);
+        emitFx("error");
       } finally {
         setBusy(false);
       }
     },
-    [askBrokerConfirm, busy, load, showToast],
+    [askBrokerConfirm, busy, load],
   );
 
   const q = query.trim().toLowerCase();
@@ -272,34 +273,35 @@ export default function TaskInboxPage() {
               <Label htmlFor="task-inbox-search">Search</Label>
               <Input
                 id="task-inbox-search"
+                label="Search"
                 type="search"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={setQuery}
                 placeholder="Search ledger and suggestions…"
               />
             </div>
             <div className="space-y-1">
               <Label htmlFor="task-inbox-view">View</Label>
-              <select
+              <Select
                 id="task-inbox-view"
-                className="input"
+                label="View"
                 value={viewPreset}
-                onChange={(e) => setViewPreset(e.target.value as InboxViewPreset)}
-              >
-                <option value="all">All sections</option>
-                <option value="tasks">Task ledger</option>
-                <option value="suggestions">Suggestions</option>
-              </select>
-            </div>
-            <label className="workboard-toggle" htmlFor="task-inbox-hide-empty">
-              <input
-                id="task-inbox-hide-empty"
-                type="checkbox"
-                checked={hideEmpty}
-                onChange={(e) => setHideEmpty(e.target.checked)}
+                onChange={(value) => setViewPreset(value as InboxViewPreset)}
+                options={[
+                  { value: "all", label: "All sections" },
+                  { value: "tasks", label: "Task ledger" },
+                  { value: "suggestions", label: "Suggestions" },
+                ]}
               />
-              <span>Hide empty sections</span>
-            </label>
+            </div>
+            <Checkbox
+              id="task-inbox-hide-empty"
+              checked={hideEmpty}
+              onChange={setHideEmpty}
+              aria-label="Hide empty sections"
+            >
+              Hide empty sections
+            </Checkbox>
             {lastRefreshAt ? (
               <span className="workboard-refresh-status">
                 Last refreshed{" "}
@@ -310,7 +312,7 @@ export default function TaskInboxPage() {
             ) : null}
           </div>
           <div className="workboard-toolbar__actions">
-            <Button outlined size="sm" onClick={() => load()} disabled={loading}>
+            <Button variant="secondary" onClick={() => load()} disabled={loading}>
               Reload
             </Button>
           </div>
@@ -318,19 +320,19 @@ export default function TaskInboxPage() {
 
         <div className="workboard-health" aria-label="Inbox health">
           {healthItems.map((item) => (
-            <button
+            <Button
               key={item.key}
+              variant="secondary"
               className={`workboard-health__item workboard-health__item--${item.key} ${
                 viewPreset === item.key ? "workboard-health__item--active" : ""
               } ${item.count === 0 ? "workboard-health__item--empty" : ""}`}
-              type="button"
               aria-pressed={viewPreset === item.key}
               aria-label={`${item.count} ${item.label}`}
               onClick={() => setViewPreset((prev) => (prev === item.key ? "all" : item.key))}
             >
               <strong>{item.count}</strong>
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -364,7 +366,7 @@ export default function TaskInboxPage() {
                 <Card>
                   <CardContent className="pt-4 space-y-2">
                     <div className="flex items-center gap-2">
-                      <Button outlined size="sm" onClick={() => load()} disabled={loading}>
+                      <Button variant="secondary" onClick={() => load()} disabled={loading}>
                         Reload
                       </Button>
                     </div>
@@ -455,15 +457,13 @@ export default function TaskInboxPage() {
                             ) : null}
                             <div className="flex items-center gap-2">
                               <Button
-                                size="sm"
                                 disabled={busy || !s.id}
                                 onClick={() => void decideIdea(s, "accept")}
                               >
                                 Start this
                               </Button>
                               <Button
-                                outlined
-                                size="sm"
+                                variant="secondary"
                                 disabled={busy || !s.id}
                                 onClick={() => void decideIdea(s, "dismiss")}
                               >
@@ -497,8 +497,9 @@ export default function TaskInboxPage() {
                       <Label htmlFor="task-inbox-receipt">Receipt id</Label>
                       <Input
                         id="task-inbox-receipt"
+                        label="Receipt id"
                         value={receiptId}
-                        onChange={(e) => setReceiptId(e.target.value)}
+                        onChange={setReceiptId}
                         placeholder="action receipt"
                       />
                     </div>
@@ -506,8 +507,9 @@ export default function TaskInboxPage() {
                       <Label htmlFor="task-inbox-session">Session</Label>
                       <Input
                         id="task-inbox-session"
+                        label="Session"
                         value={session}
-                        onChange={(e) => setSession(e.target.value)}
+                        onChange={setSession}
                         placeholder="chat session"
                       />
                     </div>
@@ -515,15 +517,16 @@ export default function TaskInboxPage() {
                       <Label htmlFor="task-inbox-task">Ledger id (read-only)</Label>
                       <Input
                         id="task-inbox-task"
+                        label="Ledger id (read-only)"
                         value={taskId}
-                        onChange={(e) => setTaskId(e.target.value)}
+                        onChange={setTaskId}
                         placeholder="task id"
                       />
                     </div>
                     <Button disabled={busy || !hasTarget} onClick={() => runControl("cancel")}>
                       Cancel
                     </Button>
-                    <Button outlined disabled={busy || !hasTarget} onClick={() => runControl("retry")}>
+                    <Button variant="secondary" disabled={busy || !hasTarget} onClick={() => runControl("retry")}>
                       Retry
                     </Button>
                   </div>
@@ -599,7 +602,6 @@ export default function TaskInboxPage() {
           title={brokerConfirm?.title ?? "Confirm task control"}
           description={brokerConfirm?.description ?? "The task backend staged this change for confirmation."}
         />
-        {toast ? <Toast toast={toast} /> : null}
       </div>
     </section>
   );

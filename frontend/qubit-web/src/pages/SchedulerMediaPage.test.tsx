@@ -11,6 +11,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { sakugaInnerAll, typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const schedMocks = vi.hoisted(() => ({
   updateCronEnabled: vi.fn(),
@@ -98,18 +100,14 @@ function text(): string {
   return container!.textContent ?? "";
 }
 
-function setInput(label: string, value: string) {
+async function setInput(label: string, value: string) {
   const el = container!.querySelector(
     `[aria-label="${label}"]`,
-  ) as HTMLInputElement | null;
+  ) as HTMLElement | null;
   expect(el, `input ${label}`).not.toBeNull();
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value",
-  )?.set;
+  await waitForSakuga(el);
   act(() => {
-    setter!.call(el, value);
-    el!.dispatchEvent(new Event("input", { bubbles: true }));
+    typeIntoSakuga(el, value);
   });
 }
 
@@ -138,7 +136,7 @@ describe("SchedulerMediaPage", () => {
       '[aria-label="Apply schedule enabled toggle"]',
     ) as HTMLButtonElement;
     expect(apply.disabled).toBe(true);
-    setInput("Schedule job id", "7");
+    await setInput("Schedule job id", "7");
     await flush();
     clickByLabel("Apply schedule enabled toggle");
     await flush();
@@ -157,7 +155,7 @@ describe("SchedulerMediaPage", () => {
     clickByLabel("Set TTS provider");
     await flush();
     expect(schedMocks.setTtsProvider).toHaveBeenCalledTimes(1);
-    setInput("Speech-out profile id", "main-voice");
+    await setInput("Speech-out profile id", "main-voice");
     await flush();
     clickByLabel("Enable TTS profile");
     await flush();
@@ -170,7 +168,7 @@ describe("SchedulerMediaPage", () => {
   it("cancels by receipt and retries by session", async () => {
     renderPage();
     await flush();
-    setInput("Cancel receipt id", "rcpt-1");
+    await setInput("Cancel receipt id", "rcpt-1");
     await flush();
     clickByLabel("Cancel task");
     await flush();
@@ -178,7 +176,7 @@ describe("SchedulerMediaPage", () => {
       { receiptId: "rcpt-1", session: undefined },
       expect.any(Function),
     );
-    setInput("Retry session", "sess-9");
+    await setInput("Retry session", "sess-9");
     await flush();
     clickByLabel("Retry task");
     await flush();

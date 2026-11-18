@@ -11,6 +11,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const talkMocks = vi.hoisted(() => ({
   getTalkMode: vi.fn(),
@@ -124,18 +126,12 @@ function clickByLabel(label: string) {
   });
 }
 
-function setInput(label: string, value: string) {
-  const el = container!.querySelector(
-    `[aria-label="${label}"]`,
-  ) as HTMLInputElement | null;
+async function setInput(label: string, value: string) {
+  const el = container!.querySelector(`[aria-label="${label}"]`);
   expect(el, `input ${label}`).not.toBeNull();
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value",
-  )?.set;
+  await waitForSakuga(el);
   act(() => {
-    setter!.call(el, value);
-    el!.dispatchEvent(new Event("input", { bubbles: true }));
+    typeIntoSakuga(el, value);
   });
 }
 
@@ -191,8 +187,8 @@ describe("TalkPage", () => {
     // Empty inputs keep the write gated.
     expect(steerBtn.disabled).toBe(true);
     expect(talkMocks.steerTalkClient).not.toHaveBeenCalled();
-    setInput("Session key", "sess-1");
-    setInput("Steer text", "hold that thought");
+    await setInput("Session key", "sess-1");
+    await setInput("Steer text", "hold that thought");
     await flush();
     clickByLabel("Send talk steer");
     await flush();
