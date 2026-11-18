@@ -127,3 +127,18 @@ html[data-qubit-manga="on"] ::selection {background:var(--qm-magenta);color:var(
 @media (prefers-reduced-motion:reduce) {
   html[data-qubit-manga="on"] :is(.qagent-sidebar__link,.qplate-row) {transition:none!important}
 }
+
+/* Text-free, scalable manga ornaments; decorative only. */
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__section-head {
+  background-image:url("/manga-ui/section-slashes.svg"),linear-gradient(95deg,var(--qm-magenta),#6e1d6d 72%,transparent 99%);
+  background-position:right 2px center,center;background-repeat:no-repeat;
+  background-size:48px 14px,100% 100%;
+}
+html[data-qubit-manga="on"] :is(main,.settings-page,.qchat) :is(.settings-section,.settings-group,[data-slot="card"]) {
+  background-image:url("/manga-ui/halftone.svg");
+  background-size:24px 24px;
+}
+html[data-qubit-manga="on"] #app-sidebar .qagent-sidebar__telemetry {
+  background-image:url("/manga-ui/halftone.svg");
+  background-position:right bottom;
+}
