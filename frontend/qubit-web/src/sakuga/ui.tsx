@@ -47,7 +47,7 @@ export {
  * unknown/quiet variants map to the secondary look, sizes are ignored because
  * the upstream control has one size, and `asChild` renders the supplied child
  * (links stay links) instead of wrapping it in a button. */
-import { cloneElement, createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, createElement, forwardRef, isValidElement, type ReactElement, type ReactNode } from 'react';
 import { SakugaButton, type SakugaButtonProps } from '@qubit/shared/sakuga';
 
 export type SakugaButtonVariant = 'primary' | 'secondary';
@@ -69,3 +69,38 @@ export function Button({ variant, size: _size, asChild, children, ...rest }: Qub
   }
   return createElement(SakugaButton, { ...rest, variant: sakugaButtonVariant(variant) }, children);
 }
+
+/* Backwards-compatible ListItem.
+ *
+ * `@nous-research/ui`'s ListItem is a styled native <button>. Replacing it with
+ * the same Sakuga Button keeps every call site's props (active/disabled/ref)
+ * and gives the row the anime press reaction; the stylesheet flattens the host
+ * so dense lists keep their layout. */
+export interface QubitListItemProps extends QubitButtonProps {
+  active?: boolean;
+}
+
+export const ListItem = forwardRef<HTMLElement, QubitListItemProps>(function ListItem(
+  { active, className, children, type = 'button', ...rest },
+  ref,
+) {
+  const ariaCurrent =
+    active === undefined
+      ? (rest as { 'aria-current'?: string })['aria-current']
+      : active
+        ? 'true'
+        : undefined;
+  return createElement(
+    Button,
+    {
+      ...rest,
+      ref,
+      type,
+      variant: 'secondary',
+      className: ['qsk-list-item', active ? 'is-active' : '', className].filter(Boolean).join(' '),
+      'data-active': active || undefined,
+      'aria-current': ariaCurrent,
+    } as QubitButtonProps,
+    children,
+  );
+});

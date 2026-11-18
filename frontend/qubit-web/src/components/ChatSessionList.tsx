@@ -18,8 +18,7 @@
  * keeps the chat context focused on switching conversations quickly.
  */
 
-import { Button, Input } from "@/sakuga/ui";
-import { ListItem } from "@nous-research/ui/ui/components/list-item";
+import { ListItem, Button, Input } from "@/sakuga/ui";
 import {
   AlertCircle,
   MessageSquarePlus,
@@ -396,6 +395,7 @@ export function ChatSessionList({
           return (
             <div key={s.id} className="relative">
               <ListItem
+                data-testid="session-row"
                 onClick={() => pick(s.id)}
                 aria-current={isActive ? "true" : undefined}
                 className={cn(

@@ -699,7 +699,7 @@ describe("Qubit TerminalChatPage right-side panel", () => {
     expect(label).toBeTruthy();
     await act(async () => {
       label!
-        .closest("button")!
+        .closest("button, sakuga-button")!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
@@ -1000,7 +1000,7 @@ describe("Qubit TerminalChatPage /chat?resume=<id> existence guard", () => {
       (el) => el.textContent?.trim() === "Panel session",
     );
     expect(label).toBeTruthy();
-    const row = label!.closest("button");
+    const row = label!.closest("button, sakuga-button");
     expect(row).toBeTruthy();
     await act(async () => {
       row!.dispatchEvent(new MouseEvent("click", { bubbles: true }));

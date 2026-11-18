@@ -41,6 +41,10 @@ export interface SakugaHostProps {
   role?: string;
   tabIndex?: number;
   onClick?: MouseEventHandler<HTMLElement>;
+  onDoubleClick?: MouseEventHandler<HTMLElement>;
+  onMouseEnter?: MouseEventHandler<HTMLElement>;
+  onMouseLeave?: MouseEventHandler<HTMLElement>;
+  onContextMenu?: MouseEventHandler<HTMLElement>;
   onKeyDown?: KeyboardEventHandler<HTMLElement>;
   onFocus?: FocusEventHandler<HTMLElement>;
   onBlur?: FocusEventHandler<HTMLElement>;
@@ -52,6 +56,7 @@ export interface SakugaHostProps {
   // into a wrapper stays assignable.
   'aria-invalid'?: boolean | 'true' | 'false' | 'grammar' | 'spelling';
   'aria-required'?: boolean | 'true' | 'false';
+  'aria-selected'?: boolean | 'true' | 'false';
   'aria-hidden'?: boolean;
   'data-testid'?: string;
 }
@@ -76,7 +81,7 @@ function hostProps(props: Record<string, unknown>): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(props)) {
     if (value === undefined || key === 'children') continue;
-    if (HOST_KEYS.has(key) || key.startsWith('aria-') || key.startsWith('data-')) {
+    if (HOST_KEYS.has(key) || key.startsWith('on') || key.startsWith('aria-') || key.startsWith('data-')) {
       // React 19 writes a boolean attribute on a custom element as an empty
       // string. ARIA/data values are read by tests and CSS, so keep the
       // literal 'true'/'false'.

@@ -40,7 +40,7 @@ vi.mock("@/i18n", () => ({
   }),
 }));
 
-vi.mock("@nous-research/ui/ui/components/button", () => ({
+vi.mock("@/sakuga/ui", () => ({
   Button: ({
     children,
     onClick,
@@ -63,9 +63,6 @@ vi.mock("@nous-research/ui/ui/components/button", () => ({
       {children}
     </button>
   ),
-}));
-
-vi.mock("@nous-research/ui/ui/components/list-item", () => ({
   ListItem: ({
     children,
     onClick,
@@ -88,6 +85,7 @@ vi.mock("@nous-research/ui/ui/components/list-item", () => ({
       {children}
     </div>
   ),
+  Input: (props: Record<string, unknown>) => <input {...props} />,
 }));
 
 vi.mock("@nous-research/ui/ui/components/spinner", () => ({

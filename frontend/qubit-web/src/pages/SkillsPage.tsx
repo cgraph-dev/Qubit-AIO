@@ -44,7 +44,6 @@ import { ToolsetConfigDrawer } from "@/components/ToolsetConfigDrawer";
 import { SkillEditorDialog } from "@/components/SkillEditorDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import {
   Dialog,
@@ -55,7 +54,7 @@ import {
 } from "@nous-research/ui/ui/components/dialog";
 import { cn } from "@/lib/utils";
 import { rebrand, rebrandOptional } from "@/lib/rebrand";
-import { Button, Input, Toggle, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { ListItem, Button, Input, Toggle, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
