@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "sakuga-vfx": {
+      "source": "finktheartist/sakuga-vfx",
+      "sourceType": "github",
+      "skillPath": "skills/sakuga-vfx/SKILL.md",
+      "computedHash": "ae55dd421101a4b0172a232457f54c760711a6a1e5cfa774de073f0244d3c944"
+    }
+  }
+}
