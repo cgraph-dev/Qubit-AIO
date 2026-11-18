@@ -2,6 +2,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
+import "../pages/sakuga-test-dom";
+import { clickSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 import { AutoField } from "./AutoField";
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,7 +28,9 @@ describe("AutoField nested scalar persistence", () => {
       });
       expect(record.retries).toBe(7);
       await render();
-      await act(async () => host.querySelector<HTMLButtonElement>('[role="switch"]')!.click());
+      const toggle = host.querySelector('[role="switch"]');
+      await waitForSakuga(toggle);
+      await act(async () => clickSakuga(toggle, "input"));
       expect(record.enabled).toBe(false);
       // This is the actual JSON request/response boundary used by config PUT/GET.
       record = JSON.parse(JSON.stringify(record));

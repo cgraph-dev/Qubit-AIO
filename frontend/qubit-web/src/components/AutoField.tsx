@@ -1,7 +1,5 @@
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
-import { Switch } from "@nous-research/ui/ui/components/switch";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
+import { Input, Select, Toggle } from "@/sakuga/ui";
 
 import { rebrandOptional } from "@/lib/rebrand";
 
@@ -76,27 +74,34 @@ function NestedValueEditor({
   }
 
   if (typeof value === "boolean") {
-    return <Switch aria-label={fieldKey} checked={value} onCheckedChange={onChange} />;
+    return <Toggle label={fieldKey} checked={value === true} onChange={(next) => onChange(next)} />;
+  }
+
+  if (typeof value === "number") {
+    // Number inputs are outside the upstream component set; keep the native
+    // control and preserve the scalar's numeric type across a round trip.
+    return (
+      <input
+        aria-label={fieldKey}
+        type="number"
+        value={formatScalar(value)}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const parsed = raw === "" ? 0 : Number(raw);
+          if (!Number.isNaN(parsed)) onChange(parsed);
+        }}
+        className="qsk-field text-xs"
+      />
+    );
   }
 
   return (
     <Input
       aria-label={fieldKey}
-      type={typeof value === "number" ? "number" : "text"}
+      label={fieldKey}
       value={formatScalar(value)}
-      onChange={(e) => {
-        const raw = e.target.value;
-        // Nested values do not have a separate schema entry. Preserve the
-        // existing scalar type so a read-modify-write round trip does not
-        // silently serialize numbers and booleans as strings.
-        if (typeof value === "number") {
-          const parsed = raw === "" ? 0 : Number(raw);
-          if (!Number.isNaN(parsed)) onChange(parsed);
-          return;
-        }
-        onChange(raw);
-      }}
-      className="text-xs"
+      onChange={(raw) => onChange(raw)}
+      className="qsk-field text-xs"
     />
   );
 }
@@ -131,10 +136,10 @@ export function AutoField({
           <Label className="text-sm">{label}</Label>
           <FieldHint schema={schema} schemaKey={schemaKey} />
         </div>
-        <Switch
+        <Toggle
+          label={label}
           checked={!!value}
-          onCheckedChange={onChange}
-          aria-label={label}
+          onChange={(next) => onChange(next)}
         />
       </div>
     );
@@ -146,13 +151,13 @@ export function AutoField({
       <div className="grid gap-1.5">
         <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
-        <Select id={fieldId} value={String(value ?? "")} onValueChange={(v) => onChange(v)}>
-          {options.map((opt) => (
-            <SelectOption key={opt} value={opt}>
-              {opt || "(none)"}
-            </SelectOption>
-          ))}
-        </Select>
+        <Select
+          id={fieldId}
+          label={label}
+          value={String(value ?? "")}
+          onChange={(v) => onChange(v)}
+          options={options.map((opt) => ({ value: opt, label: opt || "(none)" }))}
+        />
       </div>
     );
   }
@@ -162,9 +167,10 @@ export function AutoField({
       <div className="grid gap-1.5">
         <Label htmlFor={fieldId} className="text-sm">{label}</Label>
         <FieldHint schema={schema} schemaKey={schemaKey} />
-        <Input
+        <input
           id={fieldId}
           type="number"
+          className="qsk-field"
           value={value === undefined || value === null ? "" : String(value)}
           onChange={(e) => {
             const raw = e.target.value;
@@ -204,16 +210,18 @@ export function AutoField({
         <FieldHint schema={schema} schemaKey={schemaKey} />
         <Input
           id={fieldId}
+          label={label}
           value={Array.isArray(value) ? value.join(", ") : String(value ?? "")}
-          onChange={(e) =>
+          onChange={(raw) =>
             onChange(
-              e.target.value
+              raw
                 .split(",")
                 .map((s) => s.trim())
                 .filter(Boolean),
             )
           }
           placeholder="comma-separated values"
+          className="qsk-field"
         />
       </div>
     );
@@ -225,8 +233,10 @@ export function AutoField({
       <FieldHint schema={schema} schemaKey={schemaKey} />
       <Input
         id={fieldId}
+        label={label}
         value={String(value ?? "")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(v) => onChange(v)}
+        className="qsk-field"
       />
     </div>
   );
