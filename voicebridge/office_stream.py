@@ -88,10 +88,33 @@ def _fx_events(tower: Dict[str, Any], fx_mode: str) -> List[Dict[str, Any]]:
     """
     if fx_mode == "off":
         return []
-    rows = [row for row in (tower.get("activity") or [])
-            if isinstance(row, Mapping)]
-    if not rows:
+    activity = [row for row in (tower.get("activity") or [])
+                if isinstance(row, Mapping)]
+    if not activity:
         return []
+    # Attach the seat's REAL room (from the tower's own characters) so the
+    # client can fall back to the room centre when an agent anchor is off
+    # screen. A character with no declared room stays room-less; nothing is
+    # invented.
+    room_by_agent: Dict[str, str] = {}
+    for character in tower.get("characters") or []:
+        if not isinstance(character, Mapping):
+            continue
+        pos = character.get("position") or {}
+        if not isinstance(pos, Mapping):
+            continue
+        floor = pos.get("floor")
+        room = pos.get("room_id")
+        if floor is not None and room is not None:
+            room_by_agent[str(character.get("agent_id"))] = f"f{floor}r{room}"
+    rows: List[Dict[str, Any]] = []
+    for row in activity:
+        copy = dict(row)
+        if not copy.get("room_id") and copy.get("agent_id") is not None:
+            room_id = room_by_agent.get(str(copy["agent_id"]))
+            if room_id:
+                copy["room_id"] = room_id
+        rows.append(copy)
     from .office import fx as OFX
 
     ordered = list(reversed(rows))  # oldest -> newest for stable chronology

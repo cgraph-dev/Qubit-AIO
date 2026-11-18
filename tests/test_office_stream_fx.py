@@ -102,3 +102,14 @@ def test_reduced_motion_drops_nonessential_and_uses_the_still_cue():
     assert mapped[0].animation == mapped[0].still
     assert mapped[0].particles is None
     assert all(e.reduced_motion for e in mapped)
+
+
+def test_fx_carries_the_towers_real_room_for_the_room_centre_fallback():
+    t = tower([{"id": 1, "kind": "run_settled", "agent_id": 7}])
+    t["characters"] = [{
+        "agent_id": 7,
+        "position": {"floor": 2, "room_id": 3},
+    }]
+    snap = S.to_snapshot(t, 1, 0.0)
+    assert snap["fx"][0]["room"] == "f2r3"
+    assert snap["fx"][0]["agent"] == "7"
