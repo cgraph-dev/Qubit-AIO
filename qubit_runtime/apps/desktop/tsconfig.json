@@ -25,7 +25,6 @@
       "@qubit/shared/i18n": ["../shared/src/i18n.ts"],
       "@qubit/shared/translucency": ["../shared/src/translucency.ts"],
       "@qubit/shared": ["../shared/src/index.ts"],
-      "@qubit/shared/sakuga": ["../shared/src/sakuga/index.ts"],
       "@qubit/shared/sakuga": ["../shared/src/sakuga/index.ts"]
     }
   },

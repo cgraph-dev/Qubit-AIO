@@ -4,6 +4,7 @@ import * as React from 'react'
 
 import { Loader2 } from '@/lib/icons'
 import { cn } from '@/lib/utils'
+import { emitFx } from '@/sakuga/ui'
 
 // Text+icon actions underline the label on hover, not the glyph.
 const TEXT_ACTION_ICON = '[&_.codicon]:no-underline [&_svg]:no-underline'
@@ -84,6 +85,7 @@ function Button({
   loading = false,
   children,
   disabled,
+  onClick,
   ...props
 }: React.ComponentProps<'button'> &
   VariantProps<typeof buttonVariants> & {
@@ -103,6 +105,12 @@ function Button({
       data-slot="button"
       data-variant={variant}
       disabled={disabled || loading}
+      onClick={event => {
+        // A destructive action is a real warning outcome; the native element
+        // still owns the behaviour, this is a presentation cue only.
+        if (variant === 'destructive' && !disabled && !loading) void emitFx('warning')
+        onClick?.(event)
+      }}
       {...props}
     >
       {loading ? (
