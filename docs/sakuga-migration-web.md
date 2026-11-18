@@ -111,18 +111,54 @@ Swept by this lane and imported from `@/sakuga/ui`:
   `QubitConsoleModal`, `MemoryPressureBanner`, `SharedMetricsConsentBanner`,
   `ChatWorkspacePicker`.
 
-Still native / not yet swept in `src/components/**` (unimplemented, not
-accepted exceptions):
+## Pass D sweep (2026-11-18)
 
-| File:line | Control | Reason |
+Swept by this lane and importing the controls from `@/sakuga/ui`:
+
+- **Pages** — `OpenVikingPage`, `OpenVikingAgentHubPage`,
+  `OpenVikingResourcesPage`, `OpenVikingRetrievalPage`, `OpenVikingStudioPage`,
+  `OpenVikingUploadsPage`, `ProfilesPage`, `ProfileBuilderPage`, `QubitBotPage`,
+  `SchedulerMediaPage`, `SessionOpsPage`, `SkillsPage`, `SkillsReviewPage`,
+  `TalkPage`, `TaskflowsPage`, `TaskInboxPage`, `TasksPage`, `UsersAdminPage`,
+  `VoiceEditPage`, `WebChatPage`, `WorktreesPage`; `SystemPage` and
+  `WebhooksPage` notifications moved to `showSakugaToast` (+ success/error FX).
+- **Plugins** — `src/plugins/PluginPage.tsx` renders no controls; no
+  plugin-owned surface needed a change.
+- **Shared components** — `AutoField`, `AutomationBlueprints`,
+  `ModelPickerDialog`, `ScheduleBuilder`, `SkillEditorDialog`,
+  `ToolsetConfigDrawer`, `ReportList`, `om-ui` (`OmButton`/`OmField`/
+  `OmListItem`), `om-agent-ui`, `om-computer-workspace`, `ChatWorkPanel`,
+  `MultiplexStandaloneBanner`, `PageErrorBoundary`, `console-ui`,
+  `VoiceEditPreview`, and the toast hosts in `AutomationBlueprints` /
+  `ToolsetConfigDrawer` / `SystemPage` / `WebhooksPage`.
+
+### Documented exceptions added by this pass
+
+| Control | Reason |
+|---|---|
+| `type="number"` inputs (`VoiceEditPage`, `AutoField`, `ScheduleBuilder`, `om-ui` `OmField`) | Number input is outside the upstream component set (text/email/search/url/tel/password only); kept native. |
+| `type="time"` / `type="datetime-local"` (`ScheduleBuilder`, `AutomationBlueprints`) | Date/time inputs are outside the upstream component set; kept native. |
+| `<textarea>` (`VoiceEditPage`, `ProfilesPage`, `ProfileBuilderPage`, `SkillsPage`, `SkillsReviewPage`, `WebChatPage`, `QubitBotPage` composer, `SkillEditorDialog`, `AutoField`) | Multi-line text is outside the upstream component set; kept native (the QubitBot composer grows with content). |
+| `src/components/CommandPalette.tsx` search + option rows | Composite ARIA listbox: the input owns ↑/↓/Enter/Esc and rows are mouse-only `role="option"` elements; converting loses that contract. Kept native per the composite-widget exception. |
+| `src/components/LanguageSwitcher.tsx` `role="option"` rows | Composite listbox options, same reason. |
+| Hidden `<input type="file">` (`SystemPage`, `FilesPage`, `ConfigPage`) | Proxied by a Sakuga Button (owner exception). |
+
+### Shared-layer fixes this pass required
+
+- `Tabs` now reads the `CustomEvent.detail` from React's `nativeEvent` wrapper,
+  so a tab change actually reaches the wrapper's `onChange` (React wraps a
+  custom element's `change` in a synthetic event).
+- `Input` lets an explicit caller `aria-label` win over the visible `label`
+  prop, so existing `aria-label`-keyed tests stay honest.
+- Both fixes are mirrored to `qubit_runtime/apps/shared` by
+  `python3 scripts/sync_sakuga_shared.py` (7 files, `--check` OK).
+
+## Remaining composite/exception surfaces
+
+| File | Control | Reason |
 |---|---|---|
-| `AutoField.tsx:79,134,149,165,205,226` | Switch/Select/Input config fields | generated form primitives; needs a node-test adapter (`vitest` cannot upgrade the custom elements) |
-| `AutomationBlueprints.tsx:105,116,125,190,225` | Select/Input/Button + legacy Toast | page is another lane's surface; toast migration first |
-| `ModelPickerDialog.tsx:386,416,469,487,496,499,577,587` | Button/Input/Checkbox | composite modal; its tests mock the old primitives, needs the Select/Input test adapters |
-| `ScheduleBuilder.tsx:89,141,169,198,211,250` | Input/Button, native `datetime-local`/`time` | number/datetime inputs are outside the required input types; Selects/Buttons still to do |
-| `SkillEditorDialog.tsx:155,165,199,202` | Input/Button | textarea is out of the required list; Input/Buttons still to do |
-| `ToolsetConfigDrawer.tsx:229,253,314,352,381,406` | Button/Switch/Input | needs a switch/input node-test adapter |
-| `CommandPalette.tsx:105,160` | native search input + option rows | documented composite; keyboard semantics kept, effects only around the interaction |
-| `om-agent-ui.tsx`, `om-computer-workspace.tsx`, `om-ui.tsx`, `viking-settings.tsx` | native buttons/inputs + third-party dialog internals | shared inner-UI module, owned inside `components/**`; needs the om-* screens' tests in one pass |
-| `ReportList.tsx:47` | per-report text button | dense list row; low value |
-
+| `src/components/CommandPalette.tsx` | search input + option rows | composite ARIA widget (above) |
+| `src/components/LanguageSwitcher.tsx` | option rows | composite listbox options (above) |
+| `src/pages/VoiceEditPage.tsx` | number inputs, textareas | outside the upstream input/textarea set |
+| `src/pages/DocsPage.tsx`, `AnalyticsPage.tsx`, `OpenVikingStudioPage.tsx` | navigation `<a>` links | owner exception: nav links stay links |
+| third-party dialog internals | Radix dialog surfaces | third-party widget internals |
