@@ -6193,7 +6193,8 @@ def h_office_habblaud_agents(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
     try:
         tower = TWR.state(cfg)
-        snap = OS.to_snapshot(tower, 1, time.time())
+        snap = OS.to_snapshot(tower, 1, time.time(),
+                              fx_mode=OS.fx_mode_for(cfg))
     except Exception as exc:  # noqa: BLE001
         return 503, {"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
                      "detail": f"the office store could not be read: "
@@ -6258,7 +6259,8 @@ def h_office_habblaud_snapshot(cfg: Any, q: Dict[str, str],
 
     try:
         tower = TWR.state(cfg)
-        snap = OS.to_snapshot(tower, 1, time.time())
+        snap = OS.to_snapshot(tower, 1, time.time(),
+                              fx_mode=OS.fx_mode_for(cfg))
     except Exception as exc:  # noqa: BLE001
         return 503, {"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
                      "detail": f"the office store could not be read: "
@@ -6280,7 +6282,8 @@ def h_office_habblaud_status(cfg: Any, q: Dict[str, str], b: Dict[str, Any],
 
     try:
         tower = TWR.state(cfg)
-        snap = OS.to_snapshot(tower, 1, time.time())
+        snap = OS.to_snapshot(tower, 1, time.time(),
+                              fx_mode=OS.fx_mode_for(cfg))
     except Exception as exc:  # noqa: BLE001
         return 503, {
             "ok": False, "state": "UNAVAILABLE", "connected": False,
