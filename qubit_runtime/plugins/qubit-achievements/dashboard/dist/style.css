@@ -144,3 +144,68 @@
 .ha-share-btn-primary { border-color: #ffffff; color: #ffffff; background: #000000; }
 .ha-share-btn-primary:hover:not(:disabled) { background: #1a1a1a; border-color: #67e8f9; color: #67e8f9; }
 .ha-share-hint { margin: 0; color: var(--color-muted-foreground); font-size: .76rem; line-height: 1.45; }
+
+/* ── Sakuga controls ───────────────────────────────────────────────────────
+ * The plugin renders the same vendored <sakuga-button>/<sakuga-progress>
+ * elements the dashboard uses. Chrome is narrowed with the supported
+ * `::part()` seam only; the upstream palette and effects are untouched. */
+.ha-pills sakuga-button { display: inline-block; }
+.ha-pills sakuga-button::part(button) {
+  padding: .35rem .6rem;
+  font-size: .78rem;
+  font-style: normal;
+  font-weight: 700;
+  border-width: 1.5px;
+  border-radius: 6px;
+  box-shadow: 2px 2px 0 var(--sk-soft, #b8b3ff);
+}
+.ha-pills sakuga-button.active::part(button) {
+  color: var(--color-foreground);
+  border-color: var(--ha-tier, var(--color-ring));
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-card));
+}
+.ha-refresh::part(button) {
+  padding: .4rem .85rem;
+  font-size: .8rem;
+  font-style: normal;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.ha-share-btn::part(button) {
+  padding: .5rem .85rem;
+  font-size: .82rem;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.ha-share-btn-primary::part(button) {
+  border-color: #fff;
+  background: #000;
+  color: #fff;
+}
+.ha-share-btn-primary::part(button):hover:not(:disabled) {
+  background: #1a1a1a;
+  border-color: #67e8f9;
+  color: #67e8f9;
+}
+.ha-share-close::part(button) {
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  font-size: 1.1rem;
+  font-style: normal;
+  line-height: 1;
+}
+.ha-share-trigger::part(button) {
+  padding: .18rem .42rem;
+  font-size: .66rem;
+  font-style: normal;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  border-width: 1px;
+  border-radius: 4px;
+  box-shadow: none;
+}
+.ha-scan-progress { --sk-progress-width: 100%; width: 100%; margin-top: .35rem; }
+.ha-scan-progress::part(label) { font-size: 13px; padding: 1px 9px 2px; }
