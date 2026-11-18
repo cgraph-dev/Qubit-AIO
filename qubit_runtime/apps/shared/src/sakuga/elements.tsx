@@ -47,6 +47,8 @@ export interface SakugaHostProps {
   'aria-label'?: string;
   'aria-describedby'?: string;
   'aria-labelledby'?: string;
+  'aria-invalid'?: boolean;
+  'aria-required'?: boolean;
   'aria-hidden'?: boolean;
   'data-testid'?: string;
 }
@@ -72,10 +74,20 @@ function hostProps(props: Record<string, unknown>): Record<string, unknown> {
   for (const [key, value] of Object.entries(props)) {
     if (value === undefined || key === 'children') continue;
     if (HOST_KEYS.has(key) || key.startsWith('aria-') || key.startsWith('data-')) {
-      out[key === 'className' ? 'class' : key] = value;
+      // React 19 writes a boolean attribute on a custom element as an empty
+      // string. ARIA/data values are read by tests and CSS, so keep the
+      // literal 'true'/'false'.
+      out[key === 'className' ? 'class' : key] =
+        typeof value === 'boolean' && (key.startsWith('aria-') || key.startsWith('data-'))
+          ? String(value)
+          : value;
     }
   }
   return out;
+}
+
+function hostShadowInput(host: HTMLElement | null): HTMLInputElement | null {
+  return host?.shadowRoot?.querySelector<HTMLInputElement>('input') ?? null;
 }
 
 function isDefined(tag: string): boolean {
@@ -337,6 +349,14 @@ export interface SakugaInputProps extends SakugaHostProps {
   name?: string;
   disabled?: boolean;
   autoComplete?: string;
+  autoFocus?: boolean;
+  required?: boolean;
+  pattern?: string;
+  minLength?: number;
+  maxLength?: number;
+  inputMode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search';
+  readOnly?: boolean;
+  spellCheck?: boolean;
   onChange?: (value: string) => void;
   onKeyDown?: KeyboardEventHandler<HTMLElement>;
   onEnter?: () => void;
@@ -346,7 +366,8 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
   const inner = useRef<HTMLElement | null>(null);
   const {
     type = 'text', label, placeholder, value, defaultValue, name, disabled,
-    autoComplete, onChange, onKeyDown, onEnter, className, ...rest
+    autoComplete, autoFocus, required, pattern, minLength, maxLength, inputMode,
+    readOnly, spellCheck, onChange, onKeyDown, onEnter, className, ...rest
   } = props;
   const controlled = value !== undefined;
 
@@ -359,6 +380,70 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
     },
     { value: defaultValue ?? '' },
   );
+
+  // The upstream field renders its own `<input>` inside the shadow root and
+  // only forwards a small attribute set. Validation, focus and editing hints
+  // are native-input contract, so mirror them onto that inner element. This
+  // wrapper is the adaptation layer; the vendored file is untouched.
+  const innerAttrs = {
+    required,
+    pattern,
+    minlength: minLength,
+    maxlength: maxLength,
+    inputmode: inputMode,
+    readonly: readOnly,
+    spellcheck: spellCheck,
+    autocomplete: autoComplete,
+    'aria-invalid': rest['aria-invalid'],
+    'aria-describedby': rest['aria-describedby'],
+    'aria-required': required ? 'true' : undefined,
+  };
+  const innerRef = useRef<HTMLInputElement | null>(null);
+  useLayoutEffect(() => {
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let stop: ReturnType<typeof setTimeout> | null = null;
+    const apply = () => {
+      const host = inner.current;
+      const input = host?.shadowRoot?.querySelector<HTMLInputElement>('input');
+      if (!input) return false;
+      innerRef.current = input;
+      for (const [key, attr] of Object.entries(innerAttrs)) {
+        if (attr === undefined || attr === null || attr === false) input.removeAttribute(key);
+        else input.setAttribute(key, attr === true ? '' : String(attr));
+      }
+      return true;
+    };
+    if (!apply()) {
+      timer = setInterval(() => {
+        if (apply() && timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+      }, 50);
+      stop = setTimeout(() => {
+        if (timer) clearInterval(timer);
+        timer = null;
+      }, 2000);
+    }
+    if (autoFocus) {
+      const focus = () => {
+        const input = hostShadowInput(inner.current);
+        if (input) input.focus();
+        else return false;
+        return true;
+      };
+      if (!focus()) {
+        const focusTimer = setInterval(() => {
+          if (focus()) clearInterval(focusTimer);
+        }, 50);
+        setTimeout(() => clearInterval(focusTimer), 2000);
+      }
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+      if (stop) clearTimeout(stop);
+    };
+  });
 
   return createElement('sakuga-input', {
     ...hostProps(rest),
