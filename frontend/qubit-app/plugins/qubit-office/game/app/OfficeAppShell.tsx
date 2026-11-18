@@ -44,6 +44,7 @@ import {
   bindingSummary, bindingVerdict,
 } from "./office-api";
 import { createOfficeLoadingScreen } from "../loading/OfficeLoadingScreen";
+import { createOfficeAmbientOverlay } from "../motion";
 import type { OfficeLoadingConfigInput } from "../loading/config";
 import {
   officeFx, sakugaButton, sakugaLoading, sakugaProgress,
@@ -240,6 +241,7 @@ export function createOfficeApp(
   hooks: OfficeGameShellProps["hooks"],
 ) {
   const { useState, useEffect, useRef } = hooks;
+  const OfficeAmbientOverlay = createOfficeAmbientOverlay(R, hooks);
 
   return function OfficeApp(props: OfficeAppProps = {}) {
     const [loaded, setLoaded] = useState(false);
@@ -787,6 +789,10 @@ export function createOfficeApp(
         tabIndex: -1,
         "aria-label": `${OFFICE_BRAND.name} workspace`,
       }, [
+        R.createElement(OfficeAmbientOverlay, {
+          key: "ambient",
+          reducedMotion,
+        }),
         R.createElement("iframe", {
           key: "frame",
           ref: frameRef,

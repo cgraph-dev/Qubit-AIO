@@ -33,6 +33,7 @@ import { officeFx } from "./app/sakuga";
 // rules are all scoped to `.office-game`, so the dashboard is untouched.
 import "./styles/tokens.css";
 import "./styles/game.css";
+import "./styles/motion.css";
 import { OfficeAdapter } from "./adapter";
 import { buildHeadquartersPortals } from "./navigation";
 import { HQ_SLUG } from "./WorldAssembler";

@@ -34,6 +34,7 @@
 type Slice = { src?: unknown; slice?: unknown; width?: unknown; repeat?: unknown };
 type Payload = { active?: boolean; ui?: { slices?: Record<string, Slice> } };
 
+
 const STYLE_ID = "qubit-office-ui-skin";
 const SAFE_URL = /^[A-Za-z0-9._~:/?=&%+,@!$'()*;-]+$/;
 

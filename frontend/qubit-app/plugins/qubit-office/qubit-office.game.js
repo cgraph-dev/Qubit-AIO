@@ -194765,46 +194765,69 @@ html body .ui-root .ui-deliv-card:active {
 	}
 	// ../qubit-shared/src/sakuga/extras/textarea.tsx
 	var SakugaTextarea = forwardRef(function SakugaTextarea(props, ref) {
-		const { label, value, defaultValue, placeholder, rows = 3, name, required, disabled, maxLength, autoFocus, readOnly, id, className, style, description, onChange } = props;
+		const { label, value, defaultValue, onChange, className, style, description, autoResize = false, rows = 3, onInput, ...rest } = props;
 		const autoId = useId();
-		const fieldId = id ?? `qsk-textarea-${autoId}`;
+		const fieldId = rest.id ?? `qsk-textarea-${autoId}`;
 		const typeFx = useTypeFx();
 		const focusFx = useFocusFx();
+		const innerRef = useRef(null);
+		const resize = () => {
+			if (!autoResize) return;
+			const element = innerRef.current;
+			if (!element) return;
+			element.style.height = "auto";
+			element.style.height = `${Math.max(rows * 20 + 16, element.scrollHeight)}px`;
+		};
+		useLayoutEffect(() => {
+			resize();
+		}, [
+			autoResize,
+			rows,
+			value,
+			defaultValue
+		]);
 		return createElement(ExtraField, {
 			label,
-			htmlFor: fieldId,
+			htmlFor: label ? fieldId : void 0,
 			description,
 			className,
 			style
 		}, createElement("textarea", {
+			...rest,
 			id: fieldId,
-			ref,
+			ref: (node) => {
+				innerRef.current = node;
+				if (typeof ref === "function") ref(node);
+				else if (ref) ref.current = node;
+			},
 			className: "qsk-extra__control qsk-textarea",
 			style: {
 				...FIELD_STYLE,
 				width: "100%",
 				minHeight: rows * 20 + 16,
-				resize: "vertical"
+				resize: autoResize ? "none" : "vertical",
+				...style
 			},
-			name,
-			placeholder,
 			rows,
-			required,
-			disabled,
-			maxLength,
-			autoFocus,
-			readOnly,
 			value,
 			defaultValue,
 			onChange: (event) => {
 				typeFx(event.currentTarget);
 				onChange?.(event.currentTarget.value);
+				resize();
 			},
-			onFocus: (event) => focusFx(event.currentTarget)
+			onInput: (event) => {
+				resize();
+				onInput?.(event);
+			},
+			onFocus: (event) => {
+				focusFx(event.currentTarget);
+				rest.onFocus?.(event);
+			}
 		}));
 	});
 	forwardRef(function SakugaNumber(props, ref) {
-		const { label, value, defaultValue, min, max, step = 1, name, disabled, id, className, style, description, onChange } = props;
+		const { label, value, defaultValue, min, max, step = 1, name, disabled, id, className, style, description, onChange, inputProps } = props;
 		const autoId = useId();
 		const fieldId = id ?? `qsk-number-${autoId}`;
 		const inputRef = useRef(null);
@@ -194852,6 +194875,7 @@ html body .ui-root .ui-deliv-card:active {
 			className: "qsk-stepper",
 			onClick: () => stepBy(-1)
 		}, "−"), createElement("input", {
+			...inputProps ?? {},
 			id: fieldId,
 			ref: (node) => {
 				inputRef.current = node;
@@ -194899,7 +194923,7 @@ html body .ui-root .ui-deliv-card:active {
 	});
 	// ../qubit-shared/src/sakuga/extras/date-time.tsx
 	var DateTimeField = forwardRef(function DateTimeField(props, ref) {
-		const { label, value, defaultValue, min, max, name, disabled, id, className, style, description, onChange, type, openLabel } = props;
+		const { label, value, defaultValue, min, max, name, disabled, id, className, style, description, onChange, type, openLabel, inputProps } = props;
 		const autoId = useId();
 		const fieldId = id ?? `qsk-${type}-${autoId}`;
 		const inputRef = useRef(null);
@@ -194920,6 +194944,7 @@ html body .ui-root .ui-deliv-card:active {
 			className,
 			style
 		}, createElement("div", { style: ROW_STYLE }, createElement("input", {
+			...inputProps ?? {},
 			id: fieldId,
 			ref: (node) => {
 				inputRef.current = node;
@@ -195002,7 +195027,7 @@ html body .ui-root .ui-deliv-card:active {
 		cursor: "pointer"
 	};
 	forwardRef(function SakugaFile(props, ref) {
-		const { label, accept, multiple, onFiles, name, disabled, id, className, style, description, buttonLabel } = props;
+		const { label, accept, multiple, onFiles, name, disabled, id, className, style, description, buttonLabel, children, showList = true, directory, inputProps } = props;
 		const autoId = useId();
 		const fieldId = id ?? `qsk-file-${autoId}`;
 		const [files, setFiles] = useState([]);
@@ -195036,7 +195061,8 @@ html body .ui-root .ui-deliv-card:active {
 			style
 		}, createElement("div", { style: {
 			...ROW_STYLE,
-			flexWrap: "wrap"
+			flexWrap: "wrap",
+			display: showList ? void 0 : "contents"
 		} }, createElement(SakugaButton, {
 			ref: (node) => {
 				triggerRef.current = node;
@@ -195047,8 +195073,10 @@ html body .ui-root .ui-deliv-card:active {
 			disabled,
 			"aria-label": `${buttonLabel ?? (multiple ? "Choose files" : "Choose file")}: ${label}`,
 			onClick: () => inputRef.current?.click()
-		}, buttonLabel ?? (multiple ? "Choose files" : "Choose file")), createElement("input", {
+		}, children ?? buttonLabel ?? (multiple ? "Choose files" : "Choose file")), createElement("input", {
+			...inputProps ?? {},
 			id: fieldId,
+			webkitdirectory: directory ? "" : void 0,
 			ref: (node) => {
 				inputRef.current = node;
 				if (typeof ref === "function") ref(node);
@@ -211371,6 +211399,250 @@ html body .ui-root .ui-deliv-card:active {
 		if (!config.effects || !config.weather) return "none";
 		return effectForCondition(config.weather.condition);
 	}
+	// ../qubit-app/plugins/qubit-office/game/motion/ambient-motion.ts
+	/** The three token fills a petal may cycle through. All are real tokens. */
+	var PETAL_TOKEN_CYCLE = [
+		"var(--office-accent)",
+		"var(--office-warn)",
+		"var(--office-ink)"
+	];
+	/**
+	* Four warm pools around the room. Positions are normalized so the same
+	* anchors work at 1679x959 and on a phone; the overlay multiplies them by the
+	* measured viewport.
+	*/
+	var DEFAULT_LANTERN_POOLS = [
+		{
+			id: "lantern-nw",
+			nx: .27,
+			ny: .24,
+			radiusPx: 44,
+			seed: 1.1
+		},
+		{
+			id: "lantern-ne",
+			nx: .71,
+			ny: .22,
+			radiusPx: 48,
+			seed: 2.7
+		},
+		{
+			id: "lantern-sw",
+			nx: .34,
+			ny: .64,
+			radiusPx: 40,
+			seed: 4.3
+		},
+		{
+			id: "lantern-se",
+			nx: .74,
+			ny: .68,
+			radiusPx: 44,
+			seed: 5.9
+		}
+	];
+	/**
+	* Deterministic `[0, 1)` generator (Mulberry32). Reproducible across renders
+	* and test runs; no external dependency.
+	*/
+	function mulberry32(seed) {
+		let t = seed >>> 0;
+		return () => {
+			t += 1831565813;
+			let r = Math.imul(t ^ t >>> 15, 1 | t);
+			r ^= r + Math.imul(r ^ r >>> 7, 61 | r);
+			return ((r ^ r >>> 14) >>> 0) / 4294967296;
+		};
+	}
+	/** Deterministic petal pool. Same seed always yields the same petals. */
+	function createPetalPool(count = 14, seed = 20261118) {
+		const rand = mulberry32(seed);
+		const total = Math.max(0, Math.floor(count));
+		const pool = [];
+		for (let i = 0; i < total; i += 1) pool.push({
+			id: i,
+			x0: rand(),
+			y0: rand(),
+			fallDurationMs: 11500 + Math.round(rand() * 7e3),
+			swayPx: 14 + Math.round(rand() * 18),
+			swayPeriodMs: 3600 + Math.round(rand() * 2200),
+			scale: .8 + Math.round(rand() * 4) * .1,
+			opacity: .44 + rand() * .3,
+			fillToken: PETAL_TOKEN_CYCLE[i % PETAL_TOKEN_CYCLE.length]
+		});
+		return pool;
+	}
+	/**
+	* The CSS custom properties one petal needs. A negative delay starts the
+	* petal mid-fall, so the first paint is already populated instead of an empty
+	* sky that fills in over the first ~12 seconds.
+	*/
+	function petalCssVars(petal, width, height) {
+		const safeWidth = Number.isFinite(width) && width > 0 ? width : 1679;
+		const safeHeight = Number.isFinite(height) && height > 0 ? height : 959;
+		const delay = -Math.round(petal.y0 * petal.fallDurationMs);
+		return {
+			"--fx-petal-x": `${Math.round(petal.x0 * safeWidth)}px`,
+			"--fx-petal-height": `${Math.round(safeHeight)}px`,
+			"--fx-petal-breeze": "76px",
+			"--fx-petal-fall": `${petal.fallDurationMs}ms`,
+			"--fx-petal-delay": `${delay}ms`,
+			"--fx-petal-sway": `${petal.swayPx}px`,
+			"--fx-petal-sway-dur": `${petal.swayPeriodMs}ms`,
+			"--fx-petal-scale": petal.scale.toFixed(2),
+			"--fx-petal-opacity": petal.opacity.toFixed(3)
+		};
+	}
+	/** CSS animation-delay for a lantern, derived from its seed (negative). */
+	function lanternAnimationDelay(anchor) {
+		return `-${(Math.abs(anchor.seed * .9) % 3.4).toFixed(2)}s`;
+	}
+	// ../qubit-app/plugins/qubit-office/game/motion/reduced-motion.ts
+	function safeDocument() {
+		return typeof document !== "undefined" ? document : null;
+	}
+	function hasReducedAttribute(node) {
+		return Boolean(node && node.getAttribute("data-office-reduced-motion") === "1");
+	}
+	/**
+	* True when either the OS or the shell asks for reduced motion. Safe in a
+	* non-DOM environment (returns `false`).
+	*/
+	function isReducedMotionActive(hostRoot) {
+		if (typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return true;
+		const doc = safeDocument();
+		if (!doc) return false;
+		if (hasReducedAttribute(doc.documentElement)) return true;
+		if (hostRoot && "closest" in hostRoot) return hasReducedAttribute(hostRoot) || Boolean(hostRoot.closest("[data-office-reduced-motion=\"1\"]"));
+		return Boolean(doc.querySelector(".office-game[data-office-reduced-motion=\"1\"], .ui-root[data-office-reduced-motion=\"1\"]"));
+	}
+	/**
+	* Subscribe to both switches. Returns a cleanup function. The caller receives
+	* a synchronous first call so it never starts in the wrong state.
+	*
+	* Observers are optional: a host without `MutationObserver` still gets the
+	* media-query listener.
+	*/
+	function subscribeReducedMotion(onChange, hostRoot) {
+		if (typeof window === "undefined") return () => {};
+		const sync = () => onChange(isReducedMotionActive(hostRoot));
+		sync();
+		const mql = typeof window.matchMedia === "function" ? window.matchMedia("(prefers-reduced-motion: reduce)") : null;
+		mql?.addEventListener("change", sync);
+		let observer = null;
+		const doc = safeDocument();
+		if (doc && typeof MutationObserver !== "undefined") {
+			observer = new MutationObserver(sync);
+			observer.observe(doc.documentElement, {
+				attributes: true,
+				attributeFilter: ["data-office-reduced-motion"]
+			});
+			const scope = hostRoot ?? doc.querySelector(".office-game");
+			if (scope && scope !== doc.documentElement) observer.observe(scope, {
+				attributes: true,
+				attributeFilter: ["data-office-reduced-motion"]
+			});
+		}
+		return () => {
+			mql?.removeEventListener("change", sync);
+			observer?.disconnect();
+		};
+	}
+	// ../qubit-app/plugins/qubit-office/game/motion/office-ambient-overlay.ts
+	var DEFAULT_WIDTH = 1679;
+	var DEFAULT_HEIGHT = 959;
+	function stop(R, key, offset, color, opacity) {
+		return R.createElement("stop", {
+			key,
+			offset,
+			stopColor: color,
+			stopOpacity: opacity
+		});
+	}
+	/**
+	* Build the overlay component with the host's React and hooks. The returned
+	* function is a normal React function component.
+	*/
+	function createOfficeAmbientOverlay(R, hooks) {
+		const { useState, useEffect } = hooks;
+		return function OfficeAmbientOverlay(props) {
+			const width = props.width && props.width > 0 ? props.width : DEFAULT_WIDTH;
+			const height = props.height && props.height > 0 ? props.height : DEFAULT_HEIGHT;
+			const petalCount = props.petalCount ?? 14;
+			const hostRoot = props.hostRoot ?? null;
+			const [detectedReduced, setDetectedReduced] = useState(isReducedMotionActive(hostRoot));
+			const reduced = typeof props.reducedMotion === "boolean" ? props.reducedMotion : detectedReduced;
+			useEffect(() => {
+				if (typeof props.reducedMotion === "boolean") return;
+				return subscribeReducedMotion(setDetectedReduced, hostRoot);
+			}, [hostRoot, props.reducedMotion]);
+			const petals = createPetalPool(petalCount);
+			const lanterns = DEFAULT_LANTERN_POOLS;
+			const moonCx = Math.round(width * .78);
+			const moonCy = 44;
+			const svgProps = {
+				"data-fx-layer": "ambient",
+				viewBox: `0 0 ${width} ${height}`,
+				preserveAspectRatio: "xMidYMid slice",
+				"aria-hidden": "true",
+				focusable: "false"
+			};
+			if (reduced) svgProps["data-office-fx-reduced"] = "1";
+			if (props.isUserInteracting) svgProps["data-office-fx-paused"] = "1";
+			return R.createElement("svg", svgProps, R.createElement("defs", { key: "defs" }, R.createElement("radialGradient", {
+				key: "moon",
+				id: "office-fx-moon-halo",
+				cx: "50%",
+				cy: "50%",
+				r: "50%"
+			}, stop(R, "moon-0", "0%", "var(--office-warn)", "0.42"), stop(R, "moon-1", "48%", "var(--office-accent)", "0.16"), stop(R, "moon-2", "100%", "var(--office-void)", "0")), R.createElement("radialGradient", {
+				key: "lantern",
+				id: "office-fx-lantern-pool",
+				cx: "50%",
+				cy: "50%",
+				r: "50%"
+			}, stop(R, "lantern-0", "0%", "var(--office-warn)", "0.34"), stop(R, "lantern-1", "45%", "var(--office-warn)", "0.14"), stop(R, "lantern-2", "100%", "var(--office-void)", "0"))), R.createElement("g", {
+				key: "moon-node",
+				"data-fx-node": "moon"
+			}, R.createElement("circle", {
+				key: "halo",
+				cx: moonCx,
+				cy: moonCy,
+				r: 64,
+				fill: "url(#office-fx-moon-halo)"
+			}), R.createElement("circle", {
+				key: "disc",
+				cx: moonCx,
+				cy: moonCy,
+				r: 16,
+				fill: "var(--office-warn)",
+				opacity: "0.28"
+			})), lanterns.map((anchor, index) => R.createElement("g", {
+				key: anchor.id,
+				"data-fx-node": "lantern",
+				"data-fx-index": String(index),
+				style: { "--fx-lantern-delay": lanternAnimationDelay(anchor) }
+			}, R.createElement("circle", {
+				key: "pool",
+				cx: Math.round(anchor.nx * width),
+				cy: Math.round(anchor.ny * height),
+				r: anchor.radiusPx,
+				fill: "url(#office-fx-lantern-pool)"
+			}))), reduced ? null : petals.map((petal) => R.createElement("g", {
+				key: `petal-${petal.id}`,
+				"data-fx-node": "petal",
+				"data-fx-part": "fall",
+				style: petalCssVars(petal, width, height)
+			}, R.createElement("g", {
+				key: "sway",
+				"data-fx-part": "sway"
+			}, R.createElement("path", {
+				key: "glyph",
+				d: "M0 -6 C3 -4 5 0 2 5 C0 3 -1 3 -2 5 C-5 0 -3 -4 0 -6 Z",
+				fill: petal.fillToken
+			})))));
+		};
+	}
 	// ../qubit-app/plugins/qubit-office/game/app/a11y.ts
 	var FOCUSABLE_SELECTOR = [
 		"a[href]",
@@ -211581,6 +211853,7 @@ html body .ui-root .ui-deliv-card:active {
 	}
 	function createOfficeApp(R, hooks) {
 		const { useState, useEffect, useRef } = hooks;
+		const OfficeAmbientOverlay = createOfficeAmbientOverlay(R, hooks);
 		return function OfficeApp(props = {}) {
 			const [loaded, setLoaded] = useState(false);
 			const [failed, setFailed] = useState(null);
@@ -212000,29 +212273,36 @@ html body .ui-root .ui-deliv-card:active {
 					className: "office-game__main",
 					tabIndex: -1,
 					"aria-label": `${OFFICE_BRAND.name} workspace`
-				}, [R.createElement("iframe", {
-					key: "frame",
-					ref: frameRef,
-					title: OFFICE_BRAND.title,
-					"data-testid": "office-app-frame",
-					className: "office-game__frame",
-					"aria-label": OFFICE_BRAND.name,
-					"aria-describedby": "office-app-description",
-					"aria-busy": !loaded && !failed,
-					"data-state": failed ? "error" : loaded ? "ready" : "loading",
-					sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
-					allow: "clipboard-read; clipboard-write",
-					style: {
-						border: "0",
-						width: "100%",
-						height: "100%",
-						display: "block"
-					}
-				}), R.createElement("p", {
-					key: "description",
-					id: "office-app-description",
-					className: "office-game__sr-only"
-				}, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled. Every critical status is also shown as text, so muting audio never hides it. On touch screens the shell controls are at least 24 by 24 pixels.`)])
+				}, [
+					R.createElement(OfficeAmbientOverlay, {
+						key: "ambient",
+						reducedMotion
+					}),
+					R.createElement("iframe", {
+						key: "frame",
+						ref: frameRef,
+						title: OFFICE_BRAND.title,
+						"data-testid": "office-app-frame",
+						className: "office-game__frame",
+						"aria-label": OFFICE_BRAND.name,
+						"aria-describedby": "office-app-description",
+						"aria-busy": !loaded && !failed,
+						"data-state": failed ? "error" : loaded ? "ready" : "loading",
+						sandbox: "allow-scripts allow-same-origin allow-forms allow-downloads allow-popups allow-modals",
+						allow: "clipboard-read; clipboard-write",
+						style: {
+							border: "0",
+							width: "100%",
+							height: "100%",
+							display: "block"
+						}
+					}),
+					R.createElement("p", {
+						key: "description",
+						id: "office-app-description",
+						className: "office-game__sr-only"
+					}, `Interactive ${OFFICE_BRAND.name}. Use the controls within the game; unsupported write actions are disabled. Every critical status is also shown as text, so muting audio never hides it. On touch screens the shell controls are at least 24 by 24 pixels.`)
+				])
 			];
 			children.push(R.createElement("div", {
 				key: "announcer",
