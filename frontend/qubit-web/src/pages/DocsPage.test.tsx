@@ -9,6 +9,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 vi.mock("@/plugins", () => ({ PluginSlot: () => null }));
 vi.mock("@/contexts/usePageHeader", () => ({
@@ -61,13 +63,8 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
   }
 }
 
-function setInputValue(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    HTMLInputElement.prototype,
-    "value",
-  )?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
+function setInputValue(host: HTMLElement, value: string) {
+  typeIntoSakuga(host, value);
 }
 
 async function renderDocs(ui: ReactNode) {
@@ -88,7 +85,11 @@ async function renderDocsPage() {
     </I18nProvider>,
   );
   await waitFor(() =>
-    Boolean(container.querySelector('input[placeholder="Filter operations"]')),
+    Boolean(
+      container.querySelector(
+        'sakuga-input[aria-label="Filter operations"]',
+      ),
+    ),
   );
 }
 
@@ -154,8 +155,8 @@ describe("DocsPage OpenAPI reference (drift A23)", () => {
 
   it("filters operations from the reference input", async () => {
     await renderDocsPage();
-    const input = container.querySelector<HTMLInputElement>(
-      'input[placeholder="Filter operations"]',
+    const input = container.querySelector<HTMLElement>(
+      'sakuga-input[aria-label="Filter operations"]',
     );
     expect(input).not.toBeNull();
 

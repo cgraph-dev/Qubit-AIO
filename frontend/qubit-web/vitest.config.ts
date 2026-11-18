@@ -26,7 +26,12 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@qubit/shared": path.resolve(__dirname, "../qubit-shared/src"),
     },
+    // The shared Sakuga wrappers live in `frontend/qubit-shared`, which has its
+    // own `node_modules`. Without dedupe a page test loads a second React copy
+    // and every hook call reads a null dispatcher. Mirrors vite.config.ts.
+    dedupe: ["react", "react-dom"],
   },
   test: {
     environment: "node",

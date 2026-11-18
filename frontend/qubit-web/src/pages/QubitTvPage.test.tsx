@@ -11,6 +11,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 import { I18nProvider } from "@/i18n";
 import QubitTvPage from "@/pages/QubitTvPage";
 import {
@@ -36,18 +38,9 @@ async function render() {
   });
 }
 
-function typeInto(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value",
-  )!.set!;
-  setter.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
 function buttonByText(text: string): HTMLButtonElement | undefined {
-  return Array.from(container.querySelectorAll("button")).find((button) =>
-    (button.textContent ?? "").includes(text),
+  return Array.from(container.querySelectorAll("button, sakuga-button")).find(
+    (button) => (button.textContent ?? "").includes(text),
   ) as HTMLButtonElement | undefined;
 }
 
@@ -87,10 +80,10 @@ describe("QubitTvPage", () => {
 
   it("filters services by search", async () => {
     await render();
-    const search = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Find a service"]',
+    const search = container.querySelector<HTMLElement>(
+      'sakuga-input[aria-label="Find a service"]',
     )!;
-    await act(async () => typeInto(search, "net"));
+    await act(async () => typeIntoSakuga(search, "net"));
     expect(
       container.querySelector('[data-testid="qubit-tv-service-netflix"]'),
     ).not.toBeNull();
@@ -101,8 +94,8 @@ describe("QubitTvPage", () => {
 
   it("persists favorites and filters to favorites only", async () => {
     await render();
-    const favoriteButton = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Toggle Netflix favorite"]',
+    const favoriteButton = container.querySelector<HTMLElement>(
+      '[aria-label="Toggle Netflix favorite"]',
     )!;
     await act(async () => {
       favoriteButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -127,7 +120,7 @@ describe("QubitTvPage", () => {
     await render();
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Open Netflix"]')!
+        .querySelector<HTMLElement>('[aria-label="Open Netflix"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     expect(open).toHaveBeenCalledTimes(1);
@@ -142,11 +135,11 @@ describe("QubitTvPage", () => {
     const youtube = container.querySelector<HTMLElement>(
       '[data-testid="qubit-tv-youtube"]',
     )!;
-    const input = container.querySelector<HTMLInputElement>(
-      'input[aria-label="YouTube URL or video ID"]',
+    const input = container.querySelector<HTMLElement>(
+      'sakuga-input[aria-label="YouTube URL or video ID"]',
     )!;
     await act(async () =>
-      typeInto(input, "https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
+      typeIntoSakuga(input, "https://www.youtube.com/watch?v=dQw4w9WgXcQ"),
     );
     await act(async () => {
       youtube
@@ -167,10 +160,10 @@ describe("QubitTvPage", () => {
     const youtube = container.querySelector<HTMLElement>(
       '[data-testid="qubit-tv-youtube"]',
     )!;
-    const input = container.querySelector<HTMLInputElement>(
-      'input[aria-label="YouTube URL or video ID"]',
+    const input = container.querySelector<HTMLElement>(
+      'sakuga-input[aria-label="YouTube URL or video ID"]',
     )!;
-    await act(async () => typeInto(input, "not a video"));
+    await act(async () => typeIntoSakuga(input, "not a video"));
     await act(async () => {
       youtube
         .querySelector("form")!

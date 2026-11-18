@@ -18,13 +18,13 @@ import { useCallback, useMemo, useState } from "react";
 import {
   ExternalLink,
   Play,
-  Search,
   Star,
   Tv,
   Youtube,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 import {
   TV_SERVICES,
   parseYouTubeId,
@@ -55,6 +55,7 @@ export default function QubitTvPage() {
     // Cross-origin DRM players cannot be embedded here, so the browser window
     // is the whole integration. noopener/noreferrer keep it isolated.
     window.open(service.url, "_blank", SERVICE_OPEN_FEATURES);
+    emitFx("pop");
   }, []);
 
   const toggleFavorite = useCallback((id: string) => {
@@ -74,10 +75,12 @@ export default function QubitTvPage() {
       setVideoError(
         "Enter a valid YouTube URL or 11-character video ID.",
       );
+      emitFx("error");
       return;
     }
     setVideoError(null);
     setVideoId(id);
+    emitFx("success");
   }, [videoInput]);
 
   return (
@@ -118,25 +121,19 @@ export default function QubitTvPage() {
             loadVideo();
           }}
         >
-          <label className="sr-only" htmlFor="qubit-tv-youtube-input">
-            YouTube URL or video ID
-          </label>
-          <input
-            id="qubit-tv-youtube-input"
-            type="text"
-            value={videoInput}
-            onChange={(event) => setVideoInput(event.target.value)}
-            placeholder="https://www.youtube.com/watch?v=… or video ID"
-            aria-label="YouTube URL or video ID"
-            className="min-w-0 flex-1 rounded-[9px] border border-border bg-background-base px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center gap-2 rounded-[9px] border border-border bg-secondary px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
+          <div className="qsk-field min-w-0 flex-1">
+            <Input
+              label="YouTube URL or video ID"
+              value={videoInput}
+              onChange={(value) => setVideoInput(value)}
+              onEnter={loadVideo}
+              placeholder="https://www.youtube.com/watch?v=… or video ID"
+            />
+          </div>
+          <Button onClick={loadVideo} aria-label="Load video">
             <Play className="h-4 w-4" aria-hidden="true" />
             Load video
-          </button>
+          </Button>
         </form>
         {videoError ? (
           <p className="mt-2 text-xs text-destructive" role="alert">
@@ -158,9 +155,8 @@ export default function QubitTvPage() {
               <span>
                 Video <span className="font-mono text-foreground">{videoId}</span>
               </span>
-              <button
-                type="button"
-                className="rounded-[7px] border border-border px-2 py-1 text-xs text-foreground hover:bg-secondary"
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setVideoId(null);
                   setVideoInput("");
@@ -168,7 +164,7 @@ export default function QubitTvPage() {
                 }}
               >
                 Clear
-              </button>
+              </Button>
             </div>
           </div>
         ) : null}
@@ -183,28 +179,25 @@ export default function QubitTvPage() {
           <h2 className="mr-auto text-sm font-semibold text-foreground">
             Streaming services
           </h2>
-          <button
-            type="button"
-            className="rounded-[9px] border border-border bg-secondary px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent"
-            onClick={() => setFavoritesOnly((value) => !value)}
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setFavoritesOnly((value) => !value);
+              emitFx("tick");
+            }}
             aria-pressed={favoritesOnly}
           >
             {favoritesOnly ? "Show all services" : "Show favorites"}
-          </button>
+          </Button>
         </div>
 
-        <div className="relative mt-3 max-w-md">
-          <Search
-            className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <input
+        <div className="qsk-field mt-3 max-w-md">
+          <Input
             type="search"
+            label="Find a service"
             value={filter}
-            onChange={(event) => setFilter(event.target.value)}
+            onChange={(value) => setFilter(value)}
             placeholder="Find a service"
-            aria-label="Find a service"
-            className="w-full rounded-[9px] border border-border bg-background-base py-2 pl-8 pr-3 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
 
@@ -220,8 +213,8 @@ export default function QubitTvPage() {
                 )}
                 data-testid={`qubit-tv-service-${service.id}`}
               >
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   onClick={() => openService(service)}
                   className="flex min-w-0 flex-1 items-center justify-between gap-2 rounded-[8px] px-2 py-1.5 text-left text-sm font-medium text-foreground hover:bg-secondary"
                   aria-label={`Open ${service.label}`}
@@ -231,10 +224,13 @@ export default function QubitTvPage() {
                     className="h-4 w-4 shrink-0 text-muted-foreground"
                     aria-hidden="true"
                   />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => toggleFavorite(service.id)}
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    toggleFavorite(service.id);
+                    emitFx("tick");
+                  }}
                   aria-label={`Toggle ${service.label} favorite`}
                   aria-pressed={isFavorite}
                   className={cn(
@@ -247,7 +243,7 @@ export default function QubitTvPage() {
                     fill={isFavorite ? "currentColor" : "none"}
                     aria-hidden="true"
                   />
-                </button>
+                </Button>
               </article>
             );
           })}

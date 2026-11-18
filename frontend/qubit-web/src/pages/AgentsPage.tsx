@@ -5,8 +5,8 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button, emitFx } from "@/sakuga/ui";
 
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
@@ -41,6 +41,7 @@ export default function AgentsPage() {
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : String(err));
         setState("error");
+        emitFx("error");
       });
   }, []);
 
@@ -60,8 +61,7 @@ export default function AgentsPage() {
           </p>
         </div>
         <Button
-          ghost
-          size="sm"
+          variant="secondary"
           onClick={load}
           disabled={state === "loading"}
           aria-label="Refresh agents"

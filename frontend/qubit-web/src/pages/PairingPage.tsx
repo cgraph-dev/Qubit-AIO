@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import { Check, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
 import type { PairingResponse, PairingUser } from "@/lib/api";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
-import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
+import { Button, emitFx, showSakugaToast } from "@/sakuga/ui";
+
+type PairingTone = "success" | "error" | "warning";
+function notify(message: string, tone: PairingTone = "success"): void {
+  showSakugaToast(message);
+  emitFx(tone);
+}
 import { usePageHeader } from "@/contexts/usePageHeader";
 
 function getUserKey(user: PairingUser): string {
@@ -33,7 +37,6 @@ export default function PairingPage() {
   const [loading, setLoading] = useState(true);
   const [approving, setApproving] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
-  const { toast, showToast } = useToast();
   const { setEnd } = usePageHeader();
 
   const loadPairing = useCallback(() => {
@@ -43,9 +46,9 @@ export default function PairingPage() {
         setPending(res?.pending ?? []);
         setApproved(res?.approved ?? []);
       })
-      .catch(() => showToast("Failed to load pairing requests", "error"))
+      .catch(() => notify("Failed to load pairing requests", "error"))
       .finally(() => setLoading(false));
-  }, [showToast]);
+  }, []);
 
   useEffect(() => {
     loadPairing();
@@ -53,7 +56,7 @@ export default function PairingPage() {
 
   const handleApprove = async (user: PairingUser) => {
     if (!user.request_id) {
-      showToast("Missing pairing request", "error");
+      notify("Missing pairing request", "error");
       return;
     }
     const key = getUserKey(user);
@@ -61,10 +64,10 @@ export default function PairingPage() {
     try {
       // The button press is the explicit confirmation; settle the staged gate.
       await api.approvePairing(user.platform, user.request_id, () => true);
-      showToast(`Approved: "${getUserLabel(user)}"`, "success");
+      notify(`Approved: "${getUserLabel(user)}"`);
       loadPairing();
     } catch (e) {
-      showToast(`Error: ${e}`, "error");
+      notify(`Error: ${e}`, "error");
     } finally {
       setApproving(null);
     }
@@ -76,10 +79,10 @@ export default function PairingPage() {
     try {
       // The dialog above is the confirmation; settle the staged gate.
       const res = await api.clearPendingPairing(() => true);
-      showToast(`Cleared ${res.cleared} pending request(s)`, "success");
+      notify(`Cleared ${res.cleared} pending request(s)`, "warning");
       loadPairing();
     } catch (e) {
-      showToast(`Error: ${e}`, "error");
+      notify(`Error: ${e}`, "error");
     } finally {
       setClearing(false);
     }
@@ -93,17 +96,17 @@ export default function PairingPage() {
         try {
           // DeleteConfirmDialog above is the confirmation; settle the staged gate.
           await api.revokePairing(platform, user_id, () => true);
-          showToast(
+          notify(
             `Revoked: "${user ? getUserLabel(user) : user_id}"`,
-            "success",
+            "warning",
           );
           loadPairing();
         } catch (e) {
-          showToast(`Error: ${e}`, "error");
+          notify(`Error: ${e}`, "error");
           throw e;
         }
       },
-      [approved, loadPairing, showToast],
+      [approved, loadPairing],
     ),
   });
 
@@ -111,13 +114,13 @@ export default function PairingPage() {
   useLayoutEffect(() => {
     setEnd(
       <Button
+        variant="secondary"
         className="uppercase"
-        size="sm"
         onClick={handleClearPending}
         disabled={clearing}
-        prefix={clearing ? <Spinner /> : <Trash2 className="h-4 w-4" />}
+        aria-label="Clear pending"
       >
-        Clear pending
+        {clearing ? <Spinner /> : <Trash2 className="h-4 w-4" />} Clear pending
       </Button>,
     );
     return () => {
@@ -140,8 +143,6 @@ export default function PairingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Toast toast={toast} />
-
       <DeleteConfirmDialog
         open={userRevoke.isOpen}
         onCancel={userRevoke.cancel}
@@ -196,18 +197,16 @@ export default function PairingPage() {
 
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
-                    size="sm"
                     className="uppercase"
                     onClick={() => handleApprove(user)}
                     disabled={approving === key || !user.request_id}
-                    prefix={
-                      approving === key ? (
-                        <Spinner />
-                      ) : (
-                        <Check className="h-4 w-4" />
-                      )
-                    }
+                    aria-label={`Approve ${getUserLabel(user)}`}
                   >
+                    {approving === key ? (
+                      <Spinner />
+                    ) : (
+                      <Check className="h-4 w-4" />
+                    )}{" "}
                     Approve
                   </Button>
                 </div>
@@ -256,10 +255,9 @@ export default function PairingPage() {
 
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
-                    ghost
-                    size="icon"
+                    variant="secondary"
                     title="Revoke"
-                    aria-label="Revoke"
+                    aria-label={`Revoke ${getUserLabel(user)}`}
                     className="text-destructive"
                     onClick={() => userRevoke.requestDelete(key)}
                   >

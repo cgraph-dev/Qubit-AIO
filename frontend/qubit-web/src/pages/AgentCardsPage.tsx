@@ -31,6 +31,7 @@ import {
 } from "@/components/om-agent-ui";
 import type { AgentTaskRow } from "@/lib/agentSurfaceApi";
 import { cn } from "@/lib/utils";
+import { Button } from "@/sakuga/ui";
 
 type CardTab = "activity" | "ideas" | "goals" | "notifications" | "apps";
 
@@ -68,17 +69,18 @@ export default function AgentCardsPage() {
           aria-label="Agent card panels"
         >
           {TABS.map((item) => (
-            <button
+            <Button
               key={item.id}
               type="button"
               role="tab"
+              variant={tab === item.id ? "primary" : "secondary"}
               aria-selected={tab === item.id}
               aria-label={`Show ${item.label} panel`}
               onClick={() => setTab(item.id)}
               className={cn("btn btn--ghost btn--sm", tab === item.id && "active")}
             >
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
       </section>
@@ -110,14 +112,14 @@ export default function AgentCardsPage() {
                     <ul className="flex flex-col gap-1">
                       {surface.tasks.slice(0, 6).map((task) => (
                         <li key={task.id}>
-                          <button
-                            type="button"
+                          <Button
+                            variant="secondary"
                             aria-label={`Inspect task: ${task.title || task.id}`}
                             onClick={() => setSelected(task)}
                             className="w-full truncate rounded-[10px] px-2 py-2 text-left text-[13px] hover:bg-[color:var(--background-base)]"
                           >
                             {task.title || task.id}
-                          </button>
+                          </Button>
                         </li>
                       ))}
                     </ul>

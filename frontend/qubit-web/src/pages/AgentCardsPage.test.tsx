@@ -10,6 +10,7 @@
  */
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import "./sakuga-test-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 let container: HTMLDivElement;
@@ -102,8 +103,8 @@ async function renderAgentCards() {
 }
 
 function clickByText(text: string) {
-  const btn = [...container.querySelectorAll("button")].find((b) =>
-    b.textContent?.includes(text),
+  const btn = [...container.querySelectorAll("button, sakuga-button")].find(
+    (b) => b.textContent?.includes(text),
   ) as HTMLButtonElement;
   expect(btn, `button containing "${text}"`).toBeTruthy();
   return btn;

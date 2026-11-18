@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { ChevronRight, ExternalLink, RefreshCw, Search } from "lucide-react";
+import { ChevronRight, ExternalLink, RefreshCw } from "lucide-react";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn } from "@/lib/utils";
 import { PluginSlot } from "@/plugins";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 
 // Qubit-owned OpenAPI reference. Vendor provenance lives in
 // THIRD_PARTY_NOTICES.md (the legal-attribution surface), never on the rendered
@@ -244,20 +243,17 @@ export default function DocsPage() {
           </p>
         </div>
 
-        <div className="relative min-w-0 w-full sm:w-64">
-          <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+        <div className="min-w-0 w-full sm:w-72">
           <Input
-            className="h-8 pl-8 pr-2 text-xs"
+            label="Filter operations"
             placeholder="Filter operations"
-            aria-label="Filter API operations"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(value) => setSearch(value)}
           />
         </div>
 
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           onClick={load}
           disabled={state === "loading"}
           aria-label="Refresh API reference"
@@ -284,13 +280,11 @@ export default function DocsPage() {
         >
           <span className="min-w-0 flex-1 break-words">{error}</span>
           <Button
-            size="sm"
-            outlined
-            onClick={load}
-            prefix={<RefreshCw className="h-3.5 w-3.5" />}
+            variant="secondary"
+            onClick={() => { emitFx("error"); load(); }}
             aria-label="Retry loading the API reference"
           >
-            Retry
+            <RefreshCw className="h-3.5 w-3.5" /> Retry
           </Button>
         </div>
       ) : filtered.length === 0 ? (
@@ -303,8 +297,8 @@ export default function DocsPage() {
             const isOpen = isGroupOpen(group);
             return (
               <section key={group} className="mb-3 border border-border/50">
-                <button
-                  type="button"
+                <Button
+                  variant="secondary"
                   aria-expanded={isOpen}
                   aria-controls={`docs-group-${group}`}
                   onClick={() =>
@@ -324,7 +318,7 @@ export default function DocsPage() {
                   <span className="text-xs tabular-nums text-text-tertiary">
                     {ops.length}
                   </span>
-                </button>
+                </Button>
 
                 {isOpen && (
                   <ul

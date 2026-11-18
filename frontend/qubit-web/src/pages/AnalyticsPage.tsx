@@ -17,8 +17,8 @@ import type {
   AnalyticsSkillEntry,
 } from "@/lib/api";
 import { timeAgo } from "@/lib/utils";
-import { Button } from "@nous-research/ui/ui/components/button";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button, emitFx } from "@/sakuga/ui";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import {
   SettingsEmpty,
@@ -513,7 +513,10 @@ export default function AnalyticsPage() {
     api
       .getAnalytics(days)
       .then(setData)
-      .catch((err) => setError(String(err)))
+      .catch((err) => {
+        setError(String(err));
+        emitFx("error");
+      })
       .finally(() => setLoading(false));
   }, [days, showTokens]);
 
@@ -529,8 +532,8 @@ export default function AnalyticsPage() {
             <Button
               key={p.label}
               type="button"
-              size="sm"
-              outlined={days !== p.days}
+              variant={days === p.days ? "primary" : "secondary"}
+              aria-pressed={days === p.days}
               onClick={() => setDays(p.days)}
             >
               {p.label}
@@ -538,8 +541,7 @@ export default function AnalyticsPage() {
           ))}
           <Button
             type="button"
-            ghost
-            size="icon"
+            variant="secondary"
             className="text-muted-foreground hover:text-foreground"
             onClick={load}
             disabled={loading}
