@@ -90,9 +90,9 @@ async function setNativeSelect(host: HTMLElement | null, value: string) {
 
 function buttonInScope(scope: ParentNode, text: string): HTMLButtonElement | null {
   return (
-    [...scope.querySelectorAll("button, sakuga-button")].find(
+    ([...scope.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
-    ) ?? null
+    ) as HTMLButtonElement | undefined) ?? null
   );
 }
 
@@ -230,7 +230,7 @@ describe("TasksPage", () => {
       "Qubit keeps no detached-task completion-delivery registry; nothing is dismissed",
     );
     expect(row!.querySelector('a[href="/qubit-task-inbox"]')).not.toBeNull();
-    const button = row!.querySelector("button, sakuga-button") as HTMLElement;
+    const button = row!.querySelector("button, sakuga-button") as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     await act(async () => button.click());
     expect(tasksMocks.cancelBackgroundTask).not.toHaveBeenCalled();

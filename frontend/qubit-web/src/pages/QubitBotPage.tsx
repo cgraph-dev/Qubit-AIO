@@ -885,7 +885,7 @@ export default function QubitBotPage() {
                 documents.map((f) => (
                   <label key={f.id} className="qb-check-row">
                     <Checkbox
-                      label={f.name}
+                      aria-label={f.name}
                       checked={attachments.includes(f.id)}
                       onChange={() =>
                         setAttachments((ids) =>

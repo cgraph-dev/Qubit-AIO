@@ -175,11 +175,12 @@ function ModelSelect({
     <label className="text-sm">
       {label}
       <Select
-  label={label}
-  value={value}
-  onChange={(value) => onChange(value)}
-  options={[{ value: "", label: autoLabel }, ...(value && !installed ? [{ value, label: `${value} (not installed on this machine)` }] : []), ...opts.map((m) => ({ value: m.name, label: `${m.name} (${formatModelSize(m.size_bytes)})` }))]}
-/>
+    label={label}
+    data-testid={testId}
+    value={value}
+    onChange={onChange}
+    options={[{ value: "", label: autoLabel }, ...(value && !installed ? [{ value, label: `${value} (not installed on this machine)` }] : []), ...opts.map((m) => ({ value: m.name, label: `${m.name} (${formatModelSize(m.size_bytes)})` }))]}
+  />
       <span className="mt-0.5 block text-xs text-muted-foreground">{help}</span>
     </label>
   );
@@ -885,7 +886,7 @@ export default function VoiceEditPage() {
             </p>
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
-  label="Enabled"
+  aria-label="Enabled"
   data-testid="voice-edit-enabled"
   checked={settings.enabled}
   onChange={(checked) => void update({ enabled: checked })}
@@ -894,7 +895,7 @@ export default function VoiceEditPage() {
             </label>
             <label className="mt-2 flex items-center gap-2 text-sm">
               <Checkbox
-  label="Wake"
+  aria-label="Wake"
   data-testid="voice-edit-wake"
   checked={Boolean(settings.wake?.enabled)}
   onChange={(checked) =>
@@ -989,7 +990,7 @@ export default function VoiceEditPage() {
               <label className="text-sm">
                 ASR fallback for spotter misses
                 <Checkbox
-  label="Wake asr fallback"
+  aria-label="Wake asr fallback"
   data-testid="voice-edit-wake-asr-fallback"
   checked={wakeAsrFallback}
   onChange={(checked) => setWakeAsrFallback(checked)}
@@ -1104,7 +1105,7 @@ export default function VoiceEditPage() {
                     placeholder="e.g. computer"
                     value={wakeWordDraft}
                     onChange={(value) => setWakeWordDraft(value)}
-                    onKeyDown={(value) => {
+                    onKeyDown={(e) => {
                       if (e.key === "Enter" && wakeWordDraft.trim() && !busy) {
                         const word = wakeWordDraft.trim();
                         setWakeWordDraft("");
@@ -1239,7 +1240,7 @@ export default function VoiceEditPage() {
             <label className="mt-2 flex items-center gap-2 text-sm">
               Brain routing (local model decides ambiguous commands)
               <Checkbox
-  label="Brain"
+  aria-label="Brain"
   data-testid="voice-edit-brain"
   checked={settings.brain_router !== false}
   onChange={(checked) => void update({ brain_router: checked })}
@@ -1302,7 +1303,7 @@ export default function VoiceEditPage() {
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Confirm"
+  aria-label="Confirm"
   data-testid="voice-edit-confirm"
   checked={settings.confirm_before_replace}
   onChange={(checked) => void update({ confirm_before_replace: checked })}
@@ -1311,7 +1312,7 @@ export default function VoiceEditPage() {
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Option"
+  aria-label="Option"
   checked={settings.auto_send}
   onChange={(checked) => void update({ auto_send: checked })}
 />
@@ -1319,7 +1320,7 @@ export default function VoiceEditPage() {
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Block fullscreen"
+  aria-label="Block fullscreen"
   data-testid="voice-edit-block-fullscreen"
   checked={settings.block_fullscreen !== false}
   onChange={(checked) =>
@@ -1329,7 +1330,7 @@ export default function VoiceEditPage() {
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Beep"
+  aria-label="Beep"
   data-testid="voice-edit-beep"
   checked={settings.beep !== false}
   onChange={(checked) => void update({ beep: checked })}
@@ -1338,7 +1339,7 @@ export default function VoiceEditPage() {
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Noise"
+  aria-label="Noise"
   data-testid="voice-edit-noise"
   checked={settings.noise_suppression === true}
   onChange={(checked) =>
@@ -1443,7 +1444,7 @@ export default function VoiceEditPage() {
           >
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
-  label="Continuous mode"
+  aria-label="Continuous mode"
   data-testid="continuous-mode"
   checked={continuousMode}
   onChange={(checked) => void update({ continuous_mode: checked })}
@@ -1648,7 +1649,7 @@ export default function VoiceEditPage() {
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Verbatim"
+  aria-label="Verbatim"
   data-testid="voice-edit-verbatim"
   checked={Boolean(settings.verbatim_transcript)}
   onChange={(checked) =>
@@ -1658,7 +1659,7 @@ export default function VoiceEditPage() {
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Agc"
+  aria-label="Agc"
   data-testid="voice-edit-agc"
   checked={Boolean(settings.agc)}
   onChange={(checked) => void update({ agc: checked })}
@@ -1729,7 +1730,7 @@ export default function VoiceEditPage() {
                   value={detailCues}
                   onChange={(value) => setDetailCues(value)}
                   onBlur={() => void update({ detail_cues: splitCues(detailCues) })}
-                  onKeyDown={(value) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       void update({ detail_cues: splitCues(detailCues) });
                     }
@@ -1808,7 +1809,7 @@ export default function VoiceEditPage() {
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Allow api"
+  aria-label="Allow api"
   data-testid="voice-edit-allow-api"
   checked={settings.allow_api}
   onChange={(checked) => void update({ allow_api: checked })}
@@ -1817,7 +1818,7 @@ export default function VoiceEditPage() {
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Local think"
+  aria-label="Local think"
   data-testid="voice-edit-local-think"
   checked={Boolean(settings.local_think)}
   onChange={(checked) => void update({ local_think: checked })}
@@ -1834,7 +1835,7 @@ export default function VoiceEditPage() {
           >
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
-  label="Speak answers"
+  aria-label="Speak answers"
   data-testid="voice-edit-speak-answers"
   checked={Boolean(settings.speak_answers)}
   onChange={(checked) => void update({ speak_answers: checked })}
@@ -1904,7 +1905,7 @@ export default function VoiceEditPage() {
           >
             <label className="flex items-center gap-2 text-sm">
               <Checkbox
-  label="History panel"
+  aria-label="History panel"
   data-testid="voice-edit-history-panel"
   checked={Boolean(settings.history_panel)}
   onChange={(checked) => void update({ history_panel: checked })}
@@ -1913,7 +1914,7 @@ export default function VoiceEditPage() {
             </label>
             <label className="mt-2 flex items-center gap-2 text-sm">
               <Checkbox
-  label="Waveform ingame"
+  aria-label="Waveform ingame"
   data-testid="voice-edit-waveform-ingame"
   checked={settings.waveform_ingame === true}
   onChange={(checked) => void update({ waveform_ingame: checked })}
@@ -1922,7 +1923,7 @@ export default function VoiceEditPage() {
             </label>
             <label className="mt-2 flex items-center gap-2 text-sm">
               <Checkbox
-  label="Debug log"
+  aria-label="Debug log"
   data-testid="voice-edit-debug-log"
   checked={Boolean(settings.debug_log)}
   onChange={(checked) => void update({ debug_log: checked })}
@@ -2039,7 +2040,7 @@ export default function VoiceEditPage() {
                   value={sttEngine}
                   onChange={(value) => setSttEngine(value)}
                   onBlur={() => void update({ stt_engine: sttEngine })}
-                  onKeyDown={(value) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       void update({ stt_engine: sttEngine });
                     }
@@ -2072,7 +2073,7 @@ export default function VoiceEditPage() {
                   value={serviceUrl}
                   onChange={(value) => setServiceUrl(value)}
                   onBlur={() => void update({ service_url: serviceUrl })}
-                  onKeyDown={(value) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       void update({ service_url: serviceUrl });
                     }
@@ -2093,7 +2094,7 @@ export default function VoiceEditPage() {
                   value={sttWsUrl}
                   onChange={(value) => setSttWsUrl(value)}
                   onBlur={() => void update({ stt_ws_url: sttWsUrl })}
-                  onKeyDown={(value) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       void update({ stt_ws_url: sttWsUrl });
                     }
@@ -2108,7 +2109,7 @@ export default function VoiceEditPage() {
             <div className="mt-3 flex flex-col gap-2 text-sm">
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Disable key repeat"
+  aria-label="Disable key repeat"
   data-testid="voice-edit-disable_key_repeat"
   checked={Boolean(settings.disable_key_repeat)}
   onChange={(checked) =>
@@ -2118,7 +2119,7 @@ export default function VoiceEditPage() {
               </label>
               <label className="flex items-center gap-2">
                 <Checkbox
-  label="Text commands"
+  aria-label="Text commands"
   data-testid="voice-edit-text_commands"
   checked={Boolean(settings.text_commands)}
   onChange={(checked) =>

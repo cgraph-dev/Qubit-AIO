@@ -111,9 +111,9 @@ describe("OpenVikingPage", () => {
   it("opens a tree node into the viewer with Preview/Source toggle and viking:// uri", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("favorite editor") ?? false);
-    const nodeButton = Array.from(container.querySelectorAll("button, sakuga-button")).find((b) =>
-      b.textContent?.includes("favorite editor"),
-    );
+    const nodeButton = Array.from(
+      container.querySelectorAll<HTMLElement>("button, sakuga-button"),
+    ).find((b) => b.textContent?.includes("favorite editor"));
     expect(nodeButton).toBeDefined();
     await act(async () => {
       nodeButton?.click();
@@ -128,7 +128,7 @@ describe("OpenVikingPage", () => {
       t.textContent?.includes("Source"),
     );
     await act(async () => {
-      sourceTab?.click();
+      (sourceTab as HTMLElement | undefined)?.click();
     });
     expect(container.querySelector('[data-testid="viking-viewer-body"]')?.textContent).toContain(
       "editor: qubit",

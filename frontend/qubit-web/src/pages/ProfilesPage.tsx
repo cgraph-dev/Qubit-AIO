@@ -1037,13 +1037,14 @@ export default function ProfilesPage() {
                   {isRenaming ? (
                     <div className="flex flex-col gap-2">
                       <Input
-                        autoFocus
+                        label={t.profiles.rename}
                         value={renameTo}
-                        onChange={(e) => setRenameTo(e.target.value)}
+                        onChange={setRenameTo}
                         onKeyDown={(e) => {
                           if (e.key === "Enter") handleRenameSubmit();
                           if (e.key === "Escape") setRenamingFrom(null);
                         }}
+                        className="qsk-field"
                         aria-invalid={
                           renameTo.trim() !== "" &&
                           renameTo.trim() !== p.name &&

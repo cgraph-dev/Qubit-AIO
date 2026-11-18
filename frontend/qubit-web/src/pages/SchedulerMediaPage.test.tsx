@@ -12,7 +12,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./sakuga-test-dom";
-import { sakugaInnerAll, typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const schedMocks = vi.hoisted(() => ({
   updateCronEnabled: vi.fn(),

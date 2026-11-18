@@ -17,7 +17,7 @@ import {
   type McpServerDraft,
   type McpTransport,
 } from "@/lib/mcp-server-create";
-import { cn } from "@/lib/utils";
+
 import { Button, Checkbox, Input, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Profile name rule mirrors the backend (`^[a-z0-9][a-z0-9_-]{0,63}$`).
@@ -383,7 +383,7 @@ export default function ProfileBuilderPage() {
             <div className="space-y-4">
               <label className="flex items-center gap-2 text-sm">
                 <Checkbox
-                  label="Start from the full default skill bundle"
+                  aria-label="Start from the full default skill bundle"
                   checked={keepAll}
                   onChange={(v) => setKeepAll(Boolean(v))}
                 />
@@ -414,7 +414,7 @@ export default function ProfileBuilderPage() {
                           className="flex items-start gap-2 rounded px-2 py-1.5 text-sm hover:bg-muted"
                         >
                           <Checkbox
-                            label={s.name}
+                            aria-label={s.name}
                             checked={keptSkills.has(s.name)}
                             onChange={() => toggleKeep(s.name)}
                           />

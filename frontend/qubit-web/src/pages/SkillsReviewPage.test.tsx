@@ -203,8 +203,8 @@ describe("SkillsReviewPage", () => {
     for (const d of DISABLED_SKILLS_ACTIONS) {
       const row = byTestId(`sr-disabled-${d.action}`);
       expect(row).not.toBeNull();
-      const btn = row?.querySelector<HTMLElement>("button, sakuga-button");
-      expect(btn?.disabled).toBe(true);
+      const btn = row?.querySelector<HTMLButtonElement>("button, sakuga-button");
+      expect((btn as HTMLButtonElement | null)?.disabled).toBe(true);
       expect(row?.textContent).toContain(d.reason);
     }
     // No refused operation is ever called.

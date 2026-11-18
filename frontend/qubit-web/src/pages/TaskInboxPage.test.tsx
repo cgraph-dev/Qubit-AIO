@@ -106,9 +106,9 @@ function columnTitles(): string[] {
 
 function buttonByText(text: string): HTMLButtonElement | null {
   return (
-    [...document.querySelectorAll("button, sakuga-button")].find(
+    ([...document.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
-    ) ?? null
+    ) as HTMLButtonElement | undefined) ?? null
   );
 }
 
@@ -263,7 +263,7 @@ describe("TaskInboxPage", () => {
       const row = container.querySelector(`[data-testid="refusal-${code}"]`);
       expect(row).not.toBeNull();
       expect(row!.textContent).toContain(detail);
-      const button = row!.querySelector("button, sakuga-button") as HTMLElement;
+      const button = row!.querySelector("button, sakuga-button") as HTMLButtonElement;
       expect(button.disabled).toBe(true);
       await act(async () => button.click());
       expect(taskMocks.cancelTask).not.toHaveBeenCalled();
