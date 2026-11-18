@@ -23,7 +23,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 
-import { Button, Input, emitFx } from "@/sakuga/ui";
+import { Button, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
 import {
@@ -312,7 +312,7 @@ export default function TalkPage() {
             <div className="settings-row">
               <div className="settings-row__text">
                 <div className="settings-row__title flex items-center gap-2">
-                  <Spinner className="shrink-0" /> Reading mode…
+                  <SakugaLoading label="Reading mode…" />
                 </div>
               </div>
             </div>
@@ -629,7 +629,7 @@ export default function TalkPage() {
             <div className="settings-row">
               <div className="settings-row__text">
                 <div className="settings-row__title flex items-center gap-2">
-                  <Spinner className="shrink-0" /> Reading wake status…
+                  <SakugaLoading label="Reading wake status…" />
                 </div>
               </div>
             </div>

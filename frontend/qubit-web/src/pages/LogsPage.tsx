@@ -32,7 +32,8 @@ type LogsPageResponse = LogsResponse & {
   next_offset?: number | null;
 };
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { FilterGroup, Segmented } from "@nous-research/ui/ui/components/segmented";
+import { FilterGroup } from "@nous-research/ui/ui/components/segmented";
+import { SakugaSegmented } from "@/components/sakuga-segmented";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
 import { Label } from "@nous-research/ui/ui/components/label";
@@ -302,7 +303,7 @@ export default function LogsPage() {
         className="flex min-w-0 max-w-full flex-col items-start gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:gap-x-6 sm:gap-y-3"
       >
         <FilterGroup label={t.logs.file} className={filterGroupClass}>
-          <Segmented
+          <SakugaSegmented
             className={segmentedClass}
             value={file}
             onChange={setFile}
@@ -311,7 +312,7 @@ export default function LogsPage() {
         </FilterGroup>
 
         <FilterGroup label={t.logs.level} className={filterGroupClass}>
-          <Segmented
+          <SakugaSegmented
             className={segmentedClass}
             value={level}
             onChange={setLevel}
@@ -320,7 +321,7 @@ export default function LogsPage() {
         </FilterGroup>
 
         <FilterGroup label={t.logs.component} className={filterGroupClass}>
-          <Segmented
+          <SakugaSegmented
             className={segmentedClass}
             value={component}
             onChange={setComponent}
@@ -329,7 +330,7 @@ export default function LogsPage() {
         </FilterGroup>
 
         <FilterGroup label={t.logs.lines} className={filterGroupClass}>
-          <Segmented
+          <SakugaSegmented
             className={segmentedClass}
             value={String(lineCount)}
             onChange={(v) =>

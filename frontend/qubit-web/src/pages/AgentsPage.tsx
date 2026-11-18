@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button, emitFx } from "@/sakuga/ui";
+import { Button, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 import { useI18n } from "@/i18n";
 import { api } from "@/lib/api";
@@ -71,9 +71,9 @@ export default function AgentsPage() {
       </div>
 
       {state === "loading" ? (
-        <p className="flex items-center gap-2 text-sm text-text-tertiary">
-          <Spinner className="shrink-0" /> Loading agents…
-        </p>
+        <div role="status" aria-busy="true" className="flex flex-col items-start gap-1">
+          <SakugaLoading label="Loading agents…" />
+        </div>
       ) : state === "error" ? (
         <p role="alert" className="text-sm text-destructive">
           {error}

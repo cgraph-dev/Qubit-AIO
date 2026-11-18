@@ -39,9 +39,8 @@ import { getNestedValue, setNestedValue } from "@/lib/nested";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { AutoField } from "@/components/AutoField";
-import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
-import { ListItem, Button, Checkbox, Input, Select } from "@/sakuga/ui";
+import { ListItem, Button, Checkbox, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { useI18n } from "@/i18n";
@@ -331,6 +330,7 @@ export default function ConfigPage() {
     try {
       await commitConfig(config);
       setRestartNeeded(true);
+      void emitFx("success");
     } catch (e) {
       // CONFIG_NO_FIELDS means the server holds exactly what we sent (an
       // unchanged whole-tree Save): converge on the server record and say so
@@ -345,6 +345,7 @@ export default function ConfigPage() {
         return;
       }
       showToast(`${t.config.failedToSave}: ${describeConfirmError(e)}`, "error");
+      void emitFx("error");
       return;
     } finally {
       setSaving(false);
@@ -460,8 +461,8 @@ export default function ConfigPage() {
   </div>;
   if (!config || !schema) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading configuration…" />
       </div>
     );
   }

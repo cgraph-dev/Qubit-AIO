@@ -23,7 +23,7 @@ import {
   type McpResourcesResponse,
 } from "@/lib/ocFamilyAdminApi";
 import { refusalOrError } from "@/lib/policy-refusal";
-import { Button, Input, emitFx } from "@/sakuga/ui";
+import { Button, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
@@ -277,7 +277,11 @@ export default function McpCallsPage() {
             List resources
           </Button>
         </div>
-        {resLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
+        {resLoading && (
+          <div role="status" aria-busy="true" className="flex flex-col items-start gap-1">
+            <SakugaLoading label="Loading MCP resources…" />
+          </div>
+        )}
         {resources && (
           <ul data-testid="mc-resources-list" className="flex flex-col gap-1">
             {resourceRows.length === 0 ? (
@@ -320,7 +324,11 @@ export default function McpCallsPage() {
             Read resource
           </Button>
         </div>
-        {readLoading && <p className="text-xs text-muted-foreground">Reading…</p>}
+        {readLoading && (
+          <div role="status" aria-busy="true" className="flex flex-col items-start gap-1">
+            <SakugaLoading label="Reading MCP resource…" />
+          </div>
+        )}
         {readResult && (
           <pre
             data-testid="mc-read-result"

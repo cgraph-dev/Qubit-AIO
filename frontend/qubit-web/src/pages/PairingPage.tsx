@@ -8,7 +8,7 @@ import type { PairingResponse, PairingUser } from "@/lib/api";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Button, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 type PairingTone = "success" | "error" | "warning";
 function notify(message: string, tone: PairingTone = "success"): void {
@@ -131,8 +131,8 @@ export default function PairingPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading pairing…" />
       </div>
     );
   }

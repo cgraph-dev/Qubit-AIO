@@ -8,7 +8,7 @@ import {
   Zap,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button, Input, Select, emitFx } from "@/sakuga/ui";
+import { Button, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
@@ -601,8 +601,8 @@ export default function McpPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading MCP servers…" />
       </div>
     );
   }

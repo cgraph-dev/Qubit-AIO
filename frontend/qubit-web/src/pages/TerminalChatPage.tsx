@@ -18,7 +18,7 @@ import { WebglAddon } from "@xterm/addon-webgl";
 import { Terminal as XtermTerminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { Copy, Mic, PanelRightClose, PanelRightOpen } from "lucide-react";
-import { Button } from "@/sakuga/ui";
+import { Button, emitFx } from "@/sakuga/ui";
 import { api, withBackoff } from "@/lib/api";
 import type { WsTicketGrant } from "@/lib/api";
 import { WsTicketError } from "@/lib/api";
@@ -438,6 +438,7 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
   // and sends `?fresh=1` so the server can never re-adopt the old detached
   // PTY on a later reload (upstream parity: chat_ws.py `fresh` handling).
   const handleNewChat = useCallback(() => {
+    void emitFx("pop");
     setNotice(null);
     // Drop the previous session's MODEL-card override: it is gated on the
     // session id so it is inert on a fresh chat, but keeping it would flash
@@ -1448,12 +1449,15 @@ export default function TerminalChatPage({ isActive = true }: { isActive?: boole
         );
       if (!last?.content) {
         setCopyState("empty");
+        void emitFx("warning");
         return;
       }
       const copied = await copyTextToClipboard(last.content);
       setCopyState(copied ? "copied" : "failed");
+      void emitFx(copied ? "success" : "error");
     } catch {
       setCopyState("failed");
+      void emitFx("error");
     } finally {
       setCopyBusy(false);
     }

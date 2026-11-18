@@ -21,10 +21,9 @@ import {
   X,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
@@ -781,8 +780,8 @@ export default function SystemPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading system status…" />
       </div>
     );
   }

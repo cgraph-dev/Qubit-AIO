@@ -43,7 +43,7 @@ import type { ManagedFileEntry, ManagedFilesResponse } from "@/lib/api";
 import { refusalOrError } from "@/lib/policy-refusal";
 import { isAbortError } from "@/lib/api-error";
 import { PluginSlot } from "@/plugins";
-import { Button, Input, emitFx } from "@/sakuga/ui";
+import { Button, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, {
   dateStyle: "medium",
@@ -524,9 +524,8 @@ export default function FilesPage() {
           )}
 
           {loading && !listing ? (
-            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
-              <Spinner />
-              Loading files...
+            <div role="status" aria-busy="true" className="flex flex-col items-center justify-center gap-1 py-12 text-sm text-muted-foreground">
+              <SakugaLoading label="Loading files..." />
             </div>
           ) : listing && (listing.entries ?? []).length === 0 ? (
             <div className="flex flex-col items-center gap-1 py-12 text-center text-sm text-muted-foreground">

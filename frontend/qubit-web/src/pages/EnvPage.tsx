@@ -16,8 +16,7 @@ import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { OAuthProvidersCard } from "@/components/OAuthProvidersCard";
-import { Button, Input, emitFx } from "@/sakuga/ui";
-import { Spinner } from "@nous-research/ui/ui/components/spinner";
+import { Button, Input, SakugaLoading, emitFx } from "@/sakuga/ui";
 import {
   Card,
   CardContent,
@@ -816,8 +815,8 @@ export default function EnvPage() {
   </div>;
   if (!vars) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading environment…" />
       </div>
     );
   }
