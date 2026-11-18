@@ -1609,3 +1609,45 @@
 .qubit-kanban-trash-label {
   font-weight: 500;
 }
+
+/* ---- Sakuga plugin controls ----------------------------------------- */
+/* The upstream custom elements and their compact chrome come from the
+ * dashboard's shared `sakuga.css`. This file only gives the Qubit select
+ * composition its Sakuga frame and keeps the board's dense rows from growing.
+ * No engine art is changed here; these are chrome metrics and fallbacks for
+ * when the custom elements have not loaded yet. */
+.qsk-select {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+}
+.qsk-select__native {
+  min-height: 2.25rem;
+  width: 100%;
+  padding: 5px 8px 5px 11px;
+  border: 2.5px solid var(--sk-ink, #1d1a4a);
+  border-radius: 10px;
+  background-color: var(--sk-card, #fff);
+  color: var(--sk-ink, #1d1a4a);
+  font: 700 13px/1.2 "Avenir Next", "Nunito", -apple-system, "Segoe UI", system-ui, sans-serif;
+  box-shadow: 3px 4px 0 var(--sk-soft, #b8b3ff);
+  cursor: pointer;
+}
+.qsk-select__native:focus-visible {
+  outline: 2.5px solid var(--sk-acc, #ff5fa8);
+  outline-offset: 2px;
+}
+.qsk-select__native:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
+.qubit-kanban sakuga-button::part(button) {
+  min-height: 34px;
+}
+.qubit-kanban sakuga-input::part(input) {
+  min-height: 37px;
+}
+.qubit-kanban sakuga-progress {
+  --sk-progress-width: 100%;
+}
