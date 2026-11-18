@@ -808,7 +808,7 @@ export function PreviewPane({
 
     const target = event.target as HTMLElement | null
 
-    if (target?.closest?.('input, textarea, [contenteditable="true"], [contenteditable=""]')) {
+    if (target?.closest?.('input, textarea, sakuga-input, [role="textbox"], [role="searchbox"], [contenteditable="true"], [contenteditable=""]')) {
       return
     }
 
