@@ -513,7 +513,7 @@ export function ChatSessionList({
           value={searchInput}
           onChange={setSearchInput}
           placeholder={t.common.search ?? "Search sessions"}
-          className="qsk-field w-full rounded border border-midground/20 bg-transparent py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
+          className="qsk-field w-full rounded border border-midground/20 bg-transparent pl-5 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
         />
         {searchInput ? (
           <Button

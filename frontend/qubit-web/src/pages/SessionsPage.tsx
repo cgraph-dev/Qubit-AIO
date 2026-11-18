@@ -1755,6 +1755,7 @@ export default function SessionsPage() {
         a.download = `session-${id}.json`;
         a.click();
         URL.revokeObjectURL(url);
+        showToast("Session exported", "success");
       } catch {
         showToast("Failed to export session", "error");
       }
@@ -2204,12 +2205,13 @@ export default function SessionsPage() {
                 ) : (
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                 )}
-                <Input
+                <SakugaInput
+                  label={t.sessions.searchPlaceholder}
                   placeholder={t.sessions.searchPlaceholder}
                   aria-label={t.sessions.searchPlaceholder}
                   value={search}
-                  onChange={(e) => updateSearch(e.target.value)}
-                  className="h-8 py-0 pr-7 pl-8 text-xs leading-none"
+                  onChange={(value) => updateSearch(value)}
+                  className="qsk-field pl-8 pr-7 text-xs"
                 />
                 {search && (
                   <Button

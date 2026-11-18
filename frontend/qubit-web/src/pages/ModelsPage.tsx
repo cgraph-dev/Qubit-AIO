@@ -255,9 +255,11 @@ function UseAsMenu({
             result.confirm_message ||
             "This model has unusually high known pricing.",
         });
+        void emitFx("approval");
         return;
       }
       onAssigned();
+      void emitFx("success");
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -1120,6 +1122,7 @@ function ModelSettingsPanel({
       model,
     });
     if (!result.confirm_required) onSaved();
+    void emitFx(result.confirm_required ? "approval" : "success");
     return result;
   };
 
