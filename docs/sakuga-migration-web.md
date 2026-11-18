@@ -382,7 +382,7 @@ unchanged.
 The extras are now adopted on the dashboard pages rather than only in the
 gallery. The native elements that remain are named with the reason.
 
-- **Textarea (22 sites):** Profiles (description, description editor, soul
+- **Textarea (21 sites):** Profiles (description, description editor, soul
   editor), Profile Builder MCP env, Skills learn/notes, Skills Review payload,
   MCP env + invoke args, MCP calls args, Cron context ids + prompt, Voice Edit
   prompt / try-it text / import JSON, Canvas content, OpenViking memory text,
@@ -415,8 +415,8 @@ gallery. The native elements that remain are named with the reason.
 
 Documented native exceptions after this sweep:
 
-- The three chat composers (`TerminalChatPage`, `WebChatPage`, `QubitBotPage`)
-  stay native `<textarea>`: Enter-to-send, Shift+Enter newline, image paste/
+- The four chat composer textareas across `TerminalChatPage`, `WebChatPage` and
+  `QubitBotPage` (two) stay native `<textarea>`: Enter-to-send, Shift+Enter newline, image paste/
   drop, auto-resize and composer-only CSS are not exposed by `SakugaTextarea`,
   and wrapping them would either lose those handlers or add a second frame.
 - The six hidden `type=file` inputs stay native: each is a programmatic picker
