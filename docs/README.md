@@ -140,6 +140,7 @@ git show --diff-filter=D --name-only --format='' eafb54e26 | grep -c '^docs/'   
 ## Subdirectories
 
 - `docs/archive/`
+- `docs/manga-skin/` — visual evidence for the optional web-dashboard manga skin
 - `docs/e2e/`
 - `docs/evidence/`
 - `docs/game-office/`
