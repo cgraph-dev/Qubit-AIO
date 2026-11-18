@@ -270,7 +270,7 @@ describe("PluginsPage curated pinned index", () => {
     const section = container.querySelector(
       '[data-testid="plugin-pinned-index-section"]',
     );
-    const button = section?.querySelector("button, sakuga-button");
+    const button = section?.querySelector<HTMLElement>("button, sakuga-button");
     expect(button).not.toBeNull();
     await act(async () => {
       button?.click();
@@ -298,7 +298,7 @@ describe("PluginsPage curated pinned index", () => {
     const section = container.querySelector(
       '[data-testid="plugin-pinned-index-section"]',
     );
-    const button = section?.querySelector("button, sakuga-button");
+    const button = section?.querySelector<HTMLElement>("button, sakuga-button");
     expect(button).not.toBeNull();
     await act(async () => {
       button?.click();

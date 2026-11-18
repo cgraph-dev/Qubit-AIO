@@ -113,11 +113,10 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 
 function buttonByText(text: string): HTMLButtonElement | null {
   // Confirm dialogs portal into document.body, outside `container`.
-  return (
-    [...document.querySelectorAll("button, sakuga-button")].find(
-      (b) => b.textContent?.trim() === text,
-    ) ?? null
-  );
+  const match = [
+    ...document.querySelectorAll<HTMLButtonElement>("button, sakuga-button"),
+  ].find((b) => b.textContent?.trim() === text);
+  return match ?? null;
 }
 
 async function renderChannels() {
