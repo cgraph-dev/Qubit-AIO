@@ -56,7 +56,6 @@ interface DemoCardProps {
   actions?: ReactNode;
   wide?: boolean;
   tall?: boolean;
-  stack?: boolean;
   start?: boolean;
 }
 
@@ -70,7 +69,6 @@ function DemoCard({
   actions,
   wide,
   tall,
-  stack,
   start,
 }: DemoCardProps) {
   return (
@@ -88,7 +86,6 @@ function DemoCard({
         className={[
           "skg-card__stage",
           tall ? "skg-card__stage--tall" : "",
-          stack ? "skg-card__stage--stack" : "",
           start ? "skg-card__stage--start" : "",
         ]
           .filter(Boolean)

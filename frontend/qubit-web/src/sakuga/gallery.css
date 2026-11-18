@@ -102,10 +102,6 @@
   min-height: 230px;
 }
 
-.skg-card__stage--stack {
-  flex-direction: column;
-}
-
 .skg-card__stage--start {
   align-items: flex-start;
   justify-content: flex-start;
