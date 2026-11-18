@@ -913,13 +913,25 @@ html[data-qubit-manga="on"] [role="dialog"][aria-label$="options"] {
 
 /* Native fields that are not Sakuga (e.g. the TUI helper textarea is
    excluded on purpose). */
-html[data-qubit-manga="on"] #qubit-main-content :is(input, textarea, select):not(.xterm-helper-textarea),
-html[data-qubit-manga="on"] .qchat__side :is(input, textarea, select):not(.xterm-helper-textarea),
-html[data-qubit-manga="on"] [role="dialog"] :is(input, textarea, select):not(.xterm-helper-textarea) {
-  border: 2px solid var(--qm-violet);
-  border-radius: 2px;
-  background-color: var(--qm-bg-deep);
-  color: var(--qm-ink);
+html[data-qubit-manga="on"] #qubit-main-content :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="hidden"]):not(.xterm-helper-textarea),
+    textarea:not(.xterm-helper-textarea),
+    select
+  ),
+html[data-qubit-manga="on"] .qchat__side :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not(.xterm-helper-textarea),
+    textarea:not(.xterm-helper-textarea),
+    select
+  ),
+html[data-qubit-manga="on"] [role="dialog"] :is(
+    input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="hidden"]):not(.xterm-helper-textarea),
+    textarea:not(.xterm-helper-textarea),
+    select
+  ) {
+  border: 2px solid var(--qm-violet) !important;
+  border-radius: 2px !important;
+  background-color: var(--qm-bg-deep) !important;
+  color: var(--qm-ink) !important;
 }
 
 html[data-qubit-manga="on"] #qubit-main-content :is(input, textarea, select):not(.xterm-helper-textarea)::placeholder,
@@ -959,6 +971,18 @@ html[data-qubit-manga="on"] :is(button, [role="button"])[aria-disabled="true"] {
 /* Native icon buttons in page toolbars share the angular frame. */
 html[data-qubit-manga="on"] #qubit-main-content button:not(.qm-skin-switch) {
   border-radius: 2px;
+}
+
+/* Page-local h1 from the ported consoles (Operations, Docs, reports). The
+   routed page title lives in header[role=banner] and is styled separately. */
+html[data-qubit-manga="on"] #qubit-main-content h1 {
+  padding-left: 0.55rem;
+  border-left: 4px solid var(--qm-yellow);
+  color: var(--qm-ink);
+  font-family: var(--qm-display);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-shadow: 1px 1px 0 var(--qm-black);
 }
 
 /* Page-level h2 headings (Agents, System, Profiles, admin rosters) get the
