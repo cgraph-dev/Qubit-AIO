@@ -19,12 +19,15 @@ import React, {
   useRef,
   useContext,
   createContext,
+  type ComponentType,
+  type ReactNode,
 } from "react";
 import { api, fetchJSON, authedFetch, buildWsUrl, buildWsAuthParam } from "@/lib/api";
 import { cn, timeAgo, isoTimeAgo } from "@/lib/utils";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Button } from "@nous-research/ui/ui/components/button";
-import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
+import { Checkbox as DesignCheckbox } from "@nous-research/ui/ui/components/checkbox";
+import { SakugaCheckbox } from "@qubit/shared/sakuga";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import {
   Dialog, DialogClose, DialogContent, DialogDescription,
@@ -41,6 +44,52 @@ import { Separator } from "@nous-research/ui/ui/components/separator";
 import { Tabs, TabsList, TabsTrigger } from "@nous-research/ui/ui/components/tabs";
 import { useI18n } from "@/i18n";
 import { registerSlot, PluginSlot } from "./slots";
+
+/* Plugin SDK checkbox.
+ *
+ * Bundled plugins read `SDK.components.Checkbox` and call it with the Radix
+ * shape (`checked`, `onCheckedChange`). The dashboard's own pages already use
+ * the vendored Sakuga control; exposing the old design-system checkbox here
+ * left plugin surfaces (kanban, achievements) showing the small DS check while
+ * every other checkbox was the 38px Sakuga box. This adapter keeps the Radix
+ * prop contract and renders the original box. The indeterminate tri-state has
+ * no upstream equivalent, so it keeps the design-system control (the same
+ * documented exception the desktop uses).
+ */
+type PluginCheckboxChecked = boolean | "indeterminate";
+type PluginCheckboxProps = {
+  checked?: PluginCheckboxChecked;
+  defaultChecked?: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  disabled?: boolean;
+  className?: string;
+  children?: ReactNode;
+  [key: string]: unknown;
+};
+
+function PluginCheckbox({
+  checked, defaultChecked, onCheckedChange, disabled, className, children, ...rest
+}: PluginCheckboxProps) {
+  if (checked === "indeterminate") {
+    return React.createElement(
+      DesignCheckbox as unknown as ComponentType<Record<string, unknown>>,
+      { ...rest, checked, onCheckedChange, disabled, className },
+      children,
+    );
+  }
+  return React.createElement(
+    SakugaCheckbox as unknown as ComponentType<Record<string, unknown>>,
+    {
+      ...rest,
+      checked,
+      defaultChecked,
+      disabled,
+      className,
+      onChange: (value: boolean) => onCheckedChange?.(value),
+    },
+    children,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Plugin registry — plugins call register() to add their component.
@@ -164,7 +213,7 @@ export function exposePluginSDK() {
       CardContent,
       Badge,
       Button,
-      Checkbox,
+      Checkbox: PluginCheckbox,
       ConfirmDialog,
       Dialog,
       DialogClose,

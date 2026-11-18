@@ -191,3 +191,35 @@ Swept by this lane and importing the controls from `@/sakuga/ui`:
 | `src/pages/VoiceEditPage.tsx` | number inputs, textareas | outside the upstream input/textarea set |
 | `src/pages/DocsPage.tsx`, `AnalyticsPage.tsx`, `OpenVikingStudioPage.tsx` | navigation `<a>` links | owner exception: nav links stay links |
 | third-party dialog internals | Radix dialog surfaces | third-party widget internals |
+
+## Core component fixes (2026-11-18)
+
+Owner review fixes for the shared wrappers and control density.
+
+- **Toggle ON animation.** `writeValue` re-wrote `checked` with `setAttribute`
+  on every render even when the attribute was already present. `setAttribute`
+  fires `attributeChangedCallback` for an unchanged value, and the vendored
+  toggle resets `seq` to a one-frame jump unless `flipping` is set — so the
+  43-frame ON animation never played. OFF worked only because removing an
+  absent attribute is a no-op. The wrapper now compares before writing, and
+  skips property assignment when the property is read-only (progress `value`).
+  Pinned by `src/sakuga/core-controls.test.tsx` (a controlled click leaves
+  `seq.length === 43` and `pos` advances; a read-only progress value updates).
+- **Compact chrome.** `src/sakuga/sakuga.css` reduces only the control chrome
+  via `::part()`: button 5px 12px / 13px / 2.5px / 10px / 3px 4px (34px tall,
+  was ~55px), input 7px 12px / 14px / 2.5px / 4px 5px (37px, was 54px), tabs
+  and the progress percentage chip compacted, toggle side/bottom margin kept
+  with the 89px gallery top margin removed. The engine, the 108×54 toggle art
+  and the 38px checkbox box are unchanged.
+- **Loading primitive.** `SakugaLoading` (progress + caption; busy crawl when
+  no `value`, determinate when given one) is exported from
+  `@qubit/shared/sakuga`. The dashboard's route `Suspense` fallback
+  (`RouteFallback`) is the example usage.
+- **Plugin SDK checkbox.** `src/plugins/registry.ts` now exposes a
+  Sakuga-backed `Checkbox` that keeps the Radix `checked`/`onCheckedChange`
+  contract, so bundled plugin surfaces (kanban, achievements) render the
+  original box instead of the design-system check. The indeterminate tri-state
+  keeps the design-system control (no upstream equivalent).
+- **Status indicators.** The Config "configured" check icons and other
+  `Check`/`CheckCircle` glyphs are status/selection indicators, not
+  checkboxes; they were left unchanged deliberately.

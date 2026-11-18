@@ -63,3 +63,13 @@ not drag events, so moving the handlers onto it would silently disable drops.
 | Hidden file pickers | `config-settings.tsx`, pet generate/overlay | 3 | Still native hidden inputs; proxy-button work remains. |
 | Editors / canvas / xterm | Monaco code editor, transcript canvas, terminal views | — | Documented boundary. |
 | Nav `<a>` links | `Button asChild` renders the anchor unchanged | — | Documented exception. |
+
+## Core component fixes (2026-11-18)
+
+Mirrored from the web layer. `src/sakuga/sakuga.css` carries the same compact
+`::part()` chrome (button 5px 12px / 13px; input 7px 12px / 14px; compact tabs
+and progress chip; toggle gallery top margin removed) so desktop rows match the
+dashboard. `@qubit/shared/sakuga` also gains `SakugaLoading` (progress + label);
+it is exported here but the desktop surfaces have not been swept onto it yet.
+The shared wrapper fix (idempotent attribute writes, read-only progress value)
+is synced into `qubit_runtime/apps/shared` by `scripts/sync_sakuga_shared.py`.

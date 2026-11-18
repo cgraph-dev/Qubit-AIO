@@ -69,7 +69,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
-import { Button, SakugaToastHost } from "@/sakuga/ui";
+import { Button, SakugaLoading, SakugaToastHost } from "@/sakuga/ui";
 import { SelectionSwitcher } from "@nous-research/ui/ui/components/selection-switcher";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
@@ -77,7 +77,6 @@ import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { cn } from "@/lib/utils";
 import { useBackdropPhase } from "@/lib/useBackdropPhase";
 import { QubitMark } from "@/components/QubitMark";
-import { QubitAtomLoader } from "@/components/QubitAtomLoader";
 import { QubitBrandSparks } from "@/components/QubitBrandSparks";
 import { SidebarFooter } from "@/components/SidebarFooter";
 import { SidebarStatusStrip, gatewayLine } from "@/components/SidebarStatusStrip";
@@ -241,7 +240,7 @@ function RouteFallback({ label = "Loading…" }: { label?: string }) {
       aria-busy="true"
       aria-live="polite"
     >
-      <QubitAtomLoader label={label} />
+      <SakugaLoading label={label} className="qsk-route-loading" />
     </div>
   );
 }
