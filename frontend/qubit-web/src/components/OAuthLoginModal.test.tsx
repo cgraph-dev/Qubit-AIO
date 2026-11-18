@@ -194,7 +194,7 @@ describe("OAuthLoginModal local expiry", () => {
       session_id: "sess-1",
       status: "pending",
     });
-    const retry = [...container.querySelectorAll("button")].find((b) =>
+    const retry = [...container.querySelectorAll<HTMLElement>("button, sakuga-button")].find((b) =>
       b.textContent?.includes("Retry"),
     );
     expect(retry).toBeTruthy();

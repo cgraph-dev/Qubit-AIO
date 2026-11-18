@@ -19,7 +19,7 @@
  * reads/writes the same config the chat PTY was launched from.
  */
 
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
+import { Select } from "@/sakuga/ui";
 import { Brain } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -109,17 +109,13 @@ export function ReasoningPicker({
         <span className="text-display tracking-wider">reasoning</span>
       </div>
       <Select
-        className="ml-auto min-w-0"
+        label="Reasoning effort"
+        className="qsk-field ml-auto min-w-0"
         disabled={!loaded || saving}
-        onValueChange={onSelect}
+        onChange={onSelect}
         value={effort}
-      >
-        {EFFORT_OPTIONS.map((opt) => (
-          <SelectOption key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectOption>
-        ))}
-      </Select>
+        options={EFFORT_OPTIONS.map((opt) => ({ value: opt.value, label: opt.label }))}
+      />
     </div>
   );
 }

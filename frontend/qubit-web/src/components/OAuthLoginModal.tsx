@@ -1,11 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ExternalLink, X, Check, Copy } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Input } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api, type OAuthProvider, type OAuthStartResponse } from "@/lib/api";
 import { copyTextToClipboard } from "@/lib/clipboard";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { useI18n } from "@/i18n";
 import { cn, themedBody } from "@/lib/utils";
 import { refusalOrError } from "@/lib/policy-refusal";
@@ -228,8 +227,7 @@ export function OAuthLoginModal({ provider, onClose, onSuccess }: Props) {
     >
       <div className={cn(themedBody, "relative w-full max-w-md border border-border bg-card shadow-2xl")}>
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           onClick={handleClose}
           className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
           aria-label={t.common.close}
@@ -274,11 +272,11 @@ export function OAuthLoginModal({ provider, onClose, onSuccess }: Props) {
               </ol>
               <div className="flex flex-col gap-2">
                 <Input
+                  label={t.oauth.pasteCode}
                   value={pkceCode}
-                  onChange={(e) => setPkceCode(e.target.value)}
+                  onChange={setPkceCode}
                   placeholder={t.oauth.pasteCode}
                   onKeyDown={(e) => e.key === "Enter" && handleSubmitPkceCode()}
-                  autoFocus
                 />
                 <div className="flex items-center gap-2 justify-between">
                   <a
@@ -321,19 +319,16 @@ export function OAuthLoginModal({ provider, onClose, onSuccess }: Props) {
                   {deviceCode}
                 </code>
                 <Button
-                  size="sm"
-                  outlined
+                  variant="secondary"
                   className="shrink-0 uppercase"
                   onClick={() => void handleCopyDeviceCode(deviceCode)}
-                  prefix={
-                    copyStatus === "copied" ? (
-                      <Check className="h-4 w-4" />
-                    ) : (
-                      <Copy className="h-4 w-4" />
-                    )
-                  }
                   aria-label={t.oauth.copyCode}
                 >
+                  {copyStatus === "copied" ? (
+                    <Check className="h-4 w-4" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
                   {copyStatus === "copied" ? t.oauth.copied : t.oauth.copyCode}
                 </Button>
               </div>
@@ -371,7 +366,7 @@ export function OAuthLoginModal({ provider, onClose, onSuccess }: Props) {
                 {errorMsg || t.oauth.loginFailed}
               </div>
               <div className="flex justify-end gap-2">
-                <Button outlined onClick={handleClose}>
+                <Button variant="secondary" onClick={handleClose}>
                   {t.common.close}
                 </Button>
                 <Button
