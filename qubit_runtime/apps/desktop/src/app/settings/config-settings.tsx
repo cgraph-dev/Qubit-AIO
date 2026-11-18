@@ -1,10 +1,10 @@
 import { useStore } from '@nanostores/react'
 import { useQuery } from '@tanstack/react-query'
-import type { ChangeEvent, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 
-import { Button } from '@/sakuga/ui'
+import { Button, FileField } from '@/sakuga/ui'
 import { Input } from '@/components/ui/input'
 import { getElevenLabsVoices, getHermesConfigSchema, saveHermesConfig } from '@/hermes'
 import { useI18n } from '@/i18n'
@@ -349,9 +349,7 @@ function ConfigSettingsInner({
     return () => window.clearTimeout(timeout)
   }, [activeSectionId, config, schema, setSearchParams, subpage, targetField])
 
-  function handleImport(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-
+  function handleImportFile(file: File | undefined) {
     if (!file) {
       return
     }
@@ -368,7 +366,6 @@ function ConfigSettingsInner({
     }
 
     reader.readAsText(file)
-    e.target.value = ''
   }
 
   // Keep the model controller and pending MoA saves at a stable position when
@@ -382,12 +379,12 @@ function ConfigSettingsInner({
         </div>
       )}
       {children}
-      <input
+      <FileField
         accept=".json,application/json"
         className="hidden"
-        onChange={handleImport}
+        label={c.imported}
+        onFiles={files => handleImportFile(files[0])}
         ref={importInputRef}
-        type="file"
       />
     </SettingsContent>
   )

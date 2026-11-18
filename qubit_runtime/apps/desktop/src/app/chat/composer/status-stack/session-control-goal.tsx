@@ -6,7 +6,7 @@ import { StatusControlRow } from '@/components/chat/status-control-row'
 import { StatusPendingIcon } from '@/components/chat/status-pending-icon'
 import { StatusRow } from '@/components/chat/status-row'
 import { StatusSection } from '@/components/chat/status-section'
-import { Button } from '@/sakuga/ui'
+import { Button, Textarea } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
@@ -489,14 +489,14 @@ export const SessionControlGoalSection = memo(function SessionControlGoalSection
               <DialogDescription>{ctrl.addCriterionPlaceholder}</DialogDescription>
             </DialogHeader>
             <div className="py-2">
-              <textarea
-                aria-label={ctrl.criterionLabel}
+              <Textarea
                 autoFocus
-                className="w-full rounded-md border border-(--ui-stroke-secondary) bg-transparent p-2 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-primary"
                 disabled={isBusy}
-                onChange={e => setNewCriterionText(e.target.value)}
+                label={ctrl.criterionLabel}
+                onChange={setNewCriterionText}
                 placeholder={ctrl.addCriterionPlaceholder}
                 rows={3}
+                style={{ width: '100%' }}
                 value={newCriterionText}
               />
             </div>

@@ -5,17 +5,8 @@ import { useNavigate } from 'react-router'
 import { TitlebarIcon } from '@/app/shell/titlebar-icon'
 import { ZoomableImage } from '@/components/chat/zoomable-image'
 import { PageLoader } from '@/components/page-loader'
-import { Button } from '@/sakuga/ui'
+import { Button, HoverTooltip, Pagination as SakugaPagination } from '@/sakuga/ui'
 import { CopyButton } from '@/components/ui/copy-button'
-import {
-  Pagination,
-  PaginationButton,
-  PaginationContent,
-  PaginationEllipsis,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious
-} from '@/components/ui/pagination'
 import { RowButton } from '@/components/ui/row-button'
 import { Tip } from '@/components/ui/tooltip'
 import { getSessionMessages, listAllProfileSessions } from '@/qubit'
@@ -65,31 +56,6 @@ function pageRangeLabel(total: number, page: number, pageSize: number, a: Transl
   return a.rangeOf(start, end, total)
 }
 
-function paginationItems(page: number, pageCount: number): Array<number | 'ellipsis'> {
-  if (pageCount <= 7) {
-    return Array.from({ length: pageCount }, (_, index) => index + 1)
-  }
-
-  const pages: Array<number | 'ellipsis'> = [1]
-  const start = Math.max(2, page - 1)
-  const end = Math.min(pageCount - 1, page + 1)
-
-  if (start > 2) {
-    pages.push('ellipsis')
-  }
-
-  for (let nextPage = start; nextPage <= end; nextPage += 1) {
-    pages.push(nextPage)
-  }
-
-  if (end < pageCount - 1) {
-    pages.push('ellipsis')
-  }
-
-  pages.push(pageCount)
-
-  return pages
-}
 
 type CellCtx = {
   onOpen: (artifact: ArtifactRecord) => void | Promise<void>
@@ -328,7 +294,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
       searchHints={searchHints}
       searchPlaceholder={a.search}
       searchTrailingAction={
-        <Tip label={refreshing ? a.refreshing : a.refresh}>
+        <HoverTooltip content={refreshing ? a.refreshing : a.refresh}>
           <Button
             aria-label={refreshing ? a.refreshing : a.refresh}
             className="text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground"
@@ -339,7 +305,7 @@ export function ArtifactsView({ setStatusbarItemGroup: _setStatusbarItemGroup, .
           >
             {refreshing ? <TitlebarIcon name="loading" spinning /> : <TitlebarIcon name="refresh" />}
           </Button>
-        </Tip>
+        </HoverTooltip>
       }
       searchValue={query}
       tabs={[
@@ -431,34 +397,13 @@ function ArtifactsPagination({ className, itemLabel, onPageChange, page, pageSiz
         {pageRangeLabel(total, page, pageSize, a)} {itemLabel}
       </div>
       {pageCount > 1 && (
-        <Pagination className="mx-0 w-auto min-w-0 justify-end">
-          <PaginationContent className="gap-0.5">
-            <PaginationItem>
-              <PaginationPrevious disabled={page <= 1} onClick={() => onPageChange(Math.max(1, page - 1))} />
-            </PaginationItem>
-            {paginationItems(page, pageCount).map((item, index) => (
-              <PaginationItem key={`${item}-${index}`}>
-                {item === 'ellipsis' ? (
-                  <PaginationEllipsis />
-                ) : (
-                  <PaginationButton
-                    aria-label={a.goToPage(itemLabel, item)}
-                    isActive={page === item}
-                    onClick={() => onPageChange(item)}
-                  >
-                    {item}
-                  </PaginationButton>
-                )}
-              </PaginationItem>
-            ))}
-            <PaginationItem>
-              <PaginationNext
-                disabled={page >= pageCount}
-                onClick={() => onPageChange(Math.min(pageCount, page + 1))}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
+        <SakugaPagination
+          className="mx-0 w-auto min-w-0 justify-end"
+          label={itemLabel}
+          onChange={onPageChange}
+          page={page}
+          pageCount={pageCount}
+        />
       )}
     </div>
   )

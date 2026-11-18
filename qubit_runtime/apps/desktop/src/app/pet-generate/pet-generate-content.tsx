@@ -1,4 +1,4 @@
-import { Button } from '@/sakuga/ui'
+import { Button, FileField } from '@/sakuga/ui'
 import { useStore } from '@nanostores/react'
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -264,15 +264,12 @@ export function PetGenerateContent() {
 
             {/* Optional reference photo — make a pet from the user's own image.
                 Styled like the chat composer's attachment pill. */}
-            <Input
+            <FileField
               accept="image/*"
               className="hidden"
-              onChange={event => {
-                pickReference(event.target.files?.[0])
-                event.target.value = ''
-              }}
+              label="Add a reference"
+              onFiles={files => pickReference(files[0])}
               ref={fileRef}
-              type="file"
             />
           </div>
         )}

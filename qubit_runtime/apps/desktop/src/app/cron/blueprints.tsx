@@ -1,5 +1,6 @@
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { TimeField } from '@/sakuga/ui'
 import type { AutomationBlueprint, AutomationBlueprintField } from '@/hermes'
 
 // The blueprint catalog is shared with the dashboard, so its deliver slot
@@ -76,7 +77,7 @@ export function BlueprintSlotControl({
   }
 
   if (field.type === 'time') {
-    return <Input id={id} onChange={event => onChange(event.target.value)} type="time" value={value} />
+    return <TimeField id={id} label={field.label} onChange={onChange} value={value} />
   }
 
   return (
