@@ -26,6 +26,23 @@ sakuga-progress {
   max-width: 100%;
 }
 
+/* The vendored components declare these in `:host`, and a document-level
+ * universal reset (Tailwind's preflight `* { margin: 0 }`) wins over a
+ * shadow-tree `:host` rule. Without restating them here the slider's value
+ * bubble and the tooltip's hint have no reserved space and overlap whatever
+ * sits above them. These are the upstream documented metrics, not new chrome. */
+sakuga-slider {
+  margin-top: 30px;
+}
+
+sakuga-tabs {
+  margin-top: 10px;
+}
+
+sakuga-tooltip {
+  margin-top: 60px;
+}
+
 .qsk-inline {
   display: inline-flex;
   align-items: center;
@@ -86,6 +103,13 @@ sakuga-toggle {
   /* The splash draws upward; do not reserve the upstream 89px of gallery air.
      A little side/bottom gap keeps rows readable. */
   margin: 0 12px 8px;
+}
+
+/* The select panel's filter fills the panel instead of keeping the standalone
+ * 230px field width. */
+sakuga-input.qsk-select-filter {
+  width: 100%;
+  --sk-input-width: 100%;
 }
 
 /* Loading primitive: progress + visible caption. */

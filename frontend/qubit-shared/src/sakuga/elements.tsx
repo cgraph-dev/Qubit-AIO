@@ -288,6 +288,15 @@ export const SakugaButton = forwardRef<HTMLElement, SakugaButtonProps>(function 
     'sakuga-button',
     {
       ...hostProps(rest),
+      // `variant` and `type` are read once, in the element's first render, and
+      // the upstream element does not observe them. A layout-effect write is
+      // too late: the custom element has already connected and rendered its
+      // shadow DOM, so a `variant="secondary"` button stayed primary. Passing
+      // them here sets the attributes before React inserts the node, which is
+      // before `connectedCallback`.
+      variant: variant === 'secondary' ? 'secondary' : undefined,
+      type: type === 'button' ? undefined : type,
+      disabled: disabled ? '' : undefined,
       ref: (node: HTMLElement | null) => {
         inner.current = node;
         if (typeof ref === 'function') ref(node);
@@ -410,7 +419,10 @@ export const SakugaRadio = forwardRef<HTMLElement, SakugaRadioProps>(function Sa
     ...hostProps(rest),
     // The upstream component reads its options once. A changed option set must
     // remount, or the visible rows would silently disagree with the props.
-    key: signature,
+    // `label` is only read at render time and is not an observed attribute, so
+    // it must be an initial attribute too (and a change needs the remount).
+    key: `${signature}|${label}`,
+    label,
     ref: (node: HTMLElement | null) => {
       inner.current = node;
       if (typeof ref === 'function') ref(node);
@@ -490,6 +502,21 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
     'aria-required': required ? 'true' : undefined,
   };
   const innerRef = useRef<HTMLInputElement | null>(null);
+  // The upstream field's own `input` event is `composed: false`, so it never
+  // leaves its shadow root and the host `onInput` handler below cannot see a
+  // real keystroke. (The test helper dispatches a composed event, which is why
+  // jsdom page tests never caught this.) Re-publish the inner event as a
+  // composed one on the host; a composed original — the test path — is passed
+  // through untouched, so onChange still fires exactly once.
+  const wiredInput = useRef<HTMLInputElement | null>(null);
+  const wiredHandler = useRef<EventListener | null>(null);
+  useEffect(() => () => {
+    if (wiredInput.current && wiredHandler.current) {
+      wiredInput.current.removeEventListener('input', wiredHandler.current);
+    }
+    wiredInput.current = null;
+    wiredHandler.current = null;
+  }, []);
   useLayoutEffect(() => {
     let timer: ReturnType<typeof setInterval> | null = null;
     let stop: ReturnType<typeof setTimeout> | null = null;
@@ -500,6 +527,24 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
       innerRef.current = input;
       const hostElement = inner.current;
       if (hostElement) delegateInnerInput(hostElement);
+      if (wiredInput.current !== input) {
+        if (wiredInput.current && wiredHandler.current) {
+          wiredInput.current.removeEventListener('input', wiredHandler.current);
+        }
+        const wire = (event: Event) => {
+          if (event.composed) return;
+          // Re-publish on the HOST, not the inner input: dispatching on the
+          // input would run the vendored dust/form listener twice per key.
+          // The host getter returns the same value, so the wrapper's handler
+          // still reports what the user typed.
+          hostElement?.dispatchEvent(
+            new Event('input', { bubbles: true, composed: true }),
+          );
+        };
+        input.addEventListener('input', wire);
+        wiredInput.current = input;
+        wiredHandler.current = wire;
+      }
       for (const [key, attr] of Object.entries(innerAttrs)) {
         if (attr === undefined || attr === null || attr === false) input.removeAttribute(key);
         else input.setAttribute(key, attr === true ? '' : String(attr));
@@ -541,6 +586,14 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
 
   return createElement('sakuga-input', {
     ...hostProps(rest),
+    // `type` and `autocomplete` are read only while rendering the inner
+    // `<input>` and are not observed attributes, so they must exist before the
+    // element connects; a layout-effect write would leave every email/password
+    // field rendered as `type=text`.
+    type,
+    label,
+    placeholder,
+    autocomplete: autoComplete,
     ref: (node: HTMLElement | null) => {
       inner.current = node;
       if (typeof ref === 'function') ref(node);
@@ -626,7 +679,9 @@ export const SakugaTabs = forwardRef<HTMLElement, SakugaTabsProps>(function Saku
   useSakuga('tabs', inner, { label, selected });
   return createElement('sakuga-tabs', {
     ...hostProps(rest),
-    key: signature,
+    key: `${signature}|${label}`,
+    // Read once in render(); not an observed attribute.
+    label,
     ref: (node: HTMLElement | null) => {
       inner.current = node;
       if (typeof ref === 'function') ref(node);
@@ -766,6 +821,8 @@ export const SakugaRating = forwardRef<HTMLElement, SakugaRatingProps>(function 
   useSakuga('rating', inner, { label, value, name, disabled });
   return createElement('sakuga-rating', {
     ...hostProps(rest),
+    // Read once in render(); not an observed attribute.
+    label,
     ref: (node: HTMLElement | null) => {
       inner.current = node;
       if (typeof ref === 'function') ref(node);

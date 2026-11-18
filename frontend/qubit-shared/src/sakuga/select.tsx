@@ -187,6 +187,7 @@ export function SakugaSelect(props: SakugaSelectProps) {
           placeholder: 'Filter…',
           value: filter,
           onChange: setFilter,
+          className: 'qsk-select-filter',
         }),
         filtered.length
           ? createElement(SakugaRadio, {
