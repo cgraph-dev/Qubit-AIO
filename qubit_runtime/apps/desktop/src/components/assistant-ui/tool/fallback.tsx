@@ -130,7 +130,7 @@ function ToolPayloadDisclosure({ args, result }: { args: unknown; result: unknow
   return (
     // `py-0.5` tops up the parent's `p-1.5` to an even block on both edges.
     <div className="max-w-full py-0.5">
-      <button
+      <Button
         aria-expanded={open}
         className={cn(
           TOOL_SECTION_LABEL_CLASS,
@@ -141,7 +141,7 @@ function ToolPayloadDisclosure({ args, result }: { args: unknown; result: unknow
       >
         <DisclosureCaret className="text-(--ui-text-tertiary)" open={open} size="0.625rem" />
         Tool payload
-      </button>
+      </Button>
       {open && (
         <pre className={cn(TOOL_PAYLOAD_PRE_CLASS, 'mt-1 whitespace-pre-wrap wrap-anywhere')}>
           {technicalTrace(args, result)}

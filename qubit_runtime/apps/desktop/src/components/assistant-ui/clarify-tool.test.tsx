@@ -499,7 +499,7 @@ describe('ClarifyTool keyboard navigation', () => {
     // focus afterwards. jsdom's fireEvent.click does not move focus, so
     // focus it explicitly to reproduce the reported bug.
     fireEvent.click(production)
-    production.focus()
+    sakugaInner(production, 'button')?.focus()
     expect(production.getAttribute('aria-pressed')).toBe('true')
     expect(document.activeElement).toBe(production)
 
@@ -517,7 +517,7 @@ describe('ClarifyTool keyboard navigation', () => {
     // Tabbing onto a choice does not stage it. Enter still belongs to
     // activateActive, which confirms the highlighted row (staging by default)
     // rather than falling through as a hands-off keypress.
-    production.focus()
+    sakugaInner(production, 'button')?.focus()
     expect(production.getAttribute('aria-pressed')).toBe('false')
     expect(document.activeElement).toBe(production)
 
@@ -535,7 +535,7 @@ describe('ClarifyTool keyboard navigation', () => {
 
     fireEvent.click(staging)
     fireEvent.click(production)
-    production.focus()
+    sakugaInner(production, 'button')?.focus()
     expect(document.activeElement).toBe(production)
     expect(staging.getAttribute('aria-pressed')).toBe('true')
     expect(production.getAttribute('aria-pressed')).toBe('true')
@@ -707,7 +707,7 @@ describe('ClarifyTool submit shortcut', () => {
       const { respond } = renderLiveClarify({ multiSelect: true })
       const choice = screen.getByRole('button', { name: /staging/ })
       fireEvent.click(choice)
-      choice.focus()
+      sakugaInner(choice, 'button')?.focus()
       fireEvent.keyDown(choice, { key: 'Enter', ...modifier })
       await waitFor(() => expect(respond).toHaveBeenCalledTimes(1))
       expect(respond).toHaveBeenCalledWith({ answer: '["staging"]' })

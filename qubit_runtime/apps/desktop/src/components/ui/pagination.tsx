@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { Button } from './button'
 
 import { Codicon } from '@/components/ui/codicon'
 import { useI18n } from '@/i18n'
@@ -33,7 +34,7 @@ interface PaginationButtonProps extends React.ComponentProps<'button'> {
 
 function PaginationButton({ className, isActive, ...props }: PaginationButtonProps) {
   return (
-    <button
+    <Button
       aria-current={isActive ? 'page' : undefined}
       className={cn(
         'inline-flex h-5 min-w-5 items-center justify-center rounded border border-transparent px-1 text-[0.6875rem] leading-none tabular-nums transition-colors disabled:pointer-events-none disabled:opacity-45',
@@ -54,7 +55,7 @@ function PaginationPrevious({ className, ...props }: React.ComponentProps<'butto
   const { t } = useI18n()
 
   return (
-    <button
+    <Button
       aria-label={t.ui.pagination.previousAria}
       className={cn(
         'inline-flex h-5 items-center justify-center gap-0.5 rounded border border-transparent px-1 text-[0.6875rem] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45',
@@ -66,7 +67,7 @@ function PaginationPrevious({ className, ...props }: React.ComponentProps<'butto
     >
       <Codicon name="chevron-left" size="0.75rem" />
       <span>{t.ui.pagination.previous}</span>
-    </button>
+    </Button>
   )
 }
 
@@ -74,7 +75,7 @@ function PaginationNext({ className, ...props }: React.ComponentProps<'button'>)
   const { t } = useI18n()
 
   return (
-    <button
+    <Button
       aria-label={t.ui.pagination.nextAria}
       className={cn(
         'inline-flex h-5 items-center justify-center gap-0.5 rounded border border-transparent px-1 text-[0.6875rem] leading-none text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-45',
@@ -86,7 +87,7 @@ function PaginationNext({ className, ...props }: React.ComponentProps<'button'>)
     >
       <span>{t.ui.pagination.next}</span>
       <Codicon name="chevron-right" size="0.75rem" />
-    </button>
+    </Button>
   )
 }
 

@@ -41,14 +41,14 @@ export function ContribBoundary({ children, id, variant = 'pane' }: ContribBound
       fallback={({ error, reset }) =>
         variant === 'chip' ? (
           <Tip label={`${id}: ${error.message}`}>
-            <button
+            <Button
               className="inline-flex items-center gap-1 rounded px-1.5 text-[0.6875rem] text-destructive transition-colors hover:bg-(--chrome-action-hover)"
               onClick={reset}
               type="button"
             >
               <Codicon name="warning" size="0.7rem" />
               {id}
-            </button>
+            </Button>
           </Tip>
         ) : (
           <div className="grid h-full place-items-center p-6">

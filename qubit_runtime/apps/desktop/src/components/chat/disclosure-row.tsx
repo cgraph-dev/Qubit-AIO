@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 
 import { DisclosureCaret } from '@/components/ui/disclosure-caret'
 import { cn } from '@/lib/utils'
@@ -33,7 +34,7 @@ export function DisclosureRow({
 }) {
   return (
     <div className="group/disclosure-row relative flex w-full max-w-full min-w-0 text-(--ui-text-tertiary)">
-      <button
+      <Button
         aria-expanded={onToggle ? open : undefined}
         className={cn(
           // max-w-fit so the click target hugs the title text width — no
@@ -60,7 +61,7 @@ export function DisclosureRow({
             <DisclosureCaret open={open} />
           </span>
         )}
-      </button>
+      </Button>
       {action && (
         <span className="ml-auto flex h-(--conversation-line-height) shrink-0 items-center self-start pl-1.5">
           {action}

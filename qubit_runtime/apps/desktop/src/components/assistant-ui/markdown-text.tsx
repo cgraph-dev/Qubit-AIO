@@ -1,6 +1,7 @@
 'use client'
 
 import { TextMessagePartProvider, useMessagePartText } from '@assistant-ui/react'
+import { Button } from '@/components/ui/button'
 import {
   type StreamdownTextComponents,
   StreamdownTextPrimitive,
@@ -142,13 +143,13 @@ function OpenMediaButton({ kind, path }: { kind: 'audio' | 'video'; path: string
 
   return (
     <span className="block">
-      <button
+      <Button
         className="mt-2 ref text-xs font-medium text-muted-foreground hover:text-foreground"
         onClick={open}
         type="button"
       >
         Open {kind} file
-      </button>
+      </Button>
       {openFailed && <OpenMediaFailedNote name={mediaName(path)} />}
     </span>
   )
@@ -434,9 +435,9 @@ function MarkdownImageContent({
     return (
       <span className="my-2 block text-sm text-muted-foreground" data-slot="aui_markdown-image">
         Couldn&apos;t load {name}.{' '}
-        <button className="ref font-medium text-foreground" onClick={open} type="button">
+        <Button className="ref font-medium text-foreground" onClick={open} type="button">
           Open image
-        </button>
+        </Button>
         {openFailed && <OpenMediaFailedNote name={name} />}
       </span>
     )

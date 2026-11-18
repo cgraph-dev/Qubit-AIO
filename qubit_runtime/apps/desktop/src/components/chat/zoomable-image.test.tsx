@@ -24,7 +24,7 @@ async function renderImage() {
 }
 
 async function openLightbox() {
-  const trigger = screen.getByAltText(ALT).closest('button')
+  const trigger = screen.getByAltText(ALT).closest('button, sakuga-button')
   expect(trigger).toBeTruthy()
   await act(async () => {
     fireEvent.click(trigger!)

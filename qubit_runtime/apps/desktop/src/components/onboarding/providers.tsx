@@ -1,4 +1,5 @@
 import { RowButton } from '@/components/ui/row-button'
+import { Button } from '@/components/ui/button'
 import { useI18n } from '@/i18n'
 import { Check, ChevronRight, Terminal } from '@/lib/icons'
 import { PROVIDER_DISPLAY_NAMES } from '@/lib/model-status-label'
@@ -37,7 +38,7 @@ export function FeaturedProviderRow({
   const loggedIn = provider.status?.logged_in && !freeTier
 
   return (
-    <button
+    <Button
       className="group relative flex w-full items-center justify-between gap-4 rounded-[8px] bg-primary/[0.06] px-3 py-2.5 text-left transition-colors hover:bg-primary/10"
       onClick={() => onSelect(provider)}
       type="button"
@@ -65,7 +66,7 @@ export function FeaturedProviderRow({
         </p>
       </div>
       <ChevronRight className="size-4 shrink-0 text-primary transition group-hover:translate-x-0.5" />
-    </button>
+    </Button>
   )
 }
 

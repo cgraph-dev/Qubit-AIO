@@ -1,4 +1,5 @@
 import { ThreadPrimitive, useAuiEvent, useAuiState } from '@assistant-ui/react'
+import { Button } from '@/components/ui/button'
 import { useStore } from '@nanostores/react'
 import { atom } from 'nanostores'
 import {
@@ -1572,13 +1573,13 @@ const ThreadMessageListInner: FC<ThreadMessageListProps> = ({
           ref={contentRef as React.RefCallback<HTMLDivElement>}
         >
           {!renderEmpty && (hiddenCount > 0 || olderAvailable) && (
-            <button
+            <Button
               className="mx-auto mb-(--conversation-turn-gap) rounded-full border border-border/65 bg-(--composer-fill) px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
               onClick={showEarlier}
               type="button"
             >
               {t.assistant.thread.showEarlier}
-            </button>
+            </Button>
           )}
           {renderEmpty ? (
             <div className="grid flex-1 grid-rows-[minmax(0,1fr)_auto] gap-(--conversation-turn-gap)">

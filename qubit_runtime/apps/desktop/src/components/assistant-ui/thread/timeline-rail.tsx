@@ -1,4 +1,5 @@
 import './timeline.css'
+import { Button } from '@/components/ui/button'
 
 import { useVirtualizer } from '@tanstack/react-virtual'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -170,7 +171,7 @@ export function TimelineRail({ activeIndex, entries, loadingId, onJump }: Timeli
               sideOffset={8}
               style={{ textAlign: 'right' }}
             >
-              <button
+              <Button
                 aria-busy={loadingId === entry.id || undefined}
                 aria-current={item.index === activeIndex ? 'location' : undefined}
                 aria-label={entry.preview}
@@ -187,7 +188,7 @@ export function TimelineRail({ activeIndex, entries, loadingId, onJump }: Timeli
                 type="button"
               >
                 <span aria-hidden data-index={item.index} data-slot="timeline-bar" />
-              </button>
+              </Button>
             </Tip>
           )
         })}

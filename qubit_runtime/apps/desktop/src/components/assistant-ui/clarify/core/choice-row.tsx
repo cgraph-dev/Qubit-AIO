@@ -1,6 +1,7 @@
 'use client'
 
 import { Kbd } from '@/components/ui/kbd'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { bareChoice, RECOMMENDED_LABEL } from '@/store/clarify'
 
@@ -74,7 +75,7 @@ export function ChoiceButton({
   // `active` is the keyboard cursor on the live card (arrow-key navigation);
   // it highlights the row and previews its key badge.
   return (
-    <button
+    <Button
       aria-current={active || undefined}
       aria-keyshortcuts={keyShortcuts}
       aria-pressed={selected}
@@ -94,6 +95,6 @@ export function ChoiceButton({
       <span className="flex-1 wrap-anywhere">
         <ChoiceLabel choice={choice} />
       </span>
-    </button>
+    </Button>
   )
 }

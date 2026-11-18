@@ -153,7 +153,7 @@ describe('FloatingPanes (live DOM)', () => {
     mount.render(<FloatingPanes />)
 
     const before = card()!.style.left
-    const toggle = card()!.querySelector('button')!
+    const toggle = card()!.querySelector('button, sakuga-button') as HTMLElement
 
     // The button is inside the drag handle — [data-floating-no-drag] must
     // stop it starting a drag.

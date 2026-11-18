@@ -14,6 +14,7 @@
  */
 
 import { useEffect, useRef } from 'react'
+import { Button } from '@/components/ui/button'
 
 import { KbdCombo } from '@/components/ui/kbd'
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
@@ -89,23 +90,23 @@ export function TipBubble({ action, anchor, keybind, onClose, side, text, title 
               // reached but nothing steals the caret to get there. Inverted
               // fill against the accent surface, same currentColor discipline
               // as the rest of the bubble.
-              <button
+              <Button
                 className="mt-2.5 inline-flex cursor-pointer items-center rounded-md bg-current/15 px-2.5 py-1 text-[length:var(--conversation-caption-font-size)] font-semibold transition-colors hover:bg-current/25"
                 onClick={action.onSelect}
                 type="button"
               >
                 {action.label}
-              </button>
+              </Button>
             )}
           </div>
-          <button
+          <Button
             aria-label={t.tips.close}
             className="-mr-0.5 -mt-0.5 shrink-0 cursor-pointer rounded-[3px] p-0.5 text-current/70 transition-colors hover:bg-current/15 hover:text-current"
             onClick={onClose}
             type="button"
           >
             <X className={iconSize.sm} />
-          </button>
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

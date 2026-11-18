@@ -1,4 +1,5 @@
 import { ActionBarPrimitive, BranchPickerPrimitive, MessagePrimitive, useAuiState } from '@assistant-ui/react'
+import { Button } from '@/components/ui/button'
 import { type FC, type ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 
 import { DirectiveContent } from '@/components/assistant-ui/directive-text'
@@ -454,7 +455,7 @@ export const UserMessage: FC<{
                 {readOnly ? (
                   // Spectator transcript: clicking only toggles the clamp so the
                   // full prompt is readable — never opens an edit composer.
-                  <button
+                  <Button
                     aria-expanded={bodyClamped ? expanded : undefined}
                     className={cn(bubbleClassName, !bodyClamped && 'cursor-default')}
                     onClick={() => {
@@ -470,14 +471,14 @@ export const UserMessage: FC<{
                     type="button"
                   >
                     {bubbleContent}
-                  </button>
+                  </Button>
                 ) : (
                   // Always editable — clicking opens the edit composer even while a
                   // turn streams; sending the edit reverts (interrupt + rewind).
                   // A live text highlight wins: finishing a drag-select must not
                   // open the editor and throw the selection away.
                   <ActionBarPrimitive.Edit asChild>
-                    <button
+                    <Button
                       aria-label={copy.editMessage}
                       className={bubbleClassName}
                       onClick={event => {
@@ -500,7 +501,7 @@ export const UserMessage: FC<{
                       type="button"
                     >
                       {bubbleContent}
-                    </button>
+                    </Button>
                   </ActionBarPrimitive.Edit>
                 )}
                 {/* Hover cluster, bottom-right: when it was sent, then Stop or
@@ -508,7 +509,7 @@ export const UserMessage: FC<{
                 <div className="pointer-events-none absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-md bg-(--dt-user-bubble) pl-1 opacity-0 transition-opacity group-hover/user-message:opacity-100 group-hover/user-message:transition-none group-focus-within/user-message:opacity-100">
                   <MessageHoverTime className={cn(!showStop && !showRestore && 'pr-0.5')} />
                   {showStop ? (
-                    <button
+                    <Button
                       aria-label={copy.stop}
                       className={cn('pointer-events-auto size-5', USER_ACTION_ICON_BUTTON_CLASS)}
                       onClick={event => {
@@ -519,10 +520,10 @@ export const UserMessage: FC<{
                       type="button"
                     >
                       {StopGlyph}
-                    </button>
+                    </Button>
                   ) : showRestore ? (
                     <Tip label={copy.restoreFromHere}>
-                      <button
+                      <Button
                         aria-label={copy.restoreCheckpoint}
                         className={cn('pointer-events-auto size-6', USER_ACTION_ICON_BUTTON_CLASS)}
                         onClick={event => {
@@ -541,7 +542,7 @@ export const UserMessage: FC<{
                         type="button"
                       >
                         <Codicon name="discard" size="0.875rem" />
-                      </button>
+                      </Button>
                     </Tip>
                   ) : null}
                 </div>

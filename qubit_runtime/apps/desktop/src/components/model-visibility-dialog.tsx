@@ -164,7 +164,7 @@ export function ModelVisibilityDialog({
               return (
                 <div className="py-0.5" key={provider.slug}>
                   <div className="flex items-center gap-2 px-3 pb-0.5 pt-1">
-                    <button
+                    <Button
                       className="group/label flex w-full items-center gap-1 pb-0.5 pt-0.5 text-left text-[0.625rem] font-semibold uppercase tracking-wider text-(--ui-text-tertiary) hover:bg-transparent"
                       onClick={() => toggleCollapsedProvider(provider.slug)}
                       type="button"
@@ -177,7 +177,7 @@ export function ModelVisibilityDialog({
                         open={!collapsed}
                         size="0.625rem"
                       />
-                    </button>
+                    </Button>
                     <Checkbox
                       checked={checkState}
                       onCheckedChange={next => setProviderVisible(provider, next !== false)}

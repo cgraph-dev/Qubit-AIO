@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Button } from '@/components/ui/button'
 
 import { cn } from '@/lib/utils'
 
@@ -26,7 +27,7 @@ export function Chip({
   variant?: 'card' | 'pill'
 }) {
   return (
-    <button
+    <Button
       aria-pressed={on}
       className={cn(
         'flex items-center text-left',
@@ -44,6 +45,6 @@ export function Chip({
         <span className={variant === 'pill' ? 'block wrap-anywhere' : 'block truncate'}>{label}</span>
         {sub && <span className="block text-xs text-muted-foreground">{sub}</span>}
       </span>
-    </button>
+    </Button>
   )
 }

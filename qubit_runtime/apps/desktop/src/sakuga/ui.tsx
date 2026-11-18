@@ -178,20 +178,25 @@ export const Button = forwardRef<HTMLElement, QubitButtonProps>(function Button(
     else if (ref) (ref as { current: HTMLElement | null }).current = node
   }
 
-  return createElement(
-    'sakuga-button',
-    {
-      ...rest,
-      ref: setRef,
-      class: className,
-      role: (rest as { role?: string }).role ?? 'button',
-      disabled: disabled || undefined,
-      variant: sakugaButtonVariant(variant),
-      onClick: (event: React.MouseEvent<HTMLElement>) => {
-        if (fx) void emitFxAt(fx, event.currentTarget)
-        onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)
-      }
-    },
-    children
-  )
+  // React serialises `aria-*` booleans to "true"/"false" on native elements
+  // but writes an empty attribute on a custom element. Everything that reads
+  // `aria-pressed`/`aria-expanded` (tests, screen readers) needs the string.
+  const attrs: Record<string, unknown> = { ...rest }
+  for (const key of Object.keys(attrs)) {
+    if ((key.startsWith('aria-') || key.startsWith('data-')) && typeof attrs[key] === 'boolean') {
+      attrs[key] = attrs[key] ? 'true' : 'false'
+    }
+  }
+
+  attrs.ref = setRef
+  attrs.class = className
+  attrs.role = (rest as { role?: string }).role ?? 'button'
+  attrs.disabled = disabled || undefined
+  attrs.variant = sakugaButtonVariant(variant)
+  attrs.onClick = (event: React.MouseEvent<HTMLElement>) => {
+    if (fx) void emitFxAt(fx, event.currentTarget)
+    onClick?.(event as unknown as React.MouseEvent<HTMLButtonElement>)
+  }
+
+  return createElement('sakuga-button', attrs, children)
 })

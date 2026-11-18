@@ -1,4 +1,5 @@
 import './intro-reveal.css'
+import { Button } from '@/components/ui/button'
 
 import type { Ref } from 'react'
 
@@ -83,14 +84,14 @@ export function IntroRevealSurface() {
 
       <BrandClose ref={brandRef} />
 
-      <button
+      <Button
         className="absolute bottom-6 right-7 text-[0.72rem] uppercase tracking-[0.24em] text-white/40 transition-colors hover:text-white/80"
         onClick={skip}
         style={{ fontFamily: "'Collapse', sans-serif" }}
         type="button"
       >
         {SKIP}
-      </button>
+      </Button>
     </div>
   )
 }
