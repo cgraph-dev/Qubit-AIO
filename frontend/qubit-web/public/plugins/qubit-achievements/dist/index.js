@@ -107,9 +107,18 @@
       return Promise.resolve(true);
     }
     if (sakugaPromises[name]) return sakugaPromises[name];
+    const src = SAKUGA_BASE + "/" + name + "/" + name + ".js";
+    // The dashboard loader may already be injecting the same file; reuse that
+    // tag instead of defining the custom element twice.
+    const existing = document.querySelector('script[src="' + src + '"]');
     sakugaPromises[name] = new Promise(function (resolve) {
+      if (existing) {
+        existing.addEventListener("load", function () { resolve(true); });
+        existing.addEventListener("error", function () { resolve(false); });
+        return;
+      }
       const script = document.createElement("script");
-      script.src = SAKUGA_BASE + "/" + name + "/" + name + ".js";
+      script.src = src;
       script.async = false;
       script.dataset.sakuga = "1";
       script.onload = function () { resolve(true); };
