@@ -1,11 +1,10 @@
 {
   "source": "https://github.com/marmottajr/habblaud",
   "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
-  "local_commit": "34005834794831d073c23dea20ab3ca3f48b3573",
+  "local_commit": "df4fb8b44867b697d4a99dd3e7a3e31c4fc896e1",
   "local_changes": [
-    "additive Sakuga VFX overlay: vendored core.js + OfficeFx cue player consuming snapshot.fx",
-    "publish real renderer head anchors into the FX registry each frame (additive; no drawing change)",
-    "extend the Sakuga cue mapping to task/artifact/receipt/finance/marketing/CRM/memory animations (presentation only)"
+    "Sakuga UI controls across the office client (additive; QUBIT_OFFICE_SAKUGA=0 rolls back)",
+    "Vendored Sakuga control files (button/input/slider/checkbox/toggle/tabs/progress/tooltip + LICENSE) served from the client's own public/sakuga-vfx so the iframe is standalone"
   ],
   "licence": "MIT",
   "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to en by scripts/vendor_habblaud.py (English-only authoring ruling). This tree carries documented local changes on top of the upstream pin: `commit` names the upstream commit it was built from, `local_commit` names the source checkout HEAD that added them, and `local_changes` lists them.",
@@ -221,19 +220,19 @@
       "bytes": 76799
     },
     {
-      "path": "bundle/app-BW61bUik.css",
-      "sha256": "2be3803177e97e74f62009495ad23c5f49d10ad3e544ed0987552fd90b2731f3",
-      "bytes": 128520
+      "path": "bundle/app-DjD9DFwS.css",
+      "sha256": "e8cb2a1adf5a71ba07aa3f41bef0cfa9120b06def9763ae19ebbce2f328aa439",
+      "bytes": 131312
     },
     {
-      "path": "bundle/app-D_Gc15aD.js",
-      "sha256": "821064a0d04a96d0ceb3221f982d3edac4ca1d710e828223e1abfa77d5f93089",
-      "bytes": 698130
+      "path": "bundle/app-jeDv5PC_.js",
+      "sha256": "393790bf9d8467b42ba206524d9959fe470469cf585c2e742b90790acb94e11a",
+      "bytes": 702435
     },
     {
-      "path": "bundle/daystats-C_cQqlAP.js",
-      "sha256": "80b3063ed5d40dd578e9526acad671ff61e3bc7d188b91bce8633292be99d881",
-      "bytes": 36986
+      "path": "bundle/daystats-BQTf_s8z.js",
+      "sha256": "fd67866d5d9c838ab82dd8d2a838935c12718ab5fb896bf524a795cf4a35c9d5",
+      "bytes": 36960
     },
     {
       "path": "bundle/en-2E7tqGEw.js",
@@ -251,8 +250,8 @@
       "bytes": 203518
     },
     {
-      "path": "bundle/main-CIjZ6Q8r.js",
-      "sha256": "5b34bf0e12729be150b856ded0b78ea0ae29423397fe430edebaf3ef469250d6",
+      "path": "bundle/main-o81gmC0w.js",
+      "sha256": "9ca26e7ebc6678de6c1639f5cd1501f04bbfd2452494c6aa0a15a15f8abcc5bf",
       "bytes": 15337
     },
     {
@@ -381,13 +380,13 @@
       "bytes": 3939
     },
     {
-      "path": "bundle/ptypane-Y62MnRc7.js",
-      "sha256": "6fe4e4437f3b3e7e66d7167cb5080e8868825536c8861bc266d51f105ad24c3d",
+      "path": "bundle/ptypane-DxgbJ5M0.js",
+      "sha256": "ee020f5c2f4999ed5a9e66ac40eba8f7425a188263aaa3e29714f04788e6a3c2",
       "bytes": 334656
     },
     {
       "path": "index.html",
-      "sha256": "fa85fad8c4b3b54ee5015c74fc00c0d66fdd151f6903c7eb21937429ecb0a50d",
+      "sha256": "f15b42f7d3b1cdd4f39e044f12374b8a892fcaa09b6eac67986dd3a9d0cae12e",
       "bytes": 2796
     },
     {
@@ -396,11 +395,56 @@
       "bytes": 820
     },
     {
+      "path": "sakuga-vfx/LICENSE",
+      "sha256": "056e3d84530a1353df8ccad533823e2fd3a8cd94bec7dac2342b1d33eb60d624",
+      "bytes": 1073
+    },
+    {
+      "path": "sakuga-vfx/button/button.js",
+      "sha256": "2d6f452b4d9c9489a4da9b6a1f0fb2ef52d88b5a28331eb3b1c5076742e0ddb8",
+      "bytes": 46435
+    },
+    {
+      "path": "sakuga-vfx/checkbox/checkbox.js",
+      "sha256": "f8e89fd1915386a309c8e94425368a7a522529400505bdbbe227138f68704973",
+      "bytes": 44311
+    },
+    {
       "path": "sakuga-vfx/core.js",
       "sha256": "f0518dd7d4dd1986eab2c9c76796421f4c827e91eac627f4c91a63c362c79419",
       "bytes": 40621
+    },
+    {
+      "path": "sakuga-vfx/input/input.js",
+      "sha256": "f925605c387c16dc6dad7b946789b0755d40b37ffe2f27860bd8211cd841e8bf",
+      "bytes": 44336
+    },
+    {
+      "path": "sakuga-vfx/progress/progress.js",
+      "sha256": "42357bae8480cdcc32c771b340cf2a9886814bf9de706f24a85994ff6b122b31",
+      "bytes": 52256
+    },
+    {
+      "path": "sakuga-vfx/slider/slider.js",
+      "sha256": "7924dec6ed71a86c8e8b611606bb4488dc4bd13f0353daa02fa755142420dbaf",
+      "bytes": 47412
+    },
+    {
+      "path": "sakuga-vfx/tabs/tabs.js",
+      "sha256": "0467ac7bb687d8a6f8834b6e5ea7bd36133c2e126fb7231c916daac2a5d2fef5",
+      "bytes": 45799
+    },
+    {
+      "path": "sakuga-vfx/toggle/toggle.js",
+      "sha256": "0f6115ea1705fda94e8c85f92ee081bf64f71ce6148a8d2e472f28b53f411516",
+      "bytes": 505888
+    },
+    {
+      "path": "sakuga-vfx/tooltip/tooltip.js",
+      "sha256": "9929ca509ee0f5978182d71e909df90b6969f3a5dfbe416197f98a498fb25627",
+      "bytes": 44691
     }
   ],
-  "total_bytes": 2199266,
+  "total_bytes": 3038538,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }
