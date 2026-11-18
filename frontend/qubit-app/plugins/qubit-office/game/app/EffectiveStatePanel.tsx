@@ -20,6 +20,7 @@ import {
   modelRoute,
   statusLabel,
 } from "./effective-state";
+import { sakugaProgress } from "./sakuga";
 
 export interface EffectiveStatePanelProps {
   agentId: string;
@@ -64,7 +65,10 @@ export function createEffectiveStatePanel(
         "data-state": "loading",
         role: "status",
         "aria-live": "polite",
-      }, "Loading effective state…");
+      }, [
+        "Loading effective state…",
+        sakugaProgress(R, { label: "Loading effective state", value: 0.08 }),
+      ]);
     }
 
     if (read.kind === "error" || read.kind === "unavailable") {

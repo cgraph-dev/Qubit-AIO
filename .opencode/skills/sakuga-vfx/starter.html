@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Starter: a like button</title>
+<style>
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #fff; font: 15px/1.45 -apple-system, "Helvetica Neue", "Segoe UI", sans-serif; }
+</style>
+</head>
+<body>
+<like-button></like-button>
+<script src="core.js"></script>
+<script>
+// The smallest whole example: a like button built on the Sakuga core.
+// It shows the four things every component does: a real control in a shadow root, a spring for its own motion,
+// effects thrown at the page in page coordinates, and one frame() that the shared clock calls.
+(() => {
+const fx = window.SakugaFX, { Spring, at, squashy, burst, ticks, puff, sfx, hollow, later } = fx;
+
+class LikeButton extends fx.Base {
+  static delegates = true;                       // focus goes to the button inside
+  static css = `
+    button { width: 64px; height: 64px; border: var(--sk-bw) solid var(--sk-ink); border-radius: 50%; background: var(--sk-card); box-shadow: var(--sk-sh); cursor: pointer; }
+    svg { width: 30px; height: 30px; fill: var(--sk-card); stroke: var(--sk-ink); stroke-width: 2.4; stroke-linejoin: round; transform: scale(var(--s, 1)); }
+    button[aria-pressed=true] svg { fill: var(--sk-acc); }`;
+  render() { return '<button type="button" aria-pressed="false" aria-label="Like"><svg viewBox="0 0 24 24"><path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/></svg></button>'; }
+  setup() {
+    const b = this.b = this.$('button');
+    this.press = squashy(b, { low: 0.7, wide: 0.3 });   // squash while held, overshoot on release
+    this.heart = new Spring(1, 520, 11);                 // the heart's own pop
+    this.back = this.backLayer();                        // a canvas inside the element, behind the button
+    b.addEventListener('click', () => {
+      const on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(on));
+      if (!on) { const c = at(b); puff(c.x, c.y, { size: 8, n: 3, life: 0.4 }); return; }   // undoing is quiet
+      this.heart.x = 0.3; const c = at(b);                 // effects are placed in page coordinates
+      burst(c.x, c.y, { r: 44, life: 0.36, layer: this.back });   // the impact goes off behind the button, not over it
+      ticks(c.x, c.y, { dir: -Math.PI / 2, n: 7, r: 34, len: 16, fan: 0.5, life: 0.5 });
+      later(120, () => puff(c.x + 40, c.y - 30, { size: 8, n: 3, vx: 16, vy: -14 }));   // later() runs on the shared clock, so a film can step it
+      sfx('pon', c.x + 30, c.y - 70, { size: 96, ...hollow() });
+      this.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+  frame(dt) { this.press.step(dt); this.b.style.setProperty('--s', Math.max(0, this.heart.step(dt)).toFixed(3)); }
+}
+fx.define('like-button', LikeButton);
+})();
+</script>
+</body>
+</html>

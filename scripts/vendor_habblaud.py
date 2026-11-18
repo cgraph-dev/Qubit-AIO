@@ -120,7 +120,10 @@ def pin_locale(js: str) -> str:
     # every resolver must be in ONE state — all upstream, or all pinned. A file
     # with one of each is a genuine half-rewrite and is refused.
     n_pt, n_en = js.count(marker), js.count(pinned)
-    if n_pt == 0 and n_en == 2:
+    # A rebuilt client can carry the resolver in more than the two original
+    # chunks (for example after a UI split). All-pinned is still a completed
+    # transform; only a half-rewrite (some `pt-BR`, some pinned) is unsafe.
+    if n_pt == 0 and n_en >= 2:
         return js  # already pinned: nothing to do
     if n_pt != 2:
         # Do NOT silently no-op: an upstream rebuild that reshapes the resolver

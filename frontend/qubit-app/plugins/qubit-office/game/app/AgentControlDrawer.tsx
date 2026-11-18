@@ -7,7 +7,7 @@
  * bridge and then re-reads the record, so the status shown afterwards is the
  * store's answer — never a local guess.
  */
-import { officeFx, sakugaButton } from "./sakuga";
+import { officeFx, sakugaButton, sakugaProgress } from "./sakuga";
 import { OfficeInput, OfficeSelect, OfficeTextarea } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createEffectiveStatePanel } from "./EffectiveStatePanel";
@@ -402,7 +402,10 @@ export function createAgentControlDrawer(
       children.push(R.createElement("div", {
         key: "loading", className: "agent-control__state",
         "data-testid": "agent-control-loading", role: "status",
-      }, load.message ?? "Loading the agent control record…"));
+      }, [
+        load.message ?? "Loading the agent control record…",
+        sakugaProgress(R, { label: "Loading the agent control record", value: 0.08 }),
+      ]));
     } else if (load.kind === "error" || load.kind === "empty") {
       children.push(R.createElement("div", {
         key: "state",

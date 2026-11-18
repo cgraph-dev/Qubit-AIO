@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { NumberField } from '@/sakuga/ui'
 import { useI18n } from '@/i18n'
 import { prettyName } from '@/lib/text'
 import { cn } from '@/lib/utils'
@@ -182,18 +183,21 @@ export function ConfigField({
 
   if (schema.type === 'number') {
     return row(
-      <Input
-        className={CONTROL_TEXT}
-        onChange={e => {
-          const raw = e.target.value
-          const n = raw === '' ? 0 : Number(raw)
+      <NumberField
+        inputProps={{
+          'aria-label': label,
+          placeholder: c.notSet,
+          style: { width: '100%' }
+        }}
+        label=""
+        onChange={next => {
+          const n = next === '' ? 0 : Number(next)
 
           if (!Number.isNaN(n)) {
             onChange(n)
           }
         }}
-        placeholder={c.notSet}
-        type="number"
+        style={{ '--sk-number-width': '9rem' } as CSSProperties}
         value={value === undefined || value === null ? '' : String(value)}
       />
     )

@@ -29,6 +29,7 @@ import {
   SETTINGS, applySetting, defaultValues, shellAttributes,
   type SettingSpec, type SettingValues,
 } from "./ui/settings";
+import { sakugaButton } from "./app/sakuga";
 
 /**
  * REACT COMES FROM THE HOST, NOT FROM AN IMPORT.
@@ -421,20 +422,20 @@ export function OfficeGameShell(props: OfficeGameShellProps) {
       }, placeLabel(navState.viewpoint)),
     ]),
     R.createElement("div", { key: "spacer", style: { flex: "1 1 auto" } }),
-    R.createElement("button", {
+    sakugaButton(R, {
       key: "text", type: "button", className: "office-game__btn",
       "data-testid": "office-game-text-bigger",
       "aria-label": "Larger text",
       onClick: () => onSettingChange("textScale",
         nextScaleValue(settings.textScale)),
     }, "A+"),
-    R.createElement("button", {
+    sakugaButton(R, {
       key: "motion", type: "button", className: "office-game__btn",
       "aria-pressed": settings.reducedMotion,
       "data-testid": "office-game-reduce-motion",
       onClick: () => onSettingChange("reducedMotion", !settings.reducedMotion),
     }, "Motion"),
-    R.createElement("button", {
+    sakugaButton(R, {
       key: "settings", type: "button", className: "office-game__btn",
       "aria-expanded": settingsDrawer || settingsModal,
       "data-testid": "office-game-settings-btn",
@@ -567,7 +568,7 @@ function settingsBody(
                  color: "var(--office-muted)", marginBottom: "var(--office-s1)" },
       }, spec.help),
       R.createElement("div", { key: "ctl", style: { display: "flex", gap: "var(--office-s1)", flexWrap: "wrap" } },
-        (spec.options ?? []).map((o) => R.createElement("button", {
+        (spec.options ?? []).map((o) => sakugaButton(R, {
           key: String(o.value),
           type: "button",
           className: "office-game__btn",

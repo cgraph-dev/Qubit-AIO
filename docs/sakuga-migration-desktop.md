@@ -111,3 +111,26 @@ from `@/sakuga/ui` as `Textarea`, `NumberField`, `DateField`, `TimeField`,
   is used only where a light-DOM trigger is enough.
 - **Indeterminate checkbox, non-plain progress, composite search fields,
   editors/canvas/xterm, nav links** remain as documented in the earlier passes.
+
+## Second extras pass (2026-11-18)
+
+| Unit | Files | Notes |
+|---|---|---|
+| Number fields | `settings/config-field.tsx`, `plugins/kanban/board.tsx`, `components/pane-shell/tree/zone-editor.tsx` | Schema numbers, kanban priority and the template zone count now render `NumberField`. Callers that commit on blur or own a prefixed/inline label stay native (see exceptions). |
+| Download progress | `settings/local-model-download-progress.tsx` | The plain determinate meter is the shared `Progress`, which is the vendored Sakuga bar; an unknown endpoint keeps the animated native track (`indeterminate`), and a paused job keeps its muted fill. |
+| Icon tooltips | `settings/providers-settings.tsx`, `settings/connections-registry.tsx` | The remaining icon-only disconnect/remove/edit actions gained `HoverTooltip`; the broader set that already used Radix `Tip` keeps its portalled tooltip. |
+
+`npm run build` exits 0; `tsc -p tsconfig.json --noEmit` reports only the 8
+known pre-existing errors (none in the touched files).
+
+### Remaining exceptions (second pass)
+
+- **Inline numeric settings rows** (`settings/billing`, `settings/pool-limits`,
+  `settings/sessions-settings`, `settings/memory`, `settings/config-settings`):
+  these wrap the number input in their own label, carry a unit/`$` adornment, or
+  persist on blur. `NumberField` has its own label row and no `onBlur` passthrough,
+  so those stay native.
+- **Assistant-ui binding textareas** (two tags) remain native; see above.
+- **Radix `Tabs` / `Tooltip`** keep composite ARIA/portal geometry.
+- **Indeterminate checkbox, non-plain progress, composite search fields,
+  editors/canvas/xterm, nav links** remain as documented.

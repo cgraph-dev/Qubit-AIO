@@ -8,7 +8,7 @@
  * React comes from the HOST: `R.createElement`, never an import. There is no
  * shell mount here; the Office lead mounts the factory.
  */
-import { sakugaButton } from "./sakuga";
+import { sakugaButton, sakugaProgress } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type InventoryRead,
@@ -114,7 +114,10 @@ export function createPanelInventoryPanel(
         role: "status",
         "aria-live": "polite",
         className: "panel-inventory panel-inventory--state",
-      }, "Loading panel inventory…");
+      }, [
+        "Loading panel inventory…",
+        sakugaProgress(R, { label: "Loading panel inventory", value: 0.08 }),
+      ]);
     }
 
     if (read.kind === "error" || read.kind === "unavailable") {

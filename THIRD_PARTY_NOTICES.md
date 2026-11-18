@@ -1183,3 +1183,8 @@ Local divergence: the loader serves the files as plain scripts and lazy-loads
 each component; the wrappers set no drawing code. Upstream ships eleven control
 files although its README calls them twelve.
 
+The upstream workflow skill (`skills/sakuga-vfx/`: `SKILL.md`, `core.js`,
+`starter.html`, `look.mjs`) is installed at `.opencode/skills/sakuga-vfx/`
+(MIT, same pin). It is the authoring guide for new Sakuga controls; the
+runtime copies remain the ones gated by `check_sakuga_vendor.py`.
+

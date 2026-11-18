@@ -3306,6 +3306,19 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     html = html.replace("</head>", marker_html + "</head>", 1)
                 else:
                     html = marker_html + html
+            # The in-iframe Sakuga controls have an env rollback. The client
+            # treats an absent global as ON, so this only needs to emit the
+            # value when it is explicitly disabled.
+            _sakuga_off = os.environ.get(
+                "QUBIT_OFFICE_SAKUGA", "1").strip().lower() in (
+                    "0", "false", "off", "no")
+            if _sakuga_off:
+                sakuga_html = (
+                    "<script>window.__QUBIT_OFFICE_SAKUGA__=false;</script>")
+                if "</head>" in html:
+                    html = html.replace("</head>", sakuga_html + "</head>", 1)
+                else:
+                    html = sakuga_html + html
             if style_html:
                 if "</head>" in html:
                     html = html.replace("</head>", style_html + "</head>", 1)

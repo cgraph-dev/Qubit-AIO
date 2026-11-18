@@ -9,7 +9,7 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
-import { sakugaButton } from "./sakuga";
+import { sakugaButton, sakugaProgress } from "./sakuga";
 import { OfficeInput, OfficeSelect, OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
@@ -277,7 +277,10 @@ export function createCommandCenter(
         "data-state": "loading",
         role: "status",
         "aria-live": "polite",
-      }, "Loading the command center…"));
+      }, [
+        "Loading the command center…",
+        sakugaProgress(R, { label: "Loading the command center", value: 0.08 }),
+      ]));
     } else if (read.kind === "error" || read.kind === "unavailable") {
       const code = read.kind === "unavailable"
         ? read.code : "COMMAND_CENTER_READ_FAILED";

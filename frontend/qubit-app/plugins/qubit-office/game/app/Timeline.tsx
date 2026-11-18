@@ -11,7 +11,7 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
-import { sakugaButton } from "./sakuga";
+import { sakugaButton, sakugaProgress } from "./sakuga";
 import { OfficeInput, OfficeSelect, OfficeTooltip } from "./sakuga-form";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
@@ -308,7 +308,10 @@ export function createTimeline(
         "data-testid": "timeline-loading",
         role: "status",
         "aria-live": "polite",
-      }, "Loading the operator timeline…"));
+      }, [
+        "Loading the operator timeline…",
+        sakugaProgress(R, { label: "Loading the operator timeline", value: 0.08 }),
+      ]));
     } else if (read.kind === "error" || read.kind === "unavailable") {
       const code = read.kind === "unavailable" ? read.code : "TIMELINE_READ_FAILED";
       const detail = read.kind === "unavailable" ? read.detail : read.message;

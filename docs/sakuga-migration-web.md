@@ -467,6 +467,72 @@ served `frontend/qubit-web/public/plugins/qubit-achievements/dist/`):
   60 → 10 cards with `aria-pressed=true`, tier tooltip opens and Escape closes it,
   share dialog opens with 3 Sakuga actions + Sakuga close, scan progress at 50%.
 
+### Kanban plugin (bundled IIFE, not a React source tree)
+
+Changed both copies (`qubit_runtime/plugins/kanban/dashboard/dist/` and the
+served `frontend/qubit-web/public/plugins/kanban/dist/`). The two copies keep
+their own live path (WebSocket tail vs. the Qubit single-event poll); only the
+controls were swept.
+
+- A small local loader injects `/sakuga-vfx/{button,input,checkbox,progress}/…js`
+  once and renders `sakuga-*` tags with the SDK's single React runtime. No second
+  React, no vendored edit.
+- Converted: **41** `Button` uses plus **21** native `<button>`s to
+  `sakuga-button`; **21** `Input` to `sakuga-input`; **13** `Select` plus **2**
+  native `<select>`s to `SakugaSelect`; **7** `Checkbox` plus **2** native
+  checkboxes to `sakuga-checkbox`; the initial load state to `sakuga-progress`.
+- `SakugaSelect` is the documented composition: the upstream set has no select,
+  so it renders the same option model as a native `<select>` inside the Sakuga
+  frame (`qsk-select__native`). Keyboard, form and screen-reader behaviour stay
+  native; the DS `SelectOption` children and the raw `<option>`/`<optgroup>`
+  children are both understood.
+- `SakugaProgress` writes `value` as an **attribute** from a ref (the property is
+  a read-only getter). The board's loading state uses the upstream `demo`
+  self-play so it never invents a percentage.
+- Hover/focus/tap/Escape `HoverTip` (shared `.qsk-hover-tip` classes) on the
+  icon-only actions (`?` docs, column add, drawer close, attention dismiss,
+  project unbind, dependency remove) and the dense toolbar help labels (Nudge
+  dispatcher, Clear filters).
+- Preserved: drag-and-drop and the touch drag threshold, per-copy live updates,
+  markdown, i18n, every API call, `data-*`/ARIA labels and handlers.
+- Rollback: set `localStorage["qubit:sakuga-plugin-ui"] = "off"` (or
+  `window.__QUBIT_SAKUGA_PLUGIN_UI__ = false`) and reload — every helper renders
+  its native control and `HoverTip` renders only its trigger. No rebuild needed.
+- Kept native: `type="number"` inputs (outside the upstream text-input set), the
+  hidden `<input type="file">` proxied by the Sakuga upload button, the
+  description/comment `<textarea>`, and the card's `N/M` child-progress pill
+  (a dense textual metric, not a bar). The board has no tab strip; its filters
+  are the search input, two selects and the archive/lane checkboxes, all swept.
+
+Audit of the served plugin UIs: only two dashboard plugin bundles ship UI —
+`qubit-achievements` (already converted) and `kanban` (this section). The other
+catalog entries expose backend tools only, and `qubit-office` is the iframe app
+handled by the Office lanes, not a `plugins/*/dashboard/dist` bundle.
+
+Evidence: `node --check` passes on both bundles. A jsdom harness that loads the
+real vendored components and renders the board with fixture data measured **13**
+`sakuga-button`, **1** `sakuga-input`, **10** `sakuga-checkbox`, **3** framed
+selects and **9** hover tips, with **0** native buttons, **0** native text
+inputs, **0** native checkboxes and **0** console errors; typing `First` in the
+filter reduced the cards 2 → 1, the Show-archived checkbox toggled and reflected
+`checked`, the loading `sakuga-progress[demo]` appeared before the board and was
+replaced on load. The rollback flag produced 13 native buttons / 1 native text
+input / 10 native checkboxes / 0 Sakuga hosts on the same fixture.
+
+Also verified in a real Chromium against the live `:8890` dashboard with only
+the two plugin assets route-intercepted from this worktree (the backend, auth
+and Sakuga scripts stayed live): **0** console/page errors, **17** `sakuga-button`
+and **0** light-DOM `<button>` inside `.qubit-kanban`, **1** Sakuga filter input
+(typing set `el.value="abc"`), **6** Sakuga checkboxes, **2** framed selects and
+**7** hover tips; the docs tooltip opened on hover and closed on Escape; the
+Show-archived checkbox went `false → true`; the inline create dialog had **0**
+light-DOM native buttons and **0** native checkboxes, with **2** Sakuga inputs,
+**2** Sakuga buttons and **2** framed selects (its native number input and
+`<textarea>` are the documented exceptions). A delayed board request showed the
+visible `sakuga-progress[demo][label="Loading Kanban board…"]`, which was
+replaced by the board on load. This is still not a deploy: the live `:8890`
+frontend continues to serve its installed plugin copy.
+
 ### Web dashboard controls
 
 - **Voice Edit** — all 17 numeric tuning inputs are `NumberField` (Sakuga frame +

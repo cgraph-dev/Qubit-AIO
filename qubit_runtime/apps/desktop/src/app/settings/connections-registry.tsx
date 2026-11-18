@@ -3,7 +3,7 @@ import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, u
 
 import { RemoteSetupFields } from '@/components/remote-setup/fields'
 import { useRemoteSetup } from '@/components/remote-setup/use-remote-setup'
-import { Button } from '@/sakuga/ui'
+import { Button, HoverTooltip } from '@/sakuga/ui'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { Loader } from '@/components/ui/loader'
@@ -653,23 +653,27 @@ export function ConnectionsRegistrySection() {
                   )}
                   {conn.kind !== 'local' && (
                     <>
-                      <Button
-                        aria-label={s.editConnection}
-                        onClick={() => openEditor(editorFromConnection(conn), conn)}
-                        size="icon-sm"
-                        variant="ghost"
-                      >
-                        <Pencil className="size-3.5" />
-                      </Button>
-                      <Button
-                        aria-label={s.removeConnection}
-                        disabled={busy}
-                        onClick={() => setRemoveTarget(conn)}
-                        size="icon-sm"
-                        variant="ghost"
-                      >
-                        {busy ? <Loader2 className="animate-spin" /> : <Trash2 />}
-                      </Button>
+                      <HoverTooltip content={s.editConnection}>
+                        <Button
+                          aria-label={s.editConnection}
+                          onClick={() => openEditor(editorFromConnection(conn), conn)}
+                          size="icon-sm"
+                          variant="ghost"
+                        >
+                          <Pencil className="size-3.5" />
+                        </Button>
+                      </HoverTooltip>
+                      <HoverTooltip content={s.removeConnection}>
+                        <Button
+                          aria-label={s.removeConnection}
+                          disabled={busy}
+                          onClick={() => setRemoveTarget(conn)}
+                          size="icon-sm"
+                          variant="ghost"
+                        >
+                          {busy ? <Loader2 className="animate-spin" /> : <Trash2 />}
+                        </Button>
+                      </HoverTooltip>
                     </>
                   )}
                 </div>
