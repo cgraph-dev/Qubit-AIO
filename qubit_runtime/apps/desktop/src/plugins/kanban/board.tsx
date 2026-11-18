@@ -426,26 +426,32 @@ function Column({
   // board regardless of collapse state.
   if (collapsed) {
     return (
-      <button
+      // The rail is a native drag-and-drop target; the click control inside is
+      // the vendored button. Keeping the drop handlers on a plain wrapper stops
+      // the Sakuga host from swallowing them (it forwards pointer, not drag,
+      // events).
+      <div
         {...dragHandlers}
-        aria-label={k.expand(label)}
-        className={cn(
-          'flex h-full w-8 shrink-0 flex-col items-center gap-1.5 rounded-lg p-2 transition-colors hover:bg-(--ui-bg-quinary)',
-          wash
-        )}
-        onClick={onToggle}
-        type="button"
+        className={cn('flex h-full w-8 shrink-0 rounded-lg transition-colors hover:bg-(--ui-bg-quinary)', wash)}
       >
-        <span className="grid h-5 shrink-0 place-items-center">
-          <span className="size-1.5 rounded-full" style={{ backgroundColor: meta.tone }} />
-        </span>
-        <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-(--ui-text-tertiary) [writing-mode:vertical-rl]">
-          {label}
-        </span>
-        {column.tasks.length > 0 && (
-          <span className="text-[0.625rem] tabular-nums text-(--ui-text-quaternary)">{column.tasks.length}</span>
-        )}
-      </button>
+        <Button
+          aria-label={k.expand(label)}
+          className="flex h-full w-full flex-col items-center gap-1.5 rounded-lg p-2"
+          onClick={onToggle}
+          type="button"
+          variant="ghost"
+        >
+          <span className="grid h-5 shrink-0 place-items-center">
+            <span className="size-1.5 rounded-full" style={{ backgroundColor: meta.tone }} />
+          </span>
+          <span className="text-[0.6875rem] font-medium uppercase tracking-wide text-(--ui-text-tertiary) [writing-mode:vertical-rl]">
+            {label}
+          </span>
+          {column.tasks.length > 0 && (
+            <span className="text-[0.625rem] tabular-nums text-(--ui-text-quaternary)">{column.tasks.length}</span>
+          )}
+        </Button>
+      </div>
     )
   }
 
@@ -462,14 +468,16 @@ function Column({
           </span>
         </Tip>
         <span className="text-[0.625rem] tabular-nums text-(--ui-text-quaternary)">{column.tasks.length}</span>
-        <button
+        <Button
           aria-label={k.collapse(label)}
           className="ml-auto grid size-5 place-items-center rounded text-(--ui-text-tertiary) opacity-0 transition-opacity hover:bg-(--chrome-action-hover) hover:text-foreground focus-visible:opacity-100 group-hover/col:opacity-100"
           onClick={onToggle}
+          size="icon-xs"
           type="button"
+          variant="ghost"
         >
           <Codicon name="chevron-left" size="0.75rem" />
-        </button>
+        </Button>
       </header>
       <div className="relative flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
         {lanes
@@ -510,14 +518,15 @@ function Column({
             display) so it always holds its slot and never thrashes layout.
             Locked lanes get none: you can't create into a system state. */}
         {!locked && (
-          <button
+          <Button
             aria-label={k.newTaskIn(label)}
             className="flex shrink-0 items-center justify-center rounded-md border border-dashed border-(--ui-stroke-secondary) py-1.5 text-(--ui-text-tertiary) opacity-0 transition-[opacity,color,border-color] group-hover/col:opacity-100 hover:border-(--ui-text-quaternary) hover:bg-(--chrome-action-hover) hover:text-foreground focus-visible:opacity-100"
             onClick={() => onAdd(column.name)}
             type="button"
+            variant="ghost"
           >
             <Codicon name="add" size="0.8rem" />
-          </button>
+          </Button>
         )}
         {column.tasks.length === 0 && (
           <div className="pointer-events-none absolute inset-0 grid place-items-center text-[0.6875rem] text-(--ui-text-quaternary)">

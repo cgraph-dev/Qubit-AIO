@@ -170,13 +170,15 @@ export function UserSectionHeader({
   const action = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           aria-label={b.sections.options(name)}
           className="shrink-0 rounded-md p-0.5 text-(--ui-text-quaternary) opacity-0 transition hover:text-foreground group-hover/section:opacity-100 focus-visible:opacity-100 data-[state=open]:opacity-100"
+          size="icon-xs"
           type="button"
+          variant="ghost"
         >
           <Codicon name="ellipsis" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         {items.map(item => (

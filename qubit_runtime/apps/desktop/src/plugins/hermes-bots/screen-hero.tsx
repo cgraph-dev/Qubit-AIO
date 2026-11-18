@@ -7,7 +7,7 @@
  * where the user can take over.
  */
 
-import { Codicon } from '@qubit/plugin-sdk'
+import { Button, Codicon } from '@qubit/plugin-sdk'
 import { useEffect, useRef, useState } from 'react'
 
 import { botSelectionKey } from './data'
@@ -28,7 +28,7 @@ function useLiveThumbnail(bot: RosterRow, running: boolean) {
   // The backend withholds frames while a human holds the screen; that is a
   // deliberate answer, not a failed refresh, so it never ages into "stale".
   const [suppressed, setSuppressed] = useState(false)
-  const boxRef = useRef<HTMLButtonElement | null>(null)
+  const boxRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!running) {
@@ -144,13 +144,14 @@ function ScreenHeroContent({ bot, meta }: { bot: RosterRow; meta?: BotMeta | nul
         : ''
 
   return (
-    <button
+    <Button
       aria-label={`${t.screen.portalTitle}: ${caption}`}
       className={`group relative block w-full overflow-hidden rounded-lg border border-(--ui-stroke-secondary) bg-black text-left ${TONE_RING[tone] ?? ''}`}
       onClick={() => openBotScreen(bot, meta ?? null)}
       ref={boxRef}
       style={{ aspectRatio: '16 / 10' }}
       type="button"
+      variant="ghost"
     >
       {dataUrl ? (
         <img
@@ -186,6 +187,6 @@ function ScreenHeroContent({ bot, meta }: { bot: RosterRow; meta?: BotMeta | nul
           </span>
         ) : null}
       </span>
-    </button>
+    </Button>
   )
 }

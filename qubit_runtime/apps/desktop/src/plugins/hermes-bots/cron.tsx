@@ -569,6 +569,7 @@ export function RoutineRow({ job, onOpen, owner }: RoutineRowProps) {
         <Switch
           checked={active}
           disabled={busy || legacyUnsafe}
+          label={routineTitle(job, b.cron)}
           onCheckedChange={value => act(value ? 'resume' : 'pause')}
         />
         <Tip label={t.common.delete}>

@@ -13,6 +13,7 @@ import './kanban.css'
 
 import {
   cn,
+  Button,
   Codicon,
   type HermesPlugin,
   host,
@@ -63,17 +64,18 @@ function KanbanCount() {
 
   return (
     <Tip label={k.countTip(count('running'), count('ready'))}>
-      <button
+      <Button
         className={cn(
           'inline-flex h-full items-center gap-1 rounded-none px-1.5 text-[0.6875rem] tabular-nums transition-colors',
           'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) hover:text-foreground'
         )}
         onClick={() => host.navigate('/kanban')}
         type="button"
+        variant="ghost"
       >
         <Codicon name="project" size="0.7rem" />
         <span>{active}</span>
-      </button>
+      </Button>
     </Tip>
   )
 }

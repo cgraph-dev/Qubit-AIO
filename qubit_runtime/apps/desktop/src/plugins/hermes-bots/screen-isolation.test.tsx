@@ -6,8 +6,12 @@ import type { RosterRow } from './types'
 vi.mock('@qubit/plugin-sdk', async () => {
   const { useStore } = await import('@nanostores/react')
   const { onGatewayEvent } = await import('../../contrib/events')
+  const React = await import('react')
 
   return {
+    Button: React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>((props, ref) => (
+      <button ref={ref} {...props} />
+    )),
     Codicon: () => null,
     useValue: useStore,
     resolveSiblingWsUrl: vi.fn(),

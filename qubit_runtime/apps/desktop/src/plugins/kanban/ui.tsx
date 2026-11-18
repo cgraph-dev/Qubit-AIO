@@ -3,6 +3,7 @@
 
 import {
   atom,
+  Button,
   coarseElapsed,
   Codicon,
   DropdownMenu,
@@ -206,15 +207,16 @@ export function StatusMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           className="inline-flex items-center gap-1.5 rounded px-2 py-1 text-[0.6875rem] font-semibold uppercase tracking-wide transition-[filter] hover:brightness-105"
           style={{ backgroundColor: `color-mix(in srgb, ${meta.tone} 15%, transparent)`, color: meta.tone }}
           type="button"
+          variant="ghost"
         >
           <span className="size-1.5 rounded-full" style={{ backgroundColor: meta.tone }} />
           {columnLabel(k, status)}
           <Codicon name="chevron-down" size="0.7rem" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {columns

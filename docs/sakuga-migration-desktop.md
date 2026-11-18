@@ -3,7 +3,7 @@
 **Scope:** `qubit_runtime/apps/desktop/src/**` (renderer only). The web dashboard
 (`frontend/qubit-web`) and the Office plugin are separate lanes.
 
-**Status:** two passes landed; honest accounting below. The renderer loads the
+**Status:** three passes landed; honest accounting below. The renderer loads the
 vendored engine, installs the `qubit:fx` bridge, and uses the upstream controls
 for app buttons, shared-component buttons, settings toggles, sliders, selects,
 boolean checkboxes, determinate progress and product outcome cues. Remaining
@@ -24,6 +24,7 @@ exceptions are the composite widgets and unsupported states listed at the end.
 | App surface sweep (pass B) | `src/app/**` | **181** files import the adapter; **524** `<Button>` uses. **113** native `<button>` tags replaced (all non-test native buttons under `src/app`), **22** remaining `<Switch>` sites became `Toggle`, and **6** `<Checkbox>` uses moved to the upstream control. No non-test `<Switch>` remains. |
 | Shared components (pass C) | `src/components/**`, `src/contrib/**` | **0 production `<button>` tags remain** (one doc-comment example in `inline-preview-directive.tsx`). 245 `<Button>` uses across the two trees; `RowButton`, pane tabs, disclosure/tool rows, message chips and onboarding cards use the vendored control. |
 | Shared Input / Checkbox / Switch / Progress | `src/components/ui/{input,checkbox,switch,progress}.tsx` | `Input` renders `sakuga-input` (label derived from `aria-label`/placeholder/id, `aria-labelledby` when an id has a `Field` label); boolean checkboxes/switches render the vendored controls; a plain determinate meter is `sakuga-progress`. Unsupported types/states keep native. |
+| Plugin control sweep (pass D) | `src/plugins/**` | **10** native `<button>` tags replaced: kanban `ui.tsx` (status trigger), `plugin.tsx` (status-bar count), `board.tsx` (collapsed lane, collapse, lane add), `drawer.tsx` (assignee trigger, link chips); hermes-bots `user-sections-ui.tsx` (section options), `screen-hero.tsx` (hero), `screen-portal.tsx` (portal row). The **6** boolean `<Switch>` sites (`kanban/board`, `kanban/orchestration`, `hermes-bots/cron`, `model-visibility-dialog`, `catalog-advanced-dialog` ×2) already render through the shared Sakuga `Toggle`; `cron` gained a derived `label`. **0** text-like native `<input>` remain in `src/plugins`. |
 | Test migration | `src/app/**/*.test.tsx`, `src/components/**/*.test.tsx` | Native-`button` selectors widened to `[role="button"]`; toggle/checkbox wiring exercised through the real shadow-double contract. No test deleted or weakened. |
 
 Base URL that works in both shapes: `sakugaBaseUrl(document.baseURI)` →
@@ -43,6 +44,13 @@ still imports the field. Removing it would break a surface that has not adopted
 Sakuga.
 
 ## Not replaced (documented exceptions / remaining work)
+
+The plugin sweep added no new exception. One structural note: the collapsed
+kanban lane is still a native **drag-and-drop target**, so its `dragenter`/
+`dragover`/`dragleave`/`drop` handlers stay on the plain wrapper and the
+vendored `Button` is the click control inside it (`src/plugins/kanban/board.tsx`,
+collapsed-lane branch). The shared Sakuga host forwards pointer and key events,
+not drag events, so moving the handlers onto it would silently disable drops.
 
 | Control | Where (example) | Count | Reason / next step |
 |---|---|---|---|

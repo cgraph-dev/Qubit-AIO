@@ -9,7 +9,7 @@
  * it once on mount so a bot the user never opened still shows real state.
  */
 
-import { Codicon, host, useValue } from '@qubit/plugin-sdk'
+import { Button, Codicon, host, useValue } from '@qubit/plugin-sdk'
 import type { RpcEvent } from '@qubit/plugin-sdk'
 import type { ProfileGroupRoute } from '@qubit/plugin-sdk'
 import { useEffect, useMemo } from 'react'
@@ -185,11 +185,12 @@ export function ScreenPortal({ bot }: { bot: RosterRow }) {
   }
 
   return (
-    <button
+    <Button
       aria-label={`${t.screen.portalTitle}: ${subtitle}`}
       className="group flex w-full items-center gap-2 rounded-md border border-(--ui-stroke-secondary) bg-(--chrome-action-hover)/40 px-2 py-1.5 text-left transition-colors hover:bg-(--chrome-action-hover)"
       onClick={() => openBotScreen(bot, null)}
       type="button"
+      variant="ghost"
     >
       <span className="relative grid size-7 shrink-0 place-items-center rounded bg-black/70 text-white/90">
         <Codicon name={TONE_ICON[tone]} />
@@ -204,7 +205,7 @@ export function ScreenPortal({ bot }: { bot: RosterRow }) {
       <span className="flex shrink-0 items-center gap-1 text-[0.65rem] text-(--ui-text-tertiary) opacity-0 transition-opacity group-hover:opacity-100">
         {t.screen.portalOpen} <Codicon name="arrow-right" />
       </span>
-    </button>
+    </Button>
   )
 }
 

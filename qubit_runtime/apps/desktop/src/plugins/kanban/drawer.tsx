@@ -311,9 +311,10 @@ function AssigneeMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button
           className="-mx-1 inline-flex max-w-full items-center gap-1.5 rounded px-1 py-0.5 text-left transition-colors hover:bg-(--chrome-action-hover)"
           type="button"
+          variant="ghost"
         >
           {current ? (
             <>
@@ -324,7 +325,7 @@ function AssigneeMenu({
             <span className="text-(--ui-text-quaternary)">{k.unassigned}</span>
           )}
           <Codicon className="shrink-0 text-(--ui-text-quaternary)" name="chevron-down" size="0.65rem" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         {(roster?.profiles ?? []).map(profile => (
@@ -666,14 +667,15 @@ function LinkChips({
         // Chips truncate in the narrow sidebar; the tip reveals the full title.
         return (
           <Tip key={linked} label={label} placement="row">
-            <button
+            <Button
               aria-label={label}
               className="max-w-full truncate rounded bg-(--ui-bg-quaternary) px-1.5 py-0.5 text-[0.6875rem] text-(--ui-text-secondary) transition-colors hover:bg-(--chrome-action-hover) hover:text-foreground"
               onClick={() => onOpen(linked)}
               type="button"
+              variant="ghost"
             >
               {label}
-            </button>
+            </Button>
           </Tip>
         )
       })}
