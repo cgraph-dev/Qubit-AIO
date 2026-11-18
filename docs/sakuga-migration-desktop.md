@@ -46,10 +46,10 @@ Sakuga.
 
 | Control | Where (example) | Count | Reason / next step |
 |---|---|---|---|
-| Text inputs | `src/components/ui/input.tsx` (147 `<Input>` uses in `src/components`), `src/app/**` (95 `<Input>`, non-test) | 95 in app | Deferred: `SakugaInput` requires a real label and only accepts text/email/search/url/tel/password. Many app fields are `type=number`/`file`, use `prefix`/`suffix` adornments, or are typed by tests through `fireEvent.change` on the host. A label-derivation pass plus shadow typing test migration is needed. |
+| Text inputs | `src/components/ui/input.tsx` (147 `<Input>` uses in `src/components`), `src/app/**` (94 `<Input>`, non-test) | 94 in app | Deferred: `SakugaInput` requires a real label and only accepts text/email/search/url/tel/password. Many app fields are `type=number`/`file`, use `prefix`/`suffix` adornments, or are typed by tests through `fireEvent.change` on the host. A label-derivation pass plus shadow typing test migration is needed. |
 | Progress | `src/app/settings/local-model-download-progress.tsx`, `billing/index.tsx`, `updates-overlay.tsx` | 6 | Every site carries a state with no upstream equivalent (unknown/paused, destructive/fill-tone, or `indeterminate`). Long-job completion already plays `success` via the turn outcome. |
-| Tooltips | `src/components/ui/tooltip.tsx` (`<Tip>` 136 uses in `src/app`) | 136 | Radix hover/focus geometry and portalled placement; Sakuga's tooltip is a click label, so the composite stays and cues fire around it. |
-| Textarea | 16 raw `<textarea>` in `src/app` | 16 | No upstream component; stays native. |
+| Tooltips | `src/components/ui/tooltip.tsx` (`<Tip>` 133 uses in `src/app`) | 133 | Radix hover/focus geometry and portalled placement; Sakuga's tooltip is a click label, so the composite stays and cues fire around it. |
+| Textarea | 4 raw `<textarea>` in `src/app` | 4 | No upstream component; stays native. |
 | Tabs | `src/components/ui/tabs.tsx` (Radix `Tabs`, 4 usage sites) | 4 | No app-surface `<Tabs>` usage; composite ARIA widget with keyboard semantics stays as-is (components lane). |
 | Hidden file pickers | `src/app/settings/config-settings.tsx`, `src/app/pet-generate/pet-generate-content.tsx`, `src/app/pet-overlay/...` | 3 | Still native hidden inputs; proxying each with a Sakuga button is follow-up work. |
 | Editors / canvas / xterm | Monaco (`src/app/chat/...` code editor), transcript canvas, terminal views | — | Documented boundary: editors and canvas controls stay native. |
