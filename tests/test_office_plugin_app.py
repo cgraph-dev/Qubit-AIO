@@ -368,6 +368,27 @@ def test_directory_request_serves_index_over_http(plugin_root):
     assert _strip_office_global(body) == SAMPLE_HTML, body
 
 
+def test_office_sakuga_rollback_global_is_opt_in(plugin_root, monkeypatch):
+    """The Sakuga control flag is only emitted when it is switched OFF.
+
+    The vendored client treats an absent global as ON, so the default document
+    must stay byte-identical to the app body. ``QUBIT_OFFICE_SAKUGA=0`` adds
+    the one flag that restores native controls.
+    """
+    h = _make_handler(sub="qubit-office/")
+    h._serve_plugin_app("qubit-office/")
+    assert h._captured["code"] == 200
+    assert b"__QUBIT_OFFICE_SAKUGA__" not in h._captured["body"]
+
+    monkeypatch.setenv("QUBIT_OFFICE_SAKUGA", "0")
+    h2 = _make_handler(sub="qubit-office/")
+    h2._serve_plugin_app("qubit-office/")
+    body = h2._captured["body"]
+    flag = b"<script>window.__QUBIT_OFFICE_SAKUGA__=false;</script>"
+    assert flag in body
+    assert _strip_office_global(body.replace(flag, b"")) == SAMPLE_HTML
+
+
 def test_habblaud_index_injects_encoded_stream_url_before_module(tmp_path):
     from urllib.parse import quote
 
