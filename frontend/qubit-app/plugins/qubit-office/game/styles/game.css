@@ -3177,3 +3177,315 @@
   bottom: calc(var(--office-s3) + 42px);
   pointer-events: none;
 }
+
+/* ======================================================================
+   Qubit Office 2Five host skin
+   ----------------------------------------------------------------------
+   The host-side half of the repo-aware theme. The iframe's Habblaud `.ui-*`
+   DOM is skinned separately by `office-ui-skin.ts`; this block paints only the
+   shell surfaces (`--office-*` tokens, status bar, docks, roster rows) and is
+   a CSS-only layer: no markup, no control behaviour and no hit-area changes.
+
+   ZERO CONTROL MOTION (Stage 9): the rules below never add a `transition`,
+   `animation` or press/chevron `transform` to a control. Where an older rule
+   in this file did, the last blocks reset it to `none`. Sakuga custom
+   elements (`.qsk-*`, `sakuga-*`) and `.ui-switch` are deliberately untouched.
+   ====================================================================== */
+
+/* --- the bottom-left backend status, 314x38 like the reference ---------- */
+.office-game__connection {
+  left: var(--office-s2);
+  bottom: var(--office-s2);
+  box-sizing: border-box;
+  width: min(314px, calc(100% - var(--office-s4)));
+  min-height: 38px;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--office-s2);
+  padding: var(--office-s1) var(--office-s3);
+  border: 1px solid var(--office-line-strong);
+  border-radius: var(--office-radius);
+  background: linear-gradient(180deg, var(--office-plate) 0%, var(--office-void) 100%);
+  color: var(--office-ink);
+  box-shadow:
+    inset 0 0 0 1px rgba(239, 175, 103, 0.28),
+    0 8px 18px rgba(8, 3, 14, 0.72);
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+
+.office-game__connection::before {
+  content: "";
+  flex: 0 0 8px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 35% 35%, #ffe092 0%, #4fd18b 60%, #1e6f47 100%);
+  box-shadow: 0 0 0 1px var(--office-void), 0 0 6px rgba(79, 209, 139, 0.65);
+}
+
+.office-game__connection[data-state="connecting"],
+.office-game__connection[data-state="stale"] {
+  border-color: var(--office-line-strong);
+  color: #ffe092;
+}
+
+.office-game__connection[data-state="connecting"]::before,
+.office-game__connection[data-state="stale"]::before {
+  background: radial-gradient(circle at 35% 35%, #ffffff 0%, #ffe092 60%, #efaf67 100%);
+  box-shadow: 0 0 0 1px var(--office-void), 0 0 6px rgba(239, 175, 103, 0.65);
+}
+
+.office-game__connection[data-state="error"] {
+  border-color: var(--office-bad);
+  color: var(--office-ink);
+}
+
+.office-game__connection[data-state="error"]::before {
+  background: radial-gradient(circle at 35% 35%, #ffe092 0%, #f54c86 60%, #761f77 100%);
+  box-shadow: 0 0 0 1px var(--office-void), 0 0 6px rgba(245, 76, 134, 0.75);
+}
+
+.office-game__connectionProgress {
+  left: var(--office-s2);
+  bottom: calc(var(--office-s2) + 46px);
+}
+
+/* --- docks, campus sheet and their banner heads ------------------------ */
+.office-game .office-game__dock.office-theme-dock,
+.office-game .office-game__campus,
+.office-game .office-game__modal {
+  background: linear-gradient(180deg, var(--office-ground) 0%, var(--office-void) 100%);
+  border-color: var(--office-line-strong);
+  box-shadow:
+    inset 0 0 0 1px rgba(118, 31, 119, 0.45),
+    0 12px 28px rgba(8, 3, 14, 0.78);
+}
+
+.office-game .office-game__dockHead,
+.office-game .office-game__campusHead {
+  background: linear-gradient(180deg, #5a1030 0%, #4c0d27 100%);
+  border-bottom: 1px solid var(--office-line);
+  box-shadow: inset 0 -1px 0 rgba(255, 224, 146, 0.22);
+}
+
+.office-game .office-game__dockHead > span,
+.office-game .office-game__campusHead h2 {
+  color: #ffe092;
+}
+
+.office-game .office-game__dockHead > span {
+  text-shadow: 0 1px 0 var(--office-void);
+}
+
+.office-game .agents-panel__card,
+.office-game .office-theme-card {
+  background: var(--office-plate);
+  border: 1px solid var(--office-line-strong);
+  border-radius: var(--office-radius);
+  box-shadow: inset 0 0 0 1px rgba(255, 224, 146, 0.18);
+}
+
+.office-game .agents-panel__cardPortrait,
+.office-game .agents-panel__avatar,
+.office-game .agents-panel__initials {
+  border: 1px solid var(--office-line);
+  border-radius: 4px;
+  background: var(--office-void);
+  color: #ffe092;
+}
+
+.office-game .agents-panel__cardName,
+.office-game .agents-panel__divisionMeta {
+  color: #ffe092;
+}
+
+.office-game .office-menu-badge,
+.office-game .office-game__approvalsCount {
+  border: 1px solid #ffe092;
+  border-radius: 999px;
+  background: var(--office-accent);
+  color: #ffffff;
+  font-size: var(--office-fs-xs);
+  line-height: 1.2;
+}
+
+.office-game .office-game__credits,
+.office-game .office-game__floorScope {
+  border: 1px solid var(--office-line);
+  border-radius: 999px;
+  background: var(--office-void);
+  color: var(--office-muted);
+  box-shadow: 0 6px 16px rgba(8, 3, 14, 0.6);
+}
+
+.office-game .office-game__credits a,
+.office-game .office-game__hudLink {
+  color: var(--office-line-strong);
+}
+
+/* --- interactive host rows keep their hover fill, once, with no motion -- */
+.office-game .agents-panel__division {
+  overflow: hidden;
+  border: 1px solid var(--office-line);
+  border-radius: var(--office-radius);
+  background: color-mix(in srgb, var(--office-void) 88%, transparent);
+}
+
+.office-game .agents-panel__divisionHead {
+  background: linear-gradient(90deg, #4c0d27 0%, var(--office-plate) 100%);
+  color: var(--office-ink);
+}
+
+.office-game .agents-panel__divisionHead:hover {
+  filter: brightness(1.08);
+}
+
+.office-game .agents-panel__seat,
+.office-game .approvals-panel__row,
+.office-game .warroom__row,
+.office-game .agent-control__auditRow,
+.office-game .timeline__item,
+.office-game .panel-inventory__row {
+  border: 1px solid var(--office-line);
+  border-radius: var(--office-radius);
+  background: var(--office-plate);
+}
+
+.office-game .agents-panel__seat:hover,
+.office-game .approvals-panel__row:hover,
+.office-game .warroom__row:hover,
+.office-game .timeline__item:hover,
+.office-game .command-center__item > a:hover {
+  border-color: var(--office-line-strong);
+  background: var(--office-void);
+}
+
+.office-game .agents-panel__seat[aria-current="true"],
+.office-game .agents-panel__seat.is-selected {
+  background: var(--office-plate);
+  box-shadow:
+    inset 3px 0 0 #ffe092,
+    inset 0 0 0 1px var(--office-accent);
+}
+
+.office-game .agents-panel__name {
+  color: var(--office-ink);
+  font-weight: 600;
+}
+
+.office-game .agents-panel__meta {
+  color: var(--office-muted);
+}
+
+.office-game .warroom__tab.is-active {
+  border-color: var(--office-line-strong);
+  background: var(--office-plate);
+  color: #ffe092;
+}
+
+/* --- host scrollbars --------------------------------------------------- */
+.office-game .agents-panel,
+.office-game .office-game__hud,
+.office-game .command-center,
+.office-game .timeline,
+.office-game .warroom,
+.office-game .agent-control,
+.office-game .warroom__list--scroll,
+.office-game .tower__scroll,
+.office-game .office-theme-dock-body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--office-line) var(--office-void);
+}
+
+.office-game .agents-panel::-webkit-scrollbar,
+.office-game .office-game__hud::-webkit-scrollbar,
+.office-game .command-center::-webkit-scrollbar,
+.office-game .timeline::-webkit-scrollbar,
+.office-game .warroom::-webkit-scrollbar,
+.office-game .agent-control::-webkit-scrollbar,
+.office-game .warroom__list--scroll::-webkit-scrollbar,
+.office-game .tower__scroll::-webkit-scrollbar,
+.office-game .office-theme-dock-body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.office-game .agents-panel::-webkit-scrollbar-track,
+.office-game .office-game__hud::-webkit-scrollbar-track,
+.office-game .command-center::-webkit-scrollbar-track,
+.office-game .timeline::-webkit-scrollbar-track,
+.office-game .warroom::-webkit-scrollbar-track,
+.office-game .agent-control::-webkit-scrollbar-track,
+.office-game .warroom__list--scroll::-webkit-scrollbar-track,
+.office-game .tower__scroll::-webkit-scrollbar-track,
+.office-game .office-theme-dock-body::-webkit-scrollbar-track {
+  background: var(--office-void);
+  border-left: 1px solid rgba(118, 31, 119, 0.45);
+}
+
+.office-game .agents-panel::-webkit-scrollbar-thumb,
+.office-game .office-game__hud::-webkit-scrollbar-thumb,
+.office-game .command-center::-webkit-scrollbar-thumb,
+.office-game .timeline::-webkit-scrollbar-thumb,
+.office-game .warroom::-webkit-scrollbar-thumb,
+.office-game .agent-control::-webkit-scrollbar-thumb,
+.office-game .warroom__list--scroll::-webkit-scrollbar-thumb,
+.office-game .tower__scroll::-webkit-scrollbar-thumb,
+.office-game .office-theme-dock-body::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--office-line-strong) 0%, var(--office-line) 100%);
+  border: 1px solid var(--office-void);
+  border-radius: 4px;
+}
+
+/* --- non-control focus rings ------------------------------------------ */
+.office-game .office-game__skipLink:focus-visible,
+.office-game .office-game__credits a:focus-visible,
+.office-game .office-game__hudLink:focus-visible,
+.office-game .agents-panel__search:focus-visible,
+.office-game .agents-panel__divisionHead:focus-visible,
+.office-game .agents-panel__card:focus-visible,
+.office-game .office-theme-dock-link:focus-visible {
+  outline: 2px solid #ffe092;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(235, 80, 134, 0.45);
+}
+
+/* ======================================================================
+   ZERO CONTROL MOTION — Stage 9
+   ----------------------------------------------------------------------
+   The vendored CSS and a few older host rules animate interactive controls.
+   These last rules neutralise the motion ONLY; they do not change fill, size,
+   position, hit area or behaviour. `.ui-switch`/`input[type=checkbox]` are
+   excluded on purpose (Sakuga owns toggles and checkboxes).
+   ====================================================================== */
+.office-game .office-game__btn,
+.office-game .office-game__dock-close,
+.office-game .office-theme-dock-close,
+.office-game .tower__close,
+.office-game .warroom__tab,
+.office-game .agents-panel__card,
+.office-game .agents-panel__seat,
+.office-game .agents-panel__divisionHead,
+.office-game .approvals-panel__row,
+.office-game .warroom__row,
+.office-game .agent-control__auditRow,
+.office-game .timeline__item,
+.office-game .panel-inventory__row,
+.office-game .command-center__item > a,
+.office-game .office-game__campusFloor,
+.office-game .office-game__floorPicker,
+.office-game .agent-control__input,
+.office-game .warroom__input,
+.office-game .room-builder__field input,
+.office-game .room-builder__field select,
+.office-game .office-game__feedFilter {
+  transition: none;
+  animation: none;
+}
+
+.office-game .office-game__campusFloor:active,
+.office-game .agents-panel__seat:active,
+.office-game .warroom__row:active {
+  transform: none;
+}
