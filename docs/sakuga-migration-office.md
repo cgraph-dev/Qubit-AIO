@@ -172,8 +172,8 @@ native elements; the new `::part()` rules find no target.
 - `check_sakuga_vendor.py` OK (2 copies); `sync_sakuga_shared.py --check` OK
   (17 files).
 - Standalone probe of the vendored document (`?mock=1`, Google Chrome via
-  `playwright-core`): **0 light-DOM `<button>`**, 107 `sakuga-button` hosts (21
-  with `sakuga-row`), 5 `sakuga-input`, 0 non-file native inputs, 2 native day
+  `playwright-core`): **0 light-DOM `<button>`**, 106–108 `sakuga-button` hosts
+  (20–22 with `sakuga-row`; the mock roster is random), 5 `sakuga-input`, 0 non-file native inputs, 2 native day
   `<select>`s, 2 `sakuga-slider`, FX overlay present, **0 console errors / 0
   failed requests** on the base load. Opening Settings upgrades the toggle and
   slider; opening Timelapse adds the slider whose inner `input` carries
