@@ -14,9 +14,7 @@
  * changed at any time and applies on the next "New chat".
  */
 
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
+import { Button, Input, Select } from "@/sakuga/ui";
 import { FolderGit2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -112,8 +110,7 @@ export function ChatWorkspacePicker({
           <span className="text-display tracking-wider">{t.sessions.workspace}</span>
         </div>
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           onClick={rescan}
           disabled={loading}
           aria-label={t.sessions.workspaceRescan}
@@ -124,28 +121,25 @@ export function ChatWorkspacePicker({
         </Button>
       </div>
       <Select
-        className="min-w-0"
-        onValueChange={onSelect}
+        label={t.sessions.workspace}
+        className="qsk-field min-w-0"
+        onChange={onSelect}
         value={customOpen ? CUSTOM_VALUE : value}
-        aria-label={t.sessions.workspace}
-      >
-        <SelectOption value="">{defaultLabel}</SelectOption>
-        {options.map((opt) => (
-          <SelectOption key={opt.value} value={opt.value}>
-            {opt.label}
-          </SelectOption>
-        ))}
-        {!valueListed && !customOpen && (
-          <SelectOption value={value}>{abbreviateHomePath(value, home)}</SelectOption>
-        )}
-        <SelectOption value={CUSTOM_VALUE}>{t.sessions.workspaceCustom}</SelectOption>
-      </Select>
+        options={[
+          { value: "", label: defaultLabel },
+          ...options,
+          ...(!valueListed && !customOpen
+            ? [{ value, label: abbreviateHomePath(value, home) }]
+            : []),
+          { value: CUSTOM_VALUE, label: t.sessions.workspaceCustom },
+        ]}
+      />
       {customOpen && (
         <Input
-          autoFocus
+          label={t.sessions.workspaceCustom}
           value={draft}
           placeholder={home ? `${home}/…` : "/path/to/project"}
-          onChange={(e) => setDraft(e.target.value)}
+          onChange={setDraft}
           onBlur={commitDraft}
           onKeyDown={(e) => {
             if (e.key === "Enter") commitDraft();

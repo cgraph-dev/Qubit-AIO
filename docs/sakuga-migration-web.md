@@ -89,5 +89,40 @@ exception; its toolbar is not), `CheckpointsPage`, `CronPage`, `DevicesPage`,
 exception; its forms are not), `WebChatPage`, `WorktreesPage`,
 `src/plugins/PluginPage.tsx`.
 
-Excluded by the task scope: `ChatPage.tsx`, `TerminalChatPage.tsx`,
-`SessionsPage.tsx`, `src/App.tsx`, `src/components/**`.
+## Chat / shell / shared-components lane (swept 2026-11-18)
+
+Swept by this lane and imported from `@/sakuga/ui`:
+
+- `src/App.tsx` — shell header, sidebar rail (mobile open/close, collapse,
+  system actions), `SakugaToastHost` mounted once.
+- `src/pages/ChatPage.tsx` — header toggles, mission cards, selection
+  copy/clear, retry, confirm/cancel, voice engine + reasoning selects,
+  attach/voice/send, new chat/copy/summarize, message-selection and
+  voice-follow checkboxes; effects fire on send (`impact`), turn done
+  (`success`), turn error (`error`), cancel (`warning`), new chat (`pop`).
+- `src/pages/TerminalChatPage.tsx` — side-panel toggles, New chat, copy-last.
+- `src/pages/SessionsPage.tsx` — every row action, pagination, prune/import
+  dialogs, source filter, bulk actions, rename field and row/source checkboxes;
+  toasts now go through `showSakugaToast` (+ success/error effect).
+- `src/components/` — `ConfirmDialog`, `LoadErrorNotice`, `ReadAloudButton`,
+  `ChatToolsSummary`, `ChatSessionList`, `ChatSidebar`, `ThemeSwitcher`,
+  `LanguageSwitcher`, `ProfileSwitcher` (SakugaSelect), `AuthWidget`,
+  `ReasoningPicker` (SakugaSelect), `OAuthLoginModal`, `OAuthProvidersCard`,
+  `QubitConsoleModal`, `MemoryPressureBanner`, `SharedMetricsConsentBanner`,
+  `ChatWorkspacePicker`.
+
+Still native / not yet swept in `src/components/**` (unimplemented, not
+accepted exceptions):
+
+| File:line | Control | Reason |
+|---|---|---|
+| `AutoField.tsx:79,134,149,165,205,226` | Switch/Select/Input config fields | generated form primitives; needs a node-test adapter (`vitest` cannot upgrade the custom elements) |
+| `AutomationBlueprints.tsx:105,116,125,190,225` | Select/Input/Button + legacy Toast | page is another lane's surface; toast migration first |
+| `ModelPickerDialog.tsx:386,416,469,487,496,499,577,587` | Button/Input/Checkbox | composite modal; its tests mock the old primitives, needs the Select/Input test adapters |
+| `ScheduleBuilder.tsx:89,141,169,198,211,250` | Input/Button, native `datetime-local`/`time` | number/datetime inputs are outside the required input types; Selects/Buttons still to do |
+| `SkillEditorDialog.tsx:155,165,199,202` | Input/Button | textarea is out of the required list; Input/Buttons still to do |
+| `ToolsetConfigDrawer.tsx:229,253,314,352,381,406` | Button/Switch/Input | needs a switch/input node-test adapter |
+| `CommandPalette.tsx:105,160` | native search input + option rows | documented composite; keyboard semantics kept, effects only around the interaction |
+| `om-agent-ui.tsx`, `om-computer-workspace.tsx`, `om-ui.tsx`, `viking-settings.tsx` | native buttons/inputs + third-party dialog internals | shared inner-UI module, owned inside `components/**`; needs the om-* screens' tests in one pass |
+| `ReportList.tsx:47` | per-report text button | dense list row; low value |
+
