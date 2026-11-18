@@ -3,13 +3,13 @@
 **Scope:** `qubit_runtime/apps/desktop/src/**` (renderer only). The web dashboard
 (`frontend/qubit-web`) and the Office plugin are separate lanes.
 
-**Status:** partial sweep, honest accounting below. The renderer now loads the
-vendored engine, installs the `qubit:fx` bridge, and has adopted the Sakuga
-toggle (every settings boolean row), the slider, the single `<select>`, and the
-product outcome cues. Buttons, text inputs, checkboxes, the 33 remaining
-`<Switch>` sites, tabs, progress bars, tooltips/textarea, and the file-picker
-proxies are **not** replaced yet; each group is listed with file:line and the
-reason it was deferred.
+**Status:** components sweep complete (pass C), honest accounting below. The
+renderer loads the vendored engine, installs the `qubit:fx` bridge, and has
+adopted the Sakuga toggle (every settings boolean row), the slider, the single
+`<select>`, and the product outcome cues. Pass C then replaced every button in
+`src/components/**` and `src/contrib/**`, the shared text-input/checkbox/switch
+primitives, and determinate progress. Remaining exceptions are the composite
+widgets and unsupported states listed at the end.
 
 ## What landed
 
@@ -21,7 +21,12 @@ reason it was deferred.
 | Range control | `src/components/ui/slider.tsx` | `SakugaSlider` behind the old `Slider` API (maps `onChange` back to `event.target.value`). Used at 4 sites (appearance translucency ×3 + pet scale). |
 | Select | `src/app/quick-entry/quick-entry-app.tsx:187` | The renderer's only `<select>` (`Target session`) is now `SakugaSelect`; `grep -rn '<select' src --include=*.tsx` is **0**. |
 | Effects | `message-stream.ts`, `server-requests.ts`, `composer/index.tsx` | send → `impact`; reply complete → `success`; failed terminal frame → `error`; billing/history warning → `warning`; approval requested → `approval`; reaction → `celebrate`. |
-| Destructive actions | `src/components/ui/button.tsx:111` | Every `variant="destructive"` button fires `warning` on press (20 call sites) without changing the native element. |
+| Destructive actions | `src/components/ui/button.tsx` | Every `variant="destructive"` button fires `warning` on press instead of the default `impact`. |
+| Shared Button | `src/sakuga/ui.tsx`, `src/components/ui/button.tsx` | `Button` renders the vendored `sakuga-button`; the desktop adapter forwards every native prop/event (drag, pointer, double-click, context menu) and stringifies `aria-*`/`data-*` booleans, which React would otherwise write as empty on a custom element. `asChild` still renders links; `type="submit"` calls `form.requestSubmit()`. |
+| Native buttons | `src/components/**`, `src/contrib/**` | **0 production `<button>` tags remain** (one doc-comment example in `inline-preview-directive.tsx`). 245 `<Button>` uses across the two trees; `RowButton`, pane tabs, disclosure/tool rows, message chips and onboarding cards are all the vendored control. |
+| Text inputs | `src/components/ui/input.tsx` | The shared `Input` renders `sakuga-input` (label derived from `aria-label`/placeholder/id, `aria-labelledby` when an id has a `Field` label). `onChange` keeps the event-shaped contract and also accepts the host's `change`; unsupported types (number/date/file/hidden/colour/range) keep the native input. |
+| Checkbox / switch | `src/components/ui/checkbox.tsx`, `switch.tsx` | Boolean checkboxes and switches render the vendored controls; `checked`/`onCheckedChange`/`size` keep their old names. `label` supplies the toggle's accessible name. |
+| Determinate progress | `src/components/ui/progress.tsx` | A plain determinate meter is `sakuga-progress`; indeterminate, the sliding pet animation, destructive fill, custom fill or track children keep the native bar. |
 
 Base URL that works in both shapes: `sakugaBaseUrl(document.baseURI)` →
 `new URL('sakuga-vfx/', document.baseURI).href` (`src/sakuga/base.ts`). It
@@ -43,36 +48,49 @@ Sakuga.
 
 | Control | Where (example) | Count | Reason / next step |
 |---|---|---|---|
-| Native `<button>` + the `Button` primitive | `src/components/ui/button.tsx`; `src/app/shell/wslg-window-controls.tsx:49`; `src/app/chat/composer/attachments.tsx:149`; `src/app/chat/composer/trigger-popover.tsx:204` | ~280 raw tags; ~669 `<Button>` uses | Deferred: the Sakuga button's inner shadow `<button>` cannot submit the outer `<form>`, and `asChild` renders nav `<a>` links (documented exception). 98 existing tests assert `querySelector('button')`/`tagName`. A follow-up must (a) route submit controls through `form.requestSubmit()` and (b) migrate those tests to the shadow helpers. |
-| Text inputs | `src/components/ui/input.tsx` (147 `<Input>` uses), 26 raw `<input>` | 173 | Deferred: the shared `SakugaInput` API requires a `label`; `Input` consumers rely on associated `<label htmlFor>` and on `userEvent.type` against a native input. Adopting needs a label-derivation pass and rewriting the input-heavy tests to `typeIntoSakuga`. |
-| Checkbox | `src/components/ui/checkbox.tsx` (`<Checkbox>` 20 uses) | 20 | Deferred with the input lane: same typing/click test migration. |
-| Remaining switches | `src/plugins/kanban/board.tsx:793`, `src/plugins/kanban/orchestration.tsx:167`, `src/plugins/hermes-bots/cron.tsx:569`, `src/app/capabilities/connectors/connector-dialog.tsx:180` | 33 | Not all switches go through `ToggleRow`. Same adapter as `ToggleRow` is a mechanical follow-up. |
-| Tabs | `src/components/ui/tabs.tsx` (Radix `Tabs`, 4 usage sites) | 4 | Deferred: composite ARIA widget with keyboard semantics; the design allows keeping composite semantics and firing cues around the interaction. |
-| Progress | `src/components/ui/progress.tsx` (13 uses, incl. `ProgressBar` in local-model downloads) | 13 | Deferred: `indeterminate`/`animated`/`destructive` have no upstream equivalent; a determinate-only swap would silently drop those states. Long-job completion already plays `success` via the turn outcome. |
-| Tooltips | `src/components/ui/tooltip.tsx` (`<Tip>` 218 uses) | 218 | Deferred: Radix hover/focus geometry and portalled placement; Sakuga's tooltip is a click label. Keep the composite and fire cues around it. |
-| Textarea | 20 raw `<textarea>` | 20 | No upstream component; stays native. |
-| Hidden file pickers | `src/app/settings/config-settings.tsx:390`, `src/plugins/kanban/drawer.tsx:550`, `src/app/pet-generate/pet-generate-content.tsx:274` | 3 | Still native hidden inputs; proxying each with a Sakuga button is follow-up work. |
-| Editors / canvas / xterm | Monaco (`src/app/chat/...` code editor), transcript canvas, terminal views | — | Documented boundary: editors and canvas controls stay native. |
-| Nav `<a>` links | router links throughout | 33 | Documented exception. |
+| Unsupported input types | `src/components/ui/input.tsx` fallback | 3 in scope | Upstream `sakuga-input` only accepts text/email/search/url/tel/password. Number/date/file/hidden/colour/range keep the native element (the number spinner in `zone-editor`, the colour swatch in `onboarding-chat/options`, etc.). |
+| Indeterminate checkbox | `src/components/ui/checkbox.tsx` fallback | provider header | The vendored checkbox has two states; the tri-state provider selector keeps the native control. |
+| Non-plain progress | `src/components/ui/progress.tsx` fallback | 2 in scope | Unknown endpoint, the sliding pet animation, destructive fill, custom fill/track children have no upstream equivalent. |
+| Composite search fields | `src/components/find-bar.tsx`, `src/components/ui/search-field.tsx`, `src/components/ui/dropdown-menu.tsx` (menu filter), `src/components/model-visibility-dialog.tsx` (inline filter) | 4 | Bespoke focus/clear/find-in-page widgets with their own keyboard behaviour, not ordinary labelled text fields. The design keeps composite widgets on their own semantics; revisit with `SakugaInput` if the callers accept the upstream look. |
+| Tabs | `src/components/ui/tabs.tsx` (Radix `Tabs`) | 0 in scope | Every usage is under `src/app/**` (parallel lane). A Sakuga swap needs a call-site rewrite (the upstream component owns its strip, so it cannot compose with `TabsContent`); no component in this pass uses it. |
+| Select | `src/components/ui/select.tsx` | 1 in scope | `catalog-advanced-dialog` uses the composite Radix select; the design keeps composite ARIA widgets and the desktop has no native `<select>`. |
+| Tooltips | `src/components/ui/tooltip.tsx` (`<Tip>`) | — | Composite Radix hover/focus geometry with portals; Sakuga's tooltip is a click label. No standalone help-trigger exists in the swept tree, so nothing was swapped. |
+| Textarea | raw `<textarea>` | 2 in scope | No upstream textarea component; stays native. |
+| Hidden file pickers | `src/app/settings/config-settings.tsx`, `src/plugins/kanban/drawer.tsx`, `src/app/pet-generate/pet-generate-content.tsx` | 0 in scope | The three known pickers live under `src/app/**`/`src/plugins/**`, outside this pass; the Button proxy pattern is ready once that lane reaches them. |
+| Editors / canvas / xterm | Monaco/code editors, transcript canvas, terminal | — | Documented boundary: editors and canvas controls stay native. |
+| Nav `<a>` links | router links throughout | 33 | Documented exception; `Button asChild` keeps them links. |
 
 ## Verification run for this lane
 
 ```bash
 cd qubit_runtime/apps/desktop
-npm run test:ui -- src/sakuga/sakuga.test.tsx            # 9 passed
-npm run test:ui -- src/app/settings                      # 402 passed, 15 pre-existing failures
-npm run test:ui -- src/app/session/hooks/use-message-stream/gateway-event  # 81 passed
-npm run test:ui -- src/app/quick-entry/quick-entry-app.test.tsx            # 1 passed
-npm run test:ui -- src/app/settings/appearance-settings src/app/settings/pet-settings src/components/boot-failure-overlay  # 19 passed
-npx tsc -p . --noEmit                                    # only the pre-existing errors (quick-entry/slash/contrib/store)
-cd ../../.. && python3 scripts/check_sakuga_vendor.py    # OK (2 copies)
-python3 scripts/sync_sakuga_shared.py --check            # OK (7 files)
+npx vitest run --project ui src/components src/contrib   # 247 files, 1532 tests; 1 pre-existing failure
+npx vitest run --project ui src/sakuga/sakuga.test.tsx   # 9 passed
+npx tsc -p tsconfig.json --noEmit                        # only the 8 known pre-existing errors
 ```
 
-The 15 settings failures were re-run on the lane base with the toggle change
-stashed and are byte-identical there (billing portal URLs, a `config-settings`
-mock, a connections sign-in row, two terminal-disconnect cases): pre-existing,
-not caused by this lane.
+Pass C covered (per `grep` over production files in `src/components` +
+`src/contrib`):
+
+| Control | Count |
+|---|---|
+| `<Button>` uses | 245 |
+| Production native `<button>` tags | 0 (one doc-comment example) |
+| `<Input>` uses | 20 |
+| `<Switch>` uses | 3 |
+| `<Checkbox>` uses | 3 |
+| `<Progress>` uses (2 determinate swap, others native fallback) | 4 |
+| Native `type="file"` inputs | 0 |
+
+The one remaining failure is the pre-existing `assistant-ui/thread/streaming.test.tsx`
+"renders assistant text incrementally before completion": the test looks for a
+`role="status"` named "Hermes is loading a response" while the product renders
+the canonical Qubit string (and the status row carries no matching role). It is
+unrelated to controls and reproduces on the lane base.
+
+The pre-existing typecheck errors are the five files named in the task
+(`session-tile`, `use-quick-entry-bridge`, `onboarding-kickoff`,
+`quick-entry-app`, `slash`); this lane adds none.
 
 `npm run build` was not run in this lane; the renderer build is the same Vite
 pipeline and the lane only adds source modules and a public asset path already
