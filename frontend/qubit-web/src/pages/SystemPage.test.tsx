@@ -13,6 +13,11 @@ import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "./sakuga-test-dom";
 
+function toastText(): string {
+  return document.querySelector("sakuga-toast")?.shadowRoot?.textContent ?? "";
+}
+import "./sakuga-test-dom";
+
 const apiMocks = vi.hoisted(() => ({
   getStatus: vi.fn(),
   getSystemStats: vi.fn(),
@@ -225,10 +230,8 @@ describe("SystemPage gateway control confirmation", () => {
     await waitFor(() => Boolean(buttonByText("Restart gateway")));
     await act(async () => buttonByText("Restart gateway")!.click());
 
-    await waitFor(() =>
-      (document.body.textContent ?? "").includes("cancelled"),
-    );
-    expect(document.body.textContent).not.toContain("Gateway restart failed");
+    await waitFor(() => toastText().includes("cancelled"));
+    expect(toastText()).not.toContain("Gateway restart failed");
   });
 });
 

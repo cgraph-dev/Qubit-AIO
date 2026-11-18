@@ -24,10 +24,8 @@ import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Button, Checkbox, Input, Select } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { Label } from "@nous-research/ui/ui/components/label";
-import { Toast } from "@nous-research/ui/ui/components/toast";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
@@ -186,7 +184,10 @@ const MEMORY_STATUS_TONE: Record<
 };
 
 export default function SystemPage() {
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
 
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [stats, setStats] = useState<SystemStats | null>(null);
@@ -798,7 +799,6 @@ export default function SystemPage() {
   return (
     <PageErrorBoundary label="System">
     <div className="flex flex-col gap-8">
-      <Toast toast={toast} />
       <input
         ref={importUploadInputRef}
         type="file"
