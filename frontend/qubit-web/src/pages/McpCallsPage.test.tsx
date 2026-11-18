@@ -8,6 +8,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   callMcpTool: vi.fn(),
@@ -53,14 +55,20 @@ function byTestId(id: string): HTMLElement | null {
 
 function setInput(el: HTMLElement | null, value: string) {
   if (!el) throw new Error("missing input");
-  const input = el as HTMLInputElement | HTMLTextAreaElement;
-  const proto =
-    input instanceof HTMLTextAreaElement
-      ? window.HTMLTextAreaElement.prototype
-      : window.HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.dispatchEvent(new Event("change", { bubbles: true }));
+  act(() => {
+    if (el.tagName === "SAKUGA-INPUT") {
+      typeIntoSakuga(el, value);
+      return;
+    }
+    const input = el as HTMLInputElement | HTMLTextAreaElement;
+    const proto =
+      input instanceof HTMLTextAreaElement
+        ? window.HTMLTextAreaElement.prototype
+        : window.HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(input, value);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 }
 
 beforeEach(() => {
@@ -151,7 +159,7 @@ describe("McpCallsPage", () => {
     for (const d of DISABLED_MCP_ACTIONS) {
       const row = byTestId(`mc-disabled-${d.action}`);
       expect(row).not.toBeNull();
-      expect(row?.querySelector("button")?.disabled).toBe(true);
+      expect((row?.querySelector("button, sakuga-button") as (HTMLElement & { disabled?: boolean }) | null)?.disabled).toBe(true);
       expect(row?.textContent).toContain(d.reason);
     }
   });

@@ -26,6 +26,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
+import { Button, Input, emitFx } from "@/sakuga/ui";
+
 import {
   approveNode,
   describeNode,
@@ -78,6 +80,7 @@ export default function NodesPage() {
   const confirmPrompt = useCallback(
     (detailText: string) =>
       new Promise<boolean>((resolve) => {
+        emitFx("approval");
         setPendingConfirm({ detail: detailText, resolve });
       }),
     [],
@@ -95,6 +98,7 @@ export default function NodesPage() {
       .catch((err: unknown) => {
         setError(refusalOrError(err, "Node list failed."));
         setState("error");
+        emitFx("error");
       });
   }, []);
 
@@ -109,9 +113,11 @@ export default function NodesPage() {
       try {
         await fn(confirmPrompt);
         setNotice(`${label} completed.`);
+        emitFx(/revoke|remove/i.test(label) ? "warning" : "success");
         load();
       } catch (err: unknown) {
         setNotice(refusalOrError(err, `${label} failed.`));
+        emitFx("error");
       } finally {
         setBusy(null);
       }
@@ -128,6 +134,7 @@ export default function NodesPage() {
       .then((res) => setDetail(res.node))
       .catch((err: unknown) => {
         setDetailError(refusalOrError(err, "Node describe failed."));
+        emitFx("error");
       });
   }, []);
 
@@ -135,9 +142,13 @@ export default function NodesPage() {
     setBusy(`caps:${nodeId}`);
     setNotice(null);
     refreshNodeCapabilities(nodeId)
-      .then((res) => setCapabilities(res.capabilities ?? []))
+      .then((res) => {
+        setCapabilities(res.capabilities ?? []);
+        emitFx("success");
+      })
       .catch((err: unknown) => {
         setNotice(refusalOrError(err, "Capability refresh failed."));
+        emitFx("error");
       })
       .finally(() => setBusy(null));
   }, []);
@@ -163,7 +174,7 @@ export default function NodesPage() {
           title="Nodes"
           description="Enrolled nodes: describe, approve, dispatch, rename, revoke, remove."
           actions={
-            <button
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={load}
@@ -171,7 +182,7 @@ export default function NodesPage() {
               aria-label="Refresh nodes"
             >
               {state === "loading" ? <Spinner /> : "refresh"}
-            </button>
+            </Button>
           }
         />
 
@@ -194,23 +205,27 @@ export default function NodesPage() {
             description="Add a node by id with an optional label."
             control={
               <>
-                <input
-                  type="text"
-                  value={enrollId}
-                  onChange={(e) => setEnrollId(e.target.value)}
-                  placeholder="node id"
-                  aria-label="Enroll node id"
-                  className="settings-input"
-                />
-                <input
-                  type="text"
-                  value={enrollLabel}
-                  onChange={(e) => setEnrollLabel(e.target.value)}
-                  placeholder="label (optional)"
-                  aria-label="Enroll node label"
-                  className="settings-input"
-                />
-                <button
+                <div className="qsk-field">
+                  <Input
+                    type="text"
+                    value={enrollId}
+                    onChange={(value) => setEnrollId(value)}
+                    placeholder="node id"
+                    label="Enroll node id"
+                    className="settings-input"
+                  />
+                </div>
+                <div className="qsk-field">
+                  <Input
+                    type="text"
+                    value={enrollLabel}
+                    onChange={(value) => setEnrollLabel(value)}
+                    placeholder="label (optional)"
+                    label="Enroll node label"
+                    className="settings-input"
+                  />
+                </div>
+                <Button variant="secondary"
                   type="button"
                   className="btn btn--ghost btn--sm"
                   onClick={() =>
@@ -225,7 +240,7 @@ export default function NodesPage() {
                   aria-label="Enroll node"
                 >
                   {busy === "enroll" ? <Spinner /> : "enroll"}
-                </button>
+                </Button>
               </>
             }
           />
@@ -269,17 +284,17 @@ export default function NodesPage() {
                   }
                   control={
                     <>
-                      <button
+                      <Button variant="secondary"
                         type="button"
                         className="btn btn--ghost btn--sm"
                         onClick={() => describe(n.id)}
                         aria-label={`Describe node ${n.id}`}
                       >
                         describe
-                      </button>
+                      </Button>
                       {n.manageable ? (
                         <>
-                          <button
+                          <Button variant="secondary"
                             type="button"
                             className="btn btn--ghost btn--sm"
                             onClick={() =>
@@ -291,8 +306,8 @@ export default function NodesPage() {
                             aria-label={`Approve node ${n.id}`}
                           >
                             {busy === `approve:${n.id}` ? <Spinner /> : "approve"}
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="secondary"
                             type="button"
                             className="btn btn--ghost btn--sm"
                             onClick={() =>
@@ -304,8 +319,8 @@ export default function NodesPage() {
                             aria-label={`Revoke node ${n.id}`}
                           >
                             {busy === `revoke:${n.id}` ? <Spinner /> : "revoke"}
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="secondary"
                             type="button"
                             className="btn btn--ghost btn--sm"
                             onClick={() =>
@@ -317,10 +332,10 @@ export default function NodesPage() {
                             aria-label={`Remove node ${n.id}`}
                           >
                             {busy === `remove:${n.id}` ? <Spinner /> : "remove"}
-                          </button>
+                          </Button>
                         </>
                       ) : (
-                        <button
+                        <Button variant="secondary"
                           type="button"
                           disabled
                           data-state="refused"
@@ -330,7 +345,7 @@ export default function NodesPage() {
                           className="btn btn--ghost btn--sm"
                         >
                           manage unavailable
-                        </button>
+                        </Button>
                       )}
                     </>
                   }
@@ -368,7 +383,7 @@ export default function NodesPage() {
                 )
               }
               control={
-                <button
+                <Button variant="secondary"
                   type="button"
                   className="btn btn--ghost btn--sm"
                   onClick={() => refreshCapabilities(selectedId)}
@@ -376,7 +391,7 @@ export default function NodesPage() {
                   aria-label={`Refresh capabilities for ${selectedId}`}
                 >
                   {busy === `caps:${selectedId}` ? <Spinner /> : "refresh capabilities"}
-                </button>
+                </Button>
               }
             />
 
@@ -397,15 +412,17 @@ export default function NodesPage() {
               description="Send a task to this node (confirm-gated)."
               control={
                 <>
-                  <input
-                    type="text"
-                    value={dispatchTask}
-                    onChange={(e) => setDispatchTask(e.target.value)}
-                    placeholder="task to dispatch"
-                    aria-label={`Dispatch task for ${selectedId}`}
-                    className="settings-input"
-                  />
-                  <button
+                  <div className="qsk-field">
+                    <Input
+                      type="text"
+                      value={dispatchTask}
+                      onChange={(value) => setDispatchTask(value)}
+                      placeholder="task to dispatch"
+                      label={`Dispatch task for ${selectedId}`}
+                      className="settings-input"
+                    />
+                  </div>
+                  <Button variant="secondary"
                     type="button"
                     className="btn btn--ghost btn--sm"
                     onClick={() =>
@@ -417,7 +434,7 @@ export default function NodesPage() {
                     aria-label={`Dispatch to ${selectedId}`}
                   >
                     {busy === `dispatch:${selectedId}` ? <Spinner /> : "dispatch"}
-                  </button>
+                  </Button>
                 </>
               }
             />
@@ -428,15 +445,17 @@ export default function NodesPage() {
               description="Renaming a node may require re-enrollment before it accepts new work."
               control={
                 <>
-                  <input
-                    type="text"
-                    value={renameName}
-                    onChange={(e) => setRenameName(e.target.value)}
-                    placeholder="new node name"
-                    aria-label={`Rename ${selectedId}`}
-                    className="settings-input"
-                  />
-                  <button
+                  <div className="qsk-field">
+                    <Input
+                      type="text"
+                      value={renameName}
+                      onChange={(value) => setRenameName(value)}
+                      placeholder="new node name"
+                      label={`Rename ${selectedId}`}
+                      className="settings-input"
+                    />
+                  </div>
+                  <Button variant="secondary"
                     type="button"
                     className="btn btn--ghost btn--sm"
                     onClick={() =>
@@ -448,7 +467,7 @@ export default function NodesPage() {
                     aria-label={`Rename node ${selectedId}`}
                   >
                     {busy === `rename:${selectedId}` ? <Spinner /> : "rename"}
-                  </button>
+                  </Button>
                 </>
               }
             />
@@ -480,22 +499,22 @@ export default function NodesPage() {
               description={pendingConfirm.detail}
               control={
                 <>
-                  <button
+                  <Button variant="secondary"
                     type="button"
                     className="btn btn--ghost btn--sm"
                     onClick={() => settleConfirm(true)}
                     aria-label="Confirm"
                   >
                     Confirm
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="secondary"
                     type="button"
                     className="btn btn--ghost btn--sm"
                     onClick={() => settleConfirm(false)}
                     aria-label="Cancel"
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </>
               }
             />

@@ -16,6 +16,7 @@ import {
   SettingsSection,
   SettingsValue,
 } from "@/components/console-ui";
+import { Button, emitFx } from "@/sakuga/ui";
 
 const GATEWAY_DASHBOARD = "http://127.0.0.1:20128";
 const GATEWAY_API_BASE = "http://127.0.0.1:20128/v1";
@@ -63,13 +64,17 @@ export default function OmniRoutePage() {
             <SettingsValue mono>{GATEWAY_API_BASE}</SettingsValue>
           }
           control={
-            <button
+            <Button
               type="button"
+              variant="secondary"
               className="btn btn--ghost btn--sm"
-              onClick={() => copyText(GATEWAY_API_BASE)}
+              onClick={() => {
+                copyText(GATEWAY_API_BASE);
+                emitFx("success");
+              }}
             >
               Copy
-            </button>
+            </Button>
           }
         />
         <SettingsRow

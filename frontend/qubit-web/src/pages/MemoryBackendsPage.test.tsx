@@ -9,6 +9,7 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
 import MemoryBackendsPage from "./MemoryBackendsPage";
 import { MEMORY_BACKENDS, ROUTES } from "@/lib/ocFamilyMemoryApi";
 
@@ -127,7 +128,7 @@ describe("MemoryBackendsPage", () => {
       expect(reason.length).toBeGreaterThan(0);
     }
     // No control anywhere promises a hosted connect.
-    const labels = Array.from(container.querySelectorAll("button"))
+    const labels = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button"))
       .map((b) => b.textContent ?? "")
       .join(" ");
     expect(labels).not.toMatch(/connect/i);

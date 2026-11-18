@@ -104,9 +104,9 @@ async function renderNodesPage() {
   await waitFor(() => Boolean(container.querySelector('[aria-label="Node roster"]')));
 }
 
-function dialogButton(text: string): HTMLButtonElement | null {
+function dialogButton(text: string): HTMLElement | null {
   return (
-    [...document.querySelectorAll("button")].find(
+    [...document.querySelectorAll<HTMLElement>("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
     ) ?? null
   );
