@@ -193275,12 +193275,18 @@ create: function(game) {
 		delete next.value;
 		if (!next.role) next.role = "progressbar";
 		const label = typeof next.label === "string" && next.label.trim() ? next.label : "Loading";
+		const existingRef = next.ref;
+		delete next.ref;
 		const attrs = {
 			...next,
 			label,
-			value,
 			"aria-valuemin": 0,
-			"aria-valuemax": 100
+			"aria-valuemax": 100,
+			ref: (el) => {
+				if (typeof existingRef === "function") existingRef(el);
+				else if (existingRef) existingRef.current = el;
+				if (el) el.setAttribute("value", String(value));
+			}
 		};
 		if (controlled) attrs["aria-valuenow"] = Math.round(value * 100);
 		else delete attrs["aria-valuenow"];

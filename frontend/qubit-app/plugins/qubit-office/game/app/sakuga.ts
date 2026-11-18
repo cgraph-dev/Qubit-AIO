@@ -118,12 +118,25 @@ export function sakugaProgress(
   if (!next.role) next.role = "progressbar";
   const label = typeof next.label === "string" && next.label.trim()
     ? next.label : "Loading";
+  // `sakuga-progress.value` is a READ-ONLY getter in the vendored component;
+  // React would try to assign it as a DOM property and throw. Pass the value
+  // as an attribute from a callback ref instead, which is the component's
+  // observed input.
+  const existingRef = next.ref as
+    | ((el: HTMLElement | null) => void)
+    | { current: HTMLElement | null }
+    | undefined;
+  delete next.ref;
   const attrs: Record<string, unknown> = {
     ...next,
     label,
-    value,
     "aria-valuemin": 0,
     "aria-valuemax": 100,
+    ref: (el: HTMLElement | null) => {
+      if (typeof existingRef === "function") existingRef(el);
+      else if (existingRef) existingRef.current = el;
+      if (el) el.setAttribute("value", String(value));
+    },
   };
   if (controlled) attrs["aria-valuenow"] = Math.round(value * 100);
   else delete attrs["aria-valuenow"];
