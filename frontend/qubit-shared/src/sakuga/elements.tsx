@@ -445,6 +445,7 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
   // are native-input contract, so mirror them onto that inner element. This
   // wrapper is the adaptation layer; the vendored file is untouched.
   const innerAttrs = {
+    type,
     required,
     pattern,
     minlength: minLength,
@@ -472,6 +473,7 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
         if (attr === undefined || attr === null || attr === false) input.removeAttribute(key);
         else input.setAttribute(key, attr === true ? '' : String(attr));
       }
+      if (type) input.type = type;
       return true;
     };
     if (!apply()) {
