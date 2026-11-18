@@ -1,7 +1,7 @@
 {
   "source": "https://github.com/marmottajr/habblaud",
   "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
-  "local_commit": "aeb93116eb1a74cdd5312dce1754b333cbd7ca79",
+  "local_commit": "8abb50d13c7c7b023fe940301314aa4387e69f15",
   "local_changes": [
     "additive Sakuga VFX overlay: vendored core.js + OfficeFx cue player consuming snapshot.fx",
     "publish real renderer head anchors into the FX registry each frame (additive; no drawing change)"
@@ -225,13 +225,13 @@
       "bytes": 128520
     },
     {
-      "path": "bundle/app-CiV5dLls.js",
-      "sha256": "b1fec004d2cc076385d6d2c49c889686c0a8471d27658b877841169043a1ad0b",
-      "bytes": 697652
+      "path": "bundle/app-CZsceq5t.js",
+      "sha256": "a90e47725763ee403c54ef5d5a89e80b3bc1d6e9610e4db9b6f250ee234b8a4e",
+      "bytes": 697662
     },
     {
-      "path": "bundle/daystats-0M4FN-M_.js",
-      "sha256": "892278da2501fb0903a4b38d8653125a8d6d203d9a8f1ca482d0cd0ec692f353",
+      "path": "bundle/daystats-CAiRO-M9.js",
+      "sha256": "e4522edaba5c58cdcc7ec608ba9790767a1141b75dab1b8bad1518b3bf5b2a94",
       "bytes": 36986
     },
     {
@@ -250,8 +250,8 @@
       "bytes": 203518
     },
     {
-      "path": "bundle/main-Cybw6NYk.js",
-      "sha256": "5635d282f841c17473d9fb79a680787c7c042b20281c9efdef42229586fac269",
+      "path": "bundle/main-C_oRJbxL.js",
+      "sha256": "23b06df2f0867b4398a2ded868dfe1dfb56076d2d8a0e1c9c2017b6a6c5e775f",
       "bytes": 15337
     },
     {
@@ -375,18 +375,18 @@
       "bytes": 5416
     },
     {
-      "path": "bundle/ptypane-B3kLDzUP.js",
-      "sha256": "77456da43ead3a897ed395d6b97fb85b9fd84db89f40d956f8203dd6722c179d",
-      "bytes": 334656
-    },
-    {
       "path": "bundle/ptypane-BrP-ENHg.css",
       "sha256": "0e5386f16cb4be78a2fe911e014a810da76ea2db47d8c8b2a966516b2fd5270b",
       "bytes": 3939
     },
     {
+      "path": "bundle/ptypane-CZpz2PKH.js",
+      "sha256": "86cc45470488e5ae356221f0acb76cd1d29cd59bff8def8ef6e5b2a8e34c48b3",
+      "bytes": 334656
+    },
+    {
       "path": "index.html",
-      "sha256": "76792d7cf210f24a3445f13afbfa1e32a53b70a2d2da4f56bf392f8b8e4590d7",
+      "sha256": "984606e9cfd0f45d78148ff858ead4c16f1adb2c1197802a166e4731f105b559",
       "bytes": 2796
     },
     {
@@ -400,6 +400,6 @@
       "bytes": 40621
     }
   ],
-  "total_bytes": 2198788,
+  "total_bytes": 2198798,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }
