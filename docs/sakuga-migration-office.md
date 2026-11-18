@@ -51,3 +51,32 @@ the injected icons keep their native `title`/`aria-label` semantics.
 - `python3 scripts/vendor_habblaud.py --check` → ok (78 files).
 - `python3 scripts/check_sakuga_vendor.py` → OK (2 copies).
 - `python3 scripts/sync_sakuga_shared.py --check` → OK (17 files).
+
+## Follow-up pass — more buttons, progress, tooltips (2026-11-18)
+
+The owner asked for "more buttons, more places, more things". This pass extended
+the sweep rather than changing the contracts.
+
+| Unit | Files | Notes |
+|---|---|---|
+| Vector shell buttons | `game/OfficeGameShell.tsx` | The HUD's text/motion/settings controls and every settings choice pill now use `sakugaButton`. The shell is still comparison-only (`?shell=1`). |
+| Character Studio | `app/CharacterStudio.tsx` | Category and lock chips moved from native `<button>` to `sakugaButton`; the layer up/down arrows gained hover hints. `data-testid`/`data-category`/`aria-pressed` are unchanged. |
+| Loading progress | `CommandCenter`, `Timeline`, `AgentsPanel`, `ApprovalsPanel`, `EtsyConnectPanel`, `EffectiveStatePanel`, `PanelInventory`, `SeatModelPanel`, `AgentControlDrawer` | Each existing `role="status"` loading line now carries the vendored `sakuga-progress` bar beside its honest label. The root element keeps its `data-state`/`data-testid`, so the harness and a11y contracts are unchanged. |
+| Tooltips | `EtsyConnectPanel`, `ApprovalsPanel`, `CharacterStudio` | `OfficeTooltip` added to the Etsy status refresh, the approvals refresh, and the Character Studio layer arrows. |
+
+The office still never invents state: the progress bars are indeterminate-looking
+status chrome (`value` 0.08) attached to real read states, not completion
+percentages, and `office.fx: off` remains the default. The injected Habblaud
+icons stay iframe-native and keep their `title`/`aria-label`.
+
+### Evidence (follow-up)
+
+- `npx vitest run --config vitest.office-app.config.ts` → 48 files / 563 tests.
+- `npx vite build --config vite.office-game.config.ts` → rebuilt
+  `qubit-office.game.js` (8,040.63 kB); CSS unchanged (91.65 kB).
+- Office Python focused set → 99 passed; the 4 CSS-scope assertions in
+  `test_office_game_shell.py` fail identically at the base commit (documented).
+- `vendor_habblaud.py --check` ok (78 files); `check_sakuga_vendor.py` OK;
+  `sync_sakuga_shared.py --check` OK.
+- No live browser run in this worktree (no bridge is started here); the served
+  `:8890` process still carries the previous bundle.
