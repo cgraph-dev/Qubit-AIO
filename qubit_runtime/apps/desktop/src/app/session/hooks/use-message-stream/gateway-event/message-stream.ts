@@ -1,8 +1,8 @@
 import type { BillingBlock } from '@qubit/shared'
 
-import { burstVibeHearts } from '@/components/chat/vibe-hearts'
 import { reportFirstBuildTurnComplete } from '@/components/onboarding-chat/first-build'
 import { translateNow } from '@/i18n'
+import { emitFx } from '@/sakuga/ui'
 import { coerceGatewayText, coerceThinkingText } from '@/lib/chat-runtime'
 import { playCompletionSound } from '@/lib/completion-sound'
 import { parseErrorSurface } from '@/lib/error-surface'
@@ -206,9 +206,10 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
 
   if (event.type === 'reaction') {
     // Core-detected affection (ily / <3 / good bot) on the user's message.
-    // Play hearts only for the visible session so background turns stay quiet.
+    // Sakuga's celebrate cue replaces the old heart particle burst on this
+    // surface; background turns stay quiet.
     if (isActiveEvent && (payload?.kind ?? 'vibe') === 'vibe') {
-      burstVibeHearts()
+      void emitFx('celebrate')
     }
 
     return true
@@ -380,15 +381,22 @@ export function handleMessageStreamEvent(ctx: GatewayEventContext): boolean {
     // put a check-in into that session (no-op everywhere else).
     reportFirstBuildTurnComplete(sessionId, finalText)
 
+    // A finished turn is a real outcome: success when it completed, error when
+    // the terminal frame carried one. Presentation only — the transcript above
+    // is already authoritative.
+    void emitFx(failure ? 'error' : 'success')
+
     // Structured billing wall forwarded by the gateway (out of credits /
     // payment required) — cache it + raise a billing-specific toast.
     if (payload?.billing) {
       surfaceBillingBlock(sessionId, payload.billing)
+      void emitFx('warning')
     }
 
     // History-commit note (e.g. a mid-turn desync) the gateway chose to surface.
     if (typeof payload?.warning === 'string' && payload.warning.trim()) {
       notify({ kind: 'warning', message: payload.warning })
+      void emitFx('warning')
     }
 
     if (isActiveEvent) {

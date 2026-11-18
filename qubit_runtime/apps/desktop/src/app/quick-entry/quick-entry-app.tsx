@@ -1,6 +1,7 @@
 import { useEffect, useReducer, useRef } from 'react'
 
 import { isSubmitEnter } from '@/lib/ime'
+import { Select as SakugaSelect } from '@/sakuga/ui'
 import {
   initialQuickComposerState,
   QUICK_TARGET_CURRENT,
@@ -10,14 +11,6 @@ import {
   type QuickComposerState,
   quickEntryResultEvent
 } from '@/store/quick-entry'
-
-// Native select popups do not reliably inherit the closed control's colors.
-// Paint both sides of the contrast pair on every option so Chromium cannot
-// combine a dark-theme foreground with an OS-provided light popup surface.
-const QUICK_TARGET_OPTION_STYLE = {
-  backgroundColor: 'var(--ui-bg-elevated, var(--background))',
-  color: 'var(--ui-text-primary, var(--foreground))'
-}
 
 /**
  * The Quick Entry composer — the whole renderer surface of the global-hotkey
@@ -191,40 +184,18 @@ export function QuickEntryApp() {
           >
             Send to
           </label>
-          <select
-            aria-label="Target session"
+          <SakugaSelect
             disabled={!state.connected}
             id="quick-entry-target"
-            onChange={event => dispatch({ target: event.target.value, type: 'target' })}
-            onKeyDown={event => {
-              if (event.key === 'Escape') {
-                event.preventDefault()
-                dispatch({ type: 'dismiss' })
-              }
-            }}
-            style={{
-              background: 'transparent',
-              border: '1px solid var(--ui-stroke-secondary, rgba(127,127,127,0.35))',
-              borderRadius: 6,
-              color: 'var(--foreground, #eee)',
-              fontSize: 11,
-              maxWidth: 320,
-              padding: '2px 6px'
-            }}
+            label="Target session"
+            onChange={value => dispatch({ target: value, type: 'target' })}
+            options={[
+              { value: QUICK_TARGET_CURRENT, label: 'Current chat' },
+              { value: QUICK_TARGET_NEW, label: 'New session' },
+              ...state.sessions.map(session => ({ value: session.id, label: session.title }))
+            ]}
             value={state.target}
-          >
-            <option style={QUICK_TARGET_OPTION_STYLE} value={QUICK_TARGET_CURRENT}>
-              Current chat
-            </option>
-            <option style={QUICK_TARGET_OPTION_STYLE} value={QUICK_TARGET_NEW}>
-              New session
-            </option>
-            {state.sessions.map(session => (
-              <option key={session.id} style={QUICK_TARGET_OPTION_STYLE} value={session.id}>
-                {session.title}
-              </option>
-            ))}
-          </select>
+          />
         </div>
         {state.error ? (
           <div role="alert" style={{ color: 'var(--destructive, #ef4444)', fontSize: 11 }}>

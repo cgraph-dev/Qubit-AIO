@@ -17,6 +17,7 @@ import { composerFloatingStrip, composerInputBacking } from '@/components/chat/c
 import { $chatOnboardingSolo, $chatOnboardingThreadIds } from '@/components/onboarding-chat/assembly'
 import { OnboardingSkip } from '@/components/onboarding-chat/skip'
 import { Button } from '@/components/ui/button'
+import { emitFx } from '@/sakuga/ui'
 import { Slot as ContribSlot } from '@/contrib/react/slot'
 import { useI18n } from '@/i18n'
 import { chatMessageText } from '@/lib/chat-messages'
@@ -180,6 +181,10 @@ export function ChatBar({
       if (!draft) {
         return false
       }
+
+      // A real send is the product's primary action: one impact cue at the
+      // moment the prompt is accepted, before the turn starts.
+      void emitFx('impact')
 
       return onSubmitProp(draft.text, { ...options, attachments: draft.attachments })
     },

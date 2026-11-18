@@ -1,7 +1,8 @@
 /** Regression coverage for #77429: native picker options must paint a readable surface. */
 
-import { act, cleanup, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { sakugaInnerAll, waitForSakuga } from '@/sakuga/ui'
 
 import type { QuickEntryStatePush } from '@/store/quick-entry'
 
@@ -35,7 +36,7 @@ describe('QuickEntryApp', () => {
     vi.restoreAllMocks()
   })
 
-  it('paints every native target option with matching theme foreground and background tokens', () => {
+  it('offers every target through the Sakuga select', async () => {
     render(<QuickEntryApp />)
 
     act(() => {
@@ -45,12 +46,20 @@ describe('QuickEntryApp', () => {
       })
     })
 
-    const options = screen.getAllByRole('option') as HTMLOptionElement[]
-    expect(options).toHaveLength(3)
+    const trigger = screen.getByRole('combobox', { name: 'Target session' })
+    expect(trigger.getAttribute('aria-expanded')).toBe('false')
 
-    for (const option of options) {
-      expect(option.style.color).toBe('var(--ui-text-primary, var(--foreground))')
-      expect(option.style.backgroundColor).toBe('var(--ui-bg-elevated, var(--background))')
-    }
+    await act(async () => {
+      fireEvent.click(trigger)
+    })
+    await waitForSakuga(screen.getByRole('dialog', { name: 'Target session options' }).querySelector('sakuga-radio'))
+
+    const radios = sakugaInnerAll(screen.getByRole('dialog', { name: 'Target session options' }).querySelector('sakuga-radio'), 'input')
+    expect(radios).toHaveLength(3)
+    expect(radios.map(radio => (radio as HTMLInputElement).value)).toEqual([
+      'current',
+      'new',
+      'session-1'
+    ])
   })
 })
