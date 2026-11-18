@@ -3076,23 +3076,25 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 {attachState === "describing" ? "Reading…" : "Attach"}
               </FileField>
             </HoverTooltip>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={toggleVoice}
-              disabled={busy}
-              aria-label={
-                voiceState === "listening" ? "Stop voice input" : "Voice input"
-              }
-              title="Speak instead of typing (same backend turn)"
-            >
-              {voiceState === "listening" ? (
-                <Square className="h-4 w-4" />
-              ) : (
-                <Mic className="h-4 w-4" />
-              )}
-              {voiceState === "listening" ? "Stop" : "Voice"}
-            </Button>
+            <HoverTooltip content="Speak instead of typing (same backend turn)">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={toggleVoice}
+                disabled={busy}
+                aria-label={
+                  voiceState === "listening" ? "Stop voice input" : "Voice input"
+                }
+                title="Speak instead of typing (same backend turn)"
+              >
+                {voiceState === "listening" ? (
+                  <Square className="h-4 w-4" />
+                ) : (
+                  <Mic className="h-4 w-4" />
+                )}
+                {voiceState === "listening" ? "Stop" : "Voice"}
+              </Button>
+            </HoverTooltip>
             <Button
               type="button"
               disabled={busy || !input.trim()}
