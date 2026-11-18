@@ -47,8 +47,11 @@ export interface SakugaHostProps {
   'aria-label'?: string;
   'aria-describedby'?: string;
   'aria-labelledby'?: string;
-  'aria-invalid'?: boolean;
-  'aria-required'?: boolean;
+  // These mirror the native ARIA token unions, so spreading
+  // React.ComponentProps<'button'> (which carries the full AriaAttributes)
+  // into a wrapper stays assignable.
+  'aria-invalid'?: boolean | 'true' | 'false' | 'grammar' | 'spelling';
+  'aria-required'?: boolean | 'true' | 'false';
   'aria-hidden'?: boolean;
   'data-testid'?: string;
 }
@@ -516,7 +519,10 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
       else if (ref) (ref as { current: HTMLElement | null }).current = node;
     },
     class: className,
-    role: rest.role ?? 'textbox',
+    // A search field is a searchbox, not a plain textbox. The native input
+    // gets that role from `type=search`; the host must carry it too because
+    // Testing Library and assistive tech query the light-DOM host.
+    role: rest.role ?? (type === 'search' ? 'searchbox' : 'textbox'),
     // An explicit caller label wins; otherwise the visible field label is the
     // accessible name.
     'aria-label': (rest['aria-label'] as string | undefined) ?? label,
