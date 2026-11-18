@@ -16,6 +16,11 @@ opt-in skin was toggled through the sidebar control. No image here is a mockup.
 | `manga_tasks.jpg` | Qubit Tasks list and status chips |
 | `manga_analytics.jpg` | Analytics cards and section spines |
 | `manga_system.jpg` | System host/labs/curator/gateway panels |
+| `manga_mcp.jpg` | MCP server cards and status chips |
+| `manga_skills.jpg` | Skills filters, toggles and category rail |
+| `manga_open_viking.jpg` | Open Viking Studio server/studio panels |
+| `manga_webchat.jpg` | WebChat transcript and composer |
+| `manga_operations.jpg` | Operations search/select and operation list |
 | `manga_sidebar_collapsed.jpg` | Collapsed rail with the Manga switch |
 | `manga_mobile_sessions.jpg` | Sessions at 390×844 |
 | `manga_mobile_chat.jpg` | Qubit Chat at 390×844 |

@@ -133,39 +133,39 @@ bundle already on the branch (`frontend/qubit-app/plugins/qubit-office/habblaud/
 
 ### Route coverage
 
-**Verified** = opened with the skin ON and OFF/eligible marker checks, screenshot captured.
-**Partial** = shared chrome themed; a deliberately unskinned subsystem is named.
-**Excluded** = untouched by design.
+Statuses:
+- **Visual** — opened with the skin ON; screenshot reviewed; marker present, no document
+  overflow, no console/page errors in the flow.
+- **Smoke** — opened with the skin ON; screenshot captured; marker present, no document overflow,
+  no console/page errors. Uses the same shared primitives as the Visual routes but was not
+  individually design-reviewed in the final pass.
+- **Partial** — shared chrome is themed; the named subsystem is deliberately not themed.
+- **Excluded** — untouched by design.
 
-| Route | Status | Notes |
+| Family | Routes | Status |
 |---|---|---|
-| `/sessions` | Verified | stats, filters, connected platforms, session rows |
-| `/files` | Verified | path bar, drop zone, table, action buttons |
-| `/analytics` | Verified | cards, section spines, series tokens, table markup |
-| `/models` | Verified | period tabs, settings/profiles panels, “Use as”, model picker dialog |
-| `/config` | Verified | section rail, panels, inputs, numeric steppers, toggles |
-| `/plugins` | Verified | install form, toggles, catalog rows, chips; expected 403 memory-local-only |
-| `/skills` | Verified | list/detail chrome |
-| `/mcp` | Verified | server cards and controls |
-| `/channels` | Verified | channel rows and forms |
-| `/system` | Verified | host/labs/curator/gateway panels, loading → ready |
-| `/agents` | Verified | read-only roster rows (client-side navigation; see dev note) |
-| `/agent-workspace` | Verified | files/status panels |
-| `/profiles` | Verified | active banner, profile card, badges |
-| `/qubit-tasks` | Verified | list, filters, status chips |
-| `/qubit-scheduler` | Verified | schedule/TTS/power forms, checkboxes, disabled states |
-| `/qubit-taskflows` | Verified | flow panels |
-| `/qubit-board-admin` | Verified | admin panels/forms |
-| `/admin/users` | Verified | operator/credentials panels |
-| `/checkpoints` | Verified | checkpoint panels |
-| `/qubit-talk` | Verified | voice/TTS panels |
-| `/qubit-tv` | Verified | service cards |
-| `/guide` | Verified | guide sections |
-| `/qubit-chat` | Verified | full React chat: header, mission list, messages, composer, right model/tools/sessions rail |
-| `/chat` | Partial | page chrome and right rail themed; the embedded `qubit --tui` terminal is an xterm canvas and is intentionally not restyled (see `web/AGENTS.md`) |
-| `/qubit-workbench` | Excluded | server document; untouched |
-| `/qubit-hud` | Excluded | untouched |
-| `/qubit-office`, `2`, `3` | Excluded | untouched plugin surfaces |
+| Root / chat | `/` → `/chat`, `/chat` | `/chat` **Partial** (xterm canvas), rest Visual |
+| | `/qubit-chat`, `/webchat`, `/qubit-bot`, `/qubit-harness-router` | `/qubit-chat`, `/webchat` **Visual**; rest **Smoke** |
+| Sessions & tasks | `/sessions`, `/qubit-tasks`, `/qubit-scheduler`, `/qubit-taskflows`, `/qubit-board-admin`, `/checkpoints` | **Visual** |
+| | `/session-ops`, `/worktrees`, `/cron`, `/qubit-task-inbox` | **Smoke** |
+| Files / analytics | `/files`, `/analytics`, `/operations` | `/files`, `/analytics` **Visual**; `/operations` **Visual/Partial** (ported inline body) |
+| | `/logs`, `/reports` | **Smoke** |
+| Models | `/models` | **Visual** |
+| | `/qubit-models`, `/omniroute` | **Smoke** |
+| Config / settings | `/config`, `/plugins`, `/skills`, `/mcp`, `/channels`, `/system`, `/admin/users` | **Visual** |
+| | `/env`, `/webhooks`, `/pairing`, `/admin/skills-review`, `/admin/mcp-calls`, `/profiles/new`, `/docs` | **Smoke** |
+| Profiles | `/profiles` | **Visual** |
+| Agents / tools | `/agents`, `/agent-workspace` | **Visual** |
+| | `/agent-cards`, `/computer`, `/canvas`, `/kitchen` | **Smoke** |
+| Workspace / nodes | `/nodes`, `/devices` | **Smoke** |
+| Voice | `/qubit-talk` | **Visual** |
+| | `/voice-edit` | **Smoke** |
+| Memory | `/qubit-memory`, `/memory` | **Smoke** |
+| Open Viking | `/open-viking` | **Visual** |
+| | `/open-viking/retrieval`, `/uploads`, `/agent-hub`, `/resources`, `/context-store` | **Smoke** |
+| Media / misc | `/qubit-tv`, `/guide` | **Visual** |
+| | `/sakuga-gallery`, `/achievements`, `/qubit-boards`, `/qubit-runtime`, `/qubit-gateway`, `/qubit-approvals` | **Smoke** |
+| Excluded | `/qubit-workbench`, `/qubit-hud`, `/qubit-office`, `/qubit-office2`, `/qubit-office3` | **Excluded** |
 
 ### Known limitations
 
