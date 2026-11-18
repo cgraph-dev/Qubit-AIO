@@ -3491,11 +3491,26 @@
 }
 
 /* The seat-router control belongs to the host chrome, never to the vendored
-   office's panel header. Keep it on the empty outside strip above the
-   connection bar so it cannot cover a room title or a panel control. */
+   office's panel header. It is anchored INSIDE the office shell (the root is
+   `position: relative`), never to the viewport:
+   - `position: fixed` put it over the dashboard's own top bar. Measured live:
+     at 390x844 the button sat on the mobile header wordmark (y≈12..44) and the
+     header span intercepted every click; at 1024/1440 it floated inside the
+     page-header band. Absolute positioning confines it to the office region,
+     which always begins BELOW the page header.
+   - `top: var(--office-dock-top)` is the same measured offset the side sheets
+     use to clear the vendored app's fixed top bar (74px + 60px usage row =
+     134px; the token is 138px), so the toggle clears the frame's top bar and
+     the injected Panels group at every width.
+   - `z-index: 3` is BELOW the dock layer (4): an open Agents/HUD sheet paints
+     over the toggle, so it can never cover the dock's own close button. It
+     stays above the frame (auto) and below the menu fallbacks (5).
+   Tap and keyboard access are unchanged: it is still the same in-tree
+   `sakuga-button` (type=button) and only its winning box moved. */
 .office-game > .seat-model__toggle {
-  position: fixed;
-  top: 0.65rem;
-  right: 9rem;
-  z-index: 50;
+  position: absolute;
+  top: var(--office-dock-top);
+  right: var(--office-s3);
+  z-index: 3;
+  max-width: calc(100% - (2 * var(--office-s3)));
 }

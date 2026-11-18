@@ -100,6 +100,33 @@ describe("Qubit Office embedding", () => {
       .toBeUndefined();
   });
 
+  it("keeps the seat toggle a direct child of the shell root", () => {
+    // The responsive containment rule is `.office-game > .seat-model__toggle`
+    // (absolute, below the vendored top bar, under the dock layer). A wrapper
+    // element would break that combinator and let the toggle escape to the
+    // viewport again — the exact bug where it covered the dashboard header.
+    const h = createHarness();
+    const App = createOfficeApp(h.React as never, h.hooks as never);
+    App({
+      seatAgentId: 3,
+      seats: [{ agent_id: 3, slug: "lead-quality" }],
+    });
+    const root = h.tree.find((e) => e.props["data-testid"] === "office-app");
+    const toggle = h.tree.find(
+      (e) => e.props["data-testid"] === "seat-model-toggle");
+    expect(root).toBeDefined();
+    expect(toggle).toBeDefined();
+    // Still the real Sakuga host button (shadow DOM keeps keyboard/tap), with
+    // the class the stylesheet targets.
+    expect(toggle?.type).toBe("sakuga-button");
+    expect(toggle?.props.type).toBe("button");
+    expect(String(toggle?.props.className)).toContain("seat-model__toggle");
+    const children = (root?.props.children as unknown[])
+      .flatMap((child) => (Array.isArray(child) ? child : [child]));
+    expect(children).toContain(toggle);
+    h.cleanup();
+  });
+
   it("lists the office's own seats in the picker once opened", () => {
     // The picker is fed by the tower payload's characters, so the seats drawn
     // in the office are exactly the seats that can be configured.

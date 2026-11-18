@@ -158,3 +158,67 @@ describe("dock toolbar clearance", () => {
     expect(base?.[1] ?? "").toMatch(/position:\s*absolute/);
   });
 });
+
+/*
+ * Seat-toggle containment — the measured header collision.
+ *
+ * `.office-game > .seat-model__toggle` used to be `position: fixed; top:
+ * .65rem; right: 9rem`. Fixed is viewport-relative, so at 390x844 the button
+ * sat on the dashboard's mobile header wordmark (measured y≈11.7..43.7 over the
+ * `Qubit AiO` span) and Playwright's click was intercepted by that header; at
+ * 1024 and 1440 it floated inside the page-header band. The office host starts
+ * below the dashboard header, so anchoring the toggle to the office root
+ * (`position: absolute`) is what removes the header from its reachable area.
+ */
+describe("seat toggle containment", () => {
+  const TOPBAR_MAX = 134; // 74px bar + 60px usage row; 108 on phones
+  const DOCK_TOP = tokenPx("--office-dock-top");
+
+  const rule = /\.office-game\s*>\s*\.seat-model__toggle\s*\{([^}]*)\}/.exec(css);
+  const body = rule?.[1] ?? "";
+
+  it("anchors the toggle to the office shell, not the viewport", () => {
+    expect(rule).not.toBeNull();
+    expect(body).toMatch(/position:\s*absolute/);
+    // `fixed` resolves against the viewport and escapes the office region —
+    // the exact bug: it covered the dashboard's mobile header at 390/768.
+    expect(body).not.toMatch(/position:\s*fixed/);
+    // Absolute containment needs a positioned office root.
+    const root = /\.office-game:has\(>\s*\.office-game__main\)\s*\{([^}]*)\}/
+      .exec(css);
+    expect(root).not.toBeNull();
+    expect(root?.[1] ?? "").toMatch(/position:\s*relative/);
+  });
+
+  it("drops below the vendored top bar, sharing the dock offset token", () => {
+    expect(body).toMatch(/top:\s*var\(--office-dock-top\)/);
+    // Same measured token the side sheets use, so it cannot drift from the
+    // tallest bar (74 + 60 = 134px) and never covers the Panels group.
+    expect(DOCK_TOP).toBeGreaterThanOrEqual(TOPBAR_MAX);
+    // One spacing step of inset, not a magic 9rem that could land it over a
+    // global control on a narrow viewport.
+    expect(body).toMatch(/right:\s*var\(--office-s3\)/);
+  });
+
+  it("stays below the dock layer so a sheet never covers its own close button", () => {
+    const z = /z-index:\s*(-?\d+)/.exec(body);
+    expect(z).not.toBeNull();
+    const dockBase = /\.office-game__dock\s*\{([^}]*)\}/.exec(css);
+    const dockZ = /z-index:\s*(-?\d+)/.exec(dockBase?.[1] ?? "");
+    expect(dockZ).not.toBeNull();
+    expect(Number(z?.[1])).toBeLessThan(Number(dockZ?.[1]));
+  });
+
+  it("fits every measured width without horizontal overflow", () => {
+    // Measured button box on the live page: 101.3 x 32px. The office shell
+    // clips overflow, so the inset + width must fit the narrowest target.
+    const measuredToggle = 101.3;
+    for (const viewport of [390, 768, 1024, 1440]) {
+      expect(GAP + measuredToggle, `toggle @${viewport}`)
+        .toBeLessThanOrEqual(viewport);
+    }
+    // Long labels ellipsize instead of pushing the shell wider.
+    expect(body).toMatch(
+      /max-width:\s*calc\(100%\s*-\s*\(2\s*\*\s*var\(--office-s3\)\)\)/);
+  });
+});
