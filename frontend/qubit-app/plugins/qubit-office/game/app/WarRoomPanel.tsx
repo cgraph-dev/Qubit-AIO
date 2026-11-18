@@ -5,7 +5,7 @@
  * evidence, reads the recorded debate/dissent, and records the owner decision.
  * An empty store is a named empty state; a refusal shows its type and code.
  *
- * The directory tab renders the shipped TEMPLATES (132 roles, 100 floors) and
+ * The directory tab renders the shipped TEMPLATES (145 roles, 5 floors) and
  * never dresses a template as a staffed agent.
  */
 import type { OfficeGameShellProps } from "../OfficeGameShell";

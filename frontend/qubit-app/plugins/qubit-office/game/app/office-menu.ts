@@ -167,7 +167,7 @@ export const MENU_BUTTONS: readonly MenuButtonSpec[] = [
   {
     id: "campus",
     label: "Campus",
-    title: "Campus: floor scenes and the 100-floor directory",
+    title: "Campus: floor scenes and the 5-floor directory",
     testId: "office-menu-campus",
     icon: CAMPUS_ICON,
     controls: "office-game-campus",

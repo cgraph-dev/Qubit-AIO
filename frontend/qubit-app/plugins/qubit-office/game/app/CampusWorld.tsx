@@ -19,7 +19,7 @@
  *
  * SCOPE
  * -----
- * The full 100-floor tower is not rendered at once: mounting 100 copies of the
+ * The five-floor tower is not rendered at once: mounting five copies of the
  * Habblaud application is not viable. The world loads a bounded window (live
  * floors first, then the template floors nearest them) and offers incremental
  * "load more" controls. Live floors are always in the window.

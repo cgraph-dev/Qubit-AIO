@@ -1,4 +1,4 @@
-"""The shipped corporation catalog: departments, 100+ roles and 100 floors.
+"""The shipped corporation catalog: departments, 100+ roles and five product floors.
 
 This module is *data*, plus two tiny projections. It defines no behaviour worth
 testing on its own; :class:`voicebridge.business.roles.RoleRegistry` validates
@@ -2783,6 +2783,10 @@ ROLE_TEMPLATES: tuple[RoleTemplate, ...] = (
 )
 
 _WINGS = ("north", "east", "south", "west", "central")
+
+#: The product office/campus is capped at five floors. The full 100-floor
+#: catalog remains available for explicit scale fixtures/tests.
+PRODUCT_FLOOR_COUNT = 5
 _DESK_SHAPES = (9, 12, 18, 24)
 _ROOM_KINDS = ("work", "war_room", "focus", "ops")
 

@@ -1,6 +1,6 @@
 """Assign Business OS agents to real tower desks, deterministically.
 
-This is the explicit bridge between the 283 office seats and the 100-floor
+This is the explicit bridge between the 283 office seats and the five-floor
 world plan. It never invents a desk: a desk id comes from the shipped tower
 projection. The placement source is recorded so the UI can distinguish an
 organisational assignment from a manually pinned ``metadata.world_*`` link.
@@ -28,7 +28,7 @@ def _preferred_floor(agent: Any) -> Optional[int]:
         value = int(str(raw).strip())
     except (TypeError, ValueError):
         return None
-    return value if 1 <= value <= 100 else None
+    return value if 1 <= value <= 5 else None
 
 
 def assign_agents(service: Any, tenant_id: str, *, business_id: Optional[str] = None,
@@ -40,7 +40,7 @@ def assign_agents(service: Any, tenant_id: str, *, business_id: Optional[str] = 
     a free desk. An explicit existing ``metadata.world_desk`` is preserved and
     reserved. Nothing is assigned twice.
     """
-    registry = RoleRegistry.default()
+    registry = RoleRegistry.product()
     index = occupancy._Index(registry.floors)
     agents = service.list(tenant_id, business_id=business_id)
     used: set[str] = set()
@@ -55,7 +55,7 @@ def assign_agents(service: Any, tenant_id: str, *, business_id: Optional[str] = 
         by_floor.setdefault(desk.floor_index, []).append(desk)
     active_floors = sorted(
         (n for n, desks in by_floor.items()
-         if n <= 100 and any(d.floor_active for d in desks)),
+         if n <= 5 and any(d.floor_active for d in desks)),
     )
 
     assigned: List[Dict[str, Any]] = []
