@@ -52,3 +52,42 @@ Effects are presentation only. Pages fire a cue for real outcomes only:
 success after a successful save/load action, `error` on a caught API/validation
 failure, `warning` for destructive or revoking actions, `approval` for staged
 approvals. Buttons fire `impact` by default from the wrapper.
+
+## Sweep status (2026-11-18)
+
+Swept (controls imported from `@/sakuga/ui`):
+
+| Page | Buttons | Inputs | Selects | Toggle/Checkbox |
+|---|---|---|---|---|
+| DocsPage | 3 | 1 | 0 | 0 |
+| AnalyticsPage | 2 | 0 | 0 | 0 |
+| AgentsPage | 1 | 0 | 0 | 0 |
+| AgentCardsPage | 2 | 0 | 0 | 0 |
+| PairingPage | 3 | 0 | 0 | 0 |
+| QubitTvPage | 5 | 2 | 0 | 0 |
+| FilesPage | 11 | 2 | 0 | 0 |
+| ModelsPage | 20 | 1 | 1 | 1 |
+| PluginsPage | 19 | 4 | 4 | 3 |
+| ChannelsPage | 20 | 3 | 0 | 1 |
+| ConfigPage | 10 | 1 | 2 | 1 |
+| SystemPage | 37 | 8 | 1 | 2 |
+| WebhooksPage | 14 | 4 | 0 | 0 |
+| LogsPage | 5 | 1 | 0 | 1 |
+
+**Not yet swept (controls remain).** These are unimplemented work, not
+accepted exceptions:
+
+`AgentWorkspacePage`, `BoardAdminPage`, `CanvasPage` (canvas controls are an
+exception; its toolbar is not), `CheckpointsPage`, `CronPage`, `DevicesPage`,
+`EnvPage`, `HarnessRouterPage`, `KitchenPage`, `McpCallsPage`, `McpPage`,
+`MemoryBackendsPage`, `NodesPage`, `OmniRoutePage`, `OpenVikingAgentHubPage`,
+`OpenVikingPage`, `OpenVikingResourcesPage`, `OpenVikingRetrievalPage`,
+`OpenVikingStudioPage`, `OpenVikingUploadsPage`, `ProfileBuilderPage`,
+`ProfilesPage`, `QubitBotPage`, `SchedulerMediaPage`, `SessionOpsPage`,
+`SkillsPage`, `SkillsReviewPage`, `TalkPage`, `TaskflowsPage`, `TaskInboxPage`,
+`TasksPage`, `UsersAdminPage`, `VoiceEditPage` (xterm/audio internals are an
+exception; its forms are not), `WebChatPage`, `WorktreesPage`,
+`src/plugins/PluginPage.tsx`.
+
+Excluded by the task scope: `ChatPage.tsx`, `TerminalChatPage.tsx`,
+`SessionsPage.tsx`, `src/App.tsx`, `src/components/**`.
