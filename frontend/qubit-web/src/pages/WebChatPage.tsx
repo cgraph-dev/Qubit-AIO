@@ -359,6 +359,7 @@ export function WebChatPage() {
         <Button
           aria-label="Send"
           data-testid="webchat-send"
+          className="qb-send-btn"
           disabled={streaming || status === "loading" || !input.trim()}
           onClick={handleSend}
         >

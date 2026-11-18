@@ -12,6 +12,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const botMocks = vi.hoisted(() => ({
   listBotThreads: vi.fn(),
@@ -184,7 +186,7 @@ function text(): string {
 }
 
 function clickButton(label: string) {
-  const btn = Array.from(container!.querySelectorAll("button")).find(
+  const btn = Array.from(container!.querySelectorAll("button, sakuga-button")).find(
     (b) =>
       (b.textContent ?? "").trim() === label ||
       b.getAttribute("aria-label") === label,
@@ -195,23 +197,21 @@ function clickButton(label: string) {
   });
 }
 
-function setInputById(id: string, value: string) {
-  const el = container!.querySelector(`#${id}`) as
-    | HTMLInputElement
-    | HTMLTextAreaElement
-    | null;
+async function setInputById(id: string, value: string) {
+  const el = container!.querySelector(`#${id}`) as HTMLElement | null;
   expect(el, `input ${id}`).not.toBeNull();
-  // The composer is a multi-line <textarea> (upstream multiline TextInput);
-  // the remaining controls are single-line <input>s. Pick the prototype that
-  // matches the element so React's value tracker sees the change.
-  const proto =
-    el instanceof HTMLTextAreaElement
-      ? HTMLTextAreaElement.prototype
-      : HTMLInputElement.prototype;
-  const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
+  if (el?.tagName.toLowerCase() === "textarea") {
+    const area = el as unknown as HTMLTextAreaElement;
+    const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+    act(() => {
+      setter!.call(area, value);
+      area.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+    return;
+  }
+  await waitForSakuga(el);
   act(() => {
-    setter!.call(el, value);
-    el!.dispatchEvent(new Event("input", { bubbles: true }));
+    typeIntoSakuga(el, value);
   });
 }
 
@@ -253,7 +253,7 @@ describe("QubitBotPage", () => {
   it("sends a turn with the composer text", async () => {
     renderPage();
     await flush();
-    setInputById("bot-composer", "hello bot");
+    await setInputById("bot-composer", "hello bot");
     await flush();
     clickButton("Send message");
     await flush();
@@ -265,7 +265,7 @@ describe("QubitBotPage", () => {
   it("queues follow-ups locally in order and resumes them on demand", async () => {
     renderPage();
     await flush();
-    setInputById("bot-followup", "second question");
+    await setInputById("bot-followup", "second question");
     await flush();
     clickButton("Queue");
     await flush();
@@ -283,7 +283,7 @@ describe("QubitBotPage", () => {
   it("looks up a task and shows its plan", async () => {
     renderPage();
     await flush();
-    setInputById("bot-task-lookup", "task-1");
+    await setInputById("bot-task-lookup", "task-1");
     await flush();
     clickButton("Look up");
     await flush();
@@ -294,12 +294,12 @@ describe("QubitBotPage", () => {
   it("launches a delegated task with title and prompt", async () => {
     renderPage();
     await flush();
-    const launchBtn = Array.from(container!.querySelectorAll("button")).find(
+    const launchBtn = Array.from(container!.querySelectorAll("button, sakuga-button")).find(
       (b) => (b.textContent ?? "").trim() === "Launch",
     ) as HTMLButtonElement;
     expect(launchBtn.disabled).toBe(true);
-    setInputById("bot-launch-title", "Digest");
-    setInputById("bot-launch-prompt", "Summarize the inbox");
+    await setInputById("bot-launch-title", "Digest");
+    await setInputById("bot-launch-prompt", "Summarize the inbox");
     await flush();
     clickButton("Launch");
     await flush();
@@ -311,7 +311,7 @@ describe("QubitBotPage", () => {
   it("pauses and retries the looked-up task", async () => {
     renderPage();
     await flush();
-    setInputById("bot-task-lookup", "task-1");
+    await setInputById("bot-task-lookup", "task-1");
     await flush();
     clickButton("Look up");
     await flush();
@@ -338,12 +338,12 @@ describe("QubitBotPage", () => {
   it("records goals and watches, and lists the unread alert", async () => {
     renderPage();
     await flush();
-    setInputById("bot-goal-title", "Ship it");
+    await setInputById("bot-goal-title", "Ship it");
     await flush();
     clickButton("Record goal");
     await flush();
     expect(botMocks.setBotGoal).toHaveBeenCalledTimes(1);
-    setInputById("bot-watch-title", "Docs watch");
+    await setInputById("bot-watch-title", "Docs watch");
     await flush();
     clickButton("Record watch");
     await flush();
@@ -354,13 +354,13 @@ describe("QubitBotPage", () => {
   it("looks up a rich card", async () => {
     renderPage();
     await flush();
-    const lookupBtn = Array.from(container!.querySelectorAll("button")).find(
+    const lookupBtn = Array.from(container!.querySelectorAll("button, sakuga-button")).find(
       (b) => (b.textContent ?? "").trim() === "Look up",
     ) as HTMLButtonElement;
     expect(lookupBtn, "a Look up button").not.toBeNull();
-    setInputById("bot-card-lookup", "card-1");
+    await setInputById("bot-card-lookup", "card-1");
     await flush();
-    const cardBtns = Array.from(container!.querySelectorAll("button")).filter(
+    const cardBtns = Array.from(container!.querySelectorAll("button, sakuga-button")).filter(
       (b) => (b.textContent ?? "").trim() === "Look up",
     );
     act(() => {

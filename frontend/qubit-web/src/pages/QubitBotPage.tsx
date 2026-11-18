@@ -23,14 +23,12 @@ import { ChevronDown, FileText, Plus, RotateCcw, Square, X } from "lucide-react"
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Toast } from "@nous-research/ui/ui/components/toast";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
+
 import {
   DISABLED_BOT_ACTIONS,
   QUBIT_BOT_TASK_STATES,
@@ -230,7 +228,10 @@ export default function QubitBotPage() {
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
 
   const [brokerConfirm, setBrokerConfirm] = useState<{ title: string; description: string } | null>(null);
   const confirmResolverRef = useRef<((ok: boolean) => void) | null>(null);
@@ -684,7 +685,7 @@ export default function QubitBotPage() {
               <p>{historyError}</p>
             </div>
             <div className="qb-actions-row">
-              <Button outlined size="sm" onClick={() => setHistoryAttempt((a) => a + 1)}>
+              <Button variant="secondary" onClick={() => setHistoryAttempt((a) => a + 1)}>
                 Retry loading conversation
               </Button>
             </div>
@@ -701,7 +702,7 @@ export default function QubitBotPage() {
             </p>
             <div className="qb-starters">
               {STARTER_PROMPTS.map((prompt) => (
-                <button
+                <Button variant="secondary"
                   key={prompt.label}
                   type="button"
                   className="qb-starter-btn"
@@ -714,7 +715,7 @@ export default function QubitBotPage() {
                   }}
                 >
                   {prompt.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>
@@ -773,7 +774,7 @@ export default function QubitBotPage() {
         {/* Recent results affordance (upstream, non-rich mode) */}
         {!visible.length && (tasks.length > 0 || card) ? (
           <div className="qb-actions-row">
-            <Button outlined size="sm" onClick={() => setShowResults((v) => !v)}>
+            <Button variant="secondary" onClick={() => setShowResults((v) => !v)}>
               {showResults ? "Hide recent results" : "Recent results"}
             </Button>
           </div>
@@ -805,7 +806,7 @@ export default function QubitBotPage() {
               <p>{error}</p>
             </div>
             <div className="qb-actions-row">
-              <Button outlined size="sm" disabled={replying || !loaded} onClick={retry}>
+              <Button variant="secondary" disabled={replying || !loaded} onClick={retry}>
                 <RotateCcw size={15} />
                 Retry response
               </Button>
@@ -817,7 +818,7 @@ export default function QubitBotPage() {
       {/* Jump-to-latest */}
       {awayFromLatest ? (
         <div className="qb-jump-latest">
-          <Button outlined size="sm" onClick={jumpToLatest}>
+          <Button variant="secondary" onClick={jumpToLatest}>
             <ChevronDown size={15} />
             Latest messages
           </Button>
@@ -831,7 +832,7 @@ export default function QubitBotPage() {
             <div className="qb-error">
               <p>{saveError}</p>
             </div>
-            <Button outlined size="sm" disabled={busy} onClick={saveHistoryRetry}>
+            <Button variant="secondary" disabled={busy} onClick={saveHistoryRetry}>
               Retry saving conversation
             </Button>
           </div>
@@ -849,21 +850,20 @@ export default function QubitBotPage() {
                   <span className="qb-queue-item-text" title={message.text}>
                     {message.text}
                   </span>
-                  <button
+                  <Button variant="secondary"
                     type="button"
                     className="qb-queue-remove"
                     aria-label={`Remove queued message: ${message.text}`}
                     onClick={() => queue.remove(message.id)}
                   >
                     <X size={16} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
             {outbox.paused ? (
               <Button
-                outlined
-                size="sm"
+                variant="secondary"
                 disabled={replying || !!saveError}
                 onClick={() => {
                   queue.resume();
@@ -884,8 +884,8 @@ export default function QubitBotPage() {
               {documents.length ? (
                 documents.map((f) => (
                   <label key={f.id} className="qb-check-row">
-                    <input
-                      type="checkbox"
+                    <Checkbox
+                      label={f.name}
                       checked={attachments.includes(f.id)}
                       onChange={() =>
                         setAttachments((ids) =>
@@ -903,7 +903,7 @@ export default function QubitBotPage() {
               )}
             </div>
             <div className="qb-actions-row">
-              <Button outlined size="sm" onClick={() => setPicking(false)}>
+              <Button variant="secondary" onClick={() => setPicking(false)}>
                 Done
               </Button>
             </div>
@@ -917,7 +917,7 @@ export default function QubitBotPage() {
               {documents
                 .filter((f) => attachments.includes(f.id))
                 .map((f) => (
-                  <button
+                  <Button variant="secondary"
                     key={f.id}
                     type="button"
                     className="qb-attach-chip"
@@ -927,12 +927,12 @@ export default function QubitBotPage() {
                     <FileText size={14} />
                     <span className="qb-attach-chip-text">{f.name}</span>
                     <X size={13} />
-                  </button>
+                  </Button>
                 ))}
             </div>
           ) : null}
           <div className="qb-composer-row">
-            <button
+            <Button variant="secondary"
               type="button"
               className={`qb-plus-btn ${picking ? "qb-plus-btn-active" : ""}`}
               aria-label="Attach a document"
@@ -940,7 +940,7 @@ export default function QubitBotPage() {
               onClick={() => setPicking((v) => !v)}
             >
               <Plus size={22} />
-            </button>
+            </Button>
             {/* Upstream's TextInput is `multiline`: a web <textarea> that grows
                 from 44px to 140px with content (auto-resize on input), Enter
                 sends, Shift+Enter inserts a newline, and it collapses back to
@@ -974,7 +974,7 @@ export default function QubitBotPage() {
                 }
               }}
             />
-            <button
+            <Button variant="secondary"
               type="button"
               className="qb-send-btn"
               aria-label={replying ? "Stop reply" : "Send message"}
@@ -983,7 +983,7 @@ export default function QubitBotPage() {
             >
               {replying ? <Square size={18} fill="currentColor" strokeWidth={0} /> : null}
               {!replying ? <ArrowUpGlyph /> : null}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -992,7 +992,7 @@ export default function QubitBotPage() {
       {/* Collapsed by default so the page opens as the pure chat surface;
           expanding reveals the durable-work panels and scrolls within itself. */}
       <div className="qb-below">
-        <button
+        <Button variant="secondary"
           type="button"
           className="qb-below-toggle"
           aria-expanded={showWorkspace}
@@ -1000,12 +1000,12 @@ export default function QubitBotPage() {
         >
           <ChevronDown size={16} />
           {showWorkspace ? "Hide bot workspace" : "Show bot workspace"}
-        </button>
+        </Button>
         <div className="qb-below-body" hidden={!showWorkspace}>
         <div className="qb-thread-bar">
           <h2 className="text-xl font-semibold">Qubit Bot workspace</h2>
           <div className="qb-actions-row">
-            <Button outlined size="sm" onClick={() => loadAll()} disabled={loading}>
+            <Button variant="secondary" onClick={() => loadAll()} disabled={loading}>
               Reload
             </Button>
           </div>
@@ -1039,7 +1039,7 @@ export default function QubitBotPage() {
                         ) : null}
                         {drafts[t.id] ? <Badge tone="secondary">draft</Badge> : null}
                         {pending > 0 ? <Badge tone="outline">{pending} queued</Badge> : null}
-                        <Button outlined size="sm" disabled={busy || isActive} onClick={() => openThread(t.id)}>
+                        <Button variant="secondary" disabled={busy || isActive} onClick={() => openThread(t.id)}>
                           Open
                         </Button>
                       </li>
@@ -1062,8 +1062,9 @@ export default function QubitBotPage() {
                 <div className="flex items-end gap-2 flex-wrap">
                   <Input
                     id="bot-followup"
+                    label="Follow-up"
                     value={followupDraft}
-                    onChange={(e) => setFollowupDraft(e.target.value)}
+                    onChange={setFollowupDraft}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();
@@ -1072,10 +1073,10 @@ export default function QubitBotPage() {
                     }}
                     placeholder="Queue a follow-up…"
                   />
-                  <Button outlined disabled={!followupDraft.trim()} onClick={() => queueFollowup()}>
+                  <Button variant="secondary" disabled={!followupDraft.trim()} onClick={() => queueFollowup()}>
                     Queue
                   </Button>
-                  <Button outlined disabled={outbox.pending.length === 0} onClick={() => {
+                  <Button variant="secondary" disabled={outbox.pending.length === 0} onClick={() => {
                     queue.resume();
                     flush();
                   }}>
@@ -1093,19 +1094,16 @@ export default function QubitBotPage() {
               <h2 className="font-medium">Delegated tasks</h2>
               <div className="space-y-1">
                 <Label htmlFor="bot-task-state">State filter</Label>
-                <select
+                <Select
                   id="bot-task-state"
-                  className="rounded-md border bg-background px-2 py-1 text-sm"
+                  label="State filter"
                   value={taskFilter}
-                  onChange={(e) => setTaskFilter(e.target.value)}
-                >
-                  <option value="">all states</option>
-                  {QUBIT_BOT_TASK_STATES.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
+                  onChange={setTaskFilter}
+                  options={[
+                    { value: "", label: "all states" },
+                    ...QUBIT_BOT_TASK_STATES.map((s) => ({ value: s, label: s })),
+                  ]}
+                />
               </div>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -1121,7 +1119,7 @@ export default function QubitBotPage() {
                     <code className="text-xs font-mono">{t.id}</code>
                     {t.status ? <Badge tone="outline">{t.status}</Badge> : null}
                     {t.kind ? <Badge tone="secondary">{t.kind}</Badge> : null}
-                    <button
+                    <Button variant="secondary"
                       type="button"
                       className="underline underline-offset-2"
                       onClick={() => {
@@ -1130,7 +1128,7 @@ export default function QubitBotPage() {
                       }}
                     >
                       {t.title ?? t.id}
-                    </button>
+                    </Button>
                     {t.progressPercent !== undefined ? (
                       <span className="text-muted-foreground">· {t.progressPercent}%</span>
                     ) : null}
@@ -1143,8 +1141,9 @@ export default function QubitBotPage() {
                 <Label htmlFor="bot-task-lookup">Task lookup</Label>
                 <Input
                   id="bot-task-lookup"
+                    label="Task lookup"
                   value={taskLookup}
-                  onChange={(e) => setTaskLookup(e.target.value)}
+                  onChange={setTaskLookup}
                   placeholder="task, receipt, or session id"
                 />
               </div>
@@ -1153,7 +1152,7 @@ export default function QubitBotPage() {
               </Button>
               {taskDetail ? (
                 <Button
-                  outlined
+                  variant="secondary"
                   disabled={busy}
                   onClick={() => setShowTaskInline((v) => !v)}
                 >
@@ -1220,16 +1219,16 @@ export default function QubitBotPage() {
               </dl>
             ) : null}
             <div className="flex items-end gap-2 flex-wrap">
-              <Button outlined disabled={busy || (!taskDetail && !taskLookup.trim())} onClick={() => runTaskControl("pause")}>
+              <Button variant="secondary" disabled={busy || (!taskDetail && !taskLookup.trim())} onClick={() => runTaskControl("pause")}>
                 Pause
               </Button>
-              <Button outlined disabled={busy || (!taskDetail && !taskLookup.trim())} onClick={() => runTaskControl("resume")}>
+              <Button variant="secondary" disabled={busy || (!taskDetail && !taskLookup.trim())} onClick={() => runTaskControl("resume")}>
                 Resume
               </Button>
               <Button disabled={busy || (!taskDetail && !taskLookup.trim())} onClick={() => runTaskControl("cancel")}>
                 Cancel
               </Button>
-              <Button outlined disabled={busy || (!taskDetail && !taskLookup.trim())} onClick={() => runTaskControl("retry")}>
+              <Button variant="secondary" disabled={busy || (!taskDetail && !taskLookup.trim())} onClick={() => runTaskControl("retry")}>
                 Retry
               </Button>
             </div>
@@ -1240,8 +1239,9 @@ export default function QubitBotPage() {
                   <Label htmlFor="bot-launch-title">Title</Label>
                   <Input
                     id="bot-launch-title"
+                    label="Task title"
                     value={launchTitle}
-                    onChange={(e) => setLaunchTitle(e.target.value)}
+                    onChange={setLaunchTitle}
                     placeholder="Task title"
                   />
                 </div>
@@ -1249,8 +1249,9 @@ export default function QubitBotPage() {
                   <Label htmlFor="bot-launch-prompt">Prompt</Label>
                   <Input
                     id="bot-launch-prompt"
+                    label="What should the worker do"
                     value={launchPrompt}
-                    onChange={(e) => setLaunchPrompt(e.target.value)}
+                    onChange={setLaunchPrompt}
                     placeholder="What should the worker do…"
                   />
                 </div>
@@ -1293,13 +1294,13 @@ export default function QubitBotPage() {
                       </ul>
                     ) : null}
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Button outlined size="sm" disabled={busy} onClick={() => runIdea("accept", idea.id)}>
+                      <Button variant="secondary" disabled={busy} onClick={() => runIdea("accept", idea.id)}>
                         Accept
                       </Button>
-                      <Button outlined size="sm" disabled={busy} onClick={() => saveIdeaEdit(idea)}>
+                      <Button variant="secondary" disabled={busy} onClick={() => saveIdeaEdit(idea)}>
                         Save edit
                       </Button>
-                      <Button outlined size="sm" disabled={busy} onClick={() => runIdea("dismiss", idea.id)}>
+                      <Button variant="secondary" disabled={busy} onClick={() => runIdea("dismiss", idea.id)}>
                         Dismiss
                       </Button>
                     </div>
@@ -1354,8 +1355,9 @@ export default function QubitBotPage() {
                 <Label htmlFor="bot-goal-title">Goal title</Label>
                 <Input
                   id="bot-goal-title"
+                    label="Goal title"
                   value={goalTitle}
-                  onChange={(e) => setGoalTitle(e.target.value)}
+                  onChange={setGoalTitle}
                   placeholder="Goal title"
                 />
               </div>
@@ -1363,12 +1365,13 @@ export default function QubitBotPage() {
                 <Label htmlFor="bot-goal-description">Description</Label>
                 <Input
                   id="bot-goal-description"
+                    label="What does done look like"
                   value={goalDescription}
-                  onChange={(e) => setGoalDescription(e.target.value)}
+                  onChange={setGoalDescription}
                   placeholder="What does done look like…"
                 />
               </div>
-              <Button outlined disabled={busy || !goalTitle.trim()} onClick={() => saveGoal()}>
+              <Button variant="secondary" disabled={busy || !goalTitle.trim()} onClick={() => saveGoal()}>
                 Record goal
               </Button>
             </div>
@@ -1377,8 +1380,9 @@ export default function QubitBotPage() {
                 <Label htmlFor="bot-watch-title">Watch title</Label>
                 <Input
                   id="bot-watch-title"
+                    label="Watch title"
                   value={watchTitle}
-                  onChange={(e) => setWatchTitle(e.target.value)}
+                  onChange={setWatchTitle}
                   placeholder="Watch title"
                 />
               </div>
@@ -1386,12 +1390,13 @@ export default function QubitBotPage() {
                 <Label htmlFor="bot-watch-url">Address</Label>
                 <Input
                   id="bot-watch-url"
+                    label="Watch URL"
                   value={watchUrl}
-                  onChange={(e) => setWatchUrl(e.target.value)}
+                  onChange={setWatchUrl}
                   placeholder="https://…"
                 />
               </div>
-              <Button outlined disabled={busy || !watchTitle.trim()} onClick={() => saveWatch()}>
+              <Button variant="secondary" disabled={busy || !watchTitle.trim()} onClick={() => saveWatch()}>
                 Record watch
               </Button>
             </div>
@@ -1407,11 +1412,11 @@ export default function QubitBotPage() {
                       <span className="font-medium">{a.title}</span>
                       {a.body ? <span className="text-muted-foreground">{a.body}</span> : null}
                       {a.taskId ? (
-                        <Button outlined size="sm" onClick={() => viewAlertTask(a.taskId as string)}>
+                        <Button variant="secondary" onClick={() => viewAlertTask(a.taskId as string)}>
                           View task
                         </Button>
                       ) : null}
-                      <Button outlined size="sm" onClick={() => dismissAlert(a.id)}>
+                      <Button variant="secondary" onClick={() => dismissAlert(a.id)}>
                         Dismiss
                       </Button>
                     </li>
@@ -1462,8 +1467,9 @@ export default function QubitBotPage() {
                 <Label htmlFor="bot-card-lookup">Card id</Label>
                 <Input
                   id="bot-card-lookup"
+                    label="Card id"
                   value={cardLookup}
-                  onChange={(e) => setCardLookup(e.target.value)}
+                  onChange={setCardLookup}
                   placeholder="card id"
                 />
               </div>
@@ -1504,7 +1510,6 @@ export default function QubitBotPage() {
           brokerConfirm?.description ?? "The bot backend staged this change for confirmation."
         }
       />
-      {toast ? <Toast toast={toast} /> : null}
     </div>
   );
 }

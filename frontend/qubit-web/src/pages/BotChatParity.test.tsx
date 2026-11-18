@@ -12,6 +12,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 import path from "node:path";
 
 const botMocks = vi.hoisted(() => ({
@@ -82,14 +84,20 @@ async function flush() {
 /** Set a controlled field's value using the prototype React tracks. The
  *  composer is a multi-line <textarea> (upstream multiline TextInput); the
  *  other controls are single-line <input>s. */
-function setFieldValue(field: HTMLInputElement | HTMLTextAreaElement, value: string) {
+function setFieldValue(field: HTMLElement, value: string) {
+  if (field.tagName.toLowerCase() === "sakuga-input") {
+    act(() => {
+      typeIntoSakuga(field, value);
+    });
+    return;
+  }
   const proto =
     field instanceof HTMLTextAreaElement
       ? HTMLTextAreaElement.prototype
       : HTMLInputElement.prototype;
   const setter = Object.getOwnPropertyDescriptor(proto, "value")?.set;
   act(() => {
-    setter!.call(field, value);
+    setter!.call(field as HTMLInputElement, value);
     field.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
@@ -231,10 +239,10 @@ describe("QubitBotPage ported chat surface (openmuse chat.tsx)", () => {
     );
     await flush();
     // The composer is a multi-line <textarea> (upstream multiline TextInput).
-    const composer = el.querySelector("#bot-composer") as HTMLTextAreaElement;
+    const composer = el.querySelector("#bot-composer") as HTMLElement;
     setFieldValue(composer, "start");
     act(() => {
-      const send = [...el.querySelectorAll("button")].find(
+      const send = [...el.querySelectorAll("button, sakuga-button")].find(
         (b) => b.getAttribute("aria-label") === "Send message",
       ) as HTMLButtonElement;
       send.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -243,7 +251,7 @@ describe("QubitBotPage ported chat surface (openmuse chat.tsx)", () => {
     const followup = el.querySelector("#bot-followup") as HTMLInputElement;
     setFieldValue(followup, "held follow-up");
     await flush();
-    const queueBtn = [...el.querySelectorAll("button")].find(
+    const queueBtn = [...el.querySelectorAll("button, sakuga-button")].find(
       (b) => (b.textContent ?? "").trim() === "Queue",
     ) as HTMLButtonElement;
     act(() => queueBtn.dispatchEvent(new MouseEvent("click", { bubbles: true })));
@@ -274,10 +282,10 @@ describe("QubitBotPage ported chat surface (openmuse chat.tsx)", () => {
     );
     await flush();
     // The composer is a multi-line <textarea> (upstream multiline TextInput).
-    const composer = el.querySelector("#bot-composer") as HTMLTextAreaElement;
+    const composer = el.querySelector("#bot-composer") as HTMLElement;
     setFieldValue(composer, "first");
     act(() => {
-      const send = [...el.querySelectorAll("button")].find(
+      const send = [...el.querySelectorAll("button, sakuga-button")].find(
         (b) => b.getAttribute("aria-label") === "Send message",
       ) as HTMLButtonElement;
       send.dispatchEvent(new MouseEvent("click", { bubbles: true }));
