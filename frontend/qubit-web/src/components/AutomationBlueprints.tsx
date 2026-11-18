@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { Clock, Wand2 } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { Toast } from "@nous-research/ui/ui/components/toast";
+import { Button, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { api } from "@/lib/api";
 import type { AutomationBlueprint, AutomationBlueprintField } from "@/lib/api";
 import { cn, themedBody } from "@/lib/utils";
@@ -102,19 +98,20 @@ function FieldInput({
 }) {
   if (field.type === "enum" || field.type === "weekdays") {
     return (
-      <Select value={value} onValueChange={(v) => onChange(v)}>
-        {field.options.map((opt) => (
-          <SelectOption key={opt} value={opt}>
-            {opt}
-          </SelectOption>
-        ))}
-      </Select>
+      <Select
+        label={field.label}
+        value={value}
+        onChange={(v) => onChange(v)}
+        options={field.options.map((opt) => ({ value: opt, label: opt }))}
+      />
     );
   }
   if (field.type === "time") {
     return (
-      <Input
+      <input
         type="time"
+        className="qsk-field"
+        aria-label={field.label}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -123,10 +120,11 @@ function FieldInput({
   // text
   return (
     <Input
-      type="text"
+      label={field.label}
       value={value}
       placeholder={field.help || field.label}
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(v) => onChange(v)}
+      className="qsk-field"
     />
   );
 }
@@ -188,8 +186,7 @@ function BlueprintCard({
           </div>
           {fields.length > 0 ? (
             <Button
-              ghost={open}
-              size="sm"
+              variant={open ? "primary" : "secondary"}
               onClick={() => setOpen((o) => !o)}
             >
               {open ? "Cancel" : "Set up"}
@@ -225,8 +222,8 @@ function BlueprintCard({
               <Button
                 onClick={() => void submit()}
                 disabled={submitting}
-                prefix={submitting ? <Spinner /> : <Clock />}
               >
+                {submitting ? <Spinner /> : <Clock aria-hidden />}
                 Schedule it
               </Button>
             </div>
@@ -244,7 +241,10 @@ function BlueprintCard({
  * via the same create_job path as everything else.
  */
 export function AutomationBlueprints({ profile, onCreated }: AutomationBlueprintsProps) {
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
   const [blueprints, setBlueprints] = useState<AutomationBlueprint[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -285,7 +285,6 @@ export function AutomationBlueprints({ profile, onCreated }: AutomationBlueprint
 
   return (
     <>
-      <Toast toast={toast} />
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {blueprints.map((r) => (
           <BlueprintCard

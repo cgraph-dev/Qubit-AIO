@@ -131,7 +131,7 @@ describe("AutomationBlueprints rendering", () => {
     await render();
     await waitFor(() => container.textContent!.includes("Daily digest"));
     expect(container.textContent).toContain("news");
-    const setup = [...container.querySelectorAll("button")].find(
+    const setup = [...container.querySelectorAll("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === "Set up",
     );
     expect(setup).not.toBeUndefined();
