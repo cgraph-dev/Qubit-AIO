@@ -7,7 +7,7 @@
  * bridge and then re-reads the record, so the status shown afterwards is the
  * store's answer — never a local guess.
  */
-import { sakugaButton } from "./sakuga";
+import { officeFx, sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createEffectiveStatePanel } from "./EffectiveStatePanel";
 import { createCharacterStudio } from "./CharacterStudio";
@@ -239,8 +239,12 @@ export function createAgentControlDrawer(
       try {
         await fn();
         await refresh();
+        officeFx(label === "Stop" || label === "Revoke" || label === "Archive"
+          ? "warning"
+          : label === "Pause" ? "warning" : "success");
         setNotice(`${label} recorded by the Business OS.`);
       } catch (exc) {
+        officeFx("error");
         setActionError(errText(exc));
       } finally {
         setBusy(null);
@@ -307,8 +311,10 @@ export function createAgentControlDrawer(
         setDraft(null);
         setFieldErrors({});
         setPermInput({});
+        officeFx("success");
         setNotice("Changes saved and recorded in the audit trail.");
       } catch (exc) {
+        officeFx("error");
         setActionError(errText(exc));
       } finally {
         setBusy(null);

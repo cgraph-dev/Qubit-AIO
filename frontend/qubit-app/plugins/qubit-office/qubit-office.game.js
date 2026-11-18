@@ -192658,139 +192658,6 @@ create: function(game) {
 		win.fetch = bridge;
 		return restore;
 	}
-	// ../qubit-app/plugins/qubit-office/game/app/office-ui-skin.ts
-	var SAFE_URL = /^[A-Za-z0-9._~:/?=&%+,@!$'()*;-]+$/;
-	var STYLE_ID = "qubit-office-ui-skin";
-	function safeSrc(value) {
-		if (typeof value !== "string" || !value || value.includes("\\")) return null;
-		if (!SAFE_URL.test(value) || !/^(?:\/(?!\/)|https?:\/\/)/.test(value)) return null;
-		return value;
-	}
-	function sliceRule(slice, targets) {
-		const src = safeSrc(slice?.src);
-		const cell = Array.isArray(slice?.slice) && slice.slice.length === 4 ? slice.slice.filter((n) => Number.isInteger(n) && n > 0) : [];
-		if (!src || cell.length !== 4) return [];
-		const width = typeof slice?.width === "string" && /^[1-9][0-9]{0,3}px$/.test(slice.width) ? slice.width : "4px";
-		const repeat = slice?.repeat === "round" || slice?.repeat === "repeat" ? slice.repeat : "stretch";
-		return targets.map((target) => `.ui-root ${target} {border-style:solid;border-width:${width};border-image-source:url("${src}");border-image-slice:${cell.join(" ")};border-image-width:${width};border-image-repeat:${repeat};border-image-outset:0;image-rendering:pixelated; }`);
-	}
-	/** CSS for panels/dialogs/buttons/bubbles, scoped to the office document. */
-	function officeUiSkinRules(payload) {
-		if (!payload?.active) return [];
-		const slices = payload.ui?.slices ?? {};
-		return [
-			...sliceRule(slices.panel, [
-				".ui-panel",
-				".ui-drawer",
-				".ui-dialog",
-				".ui-feed",
-				".ui-sidebar",
-				".ui-settings",
-				".ui-spawn",
-				".ui-perm",
-				".ui-history",
-				".ui-timelapse",
-				".ui-daystats",
-				".ui-deliveries",
-				".ui-popover",
-				".ui-usage-card",
-				".ui-row",
-				".ui-tab"
-			]),
-			...sliceRule(slices.dock, [
-				".ui-drawer",
-				".ui-feed",
-				".ui-sidebar"
-			]),
-			...sliceRule(slices.card, [
-				".ui-row",
-				".ui-usage-card",
-				".ui-deliv-row"
-			]),
-			...sliceRule(slices.dialog, [
-				".ui-dialog",
-				".ui-popover",
-				".ui-modal"
-			]),
-			...sliceRule(slices.bubble, [
-				".ui-bubble",
-				".ui-toast",
-				".ui-chip"
-			]),
-			...sliceRule(slices.button, [".ui-btn"]),
-			`.ui-root { image-rendering: pixelated; }`,
-			`.ui-feed, .ui-sidebar, .ui-panel, .ui-drawer, .ui-dialog, .ui-settings, .ui-spawn, .ui-perm, .ui-history, .ui-timelapse, .ui-daystats, .ui-deliveries { padding: 8px 10px; }`,
-			`.ui-feed .ui-feed__head, .ui-sidebar .ui-sidebar__head { margin-top: 2px; }`
-		];
-	}
-	var ICON_SELECTORS = {
-		overview: ["button[title^=\"Visão geral\"]", "button[aria-label^=\"Visão geral\"]"],
-		zoomOut: ["button[title^=\"Afastar\"]", "button[aria-label^=\"Afastar\"]"],
-		zoomIn: ["button[title^=\"Aproximar\"]", "button[aria-label^=\"Aproximar\"]"],
-		timelapse: [".ui-btn-timelapse", "button[title^=\"Timelapse\"]"],
-		history: ["button[title^=\"Histórico\"]", "button[aria-label^=\"Histórico\"]"],
-		spawn: ["button[title^=\"Novo agente\"]", "button[aria-label^=\"Novo agente\"]"],
-		feed: [".ui-btn-feed"],
-		sidebar: [".ui-btn-sidebar"],
-		settings: [".ui-btn-settings"],
-		help: ["button[title^=\"Ajuda\"]", "button[aria-label^=\"Ajuda\"]"],
-		agents: ["[data-testid=\"office-menu-agents\"]"],
-		hud: ["[data-testid=\"office-menu-hud\"]"],
-		approvals: ["[data-testid=\"office-menu-approvals\"]"],
-		command: ["[data-testid=\"office-menu-command-center\"]"],
-		timeline: ["[data-testid=\"office-menu-timeline\"]"],
-		studio: ["[data-testid=\"office-menu-studio\"]"],
-		campus: ["[data-testid=\"office-menu-campus\"]"],
-		etsy: ["button[title^=\"Etsy\"]", "button[aria-label^=\"Etsy\"]"]
-	};
-	function applyIcons(doc, payload, touched) {
-		const icons = payload.ui?.icons ?? {};
-		for (const [name, selectors] of Object.entries(ICON_SELECTORS)) {
-			const src = safeSrc(icons[name]?.src);
-			if (!src) continue;
-			for (const selector of selectors) for (const node of Array.from(doc.querySelectorAll(selector))) {
-				const el = node;
-				el.style.backgroundImage = `url("${src}")`;
-				el.style.backgroundPosition = "center";
-				el.style.backgroundRepeat = "no-repeat";
-				el.style.backgroundSize = "18px 18px";
-				el.style.imageRendering = "pixelated";
-				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "none";
-				touched.add(el);
-			}
-		}
-	}
-	/** Install the skin in a same-origin office iframe; returns an undo function. */
-	function installOfficeUiSkin(win) {
-		const doc = win.document;
-		const payload = win.__QUBIT_OFFICE_THEME__;
-		if (!payload?.active) return () => {};
-		const style = doc.createElement("style");
-		style.id = STYLE_ID;
-		style.setAttribute("data-office-ui-skin", "");
-		style.textContent = officeUiSkinRules(payload).join("\n");
-		doc.head.appendChild(style);
-		const touched = /* @__PURE__ */ new Set();
-		const reapply = () => applyIcons(doc, payload, touched);
-		reapply();
-		const obs = new win.MutationObserver(reapply);
-		obs.observe(doc.documentElement, {
-			childList: true,
-			subtree: true
-		});
-		return () => {
-			obs.disconnect();
-			style.remove();
-			for (const el of touched) {
-				el.style.backgroundImage = "";
-				el.style.backgroundPosition = "";
-				el.style.backgroundRepeat = "";
-				el.style.backgroundSize = "";
-				el.style.imageRendering = "";
-				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "";
-			}
-		};
-	}
 	var MENU_BUTTONS = [
 		{
 			id: "agents",
@@ -192867,7 +192734,7 @@ create: function(game) {
 		{
 			id: "campus",
 			label: "Campus",
-			title: "Campus: floor scenes and the 100-floor directory",
+			title: "Campus: floor scenes and the 5-floor directory",
 			testId: "office-menu-campus",
 			icon: {
 				cols: 16,
@@ -193381,6 +193248,65 @@ create: function(game) {
 		const next = { ...props ?? {} };
 		if (!next.role) next.role = "button";
 		return R.createElement("sakuga-button", next, ...children);
+	}
+	/** Clamp a value into the upstream progress bar's 0..1 range. */
+	function progressValue(value, fallback) {
+		return Math.max(0, Math.min(1, typeof value === "number" && Number.isFinite(value) ? value : fallback));
+	}
+	/**
+	* A `sakuga-progress` host with the caller's attributes preserved.
+	*
+	* The inner bar is the vendored shadow control. `value` is 0..1; callers that
+	* have no completion number pass a small, honest starting value (the bar is a
+	* status surface, not a fabricated percentage). `aria-valuenow` is only
+	* mirrored when the caller supplies a real value.
+	*/
+	function sakugaProgress(R, props) {
+		configureOfficeSakuga();
+		try {
+			loadSakugaComponent("progress").catch(() => {});
+		} catch {}
+		const next = { ...props ?? {} };
+		const explicitNow = typeof next["aria-valuenow"] === "number" && Number.isFinite(next["aria-valuenow"]);
+		const indeterminate = next.indeterminate === true;
+		delete next.indeterminate;
+		const controlled = !indeterminate && (typeof next.value === "number" && Number.isFinite(next.value) || explicitNow);
+		const value = progressValue(next.value, explicitNow ? Number(next["aria-valuenow"]) / 100 : 0);
+		delete next.value;
+		if (!next.role) next.role = "progressbar";
+		const label = typeof next.label === "string" && next.label.trim() ? next.label : "Loading";
+		const attrs = {
+			...next,
+			label,
+			value,
+			"aria-valuemin": 0,
+			"aria-valuemax": 100
+		};
+		if (controlled) attrs["aria-valuenow"] = Math.round(value * 100);
+		else delete attrs["aria-valuenow"];
+		return R.createElement("sakuga-progress", attrs);
+	}
+	/**
+	* A label + progress pair, built from the same upstream bar. Used for long
+	* office loads; it never invents a number when the caller has none.
+	*/
+	function sakugaLoading(R, props, ...children) {
+		const { label = "Loading…", showLabel = true, className, style, id, "data-testid": testId, value, doneLabel, ...rest } = props ?? {};
+		const classes = ["qsk-loading", className].filter(Boolean).join(" ");
+		return R.createElement("div", {
+			id,
+			className: classes,
+			style,
+			role: "status",
+			"aria-live": "polite",
+			"aria-label": label,
+			"data-testid": testId
+		}, showLabel ? R.createElement("div", { className: "qsk-loading__label" }, label) : null, sakugaProgress(R, {
+			label,
+			value: progressValue(value, .08),
+			...typeof doneLabel === "string" ? { "done-label": doneLabel } : {},
+			...rest
+		}), ...children);
 	}
 	/** Fire one named cue in the dashboard document (the office shell). */
 	function officeFx(cue, options = {}) {
@@ -196490,8 +196416,10 @@ create: function(game) {
 				try {
 					await fn();
 					await refresh();
+					officeFx(label === "Stop" || label === "Revoke" || label === "Archive" ? "warning" : label === "Pause" ? "warning" : "success");
 					setNotice(`${label} recorded by the Business OS.`);
 				} catch (exc) {
+					officeFx("error");
 					setActionError(errText$1(exc));
 				} finally {
 					setBusy(null);
@@ -196554,8 +196482,10 @@ create: function(game) {
 					setDraft(null);
 					setFieldErrors({});
 					setPermInput({});
+					officeFx("success");
 					setNotice("Changes saved and recorded in the audit trail.");
 				} catch (exc) {
+					officeFx("error");
 					setActionError(errText$1(exc));
 				} finally {
 					setBusy(null);
@@ -198319,8 +198249,10 @@ create: function(game) {
 						setSelectedId(nextSelected);
 						setBundle(await fetchWarRoomBundle(nextSelected, { tenant_id: tenantId }, opts));
 					}
+					officeFx(label === "Decision" ? "approval" : "success");
 					setNotice(`${label} recorded.`);
 				} catch (exc) {
+					officeFx("error");
 					const { message, code } = errText(exc);
 					setError(code ? `${code}: ${message}` : message);
 				} finally {
@@ -199031,6 +198963,7 @@ create: function(game) {
 					if (!live) return;
 					setState(next);
 					if (next.kind === "ready") props.onCountChange?.(next.items.length);
+					if (next.kind === "error") officeFx("error");
 				});
 				return () => {
 					live = false;
@@ -199046,8 +198979,10 @@ create: function(game) {
 					base: props.base,
 					fetchImpl: props.fetchImpl
 				}).then(() => {
+					officeFx(decision === "approve" ? "success" : "warning");
 					setNotice(decision === "approve" ? `Approved ${approvalTool(item)}.` : `Rejected ${approvalTool(item)}.`);
 				}).catch((exc) => {
+					officeFx("error");
 					setFailure(actionError(exc));
 				}).finally(() => {
 					setBusyId(null);
@@ -201413,15 +201348,21 @@ create: function(game) {
 				setPublish({ kind: "publishing" });
 				publishState(state, { onPublish: props.onPublish }).then(({ state: next, result }) => {
 					setState(next);
-					if (result.kind === "published") setPublish({
-						kind: "published",
-						version: result.version
-					});
-					else setPublish({
-						kind: "error",
-						problems: result.problems
-					});
+					if (result.kind === "published") {
+						officeFx("success");
+						setPublish({
+							kind: "published",
+							version: result.version
+						});
+					} else {
+						officeFx("error");
+						setPublish({
+							kind: "error",
+							problems: result.problems
+						});
+					}
 				}).catch((err) => {
+					officeFx("error");
 					setPublish({
 						kind: "error",
 						problems: [messageOf(err)]
@@ -201431,6 +201372,7 @@ create: function(game) {
 			const onRollbackClick = () => {
 				if (state.published_version === null) return;
 				const version = state.published_version;
+				officeFx("warning");
 				edit((current) => rollbackState(current, version));
 				props.onRollback?.(version);
 			};
@@ -203319,6 +203261,13 @@ create: function(game) {
 						className: "outside-world__stateLabel"
 					}, label),
 					statusLine(),
+					view.status === "loading" ? sakugaLoading(R, {
+						key: "progress",
+						className: "outside-world__loading",
+						label,
+						showLabel: false,
+						value: .12
+					}) : null,
 					view.code ? R.createElement("p", {
 						key: "code",
 						className: "outside-world__code",
@@ -205016,11 +204965,13 @@ create: function(game) {
 					base: props.base,
 					fetchImpl: props.fetchImpl
 				}).then((next) => {
+					officeFx("impact");
 					setStarted(next);
 					setStateInput(next.state);
 					openAuthorization(next.url);
 					setNotice("Etsy authorization opened. Approve the app, then paste the redirect URL (or its code) below.");
 				}).catch((exc) => {
+					officeFx("error");
 					setFailure(failureOf(exc));
 				}).finally(() => {
 					setBusy(null);
@@ -205055,11 +205006,13 @@ create: function(game) {
 				}).then((status) => {
 					applyStatus(status);
 					if (isConnected(status)) {
+						officeFx("success");
 						setNotice("Etsy is connected.");
 						setCodeInput("");
 						setStarted(null);
 					}
 				}).catch((exc) => {
+					officeFx("error");
 					setFailure(failureOf(exc));
 				}).finally(() => {
 					setBusy(null);
@@ -205074,11 +205027,13 @@ create: function(game) {
 					base: props.base,
 					fetchImpl: props.fetchImpl
 				}).then((status) => {
+					officeFx("warning");
 					applyStatus(status);
 					setStarted(null);
 					setCodeInput("");
 					setStateInput("");
 				}).catch((exc) => {
+					officeFx("error");
 					setFailure(failureOf(exc));
 				}).finally(() => {
 					setBusy(null);
@@ -209226,6 +209181,16 @@ create: function(game) {
 			const [hidden, setHidden] = useState(false);
 			const [leaving, setLeaving] = useState(false);
 			const [tipIndex, setTipIndex] = useState(0);
+			const [crawl, setCrawl] = useState(.08);
+			const outcomeRef = useRef("");
+			useEffect(() => {
+				if (typeof props.progress === "number") return;
+				setCrawl(.08);
+				const timer = setInterval(() => {
+					setCrawl((current) => current >= .9 ? current : Math.min(.9, current + (.9 - current) * .12));
+				}, 350);
+				return () => clearInterval(timer);
+			}, [props.progress]);
 			const selectorRef = useRef(null);
 			if (!selectorRef.current) selectorRef.current = createEffectSelector({ hysteresisMs: config.hysteresisMs });
 			const backCanvas = useRef(null);
@@ -209326,6 +209291,12 @@ create: function(game) {
 				setLeaving(false);
 				setHidden(false);
 			}, [props.ready, phase]);
+			useEffect(() => {
+				const outcome = phase === "error" ? "error" : props.ready ? "success" : "";
+				if (!outcome || outcomeRef.current === outcome) return;
+				outcomeRef.current = outcome;
+				officeFx(outcome === "error" ? "error" : "success");
+			}, [phase, props.ready]);
 			if (hidden) return null;
 			const statusText = phase === "error" ? props.error?.trim() || "The office could not be loaded." : !online ? "Offline — the office will connect when the network returns." : props.status?.trim() || "Preparing the office…";
 			const weatherText = weatherLabel(weather);
@@ -209394,22 +209365,16 @@ create: function(game) {
 					key: "text",
 					className: "office-loading__statusText"
 				}, statusText)]),
-				R.createElement("div", {
+				sakugaProgress(R, {
 					key: "progress",
 					className: `office-loading__progress${progressPct === null ? " is-indeterminate" : ""}`,
 					"data-testid": "office-loading-progress",
-					role: "progressbar",
 					"aria-label": "Loading the office",
-					...progressPct === null ? {} : {
-						"aria-valuemin": 0,
-						"aria-valuemax": 100,
-						"aria-valuenow": progressPct
-					}
-				}, R.createElement("span", {
-					key: "bar",
-					className: "office-loading__bar",
-					style: progressPct === null ? void 0 : { width: `${progressPct}%` }
-				})),
+					label: "Loading the office",
+					value: progressPct === null ? crawl : props.progress,
+					indeterminate: progressPct === null,
+					...progressPct === null ? {} : { "aria-valuenow": progressPct }
+				}),
 				R.createElement("p", {
 					key: "weather",
 					className: "office-loading__weather",
@@ -209422,12 +209387,15 @@ create: function(game) {
 				key: "retry",
 				className: "office-loading__error",
 				"data-testid": "office-loading-retry"
-			}, [R.createElement("p", { key: "detail" }, statusText), props.onRetry ? R.createElement("button", {
+			}, [R.createElement("p", { key: "detail" }, statusText), props.onRetry ? sakugaButton(R, {
 				key: "button",
 				type: "button",
 				className: "office-loading__button",
 				"data-testid": "office-loading-retry-button",
-				onClick: () => props.onRetry?.()
+				onClick: () => {
+					officeFx("impact");
+					props.onRetry?.();
+				}
 			}, "Retry") : null]));
 			else if (tip) contentChildren.push(R.createElement("p", {
 				key: "tip",
@@ -209835,10 +209803,12 @@ create: function(game) {
 					setCampusDirectory(directory);
 					setCampusWorld(world);
 					setCampusState("ready");
+					officeFx("success");
 				}).catch((exc) => {
 					if (!live) return;
 					setCampusState("error");
 					setCampusError(exc instanceof Error ? exc.message : String(exc));
+					officeFx("error");
 				});
 				return () => {
 					live = false;
@@ -209947,13 +209917,10 @@ create: function(game) {
 					return;
 				}
 				let restoreEscape;
-				let restoreUiSkin;
 				const onLoad = () => {
 					setLoaded(true);
 					setFailed(null);
 					installOfficeBrand(win);
-					restoreUiSkin?.();
-					restoreUiSkin = installOfficeUiSkin(win);
 					restoreEscape?.();
 					const loadedWindow = frame.contentWindow;
 					restoreEscape = installEscapeToShell(loadedWindow, () => {
@@ -210004,8 +209971,6 @@ create: function(game) {
 					frame.removeEventListener("error", onError);
 					menuRef.current?.dispose();
 					menuRef.current = null;
-					restoreUiSkin?.();
-					restoreUiSkin = void 0;
 					restoreEscape?.();
 					restoreBridge?.();
 				};
@@ -210154,6 +210119,14 @@ create: function(game) {
 					role: state === "error" ? "alert" : "status",
 					"aria-live": state === "connecting" ? "polite" : "assertive"
 				}, connectionText(props)));
+				if (state === "connecting") children.push(sakugaProgress(R, {
+					key: "connection-progress",
+					className: "office-game__connectionProgress",
+					"data-testid": "office-app-connection-progress",
+					label: "Connecting to the office backend",
+					value: .08,
+					indeterminate: true
+				}));
 			}
 			const verdict = bindingVerdict();
 			children.push(R.createElement("div", {
@@ -210479,7 +210452,10 @@ create: function(game) {
 					className: "office-game__btn office-game__studioTab",
 					"data-testid": `office-studio-tab-${id}`,
 					"aria-pressed": studioTab === id,
-					onClick: () => setStudioTab(id)
+					onClick: () => {
+						if (studioTab !== id) officeFx("tick");
+						setStudioTab(id);
+					}
 				}, label);
 				const body = studioTab === "rooms" ? R.createElement(RoomBuilder, { key: "rooms" }) : studioTab === "outside" ? R.createElement(OutsideWorld, {
 					key: "outside",
@@ -210532,15 +210508,23 @@ create: function(game) {
 				type: "button",
 				className: "office-game__btn",
 				"data-testid": "office-floor-scope-clear",
-				onClick: () => setFloorScope("")
+				onClick: () => {
+					officeFx("pop");
+					setFloorScope("");
+				}
 			}, "All floors")]));
 			if (campusOpen) {
 				const directoryBody = campusState === "loading" ? R.createElement("div", {
 					key: "loading",
 					className: "office-game__campusState",
-					"data-testid": "office-campus-loading",
-					role: "status"
-				}, "Loading the 100-floor directory…") : campusState === "error" ? R.createElement("div", {
+					"data-testid": "office-campus-loading"
+				}, [R.createElement("span", { key: "text" }, "Loading the 5-floor directory…"), sakugaLoading(R, {
+					key: "progress",
+					className: "office-game__campusLoading",
+					label: "Loading the 5-floor directory",
+					showLabel: false,
+					value: .12
+				})]) : campusState === "error" ? R.createElement("div", {
 					key: "error",
 					className: "office-game__campusState",
 					"data-testid": "office-campus-error",
@@ -210566,7 +210550,7 @@ create: function(game) {
 					R.createElement("p", {
 						key: "counts",
 						"data-testid": "office-campus-counts"
-					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "100-floor directory · floors, rooms, desks and occupancy"),
+					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "5-floor directory · floors, rooms, desks and occupancy"),
 					R.createElement("div", {
 						key: "tabs",
 						className: "office-game__campusTabs"
@@ -210584,7 +210568,7 @@ create: function(game) {
 						"data-testid": "office-campus-tab-directory",
 						"aria-pressed": campusTab === "directory",
 						onClick: () => setCampusTab("directory")
-					}, "100-floor directory")])
+					}, "5-floor directory")])
 				]), sakugaButton(R, {
 					key: "close",
 					type: "button",
@@ -210600,6 +210584,7 @@ create: function(game) {
 					fetchImpl: props.fetchImpl,
 					templates: campusDirectory?.floors,
 					onOpenFloor: (floor) => {
+						officeFx("pop");
 						setFloorScope(floor.scope);
 						setCampusOpen(false);
 					}

@@ -61,6 +61,10 @@ sakuga-tooltip {
  */
 sakuga-button::part(button) {
   min-height: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   padding: 5px 12px;
   font-size: 13px;
   line-height: 1.2;

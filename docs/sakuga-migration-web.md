@@ -296,3 +296,35 @@ not see two of these. The vendored files are untouched.
   hidden`; the gallery keeps it visible and clips only the layout overflow.
 - Reduced motion plays no effects and jumps animations to their end frame
   (`fx.calm`; the toggle's sequence is still 43 frames with `pos === 42`).
+
+## Office host shell + in-canvas (2026-11-18 completion pass)
+
+The office host already rendered every dock/menu action as `sakuga-button` and
+the Agents/Approvals/Etsy/Studio panels were on the same control. This pass
+added the loading/progress surfaces and more real-event cues:
+
+- `game/loading/OfficeLoadingScreen.tsx` — the light-DOM progress bar is now
+  `sakuga-progress` (indeterminate crawls to 90%, determinate when a real
+  `progress` is supplied) and Retry is `sakuga-button`. Cues: `success` when
+  the frame is ready, `error` on the failure screen.
+- `game/app/OfficeAppShell.tsx` — a compact `sakuga-progress` under the
+  connecting banner, a `SakugaLoading` in the campus directory load, and cues
+  on campus ready/error, floor open/clear, and Studio tab changes.
+- Panel outcomes fire real cues: approval approve/reject/failure, Etsy
+  authorize/complete/disconnect/failure, room publish/rollback, War Room
+  record/decision/failure, agent save/stop/revoke/archive.
+- `voicebridge/office_stream.py` now projects recent committed `bos_event`
+  rows (task/artifact/receipt/finance/marketing/CRM/memory) beside the office
+  activity rows; `voicebridge/office/fx.py` gained aliases for the
+  task/artifact/receipt/finance/marketing/CRM/memory office-event kinds. The
+  projection stays bounded, deterministic, read-only, and `office.fx: off`
+  still sends `[]`.
+
+Documented office exceptions (unchanged): the two icon buttons injected into
+the vendored app's own Panels group are created with `document.createElement`
+inside the Habblaud document because they must inherit its
+`.ui-btn-group`/`ui-px-icon` chrome; they keep the upstream DOM contract. Panels
+keep native `<select>` controls (composite filter/seat pickers) and the
+controlled search `<input>`s, which the upstream input cannot replace without
+piercing its shadow event contract; the shell's own inputs/selects are
+compact-sized to the same row height.

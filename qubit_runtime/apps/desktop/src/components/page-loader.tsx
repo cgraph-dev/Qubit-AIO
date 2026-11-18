@@ -1,7 +1,7 @@
 import type { ComponentProps } from 'react'
 
-import { Loader } from '@/components/ui/loader'
 import { cn } from '@/lib/utils'
+import { SakugaLoading } from '@/sakuga/ui'
 
 interface PageLoaderProps extends Omit<ComponentProps<'div'>, 'children'> {
   label?: string
@@ -21,14 +21,7 @@ export function PageLoader({
       className={cn('grid h-full place-items-center', className)}
       role={role}
     >
-      <Loader
-        aria-hidden="true"
-        className="size-10 text-primary/70"
-        pathSteps={220}
-        role="presentation"
-        strokeScale={0.72}
-        type="rose-curve"
-      />
+      <SakugaLoading className="qsk-page-loader" label={label} />
     </div>
   )
 }

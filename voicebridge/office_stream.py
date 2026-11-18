@@ -78,20 +78,89 @@ def fx_mode_for(cfg: Any) -> str:
     return "sakuga" if value != "off" else "off"
 
 
-def _fx_events(tower: Dict[str, Any], fx_mode: str) -> List[Dict[str, Any]]:
+def _epoch(stamp: Any) -> float:
+    """Best-effort epoch seconds for a mixed office/BOS timestamp."""
+    if isinstance(stamp, (int, float)):
+        return float(stamp)
+    text = str(stamp or "").strip()
+    if not text:
+        return 0.0
+    try:
+        return float(text)
+    except ValueError:
+        pass
+    try:
+        from datetime import datetime, timezone
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return parsed.timestamp()
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+
+
+def business_fx_events(cfg: Any, *, limit: int = FX_SNAPSHOT_LIMIT
+                       ) -> List[Dict[str, Any]]:
+    """Recent committed Business OS events, shaped for :func:`_fx_events`.
+
+    A READ-ONLY projection of the append-only ``bos_event`` log. It never
+    creates a tenant or a database: no store file means no events, more than
+    one tenant is ambiguous and is skipped rather than guessed, and any read
+    failure degrades to an empty list. Only presentation fields are returned.
+    """
+    if cfg is None:
+        return []
+    try:
+        from .business.store import BusinessStore
+        store = BusinessStore.from_config(cfg)
+        if not store.path.is_file():
+            return []
+        with store.read() as conn:
+            tenants = [str(row[0]) for row in conn.execute(
+                "SELECT tenant_id FROM bos_tenant LIMIT 2")]
+            if len(tenants) != 1:
+                return []
+            rows = conn.execute(
+                "SELECT event_id, type, payload_json, occurred_at"
+                " FROM bos_event WHERE tenant_id=?"
+                " ORDER BY occurred_at DESC, event_id DESC LIMIT ?",
+                (tenants[0], max(1, min(int(limit), FX_SNAPSHOT_LIMIT))),
+            ).fetchall()
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            try:
+                payload = json.loads(row["payload_json"] or "{}")
+            except (TypeError, ValueError):
+                payload = {}
+            out.append({
+                "event_id": row["event_id"],
+                "type": row["type"],
+                "payload": payload if isinstance(payload, Mapping) else {},
+                "occurred_at": row["occurred_at"],
+            })
+        return out
+    except Exception:  # noqa: BLE001 - a projection read must not break the office
+        return []
+
+
+def _fx_events(tower: Dict[str, Any], fx_mode: str,
+               business_events: Optional[Iterable[Any]] = None
+               ) -> List[Dict[str, Any]]:
     """The bounded FX projection of the tower's real activity rows.
 
-    The tower feeds ``activity`` newest-first from ``office_event``. FX is a
-    presentation projection of those committed rows only: an empty feed is an
-    empty list, and an unknown kind is dropped (never invented). Nothing is
-    mutated and the result is deterministic for the same rows.
+    The tower feeds ``activity`` newest-first from ``office_event``; the
+    optional ``business_events`` are recent committed ``bos_event`` rows from
+    :func:`business_fx_events`. FX is a presentation projection of those
+    committed rows only: an empty feed is an empty list, and an unknown kind is
+    dropped (never invented). Nothing is mutated and the result is
+    deterministic for the same rows.
     """
     if fx_mode == "off":
         return []
+    from .office import fx as OFX
+
     activity = [row for row in (tower.get("activity") or [])
                 if isinstance(row, Mapping)]
-    if not activity:
-        return []
     # Attach the seat's REAL room (from the tower's own characters) so the
     # client can fall back to the room centre when an agent anchor is off
     # screen. A character with no declared room stays room-less; nothing is
@@ -115,11 +184,34 @@ def _fx_events(tower: Dict[str, Any], fx_mode: str) -> List[Dict[str, Any]]:
             if room_id:
                 copy["room_id"] = room_id
         rows.append(copy)
-    from .office import fx as OFX
 
     ordered = list(reversed(rows))  # oldest -> newest for stable chronology
-    return [event.to_dict() for event in OFX.map_office_events(
-        ordered, limit=FX_SNAPSHOT_LIMIT)]
+    projected: List[tuple[float, int, Dict[str, Any]]] = []
+    for index, event in enumerate(OFX.map_office_events(ordered)):
+        projected.append((0.0, index, event.to_dict()))
+    # Restore the real office row times (map_office_events drops them).
+    timestamps = {str(row.get("id")): _epoch(row.get("ts")) for row in ordered}
+    projected = [
+        (timestamps.get(str(item[2].get("event_id")), 0.0), item[1], item[2])
+        for item in projected
+    ]
+
+    bos_rows = [dict(row) for row in (business_events or [])
+                if isinstance(row, Mapping)]
+    for index, event in enumerate(OFX.map_events(list(reversed(bos_rows)))):
+        projected.append((0.0, 1000 + index, event.to_dict()))
+    # Restore BOS occurred_at for ordering.
+    bos_times = {
+        str(row.get("event_id")): _epoch(row.get("occurred_at"))
+        for row in bos_rows
+    }
+    projected = [
+        (bos_times.get(str(item[2].get("event_id")), item[0]), item[1], item[2])
+        for item in projected
+    ]
+
+    projected.sort(key=lambda item: (item[0], item[1]))
+    return [item[2] for item in projected[-FX_SNAPSHOT_LIMIT:]]
 
 
 
@@ -275,7 +367,9 @@ def template_tower(floor_id: str,
 
 def to_snapshot(tower: Dict[str, Any], revision: int,
                 start_time: float, *,
-                fx_mode: str = DEFAULT_FX_MODE) -> Dict[str, Any]:
+                fx_mode: str = DEFAULT_FX_MODE,
+                business_events: Optional[Iterable[Any]] = None
+                ) -> Dict[str, Any]:
     """Render the tower payload into the client's `OfficeSnapshot`.
 
     Every field is either taken from the tower or omitted. There is no default
@@ -448,7 +542,7 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
         # Presentation-only effects projected from the tower's real
         # `office_event` rows. `off` is an empty list; the client keeps its
         # existing rendering either way.
-        "fx": _fx_events(tower, fx_mode),
+        "fx": _fx_events(tower, fx_mode, business_events),
         "meta": {
             # demo=false is the honest answer: this is a real office store.
             "demo": False,
@@ -610,7 +704,9 @@ def notice(text: str, *, level: str = "info", kind: str = "",
 
 def stream_frames(tower: Dict[str, Any], revision: int, start_time: float,
                   retry_ms: int = 2000, *,
-                  fx_mode: str = DEFAULT_FX_MODE) -> Iterable[bytes]:
+                  fx_mode: str = DEFAULT_FX_MODE,
+                  business_events: Optional[Iterable[Any]] = None
+                  ) -> Iterable[bytes]:
     """The opening frames of a stream: the retry hint, then a snapshot + feed.
 
     One snapshot per connection is what the client's `snapshot` handler expects;
@@ -619,7 +715,8 @@ def stream_frames(tower: Dict[str, Any], revision: int, start_time: float,
     """
     yield f"retry: {retry_ms}\n\n".encode("utf-8")
     yield sse("snapshot", to_snapshot(tower, revision, start_time,
-                                      fx_mode=fx_mode))
+                                      fx_mode=fx_mode,
+                                      business_events=business_events))
     feed = to_feed(tower)
     if feed:
         yield sse("feed", feed)

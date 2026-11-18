@@ -22,6 +22,7 @@ import {
   type EffectSelector, type LoadWeatherOptions,
 } from "./weather";
 import type { NormalizedWeather, OfficeLoadingConfig, WeatherEffectId } from "./types";
+import { officeFx, sakugaButton, sakugaProgress } from "../app/sakuga";
 // The stylesheet travels with this component; Vite emits it into the plugin's
 // one CSS file. No other shell stylesheet is edited.
 import "./loading.css";
@@ -118,6 +119,21 @@ export function createOfficeLoadingScreen(
     const [hidden, setHidden] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [tipIndex, setTipIndex] = useState(0);
+    // Indeterminate crawl for the Sakuga bar. A loading screen has no real
+    // completion number, so it eases toward 90% and stops there; a real
+    // `progress` prop bypasses this entirely.
+    const [crawl, setCrawl] = useState(0.08);
+    const outcomeRef = useRef<string>("");
+    useEffect(() => {
+      if (typeof props.progress === "number") return;
+      setCrawl(0.08);
+      const timer = setInterval(() => {
+        setCrawl((current: number) => (
+          current >= 0.9 ? current : Math.min(0.9, current + (0.9 - current) * 0.12)
+        ));
+      }, 350);
+      return () => clearInterval(timer);
+    }, [props.progress]);
     const selectorRef = useRef<EffectSelector | null>(null);
     if (!selectorRef.current) {
       selectorRef.current = createEffectSelector({ hysteresisMs: config.hysteresisMs });
@@ -226,6 +242,15 @@ export function createOfficeLoadingScreen(
       return undefined;
     }, [props.ready, phase]);
 
+    // One real-outcome cue per state change. Presentation only; the loading
+    // contract and the retry path never depend on it.
+    useEffect(() => {
+      const outcome = phase === "error" ? "error" : props.ready ? "success" : "";
+      if (!outcome || outcomeRef.current === outcome) return;
+      outcomeRef.current = outcome;
+      officeFx(outcome === "error" ? "error" : "success");
+    }, [phase, props.ready]);
+
     if (hidden) return null;
 
     const statusText = phase === "error"
@@ -295,20 +320,16 @@ export function createOfficeLoadingScreen(
         }) : null,
         R.createElement("span", { key: "text", className: "office-loading__statusText" }, statusText),
       ]),
-      R.createElement("div", {
+      sakugaProgress(R, {
         key: "progress",
         className: `office-loading__progress${progressPct === null ? " is-indeterminate" : ""}`,
         "data-testid": "office-loading-progress",
-        role: "progressbar",
         "aria-label": "Loading the office",
-        ...(progressPct === null
-          ? {}
-          : { "aria-valuemin": 0, "aria-valuemax": 100, "aria-valuenow": progressPct }),
-      }, R.createElement("span", {
-        key: "bar",
-        className: "office-loading__bar",
-        style: progressPct === null ? undefined : { width: `${progressPct}%` },
-      })),
+        label: "Loading the office",
+        value: progressPct === null ? crawl : (props.progress as number),
+        indeterminate: progressPct === null,
+        ...(progressPct === null ? {} : { "aria-valuenow": progressPct }),
+      }),
       R.createElement("p", {
         key: "weather",
         className: "office-loading__weather",
@@ -325,12 +346,15 @@ export function createOfficeLoadingScreen(
         "data-testid": "office-loading-retry",
       }, [
         R.createElement("p", { key: "detail" }, statusText),
-        props.onRetry ? R.createElement("button", {
+        props.onRetry ? sakugaButton(R, {
           key: "button",
           type: "button",
           className: "office-loading__button",
           "data-testid": "office-loading-retry-button",
-          onClick: () => props.onRetry?.(),
+          onClick: () => {
+            officeFx("impact");
+            props.onRetry?.();
+          },
         }, "Retry") : null,
       ]));
     } else if (tip) {

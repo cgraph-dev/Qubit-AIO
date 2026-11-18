@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DecodeText } from '@/components/ui/decode-text'
 import { prefersReducedMotion } from '@/hooks/use-media-query'
 import { cn } from '@/lib/utils'
+import { SakugaLoading, emitFx } from '@/sakuga/ui'
 import { $desktopBoot } from '@/store/boot'
 import { $gatewaySwitching } from '@/store/gateway-switch'
 import { guidedOnboardingActive } from '@/store/onboarding-gate'
@@ -43,6 +44,8 @@ export function GatewayConnectingOverlay() {
   const gatewaySwitching = useStore($gatewaySwitching)
   const [previewing] = useState(forcedPreview)
   const reduce = prefersReducedMotion()
+  const outcomeRef = useRef('')
+  const bootPct = Math.max(0, Math.min(100, boot.progress))
   // Under reduced motion, skip the multi-phase exit choreography (text-out →
   // hold → overlay fade) and jump straight to gone so the overlay unmounts
   // the instant the gateway opens. E2E screenshots rely on this to avoid
@@ -74,6 +77,16 @@ export function GatewayConnectingOverlay() {
   if (previewing || connecting) {
     shownRef.current = true
   }
+
+  // One real-outcome cue per transition. Presentation only: connection state
+  // and the overlay's lifecycle never depend on it.
+  useEffect(() => {
+    const outcome = boot.error ? 'error'
+      : gatewayState === 'open' && shownRef.current ? 'success' : ''
+    if (!outcome || outcomeRef.current === outcome) return
+    outcomeRef.current = outcome
+    void emitFx(outcome === 'error' ? 'error' : 'success')
+  }, [boot.error, gatewayState])
 
   // Kick off the exit when connected: real connect, or a faked timer in preview.
   useEffect(() => {
@@ -156,17 +169,27 @@ export function GatewayConnectingOverlay() {
       // in styles.css.
       data-glass-opaque=""
     >
-      <DecodeText
-        active={phase === 'live' && (previewing || connecting)}
-        className={cn(
-          'pl-[0.4em] text-(--theme-primary) transition duration-300 ease-out',
-          leaving ? 'translate-y-2 opacity-0 saturate-0' : 'translate-y-0 opacity-100 saturate-100'
-        )}
-        cursor
-        loop
-        prefix={4}
-        text={TEXT}
-      />
+      <div className="flex flex-col items-center gap-5">
+        <DecodeText
+          active={phase === 'live' && (previewing || connecting)}
+          className={cn(
+            'pl-[0.4em] text-(--theme-primary) transition duration-300 ease-out',
+            leaving ? 'translate-y-2 opacity-0 saturate-0' : 'translate-y-0 opacity-100 saturate-100'
+          )}
+          cursor
+          loop
+          prefix={4}
+          text={TEXT}
+        />
+        <SakugaLoading
+          className={cn(
+            'qsk-connect-loader transition duration-300 ease-out',
+            leaving ? 'translate-y-2 opacity-0' : 'translate-y-0 opacity-100'
+          )}
+          label={boot.message || 'Connecting to the local gateway'}
+          value={previewing ? undefined : bootPct / 100}
+        />
+      </div>
     </div>
   )
 }

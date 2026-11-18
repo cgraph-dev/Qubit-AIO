@@ -106,8 +106,9 @@ describe("loading screen", () => {
     expect(bg.style.backgroundImage).toContain("office-loading.webp");
     const progress = container.querySelector('[data-testid="office-loading-progress"]');
     expect(progress?.getAttribute("aria-valuenow")).toBe("42");
-    const bar = container.querySelector(".office-loading__bar") as HTMLElement;
-    expect(bar.style.width).toBe("42%");
+    // The vendored progress bar reads its fraction from `value`; the visible
+    // fill lives in the component's shadow tree, not a light-DOM span.
+    expect(progress?.getAttribute("value")).toBe("0.42");
     root.unmount();
   });
 
