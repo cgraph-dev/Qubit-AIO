@@ -8,6 +8,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -132,14 +134,9 @@ describe("AgentWorkspacePage browse (agents.workspace.list/get)", () => {
       '[aria-label="Show run status panel"]',
     ) as HTMLButtonElement;
     await act(async () => runTab.click());
-    const input = container.querySelector('[aria-label="Run id"]') as HTMLInputElement;
+    const input = container.querySelector('[aria-label="Run id"]');
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        "value",
-      )!.set!;
-      setter.call(input, "run-1");
-      input.dispatchEvent(new Event("input", { bubbles: true }));
+      typeIntoSakuga(input, "run-1");
     });
     const check = container.querySelector(
       '[aria-label="Check run status"]',

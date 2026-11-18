@@ -88,7 +88,7 @@ describe("EnvPage tab family (drift A22)", () => {
 
     const nav = container.querySelector('nav[aria-label="Jump to section"]');
     expect(nav).not.toBeNull();
-    const labels = Array.from(nav!.querySelectorAll("button")).map((b) =>
+    const labels = Array.from(nav!.querySelectorAll<HTMLElement>("button, sakuga-button")).map((b) =>
       b.textContent?.trim(),
     );
     expect(labels).toEqual([

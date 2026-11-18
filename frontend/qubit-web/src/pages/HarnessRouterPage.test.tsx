@@ -12,6 +12,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -62,7 +64,7 @@ function query(sel: string): HTMLElement {
 }
 
 function queryButtonText(text: string): HTMLElement {
-  const found = Array.from(container.querySelectorAll("button")).find(
+  const found = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find(
     (b) => (b.textContent ?? "").includes(text),
   );
   if (!found) throw new Error(`missing button ${text}`);
@@ -141,14 +143,17 @@ describe("HarnessRouterPage", () => {
     await act(async () => {
       prompt.focus();
     });
-    // React-controlled input: set value via native setter + input event.
-    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-    setter?.call(prompt, "summarize the inbox");
-    prompt.dispatchEvent(new Event("input", { bubbles: true }));
-    const select = query('[data-testid="harness-switch"]') as HTMLSelectElement;
     await act(async () => {
-      select.value = "qubit-codex";
-      select.dispatchEvent(new Event("change", { bubbles: true }));
+      typeIntoSakuga(prompt, "summarize the inbox");
+    });
+    const selectWrap = query('[data-testid="harness-switch"]');
+    const trigger = selectWrap.querySelector('button[role="combobox"]') as HTMLElement;
+    await act(async () => trigger.click());
+    const radio = document.querySelector("sakuga-radio") as (HTMLElement & { value?: string }) | null;
+    if (!radio) throw new Error("harness select radio missing");
+    radio.value = "qubit-codex";
+    await act(async () => {
+      radio.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     });
     await act(async () => {
       query('[data-testid="harness-submit"]').click();

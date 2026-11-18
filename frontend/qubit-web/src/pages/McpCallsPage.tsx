@@ -23,6 +23,7 @@ import {
   type McpResourcesResponse,
 } from "@/lib/ocFamilyAdminApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
@@ -93,8 +94,10 @@ export default function McpCallsPage() {
       );
       setCallResult(res);
       setNotice(`${server.trim()}/${tool.trim()}: ${res.state ?? "OK"}`);
+      emitFx("success");
     } catch (e) {
       setError(errText(e, "Tool call failed"));
+      emitFx("error");
     } finally {
       setInvoking(false);
     }
@@ -110,8 +113,10 @@ export default function McpCallsPage() {
     setResources(null);
     try {
       setResources(await listMcpResources(resServer.trim()));
+      emitFx("success");
     } catch (e) {
       setError(errText(e, "Resource list failed"));
+      emitFx("error");
     } finally {
       setResLoading(false);
     }
@@ -127,8 +132,10 @@ export default function McpCallsPage() {
     setReadResult(null);
     try {
       setReadResult(await readMcpResource(resServer.trim(), readUri.trim()));
+      emitFx("success");
     } catch (e) {
       setError(errText(e, "Resource read failed"));
+      emitFx("error");
     } finally {
       setReadLoading(false);
     }
@@ -190,24 +197,26 @@ export default function McpCallsPage() {
           <label htmlFor="mc-server" className="text-xs text-muted-foreground">
             Server
           </label>
-          <input
+          <Input
             id="mc-server"
             data-testid="mc-server"
-            className="h-8 border border-border bg-background px-2 font-mono text-xs"
+            label="Server"
+            className="font-mono text-xs"
             placeholder="server name"
             value={server}
-            onChange={(e) => setServer(e.target.value)}
+            onChange={(value) => setServer(value)}
           />
           <label htmlFor="mc-tool" className="text-xs text-muted-foreground">
             Tool
           </label>
-          <input
+          <Input
             id="mc-tool"
             data-testid="mc-tool"
-            className="h-8 border border-border bg-background px-2 font-mono text-xs"
+            label="Tool"
+            className="font-mono text-xs"
             placeholder="tool name"
             value={tool}
-            onChange={(e) => setTool(e.target.value)}
+            onChange={(value) => setTool(value)}
           />
         </div>
         <label htmlFor="mc-args" className="text-xs text-muted-foreground">
@@ -222,7 +231,7 @@ export default function McpCallsPage() {
           onChange={(e) => setArgsText(e.target.value)}
         />
         <div>
-          <button
+          <Button variant="secondary"
             type="button"
             data-testid="mc-invoke"
             className="border border-border px-3 py-1 text-xs uppercase"
@@ -230,7 +239,7 @@ export default function McpCallsPage() {
             onClick={() => void handleCall()}
           >
             {invoking ? "Invoking…" : "Invoke"}
-          </button>
+          </Button>
         </div>
         {callResult && (
           <pre
@@ -249,15 +258,16 @@ export default function McpCallsPage() {
           <label htmlFor="mc-res-server" className="text-xs text-muted-foreground">
             Server
           </label>
-          <input
+          <Input
             id="mc-res-server"
             data-testid="mc-res-server"
-            className="h-8 border border-border bg-background px-2 font-mono text-xs"
+            label="Server"
+            className="font-mono text-xs"
             placeholder="server name"
             value={resServer}
-            onChange={(e) => setResServer(e.target.value)}
+            onChange={(value) => setResServer(value)}
           />
-          <button
+          <Button variant="secondary"
             type="button"
             data-testid="mc-list-resources"
             className="border border-border px-2 py-1 text-xs"
@@ -265,7 +275,7 @@ export default function McpCallsPage() {
             onClick={() => void handleListResources()}
           >
             List resources
-          </button>
+          </Button>
         </div>
         {resLoading && <p className="text-xs text-muted-foreground">Loading…</p>}
         {resources && (
@@ -289,15 +299,18 @@ export default function McpCallsPage() {
           <label htmlFor="mc-read-uri" className="text-xs text-muted-foreground">
             URI
           </label>
-          <input
-            id="mc-read-uri"
-            data-testid="mc-read-uri"
-            className="h-8 flex-1 border border-border bg-background px-2 font-mono text-xs"
-            placeholder="resource URI"
-            value={readUri}
-            onChange={(e) => setReadUri(e.target.value)}
-          />
-          <button
+          <div className="qsk-field flex-1">
+            <Input
+              id="mc-read-uri"
+              data-testid="mc-read-uri"
+              label="URI"
+              className="font-mono text-xs"
+              placeholder="resource URI"
+              value={readUri}
+              onChange={(value) => setReadUri(value)}
+            />
+          </div>
+          <Button variant="secondary"
             type="button"
             data-testid="mc-read-resource"
             className="border border-border px-2 py-1 text-xs"
@@ -305,7 +318,7 @@ export default function McpCallsPage() {
             onClick={() => void handleReadResource()}
           >
             Read resource
-          </button>
+          </Button>
         </div>
         {readLoading && <p className="text-xs text-muted-foreground">Reading…</p>}
         {readResult && (
@@ -335,7 +348,7 @@ export default function McpCallsPage() {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <code className="font-mono text-xs">{d.action}</code>
-                <button
+                <Button variant="secondary"
                   type="button"
                   disabled
                   title={d.reason}
@@ -344,7 +357,7 @@ export default function McpCallsPage() {
                   className="cursor-not-allowed border border-border px-2 py-1 text-xs"
                 >
                   Disabled
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-muted-foreground" data-testid={`mc-disabled-reason-${d.action}`}>
                 Prerequisite: {d.reason}. Counterpart: {d.counterpart}.

@@ -44,6 +44,7 @@ import {
   SettingsSummary,
   SettingsValue,
 } from "@/components/console-ui";
+import { Button, emitFx } from "@/sakuga/ui";
 
 type LoadState = "loading" | "ready" | "failed";
 
@@ -77,6 +78,7 @@ export default function MemoryBackendsPage() {
       setProbe(null);
       setLoadError(e instanceof Error ? e.message : String(e));
       setLoadState("failed");
+      emitFx("error");
     }
   }, []);
 
@@ -90,9 +92,11 @@ export default function MemoryBackendsPage() {
     try {
       await setMemoryProvider("qubit-local");
       setActionMessage("Qubit local memory confirmed as the active provider.");
+      emitFx("success");
       await refresh();
     } catch (e) {
       setActionMessage(refusalOrError(e, "Selecting Qubit local memory failed."));
+      emitFx("error");
     } finally {
       setSelecting(false);
     }
@@ -148,7 +152,7 @@ export default function MemoryBackendsPage() {
             </span>
           }
           actions={
-            <button
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() => void refresh()}
@@ -156,7 +160,7 @@ export default function MemoryBackendsPage() {
               aria-label="Refresh memory status"
             >
               Refresh
-            </button>
+            </Button>
           }
         />
 
@@ -174,14 +178,14 @@ export default function MemoryBackendsPage() {
               title="Memory status unavailable"
               description={<span data-testid="memory-status-error">{loadError}</span>}
               control={
-                <button
+                <Button variant="secondary"
                   type="button"
                   className="btn btn--ghost btn--sm"
                   data-testid="memory-status-retry"
                   onClick={() => void refresh()}
                 >
                   Retry
-                </button>
+                </Button>
               }
             />
           ) : status ? (
@@ -300,7 +304,7 @@ export default function MemoryBackendsPage() {
                 }
                 control={
                   backend.selectable ? (
-                    <button
+                    <Button variant="secondary"
                       type="button"
                       className={`btn btn--ghost btn--sm${selecting ? " active" : ""}`}
                       data-testid={`memory-backend-${backend.id}-select`}
@@ -308,9 +312,9 @@ export default function MemoryBackendsPage() {
                       onClick={() => void onSelectLocal()}
                     >
                       {selecting ? "Confirming…" : "Use Qubit local memory"}
-                    </button>
+                    </Button>
                   ) : (
-                    <button
+                    <Button variant="secondary"
                       type="button"
                       className="btn btn--ghost btn--sm"
                       data-testid={`memory-backend-${backend.id}-select`}
@@ -319,7 +323,7 @@ export default function MemoryBackendsPage() {
                       aria-disabled="true"
                     >
                       Unavailable — disabled with reason
-                    </button>
+                    </Button>
                   )
                 }
               />

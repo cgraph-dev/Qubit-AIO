@@ -12,12 +12,14 @@ original palette, no recolouring. This file records only the controls that were
 | `src/pages/DocsPage.tsx` (header action `<a>`), `src/pages/AnalyticsPage.tsx` (`<Link>`) | navigation links | owner exception: nav `<a>` links stay links |
 | `src/pages/AgentCardsPage.tsx` (`AgentActivityScreen`, `DelegateSheet`) | controls rendered by `src/components/om-agent-ui.tsx` | component owned by another lane; not edited here |
 | `src/pages/VoiceEditPage.tsx` | audio device / xterm surfaces | third-party widget internals + editor/canvas exception |
-| `src/pages/CanvasPage.tsx` | canvas controls | canvas exception |
+| `src/pages/CanvasPage.tsx` (`Stored content` textarea, preview iframe) | canvas/editor surfaces | canvas exception; the page toolbar, file roster actions, add-file name and node controls are Sakuga |
 | `src/pages/FilesPage.tsx` (`Drop files here` surface) | drag-and-drop upload button | the wrapper exposes no drag/drop props; a drop target is not a plain control. The hidden `<input type=file>` stays native and is proxied by the Sakuga Upload button (owner exception). |
-| `src/pages/FilesPage.tsx`, `src/pages/ConfigPage.tsx`, `src/pages/SystemPage.tsx` | hidden `<input type=file>` | hidden file inputs are proxied by a Sakuga Button (owner exception) |
+| `src/pages/FilesPage.tsx`, `src/pages/ConfigPage.tsx`, `src/pages/SystemPage.tsx`, `src/pages/KitchenPage.tsx` | hidden `<input type=file>` | hidden file inputs are proxied by a Sakuga Button (owner exception) |
 | `src/components/AutoField.tsx` (rendered by Config) | auto-generated config fields | component owned by another lane; documented rather than edited |
 | `src/components/DeleteConfirmDialog.tsx`, `ConfirmDialog.tsx` | confirm dialogs | component-owned; their buttons are outside this file scope |
 | `src/pages/LogsPage.tsx` (`Log line N detail` rows) | per-line disclosure | dense monospace text rows, not an action affordance; a Sakuga button per line would add panel chrome to log output. Toolbar controls are Sakuga. |
+| `src/pages/CronPage.tsx` (`repeat`), `src/pages/DevicesPage.tsx` (setup-code TTL) | `type=number` inputs | number inputs are outside the required input map (text/email/password/search/url/tel); every text input on both pages is Sakuga. |
+| `src/pages/CronPage.tsx`, `src/pages/McpPage.tsx`, `src/pages/McpCallsPage.tsx`, `src/pages/CanvasPage.tsx` | `<textarea>` (prompt/context/env/args/stored-content) | multi-line editors are outside the required input map; their surrounding buttons and single-line fields are Sakuga. |
 | `src/components/CommandBlock.tsx` `CopyButton` (Webhooks) | copy-to-clipboard | component-owned |
 
 _(This table grows as pages are swept; every entry names file:line, control and reason.)_
@@ -66,21 +68,32 @@ Swept (controls imported from `@/sakuga/ui`):
 | PairingPage | 3 | 0 | 0 | 0 |
 | QubitTvPage | 5 | 2 | 0 | 0 |
 | FilesPage | 11 | 2 | 0 | 0 |
-| ModelsPage | 20 | 1 | 1 | 1 |
+| ModelsPage | 23 | 1 | 1 | 1 |
 | PluginsPage | 19 | 4 | 4 | 3 |
 | ChannelsPage | 20 | 3 | 0 | 1 |
 | ConfigPage | 10 | 1 | 2 | 1 |
 | SystemPage | 37 | 8 | 1 | 2 |
 | WebhooksPage | 14 | 4 | 0 | 0 |
 | LogsPage | 5 | 1 | 0 | 1 |
+| AgentWorkspacePage | 6 | 1 | 0 | 0 |
+| BoardAdminPage | 12 | 13 | 1 | 1 |
+| CanvasPage | 10 | 2 | 1 | 0 |
+| CheckpointsPage | 7 | 2 | 0 | 0 |
+| CronPage | 10 | 4 | 5 | 3 |
+| DevicesPage | 12 | 4 | 0 | 0 |
+| EnvPage | 12 | 2 | 0 | 0 |
+| HarnessRouterPage | 21 | 4 | 2 | 1 |
+| KitchenPage | 7 | 2 | 0 | 0 |
+| McpCallsPage | 4 | 4 | 0 | 0 |
+| McpPage | 17 | 7 | 3 | 0 |
+| MemoryBackendsPage | 4 | 0 | 0 | 0 |
+| NodesPage | 12 | 4 | 0 | 0 |
+| OmniRoutePage | 1 | 0 | 0 | 0 |
 
 **Not yet swept (controls remain).** These are unimplemented work, not
 accepted exceptions:
 
-`AgentWorkspacePage`, `BoardAdminPage`, `CanvasPage` (canvas controls are an
-exception; its toolbar is not), `CheckpointsPage`, `CronPage`, `DevicesPage`,
-`EnvPage`, `HarnessRouterPage`, `KitchenPage`, `McpCallsPage`, `McpPage`,
-`MemoryBackendsPage`, `NodesPage`, `OmniRoutePage`, `OpenVikingAgentHubPage`,
+`OpenVikingAgentHubPage`,
 `OpenVikingPage`, `OpenVikingResourcesPage`, `OpenVikingRetrievalPage`,
 `OpenVikingStudioPage`, `OpenVikingUploadsPage`, `ProfileBuilderPage`,
 `ProfilesPage`, `QubitBotPage`, `SchedulerMediaPage`, `SessionOpsPage`,
@@ -88,6 +101,21 @@ exception; its toolbar is not), `CheckpointsPage`, `CronPage`, `DevicesPage`,
 `TasksPage`, `UsersAdminPage`, `VoiceEditPage` (xterm/audio internals are an
 exception; its forms are not), `WebChatPage`, `WorktreesPage`,
 `src/plugins/PluginPage.tsx`.
+
+## Admin / infrastructure lane (pass C, swept 2026-11-18)
+
+Imported from `@/sakuga/ui`: `AgentCardsPage`, `AgentsPage`,
+`AgentWorkspacePage`, `AnalyticsPage`, `BoardAdminPage`, `CanvasPage`,
+`CheckpointsPage`, `CronPage`, `DevicesPage`, `DocsPage`, `EnvPage`,
+`FilesPage`, `HarnessRouterPage`, `KitchenPage`, `LogsPage`, `McpCallsPage`,
+`McpPage`, `MemoryBackendsPage`, `ModelsPage`, `NodesPage`, `OmniRoutePage`.
+Native `<button>`, text/email/password/search/url/tel inputs, `<select>`s,
+checkboxes and the native `Segmented`-free tab strips on these pages are
+Sakuga controls; select option children were converted to `SakugaSelect`
+option arrays. Effects fire on real outcomes: success for a completed
+load/save/probe/invoke, `warning` for delete/prune/revoke/remove/cancel,
+`approval` when a staged confirmation opens, and `error` on a caught
+API/validation failure.
 
 ## Chat / shell / shared-components lane (swept 2026-11-18)
 

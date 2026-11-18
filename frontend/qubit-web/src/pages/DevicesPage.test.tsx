@@ -9,6 +9,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -126,21 +128,16 @@ async function renderDevicesPage() {
   await waitFor(() => Boolean(container.querySelector('[aria-label="Device pairings"]')));
 }
 
-function dialogButton(text: string): HTMLButtonElement | null {
+function dialogButton(text: string): HTMLElement | null {
   return (
-    [...document.querySelectorAll("button")].find(
+    [...document.querySelectorAll<HTMLElement>("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
     ) ?? null
   );
 }
 
-function setInput(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value",
-  )!.set!;
-  setter.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
+async function setInput(input: Element | null, value: string) {
+  await act(async () => typeIntoSakuga(input, value));
 }
 
 beforeEach(() => {
@@ -215,13 +212,8 @@ describe("DevicesPage confirm-gated approve (staged-then-settle)", () => {
 describe("DevicesPage secrets", () => {
   it("mints a setup code without ever displaying the secret value", async () => {
     await renderDevicesPage();
-    await act(async () => {
-      setInput(container.querySelector('[aria-label="Setup code label"]') as HTMLInputElement, "owner phone");
-      setInput(
-        container.querySelector('[aria-label="Setup code scopes"]') as HTMLInputElement,
-        "pair",
-      );
-    });
+    await setInput(container.querySelector('[aria-label="Setup code label"]'), "owner phone");
+    await setInput(container.querySelector('[aria-label="Setup code scopes"]'), "pair");
     const mint = container.querySelector(
       '[aria-label="Mint setup code"]',
     ) as HTMLButtonElement;

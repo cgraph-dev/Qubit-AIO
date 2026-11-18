@@ -8,6 +8,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   getMcpServers: vi.fn(),
@@ -63,15 +65,20 @@ async function renderPage() {
 }
 
 function setNativeValue(
-  el: HTMLInputElement | HTMLTextAreaElement,
+  el: HTMLElement,
   value: string,
 ) {
+  if (el.tagName === "SAKUGA-INPUT") {
+    typeIntoSakuga(el, value);
+    return;
+  }
+  const target = el as HTMLInputElement | HTMLTextAreaElement;
   const proto =
-    el instanceof HTMLTextAreaElement
+    target instanceof HTMLTextAreaElement
       ? window.HTMLTextAreaElement.prototype
       : window.HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(target, value);
+  target.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 beforeEach(() => {
@@ -140,18 +147,18 @@ describe("McpPage tool invocation", () => {
     await renderPage();
     await waitFor(() => apiMocks.getMcpServers.mock.calls.length > 0);
     await waitFor(
-      () => container.querySelector('button[aria-label="Invoke a tool"]') !== null,
+      () => container.querySelector('[aria-label="Invoke a tool"]') !== null,
     );
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Invoke a tool"]')
+        .querySelector<HTMLElement>('[aria-label="Invoke a tool"]')
         ?.click();
     });
 
     const toolInput = await (async () => {
       await waitFor(() => container.querySelector("#invoke-tool") !== null);
-      return container.querySelector<HTMLInputElement>("#invoke-tool")!;
+      return container.querySelector<HTMLElement>("#invoke-tool")!;
     })();
     const argsInput = container.querySelector<HTMLTextAreaElement>("#invoke-args")!;
 
@@ -161,7 +168,7 @@ describe("McpPage tool invocation", () => {
     });
 
     const invokeButton = Array.from(
-      container.querySelectorAll<HTMLButtonElement>("button"),
+      container.querySelectorAll<HTMLElement>("button, sakuga-button"),
     ).find((b) => b.textContent?.trim() === "Invoke");
     expect(invokeButton).toBeTruthy();
 
@@ -182,12 +189,12 @@ describe("McpPage tool invocation", () => {
     await renderPage();
     await waitFor(() => apiMocks.getMcpServers.mock.calls.length > 0);
     await waitFor(
-      () => container.querySelector('button[aria-label="Capabilities for cgraph-graft"]') !== null,
+      () => container.querySelector('[aria-label="Capabilities for cgraph-graft"]') !== null,
     );
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Capabilities for cgraph-graft"]')
+        .querySelector<HTMLElement>('[aria-label="Capabilities for cgraph-graft"]')
         ?.click();
     });
 
@@ -216,18 +223,18 @@ describe("McpPage tool invocation", () => {
     await renderPage();
     await waitFor(() => apiMocks.getMcpServers.mock.calls.length > 0);
     await waitFor(
-      () => container.querySelector('button[aria-label="Capabilities for cgraph-graft"]') !== null,
+      () => container.querySelector('[aria-label="Capabilities for cgraph-graft"]') !== null,
     );
 
     await act(async () => {
       container
-        .querySelector<HTMLButtonElement>('button[aria-label="Capabilities for cgraph-graft"]')
+        .querySelector<HTMLElement>('[aria-label="Capabilities for cgraph-graft"]')
         ?.click();
     });
 
     await waitFor(
       () =>
-        container.querySelector('button[aria-label="Retry Resources for cgraph-graft"]') !==
+        container.querySelector('[aria-label="Retry Resources for cgraph-graft"]') !==
         null,
     );
     expect(container.textContent).toContain("MCP_READ_FAILED");

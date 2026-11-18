@@ -9,6 +9,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { clickSakuga, typeIntoSakuga } from "@qubit/shared/sakuga";
 
 const boardMocks = vi.hoisted(() => ({
   listBoardTabs: vi.fn(),
@@ -91,16 +93,20 @@ async function renderPage() {
   await act(async () => root.render(ui));
 }
 
-function setNativeValue(el: HTMLInputElement, value: string) {
-  const proto = window.HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+async function setNativeValue(el: Element | null, value: string) {
+  await act(async () => typeIntoSakuga(el, value));
 }
 
-function setSelectValue(el: HTMLSelectElement, value: string) {
-  const proto = window.HTMLSelectElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(el, value);
-  el.dispatchEvent(new Event("change", { bubbles: true }));
+async function setSelectValue(label: string, value: string) {
+  const trigger = document.querySelector(`[aria-label="${label}"]`) as HTMLElement | null;
+  if (!trigger) throw new Error(`no select trigger ${label}`);
+  await act(async () => trigger.click());
+  const radio = document.querySelector("sakuga-radio") as (HTMLElement & { value?: string }) | null;
+  if (!radio) throw new Error(`no select radio for ${label}`);
+  radio.value = value;
+  await act(async () => {
+    radio.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+  });
 }
 
 function columnTitles(): string[] {
@@ -109,9 +115,9 @@ function columnTitles(): string[] {
   );
 }
 
-function buttonByText(text: string): HTMLButtonElement | null {
+function buttonByText(text: string): HTMLElement | null {
   return (
-    [...document.querySelectorAll("button")].find(
+    [...document.querySelectorAll<HTMLElement>("button, sakuga-button")].find(
       (b) => b.textContent?.trim() === text,
     ) ?? null
   );
@@ -170,14 +176,8 @@ describe("BoardAdminPage", () => {
   it("creates a tab through the family client", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("ideas") ?? false);
-    setNativeValue(
-      container.querySelector("#board-admin-new-slug") as HTMLInputElement,
-      "later",
-    );
-    setNativeValue(
-      container.querySelector("#board-admin-new-title") as HTMLInputElement,
-      "Later",
-    );
+    await setNativeValue(container.querySelector("#board-admin-new-slug"), "later");
+    await setNativeValue(container.querySelector("#board-admin-new-title"), "Later");
     await act(async () => buttonByText("Create tab")!.click());
     await waitFor(() => boardMocks.createBoardTab.mock.calls.length > 0);
     expect(boardMocks.createBoardTab).toHaveBeenCalledWith(
@@ -215,15 +215,12 @@ describe("BoardAdminPage", () => {
   it("search filters rows and shows the upstream empty state", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("ideas") ?? false);
-    setNativeValue(
-      container.querySelector("#board-admin-search") as HTMLInputElement,
-      "zzz-no-match",
-    );
+    await setNativeValue(container.querySelector("#board-admin-search"), "zzz-no-match");
     await waitFor(() => container.querySelector(".workboard-empty-state") !== null);
     expect(container.querySelector(".workboard-empty-state")!.textContent).toContain(
       "No sections match this filter",
     );
-    setNativeValue(container.querySelector("#board-admin-search") as HTMLInputElement, "");
+    await setNativeValue(container.querySelector("#board-admin-search"), "");
     await waitFor(() => container.querySelector(".workboard-empty-state") === null);
     expect(container.textContent).toContain("ideas");
   });
@@ -231,7 +228,7 @@ describe("BoardAdminPage", () => {
   it("view preset and health strip narrow to one column", async () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("ideas") ?? false);
-    setSelectValue(container.querySelector("#board-admin-view") as HTMLSelectElement, "widgets");
+    await setSelectValue("View", "widgets");
     await waitFor(() => {
       const titles = columnTitles();
       return titles.length === 1 && titles[0] === "Widgets";
@@ -250,12 +247,9 @@ describe("BoardAdminPage", () => {
     await renderPage();
     await waitFor(() => container.textContent?.includes("ideas") ?? false);
     // "shopping" matches only the widget row.
-    setNativeValue(
-      container.querySelector("#board-admin-search") as HTMLInputElement,
-      "shopping",
-    );
+    await setNativeValue(container.querySelector("#board-admin-search"), "shopping");
     await waitFor(() => (container.textContent?.includes("Shopping list") ?? false));
-    await act(async () => (container.querySelector("#board-admin-hide-empty") as HTMLInputElement).click());
+    await act(async () => clickSakuga(container.querySelector("#board-admin-hide-empty"), "input"));
     await waitFor(() => {
       const titles = columnTitles();
       return titles.length === 1 && titles[0] === "Widgets";
@@ -280,7 +274,7 @@ describe("BoardAdminPage", () => {
       expect(row!.textContent).toContain(detail);
       expect(row!.textContent).toContain(prerequisite);
       expect(row!.textContent).toContain(counterpart);
-      const button = row!.querySelector("button") as HTMLButtonElement;
+      const button = row!.querySelector("sakuga-button, button") as HTMLButtonElement;
       expect(button.disabled).toBe(true);
       await act(async () => button.click());
       expect(boardMocks.createBoardTab).not.toHaveBeenCalled();

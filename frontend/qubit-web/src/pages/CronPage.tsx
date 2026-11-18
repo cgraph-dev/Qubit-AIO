@@ -5,8 +5,7 @@ import {
 } from "@qubit/shared";
 import { Clock, Pause, Pencil, Play, Trash2, X, Zap } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
+import { Button, Checkbox, Input, Select, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api, ConfirmRequiredError } from "@/lib/api";
@@ -44,7 +43,6 @@ import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
@@ -114,19 +112,15 @@ function NameCheckboxPicker({
       className="max-h-36 overflow-y-auto border border-border bg-background/40 p-1"
     >
       {all.map((item) => (
-        <label
+        <Checkbox
           key={item.name}
           className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-muted/40"
           title={item.description || undefined}
+          checked={chosen.includes(item.name)}
+          onChange={(checked) => toggle(item.name, checked)}
         >
-          <input
-            type="checkbox"
-            className="accent-foreground"
-            checked={chosen.includes(item.name)}
-            onChange={(e) => toggle(item.name, e.target.checked)}
-          />
           <span className="font-mono-ui truncate">{item.name}</span>
-        </label>
+        </Checkbox>
       ))}
     </div>
   );
@@ -216,21 +210,11 @@ function normalizeDeliveryTargets(
 function selectOptions(
   current: string,
   options: Array<{ value: string; label: string }>,
-) {
+): Array<{ value: string; label: string }> {
   const known = new Set(options.map((option) => option.value));
   return [
-    ...options.map((option) => (
-      <SelectOption key={option.value} value={option.value}>
-        {option.label}
-      </SelectOption>
-    )),
-    ...(current && !known.has(current)
-      ? [
-          <SelectOption key={current} value={current}>
-            {current}
-          </SelectOption>,
-        ]
-      : []),
+    ...options,
+    ...(current && !known.has(current) ? [{ value: current, label: current }] : []),
   ];
 }
 
@@ -271,31 +255,35 @@ function CronAdvancedFields({
             <Label htmlFor={`${idPrefix}-provider`}>Provider</Label>
             <Select
               id={`${idPrefix}-provider`}
+              label="Provider"
               value={form.provider}
-              onValueChange={(v) => {
+              options={[
+                { value: "", label: "Default" },
+                ...selectOptions(
+                  form.provider,
+                  providers.map((p) => ({ value: p.slug, label: p.name })),
+                ),
+              ]}
+              onChange={(v) => {
                 onChange({ ...form, provider: v, model: "" });
               }}
-            >
-              <SelectOption value="">Default</SelectOption>
-              {selectOptions(
-                form.provider,
-                providers.map((p) => ({ value: p.slug, label: p.name })),
-              )}
-            </Select>
+            />
           </div>
           <div className="grid gap-1">
             <Label htmlFor={`${idPrefix}-model`}>Model</Label>
             <Select
               id={`${idPrefix}-model`}
+              label="Model"
               value={form.model}
-              onValueChange={(v) => update("model", v)}
-            >
-              <SelectOption value="">Default</SelectOption>
-              {selectOptions(
-                form.model,
-                models.map((model) => ({ value: model, label: model })),
-              )}
-            </Select>
+              options={[
+                { value: "", label: "Default" },
+                ...selectOptions(
+                  form.model,
+                  models.map((model) => ({ value: model, label: model })),
+                ),
+              ]}
+              onChange={(v) => update("model", v)}
+            />
           </div>
         </div>
 
@@ -303,28 +291,28 @@ function CronAdvancedFields({
           <Label htmlFor={`${idPrefix}-base-url`}>Base URL override</Label>
           <Input
             id={`${idPrefix}-base-url`}
+            label="Base URL override"
             placeholder="https://api.example.com/v1"
             value={form.base_url}
-            onChange={(e) => update("base_url", e.target.value)}
+            onChange={(value) => update("base_url", value)}
           />
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-end">
-          <label className="flex items-center gap-2 text-xs text-muted-foreground">
-            <input
-              type="checkbox"
-              className="accent-foreground"
-              checked={form.no_agent}
-              onChange={(e) => update("no_agent", e.target.checked)}
-            />
+          <Checkbox
+            className="flex items-center gap-2 text-xs text-muted-foreground"
+            checked={form.no_agent}
+            onChange={(checked) => update("no_agent", checked)}
+          >
             no_agent: run the script only and deliver stdout verbatim
-          </label>
+          </Checkbox>
           <div className="grid gap-1">
             <Label htmlFor={`${idPrefix}-script`}>Script</Label>
             <Input
               id={`${idPrefix}-script`}
+              label="Script"
               value={form.script}
-              onChange={(e) => update("script", e.target.value)}
+              onChange={(value) => update("script", value)}
               placeholder="relative/path/in/scripts"
             />
           </div>
@@ -334,21 +322,20 @@ function CronAdvancedFields({
           <Label htmlFor={`${idPrefix}-workdir`}>Workdir</Label>
           <Input
             id={`${idPrefix}-workdir`}
+            label="Workdir"
             value={form.workdir}
-            onChange={(e) => update("workdir", e.target.value)}
+            onChange={(value) => update("workdir", value)}
             placeholder="/absolute/project/path"
           />
         </div>
 
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            className="accent-foreground"
-            checked={form.continuity}
-            onChange={(e) => update("continuity", e.target.checked)}
-          />
+        <Checkbox
+          className="flex items-center gap-2 text-xs text-muted-foreground"
+          checked={form.continuity}
+          onChange={(checked) => update("continuity", checked)}
+        >
           continuity: each run sees the previous run&apos;s output (dedupe, pick up where it left off)
-        </label>
+        </Checkbox>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="grid gap-1">
@@ -387,7 +374,6 @@ interface CronJobFormFieldsProps {
 
 function CronJobFormFields({
   idPrefix,
-  autoFocus,
   form,
   resources,
   onChange,
@@ -422,10 +408,10 @@ function CronJobFormFields({
         <Label htmlFor={`${idPrefix}-name`}>{t.cron.nameOptional}</Label>
         <Input
           id={`${idPrefix}-name`}
-          autoFocus={autoFocus}
+          label={t.cron.nameOptional}
           placeholder={t.cron.namePlaceholder}
           value={form.name}
-          onChange={(e) => update("name", e.target.value)}
+          onChange={(value) => update("name", value)}
         />
       </div>
 
@@ -449,11 +435,11 @@ function CronJobFormFields({
         <Label htmlFor={`${idPrefix}-deliver`}>{t.cron.deliverTo}</Label>
         <Select
           id={`${idPrefix}-deliver`}
+          label={t.cron.deliverTo}
           value={form.deliver}
-          onValueChange={(v) => update("deliver", v)}
-        >
-          {deliveryOptions}
-        </Select>
+          options={deliveryOptions}
+          onChange={(v) => update("deliver", v)}
+        />
         {onlyLocalAvailable && (
           <p className="text-xs text-muted-foreground">
             {t.cron.delivery.noneConfigured ??
@@ -464,10 +450,11 @@ function CronJobFormFields({
 
       <div className="grid gap-2">
         <Label htmlFor={`${idPrefix}-repeat`}>{t.cron.repeat}</Label>
-        <Input
+        <input
           id={`${idPrefix}-repeat`}
           type="number"
           min={1}
+          className="accent-foreground"
           placeholder={t.cron.repeatPlaceholder}
           value={form.repeat}
           onChange={(e) => update("repeat", e.target.value)}
@@ -787,11 +774,13 @@ export default function CronPage() {
       // helper re-issues with confirm once the human approves.
       await api.createCronJob(payload, createProfile);
       showToast(t.common.create + " ✓", "success");
+      emitFx("success");
       setCreateForm(emptyCronJobForm());
       setCreateModalOpen(false);
       loadJobs(selectedProfile);
     } catch (e) {
       showToast(`${t.config.failedToSave}: ${describeConfirmError(e)}`, "error");
+      emitFx("error");
     } finally {
       setCreating(false);
     }
@@ -824,10 +813,12 @@ export default function CronPage() {
         getJobProfile(editJob),
       );
       showToast("Saved changes ✓", "success");
+      emitFx("success");
       setEditJob(null);
       loadJobs(selectedProfile);
     } catch (e) {
       showToast(`${t.config.failedToSave}: ${describeConfirmError(e)}`, "error");
+      emitFx("error");
     } finally {
       setSaving(false);
     }
@@ -850,9 +841,11 @@ export default function CronPage() {
           "success",
         );
       }
+      emitFx("success");
       loadJobs(selectedProfile);
     } catch (e) {
       showToast(`${t.status.error}: ${e}`, "error");
+      emitFx("error");
     }
   };
 
@@ -881,6 +874,7 @@ export default function CronPage() {
       ) return;
 
       showToast(`${label} ✓`, "success");
+      emitFx("success");
       loadJobs(viewProfile);
     } catch (e) {
       if (
@@ -888,6 +882,7 @@ export default function CronPage() {
         selectedProfileRef.current === viewProfile
       ) {
         showToast(`${t.status.error}: ${e}`, "error");
+        emitFx("error");
       }
     }
   };
@@ -905,9 +900,11 @@ export default function CronPage() {
             `${t.common.delete}: "${job ? truncateText(getJobTitle(job), 30) : id}"`,
             "success",
           );
+          emitFx("warning");
           loadJobs(selectedProfile);
         } catch (e) {
           showToast(`${t.status.error}: ${describeConfirmError(e)}`, "error");
+          emitFx("error");
           throw e;
         }
       },
@@ -996,7 +993,7 @@ export default function CronPage() {
         >
           <div className={cn(themedBody, "relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
             <Button
-              ghost
+              variant="secondary"
               size="icon"
               onClick={() => setCreateModalOpen(false)}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
@@ -1019,15 +1016,14 @@ export default function CronPage() {
                 <Label htmlFor="cron-profile">Profile</Label>
                 <Select
                   id="cron-profile"
+                  label="Profile"
                   value={createProfile}
-                  onValueChange={(v) => setCreateProfile(v)}
-                >
-                  {profiles.map((profile) => (
-                    <SelectOption key={profile.name} value={profile.name}>
-                      {profileLabel(profile.name)}
-                    </SelectOption>
-                  ))}
-                </Select>
+                  options={profiles.map((profile) => ({
+                    value: profile.name,
+                    label: profileLabel(profile.name),
+                  }))}
+                  onChange={(v) => setCreateProfile(v)}
+                />
               </div>
 
               <CronJobFormFields
@@ -1049,9 +1045,8 @@ export default function CronPage() {
                   size="sm"
                   onClick={handleCreate}
                   disabled={creating}
-                  prefix={creating ? <Spinner /> : undefined}
                 >
-                  {creating ? t.common.creating : t.common.create}
+                  {creating ? <><Spinner /> {t.common.creating}</> : t.common.create}
                 </Button>
               </div>
             </div>
@@ -1071,7 +1066,7 @@ export default function CronPage() {
         >
           <div className={cn(themedBody, "relative w-full max-w-3xl max-h-[90vh] border border-border bg-card shadow-2xl flex flex-col")}>
             <Button
-              ghost
+              variant="secondary"
               size="icon"
               onClick={() => setEditJob(null)}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
@@ -1112,9 +1107,8 @@ export default function CronPage() {
                   size="sm"
                   onClick={handleEdit}
                   disabled={saving}
-                  prefix={saving ? <Spinner /> : undefined}
                 >
-                  {saving ? t.common.loading : "Save changes"}
+                  {saving ? <><Spinner /> {t.common.loading}</> : "Save changes"}
                 </Button>
               </div>
             </div>
@@ -1137,16 +1131,17 @@ export default function CronPage() {
             <Label htmlFor="cron-profile-filter">Profile</Label>
             <Select
               id="cron-profile-filter"
+              label="Profile"
               value={selectedProfile}
-              onValueChange={(v) => setSelectedProfile(v)}
-            >
-              <SelectOption value="all">All profiles</SelectOption>
-              {profiles.map((profile) => (
-                <SelectOption key={profile.name} value={profile.name}>
-                  {profileLabel(profile.name)}
-                </SelectOption>
-              ))}
-            </Select>
+              options={[
+                { value: "all", label: "All profiles" },
+                ...profiles.map((profile) => ({
+                  value: profile.name,
+                  label: profileLabel(profile.name),
+                })),
+              ]}
+              onChange={(v) => setSelectedProfile(v)}
+            />
           </div>
         </div>
 
@@ -1267,7 +1262,7 @@ export default function CronPage() {
 
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
-                    ghost
+                    variant="secondary"
                     size="icon"
                     title={state === "paused" ? t.cron.resume : t.cron.pause}
                     aria-label={
@@ -1282,7 +1277,7 @@ export default function CronPage() {
                   </Button>
 
                   <Button
-                    ghost
+                    variant="secondary"
                     size="icon"
                     disabled={triggeringJobKeys.has(jobKey)}
                     title={t.cron.triggerNow}
@@ -1293,7 +1288,7 @@ export default function CronPage() {
                   </Button>
 
                   <Button
-                    ghost
+                    variant="secondary"
                     size="icon"
                     title="Edit job"
                     aria-label="Edit job"
@@ -1303,8 +1298,7 @@ export default function CronPage() {
                   </Button>
 
                   <Button
-                    ghost
-                    destructive
+                    variant="secondary"
                     size="icon"
                     title={t.common.delete}
                     aria-label={t.common.delete}

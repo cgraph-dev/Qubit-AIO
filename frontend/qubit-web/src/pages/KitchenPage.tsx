@@ -31,8 +31,7 @@ import {
   Sparkles,
   Trash2,
 } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Input } from "@nous-research/ui/ui/components/input";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -195,6 +194,7 @@ export default function KitchenPage() {
       repoName.trim() || value.replace(/\.git$/, "").split("/").filter(Boolean).pop() || value;
     record({ kind: "repo", name, source: value, fileCount: 0 });
     showToast("Repo staged for decomposition.", "success");
+    emitFx("success");
     setRepoUrl("");
     setRepoName("");
   }
@@ -208,6 +208,7 @@ export default function KitchenPage() {
       fileCount: folderFiles.length,
     });
     showToast(`Folder staged — ${folderFiles.length} files.`, "success");
+    emitFx("success");
     setFolderFiles([]);
     if (dirInputRef.current) dirInputRef.current.value = "";
   }
@@ -225,9 +226,11 @@ export default function KitchenPage() {
       });
       setResult(r);
       showToast(`Decomposed ${r.stage1_decompose.inventory.file_count} files.`, "success");
+      emitFx("success");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       setError(msg);
+      emitFx("error");
     } finally {
       setBusy(false);
     }
@@ -271,16 +274,17 @@ export default function KitchenPage() {
       <section className="kitchen-panel" aria-label="Add a source">
         <div className="kitchen-modes" role="tablist">
           {MODES.map((m) => (
-            <button
+            <Button
               key={m.key}
               type="button"
               role="tab"
+              variant={mode === m.key ? "primary" : "secondary"}
               aria-selected={mode === m.key}
               onClick={() => setMode(m.key)}
               className={cn("kitchen-mode", mode === m.key && "is-active")}
             >
               <m.icon className="h-4 w-4" aria-hidden /> {m.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -295,24 +299,30 @@ export default function KitchenPage() {
             <label className="kitchen-field">
               <span className="kitchen-field__label">Repository URL</span>
               <Input
+                label="Repository URL"
                 value={repoUrl}
-                onChange={(e) => setRepoUrl(e.target.value)}
+                onChange={(value) => setRepoUrl(value)}
                 placeholder="https://github.com/owner/repo"
-                aria-label="Repository URL"
                 className="font-courier"
               />
             </label>
             <label className="kitchen-field">
               <span className="kitchen-field__label">Name (optional)</span>
               <Input
+                label="Source name"
                 value={repoName}
-                onChange={(e) => setRepoName(e.target.value)}
+                onChange={(value) => setRepoName(value)}
                 placeholder="How it should appear in the Kitchen"
-                aria-label="Source name"
               />
             </label>
             <div className="kitchen-actions">
-              <Button type="submit" size="sm" className="uppercase" disabled={!repoUrl.trim()}>
+              <Button
+                type="submit"
+                size="sm"
+                className="uppercase"
+                disabled={!repoUrl.trim()}
+                onClick={() => stageRepo()}
+              >
                 <GitBranch className="h-4 w-4" /> Stage repo
               </Button>
             </div>
@@ -385,8 +395,9 @@ export default function KitchenPage() {
           <ul className="kitchen-list" data-testid="kitchen-staged">
             {staged.map((s) => (
               <li key={s.id}>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   className={cn("kitchen-item", s.id === selected && "is-selected")}
                   onClick={() => setSelected(s.id)}
                 >
@@ -399,9 +410,10 @@ export default function KitchenPage() {
                   <span className="kitchen-item__meta">
                     {s.kind === "repo" ? "repo" : `${s.fileCount} files`} · {s.at}
                   </span>
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="secondary"
                   className="kitchen-item__analyze"
                   aria-label={`Analyze ${s.name}`}
                   disabled={busy}
@@ -413,17 +425,19 @@ export default function KitchenPage() {
                     <Boxes className="h-3.5 w-3.5" aria-hidden />
                   )}
                   Analyze
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="secondary"
                   className="kitchen-item__remove"
                   aria-label={`Remove ${s.name}`}
-                  onClick={() =>
-                    setStaged((prev) => prev.filter((x) => x.id !== s.id))
-                  }
+                  onClick={() => {
+                    emitFx("warning");
+                    setStaged((prev) => prev.filter((x) => x.id !== s.id));
+                  }}
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden />
-                </button>
+                </Button>
               </li>
             ))}
           </ul>

@@ -7,6 +7,8 @@
  * staged source produces the decomposition → integration-plan pipeline. They
  * must not assert on network calls the page does not make.
  */
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
@@ -31,20 +33,14 @@ async function render() {
   });
 }
 
-/** Set a controlled React input's value the way a user typing would. */
-function typeInto(input: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(
-    window.HTMLInputElement.prototype,
-    "value",
-  )!.set!;
-  setter.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
+async function typeInto(input: Element | null, value: string) {
+  await act(async () => typeIntoSakuga(input, value));
 }
 
-function buttonByText(text: string): HTMLButtonElement | undefined {
-  return Array.from(container.querySelectorAll("button")).find((b) =>
+function buttonByText(text: string): (HTMLElement & { disabled?: boolean }) | undefined {
+  return Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) =>
     (b.textContent ?? "").includes(text),
-  ) as HTMLButtonElement | undefined;
+  );
 }
 
 beforeEach(() => {
@@ -70,12 +66,8 @@ describe("KitchenPage", () => {
 
   it("stages a repo and shows the integration pipeline", async () => {
     await render();
-    const input = container.querySelector<HTMLInputElement>(
-      'input[aria-label="Repository URL"]',
-    )!;
-    await act(async () => {
-      typeInto(input, "https://github.com/acme/widget");
-    });
+    const input = container.querySelector('[aria-label="Repository URL"]');
+    await typeInto(input, "https://github.com/acme/widget");
     const stage = buttonByText("Stage repo")!;
     expect(stage.disabled).toBe(false);
     await act(async () => {

@@ -1,18 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from "react";
 import {
-  KeyRound,
   Package,
   Play,
-  Power,
-  RefreshCw,
   Server,
   Trash2,
   X,
   Zap,
 } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Select, SelectOption } from "@nous-research/ui/ui/components/select";
+import { Button, Input, Select, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
@@ -30,7 +26,6 @@ import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { rebrand } from "@/lib/rebrand";
@@ -358,6 +353,7 @@ export default function McpPage() {
           : "Add ✓",
         "success",
       );
+      emitFx("success");
       setName("");
       setUrl("");
       setHttpAuth("none");
@@ -370,6 +366,7 @@ export default function McpPage() {
       loadServers();
     } catch (e) {
       showToast(`Failed to add: ${e}`, "error");
+      emitFx("error");
     } finally {
       setCreating(false);
     }
@@ -382,11 +379,14 @@ export default function McpPage() {
       setTestResults((prev) => ({ ...prev, [server.name]: result }));
       if (result.ok) {
         showToast(`${server.name}: ${result.tools.length} tool(s)`, "success");
+        emitFx("success");
       } else {
         showToast(`${server.name}: ${result.error ?? "Failed"}`, "error");
+        emitFx("error");
       }
     } catch (e) {
       showToast(`Error: ${e}`, "error");
+      emitFx("error");
     } finally {
       setTesting(null);
     }
@@ -438,14 +438,17 @@ export default function McpPage() {
             : JSON.stringify(res.result ?? res, null, 2),
         );
         showToast(`${invokeFor.name}/${tool}: ${res.state ?? "OK"}`, "success");
+        emitFx("success");
       } else {
         const detail = `${res.code ?? "FAILED"}: ${res.detail ?? "invocation refused"}`;
         setInvokeError(detail);
         showToast(detail, "error");
+        emitFx("error");
       }
     } catch (e) {
       setInvokeError(String(e));
       showToast(`Invoke failed: ${e}`, "error");
+      emitFx("error");
     } finally {
       setInvoking(false);
     }
@@ -465,8 +468,10 @@ export default function McpPage() {
         [server.name]: { ok: true, tools: result.tools ?? [] },
       }));
       showToast(`${server.name}: OAuth authentication complete`, "success");
+      emitFx("success");
     } catch (e) {
       showToast(refusalOrError(e, `OAuth error: ${e}`), "error");
+      emitFx("error");
     } finally {
       setAuthenticating(null);
     }
@@ -492,8 +497,10 @@ export default function McpPage() {
       setRestartNote(
         "Applies immediately to client invocation; the agent tool list refreshes on the next session.",
       );
+      emitFx("success");
     } catch (e) {
       showToast(refusalOrError(e, `Error: ${e}`), "error");
+      emitFx("error");
     } finally {
       setTogglingName(null);
     }
@@ -505,6 +512,7 @@ export default function McpPage() {
         try {
           await api.removeMcpServer(serverName);
           showToast(`Delete: "${truncateText(serverName, 30)}"`, "success");
+          emitFx("warning");
           setTestResults((prev) => {
             const next = { ...prev };
             delete next[serverName];
@@ -513,6 +521,7 @@ export default function McpPage() {
           loadServers();
         } catch (e) {
           showToast(`Error: ${e}`, "error");
+          emitFx("error");
           throw e;
         }
       },
@@ -531,11 +540,13 @@ export default function McpPage() {
         } else {
           showToast(`Installed: "${truncateText(entry.name, 30)}"`, "success");
         }
+        emitFx("success");
         setInstallEntry(null);
         setInstallEnv({});
         await Promise.all([loadServers(), loadCatalog()]);
       } catch (e) {
         showToast(refusalOrError(e, `Failed to install: ${e}`), "error");
+        emitFx("error");
       } finally {
         setInstallingName(null);
       }
@@ -636,7 +647,7 @@ export default function McpPage() {
             )}
           >
             <Button
-              ghost
+              variant="secondary"
               size="icon"
               onClick={closeCreateModal}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
@@ -659,10 +670,10 @@ export default function McpPage() {
                 <Label htmlFor="mcp-name">Name</Label>
                 <Input
                   id="mcp-name"
-                  autoFocus
+                  label="Name"
                   placeholder="my-server"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(value) => setName(value)}
                 />
               </div>
 
@@ -670,16 +681,18 @@ export default function McpPage() {
                 <Label htmlFor="mcp-transport">Transport</Label>
                 <Select
                   id="mcp-transport"
+                  label="Transport"
                   value={transport}
-                  onValueChange={(value) => {
+                  options={[
+                    { value: "http", label: "HTTP/SSE" },
+                    { value: "stdio", label: "stdio" },
+                  ]}
+                  onChange={(value) => {
                     const nextTransport = value as McpTransport;
                     setTransport(nextTransport);
                     if (nextTransport === "stdio") setBearerToken("");
                   }}
-                >
-                  <SelectOption value="http">HTTP/SSE</SelectOption>
-                  <SelectOption value="stdio">stdio</SelectOption>
-                </Select>
+                />
               </div>
 
               {transport === "http" ? (
@@ -688,37 +701,41 @@ export default function McpPage() {
                     <Label htmlFor="mcp-url">URL</Label>
                     <Input
                       id="mcp-url"
+                      label="URL"
                       placeholder="https://example.com/mcp"
                       value={url}
-                      onChange={(e) => setUrl(e.target.value)}
+                      onChange={(value) => setUrl(value)}
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="mcp-auth">Authentication</Label>
                     <Select
                       id="mcp-auth"
+                      label="Authentication"
                       value={httpAuth}
-                      onValueChange={(value) => {
+                      options={[
+                        { value: "none", label: "None" },
+                        { value: "header", label: "Bearer token" },
+                        { value: "oauth", label: "OAuth" },
+                      ]}
+                      onChange={(value) => {
                         const nextAuth = value as McpHttpAuth;
                         setHttpAuth(nextAuth);
                         if (nextAuth !== "header") setBearerToken("");
                       }}
-                    >
-                      <SelectOption value="none">None</SelectOption>
-                      <SelectOption value="header">Bearer token</SelectOption>
-                      <SelectOption value="oauth">OAuth</SelectOption>
-                    </Select>
+                    />
                   </div>
                   {httpAuth === "header" && (
                     <div className="grid gap-2">
                       <Label htmlFor="mcp-bearer-token">Bearer token</Label>
                       <Input
                         id="mcp-bearer-token"
+                        label="Bearer token"
                         type="password"
                         autoComplete="new-password"
                         placeholder="Token or Bearer token"
                         value={bearerToken}
-                        onChange={(e) => setBearerToken(e.target.value)}
+                        onChange={(value) => setBearerToken(value)}
                       />
                       <p className="text-xs text-muted-foreground">
                         Stored in this profile&apos;s .env; config.yaml keeps
@@ -740,18 +757,20 @@ export default function McpPage() {
                     <Label htmlFor="mcp-command">Command</Label>
                     <Input
                       id="mcp-command"
+                      label="Command"
                       placeholder="npx"
                       value={command}
-                      onChange={(e) => setCommand(e.target.value)}
+                      onChange={(value) => setCommand(value)}
                     />
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="mcp-args">Args</Label>
                     <Input
                       id="mcp-args"
+                      label="Args"
                       placeholder="-y @modelcontextprotocol/server-foo"
                       value={args}
-                      onChange={(e) => setArgs(e.target.value)}
+                      onChange={(value) => setArgs(value)}
                     />
                   </div>
                   <div className="grid gap-2">
@@ -775,7 +794,7 @@ export default function McpPage() {
                   size="sm"
                   onClick={handleCreate}
                   disabled={creating}
-                  prefix={creating ? <Spinner /> : undefined}
+
                 >
                   {creating ? "Adding..." : "Add"}
                 </Button>
@@ -802,7 +821,7 @@ export default function McpPage() {
             )}
           >
             <Button
-              ghost
+              variant="secondary"
               size="icon"
               onClick={() => setInstallEntry(null)}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
@@ -832,13 +851,14 @@ export default function McpPage() {
                   </Label>
                   <Input
                     id={`install-env-${item.name}`}
+                    label={item.prompt}
                     type="password"
                     placeholder={item.name}
                     value={installEnv[item.name] ?? ""}
-                    onChange={(e) =>
+                    onChange={(value) =>
                       setInstallEnv((prev) => ({
                         ...prev,
-                        [item.name]: e.target.value,
+                        [item.name]: value,
                       }))
                     }
                   />
@@ -851,11 +871,7 @@ export default function McpPage() {
                   size="sm"
                   onClick={handleInstallSubmit}
                   disabled={installingName === installEntry.name}
-                  prefix={
-                    installingName === installEntry.name ? (
-                      <Spinner />
-                    ) : undefined
-                  }
+
                 >
                   {installingName === installEntry.name
                     ? "Installing..."
@@ -884,7 +900,7 @@ export default function McpPage() {
             )}
           >
             <Button
-              ghost
+              variant="secondary"
               size="icon"
               onClick={closeInvokeModal}
               className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"
@@ -918,21 +934,21 @@ export default function McpPage() {
                 {invokeFor.capabilities && invokeFor.capabilities.length > 0 ? (
                   <Select
                     id="invoke-tool"
+                    label="Tool"
                     value={invokeTool}
-                    onValueChange={(value) => setInvokeTool(value)}
-                  >
-                    {invokeFor.capabilities.map((cap) => (
-                      <SelectOption key={cap} value={cap}>
-                        {cap}
-                      </SelectOption>
-                    ))}
-                  </Select>
+                    options={invokeFor.capabilities.map((cap) => ({
+                      value: cap,
+                      label: cap,
+                    }))}
+                    onChange={(value) => setInvokeTool(value)}
+                  />
                 ) : (
                   <Input
                     id="invoke-tool"
+                    label="Tool"
                     placeholder="tool name"
                     value={invokeTool}
-                    onChange={(e) => setInvokeTool(e.target.value)}
+                    onChange={(value) => setInvokeTool(value)}
                   />
                 )}
               </div>
@@ -965,7 +981,7 @@ export default function McpPage() {
                   size="sm"
                   onClick={handleInvoke}
                   disabled={invoking}
-                  prefix={invoking ? <Spinner /> : <Play />}
+
                 >
                   {invoking ? "Invoking…" : "Invoke"}
                 </Button>
@@ -1085,25 +1101,19 @@ export default function McpPage() {
                 <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
                   {server.auth === "oauth" && (
                     <Button
-                      ghost
+              variant="secondary"
                       size="sm"
                       title="Authenticate with OAuth"
                       onClick={() => handleAuthenticate(server)}
                       disabled={authenticating === server.name}
-                      prefix={
-                        authenticating === server.name ? (
-                          <Spinner />
-                        ) : (
-                          <KeyRound />
-                        )
-                      }
+
                     >
                       Authenticate
                     </Button>
                   )}
 
                   <Button
-                    ghost
+              variant="secondary"
                     size="sm"
                     title={
                       server.editable === false
@@ -1123,16 +1133,14 @@ export default function McpPage() {
                     disabled={
                       togglingName === server.name || server.editable === false
                     }
-                    prefix={
-                      togglingName === server.name ? <Spinner /> : <Power />
-                    }
+
                     className={server.enabled ? "text-success" : undefined}
                   >
                     {server.enabled ? "Disable" : "Enable"}
                   </Button>
 
                   <Button
-                    ghost
+              variant="secondary"
                     size="sm"
                     title={capOpen[server.name] ? "Hide capabilities" : "Show capabilities"}
                     aria-label={`Capabilities for ${server.name}`}
@@ -1143,7 +1151,7 @@ export default function McpPage() {
                   </Button>
 
                   <Button
-                    ghost
+              variant="secondary"
                     size="icon"
                     title="Invoke a tool"
                     aria-label="Invoke a tool"
@@ -1153,7 +1161,7 @@ export default function McpPage() {
                   </Button>
 
                   <Button
-                    ghost
+              variant="secondary"
                     size="icon"
                     title="Test connection"
                     aria-label="Test connection"
@@ -1164,8 +1172,7 @@ export default function McpPage() {
                   </Button>
 
                   <Button
-                    ghost
-                    destructive
+              variant="secondary"
                     size="icon"
                     title="Delete"
                     aria-label="Delete"
@@ -1182,15 +1189,13 @@ export default function McpPage() {
                       Capabilities — {server.name}
                     </p>
                     <Button
-                      ghost
+              variant="secondary"
                       size="sm"
                       title="Reload capabilities"
                       aria-label={`Reload capabilities for ${server.name}`}
                       onClick={() => loadCapabilities(server.name)}
                       disabled={!!capLoading[server.name]}
-                      prefix={
-                        capLoading[server.name] ? <Spinner /> : <RefreshCw />
-                      }
+
                     >
                       Reload
                     </Button>
@@ -1250,7 +1255,7 @@ export default function McpPage() {
                               {err}
                             </p>
                             <Button
-                              ghost
+              variant="secondary"
                               size="sm"
                               aria-label={`Retry ${title} for ${server.name}`}
                               onClick={() => loadCapabilities(server.name)}
@@ -1269,7 +1274,7 @@ export default function McpPage() {
                                 : ""}
                             </p>
                             <Button
-                              ghost
+              variant="secondary"
                               size="sm"
                               aria-label={`Retry ${title} for ${server.name}`}
                               onClick={() => loadCapabilities(server.name)}
@@ -1465,7 +1470,7 @@ export default function McpPage() {
                       size="sm"
                       onClick={() => handleInstallClick(entry)}
                       disabled={isInstalling}
-                      prefix={isInstalling ? <Spinner /> : undefined}
+
                     >
                       {isInstalling ? "Installing..." : "Install"}
                     </Button>

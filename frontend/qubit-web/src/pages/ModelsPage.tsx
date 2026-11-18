@@ -290,7 +290,7 @@ function UseAsMenu({
       </Button>
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[220px] border border-border bg-card shadow-lg">
-          <button
+          <Button variant="secondary"
             type="button"
             onClick={() => assign("main", "")}
             disabled={busy}
@@ -305,23 +305,23 @@ function UseAsMenu({
                 current
               </span>
             )}
-          </button>
+          </Button>
 
           <div className="border-t border-border/50 px-3 py-1.5 text-display text-xs tracking-wider text-text-tertiary">
             Auxiliary task
           </div>
 
-          <button
+          <Button variant="secondary"
             type="button"
             onClick={() => assign("auxiliary", "")}
             disabled={busy}
             className="flex w-full items-center justify-between px-3 py-1.5 text-xs uppercase hover:bg-muted/50 disabled:opacity-40"
           >
             <span>All auxiliary tasks</span>
-          </button>
+          </Button>
 
           {AUX_TASKS.map((t) => (
-            <button
+            <Button variant="secondary"
               key={t.key}
               type="button"
               onClick={() => assign("auxiliary", t.key)}
@@ -334,7 +334,7 @@ function UseAsMenu({
                   current
                 </span>
               )}
-            </button>
+            </Button>
           ))}
 
           {error && (

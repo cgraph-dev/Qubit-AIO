@@ -24,9 +24,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Checkbox, Input, Select, emitFx } from "@/sakuga/ui";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Toast } from "@nous-research/ui/ui/components/toast";
@@ -156,6 +155,7 @@ export default function BoardAdminPage() {
         const message = refusalOrError(e, "Failed to load board state.");
         setError(message);
         showToast(message, "error");
+        emitFx("error");
       } finally {
         setLoading(false);
       }
@@ -175,11 +175,13 @@ export default function BoardAdminPage() {
       try {
         await call();
         showToast(title, "success");
+        emitFx("success");
         await load(board);
       } catch (e) {
         const message = refusalOrError(e, `${title} failed.`);
         setError(message);
         showToast(message, "error");
+        emitFx("error");
       } finally {
         setBusy(false);
       }
@@ -245,8 +247,9 @@ export default function BoardAdminPage() {
               <Label htmlFor="board-admin-board">Board</Label>
               <Input
                 id="board-admin-board"
+                label="Board"
                 value={board}
-                onChange={(e) => setBoard(e.target.value.trim() || "main")}
+                onChange={(value) => setBoard(value.trim() || "main")}
                 placeholder="main"
               />
             </div>
@@ -255,55 +258,58 @@ export default function BoardAdminPage() {
               <Input
                 id="board-admin-search"
                 type="search"
+                label="Search"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(value) => setQuery(value)}
                 placeholder="Search tabs, widgets, roles, events…"
               />
             </div>
             <div className="space-y-1">
               <Label htmlFor="board-admin-view">View</Label>
-              <select
+              <Select
                 id="board-admin-view"
-                className="input"
+                label="View"
                 value={viewPreset}
-                onChange={(e) => setViewPreset(e.target.value as BoardViewPreset)}
-              >
-                <option value="all">All sections</option>
-                <option value="tabs">Tabs</option>
-                <option value="widgets">Widgets</option>
-                <option value="roles">Roles</option>
-                <option value="log">Board log</option>
-              </select>
-            </div>
-            <label className="workboard-toggle" htmlFor="board-admin-hide-empty">
-              <input
-                id="board-admin-hide-empty"
-                type="checkbox"
-                checked={hideEmpty}
-                onChange={(e) => setHideEmpty(e.target.checked)}
+                options={[
+                  { value: "all", label: "All sections" },
+                  { value: "tabs", label: "Tabs" },
+                  { value: "widgets", label: "Widgets" },
+                  { value: "roles", label: "Roles" },
+                  { value: "log", label: "Board log" },
+                ]}
+                onChange={(value) => setViewPreset(value as BoardViewPreset)}
               />
-              <span>Hide empty sections</span>
-            </label>
+            </div>
+            <Checkbox
+              id="board-admin-hide-empty"
+              checked={hideEmpty}
+              onChange={(checked) => setHideEmpty(checked)}
+              className="workboard-toggle"
+            >
+              Hide empty sections
+            </Checkbox>
             <div className="workboard-layout-controls">
               <div className="workboard-layout-toggle" role="group" aria-label="Layout">
-                <button
+                <Button
                   className={`btn btn--icon ${layout === "compact" ? "active" : ""}`}
                   type="button"
+                  variant={layout === "compact" ? "primary" : "secondary"}
                   aria-label="Compact layout"
                   aria-pressed={layout === "compact"}
                   onClick={() => setLayout("compact")}
                 >
                   Compact
-                </button>
-                <button
+                </Button>
+                <Button
                   className={`btn btn--icon ${layout === "comfortable" ? "active" : ""}`}
                   type="button"
+                  variant={layout === "comfortable" ? "primary" : "secondary"}
                   aria-label="Comfortable layout"
                   aria-pressed={layout === "comfortable"}
                   onClick={() => setLayout("comfortable")}
                 >
                   Comfortable
-                </button>
+                </Button>
               </div>
               {lastRefreshAt ? (
                 <span className="workboard-refresh-status">
@@ -316,7 +322,7 @@ export default function BoardAdminPage() {
             </div>
           </div>
           <div className="workboard-toolbar__actions">
-            <Button outlined onClick={() => load(board)} disabled={loading}>
+            <Button variant="secondary" onClick={() => load(board)} disabled={loading}>
               Reload
             </Button>
           </div>
@@ -324,19 +330,20 @@ export default function BoardAdminPage() {
 
         <div className="workboard-health" aria-label="Board health">
           {healthItems.map((item) => (
-            <button
+            <Button
               key={item.key}
               className={`workboard-health__item workboard-health__item--${item.key} ${
                 viewPreset === item.key ? "workboard-health__item--active" : ""
               } ${item.count === 0 ? "workboard-health__item--empty" : ""}`}
               type="button"
+              variant={viewPreset === item.key ? "primary" : "secondary"}
               aria-pressed={viewPreset === item.key}
               aria-label={`${item.count} ${item.label}`}
               onClick={() => setViewPreset((prev) => (prev === item.key ? "all" : item.key))}
             >
               <strong>{item.count}</strong>
               {item.label}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -381,7 +388,7 @@ export default function BoardAdminPage() {
                               <Badge tone="outline">pos {t.position}</Badge>
                             ) : null}
                             <Button
-                              outlined
+                              variant="secondary"
                               size="sm"
                               disabled={busy}
                               onClick={() =>
@@ -401,8 +408,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-new-slug">New tab id</Label>
                         <Input
                           id="board-admin-new-slug"
+                          label="New tab id"
                           value={newSlug}
-                          onChange={(e) => setNewSlug(e.target.value)}
+                          onChange={(value) => setNewSlug(value)}
                           placeholder="ideas"
                         />
                       </div>
@@ -410,8 +418,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-new-title">Title</Label>
                         <Input
                           id="board-admin-new-title"
+                          label="Title"
                           value={newTitle}
-                          onChange={(e) => setNewTitle(e.target.value)}
+                          onChange={(value) => setNewTitle(value)}
                           placeholder="Ideas"
                         />
                       </div>
@@ -435,8 +444,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-rename-slug">Tab id</Label>
                         <Input
                           id="board-admin-rename-slug"
+                          label="Tab id"
                           value={renameSlug}
-                          onChange={(e) => setRenameSlug(e.target.value)}
+                          onChange={(value) => setRenameSlug(value)}
                           placeholder="ideas"
                         />
                       </div>
@@ -444,13 +454,14 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-rename-title">New title</Label>
                         <Input
                           id="board-admin-rename-title"
+                          label="New title"
                           value={renameTitle}
-                          onChange={(e) => setRenameTitle(e.target.value)}
+                          onChange={(value) => setRenameTitle(value)}
                           placeholder="Ideas v2"
                         />
                       </div>
                       <Button
-                        outlined
+                        variant="secondary"
                         disabled={busy || !renameSlug.trim() || !renameTitle.trim()}
                         onClick={() => {
                           const slug = renameSlug.trim();
@@ -468,8 +479,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-move-slug">Move tab id</Label>
                         <Input
                           id="board-admin-move-slug"
+                          label="Move tab id"
                           value={moveSlug}
-                          onChange={(e) => setMoveSlug(e.target.value)}
+                          onChange={(value) => setMoveSlug(value)}
                           placeholder="ideas"
                         />
                       </div>
@@ -477,13 +489,14 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-move-pos">Position</Label>
                         <Input
                           id="board-admin-move-pos"
+                          label="Position"
                           value={movePos}
-                          onChange={(e) => setMovePos(e.target.value)}
+                          onChange={(value) => setMovePos(value)}
                           placeholder="0"
                         />
                       </div>
                       <Button
-                        outlined
+                        variant="secondary"
                         disabled={busy || !moveSlug.trim()}
                         onClick={() => {
                           const slug = moveSlug.trim();
@@ -522,7 +535,7 @@ export default function BoardAdminPage() {
                             {w.kind ? <Badge tone="outline">{w.kind}</Badge> : null}
                             <span>{w.title}</span>
                             <Button
-                              outlined
+                              variant="secondary"
                               size="sm"
                               disabled={busy}
                               onClick={() =>
@@ -542,8 +555,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-widget-kind">Kind</Label>
                         <Input
                           id="board-admin-widget-kind"
+                          label="Kind"
                           value={widgetKind}
-                          onChange={(e) => setWidgetKind(e.target.value)}
+                          onChange={(value) => setWidgetKind(value)}
                           placeholder="note"
                         />
                       </div>
@@ -551,8 +565,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-widget-title">Title</Label>
                         <Input
                           id="board-admin-widget-title"
+                          label="Title"
                           value={widgetTitle}
-                          onChange={(e) => setWidgetTitle(e.target.value)}
+                          onChange={(value) => setWidgetTitle(value)}
                           placeholder="Shopping list"
                         />
                       </div>
@@ -560,8 +575,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-widget-content">Content</Label>
                         <Input
                           id="board-admin-widget-content"
+                          label="Content"
                           value={widgetContent}
-                          onChange={(e) => setWidgetContent(e.target.value)}
+                          onChange={(value) => setWidgetContent(value)}
                           placeholder="milk, eggs"
                         />
                       </div>
@@ -614,8 +630,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-grant-subject">Subject</Label>
                         <Input
                           id="board-admin-grant-subject"
+                          label="Subject"
                           value={grantSubject}
-                          onChange={(e) => setGrantSubject(e.target.value)}
+                          onChange={(value) => setGrantSubject(value)}
                           placeholder="teammate"
                         />
                       </div>
@@ -623,8 +640,9 @@ export default function BoardAdminPage() {
                         <Label htmlFor="board-admin-grant-role">Role</Label>
                         <Input
                           id="board-admin-grant-role"
+                          label="Role"
                           value={grantRole}
-                          onChange={(e) => setGrantRole(e.target.value)}
+                          onChange={(value) => setGrantRole(value)}
                           placeholder="viewer"
                         />
                       </div>

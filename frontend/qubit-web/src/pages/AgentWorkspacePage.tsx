@@ -21,6 +21,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
+import { Button, Input, emitFx } from "@/sakuga/ui";
+
 import {
   getAgentRunStatus,
   getWorkspaceFile,
@@ -108,6 +110,7 @@ export default function AgentWorkspacePage() {
       .catch((err: unknown) => {
         setError(refusalOrError(err, "Workspace list failed."));
         setState("error");
+        emitFx("error");
       });
   }, []);
 
@@ -124,9 +127,11 @@ export default function AgentWorkspacePage() {
       .then((res) => {
         setOpenContent(res.content);
         setOpenTruncated(res.truncated === true);
+        emitFx("success");
       })
       .catch((err: unknown) => {
         setOpenContent(refusalOrError(err, "File open failed."));
+        emitFx("error");
       })
       .finally(() => setOpening(false));
   }, []);
@@ -145,6 +150,7 @@ export default function AgentWorkspacePage() {
       .catch((err: unknown) => {
         setRunError(refusalOrError(err, "Run status failed."));
         setRunState("error");
+        emitFx("error");
       });
   }, [runId]);
 
@@ -159,38 +165,41 @@ export default function AgentWorkspacePage() {
             </p>
           </div>
           <div className="settings-section__actions">
-            <button
+            <Button
               type="button"
+              variant="secondary"
               className="btn btn--ghost btn--sm"
               onClick={load}
               disabled={state === "loading"}
               aria-label="Refresh workspace"
             >
               {state === "loading" ? <Spinner /> : "refresh"}
-            </button>
+            </Button>
           </div>
         </div>
         <div className="settings-section__actions" role="tablist" aria-label="Workspace panels">
-          <button
+          <Button
             type="button"
             role="tab"
+            variant={tab === "files" ? "primary" : "secondary"}
             aria-selected={tab === "files"}
             aria-label="Show workspace files panel"
             onClick={() => setTab("files")}
             className={cn("btn btn--ghost btn--sm", tab === "files" && "active")}
           >
             Files{state === "ready" ? ` (${files.length})` : ""}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
             role="tab"
+            variant={tab === "run" ? "primary" : "secondary"}
             aria-selected={tab === "run"}
             aria-label="Show run status panel"
             onClick={() => setTab("run")}
             className={cn("btn btn--ghost btn--sm", tab === "run" && "active")}
           >
             Run status
-          </button>
+          </Button>
         </div>
       </section>
 
@@ -246,18 +255,20 @@ export default function AgentWorkspacePage() {
                     </div>
                     <div className="settings-row__control">
                       {f.readable ? (
-                        <button
+                        <Button
                           type="button"
+                          variant="secondary"
                           className="btn btn--ghost btn--sm"
                           onClick={() => openFile(f.path)}
                           disabled={opening && openPath === f.path}
                           aria-label={`Open file ${f.path}`}
                         >
                           {opening && openPath === f.path ? <Spinner /> : "open"}
-                        </button>
+                        </Button>
                       ) : (
-                        <button
+                        <Button
                           type="button"
+                          variant="secondary"
                           disabled
                           data-state="refused"
                           title={f.unreadable_reason ?? "This file cannot be opened from the dashboard."}
@@ -266,7 +277,7 @@ export default function AgentWorkspacePage() {
                           className="btn btn--ghost btn--sm"
                         >
                           open unavailable
-                        </button>
+                        </Button>
                       )}
                     </div>
                   </li>
@@ -314,23 +325,26 @@ export default function AgentWorkspacePage() {
                 <span className="settings-row__desc">Query the backend for one run's state.</span>
               </div>
               <div className="settings-row__control">
-                <input
-                  type="text"
-                  value={runId}
-                  onChange={(e) => setRunId(e.target.value)}
-                  placeholder="run id"
-                  aria-label="Run id"
-                  className="settings-input"
-                />
-                <button
+                <div className="qsk-field">
+                  <Input
+                    type="text"
+                    value={runId}
+                    onChange={(value) => setRunId(value)}
+                    placeholder="run id"
+                    label="Run id"
+                    className="settings-input"
+                  />
+                </div>
+                <Button
                   type="button"
+                  variant="secondary"
                   className="btn btn--ghost btn--sm"
                   onClick={checkRun}
                   disabled={runState === "loading" || !runId.trim()}
                   aria-label="Check run status"
                 >
                   {runState === "loading" ? <Spinner /> : "check"}
-                </button>
+                </Button>
               </div>
             </div>
             {runState === "error" ? (

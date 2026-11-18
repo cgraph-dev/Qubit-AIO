@@ -17,6 +17,7 @@ import {
   type CheckpointVerifyResponse,
 } from "@/lib/ocFamilySessionsApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 
 interface StagedOp {
   title: string;
@@ -64,9 +65,11 @@ export default function CheckpointsPage() {
     try {
       const out = await op.run();
       setResultText(formatResult(out));
+      emitFx("success");
       await refresh();
     } catch (e) {
       setErrorText(refusalOrError(e, `Operation failed: ${e}`));
+      emitFx("error");
     } finally {
       setBusy(false);
       setPending(null);
@@ -81,8 +84,10 @@ export default function CheckpointsPage() {
       const out = await verifyCheckpoint(verifyId.trim());
       setVerifyOut(out);
       setResultText(formatResult(out));
+      emitFx("success");
     } catch (e) {
       setErrorText(refusalOrError(e, `Verify failed: ${e}`));
+      emitFx("error");
     } finally {
       setBusy(false);
     }
@@ -102,7 +107,7 @@ export default function CheckpointsPage() {
             </p>
           </div>
           <div className="settings-section__actions">
-            <button
+            <Button variant="secondary"
               type="button"
               aria-label="checkpoints-refresh"
               disabled={busy}
@@ -111,7 +116,7 @@ export default function CheckpointsPage() {
               onClick={() => void refresh()}
             >
               Refresh
-            </button>
+            </Button>
           </div>
         </div>
       </section>
@@ -165,7 +170,7 @@ export default function CheckpointsPage() {
                     </span>
                   </div>
                   <div className="settings-row__control">
-                    <button
+                    <Button variant="secondary"
                       type="button"
                       aria-label={`checkpoint-verify-${row.session}`}
                       disabled={busy}
@@ -176,7 +181,7 @@ export default function CheckpointsPage() {
                       }}
                     >
                       Verify
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -198,14 +203,16 @@ export default function CheckpointsPage() {
               </span>
             </div>
             <div className="settings-row__control">
-              <input
-                aria-label="checkpoint-verify-input"
-                className="settings-input"
-                placeholder="checkpoint id"
-                value={verifyId}
-                onChange={(e) => setVerifyId(e.target.value)}
-              />
-              <button
+              <div className="qsk-field">
+                <Input
+                  label="Checkpoint id"
+                  className="settings-input"
+                  placeholder="checkpoint id"
+                  value={verifyId}
+                  onChange={(value) => setVerifyId(value)}
+                />
+              </div>
+              <Button variant="secondary"
                 type="button"
                 aria-label="checkpoint-verify-submit"
                 disabled={busy || !verifyId.trim()}
@@ -214,7 +221,7 @@ export default function CheckpointsPage() {
                 onClick={() => void runVerify()}
               >
                 Verify
-              </button>
+              </Button>
             </div>
           </div>
           {verifyOut && (
@@ -245,14 +252,16 @@ export default function CheckpointsPage() {
               </span>
             </div>
             <div className="settings-row__control">
-              <input
-                aria-label="checkpoint-create-session"
-                className="settings-input"
-                placeholder="session id"
-                value={newSessionId}
-                onChange={(e) => setNewSessionId(e.target.value)}
-              />
-              <button
+              <div className="qsk-field">
+                <Input
+                  label="Session id"
+                  className="settings-input"
+                  placeholder="session id"
+                  value={newSessionId}
+                  onChange={(value) => setNewSessionId(value)}
+                />
+              </div>
+              <Button variant="secondary"
                 type="button"
                 aria-label="checkpoint-create-submit"
                 disabled={busy || !newSessionId.trim()}
@@ -267,7 +276,7 @@ export default function CheckpointsPage() {
                 }
               >
                 Create
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -287,7 +296,7 @@ export default function CheckpointsPage() {
               <span className="settings-row__title">Prune checkpoints</span>
             </div>
             <div className="settings-row__control">
-              <button
+              <Button variant="secondary"
                 type="button"
                 aria-label="checkpoint-prune-submit"
                 disabled={busy || journal.length === 0}
@@ -308,7 +317,7 @@ export default function CheckpointsPage() {
                 }
               >
                 Prune checkpoints
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -362,7 +371,7 @@ export default function CheckpointsPage() {
             <h2 className="settings-section__heading">{pending.title}</h2>
             <p className="settings-section__desc">{pending.detail}</p>
             <div className="mt-3 flex gap-2">
-              <button
+              <Button variant="secondary"
                 type="button"
                 aria-label="confirm-staged-op"
                 disabled={busy}
@@ -371,15 +380,15 @@ export default function CheckpointsPage() {
                 onClick={() => void settle(pending)}
               >
                 Confirm
-              </button>
-              <button
+              </Button>
+              <Button variant="secondary"
                 type="button"
                 aria-label="cancel-staged-op"
                 className="btn btn--sm btn--ghost"
                 onClick={() => setPending(null)}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>
