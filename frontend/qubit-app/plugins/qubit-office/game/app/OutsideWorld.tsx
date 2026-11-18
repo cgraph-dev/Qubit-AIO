@@ -17,6 +17,7 @@
  * React and hooks arrive as arguments, exactly as the rest of the plugin does
  * it, so the host keeps one React runtime.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type OutsideChunk, type OutsideEnvironmentEvent, type OutsideFloorLink,
@@ -174,7 +175,7 @@ export function createOutsideWorld(R: ReactArg, hooks: HooksArg) {
 
     const retryButton = () => {
       if (!props.onRetry) return null;
-      return R.createElement("button", {
+      return sakugaButton(R, {
         key: "retry",
         type: "button",
         className: "outside-world__retry",
@@ -247,7 +248,7 @@ export function createOutsideWorld(R: ReactArg, hooks: HooksArg) {
 
     const zoneButton = (zone: OutsideZone) => {
       const isSelected = selectedId === zone.zone_id;
-      return R.createElement("button", {
+      return sakugaButton(R, {
         key: zone.zone_id,
         type: "button",
         ref: (node: HTMLElement | null) => {

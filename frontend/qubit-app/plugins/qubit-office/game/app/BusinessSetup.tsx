@@ -22,6 +22,7 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { BusinessApiError, bootstrapOfficeSeats } from "./business-api";
 
@@ -92,7 +93,7 @@ export function renderBusinessSetup(
     }, "Business OS is ready. Reloading this panel…"));
     // If the retried read still cannot see the tenant (a slow/foreign store),
     // the operator gets an explicit re-read rather than a dead end.
-    children.push(R.createElement("button", {
+    children.push(sakugaButton(R, {
       key: "retry",
       type: "button",
       className: "business-setup__start",
@@ -101,7 +102,7 @@ export function renderBusinessSetup(
       onClick: onRetry,
     }, "Reload this panel"));
   } else {
-    children.push(R.createElement("button", {
+    children.push(sakugaButton(R, {
       key: "start",
       type: "button",
       className: "business-setup__start",

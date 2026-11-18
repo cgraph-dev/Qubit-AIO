@@ -2829,6 +2829,7 @@ class WebUIHandler(BaseHTTPRequestHandler):
         # The config lives on the orchestrator, exactly as every other compat
         # handler reads it (`self.app.orch.cfg`).
         cfg = self.app.orch.cfg
+        fx_mode = OS.fx_mode_for(cfg)
 
         # HTTP/1.1 + CHUNKED is the shape a browser's EventSource actually
         # consumes. The previous response was length-less with
@@ -2881,7 +2882,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                     continue
 
                 revision += 1
-                for frame in OS.stream_frames(tower, revision, start):
+                for frame in OS.stream_frames(tower, revision, start,
+                                              fx_mode=fx_mode):
                     write_frame(frame)
                 # Every frame comes from office_stream's explicit client schema.
                 # The raw tower report and its internal field names stay server-side.
@@ -2917,7 +2919,8 @@ class WebUIHandler(BaseHTTPRequestHandler):
                      if scope.startswith("floor-") else None)
             if tower is None:
                 tower = OS.scope_tower(TWR.state(cfg), scope)
-            snap = OS.to_snapshot(tower, 1, time.time())
+            snap = OS.to_snapshot(tower, 1, time.time(),
+                                  fx_mode=OS.fx_mode_for(cfg))
         except Exception as exc:  # noqa: BLE001 - a read must not 500
             self._json({"ok": False, "code": "OFFICE_TOWER_UNAVAILABLE",
                         "detail": f"the office store could not be read: "

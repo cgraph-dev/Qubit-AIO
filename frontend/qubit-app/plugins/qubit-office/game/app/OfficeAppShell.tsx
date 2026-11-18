@@ -45,6 +45,9 @@ import {
 import { createOfficeLoadingScreen } from "../loading/OfficeLoadingScreen";
 import type { OfficeLoadingConfigInput } from "../loading/config";
 import {
+  officeFx, sakugaButton,
+} from "./sakuga";
+import {
   captureFocus,
   focusFirst,
   installEscapeToShell,
@@ -319,6 +322,7 @@ export function createOfficeApp(
     // may share the row (the stylesheet splits it). Campus keeps its original
     // behavior because it is a full-surface view, not a side sheet.
     const toggleAgents = () => {
+      if (!agentsOpen) officeFx("impact");
       setApprovalsOpen(false);
       setCommandCenterOpen(false);
       setTimelineOpen(false);
@@ -326,6 +330,7 @@ export function createOfficeApp(
       setAgentsOpen((v: boolean) => !v);
     };
     const toggleHud = () => {
+      if (!hudOpen) officeFx("impact");
       setApprovalsOpen(false);
       setCommandCenterOpen(false);
       setTimelineOpen(false);
@@ -334,6 +339,7 @@ export function createOfficeApp(
       setHudOpen((v: boolean) => !v);
     };
     const toggleApprovals = () => {
+      if (!approvalsOpen) officeFx("impact");
       setAgentsOpen(false);
       setHudOpen(false);
       setWarRoomOpen(false);
@@ -344,6 +350,7 @@ export function createOfficeApp(
       setApprovalsOpen((v: boolean) => !v);
     };
     const toggleCommandCenter = () => {
+      if (!commandCenterOpen) officeFx("impact");
       setAgentsOpen(false);
       setHudOpen(false);
       setWarRoomOpen(false);
@@ -355,6 +362,7 @@ export function createOfficeApp(
       setCommandCenterOpen((v: boolean) => !v);
     };
     const toggleTimeline = () => {
+      if (!timelineOpen) officeFx("impact");
       setAgentsOpen(false);
       setHudOpen(false);
       setWarRoomOpen(false);
@@ -366,6 +374,7 @@ export function createOfficeApp(
       setTimelineOpen((v: boolean) => !v);
     };
     const toggleStudio = () => {
+      if (!studioOpen) officeFx("impact");
       setAgentsOpen(false);
       setHudOpen(false);
       setWarRoomOpen(false);
@@ -376,7 +385,10 @@ export function createOfficeApp(
       setControlSeat(null);
       setStudioOpen((v: boolean) => !v);
     };
-    const toggleCampus = () => setCampusOpen((v: boolean) => !v);
+    const toggleCampus = () => {
+      if (!campusOpen) officeFx("impact");
+      setCampusOpen((v: boolean) => !v);
+    };
     const toggleFor = (id: string): (() => void) => {
       switch (id) {
         case "agents": return toggleAgents;
@@ -434,6 +446,11 @@ export function createOfficeApp(
       return () => { live = false; ctl?.abort(); };
     }, [campusOpen, campusTab, props.base, props.fetchImpl]);
     const frameRef = useRef<HTMLIFrameElement | null>(null);
+    // Previous pending count, for the one cue this shell owns: a NEW pending
+    // approval is an event the operator must notice, not decoration. Declared
+    // AFTER frameRef so the first ref slot stays the iframe (the shell tests
+    // seed it by position).
+    const approvalCountRef = useRef(0);
     // The two icon buttons installed into the office's own panel group. The
     // controller lives for one iframe load; a reload (or a new base) swaps it.
     const menuRef = useRef<OfficeMenuController | null>(null);
@@ -557,7 +574,11 @@ export function createOfficeApp(
       let live = true;
       const read = () => {
         fetchApprovals({ base: props.base }).then((next) => {
-          if (live && next.kind === "ready") setApprovalCount(next.items.length);
+          if (!live || next.kind !== "ready") return;
+          const count = next.items.length;
+          if (count > approvalCountRef.current) officeFx("approval");
+          approvalCountRef.current = count;
+          setApprovalCount(count);
         });
       };
       read();
@@ -836,7 +857,7 @@ export function createOfficeApp(
     // write control inside the vendored client could not save anything.
     if (props.seatAgentId !== undefined && props.seatAgentId !== null) {
       const seats = props.seats ?? [];
-      children.push(R.createElement("button", {
+      children.push(sakugaButton(R, {
         key: "seat-model-toggle",
         type: "button",
         className: "seat-model__toggle",
@@ -901,7 +922,7 @@ export function createOfficeApp(
       }, [
         R.createElement("div", { key: "head", className: "office-game__dockHead office-theme-dock-head" }, [
           R.createElement("span", { key: "t", className: "office-theme-dock-title" }, "Agents"),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "warroom", type: "button",
             className: "office-game__btn office-theme-dock-link",
             "data-testid": "office-game-warroom-open",
@@ -915,7 +936,7 @@ export function createOfficeApp(
               setWarRoomOpen(true);
             },
           }, "War Room"),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "etsy", type: "button",
             className: "office-game__btn office-theme-dock-link",
             "data-testid": "office-game-etsy-open",
@@ -931,7 +952,7 @@ export function createOfficeApp(
               setEtsyOpen(true);
             },
           }, "Etsy"),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-agents-close", "aria-label": "Close agents",
             "data-office-slice": buttonSlice,
@@ -1016,7 +1037,7 @@ export function createOfficeApp(
             "data-testid": "office-game-approvals-count",
             "data-count": String(approvalCount),
           }, String(approvalCount)),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-approvals-close", "aria-label": "Close approvals",
             "data-office-slice": buttonSlice,
@@ -1025,7 +1046,11 @@ export function createOfficeApp(
         ]),
         R.createElement(ApprovalsPanel as never, {
           key: "body", base: props.base,
-          onCountChange: (n: number) => setApprovalCount(n),
+          onCountChange: (n: number) => {
+            if (n > approvalCountRef.current) officeFx("approval");
+            approvalCountRef.current = n;
+            setApprovalCount(n);
+          },
           onClose: () => setApprovalsOpen(false),
         }),
       ]));
@@ -1077,7 +1102,7 @@ export function createOfficeApp(
             "data-testid": "office-game-hud-open-link",
             href: hudFrameSrc(props.base),
           }, "Open HUD"),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "x", type: "button", className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-hud-close", "aria-label": "Close HUD",
             "data-office-slice": buttonSlice,
@@ -1131,7 +1156,7 @@ export function createOfficeApp(
             "aria-hidden": "true",
           }, String(approvalCount)));
         }
-        return R.createElement("button", {
+        return sakugaButton(R, {
           key: spec.id,
           type: "button",
           className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
@@ -1212,7 +1237,7 @@ export function createOfficeApp(
 
     if (studioOpen) {
       const tab = (id: "panels" | "rooms" | "outside", label: string) =>
-        R.createElement("button", {
+        sakugaButton(R, {
           key: `studio-tab-${id}`, type: "button",
           className: "office-game__btn office-game__studioTab",
           "data-testid": `office-studio-tab-${id}`,
@@ -1249,7 +1274,7 @@ export function createOfficeApp(
           tab("panels", "Panels"),
           tab("rooms", "Rooms"),
           tab("outside", "Outside"),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "x", type: "button",
             className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-game-studio-close",
@@ -1272,7 +1297,7 @@ export function createOfficeApp(
       }, [
         R.createElement("span", { key: "t" },
           `Viewing ${floorScope.replace("live:", "Floor ")}`),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "all", type: "button", className: "office-game__btn",
           "data-testid": "office-floor-scope-clear",
           onClick: () => setFloorScope(""),
@@ -1320,14 +1345,14 @@ export function createOfficeApp(
             R.createElement("div", {
               key: "tabs", className: "office-game__campusTabs",
             }, [
-              R.createElement("button", {
+              sakugaButton(R, {
                 key: "floors", type: "button",
                 className: "office-game__btn",
                 "data-testid": "office-campus-tab-floors",
                 "aria-pressed": campusTab === "floors",
                 onClick: () => setCampusTab("floors"),
               }, "Campus world"),
-              R.createElement("button", {
+              sakugaButton(R, {
                 key: "directory", type: "button",
                 className: "office-game__btn",
                 "data-testid": "office-campus-tab-directory",
@@ -1336,7 +1361,7 @@ export function createOfficeApp(
               }, "5-floor directory"),
             ]),
           ]),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "close", type: "button",
             className: "office-game__btn office-theme-dock-close",
             "data-testid": "office-campus-close",

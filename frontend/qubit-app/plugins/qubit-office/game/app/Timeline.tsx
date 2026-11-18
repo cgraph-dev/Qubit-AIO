@@ -11,6 +11,7 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
 import {
@@ -227,7 +228,7 @@ export function createTimeline(
           }, "REPLAY · simulated · effects stubbed")
         : null,
       props.onClose
-        ? R.createElement("button", {
+        ? sakugaButton(R, {
             key: "close", type: "button",
             className: "office-game__btn office-theme-dock-close",
             "data-testid": "timeline-close",
@@ -286,7 +287,7 @@ export function createTimeline(
               statusLabel(status))),
         ]),
       ]),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "replay", type: "button",
         "data-testid": "timeline-replay-toggle",
         "aria-pressed": replayToggle ? "true" : "false",
@@ -323,7 +324,7 @@ export function createTimeline(
             key: "d", className: "timeline__muted",
             "data-testid": "timeline-error-detail",
           }, `${code}: ${detail}`),
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "r", type: "button",
             "data-testid": "timeline-retry",
             onClick: () => setRetryToken((value: number) => value + 1),

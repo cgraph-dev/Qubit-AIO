@@ -47,6 +47,7 @@ __all__ = [
     "CANCELLATIONS",
     "FORBIDDEN_TRUTH_KEYS",
     "EVENT_RULES",
+    "OFFICE_EVENT_RULES",
     "FX_RULE_TYPES",
     "FX_INPUT_TYPES",
     "FXError",
@@ -318,6 +319,38 @@ FX_RULE_TYPES: Tuple[str, ...] = tuple(sorted(EVENT_RULES))
 FX_INPUT_TYPES = frozenset(EVENT_RULES)
 
 
+#: Office-event translation. The office stream's real event log is
+#: ``office_event`` (``run_settled``, ``consent_denied``, ...), which is a
+#: different vocabulary from the Business OS ``bos_event`` types above. These
+#: are declared explicitly rather than guessed: a kind absent here produces NO
+#: effect, exactly like an unknown ``bos_event`` type. The rules themselves are
+#: reused so the presentation language stays one table.
+OFFICE_EVENT_RULES: Dict[str, FXRules] = {
+    "run_started": EVENT_RULES["agent.turn.started"],
+    "run_settled": EVENT_RULES["agent.turn.completed"],
+    "run_unpriced": _r(
+        "settle-quiet", "status-check", emote="done",
+        priority=PRIORITY_HIGH, essential=True, cancellation="replace",
+        fallback="status-badge",
+    ),
+    "run_failed": EVENT_RULES["agent.turn.failed"],
+    "task_done": EVENT_RULES["delegation.completed"],
+    "task_unverified": _r(
+        "warning", "status-warning", emote="unverified",
+        priority=PRIORITY_HIGH, essential=True, fallback="status-badge",
+    ),
+    "consent_denied": EVENT_RULES["agent.turn.tool.denied"],
+    "tool_call": EVENT_RULES["agent.turn.tool.completed"],
+    "note_written": EVENT_RULES["memory.recorded"],
+    "memory_written": EVENT_RULES["memory.recorded"],
+    "skill_used": EVENT_RULES["agent.turn.started"],
+    "mcp_call": EVENT_RULES["agent.turn.tool.completed"],
+    "ledger_write": EVENT_RULES["finance.posting.posted"],
+    "escalation": EVENT_RULES["approval.requested"],
+    "meeting": _r("talk", "talk-still", emote="meeting"),
+}
+
+
 # --------------------------------------------------------------------------- model
 @dataclass(frozen=True, slots=True)
 class FXEvent:
@@ -534,6 +567,94 @@ def map_events(
         )
         if fx is not None:
             mapped.append(fx)
+    return mapped
+
+
+def map_office_event(
+    row: Any,
+    *,
+    reduced_motion: bool = False,
+    disable_nonessential: bool = False,
+    replay: bool = False,
+) -> Optional[FXEvent]:
+    """Map one committed ``office_event`` row to one :class:`FXEvent`.
+
+    The row is the real log the tower's activity feed reads: ``id``, ``kind``,
+    ``agent_id`` (and optionally ``room_id``). Only declared kinds produce an
+    effect; an unknown kind, a missing id, or a non-mapping row is a no-op, so
+    animation can never invent work the office did not record.
+    """
+    if not isinstance(row, Mapping):
+        return None
+    raw_id = row.get("id")
+    event_id = _text(raw_id)
+    kind = _text(row.get("kind"))
+    if not event_id or not kind:
+        return None
+    rule = OFFICE_EVENT_RULES.get(kind)
+    if rule is None:
+        return None
+    agent = _optional_text(row.get("agent_id"))
+    room = _optional_text(row.get("room_id") or row.get("room"))
+
+    animation = rule.animation
+    particles = rule.particles
+    if reduced_motion:
+        if not rule.essential:
+            return None
+        animation = rule.still
+        particles = None
+    if disable_nonessential and not rule.essential:
+        return None
+
+    event_type = f"office.{kind}"
+    return FXEvent(
+        fx_event_id=fx_event_id_for(event_id, event_type, animation, agent, room),
+        event_id=event_id,
+        event_type=event_type,
+        room=room,
+        agent=agent,
+        animation=animation,
+        still=rule.still,
+        emote=rule.emote,
+        particles=particles,
+        sound=rule.sound,
+        seed=seed_for(event_id, animation, agent, room),
+        priority=rule.priority,
+        cancellation=rule.cancellation,
+        replay=bool(replay),
+        reduced_motion=bool(reduced_motion),
+        fallback=rule.fallback,
+        essential=rule.essential,
+        group=rule.group,
+    )
+
+
+def map_office_events(
+    rows: Iterable[Any],
+    *,
+    reduced_motion: bool = False,
+    disable_nonessential: bool = False,
+    replay: bool = False,
+    limit: Optional[int] = None,
+) -> List[FXEvent]:
+    """Map office-event rows in the given (oldest -> newest) order.
+
+    ``limit`` keeps the newest N mapped effects; the caller passes rows in
+    chronological order and the result stays chronological. Deterministic.
+    """
+    mapped: List[FXEvent] = []
+    for row in rows:
+        fx = map_office_event(
+            row,
+            reduced_motion=reduced_motion,
+            disable_nonessential=disable_nonessential,
+            replay=replay,
+        )
+        if fx is not None:
+            mapped.append(fx)
+    if limit is not None and limit >= 0:
+        mapped = mapped[-limit:] if limit else []
     return mapped
 
 

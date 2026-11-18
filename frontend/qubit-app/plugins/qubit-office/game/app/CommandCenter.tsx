@@ -9,6 +9,7 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createBusinessSetup, isTenantMissing } from "./BusinessSetup";
 import {
@@ -184,7 +185,7 @@ export function createCommandCenter(
         R.createElement("span", {
           key: "title", className: "office-theme-dock-title",
         }, "Command Center"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "close", type: "button",
           className: "office-game__btn office-theme-dock-close",
           "data-testid": "command-center-close",
@@ -446,7 +447,7 @@ export function createCommandCenter(
           return R.createElement("li", {
             key: entry.entry_id,
             className: "command-center__item",
-          }, R.createElement("button", {
+          }, sakugaButton(R, {
             ...common,
             type: "button",
             onClick: () => jumpTo(entry, null, props.onJump),

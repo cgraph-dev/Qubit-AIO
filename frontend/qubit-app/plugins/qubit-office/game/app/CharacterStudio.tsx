@@ -15,6 +15,7 @@ type ReactLike = {
 type HooksLike = {
   useState: <T>(value: T) => [T, (next: T | ((prev: T) => T)) => void];
 };
+import { sakugaButton } from "./sakuga";
 import {
   ANIMATIONS,
   type AnimationName,
@@ -270,7 +271,7 @@ export function createCharacterStudio(
         ? state.draft.accessory_ids.includes(part.part_id)
         : String(state.draft[
           `${part.category}_id` as keyof CharacterProfile]) === part.part_id;
-      return R.createElement("button", {
+      return sakugaButton(R, {
         key: part.part_id,
         type: "button",
         className: "character-studio__part",
@@ -306,7 +307,7 @@ export function createCharacterStudio(
         "data-testid": "character-layer-row",
         "data-layer": layer,
       }, layer),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: `layer-up-${layer}`,
         type: "button",
         "data-testid": "character-layer",
@@ -317,7 +318,7 @@ export function createCharacterStudio(
         onClick: () => updateDraft((current) =>
           moveLayer(current, layer, "up")),
       }, "↑"),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: `layer-down-${layer}`,
         type: "button",
         "data-testid": "character-layer",
@@ -345,7 +346,7 @@ export function createCharacterStudio(
       },
     );
 
-    const shadowButton = (policy: ShadowPolicy) => R.createElement("button", {
+    const shadowButton = (policy: ShadowPolicy) => sakugaButton(R, {
       key: `shadow-${policy}`,
       type: "button",
       "data-testid": "character-shadow",
@@ -356,7 +357,7 @@ export function createCharacterStudio(
         setShadowPolicy(current, policy)),
     }, policy);
 
-    const portraitButton = (size: 32 | 48) => R.createElement("button", {
+    const portraitButton = (size: 32 | 48) => sakugaButton(R, {
       key: `portrait-${size}`,
       type: "button",
       "data-testid": "character-portrait-size",
@@ -397,7 +398,7 @@ export function createCharacterStudio(
         }, detail),
       ]);
 
-    const revisionRow = (row: StudioRevision) => R.createElement("button", {
+    const revisionRow = (row: StudioRevision) => sakugaButton(R, {
       key: `revision-${row.revision}`,
       type: "button",
       "data-testid": "character-rollback",
@@ -453,14 +454,14 @@ export function createCharacterStudio(
           onChange: (event: { target: { value: string } }) =>
             update((current) => setSearch(current, event.target.value)),
         }),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "randomize",
           type: "button",
           "data-testid": "character-randomize",
           "aria-label": "Randomize unlocked parts",
           onClick: () => updateDraft((current) => randomize(current)),
         }, "Randomize"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "undo",
           type: "button",
           "data-testid": "character-undo",
@@ -468,7 +469,7 @@ export function createCharacterStudio(
           disabled: state.history.length === 0,
           onClick: () => updateDraft(undo),
         }, "Undo"),
-        R.createElement("button", {
+        sakugaButton(R, {
           key: "redo",
           type: "button",
           "data-testid": "character-redo",
@@ -476,7 +477,7 @@ export function createCharacterStudio(
           disabled: state.future.length === 0,
           onClick: () => updateDraft(redo),
         }, "Redo"),
-        ...PRESETS.map((preset) => R.createElement("button", {
+        ...PRESETS.map((preset) => sakugaButton(R, {
           key: `preset-${preset.preset_id}`,
           type: "button",
           "data-testid": "character-preset",
@@ -568,7 +569,7 @@ export function createCharacterStudio(
         className: "character-studio__error",
         role: "alert",
       }, `${save.code}: ${save.detail}`) : null,
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "save",
         type: "button",
         "data-testid": "character-save",

@@ -28,8 +28,9 @@ delivery state.
 from __future__ import annotations
 
 import json
+import os
 import time
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Mapping, Optional
 
 #: How long one SSE connection is held open before the client is asked to
 #: reconnect. The client already reconnects, so this is a ceiling on a single
@@ -39,6 +40,87 @@ STREAM_MAX_SECONDS = 300
 #: How often a fresh snapshot is sent. The tower report is a fold over the
 #: office store, so this is the resolution of "live" and should stay modest.
 SNAPSHOT_INTERVAL_SECONDS = 2.0
+
+#: `office.fx` accepts exactly two states: the overlay on, or off. Default on.
+FX_MODES = ("sakuga", "off")
+DEFAULT_FX_MODE = "sakuga"
+
+#: The snapshot's FX window. It is a presentation projection of the tower's
+#: OWN activity rows; the newest few are enough for the client to play new
+#: cues (it de-duplicates by `fx_event_id`). Sending the whole feed would let
+#: a 100-event burst animate at once.
+FX_SNAPSHOT_LIMIT = 12
+
+
+def fx_mode_for(cfg: Any) -> str:
+    """Resolve ``office.fx`` (env ``QUBIT_OFFICE_FX`` wins) to ``sakuga|off``.
+
+    An absent key is the documented default (``sakuga``), not an error. Any
+    unrecognised value also defaults to ``sakuga`` so a typo cannot silently
+    disable a presentation layer the owner expects to see.
+    """
+    env = os.environ.get("QUBIT_OFFICE_FX")
+    if env is not None and str(env).strip():
+        return "sakuga" if str(env).strip().lower() != "off" else "off"
+    raw: Any = None
+    if isinstance(cfg, Mapping):
+        office = cfg.get("office")
+        if isinstance(office, Mapping):
+            raw = office.get("fx")
+    else:
+        getter = getattr(cfg, "get", None)
+        if callable(getter):
+            try:
+                raw = getter("office", "fx", default=DEFAULT_FX_MODE)
+            except Exception:  # noqa: BLE001 - a foreign config shape is not fatal
+                raw = None
+    value = str(raw or DEFAULT_FX_MODE).strip().lower()
+    return "sakuga" if value != "off" else "off"
+
+
+def _fx_events(tower: Dict[str, Any], fx_mode: str) -> List[Dict[str, Any]]:
+    """The bounded FX projection of the tower's real activity rows.
+
+    The tower feeds ``activity`` newest-first from ``office_event``. FX is a
+    presentation projection of those committed rows only: an empty feed is an
+    empty list, and an unknown kind is dropped (never invented). Nothing is
+    mutated and the result is deterministic for the same rows.
+    """
+    if fx_mode == "off":
+        return []
+    activity = [row for row in (tower.get("activity") or [])
+                if isinstance(row, Mapping)]
+    if not activity:
+        return []
+    # Attach the seat's REAL room (from the tower's own characters) so the
+    # client can fall back to the room centre when an agent anchor is off
+    # screen. A character with no declared room stays room-less; nothing is
+    # invented.
+    room_by_agent: Dict[str, str] = {}
+    for character in tower.get("characters") or []:
+        if not isinstance(character, Mapping):
+            continue
+        pos = character.get("position") or {}
+        if not isinstance(pos, Mapping):
+            continue
+        floor = pos.get("floor")
+        room = pos.get("room_id")
+        if floor is not None and room is not None:
+            room_by_agent[str(character.get("agent_id"))] = f"f{floor}r{room}"
+    rows: List[Dict[str, Any]] = []
+    for row in activity:
+        copy = dict(row)
+        if not copy.get("room_id") and copy.get("agent_id") is not None:
+            room_id = room_by_agent.get(str(copy["agent_id"]))
+            if room_id:
+                copy["room_id"] = room_id
+        rows.append(copy)
+    from .office import fx as OFX
+
+    ordered = list(reversed(rows))  # oldest -> newest for stable chronology
+    return [event.to_dict() for event in OFX.map_office_events(
+        ordered, limit=FX_SNAPSHOT_LIMIT)]
+
 
 
 def _cents(value: Any) -> Optional[int]:
@@ -192,7 +274,8 @@ def template_tower(floor_id: str,
 
 
 def to_snapshot(tower: Dict[str, Any], revision: int,
-                start_time: float) -> Dict[str, Any]:
+                start_time: float, *,
+                fx_mode: str = DEFAULT_FX_MODE) -> Dict[str, Any]:
     """Render the tower payload into the client's `OfficeSnapshot`.
 
     Every field is either taken from the tower or omitted. There is no default
@@ -362,6 +445,10 @@ def to_snapshot(tower: Dict[str, Any], revision: int,
         "rooms": rooms,
         "agents": agents,
         "accounts": [],
+        # Presentation-only effects projected from the tower's real
+        # `office_event` rows. `off` is an empty list; the client keeps its
+        # existing rendering either way.
+        "fx": _fx_events(tower, fx_mode),
         "meta": {
             # demo=false is the honest answer: this is a real office store.
             "demo": False,
@@ -522,7 +609,8 @@ def notice(text: str, *, level: str = "info", kind: str = "",
 
 
 def stream_frames(tower: Dict[str, Any], revision: int, start_time: float,
-                  retry_ms: int = 2000) -> Iterable[bytes]:
+                  retry_ms: int = 2000, *,
+                  fx_mode: str = DEFAULT_FX_MODE) -> Iterable[bytes]:
     """The opening frames of a stream: the retry hint, then a snapshot + feed.
 
     One snapshot per connection is what the client's `snapshot` handler expects;
@@ -530,7 +618,8 @@ def stream_frames(tower: Dict[str, Any], revision: int, start_time: float,
     report each time rather than caching one.
     """
     yield f"retry: {retry_ms}\n\n".encode("utf-8")
-    yield sse("snapshot", to_snapshot(tower, revision, start_time))
+    yield sse("snapshot", to_snapshot(tower, revision, start_time,
+                                      fx_mode=fx_mode))
     feed = to_feed(tower)
     if feed:
         yield sse("feed", feed)

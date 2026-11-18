@@ -24,6 +24,7 @@
  *
  * React comes from the HOST: `R.createElement`, never an import.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   ApprovalApiError,
@@ -149,7 +150,7 @@ function row(
     R.createElement("div", {
       key: "actions", className: "approvals-panel__actions",
     }, [
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "approve", type: "button",
         className: "office-game__btn approvals-panel__approve",
         "data-testid": "approval-approve",
@@ -158,7 +159,7 @@ function row(
         disabled: busy,
         onClick: () => onDecide(item, "approve"),
       }, busy ? "Approving\u2026" : "Approve"),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "reject", type: "button",
         className: "office-game__btn approvals-panel__reject",
         "data-testid": "approval-reject",
@@ -245,7 +246,7 @@ export function createApprovalsPanel(
         "data-count": String(count),
         "aria-label": `${count} pending approval${count === 1 ? "" : "s"}`,
       }, `${count} pending`),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "refresh", type: "button",
         className: "office-game__btn approvals-panel__refresh",
         "data-testid": "approvals-refresh",
@@ -314,7 +315,7 @@ export function createApprovalsPanel(
     if (props.onClose) {
       children.unshift(R.createElement("div", {
         key: "closeRow", className: "approvals-panel__closeRow",
-      }, R.createElement("button", {
+      }, sakugaButton(R, {
         key: "close", type: "button",
         className: "office-game__btn approvals-panel__close",
         "data-testid": "approvals-close",

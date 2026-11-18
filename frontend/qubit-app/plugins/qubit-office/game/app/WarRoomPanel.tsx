@@ -8,6 +8,7 @@
  * The directory tab renders the shipped TEMPLATES (145 roles, 5 floors) and
  * never dresses a template as a staffed agent.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import {
   type BusinessDirectory, type BusinessOverview,
@@ -250,7 +251,7 @@ export function createWarRoomPanel(
     }, [
       R.createElement("span", { key: "t", className: "office-theme-dock-title" },
         "War Room / Idea Lab"),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "x", type: "button",
         className: "office-game__btn office-theme-dock-close",
         "data-testid": "warroom-close", "aria-label": "Close War Room",
@@ -262,14 +263,14 @@ export function createWarRoomPanel(
     children.push(R.createElement("div", {
       key: "tabs", className: "warroom__tabs", role: "tablist",
     }, [
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "idea", type: "button", role: "tab",
         "aria-selected": tab === "idea" ? "true" : "false",
         "data-testid": "warroom-tab-idea",
         className: "warroom__tab" + (tab === "idea" ? " is-active" : ""),
         onClick: () => setTab("idea"),
       }, "Idea Lab"),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "directory", type: "button", role: "tab",
         "aria-selected": tab === "directory" ? "true" : "false",
         "data-testid": "warroom-tab-directory",
@@ -381,7 +382,7 @@ export function createWarRoomPanel(
               onInput: (event: { target: { value: string } }) =>
                 setTitle(event.target.value),
             }),
-            R.createElement("button", {
+            sakugaButton(R, {
               key: "create", type: "button", className: "office-game__btn",
               "data-testid": "warroom-new-create",
               disabled: busy !== null || !title.trim(),
@@ -399,7 +400,7 @@ export function createWarRoomPanel(
             }, "Open session"),
           ]),
           R.createElement("div", { key: "pilot", className: "warroom__row" }, [
-            R.createElement("button", {
+            sakugaButton(R, {
               key: "etsy", type: "button", className: "office-game__btn",
               "data-testid": "warroom-etsy-pilot",
               disabled: busy !== null,
@@ -464,7 +465,7 @@ export function createWarRoomPanel(
                 onInput: (event: { target: { value: string } }) =>
                   setSourceLocator(event.target.value),
               }),
-              R.createElement("button", {
+              sakugaButton(R, {
                 key: "add", type: "button", className: "office-game__btn",
                 "data-testid": "warroom-source-add",
                 disabled: busy !== null || !sourceLocator.trim(),
@@ -490,7 +491,7 @@ export function createWarRoomPanel(
                 onInput: (event: { target: { value: string } }) =>
                   setResearchQuery(event.target.value),
               }),
-              R.createElement("button", {
+              sakugaButton(R, {
                 key: "run", type: "button", className: "office-game__btn",
                 "data-testid": "warroom-research-perplexity",
                 disabled: busy !== null || !canResearch,
@@ -558,7 +559,7 @@ export function createWarRoomPanel(
                   key: source.source_id, value: source.source_id,
                 }, `${source.kind}: ${source.locator.slice(0, 40)}`)),
               ]),
-              R.createElement("button", {
+              sakugaButton(R, {
                 key: "add", type: "button", className: "office-game__btn",
                 "data-testid": "warroom-evidence-add",
                 disabled: busy !== null || !evidenceClaim.trim(),
@@ -631,7 +632,7 @@ export function createWarRoomPanel(
                     onInput: (event: { target: { value: string } }) =>
                       setDecisionNote(event.target.value),
                   }),
-                  R.createElement("button", {
+                  sakugaButton(R, {
                     key: "approve", type: "button", className: "office-game__btn",
                     "data-testid": "warroom-approve",
                     disabled: busy !== null,
@@ -642,7 +643,7 @@ export function createWarRoomPanel(
                         idempotency_key: newIdempotencyKey("warroom.decision"),
                       }, opts)),
                   }, "Approve"),
-                  R.createElement("button", {
+                  sakugaButton(R, {
                     key: "reject", type: "button",
                     className: "office-game__btn warroom__danger",
                     "data-testid": "warroom-reject",
@@ -657,7 +658,7 @@ export function createWarRoomPanel(
                 ])
               : null,
             session.state === "approved"
-              ? R.createElement("button", {
+              ? sakugaButton(R, {
                   key: "tasks", type: "button", className: "office-game__btn",
                   "data-testid": "warroom-create-tasks",
                   disabled: busy !== null,

@@ -192658,6 +192658,139 @@ create: function(game) {
 		win.fetch = bridge;
 		return restore;
 	}
+	// ../qubit-app/plugins/qubit-office/game/app/office-ui-skin.ts
+	var SAFE_URL = /^[A-Za-z0-9._~:/?=&%+,@!$'()*;-]+$/;
+	var STYLE_ID = "qubit-office-ui-skin";
+	function safeSrc(value) {
+		if (typeof value !== "string" || !value || value.includes("\\")) return null;
+		if (!SAFE_URL.test(value) || !/^(?:\/(?!\/)|https?:\/\/)/.test(value)) return null;
+		return value;
+	}
+	function sliceRule(slice, targets) {
+		const src = safeSrc(slice?.src);
+		const cell = Array.isArray(slice?.slice) && slice.slice.length === 4 ? slice.slice.filter((n) => Number.isInteger(n) && n > 0) : [];
+		if (!src || cell.length !== 4) return [];
+		const width = typeof slice?.width === "string" && /^[1-9][0-9]{0,3}px$/.test(slice.width) ? slice.width : "4px";
+		const repeat = slice?.repeat === "round" || slice?.repeat === "repeat" ? slice.repeat : "stretch";
+		return targets.map((target) => `.ui-root ${target} {border-style:solid;border-width:${width};border-image-source:url("${src}");border-image-slice:${cell.join(" ")};border-image-width:${width};border-image-repeat:${repeat};border-image-outset:0;image-rendering:pixelated; }`);
+	}
+	/** CSS for panels/dialogs/buttons/bubbles, scoped to the office document. */
+	function officeUiSkinRules(payload) {
+		if (!payload?.active) return [];
+		const slices = payload.ui?.slices ?? {};
+		return [
+			...sliceRule(slices.panel, [
+				".ui-panel",
+				".ui-drawer",
+				".ui-dialog",
+				".ui-feed",
+				".ui-sidebar",
+				".ui-settings",
+				".ui-spawn",
+				".ui-perm",
+				".ui-history",
+				".ui-timelapse",
+				".ui-daystats",
+				".ui-deliveries",
+				".ui-popover",
+				".ui-usage-card",
+				".ui-row",
+				".ui-tab"
+			]),
+			...sliceRule(slices.dock, [
+				".ui-drawer",
+				".ui-feed",
+				".ui-sidebar"
+			]),
+			...sliceRule(slices.card, [
+				".ui-row",
+				".ui-usage-card",
+				".ui-deliv-row"
+			]),
+			...sliceRule(slices.dialog, [
+				".ui-dialog",
+				".ui-popover",
+				".ui-modal"
+			]),
+			...sliceRule(slices.bubble, [
+				".ui-bubble",
+				".ui-toast",
+				".ui-chip"
+			]),
+			...sliceRule(slices.button, [".ui-btn"]),
+			`.ui-root { image-rendering: pixelated; }`,
+			`.ui-feed, .ui-sidebar, .ui-panel, .ui-drawer, .ui-dialog, .ui-settings, .ui-spawn, .ui-perm, .ui-history, .ui-timelapse, .ui-daystats, .ui-deliveries { padding: 8px 10px; }`,
+			`.ui-feed .ui-feed__head, .ui-sidebar .ui-sidebar__head { margin-top: 2px; }`
+		];
+	}
+	var ICON_SELECTORS = {
+		overview: ["button[title^=\"Visão geral\"]", "button[aria-label^=\"Visão geral\"]"],
+		zoomOut: ["button[title^=\"Afastar\"]", "button[aria-label^=\"Afastar\"]"],
+		zoomIn: ["button[title^=\"Aproximar\"]", "button[aria-label^=\"Aproximar\"]"],
+		timelapse: [".ui-btn-timelapse", "button[title^=\"Timelapse\"]"],
+		history: ["button[title^=\"Histórico\"]", "button[aria-label^=\"Histórico\"]"],
+		spawn: ["button[title^=\"Novo agente\"]", "button[aria-label^=\"Novo agente\"]"],
+		feed: [".ui-btn-feed"],
+		sidebar: [".ui-btn-sidebar"],
+		settings: [".ui-btn-settings"],
+		help: ["button[title^=\"Ajuda\"]", "button[aria-label^=\"Ajuda\"]"],
+		agents: ["[data-testid=\"office-menu-agents\"]"],
+		hud: ["[data-testid=\"office-menu-hud\"]"],
+		approvals: ["[data-testid=\"office-menu-approvals\"]"],
+		command: ["[data-testid=\"office-menu-command-center\"]"],
+		timeline: ["[data-testid=\"office-menu-timeline\"]"],
+		studio: ["[data-testid=\"office-menu-studio\"]"],
+		campus: ["[data-testid=\"office-menu-campus\"]"],
+		etsy: ["button[title^=\"Etsy\"]", "button[aria-label^=\"Etsy\"]"]
+	};
+	function applyIcons(doc, payload, touched) {
+		const icons = payload.ui?.icons ?? {};
+		for (const [name, selectors] of Object.entries(ICON_SELECTORS)) {
+			const src = safeSrc(icons[name]?.src);
+			if (!src) continue;
+			for (const selector of selectors) for (const node of Array.from(doc.querySelectorAll(selector))) {
+				const el = node;
+				el.style.backgroundImage = `url("${src}")`;
+				el.style.backgroundPosition = "center";
+				el.style.backgroundRepeat = "no-repeat";
+				el.style.backgroundSize = "18px 18px";
+				el.style.imageRendering = "pixelated";
+				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "none";
+				touched.add(el);
+			}
+		}
+	}
+	/** Install the skin in a same-origin office iframe; returns an undo function. */
+	function installOfficeUiSkin(win) {
+		const doc = win.document;
+		const payload = win.__QUBIT_OFFICE_THEME__;
+		if (!payload?.active) return () => {};
+		const style = doc.createElement("style");
+		style.id = STYLE_ID;
+		style.setAttribute("data-office-ui-skin", "");
+		style.textContent = officeUiSkinRules(payload).join("\n");
+		doc.head.appendChild(style);
+		const touched = /* @__PURE__ */ new Set();
+		const reapply = () => applyIcons(doc, payload, touched);
+		reapply();
+		const obs = new win.MutationObserver(reapply);
+		obs.observe(doc.documentElement, {
+			childList: true,
+			subtree: true
+		});
+		return () => {
+			obs.disconnect();
+			style.remove();
+			for (const el of touched) {
+				el.style.backgroundImage = "";
+				el.style.backgroundPosition = "";
+				el.style.backgroundRepeat = "";
+				el.style.backgroundSize = "";
+				el.style.imageRendering = "";
+				for (const svg of Array.from(el.querySelectorAll("svg"))) svg.style.display = "";
+			}
+		};
+	}
 	var MENU_BUTTONS = [
 		{
 			id: "agents",
@@ -192734,7 +192867,7 @@ create: function(game) {
 		{
 			id: "campus",
 			label: "Campus",
-			title: "Campus: floor scenes and the 5-floor directory",
+			title: "Campus: floor scenes and the 100-floor directory",
 			testId: "office-menu-campus",
 			icon: {
 				cols: 16,
@@ -192958,6 +193091,303 @@ create: function(game) {
 			}
 		};
 	}
+	// ../qubit-shared/src/sakuga/loader.ts
+	var TAGS = {
+		button: "sakuga-button",
+		toggle: "sakuga-toggle",
+		slider: "sakuga-slider",
+		checkbox: "sakuga-checkbox",
+		radio: "sakuga-radio",
+		input: "sakuga-input",
+		tabs: "sakuga-tabs",
+		progress: "sakuga-progress",
+		rating: "sakuga-rating",
+		toast: "sakuga-toast",
+		tooltip: "sakuga-tooltip"
+	};
+	var base = "/sakuga-vfx";
+	var scripts = /* @__PURE__ */ new Map();
+	/** Point the loader at a different served copy (office frame, Electron file://). */
+	function configureSakuga(options = {}) {
+		if (options.base) base = options.base.replace(/\/+$/, "");
+	}
+	function canUseDom() {
+		return typeof window !== "undefined" && typeof document !== "undefined";
+	}
+	function inject(src) {
+		const existing = scripts.get(src);
+		if (existing) return existing;
+		const promise = new Promise((resolve, reject) => {
+			if (!canUseDom()) {
+				reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
+				return;
+			}
+			const script = document.createElement("script");
+			script.src = src;
+			script.async = false;
+			script.dataset.sakuga = "1";
+			script.onload = () => resolve();
+			script.onerror = () => {
+				scripts.delete(src);
+				reject(/* @__PURE__ */ new Error(`SAKUGA_LOAD_FAILED ${src}`));
+			};
+			document.head.append(script);
+		});
+		scripts.set(src, promise);
+		return promise;
+	}
+	/** Load and return the shared effects engine. Idempotent. */
+	function loadSakugaCore() {
+		if (!canUseDom()) return Promise.reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
+		if (window.SakugaFX) return Promise.resolve(window.SakugaFX);
+		return inject(`${base}/core.js`).then(() => {
+			if (!window.SakugaFX) throw new Error("SAKUGA_CORE_NOT_REGISTERED");
+			return window.SakugaFX;
+		});
+	}
+	/** Load one component file and resolve when its custom element exists. */
+	function loadSakugaComponent(name) {
+		if (!canUseDom()) return Promise.reject(/* @__PURE__ */ new Error("SAKUGA_NO_DOM"));
+		return inject(`${base}/${name}/${name}.js`).then(() => {
+			if (!window.customElements.get(TAGS[name])) throw new Error(`SAKUGA_ELEMENT_NOT_REGISTERED ${TAGS[name]}`);
+		});
+	}
+	// ../qubit-shared/src/sakuga/fx.ts
+	var listeners = /* @__PURE__ */ new Set();
+	function viewportCentre() {
+		if (typeof window === "undefined") return {
+			x: 0,
+			y: 0
+		};
+		return {
+			x: window.scrollX + window.innerWidth / 2,
+			y: window.scrollY + window.innerHeight / 2
+		};
+	}
+	function anchor(detail) {
+		if (typeof detail.x === "number" && typeof detail.y === "number") return {
+			x: detail.x,
+			y: detail.y
+		};
+		const el = detail.target;
+		if (el && typeof el.getBoundingClientRect === "function") {
+			const rect = el.getBoundingClientRect();
+			return {
+				x: rect.left + window.scrollX + rect.width / 2,
+				y: rect.top + window.scrollY + rect.height / 2
+			};
+		}
+		return viewportCentre();
+	}
+	function draw$6(api, detail) {
+		const { x, y } = anchor(detail);
+		const s = Math.max(.35, Math.min(3, detail.scale ?? 1));
+		const word = detail.word;
+		const lettering = (fallback, opts = {}) => {
+			if (detail.silent) return;
+			api.sfx(word ?? fallback, x, y - 46 * s, {
+				size: opts.size ?? 56 * s,
+				...opts.dots ? api.dotted() : api.hollow()
+			});
+		};
+		switch (detail.cue) {
+			case "impact":
+				api.burst(x, y, {
+					r: 60 * s,
+					spikes: 14
+				});
+				api.puff(x - 34 * s, y + 18 * s, {
+					n: 5,
+					size: 12 * s
+				});
+				api.puff(x + 34 * s, y + 18 * s, {
+					n: 5,
+					size: 12 * s
+				});
+				api.shards(x, y, {
+					n: 9,
+					speed: 200 * s,
+					size: 5 * s
+				});
+				api.ticks(x, y, {
+					n: 3,
+					r: 26 * s
+				});
+				lettering("don", { size: 62 * s });
+				break;
+			case "success":
+				api.burst(x, y, {
+					r: 52 * s,
+					spikes: 12
+				});
+				api.ring(x, y + 34 * s, {
+					rx: 42 * s,
+					ry: 13 * s
+				});
+				api.kira(x + 30 * s, y - 24 * s, { r: 8 * s });
+				lettering("don", { size: 54 * s });
+				break;
+			case "error":
+				api.slash(x, y, {
+					len: 120 * s,
+					ang: -.6,
+					thick: 12 * s
+				});
+				api.lines(x, y, {
+					n: 7,
+					len: 46 * s
+				});
+				api.wob(x, y + 22 * s, { r: 18 * s });
+				lettering("zuza", {
+					dots: true,
+					size: 52 * s
+				});
+				break;
+			case "warning":
+				api.ring(x, y, {
+					rx: 44 * s,
+					ry: 13 * s,
+					life: .6
+				});
+				api.ticks(x, y, {
+					n: 4,
+					r: 22 * s
+				});
+				api.wob(x + 36 * s, y, { r: 14 * s });
+				lettering("pon", { size: 46 * s });
+				break;
+			case "celebrate":
+				api.burst(x, y, {
+					r: 70 * s,
+					spikes: 16
+				});
+				api.shards(x, y, {
+					n: 12,
+					speed: 240 * s,
+					size: 6 * s
+				});
+				api.puff(x - 52 * s, y + 20 * s, {
+					n: 6,
+					size: 13 * s
+				});
+				api.puff(x + 52 * s, y + 20 * s, {
+					n: 6,
+					size: 13 * s
+				});
+				lettering("don", { size: 68 * s });
+				break;
+			case "pop":
+				api.puff(x, y, {
+					n: 5,
+					size: 11 * s
+				});
+				lettering("pon", { size: 44 * s });
+				break;
+			case "slash":
+				api.slash(x, y, {
+					len: 140 * s,
+					ang: -.42,
+					thick: 15 * s
+				});
+				lettering("shu", { size: 46 * s });
+				break;
+			case "tick":
+				api.kira(x, y, { r: 10 * s });
+				api.ticks(x, y, {
+					n: 2,
+					r: 18 * s
+				});
+				lettering("kachi", { size: 42 * s });
+				break;
+			case "focus":
+				api.ticks(x, y, {
+					n: 3,
+					r: 20 * s
+				});
+				api.puff(x, y + 10 * s, {
+					n: 3,
+					size: 7 * s
+				});
+				break;
+			case "type":
+				api.puff(x, y, {
+					n: 3,
+					size: 5 * s,
+					life: .42,
+					vy: -10
+				});
+				break;
+			case "approval":
+				api.ring(x, y, {
+					rx: 50 * s,
+					ry: 15 * s,
+					life: .7
+				});
+				api.ticks(x, y, {
+					n: 5,
+					r: 24 * s
+				});
+				lettering("kachi", { size: 48 * s });
+				break;
+			case "agents":
+				api.burst(x, y, {
+					r: 40 * s,
+					spikes: 10
+				});
+				api.puff(x, y + 16 * s, {
+					n: 4,
+					size: 10 * s
+				});
+				lettering("gogo", { size: 48 * s });
+		}
+	}
+	/** Fire one cue. Resolves after the engine has loaded; failures are non-fatal. */
+	async function emitFx(cue, options = {}) {
+		const detail = {
+			cue,
+			...options
+		};
+		for (const listener of listeners) listener(detail);
+		try {
+			if (typeof window !== "undefined" && window.SakugaFX?.calm) return;
+			draw$6(await loadSakugaCore(), detail);
+		} catch {}
+	}
+	// ../qubit-app/plugins/qubit-office/game/app/sakuga.ts
+	var configured = false;
+	/** Point the loader at the served `/sakuga-vfx` assets, once per document. */
+	function configureOfficeSakuga() {
+		if (configured) return;
+		configured = true;
+		const raw = (typeof window === "undefined" ? null : window)?.__QUBIT_SAKUGA_BASE__ || "/sakuga-vfx";
+		const base = String(raw).replace(/\/+$/, "") || "/sakuga-vfx";
+		try {
+			configureSakuga({ base });
+		} catch {}
+	}
+	/**
+	* A `sakuga-button` with the caller's attributes preserved.
+	*
+	* `props` are passed through unchanged (role, label, testid, className, type,
+	* disabled, aria-*, data-*), so every existing selector and assertion keeps
+	* working. The component script is loaded lazily; until it is defined the host
+	* element is inert but still carries the accessible role and label.
+	*/
+	function sakugaButton(R, props, ...children) {
+		configureOfficeSakuga();
+		try {
+			loadSakugaComponent("button").catch(() => {});
+		} catch {}
+		const next = { ...props ?? {} };
+		if (!next.role) next.role = "button";
+		return R.createElement("sakuga-button", next, ...children);
+	}
+	/** Fire one named cue in the dashboard document (the office shell). */
+	function officeFx(cue, options = {}) {
+		if (!cue) return;
+		configureOfficeSakuga();
+		emitFx(cue, options);
+	}
 	var SEAT_MODEL_ROUTE = `/agent/api/office/habblaud/agents`;
 	function seatModelUrl(agentId) {
 		return `${SEAT_MODEL_ROUTE}/${encodeURIComponent(String(agentId))}/model`;
@@ -193156,7 +193586,7 @@ create: function(game) {
 					key: "note",
 					className: "seat-model__note"
 				}, state.providers_note));
-				children.push(R.createElement("button", {
+				children.push(sakugaButton(R, {
 					key: "save",
 					type: "button",
 					className: "seat-model__save",
@@ -195235,7 +195665,7 @@ create: function(game) {
 			}, `${labelOf(category)} (${counts[category] ?? 0})`);
 			const partButton = (part) => {
 				const selected = part.category === "accessory" ? state.draft.accessory_ids.includes(part.part_id) : String(state.draft[`${part.category}_id`]) === part.part_id;
-				return R.createElement("button", {
+				return sakugaButton(R, {
 					key: part.part_id,
 					type: "button",
 					className: "character-studio__part",
@@ -195262,7 +195692,7 @@ create: function(game) {
 					"data-testid": "character-layer-row",
 					"data-layer": layer
 				}, layer),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: `layer-up-${layer}`,
 					type: "button",
 					"data-testid": "character-layer",
@@ -195272,7 +195702,7 @@ create: function(game) {
 					disabled: index === 0,
 					onClick: () => updateDraft((current) => moveLayer(current, layer, "up"))
 				}, "↑"),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: `layer-down-${layer}`,
 					type: "button",
 					"data-testid": "character-layer",
@@ -195292,7 +195722,7 @@ create: function(game) {
 				value: colour,
 				onChange: (event) => updateDraft((current) => setPaletteColor(current, index, event.target.value))
 			});
-			const shadowButton = (policy) => R.createElement("button", {
+			const shadowButton = (policy) => sakugaButton(R, {
 				key: `shadow-${policy}`,
 				type: "button",
 				"data-testid": "character-shadow",
@@ -195301,7 +195731,7 @@ create: function(game) {
 				"aria-label": `${policy} shadow policy`,
 				onClick: () => updateDraft((current) => setShadowPolicy(current, policy))
 			}, policy);
-			const portraitButton = (size) => R.createElement("button", {
+			const portraitButton = (size) => sakugaButton(R, {
 				key: `portrait-${size}`,
 				type: "button",
 				"data-testid": "character-portrait-size",
@@ -195329,7 +195759,7 @@ create: function(game) {
 				key: "detail",
 				"data-testid": "character-adapter-detail"
 			}, detail)]);
-			const revisionRow = (row) => R.createElement("button", {
+			const revisionRow = (row) => sakugaButton(R, {
 				key: `revision-${row.revision}`,
 				type: "button",
 				"data-testid": "character-rollback",
@@ -195382,14 +195812,14 @@ create: function(game) {
 						"aria-label": "Search parts",
 						onChange: (event) => update((current) => setSearch(current, event.target.value))
 					}),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "randomize",
 						type: "button",
 						"data-testid": "character-randomize",
 						"aria-label": "Randomize unlocked parts",
 						onClick: () => updateDraft((current) => randomize(current))
 					}, "Randomize"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "undo",
 						type: "button",
 						"data-testid": "character-undo",
@@ -195397,7 +195827,7 @@ create: function(game) {
 						disabled: state.history.length === 0,
 						onClick: () => updateDraft(undo$1)
 					}, "Undo"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "redo",
 						type: "button",
 						"data-testid": "character-redo",
@@ -195405,7 +195835,7 @@ create: function(game) {
 						disabled: state.future.length === 0,
 						onClick: () => updateDraft(redo$1)
 					}, "Redo"),
-					...PRESETS.map((preset) => R.createElement("button", {
+					...PRESETS.map((preset) => sakugaButton(R, {
 						key: `preset-${preset.preset_id}`,
 						type: "button",
 						"data-testid": "character-preset",
@@ -195487,7 +195917,7 @@ create: function(game) {
 					className: "character-studio__error",
 					role: "alert"
 				}, `${save.code}: ${save.detail}`) : null,
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "save",
 					type: "button",
 					"data-testid": "character-save",
@@ -196193,7 +196623,7 @@ create: function(game) {
 			}, [R.createElement("span", {
 				key: "t",
 				className: "office-theme-dock-title"
-			}, seatName ? `Agent controls — ${seatName}` : "Agent controls"), R.createElement("button", {
+			}, seatName ? `Agent controls — ${seatName}` : "Agent controls"), sakugaButton(R, {
 				key: "x",
 				type: "button",
 				className: "office-game__btn office-theme-dock-close",
@@ -196326,7 +196756,7 @@ create: function(game) {
 							className: "agent-control__chip",
 							"data-testid": `agent-control-perm-chip-${category}`,
 							"data-scope": scope
-						}, [R.createElement("span", { key: "s" }, scope), R.createElement("button", {
+						}, [R.createElement("span", { key: "s" }, scope), sakugaButton(R, {
 							key: "r",
 							type: "button",
 							"data-testid": "agent-control-perm-remove",
@@ -196367,7 +196797,7 @@ create: function(game) {
 									[category]: event.target.value
 								})
 							}),
-							R.createElement("button", {
+							sakugaButton(R, {
 								key: "a",
 								type: "button",
 								className: "office-game__btn",
@@ -196542,7 +196972,7 @@ create: function(game) {
 						key: "preview-actions",
 						className: "agent-control__actions",
 						"data-testid": "agent-control-preview-actions"
-					}, [R.createElement("button", {
+					}, [sakugaButton(R, {
 						key: "run",
 						type: "button",
 						className: "office-game__btn",
@@ -196569,7 +196999,7 @@ create: function(game) {
 				const buttons = [];
 				if (editing) {
 					const dirty = isDraftDirty(draft, selected);
-					buttons.push(R.createElement("button", {
+					buttons.push(sakugaButton(R, {
 						key: "save",
 						type: "button",
 						className: "office-game__btn",
@@ -196579,7 +197009,7 @@ create: function(game) {
 							saveEdit();
 						}
 					}, "Save changes"));
-					buttons.push(R.createElement("button", {
+					buttons.push(sakugaButton(R, {
 						key: "cancel",
 						type: "button",
 						className: "office-game__btn",
@@ -196587,7 +197017,7 @@ create: function(game) {
 						disabled: lock,
 						onClick: cancelEdit
 					}, "Cancel"));
-					buttons.push(R.createElement("button", {
+					buttons.push(sakugaButton(R, {
 						key: "reset",
 						type: "button",
 						className: "office-game__btn",
@@ -196602,7 +197032,7 @@ create: function(game) {
 						role: "status"
 					}, "Unsaved changes"));
 				} else {
-					buttons.push(R.createElement("button", {
+					buttons.push(sakugaButton(R, {
 						key: "edit",
 						type: "button",
 						className: "office-game__btn",
@@ -196610,7 +197040,7 @@ create: function(game) {
 						disabled: lock,
 						onClick: beginEdit
 					}, "Edit controls"));
-					if (canPause(selected)) buttons.push(R.createElement("button", {
+					if (canPause(selected)) buttons.push(sakugaButton(R, {
 						key: "pause",
 						type: "button",
 						className: "office-game__btn",
@@ -196621,7 +197051,7 @@ create: function(game) {
 							fetchImpl: props.fetchImpl
 						}))
 					}, "Pause"));
-					if (canResume(selected)) buttons.push(R.createElement("button", {
+					if (canResume(selected)) buttons.push(sakugaButton(R, {
 						key: "resume",
 						type: "button",
 						className: "office-game__btn",
@@ -196632,7 +197062,7 @@ create: function(game) {
 							fetchImpl: props.fetchImpl
 						}))
 					}, "Resume"));
-					buttons.push(R.createElement("button", {
+					buttons.push(sakugaButton(R, {
 						key: "stop",
 						type: "button",
 						className: "office-game__btn",
@@ -196643,7 +197073,7 @@ create: function(game) {
 							fetchImpl: props.fetchImpl
 						}))
 					}, "Stop turn"));
-					buttons.push(R.createElement("button", {
+					buttons.push(sakugaButton(R, {
 						key: "takeover",
 						type: "button",
 						className: "office-game__btn",
@@ -196654,7 +197084,7 @@ create: function(game) {
 							fetchImpl: props.fetchImpl
 						}))
 					}, "Take over"));
-					if (canRevoke(selected)) buttons.push(R.createElement("button", {
+					if (canRevoke(selected)) buttons.push(sakugaButton(R, {
 						key: "revoke",
 						type: "button",
 						className: "office-game__btn agent-control__danger",
@@ -196665,7 +197095,7 @@ create: function(game) {
 							fetchImpl: props.fetchImpl
 						}))
 					}, "Revoke all scopes"));
-					if (canArchive(selected)) buttons.push(R.createElement("button", {
+					if (canArchive(selected)) buttons.push(sakugaButton(R, {
 						key: "archive",
 						type: "button",
 						className: "office-game__btn agent-control__danger",
@@ -197443,7 +197873,7 @@ create: function(game) {
 							className: "tower__sceneSource",
 							"data-testid": "tower-scene-source"
 						}, sceneSource === "endpoint" ? "endpoint rooms" : "template rooms"),
-						props.onOpenFloor ? R.createElement("button", {
+						props.onOpenFloor ? sakugaButton(R, {
 							key: "open",
 							type: "button",
 							className: "tower__liveFloor",
@@ -197538,7 +197968,7 @@ create: function(game) {
 						className: "tower__floorState",
 						"data-testid": "tower-detail-state"
 					}, stateText(selected.active_by_default)),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "close",
 						type: "button",
 						className: "tower__close",
@@ -197637,21 +198067,21 @@ create: function(game) {
 						key: "label",
 						className: "tower__liveLabel"
 					}, "Live office floors"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "f1",
 						type: "button",
 						className: "tower__liveFloor",
 						"data-testid": "tower-open-live-1",
 						onClick: () => props.onOpenLiveFloor?.("live:1")
 					}, "1 · Executive"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "f2",
 						type: "button",
 						className: "tower__liveFloor",
 						"data-testid": "tower-open-live-2",
 						onClick: () => props.onOpenLiveFloor?.("live:2")
 					}, "2 · Operations"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "f3",
 						type: "button",
 						className: "tower__liveFloor",
@@ -197903,7 +198333,7 @@ create: function(game) {
 			}, [R.createElement("span", {
 				key: "t",
 				className: "office-theme-dock-title"
-			}, "War Room / Idea Lab"), R.createElement("button", {
+			}, "War Room / Idea Lab"), sakugaButton(R, {
 				key: "x",
 				type: "button",
 				className: "office-game__btn office-theme-dock-close",
@@ -197915,7 +198345,7 @@ create: function(game) {
 				key: "tabs",
 				className: "warroom__tabs",
 				role: "tablist"
-			}, [R.createElement("button", {
+			}, [sakugaButton(R, {
 				key: "idea",
 				type: "button",
 				role: "tab",
@@ -197923,7 +198353,7 @@ create: function(game) {
 				"data-testid": "warroom-tab-idea",
 				className: "warroom__tab" + (tab === "idea" ? " is-active" : ""),
 				onClick: () => setTab("idea")
-			}, "Idea Lab"), R.createElement("button", {
+			}, "Idea Lab"), sakugaButton(R, {
 				key: "directory",
 				type: "button",
 				role: "tab",
@@ -198022,7 +198452,7 @@ create: function(game) {
 					placeholder: "Idea title",
 					value: title,
 					onInput: (event) => setTitle(event.target.value)
-				}), R.createElement("button", {
+				}), sakugaButton(R, {
 					key: "create",
 					type: "button",
 					className: "office-game__btn",
@@ -198041,7 +198471,7 @@ create: function(game) {
 				}, "Open session")]), R.createElement("div", {
 					key: "pilot",
 					className: "warroom__row"
-				}, [R.createElement("button", {
+				}, [sakugaButton(R, {
 					key: "etsy",
 					type: "button",
 					className: "office-game__btn",
@@ -198112,7 +198542,7 @@ create: function(game) {
 							value: sourceLocator,
 							onInput: (event) => setSourceLocator(event.target.value)
 						}),
-						R.createElement("button", {
+						sakugaButton(R, {
 							key: "add",
 							type: "button",
 							className: "office-game__btn",
@@ -198136,7 +198566,7 @@ create: function(game) {
 						placeholder: "Question about the idea or a source",
 						value: researchQuery,
 						onInput: (event) => setResearchQuery(event.target.value)
-					}), R.createElement("button", {
+					}), sakugaButton(R, {
 						key: "run",
 						type: "button",
 						className: "office-game__btn",
@@ -198205,7 +198635,7 @@ create: function(game) {
 							key: source.source_id,
 							value: source.source_id
 						}, `${source.kind}: ${source.locator.slice(0, 40)}`))]),
-						R.createElement("button", {
+						sakugaButton(R, {
 							key: "add",
 							type: "button",
 							className: "office-game__btn",
@@ -198260,7 +198690,7 @@ create: function(game) {
 								value: decisionNote,
 								onInput: (event) => setDecisionNote(event.target.value)
 							}),
-							R.createElement("button", {
+							sakugaButton(R, {
 								key: "approve",
 								type: "button",
 								className: "office-game__btn",
@@ -198272,7 +198702,7 @@ create: function(game) {
 									idempotency_key: newIdempotencyKey("warroom.decision")
 								}, opts))
 							}, "Approve"),
-							R.createElement("button", {
+							sakugaButton(R, {
 								key: "reject",
 								type: "button",
 								className: "office-game__btn warroom__danger",
@@ -198285,7 +198715,7 @@ create: function(game) {
 								}, opts))
 							}, "Reject")
 						]) : null,
-						session.state === "approved" ? R.createElement("button", {
+						session.state === "approved" ? sakugaButton(R, {
 							key: "tasks",
 							type: "button",
 							className: "office-game__btn",
@@ -198561,7 +198991,7 @@ create: function(game) {
 			R.createElement("div", {
 				key: "actions",
 				className: "approvals-panel__actions"
-			}, [R.createElement("button", {
+			}, [sakugaButton(R, {
 				key: "approve",
 				type: "button",
 				className: "office-game__btn approvals-panel__approve",
@@ -198570,7 +199000,7 @@ create: function(game) {
 				"aria-label": `Approve ${label} (${item.id})`,
 				disabled: busy,
 				onClick: () => onDecide(item, "approve")
-			}, busy ? "Approving…" : "Approve"), R.createElement("button", {
+			}, busy ? "Approving…" : "Approve"), sakugaButton(R, {
 				key: "reject",
 				type: "button",
 				className: "office-game__btn approvals-panel__reject",
@@ -198643,7 +199073,7 @@ create: function(game) {
 					"data-count": String(count),
 					"aria-label": `${count} pending approval${count === 1 ? "" : "s"}`
 				}, `${count} pending`),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "refresh",
 					type: "button",
 					className: "office-game__btn approvals-panel__refresh",
@@ -198700,7 +199130,7 @@ create: function(game) {
 			if (props.onClose) children.unshift(R.createElement("div", {
 				key: "closeRow",
 				className: "approvals-panel__closeRow"
-			}, R.createElement("button", {
+			}, sakugaButton(R, {
 				key: "close",
 				type: "button",
 				className: "office-game__btn approvals-panel__close",
@@ -198753,7 +199183,7 @@ create: function(game) {
 				role: "status",
 				"aria-live": "polite"
 			}, "Business OS is ready. Reloading this panel…"));
-			children.push(R.createElement("button", {
+			children.push(sakugaButton(R, {
 				key: "retry",
 				type: "button",
 				className: "business-setup__start",
@@ -198761,7 +199191,7 @@ create: function(game) {
 				"aria-label": `Reload the ${surface} after setup`,
 				onClick: onRetry
 			}, "Reload this panel"));
-		} else children.push(R.createElement("button", {
+		} else children.push(sakugaButton(R, {
 			key: "start",
 			type: "button",
 			className: "business-setup__start",
@@ -198946,7 +199376,7 @@ create: function(game) {
 			}, [R.createElement("span", {
 				key: "title",
 				className: "office-theme-dock-title"
-			}, "Command Center"), R.createElement("button", {
+			}, "Command Center"), sakugaButton(R, {
 				key: "close",
 				type: "button",
 				className: "office-game__btn office-theme-dock-close",
@@ -199194,7 +199624,7 @@ create: function(game) {
 						return R.createElement("li", {
 							key: entry.entry_id,
 							className: "command-center__item"
-						}, R.createElement("button", {
+						}, sakugaButton(R, {
 							...common,
 							type: "button",
 							onClick: () => jumpTo(entry, null, props.onJump)
@@ -199654,7 +200084,7 @@ create: function(game) {
 					role: "note",
 					"aria-label": "Replay mode: simulated, effects stubbed"
 				}, "REPLAY · simulated · effects stubbed") : null,
-				props.onClose ? R.createElement("button", {
+				props.onClose ? sakugaButton(R, {
 					key: "close",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
@@ -199702,7 +200132,7 @@ create: function(game) {
 					key: status,
 					value: status
 				}, statusLabel$1(status)))])]),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "replay",
 					type: "button",
 					"data-testid": "timeline-replay-toggle",
@@ -199734,7 +200164,7 @@ create: function(game) {
 						className: "timeline__muted",
 						"data-testid": "timeline-error-detail"
 					}, `${code}: ${detail}`),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "r",
 						type: "button",
 						"data-testid": "timeline-retry",
@@ -201028,7 +201458,7 @@ create: function(game) {
 				value,
 				onChange: (event) => onChange(event.target.value)
 			})]);
-			const roomButton = (row) => R.createElement("button", {
+			const roomButton = (row) => sakugaButton(R, {
 				key: row.room_id,
 				type: "button",
 				"data-testid": "room-builder-room",
@@ -201041,7 +201471,7 @@ create: function(game) {
 				key: cell.cell_id,
 				"data-testid": "room-builder-cell",
 				"data-cell": cell.cell_id
-			}, [R.createElement("span", { key: "label" }, `${cell.cell_id} · ${cell.cols}x${cell.rows} · ${cell.desks.length} desks`), R.createElement("button", {
+			}, [R.createElement("span", { key: "label" }, `${cell.cell_id} · ${cell.cols}x${cell.rows} · ${cell.desks.length} desks`), sakugaButton(R, {
 				key: "remove",
 				type: "button",
 				"data-testid": "room-builder-remove-cell",
@@ -201054,7 +201484,7 @@ create: function(game) {
 				key: desk.desk_id,
 				"data-testid": "room-builder-desk",
 				"data-desk": desk.desk_id
-			}, [R.createElement("span", { key: "label" }, `${desk.desk_id} (${desk.x},${desk.y}) ${desk.w}x${desk.h}`), R.createElement("button", {
+			}, [R.createElement("span", { key: "label" }, `${desk.desk_id} (${desk.x},${desk.y}) ${desk.w}x${desk.h}`), sakugaButton(R, {
 				key: "remove",
 				type: "button",
 				"data-testid": "room-builder-remove-desk",
@@ -201119,7 +201549,7 @@ create: function(game) {
 					role: "toolbar",
 					"aria-label": "Draft controls"
 				}, [
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "preview",
 						type: "button",
 						"data-testid": "room-builder-preview",
@@ -201127,7 +201557,7 @@ create: function(game) {
 						"aria-pressed": previewOpen,
 						onClick: () => setPreviewOpen((open) => !open)
 					}, previewOpen ? "Hide preview" : "Preview"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "undo",
 						type: "button",
 						"data-testid": "room-builder-undo",
@@ -201135,7 +201565,7 @@ create: function(game) {
 						disabled: state.history.length === 0,
 						onClick: () => edit(undo)
 					}, "Undo"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "redo",
 						type: "button",
 						"data-testid": "room-builder-redo",
@@ -201143,14 +201573,14 @@ create: function(game) {
 						disabled: state.future.length === 0,
 						onClick: () => edit(redo)
 					}, "Redo"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "approve",
 						type: "button",
 						"data-testid": "room-builder-approve",
 						"aria-label": "Approve the valid draft",
 						onClick: () => edit(approveState)
 					}, "Approve"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "rollback",
 						type: "button",
 						"data-testid": "room-builder-rollback",
@@ -201158,7 +201588,7 @@ create: function(game) {
 						disabled: state.published_version === null,
 						onClick: onRollbackClick
 					}, "Rollback"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "publish",
 						type: "button",
 						"data-testid": "room-builder-publish",
@@ -201212,21 +201642,21 @@ create: function(game) {
 						role: "group",
 						"aria-label": "Cell and desk actions"
 					}, [
-						R.createElement("button", {
+						sakugaButton(R, {
 							key: "add-cell",
 							type: "button",
 							"data-testid": "room-builder-add-cell",
 							"aria-label": "Add a fixed 16 by 12 cell",
 							onClick: () => edit((current) => addCell(current, room.room_id, 2))
 						}, "Add cell"),
-						R.createElement("button", {
+						sakugaButton(R, {
 							key: "add-desk",
 							type: "button",
 							"data-testid": "room-builder-add-desk",
 							"aria-label": "Add a desk",
 							onClick: () => edit((current) => addDesk(current, room.room_id))
 						}, "Add desk"),
-						R.createElement("button", {
+						sakugaButton(R, {
 							key: "remove-room",
 							type: "button",
 							"data-testid": "room-builder-remove-room",
@@ -201303,7 +201733,7 @@ create: function(game) {
 						field("Agents (comma separated)", assignAgents, "room-builder-agents", setAssignAgents),
 						field("Capability manifest", assignCapability, "room-builder-capability", setAssignCapability),
 						field("Memory scope", assignMemory, "room-builder-memory", setAssignMemory),
-						R.createElement("button", {
+						sakugaButton(R, {
 							key: "assign",
 							type: "button",
 							"data-testid": "room-builder-assign",
@@ -201337,7 +201767,7 @@ create: function(game) {
 					field("New room name", newRoomName, "room-builder-new-room-name", setNewRoomName),
 					styleSelect("Room kind", newRoomKind, DEPARTMENT_ZONES, "room-builder-new-room-kind", setNewRoomKind),
 					field("Desks", newRoomDesks, "room-builder-new-room-desks", setNewRoomDesks),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "add",
 						type: "button",
 						"data-testid": "room-builder-add-room",
@@ -201356,14 +201786,14 @@ create: function(game) {
 					role: "group",
 					"aria-label": "Department actions"
 				}, [
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "clone",
 						type: "button",
 						"data-testid": "room-builder-clone",
 						"aria-label": "Clone the selected department",
 						onClick: () => edit((current) => cloneDepartment(current, room?.floor_id ?? current.floors[0].floor_id, `floor-${current.floors.length + 1}`))
 					}, "Clone department"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "merge",
 						type: "button",
 						"data-testid": "room-builder-merge",
@@ -201371,7 +201801,7 @@ create: function(game) {
 						disabled: state.floors.length < 2,
 						onClick: () => edit((current) => mergeDepartments(current, current.floors.map((floor) => floor.floor_id), current.floors[0].floor_id))
 					}, "Merge departments"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "split",
 						type: "button",
 						"data-testid": "room-builder-split",
@@ -202868,7 +203298,7 @@ create: function(game) {
 			}, view.message);
 			const retryButton = () => {
 				if (!props.onRetry) return null;
-				return R.createElement("button", {
+				return sakugaButton(R, {
 					key: "retry",
 					type: "button",
 					className: "outside-world__retry",
@@ -202932,7 +203362,7 @@ create: function(game) {
 			};
 			const zoneButton = (zone) => {
 				const isSelected = selectedId === zone.zone_id;
-				return R.createElement("button", {
+				return sakugaButton(R, {
 					key: zone.zone_id,
 					type: "button",
 					ref: (node) => {
@@ -203435,7 +203865,7 @@ create: function(game) {
 						key: "detail",
 						"data-testid": "panel-inventory-error-detail"
 					}, `${code}: ${detail}`),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "retry",
 						type: "button",
 						"data-testid": "panel-inventory-retry",
@@ -204174,7 +204604,7 @@ create: function(game) {
 			};
 			const canLoadMore = floors.length < totalFloors;
 			const canLoadFewer = floors.length > 4 && limit > 4;
-			const controlButton = (key, label, testId, onClick, disabled = false) => R.createElement("button", {
+			const controlButton = (key, label, testId, onClick, disabled = false) => sakugaButton(R, {
 				key,
 				type: "button",
 				className: "office-game__btn",
@@ -204228,7 +204658,7 @@ create: function(game) {
 						width: `720px`,
 						height: `420px`
 					}
-				}, [R.createElement("button", {
+				}, [sakugaButton(R, {
 					key: "label",
 					type: "button",
 					className: "office-game__campusFloorLabel",
@@ -204662,7 +205092,7 @@ create: function(game) {
 					key: "t",
 					className: "office-theme-dock-title"
 				}, "Etsy connection"),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "refresh",
 					type: "button",
 					className: "office-game__btn office-theme-dock-link",
@@ -204671,7 +205101,7 @@ create: function(game) {
 					disabled: busy !== null || read.kind === "loading",
 					onClick: () => setRefresh((n) => n + 1)
 				}, "Refresh"),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "x",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
@@ -204729,7 +205159,7 @@ create: function(game) {
 					}, [R.createElement("p", {
 						key: "exp",
 						className: "etsy-connect__meta"
-					}, `Access expires ${expiry}.`), R.createElement("button", {
+					}, `Access expires ${expiry}.`), sakugaButton(R, {
 						key: "disconnect",
 						type: "button",
 						className: "office-game__btn etsy-connect__secondary",
@@ -204741,7 +205171,7 @@ create: function(game) {
 					children.push(R.createElement("div", {
 						key: "connect-row",
 						className: "etsy-connect__actions"
-					}, [R.createElement("button", {
+					}, [sakugaButton(R, {
 						key: "connect",
 						type: "button",
 						className: "office-game__btn etsy-connect__primary",
@@ -204789,7 +205219,7 @@ create: function(game) {
 								setStateInput(event.target.value);
 							}
 						})]),
-						R.createElement("button", {
+						sakugaButton(R, {
 							key: "complete",
 							type: "button",
 							className: "office-game__btn etsy-connect__primary",
@@ -209285,6 +209715,7 @@ create: function(game) {
 			const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion());
 			const [highContrast, setHighContrast] = useState(prefersHighContrast());
 			const toggleAgents = () => {
+				if (!agentsOpen) officeFx("impact");
 				setApprovalsOpen(false);
 				setCommandCenterOpen(false);
 				setTimelineOpen(false);
@@ -209292,6 +209723,7 @@ create: function(game) {
 				setAgentsOpen((v) => !v);
 			};
 			const toggleHud = () => {
+				if (!hudOpen) officeFx("impact");
 				setApprovalsOpen(false);
 				setCommandCenterOpen(false);
 				setTimelineOpen(false);
@@ -209300,6 +209732,7 @@ create: function(game) {
 				setHudOpen((v) => !v);
 			};
 			const toggleApprovals = () => {
+				if (!approvalsOpen) officeFx("impact");
 				setAgentsOpen(false);
 				setHudOpen(false);
 				setWarRoomOpen(false);
@@ -209310,6 +209743,7 @@ create: function(game) {
 				setApprovalsOpen((v) => !v);
 			};
 			const toggleCommandCenter = () => {
+				if (!commandCenterOpen) officeFx("impact");
 				setAgentsOpen(false);
 				setHudOpen(false);
 				setWarRoomOpen(false);
@@ -209321,6 +209755,7 @@ create: function(game) {
 				setCommandCenterOpen((v) => !v);
 			};
 			const toggleTimeline = () => {
+				if (!timelineOpen) officeFx("impact");
 				setAgentsOpen(false);
 				setHudOpen(false);
 				setWarRoomOpen(false);
@@ -209332,6 +209767,7 @@ create: function(game) {
 				setTimelineOpen((v) => !v);
 			};
 			const toggleStudio = () => {
+				if (!studioOpen) officeFx("impact");
 				setAgentsOpen(false);
 				setHudOpen(false);
 				setWarRoomOpen(false);
@@ -209342,7 +209778,10 @@ create: function(game) {
 				setControlSeat(null);
 				setStudioOpen((v) => !v);
 			};
-			const toggleCampus = () => setCampusOpen((v) => !v);
+			const toggleCampus = () => {
+				if (!campusOpen) officeFx("impact");
+				setCampusOpen((v) => !v);
+			};
 			const toggleFor = (id) => {
 				switch (id) {
 					case "agents": return toggleAgents;
@@ -209412,6 +209851,7 @@ create: function(game) {
 				props.fetchImpl
 			]);
 			const frameRef = useRef(null);
+			const approvalCountRef = useRef(0);
 			const menuRef = useRef(null);
 			const openDockRef = useRef(null);
 			const focusReturnRef = useRef(null);
@@ -209477,7 +209917,11 @@ create: function(game) {
 				let live = true;
 				const read = () => {
 					fetchApprovals({ base: props.base }).then((next) => {
-						if (live && next.kind === "ready") setApprovalCount(next.items.length);
+						if (!live || next.kind !== "ready") return;
+						const count = next.items.length;
+						if (count > approvalCountRef.current) officeFx("approval");
+						approvalCountRef.current = count;
+						setApprovalCount(count);
 					});
 				};
 				read();
@@ -209503,10 +209947,13 @@ create: function(game) {
 					return;
 				}
 				let restoreEscape;
+				let restoreUiSkin;
 				const onLoad = () => {
 					setLoaded(true);
 					setFailed(null);
 					installOfficeBrand(win);
+					restoreUiSkin?.();
+					restoreUiSkin = installOfficeUiSkin(win);
 					restoreEscape?.();
 					const loadedWindow = frame.contentWindow;
 					restoreEscape = installEscapeToShell(loadedWindow, () => {
@@ -209557,6 +210004,8 @@ create: function(game) {
 					frame.removeEventListener("error", onError);
 					menuRef.current?.dispose();
 					menuRef.current = null;
+					restoreUiSkin?.();
+					restoreUiSkin = void 0;
 					restoreEscape?.();
 					restoreBridge?.();
 				};
@@ -209716,7 +210165,7 @@ create: function(game) {
 			}, bindingSummary()));
 			if (props.seatAgentId !== void 0 && props.seatAgentId !== null) {
 				const seats = props.seats ?? [];
-				children.push(R.createElement("button", {
+				children.push(sakugaButton(R, {
 					key: "seat-model-toggle",
 					type: "button",
 					className: "seat-model__toggle",
@@ -209770,7 +210219,7 @@ create: function(game) {
 					key: "t",
 					className: "office-theme-dock-title"
 				}, "Agents"),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "warroom",
 					type: "button",
 					className: "office-game__btn office-theme-dock-link",
@@ -209785,7 +210234,7 @@ create: function(game) {
 						setWarRoomOpen(true);
 					}
 				}, "War Room"),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "etsy",
 					type: "button",
 					className: "office-game__btn office-theme-dock-link",
@@ -209802,7 +210251,7 @@ create: function(game) {
 						setEtsyOpen(true);
 					}
 				}, "Etsy"),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "x",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
@@ -209874,7 +210323,7 @@ create: function(game) {
 					"data-testid": "office-game-approvals-count",
 					"data-count": String(approvalCount)
 				}, String(approvalCount)),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "x",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
@@ -209886,7 +210335,11 @@ create: function(game) {
 			]), R.createElement(ApprovalsPanel, {
 				key: "body",
 				base: props.base,
-				onCountChange: (n) => setApprovalCount(n),
+				onCountChange: (n) => {
+					if (n > approvalCountRef.current) officeFx("approval");
+					approvalCountRef.current = n;
+					setApprovalCount(n);
+				},
 				onClose: () => setApprovalsOpen(false)
 			})]));
 			if (etsyOpen) children.push(R.createElement("div", {
@@ -209926,7 +210379,7 @@ create: function(game) {
 					"data-testid": "office-game-hud-open-link",
 					href: hudFrameSrc(props.base)
 				}, "Open HUD"),
-				R.createElement("button", {
+				sakugaButton(R, {
 					key: "x",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
@@ -209966,7 +210419,7 @@ create: function(game) {
 					"data-testid": "office-menu-approvals-badge-fallback",
 					"aria-hidden": "true"
 				}, String(approvalCount)));
-				return R.createElement("button", {
+				return sakugaButton(R, {
 					key: spec.id,
 					type: "button",
 					className: `office-game__btn office-theme-menu-btn office-theme-menu-${spec.id} office-theme-menu-fallback-btn`,
@@ -210020,7 +210473,7 @@ create: function(game) {
 				onClose: () => setTimelineOpen(false)
 			})]));
 			if (studioOpen) {
-				const tab = (id, label) => R.createElement("button", {
+				const tab = (id, label) => sakugaButton(R, {
 					key: `studio-tab-${id}`,
 					type: "button",
 					className: "office-game__btn office-game__studioTab",
@@ -210056,7 +210509,7 @@ create: function(game) {
 					tab("panels", "Panels"),
 					tab("rooms", "Rooms"),
 					tab("outside", "Outside"),
-					R.createElement("button", {
+					sakugaButton(R, {
 						key: "x",
 						type: "button",
 						className: "office-game__btn office-theme-dock-close",
@@ -210074,7 +210527,7 @@ create: function(game) {
 				className: "office-game__floorScope",
 				"data-testid": "office-floor-scope",
 				role: "status"
-			}, [R.createElement("span", { key: "t" }, `Viewing ${floorScope.replace("live:", "Floor ")}`), R.createElement("button", {
+			}, [R.createElement("span", { key: "t" }, `Viewing ${floorScope.replace("live:", "Floor ")}`), sakugaButton(R, {
 				key: "all",
 				type: "button",
 				className: "office-game__btn",
@@ -210087,7 +210540,7 @@ create: function(game) {
 					className: "office-game__campusState",
 					"data-testid": "office-campus-loading",
 					role: "status"
-				}, "Loading the 5-floor directory…") : campusState === "error" ? R.createElement("div", {
+				}, "Loading the 100-floor directory…") : campusState === "error" ? R.createElement("div", {
 					key: "error",
 					className: "office-game__campusState",
 					"data-testid": "office-campus-error",
@@ -210113,26 +210566,26 @@ create: function(game) {
 					R.createElement("p", {
 						key: "counts",
 						"data-testid": "office-campus-counts"
-					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "5-floor directory · floors, rooms, desks and occupancy"),
+					}, campusTab === "floors" ? "Campus world · real live floors and unstaffed templates on one camera" : "100-floor directory · floors, rooms, desks and occupancy"),
 					R.createElement("div", {
 						key: "tabs",
 						className: "office-game__campusTabs"
-					}, [R.createElement("button", {
+					}, [sakugaButton(R, {
 						key: "floors",
 						type: "button",
 						className: "office-game__btn",
 						"data-testid": "office-campus-tab-floors",
 						"aria-pressed": campusTab === "floors",
 						onClick: () => setCampusTab("floors")
-					}, "Campus world"), R.createElement("button", {
+					}, "Campus world"), sakugaButton(R, {
 						key: "directory",
 						type: "button",
 						className: "office-game__btn",
 						"data-testid": "office-campus-tab-directory",
 						"aria-pressed": campusTab === "directory",
 						onClick: () => setCampusTab("directory")
-					}, "5-floor directory")])
-				]), R.createElement("button", {
+					}, "100-floor directory")])
+				]), sakugaButton(R, {
 					key: "close",
 					type: "button",
 					className: "office-game__btn office-theme-dock-close",
@@ -210216,6 +210669,7 @@ create: function(game) {
 				agents: 0,
 				error: ""
 			});
+			const previousAnimations = H.useRef(/* @__PURE__ */ new Map());
 			H.useEffect(() => {
 				const adapter = new OfficeAdapter({
 					intervalMs: POLL_INTERVAL_MS,
@@ -210231,6 +210685,24 @@ create: function(game) {
 							error: s.error ?? ""
 						});
 						if (characters.length === 0) return;
+						const before = previousAnimations.current;
+						const after = /* @__PURE__ */ new Map();
+						let completed = false;
+						let failed = false;
+						let blocked = false;
+						for (const character of characters) {
+							const animation = String(character.animation || "");
+							after.set(character.agent_id, animation);
+							const previous = before.get(character.agent_id);
+							if (previous === void 0 || previous === animation) continue;
+							if (animation === "done" || animation === "settling") completed = true;
+							else if (animation === "stopped") failed = true;
+							else if (animation === "blocked") blocked = true;
+						}
+						previousAnimations.current = after;
+						if (completed) officeFx("success");
+						if (failed) officeFx("error");
+						if (blocked) officeFx("warning");
 						setSeats(characters.map((c) => ({
 							agent_id: c.agent_id,
 							slug: c.slug

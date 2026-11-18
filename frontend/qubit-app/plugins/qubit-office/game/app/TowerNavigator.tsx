@@ -16,6 +16,7 @@
  * React and hooks arrive as arguments, exactly as the rest of the plugin does
  * it: the host injects one React and a second copy would split the runtime.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import type { FloorTemplate } from "./business-api";
 import {
@@ -408,7 +409,7 @@ export function createTowerNavigator(
             "data-testid": "tower-scene-source",
           }, sceneSource === "endpoint" ? "endpoint rooms" : "template rooms"),
           props.onOpenFloor
-            ? R.createElement("button", {
+            ? sakugaButton(R, {
                 key: "open", type: "button",
                 className: "tower__liveFloor",
                 "data-testid": "tower-open-floor",
@@ -515,7 +516,7 @@ export function createTowerNavigator(
               className: "tower__floorState",
               "data-testid": "tower-detail-state",
             }, stateText(selected.active_by_default)),
-            R.createElement("button", {
+            sakugaButton(R, {
               key: "close", type: "button",
               className: "tower__close",
               "data-testid": "tower-detail-close",
@@ -639,17 +640,17 @@ export function createTowerNavigator(
             R.createElement("span", {
               key: "label", className: "tower__liveLabel",
             }, "Live office floors"),
-            R.createElement("button", {
+            sakugaButton(R, {
               key: "f1", type: "button", className: "tower__liveFloor",
               "data-testid": "tower-open-live-1",
               onClick: () => props.onOpenLiveFloor?.("live:1"),
             }, "1 · Executive"),
-            R.createElement("button", {
+            sakugaButton(R, {
               key: "f2", type: "button", className: "tower__liveFloor",
               "data-testid": "tower-open-live-2",
               onClick: () => props.onOpenLiveFloor?.("live:2"),
             }, "2 · Operations"),
-            R.createElement("button", {
+            sakugaButton(R, {
               key: "f3", type: "button", className: "tower__liveFloor",
               "data-testid": "tower-open-live-3",
               onClick: () => props.onOpenLiveFloor?.("live:3"),

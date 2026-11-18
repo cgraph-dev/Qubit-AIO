@@ -7,6 +7,7 @@
  * bridge and then re-reads the record, so the status shown afterwards is the
  * store's answer — never a local guess.
  */
+import { sakugaButton } from "./sakuga";
 import type { OfficeGameShellProps } from "../OfficeGameShell";
 import { createEffectiveStatePanel } from "./EffectiveStatePanel";
 import { createCharacterStudio } from "./CharacterStudio";
@@ -380,7 +381,7 @@ export function createAgentControlDrawer(
     }, [
       R.createElement("span", { key: "t", className: "office-theme-dock-title" },
         seatName ? `Agent controls — ${seatName}` : "Agent controls"),
-      R.createElement("button", {
+      sakugaButton(R, {
         key: "x", type: "button",
         className: "office-game__btn office-theme-dock-close",
         "data-testid": "agent-control-close", "aria-label": "Close agent controls",
@@ -533,7 +534,7 @@ export function createAgentControlDrawer(
               "data-scope": scope,
             }, [
               R.createElement("span", { key: "s" }, scope),
-              R.createElement("button", {
+              sakugaButton(R, {
                 key: "r", type: "button",
                 "data-testid": "agent-control-perm-remove",
                 "data-category": category, "data-scope": scope,
@@ -565,7 +566,7 @@ export function createAgentControlDrawer(
               onChange: (event: { target: { value: string } }) =>
                 setPermInput({ ...permInput, [category]: event.target.value }),
             }),
-            R.createElement("button", {
+            sakugaButton(R, {
               key: "a", type: "button", className: "office-game__btn",
               "data-testid": "agent-control-perm-add",
               "data-category": category, disabled: lock,
@@ -778,7 +779,7 @@ export function createAgentControlDrawer(
           key: "preview-actions", className: "agent-control__actions",
           "data-testid": "agent-control-preview-actions",
         }, [
-          R.createElement("button", {
+          sakugaButton(R, {
             key: "run", type: "button", className: "office-game__btn",
             "data-testid": "agent-control-preview-run",
             disabled: lock || previewBusy,
@@ -809,17 +810,17 @@ export function createAgentControlDrawer(
       const buttons: unknown[] = [];
       if (editing) {
         const dirty = isDraftDirty(draft, selected);
-        buttons.push(R.createElement("button", {
+        buttons.push(sakugaButton(R, {
           key: "save", type: "button", className: "office-game__btn",
           "data-testid": "agent-control-save", disabled: lock,
           onClick: () => { void saveEdit(); },
         }, "Save changes"));
-        buttons.push(R.createElement("button", {
+        buttons.push(sakugaButton(R, {
           key: "cancel", type: "button", className: "office-game__btn",
           "data-testid": "agent-control-cancel", disabled: lock,
           onClick: cancelEdit,
         }, "Cancel"));
-        buttons.push(R.createElement("button", {
+        buttons.push(sakugaButton(R, {
           key: "reset", type: "button", className: "office-game__btn",
           "data-testid": "agent-control-reset", disabled: lock || !dirty,
           onClick: resetDraft,
@@ -831,13 +832,13 @@ export function createAgentControlDrawer(
           }, "Unsaved changes"));
         }
       } else {
-        buttons.push(R.createElement("button", {
+        buttons.push(sakugaButton(R, {
           key: "edit", type: "button", className: "office-game__btn",
           "data-testid": "agent-control-edit", disabled: lock,
           onClick: beginEdit,
         }, "Edit controls"));
         if (canPause(selected)) {
-          buttons.push(R.createElement("button", {
+          buttons.push(sakugaButton(R, {
             key: "pause", type: "button", className: "office-game__btn",
             "data-testid": "agent-control-pause",
             disabled: lock,
@@ -846,7 +847,7 @@ export function createAgentControlDrawer(
           }, "Pause"));
         }
         if (canResume(selected)) {
-          buttons.push(R.createElement("button", {
+          buttons.push(sakugaButton(R, {
             key: "resume", type: "button", className: "office-game__btn",
             "data-testid": "agent-control-resume",
             disabled: lock,
@@ -854,14 +855,14 @@ export function createAgentControlDrawer(
               base: props.base, fetchImpl: props.fetchImpl })),
           }, "Resume"));
         }
-        buttons.push(R.createElement("button", {
+        buttons.push(sakugaButton(R, {
           key: "stop", type: "button", className: "office-game__btn",
           "data-testid": "agent-control-stop",
           disabled: lock,
           onClick: () => run("Stop", () => stopAgent(selected.agent_id, {}, {
             base: props.base, fetchImpl: props.fetchImpl })),
         }, "Stop turn"));
-        buttons.push(R.createElement("button", {
+        buttons.push(sakugaButton(R, {
           key: "takeover", type: "button", className: "office-game__btn",
           "data-testid": "agent-control-takeover",
           disabled: lock,
@@ -869,7 +870,7 @@ export function createAgentControlDrawer(
             base: props.base, fetchImpl: props.fetchImpl })),
         }, "Take over"));
         if (canRevoke(selected)) {
-          buttons.push(R.createElement("button", {
+          buttons.push(sakugaButton(R, {
             key: "revoke", type: "button",
             className: "office-game__btn agent-control__danger",
             "data-testid": "agent-control-revoke",
@@ -880,7 +881,7 @@ export function createAgentControlDrawer(
           }, "Revoke all scopes"));
         }
         if (canArchive(selected)) {
-          buttons.push(R.createElement("button", {
+          buttons.push(sakugaButton(R, {
             key: "archive", type: "button",
             className: "office-game__btn agent-control__danger",
             "data-testid": "agent-control-archive",
