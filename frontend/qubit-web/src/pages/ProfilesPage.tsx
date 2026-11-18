@@ -22,7 +22,6 @@ import {
   Users,
   X,
 } from "lucide-react";
-import spinners from "unicode-animations";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api } from "@/lib/api";
 import type { ActiveProfileInfo, ProfileInfo } from "@/lib/api";
@@ -36,39 +35,15 @@ import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn, themedBody } from "@/lib/utils";
-import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Mirrors qubit_cli/profiles.py::_PROFILE_ID_RE so we can reject obviously
 // invalid names (uppercase, spaces, …) before round-tripping a doomed POST.
 const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 
-/** Braille unicode spinner (`unicode-animations`); static first frame when reduced motion is preferred. */
+/** Loading surface: the Sakuga progress bar (same busy crawl as route loads). */
 function ProfilesLoadingSpinner() {
-  const { frames, interval } = spinners.braille;
-  const [frameIndex, setFrameIndex] = useState(0);
-
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
-    const id = window.setInterval(
-      () => setFrameIndex((i) => (i + 1) % frames.length),
-      interval,
-    );
-    return () => window.clearInterval(id);
-  }, [frames.length, interval]);
-
-  return (
-    <span
-      aria-hidden
-      className="inline-block select-none font-mono text-xl leading-none text-muted-foreground"
-    >
-      {frames[frameIndex]}
-    </span>
-  );
+  return <SakugaLoading label="Loading profiles…" />;
 }
 
 /**

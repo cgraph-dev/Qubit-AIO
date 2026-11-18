@@ -5,7 +5,7 @@ import {
 } from "@qubit/shared";
 import { Clock, Pause, Pencil, Play, Trash2, X, Zap } from "lucide-react";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Button, Checkbox, Input, Select, emitFx } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { H2 } from "@nous-research/ui/ui/components/typography/h2";
 import { api, ConfirmRequiredError } from "@/lib/api";
@@ -47,7 +47,7 @@ import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
-import { Segmented } from "@nous-research/ui/ui/components/segmented";
+import { SakugaSegmented } from "@/components/sakuga-segmented";
 import { AutomationBlueprints } from "@/components/AutomationBlueprints";
 import { PageErrorBoundary } from "@/components/PageErrorBoundary";
 import { cn, themedBody } from "@/lib/utils";
@@ -933,8 +933,8 @@ export default function CronPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading schedules…" />
       </div>
     );
   }
@@ -949,7 +949,7 @@ export default function CronPage() {
       <PluginSlot name="cron:top" />
       <Toast toast={toast} />
 
-      <Segmented
+      <SakugaSegmented
         value={view}
         onChange={(v) => setView(v as "jobs" | "blueprints")}
         options={[

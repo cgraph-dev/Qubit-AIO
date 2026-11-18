@@ -1,0 +1,24 @@
+/* Segmented toolbar: the compact row the design-system `Segmented` had, with
+ * the Sakuga button art. Only chrome is touched; the drawing is upstream's. */
+.qsk-segmented {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.qsk-segmented sakuga-button::part(button) {
+  padding: 3px 9px;
+  font-size: 12px;
+  line-height: 1.15;
+  border-width: 2px;
+  border-radius: 8px;
+  box-shadow: none;
+  min-height: 26px;
+}
+
+.qsk-segmented--md sakuga-button::part(button) {
+  padding: 4px 11px;
+  font-size: 13px;
+  min-height: 30px;
+}

@@ -54,7 +54,7 @@ import {
 } from "@nous-research/ui/ui/components/dialog";
 import { cn } from "@/lib/utils";
 import { rebrand, rebrandOptional } from "@/lib/rebrand";
-import { ListItem, Button, Input, Toggle, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { ListItem, Button, Input, Toggle, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { PluginSlot } from "@/plugins";
@@ -392,8 +392,8 @@ export default function SkillsPage() {
   /* ---- Loading ---- */
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading skills…" />
       </div>
     );
   }

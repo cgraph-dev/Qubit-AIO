@@ -20,7 +20,7 @@ import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { CommandBlock, CopyButton } from "@nous-research/ui/ui/components/command-block";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
-import { Button, Input, Select, Toggle } from "@/sakuga/ui";
+import { Button, Input, Select, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
@@ -237,8 +237,8 @@ function MemoryProviderSetupHint({
       ) : null}
 
       {installing ? (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Spinner /> Running provider setup. This may take a minute…
+        <div className="flex flex-col items-start gap-1 text-muted-foreground">
+          <SakugaLoading label="Running provider setup. This may take a minute…" />
         </div>
       ) : null}
 
@@ -337,7 +337,16 @@ export default function PluginsPage() {
   const [indexQuery, setIndexQuery] = useState("");
   const [indexBusy, setIndexBusy] = useState<string | null>(null);
 
-  const { toast, showToast } = useToast();
+  const { toast, showToast: announce } = useToast();
+  // Every plugin outcome goes through one place, so the Sakuga cue always
+  // matches the toast Qubit actually showed (never a fabricated state).
+  const showToast = useCallback(
+    (message: string, type: "error" | "success") => {
+      announce(message, type);
+      void emitFx(type === "error" ? "error" : "success");
+    },
+    [announce],
+  );
   const { t } = useI18n();
   const { setAfterTitle } = usePageHeader();
 
@@ -817,8 +826,8 @@ export default function PluginsPage() {
                   )}
 
                   {selectedMemoryName && memoryConfigBusy && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Spinner /> Loading provider settings…
+                    <div className="flex flex-col items-start gap-1 text-sm text-muted-foreground">
+                      <SakugaLoading label="Loading provider settings…" />
                     </div>
                   )}
 
@@ -1113,9 +1122,8 @@ export default function PluginsPage() {
                 {catalogError}
               </p>
             ) : catalogLoading ? (
-              <div className="flex items-center gap-2 py-6 text-xs text-text-tertiary">
-                <Spinner />
-                <span>{t.common.loading}</span>
+              <div className="flex flex-col items-start gap-1 py-6 text-xs text-text-tertiary">
+                <SakugaLoading label={t.common.loading} />
               </div>
             ) : catalog.length === 0 ? (
               <p className="text-xs text-text-tertiary">

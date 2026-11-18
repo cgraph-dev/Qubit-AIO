@@ -44,7 +44,7 @@ import { useI18n } from "@/i18n";
 import { PluginSlot } from "@/plugins";
 import { ModelPickerDialog } from "@/components/ModelPickerDialog";
 import { ModelReloadConfirm } from "@/components/ModelReloadConfirm";
-import { Button, Input, Select, Toggle, emitFx } from "@/sakuga/ui";
+import { Button, Input, Select, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 const PERIODS = [
   { label: "7d", days: 7 },
@@ -1400,11 +1400,11 @@ function ProfileUseAsPanel({ onAssigned }: { onAssigned(): void }) {
         {loading && !profiles ? (
           <div
             data-state="loading"
+            role="status"
             aria-busy="true"
-            className="flex items-center gap-2 py-4 text-xs text-text-tertiary"
+            className="flex flex-col items-start gap-1 py-4 text-xs text-text-tertiary"
           >
-            <Spinner className="shrink-0" />
-            <span>Loading model profiles…</span>
+            <SakugaLoading label="Loading model profiles…" />
           </div>
         ) : error ? (
           <div
@@ -1726,8 +1726,8 @@ export default function ModelsPage() {
       </div>
 
       {loading && !data && (
-        <div className="flex items-center justify-center py-24">
-          <Spinner className="text-2xl text-primary" />
+        <div className="flex items-center justify-center py-24" aria-busy="true">
+          <SakugaLoading label="Loading models…" />
         </div>
       )}
 

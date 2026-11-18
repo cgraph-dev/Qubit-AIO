@@ -25,7 +25,7 @@ import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Toast } from "@nous-research/ui/ui/components/toast";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
-import { Button, Input, Toggle } from "@/sakuga/ui";
+import { Button, Input, Toggle, SakugaLoading, emitFx } from "@/sakuga/ui";
 import { api, ConfirmRequiredError } from "@/lib/api";
 import type {
   MessagingPlatform,
@@ -246,10 +246,12 @@ export default function ChannelsPage() {
           ),
       );
       showToast(`${editing.name} saved`, "success");
+      void emitFx("success");
       setEditing(null);
       if (!result.hot_served) setRestartNeeded(true);
       await load();
     } catch (e) {
+      void emitFx("error");
       if (e instanceof ConfirmRequiredError) {
         showToast(`${editing.name} save cancelled`, "error");
       } else {
@@ -354,8 +356,8 @@ export default function ChannelsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading channels…" />
       </div>
     );
   }

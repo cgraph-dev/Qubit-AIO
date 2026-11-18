@@ -18,7 +18,7 @@ import {
   type McpTransport,
 } from "@/lib/mcp-server-create";
 
-import { Button, Checkbox, Input, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, Input, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 // Profile name rule mirrors the backend (`^[a-z0-9][a-z0-9_-]{0,63}$`).
 const PROFILE_NAME_RE = /^[a-z0-9][a-z0-9_-]{0,63}$/;
@@ -351,7 +351,7 @@ export default function ProfileBuilderPage() {
                 className="qsk-field"
               />
               {modelChoices === null ? (
-                <p className="text-sm text-muted-foreground">Loading models…</p>
+                <SakugaLoading label="Loading models…" showLabel={false} />
               ) : (
                 <div className="max-h-72 space-y-1 overflow-y-auto">
                   <Button
@@ -403,9 +403,7 @@ export default function ProfileBuilderPage() {
                     className="qsk-field"
                   />
                   {skills === null ? (
-                    <p className="text-sm text-muted-foreground">
-                      Loading skills…
-                    </p>
+                    <SakugaLoading label="Loading skills…" showLabel={false} />
                   ) : (
                     <div className="max-h-56 space-y-1 overflow-y-auto">
                       {filteredSkills.map((s) => (

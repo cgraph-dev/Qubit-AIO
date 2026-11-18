@@ -12,7 +12,7 @@
  * and the sessions switcher.
  */
 
-import { Button, Checkbox, Select, emitFx, emitFxAt } from "@/sakuga/ui";
+import { Button, Checkbox, Select, SakugaLoading, emitFx, emitFxAt } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import {
@@ -2481,9 +2481,9 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                 </Button>
               </div>
               {debugState === "loading" ? (
-                <p className="flex items-center gap-2 text-text-tertiary">
-                  <Spinner className="shrink-0" /> Loading runtime + logs…
-                </p>
+                <div role="status" aria-busy="true" className="flex flex-col items-start gap-1 text-text-tertiary">
+                  <SakugaLoading label="Loading runtime + logs…" />
+                </div>
               ) : debugState === "error" ? (
                 <p role="alert" className="text-destructive">
                   {debugError}

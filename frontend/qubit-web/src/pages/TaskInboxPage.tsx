@@ -33,7 +33,6 @@ import { Link } from "react-router";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Label } from "@nous-research/ui/ui/components/label";
-import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { ConfirmDialog } from "@nous-research/ui/ui/components/confirm-dialog";
 import {
   MENTIONS_REFUSAL,
@@ -51,7 +50,7 @@ import {
   type TaskRow,
 } from "@/lib/ocFamilyBoardApi";
 import { refusalOrError } from "@/lib/policy-refusal";
-import { Button, Checkbox, Input, Select, emitFx, showSakugaToast } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, SakugaLoading, emitFx, showSakugaToast } from "@/sakuga/ui";
 
 type InboxViewPreset = "all" | "tasks" | "suggestions";
 
@@ -337,8 +336,8 @@ export default function TaskInboxPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center gap-2">
-            <Spinner /> <span className="text-sm">Loading task inbox…</span>
+          <div role="status" aria-busy="true" className="flex flex-col items-start gap-1">
+            <SakugaLoading label="Loading task inbox…" />
           </div>
         ) : null}
         {error ? (

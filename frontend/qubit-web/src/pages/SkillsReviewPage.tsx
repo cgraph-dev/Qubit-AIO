@@ -35,7 +35,7 @@ import {
   type SkillProposal,
 } from "@/lib/ocFamilyAdminApi";
 import { refusalOrError } from "@/lib/policy-refusal";
-import { Button, Input, Tabs, emitFx } from "@/sakuga/ui";
+import { Button, Input, Tabs, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
@@ -272,7 +272,7 @@ export default function SkillsReviewPage() {
           </div>
 
           {loading ? (
-            <div className="settings-empty">Loading proposals…</div>
+            <div className="settings-empty"><SakugaLoading label="Loading proposals…" /></div>
           ) : proposals.length === 0 ? (
             <div className="settings-empty" data-testid="sr-empty">
               No proposals in the queue.
@@ -550,7 +550,7 @@ export default function SkillsReviewPage() {
           </div>
           <div className="settings-group">
             {eventsLoading ? (
-              <div className="settings-empty">Loading events…</div>
+              <div className="settings-empty"><SakugaLoading label="Loading events…" /></div>
             ) : events.length === 0 ? (
               <div className="settings-empty">No events recorded.</div>
             ) : (

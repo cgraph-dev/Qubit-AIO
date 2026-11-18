@@ -54,8 +54,8 @@ import { Markdown } from "@/components/Markdown";
 import { StructuredReasoning } from "@/components/StructuredReasoning";
 import { shouldRenderStructuredReasoning } from "@/lib/reasoning-markup";
 import { PlatformsCard } from "@/components/PlatformsCard";
-import { ListItem, Button, Input as SakugaInput, Checkbox, showSakugaToast, emitFx } from "@/sakuga/ui";
-import { Segmented } from "@nous-research/ui/ui/components/segmented";
+import { ListItem, Button, Input as SakugaInput, Checkbox, SakugaLoading, showSakugaToast, emitFx } from "@/sakuga/ui";
+import { SakugaSegmented } from "@/components/sakuga-segmented";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@nous-research/ui/ui/components/card";
@@ -1857,8 +1857,8 @@ export default function SessionsPage() {
   </div>;
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Spinner className="text-2xl text-primary" />
+      <div className="flex items-center justify-center py-24" aria-busy="true">
+        <SakugaLoading label="Loading sessions…" />
       </div>
     );
   }
@@ -2093,7 +2093,7 @@ export default function SessionsPage() {
       {(showOverviewTab && !isSearching) || showList ? (
         <div className="flex w-full min-w-0 flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:gap-3">
-            <Segmented
+            <SakugaSegmented
               className="w-fit shrink-0"
               size="md"
               value={sessionCategory}
@@ -2163,9 +2163,8 @@ export default function SessionsPage() {
                               }}
                               aria-label={`${t.sessions.sourceFilter}: ${sourceLabel(source)}`}
                             />
-                            <button
-                              type="button"
-                              className="flex min-w-0 flex-1 items-center gap-2 text-left text-xs"
+                            <ListItem
+                              className="min-w-0 flex-1 items-center gap-2 text-left text-xs"
                               onClick={() => toggleSourceFilter(source)}
                             >
                               <SourceIcon className={`h-3.5 w-3.5 shrink-0 ${sourceColor}`} />
@@ -2175,7 +2174,7 @@ export default function SessionsPage() {
                               <span className="shrink-0 tabular-nums text-muted-foreground">
                                 {count}
                               </span>
-                            </button>
+                            </ListItem>
                           </div>
                         );
                       })
@@ -2186,7 +2185,7 @@ export default function SessionsPage() {
             </div>
 
             {showOverviewTab && !isSearching && (
-              <Segmented
+              <SakugaSegmented
                 className="w-fit shrink-0"
                 size="md"
                 value={effectiveView}

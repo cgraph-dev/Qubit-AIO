@@ -26,7 +26,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Button, Checkbox, Input, Select, emitFx } from "@/sakuga/ui";
+import { Button, Checkbox, Input, Select, SakugaLoading, emitFx } from "@/sakuga/ui";
 
 import {
   DISABLED_SCHEDULER_ACTIONS,
@@ -387,7 +387,7 @@ export default function SchedulerMediaPage() {
             <div className="settings-row">
               <div className="settings-row__text">
                 <div className="settings-row__title flex items-center gap-2">
-                  <Spinner className="shrink-0" /> Reading power state…
+                  <SakugaLoading label="Reading power state…" />
                 </div>
               </div>
             </div>
