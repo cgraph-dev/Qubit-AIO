@@ -3938,6 +3938,16 @@
 .office-game .warroom__row:active {
   transform: none;
 }
+
+/* The seat-router control belongs to the host chrome, never to the vendored
+   office's panel header. Keep it on the empty outside strip above the
+   connection bar so it cannot cover a room title or a panel control. */
+.office-game > .seat-model__toggle {
+  position: fixed;
+  top: 0.65rem;
+  right: 9rem;
+  z-index: 50;
+}
 /* Stage 8/9 — Office ambient motion (repo-aware, zero control motion).
  *
  * WHAT THIS IS
