@@ -17,29 +17,9 @@
 
   const { React } = SDK;
   const h = React.createElement;
-  const {
-    Card, CardContent,
-    Badge, Button, Input, Label, Select, SelectOption,
-  } = SDK.components;
+  const { Card, CardContent, Badge, Label, SelectOption } = SDK.components;
   const { useState, useEffect, useCallback, useMemo, useRef } = SDK.hooks;
   const { cn, timeAgo } = SDK.utils;
-
-  // Newer host dashboards expose a DS-styled Checkbox on the plugin SDK.
-  // Fall back to a native <input type="checkbox"> shim so older hosts that
-  // predate the design-system rollout still render. The shim normalises
-  // Radix's onCheckedChange(checked) signature to native onChange(event).
-  const Checkbox = SDK.components.Checkbox || function (props) {
-    const { checked, onCheckedChange, className, onClick, ...rest } = props;
-    return h("input", Object.assign({
-      type: "checkbox",
-      checked: !!checked,
-      className: className,
-      onClick: onClick,
-      onChange: function (e) {
-        if (onCheckedChange) onCheckedChange(e.target.checked);
-      },
-    }, rest));
-  };
 
   // useI18n is a hook each component calls locally. Older host dashboards
   // may not expose it yet; fall back to a shim so the bundle still renders
@@ -72,6 +52,344 @@
   // FastAPI bodies look like ``{"detail":"<message>"}``.  Pull the
   // human-readable message out so banners/toasts don't have to leak HTTP
   // plumbing at the user (e.g. ``409: {"detail":"…"}``).  See #26744.
+  // ── Sakuga controls ────────────────────────────────────────────────────
+  // The dashboard loads the vendored Sakuga custom elements scripts, but this
+  // bundle is a plain IIFE with no React source tree, so it injects the
+  // component files once and renders the validated tags through the SDK's one
+  // React runtime. No second React is bundled and the vendored files are
+  // never edited. Rollback: set localStorage["qubit:sakuga-plugin-ui"]="off"
+  // (or window.__QUBIT_SAKUGA_PLUGIN_UI__ = false) and reload — every helper
+  // below then renders the original native control.
+  const SAKUGA_UI = (function () {
+    try {
+      if (typeof window !== "undefined" && window.__QUBIT_SAKUGA_PLUGIN_UI__ === false) return false;
+      if (typeof window !== "undefined" && window.localStorage
+          && window.localStorage.getItem("qubit:sakuga-plugin-ui") === "off") return false;
+    } catch (_e) { /* storage disabled: keep Sakuga */ }
+    return true;
+  })();
+  const SAKUGA_BASE = "/sakuga-vfx";
+  const sakugaPromises = {};
+  function ensureSakuga(name) {
+    if (typeof document === "undefined" || typeof window === "undefined") {
+      return Promise.resolve(false);
+    }
+    if (window.customElements && window.customElements.get("sakuga-" + name)) {
+      return Promise.resolve(true);
+    }
+    if (sakugaPromises[name]) return sakugaPromises[name];
+    const src = SAKUGA_BASE + "/" + name + "/" + name + ".js";
+    // The dashboard loader may already be injecting the same file; reuse that
+    // tag instead of defining the custom element twice.
+    const existing = document.querySelector('script[src="' + src + '"]');
+    sakugaPromises[name] = new Promise(function (resolve) {
+      if (existing) {
+        existing.addEventListener("load", function () { resolve(true); });
+        existing.addEventListener("error", function () { resolve(false); });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = src;
+      script.async = false;
+      script.dataset.sakuga = "1";
+      script.onload = function () { resolve(true); };
+      script.onerror = function () { resolve(false); };
+      document.head.appendChild(script);
+    });
+    return sakugaPromises[name];
+  }
+  // Each component file embeds the shared core, so these four cover the page.
+  ["button", "input", "checkbox", "progress"].forEach(function (name) { void ensureSakuga(name); });
+
+  function setSakugaAttr(el, key, value) {
+    if (!el) return;
+    if (value === undefined || value === null || value === false) {
+      if (el.hasAttribute(key)) el.removeAttribute(key);
+      return;
+    }
+    const next = value === true ? "" : String(value);
+    if (el.getAttribute(key) !== next) el.setAttribute(key, next);
+  }
+
+  function SakugaButton(props) {
+    const { variant, type, disabled, className, onClick, title, children } = props;
+    if (!SAKUGA_UI) {
+      return h("button", {
+        type: type === "submit" ? "submit" : (type === "reset" ? "reset" : "button"),
+        className: className,
+        disabled: disabled,
+        onClick: onClick,
+        title: title,
+        role: props.role,
+        "aria-label": props["aria-label"],
+        "aria-pressed": props["aria-pressed"],
+        "aria-expanded": props["aria-expanded"],
+        "aria-haspopup": props["aria-haspopup"],
+        "data-testid": props["data-testid"],
+      }, children);
+    }
+    return h("sakuga-button", {
+      variant: (variant === "secondary" || variant === "outline") ? "secondary" : undefined,
+      type: type === "submit" ? "submit" : (type === "reset" ? "reset" : undefined),
+      disabled: disabled ? "" : undefined,
+      className: className,
+      title: title,
+      onClick: onClick,
+      role: props.role || "button",
+      "aria-label": props["aria-label"],
+      "aria-pressed": props["aria-pressed"],
+      "aria-expanded": props["aria-expanded"],
+      "aria-haspopup": props["aria-haspopup"],
+      "data-testid": props["data-testid"],
+    }, children);
+  }
+
+  function SakugaInput(props) {
+    const {
+      value, onChange, onInput, className, type, label, placeholder, autoFocus,
+      onKeyDown, onBlur, onFocus, disabled, title, style, id,
+    } = props;
+    const numeric = { min: props.min, max: props.max, step: props.step };
+    const ref = React.useRef(null);
+    React.useEffect(function () {
+      const el = ref.current;
+      if (!el || !SAKUGA_UI || type === "number") return;
+      const next = value === undefined || value === null ? "" : String(value);
+      if (el.value !== next) {
+        try { el.value = next; } catch (_e) { setSakugaAttr(el, "value", next); }
+      }
+    }, [value]);
+    React.useEffect(function () {
+      if (autoFocus && ref.current) {
+        try { ref.current.focus(); } catch (_e) { /* non-fatal */ }
+      }
+    }, []);
+    if (!SAKUGA_UI || type === "number") {
+      // Number inputs are outside the upstream text-input set; keep them native.
+      return h("input", {
+        ref: ref,
+        id: id,
+        type: type || "text",
+        className: className,
+        value: value,
+        placeholder: placeholder,
+        disabled: disabled,
+        title: title,
+        style: style,
+        autoFocus: autoFocus,
+        onKeyDown: onKeyDown,
+        onBlur: onBlur,
+        onFocus: onFocus,
+        min: numeric.min,
+        max: numeric.max,
+        step: numeric.step,
+        autoCapitalize: props.autoCapitalize,
+        autoCorrect: props.autoCorrect,
+        spellCheck: props.spellCheck,
+        inputMode: props.inputMode,
+        maxLength: props.maxLength,
+        "aria-label": props["aria-label"],
+        onChange: function (e) {
+          if (onChange) onChange(e);
+          if (onInput) onInput(e);
+        },
+      });
+    }
+    return h("sakuga-input", {
+      ref: ref,
+      id: id,
+      type: type && type !== "text" ? type : undefined,
+      label: label || props["aria-label"] || title || placeholder,
+      placeholder: placeholder,
+      disabled: disabled ? "" : undefined,
+      className: className,
+      title: title,
+      style: style,
+      autoCapitalize: props.autoCapitalize,
+      autoCorrect: props.autoCorrect,
+      spellCheck: props.spellCheck,
+      inputMode: props.inputMode,
+      maxLength: props.maxLength,
+      onKeyDown: onKeyDown,
+      onBlur: onBlur,
+      onFocus: onFocus,
+      onInput: function (e) {
+        const v = e.currentTarget.value;
+        if (onInput) onInput(e);
+        if (onChange) onChange({ target: { value: v }, currentTarget: e.currentTarget });
+      },
+    });
+  }
+
+  function SakugaCheckbox(props) {
+    const { checked, onCheckedChange, onChange, className, disabled, onClick, title, children } = props;
+    const ref = React.useRef(null);
+    const current = !!checked;
+    React.useEffect(function () {
+      const el = ref.current;
+      if (!el || !SAKUGA_UI) return;
+      if (current) {
+        if (!el.hasAttribute("checked")) el.setAttribute("checked", "");
+      } else if (el.hasAttribute("checked")) {
+        el.removeAttribute("checked");
+      }
+    }, [current]);
+    if (!SAKUGA_UI) {
+      return h("input", {
+        ref: ref,
+        type: "checkbox",
+        className: className,
+        checked: current,
+        disabled: disabled,
+        title: title,
+        onClick: onClick,
+        "aria-label": props["aria-label"],
+        onChange: function (e) {
+          const v = e.target.checked;
+          if (onCheckedChange) onCheckedChange(v);
+          if (onChange) onChange(e);
+        },
+      });
+    }
+    return h("sakuga-checkbox", {
+      ref: ref,
+      checked: current ? "" : undefined,
+      disabled: disabled ? "" : undefined,
+      className: className,
+      title: title,
+      onClick: onClick,
+      role: "checkbox",
+      "aria-checked": current ? "true" : "false",
+      "aria-label": props["aria-label"],
+      onChange: function (e) {
+        const v = !!(e.currentTarget && e.currentTarget.checked);
+        if (onCheckedChange) onCheckedChange(v);
+        if (onChange) onChange({ target: { checked: v } });
+      },
+    }, children);
+  }
+
+  function collectSelectOptions(children, out) {
+    React.Children.forEach(children, function (child) {
+      if (!React.isValidElement(child)) return;
+      if (child.type === SDK.components.SelectOption) {
+        const raw = child.props.value;
+        out.push({
+          value: String(raw == null ? "" : raw),
+          label: typeof child.props.children === "string" ? child.props.children : String(raw),
+        });
+      } else if (child.props && child.props.children) {
+        collectSelectOptions(child.props.children, out);
+      }
+    });
+    return out;
+  }
+  function hasSelectOption(children) {
+    let found = false;
+    React.Children.forEach(children, function (child) {
+      if (found || !React.isValidElement(child)) return;
+      if (child.type === SDK.components.SelectOption) { found = true; return; }
+      if (child.props && child.props.children) found = hasSelectOption(child.props.children);
+    });
+    return found;
+  }
+  // The upstream set has no select. This is the documented Qubit composition:
+  // the same option model rendered as a native <select> in a Sakuga frame, so
+  // keyboard, form and screen-reader behaviour stay the native contract.
+  function SakugaSelect(props) {
+    const {
+      value, onValueChange, onChange, className, disabled, id, style, children,
+      autoFocus, onKeyDown, title,
+    } = props;
+    const emit = function (e) {
+      if (onValueChange) onValueChange(e.target.value);
+      else if (onChange) onChange(e);
+    };
+    let options = children;
+    if (hasSelectOption(children)) {
+      const collected = collectSelectOptions(children, []);
+      const current = value == null ? "" : String(value);
+      const rendered = collected.map(function (o) {
+        return h("option", { key: o.value, value: o.value }, o.label);
+      });
+      // Keep the DS Select's display of an unknown current value: a native
+      // select would otherwise fall back to its first option.
+      if (current && !collected.some(function (o) { return o.value === current; })) {
+        rendered.unshift(h("option", { key: "__current", value: current }, current));
+      }
+      options = rendered;
+    }
+    if (!SAKUGA_UI) {
+      return h("select", {
+        id: id,
+        className: className,
+        value: value == null ? "" : String(value),
+        disabled: disabled,
+        style: style,
+        title: title,
+        autoFocus: autoFocus,
+        onKeyDown: onKeyDown,
+        "aria-label": props["aria-label"],
+        onChange: emit,
+      }, options);
+    }
+    return h("span", { className: "qsk-select", style: style },
+      h("select", {
+        id: id,
+        className: cn("qsk-select__native", className),
+        value: value == null ? "" : String(value),
+        disabled: disabled,
+        title: title,
+        autoFocus: autoFocus,
+        onKeyDown: onKeyDown,
+        "aria-label": props["aria-label"],
+        onChange: emit,
+      }, options));
+  }
+
+  function SakugaProgress(props) {
+    const ref = React.useRef(null);
+    const value = Math.max(0, Math.min(1, Number(props.value) || 0));
+    React.useEffect(function () {
+      const el = ref.current;
+      if (el) el.setAttribute("value", String(value));
+    }, [value]);
+    if (!SAKUGA_UI) {
+      return h("div", { className: props.className || "p-8 text-sm text-muted-foreground" },
+        props.label);
+    }
+    return h("sakuga-progress", {
+      ref: ref,
+      label: props.label,
+      demo: props.demo ? "" : undefined,
+      className: props.className,
+    });
+  }
+
+  // Hover/focus/tap tooltip using the dashboard's shared Sakuga bubble classes
+  // (loaded from src/sakuga/sakuga.css on every route).
+  function HoverTip(props) {
+    const [open, setOpen] = React.useState(false);
+    if (!SAKUGA_UI) return props.children;
+    React.useEffect(function () {
+      if (!open) return undefined;
+      function onKey(e) { if (e.key === "Escape") setOpen(false); }
+      window.addEventListener("keydown", onKey);
+      return function () { window.removeEventListener("keydown", onKey); };
+    }, [open]);
+    return h("span", {
+      className: "qsk-hover-tip",
+      onMouseEnter: function () { setOpen(true); },
+      onMouseLeave: function () { setOpen(false); },
+      onFocus: function () { setOpen(true); },
+      onBlur: function () { setOpen(false); },
+      onClick: function () { setOpen(true); },
+    }, props.children, open ? h("span", {
+      className: "qsk-hover-tip__bubble",
+      role: "tooltip",
+    }, h("span", { className: "qsk-hover-tip__text" }, props.content)) : null);
+  }
+
   function parseApiErrorMessage(err) {
     const raw = (err && err.message) ? String(err.message) : String(err || "");
     const m = raw.match(/^(\d{3}):\s*(.*)$/s);
@@ -329,7 +647,7 @@
   // fires. This helper wires both signatures so a setter works with
   // either API — use it as:
   //
-  //   h(Select, {..., ...selectChangeHandler(setState), ...})
+  //   h(SakugaSelect, {..., ...selectChangeHandler(setState), ...})
   function selectChangeHandler(setter) {
     return {
       onValueChange: function (v) { setter(v == null ? "" : v); },
@@ -575,7 +893,7 @@
           tx(t, "renderingError", "Kanban tab hit a rendering error")),
         h("div", { className: "text-muted-foreground text-xs mb-3" },
           props.message),
-        h(Button, {
+        h(SakugaButton, {
           onClick: props.onReset,
           size: "sm",
         }, tx(t, "reloadView", "Reload view")),
@@ -1269,8 +1587,11 @@
 
     // --- render -------------------------------------------------------------
     if (loading && !boardData) {
-      return h("div", { className: "p-8 text-sm text-muted-foreground" },
-        tx(t, "loading", "Loading Kanban board…"));
+      return h("div", { className: "p-8" },
+        h(SakugaProgress, {
+          demo: true,
+          label: tx(t, "loading", "Loading Kanban board…"),
+        }));
     }
     if (error && !boardData) {
       return h(Card, null,
@@ -1454,17 +1775,18 @@
             : tx(t, "tasksNeedAttention", "{n} tasks need attention",
                 { n: diagTasks.length }),
         ),
-        h("button", {
+        h(SakugaButton, {
           className: "qubit-kanban-attention-toggle",
           onClick: function () { setExpanded(function (x) { return !x; }); },
           type: "button",
         }, expanded ? tx(t, "hide", "Hide") : tx(t, "show", "Show")),
-        h("button", {
-          className: "qubit-kanban-attention-dismiss",
-          onClick: function () { setDismissed(true); },
-          title: "Hide until next page reload",
-          type: "button",
-        }, "\u2715"),
+        h(HoverTip, { content: "Hide until next page reload" },
+          h(SakugaButton, {
+            className: "qubit-kanban-attention-dismiss",
+            onClick: function () { setDismissed(true); },
+            type: "button",
+            "aria-label": "Hide until next page reload",
+          }, "\u2715")),
       ),
       expanded
         ? h("div", { className: "qubit-kanban-attention-list" },
@@ -1488,7 +1810,7 @@
                   " \u00b7 ",
                   kinds.length > 0 ? kinds.join(", ") : tx(t, "diagnostic", "diagnostic"),
                 ),
-                h("button", {
+                h(SakugaButton, {
                   className: "qubit-kanban-attention-row-btn",
                   onClick: function () { props.onOpen(task.id); },
                   type: "button",
@@ -1528,7 +1850,7 @@
     );
     if (action.kind === "reclaim" || action.kind === "reassign" ||
         action.kind === "unblock") {
-      return h("button", {
+      return h(SakugaButton, {
         className: cls,
         disabled: busy || (extra && extra.disabled),
         onClick: function () { onExec(action); },
@@ -1536,7 +1858,7 @@
       }, label);
     }
     if (action.kind === "cli_hint") {
-      return h("button", {
+      return h(SakugaButton, {
         className: cls,
         disabled: busy,
         onClick: function () { onExec(action); },
@@ -1545,7 +1867,7 @@
       }, (extra && extra.copied) ? tx(t, "copied", "Copied") : label);
     }
     if (action.kind === "comment") {
-      return h("button", {
+      return h(SakugaButton, {
         className: cls,
         onClick: function () { onExec(action); },
         type: "button",
@@ -1721,7 +2043,7 @@
         ? h("div", { className: "qubit-kanban-diag-reassign-row" },
             h("span", { className: "qubit-kanban-diag-reassign-label" },
               tx(t, "reassignTo", "Reassign to:")),
-            h("select", {
+            h(SakugaSelect, {
               className: "qubit-kanban-recovery-select",
               value: reassignProfile,
               onChange: function (e) { setReassignProfile(e.target.value); },
@@ -1779,7 +2101,7 @@
                 `\u26a0 ${tx(t, "diagnostics", "Diagnostics")} (${diags.length})`)
             : tx(t, "diagnostics", "Diagnostics"),
         ),
-        h("button", {
+        h(SakugaButton, {
           className: "qubit-kanban-section-toggle",
           onClick: function () { setOpen(function (x) { return !x; }); },
           type: "button",
@@ -1810,14 +2132,14 @@
   // page in a new tab so users can look up what any of the widgets mean
   // without losing the current board view.
   function DocsLink() {
-    return h("a", {
-      href: DOCS_URL,
-      target: "_blank",
-      rel: "noopener noreferrer",
-      className: "qubit-kanban-docs-link",
-      title: "Open Qubit Kanban docs in a new tab",
-      "aria-label": "Qubit Kanban documentation",
-    }, "?");
+    return h(HoverTip, { content: "Qubit Kanban documentation — what the board, columns, cards and dialogs mean" },
+      h("a", {
+        href: DOCS_URL,
+        target: "_blank",
+        rel: "noopener noreferrer",
+        className: "qubit-kanban-docs-link",
+        "aria-label": "Qubit Kanban documentation",
+      }, "?"));
   }
 
   // ---------------------------------------------------------------------
@@ -1926,7 +2248,7 @@
       : (autoOn
           ? "Orchestration: Auto — the dispatcher decomposes new triage tasks automatically every tick. Click to switch to Manual (pre-PR behavior)."
           : "Orchestration: Manual — triage tasks stay in triage until you click ⚗ Decompose on each card. Click to switch to Auto.");
-    const modePill = h("button", {
+    const modePill = h(SakugaButton, {
       type: "button",
       onClick: function () {
         if (settings === null) return;  // not loaded yet
@@ -1948,7 +2270,7 @@
     if (!expanded) {
       return h("div", { className: "flex items-center gap-3 text-xs" },
         modePill,
-        h("button", {
+        h(SakugaButton, {
           type: "button",
           onClick: function () { setExpanded(true); },
           className: "underline text-muted-foreground hover:text-foreground",
@@ -1965,13 +2287,13 @@
     return h(Card, { className: "p-3" },
       h(CardContent, { className: "p-2 flex flex-col gap-3" },
         h("div", { className: "flex items-center justify-between" },
-          h("button", {
+          h(SakugaButton, {
             type: "button",
             onClick: function () { setExpanded(false); },
             className: "text-sm font-medium underline-offset-2 hover:underline",
           }, headerLabel),
           modePill,
-          h(Button, { onClick: loadAll, size: "sm" }, "Reload"),
+          h(SakugaButton, { onClick: loadAll, size: "sm" }, "Reload"),
         ),
         msg ? h("div", {
           className: msg.ok ? "qubit-kanban-msg-ok" : "qubit-kanban-msg-err",
@@ -1981,7 +2303,7 @@
           h("div", { className: "flex flex-col gap-1" },
             h(Label, { className: "text-xs text-muted-foreground" },
               "Orchestrator profile"),
-            h(Select, Object.assign({
+            h(SakugaSelect, Object.assign({
               value: settings.orchestrator_profile || "",
               className: "h-8",
             }, selectChangeHandler(function (v) {
@@ -1999,7 +2321,7 @@
           h("div", { className: "flex flex-col gap-1" },
             h(Label, { className: "text-xs text-muted-foreground" },
               "Default assignee"),
-            h(Select, Object.assign({
+            h(SakugaSelect, Object.assign({
               value: settings.default_assignee || "",
               className: "h-8",
             }, selectChangeHandler(function (v) {
@@ -2016,7 +2338,7 @@
             h(Label, { className: "text-xs text-muted-foreground" },
               "Orchestration mode"),
             h("label", { className: "flex items-center gap-2 text-xs h-8" },
-              h(Checkbox, {
+              h(SakugaCheckbox, {
                 checked: !!settings.auto_decompose,
                 onCheckedChange: function (checked) {
                   saveSettings({ auto_decompose: checked === true });
@@ -2079,19 +2401,19 @@
           : null,
       ),
       h("div", { className: "flex items-center gap-2" },
-        h(Input, {
+        h(SakugaInput, {
           value: draft,
           onChange: function (e) { setDraft(e.target.value); },
           placeholder: "What is this profile good at?",
           className: "h-7 text-xs flex-1",
         }),
-        h(Button, {
+        h(SakugaButton, {
           onClick: function () { props.onSave(p.name, draft); },
           size: "sm",
           disabled: !!busy || draft === (p.description || ""),
           title: "Save the description above as user-authored",
         }, busy === "save" ? "Saving…" : "Save"),
-        h(Button, {
+        h(SakugaButton, {
           onClick: function () { props.onAuto(p.name, true); },
           size: "sm",
           disabled: !!busy,
@@ -2115,13 +2437,13 @@
       title: tx(t, "boardProjectBadgeTitle", "New tasks on this board inherit this project"),
     },
       tx(t, "boardProjectBadge", "Project: {name}", { name: b.project_name || b.project_id }),
-      h("button", {
-        type: "button",
-        className: "qubit-kanban-board-project-unbind",
-        "aria-label": tx(t, "unbindProject", "Unbind project"),
-        title: tx(t, "unbindProject", "Unbind project"),
-        onClick: props.onUnbind,
-      }, "×"),
+      h(HoverTip, { content: tx(t, "unbindProject", "Unbind project") },
+        h(SakugaButton, {
+          type: "button",
+          className: "qubit-kanban-board-project-unbind",
+          "aria-label": tx(t, "unbindProject", "Unbind project"),
+          onClick: props.onUnbind,
+        }, "×")),
     );
   }
 
@@ -2145,12 +2467,12 @@
         className: "qubit-kanban-boardswitcher-compact",
         title: tx(t, "boardSwitcherHint", "Boards let you separate unrelated streams of work"),
       },
-        h(Button, {
+        h(SakugaButton, {
           onClick: props.onNewClick,
           size: "sm",
           className: "h-7 text-xs",
         }, tx(t, "newBoard", "+ New board")),
-        h(Button, {
+        h(SakugaButton, {
           onClick: props.onSettingsClick,
           size: "sm",
           className: "h-7 text-xs",
@@ -2168,7 +2490,7 @@
           h("div", { className: "text-[11px] tracking-wider text-muted-foreground" },
             tx(t, "board", "Board")),
           h("div", { className: "flex items-center gap-2" },
-            h(Select, Object.assign({
+            h(SakugaSelect, Object.assign({
               value: props.board,
               className: "h-8 min-w-[220px]",
               "aria-label": "Switch kanban board",
@@ -2188,21 +2510,21 @@
         ),
         h("div", { className: "flex-1" }),
         h(DocsLink, null),
-        h(Button, {
+        h(SakugaButton, {
           onClick: props.onSettingsClick,
           size: "sm",
           className: "h-8",
           title: tx(t, "boardSettingsTitle",
             "Board settings — name, description, and the default project directory new tasks inherit"),
         }, tx(t, "boardSettings", "Settings")),
-        h(Button, {
+        h(SakugaButton, {
           onClick: props.onNewClick,
           size: "sm",
           className: "h-8",
           title: "Create a new board. Useful when you want an unrelated work stream (different project, different team, isolated scratch area).",
         }, tx(t, "newBoard", "+ New board")),
         props.board !== "default"
-          ? h(Button, {
+          ? h(SakugaButton, {
             onClick: function () {
               const msg = tx(t, "archiveBoardConfirm",
                 "Archive board '{name}'? It will be moved to boards/_archived/ so you can recover it later. Tasks on this board will no longer appear anywhere in the UI.",
@@ -2311,7 +2633,7 @@
             h(Label, { className: "text-xs" }, tx(t, "slug", "Slug"), " ",
               h("span", { className: "text-muted-foreground" },
                 tx(t, "slugHint", "— lowercase, hyphens, e.g. atm10-server"))),
-            h(Input, {
+            h(SakugaInput, {
               value: slug,
               onChange: function (e) { setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9\-_]/g, "-")); },
               placeholder: "atm10-server",
@@ -2323,7 +2645,7 @@
             h(Label, { className: "text-xs" }, tx(t, "displayName", "Display name"), " ",
               h("span", { className: "text-muted-foreground" },
                 tx(t, "displayNameHint", "(optional)"))),
-            h(Input, {
+            h(SakugaInput, {
               value: name,
               onChange: function (e) { setName(e.target.value); },
               placeholder: autoName || tx(t, "displayName", "Display name"),
@@ -2334,7 +2656,7 @@
             h(Label, { className: "text-xs" }, tx(t, "description", "Description"), " ",
               h("span", { className: "text-muted-foreground" },
                 tx(t, "descriptionHint", "(optional)"))),
-            h(Input, {
+            h(SakugaInput, {
               value: description,
               onChange: function (e) { setDescription(e.target.value); },
               placeholder: "What goes on this board?",
@@ -2346,7 +2668,7 @@
               tx(t, "projectDirectory", "Project directory"), " ",
               h("span", { className: "text-muted-foreground" },
                 tx(t, "projectDirectoryHint", "(recommended)"))),
-            h(Input, {
+            h(SakugaInput, {
               value: projectDirectory,
               onChange: function (e) { setProjectDirectory(e.target.value); },
               placeholder: tx(t, "projectDirectoryPlaceholder",
@@ -2366,7 +2688,7 @@
             h(Label, { className: "text-xs" }, tx(t, "boardProject", "Project"), " ",
               h("span", { className: "text-muted-foreground" },
                 tx(t, "boardProjectHint", "(optional)"))),
-            h(Select, Object.assign({
+            h(SakugaSelect, Object.assign({
               value: projectId,
               className: "h-8",
             }, selectChangeHandler(setProjectId)),
@@ -2385,7 +2707,7 @@
             h(Label, { className: "text-xs" }, tx(t, "icon", "Icon"), " ",
               h("span", { className: "text-muted-foreground" },
                 tx(t, "iconHint", "(single character or emoji)"))),
-            h(Input, {
+            h(SakugaInput, {
               value: icon,
               onChange: function (e) { setIcon(e.target.value.slice(0, 4)); },
               placeholder: "📦",
@@ -2393,7 +2715,7 @@
             }),
           ),
           h("label", { className: "flex items-center gap-2 text-xs" },
-            h(Checkbox, {
+            h(SakugaCheckbox, {
               checked: switchTo,
               onCheckedChange: function (checked) { setSwitchTo(checked === true); },
             }),
@@ -2402,13 +2724,13 @@
         ),
         err ? h("div", { className: "text-xs text-destructive mt-2" }, err) : null,
         h("div", { className: "qubit-kanban-dialog-actions" },
-          h(Button, {
+          h(SakugaButton, {
             type: "button",
             onClick: props.onCancel,
             size: "sm",
             disabled: submitting,
           }, tx(t, "cancel", "Cancel")),
-          h(Button, {
+          h(SakugaButton, {
             type: "submit",
             size: "sm",
             disabled: submitting || !slug.trim(),
@@ -2474,7 +2796,7 @@
         h("div", { className: "flex flex-col gap-3" },
           h("div", { className: "flex flex-col gap-1" },
             h(Label, { className: "text-xs" }, tx(t, "displayName", "Display name")),
-            h(Input, {
+            h(SakugaInput, {
               value: name,
               onChange: function (e) { setName(e.target.value); },
               className: "h-8",
@@ -2482,7 +2804,7 @@
           ),
           h("div", { className: "flex flex-col gap-1" },
             h(Label, { className: "text-xs" }, tx(t, "description", "Description")),
-            h(Input, {
+            h(SakugaInput, {
               value: description,
               onChange: function (e) { setDescription(e.target.value); },
               className: "h-8",
@@ -2491,7 +2813,7 @@
           h("div", { className: "flex flex-col gap-1" },
             h(Label, { className: "text-xs" },
               tx(t, "projectDirectory", "Project directory")),
-            h(Input, {
+            h(SakugaInput, {
               value: projectDirectory,
               onChange: function (e) { setProjectDirectory(e.target.value); },
               placeholder: tx(t, "projectDirectoryPlaceholder",
@@ -2510,7 +2832,7 @@
           projects.length ? h("div", { className: "flex flex-col gap-1" },
             h(Label, { className: "text-xs" },
               tx(t, "boardProject", "Project")),
-            h(Select, Object.assign({
+            h(SakugaSelect, Object.assign({
               value: projectId,
               className: "h-8",
             }, selectChangeHandler(setProjectId)),
@@ -2530,13 +2852,13 @@
         ),
         err ? h("div", { className: "text-xs text-destructive mt-2" }, err) : null,
         h("div", { className: "qubit-kanban-dialog-actions" },
-          h(Button, {
+          h(SakugaButton, {
             type: "button",
             onClick: props.onCancel,
             size: "sm",
             disabled: submitting,
           }, tx(t, "cancel", "Cancel")),
-          h(Button, {
+          h(SakugaButton, {
             type: "submit",
             size: "sm",
             disabled: submitting,
@@ -2558,7 +2880,7 @@
       h("div", { className: "flex flex-col gap-1",
                  title: "Fuzzy-match tasks by id, title, or description. Matches across all columns." },
         h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "search", "Search")),
-        h(Input, {
+        h(SakugaInput, {
           placeholder: tx(t, "filterCards", "Filter cards…"),
           value: props.search,
           onChange: function (e) { props.setSearch(e.target.value); },
@@ -2568,7 +2890,7 @@
       h("div", { className: "flex flex-col gap-1",
                  title: "Tenants are free-form tags on a task (e.g. customer, project, team). Set them via the task drawer or kanban_create." },
         h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "tenant", "Tenant")),
-        h(Select, Object.assign({
+        h(SakugaSelect, Object.assign({
           value: props.tenantFilter,
           className: "h-8",
         }, selectChangeHandler(props.setTenantFilter)),
@@ -2581,7 +2903,7 @@
       h("div", { className: "flex flex-col gap-1",
                  title: "Filter by assigned Qubit profile. Profiles are the named agent identities that claim and work on tasks." },
         h(Label, { className: "text-xs text-muted-foreground" }, tx(t, "assignee", "Assignee")),
-        h(Select, Object.assign({
+        h(SakugaSelect, Object.assign({
           value: props.assigneeFilter,
           className: "h-8",
         }, selectChangeHandler(props.setAssigneeFilter)),
@@ -2593,7 +2915,7 @@
       ),
       h("label", { className: "flex items-center gap-2 text-xs",
                    title: "Include archived tasks in the board view. Archived tasks are hidden by default." },
-        h(Checkbox, {
+        h(SakugaCheckbox, {
           checked: props.includeArchived,
           onCheckedChange: function (checked) { props.setIncludeArchived(checked === true); },
         }),
@@ -2601,33 +2923,35 @@
       ),
       h("label", { className: "flex items-center gap-2 text-xs",
                    title: "Group the Running column by assigned profile" },
-        h(Checkbox, {
+        h(SakugaCheckbox, {
           checked: props.laneByProfile,
           onCheckedChange: function (checked) { props.setLaneByProfile(checked === true); },
         }),
         tx(t, "lanesByProfile", "Lanes by profile"),
       ),
       h("div", { className: "flex-1" }),
-      h(Button, {
-        onClick: props.onNudgeDispatch,
-        size: "sm",
-        title: "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick. Use this after adding tasks if you want them picked up immediately.",
-      }, tx(t, "nudgeDispatcher", "Nudge dispatcher")),
-      h(Button, {
+      h(HoverTip, { content: "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick." },
+        h(SakugaButton, {
+          onClick: props.onNudgeDispatch,
+          size: "sm",
+          title: "Wake the dispatcher to claim ready tasks now instead of waiting for the next tick.",
+        }, tx(t, "nudgeDispatcher", "Nudge dispatcher"))),
+      h(SakugaButton, {
         onClick: props.onRefresh,
         size: "sm",
         title: "Reload the board from the database. The board auto-refreshes on task events; this is for forcing a re-read.",
       }, tx(t, "refresh", "Refresh")),
-      h(Button, {
-        onClick: function () {
-          props.setSearch("");
-          props.setTenantFilter("");
-          props.setAssigneeFilter("");
-          props.setIncludeArchived(false);
-        },
-        size: "sm",
-        title: "Clear all active filters (search, tenant, assignee, archived).",
-      }, tx(t, "clearFilters", "Clear filters")),
+      h(HoverTip, { content: "Clear all active filters (search, tenant, assignee, archived)." },
+        h(SakugaButton, {
+          onClick: function () {
+            props.setSearch("");
+            props.setTenantFilter("");
+            props.setAssigneeFilter("");
+            props.setIncludeArchived(false);
+          },
+          size: "sm",
+          title: "Clear all active filters (search, tenant, assignee, archived).",
+        }, tx(t, "clearFilters", "Clear filters"))),
     );
   }
 
@@ -2643,29 +2967,29 @@
     return h("div", { className: "qubit-kanban-bulk" },
       h("span", { className: "qubit-kanban-bulk-count" },
         `${props.count} ${tx(t, "selected", "selected")}`),
-      h(Button, {
+      h(SakugaButton, {
         onClick: function () { props.onApply({ status: "todo" }); },
         size: "sm",
         title: "Move selected tasks to Todo.",
       }, "→ todo"),
-      h(Button, {
+      h(SakugaButton, {
         onClick: function () { props.onApply({ status: "ready" }); },
         size: "sm",
         title: "Move selected tasks to Ready. Ready tasks are picked up by the dispatcher on the next tick.",
       }, "→ ready"),
-      h(Button, {
+      h(SakugaButton, {
         onClick: function () { props.onApply({ status: "blocked" },
           `Block ${props.count} task(s)?`); },
         size: "sm",
         title: "Block selected tasks. Releases any active claims.",
       }, "Block"),
-      h(Button, {
+      h(SakugaButton, {
         onClick: function () { props.onApply({ status: "ready" },
           `Unblock ${props.count} task(s)?`); },
         size: "sm",
         title: "Unblock selected tasks (promote to Ready).",
       }, "Unblock"),
-      h(Button, {
+      h(SakugaButton, {
         onClick: function () {
           props.onApply({ status: "done" },
             tx(t, "markDone", "Mark {n} task(s) as done?", { n: props.count }));
@@ -2673,7 +2997,7 @@
         size: "sm",
         title: "Mark selected tasks as done. Releases any claims and unblocks dependent children. You'll be asked for a completion summary.",
       }, tx(t, "complete", "Complete")),
-      h(Button, {
+      h(SakugaButton, {
         onClick: function () {
           props.onApply({ archive: true },
             tx(t, "markArchived", "Archive {n} task(s)?", { n: props.count }));
@@ -2681,7 +3005,7 @@
         size: "sm",
         title: "Archive selected tasks. They disappear from the default board view but remain in the database.",
       }, tx(t, "archive", "Archive")),
-      h(Button, {
+      h(SakugaButton, {
         onClick: function () {
           props.onDelete(props.count);
         },
@@ -2691,14 +3015,14 @@
       }, tx(t, "delete", "Delete")),
       h("div", { className: "qubit-kanban-bulk-priority",
                  title: "Set priority on selected tasks. Higher = claimed first." },
-        h(Input, {
+        h(SakugaInput, {
           type: "number",
           value: priority,
           onChange: function (e) { setPriority(e.target.value); },
           placeholder: tx(t, "priority", "pri"),
           className: "h-7 text-xs w-16",
         }),
-        h(Button, {
+        h(SakugaButton, {
           onClick: function () {
             if (priority === "") return;
             props.onApply({ priority: Number(priority) });
@@ -2710,7 +3034,7 @@
       ),
       h("div", { className: "qubit-kanban-bulk-reassign",
                  title: "Reassign selected tasks to a different Qubit profile. Pick a profile (or unassign) and click Apply." },
-        h(Select, Object.assign({
+        h(SakugaSelect, Object.assign({
           value: assignee,
           className: "h-7 text-xs",
         }, selectChangeHandler(setAssignee)),
@@ -2720,7 +3044,7 @@
             return h(SelectOption, { key: a, value: a }, a);
           }),
         ),
-        h(Button, {
+        h(SakugaButton, {
           onClick: function () {
             if (!assignee) return;
             props.onApply({ assignee: assignee === "__none__" ? "" : assignee, reclaim_first: reclaimFirst });
@@ -2732,19 +3056,19 @@
         }, tx(t, "apply", "Apply")),
       ),
       h("label", { className: "qubit-kanban-bulk-reclaim-first", title: "Reclaim any active claims before reassigning" },
-        h(Checkbox, {
+        h(SakugaCheckbox, {
           checked: reclaimFirst,
           onCheckedChange: function (checked) { setReclaimFirst(checked === true); },
         }),
         "Reclaim first",
       ),
       h("div", { className: "flex-1" }),
-      h(Button, {
+      h(SakugaButton, {
         onClick: props.onSelectAllVisible,
         size: "sm",
         title: "Select all visible cards across columns.",
       }, "Select all visible"),
-      h(Button, {
+      h(SakugaButton, {
         onClick: props.onClear,
         size: "sm",
         title: "Deselect all tasks and hide this bar.",
@@ -3028,7 +3352,7 @@
     },
       h("div", { className: "qubit-kanban-column-header",
                  title: colHelp || "" },
-        h(Checkbox, {
+        h(SakugaCheckbox, {
           className: "qubit-kanban-col-check",
           title: "Select all tasks in this column",
           "aria-label": `Select all tasks in ${colLabel || props.column.name}`,
@@ -3044,12 +3368,13 @@
         h("span", { className: "qubit-kanban-column-count",
                     title: `${props.column.tasks.length} task${props.column.tasks.length === 1 ? "" : "s"} in this column` },
           props.column.tasks.length),
-        h("button", {
-          type: "button",
-          className: "qubit-kanban-column-add",
-          title: tx(t, "createTask", "Create task in this column"),
-          onClick: function () { setShowCreate(function (v) { return !v; }); },
-        }, showCreate ? "×" : "+"),
+        h(HoverTip, { content: tx(t, "createTask", "Create task in this column") },
+          h(SakugaButton, {
+            type: "button",
+            className: "qubit-kanban-column-add",
+            "aria-label": tx(t, "createTask", "Create task in this column"),
+            onClick: function () { setShowCreate(function (v) { return !v; }); },
+          }, showCreate ? "×" : "+")),
       ),
       h("div", { className: "qubit-kanban-column-sub" },
         colHelp || ""),
@@ -3209,7 +3534,7 @@
               title: tx(i18n, "selectForBulk", "Select for bulk actions"),
               onClick: function (e) { e.stopPropagation(); },
             },
-              h(Checkbox, {
+              h(SakugaCheckbox, {
                 className: "qubit-kanban-card-check",
                 checked: props.selected,
                 onCheckedChange: handleCheckedChange,
@@ -3403,7 +3728,7 @@
                 ? tx(t, "specifier", "specifier")
                 : tx(t, "assigneeLabel", "Assignee"),
                 tx(t, "assigneeLabelHint", "(blank = dispatcher picks)")),
-              h(Input, {
+              h(SakugaInput, {
                 value: assignee,
                 onChange: function (e) { setAssignee(e.target.value); },
                 placeholder: props.columnName === "triage"
@@ -3421,7 +3746,7 @@
             ),
             h("div", { className: "flex flex-col gap-1 w-20" },
               fieldLabel(tx(t, "priority", "Priority")),
-              h(Input, {
+              h(SakugaInput, {
                 type: "number",
                 value: priority,
                 onChange: function (e) { setPriority(e.target.value); },
@@ -3434,7 +3759,7 @@
           h("div", { className: "flex flex-col gap-1" },
             fieldLabel(tx(t, "skillsLabel", "Skills"),
               tx(t, "skillsLabelHint", "(optional, comma-separated)")),
-            h(Input, {
+            h(SakugaInput, {
               value: skills,
               onChange: function (e) { setSkills(e.target.value); },
               placeholder: tx(t, "skillsPlaceholder",
@@ -3446,7 +3771,7 @@
           h("div", { className: "flex flex-col gap-1" },
             fieldLabel(tx(t, "workspace", "Workspace")),
             h("div", { className: "flex gap-2" },
-              h(Select, Object.assign({
+              h(SakugaSelect, Object.assign({
                 value: workspaceKind,
                 title: "Choose whether task files are temporary or preserved after completion.",
                 className: "h-8 text-sm flex-1",
@@ -3458,7 +3783,7 @@
                 h(SelectOption, { value: "dir" },
                   tx(t, "workspaceDir", "Directory — preserved")),
               ),
-              showPathInput ? h(Input, {
+              showPathInput ? h(SakugaInput, {
                 value: workspacePath,
                 onChange: function (e) { setWorkspacePath(e.target.value); },
                 placeholder: pathPlaceholder,
@@ -3474,7 +3799,7 @@
           h("div", { className: "flex flex-col gap-1" },
             fieldLabel(tx(t, "parentLabel", "Parent task"),
               tx(t, "parentLabelHint", "(child stays blocked until the parent is done)")),
-            h(Select, Object.assign({
+            h(SakugaSelect, Object.assign({
               value: parent,
               className: "h-8 text-sm",
               title: "Optional parent task. A child stays blocked in its current column until the parent is marked done.",
@@ -3491,15 +3816,14 @@
               className: "flex items-center gap-1.5 text-xs cursor-pointer select-none",
               title: "Goal mode: the worker keeps going in the same session until a judge agrees the card is done (or the turn budget runs out, which blocks it for review). Best for open-ended cards one shot rarely finishes.",
             },
-              h("input", {
-                type: "checkbox",
+              h(SakugaCheckbox, {
                 checked: goalMode,
-                onChange: function (e) { setGoalMode(!!e.target.checked); },
-                className: "h-3.5 w-3.5 accent-current",
+                onCheckedChange: function (checked) { setGoalMode(!!checked); },
+                className: "h-3.5 w-3.5",
               }),
               tx(t, "goalMode", "goal mode"),
             ),
-            goalMode ? h(Input, {
+            goalMode ? h(SakugaInput, {
               type: "number",
               value: goalMaxTurns,
               onChange: function (e) { setGoalMaxTurns(e.target.value); },
@@ -3511,12 +3835,12 @@
           ),
         ),
         h("div", { className: "qubit-kanban-dialog-actions" },
-          h(Button, {
+          h(SakugaButton, {
             type: "button",
             onClick: props.onCancel,
             size: "sm",
           }, tx(t, "cancel", "Cancel")),
-          h(Button, {
+          h(SakugaButton, {
             type: "submit",
             size: "sm",
             disabled: !title.trim(),
@@ -3815,12 +4139,13 @@
       },
         h("div", { className: "qubit-kanban-drawer-head" },
           h("span", { className: "text-xs text-muted-foreground" }, props.taskId),
-          h("button", {
-            type: "button",
-            onClick: props.onClose,
-            className: "qubit-kanban-drawer-close",
-            title: tx(t, "close", "Close (Esc)"),
-          }, "×"),
+          h(HoverTip, { content: tx(t, "close", "Close (Esc)") },
+            h(SakugaButton, {
+              type: "button",
+              onClick: props.onClose,
+              className: "qubit-kanban-drawer-close",
+              "aria-label": tx(t, "close", "Close (Esc)"),
+            }, "×")),
         ),
         loading ? h("div", { className: "p-4 text-sm text-muted-foreground" },
           tx(t, "loadingDetail", "Loading…")) :
@@ -3863,7 +4188,7 @@
               "Comments reach the worker on its next run or kanban_show() — no need to block the task first."),
           ),
           h("div", { className: "qubit-kanban-drawer-comment-row" },
-            h(Input, {
+            h(SakugaInput, {
               value: newComment,
               onChange: function (e) { setNewComment(e.target.value); },
               onKeyDown: function (e) {
@@ -3874,7 +4199,7 @@
               placeholder: tx(t, "addComment", "Add a comment… (Enter to submit)"),
               className: "h-8 text-sm flex-1",
             }),
-            h(Button, {
+            h(SakugaButton, {
               onClick: handleComment,
               size: "sm",
             }, tx(t, "comment", "Comment")),
@@ -3947,7 +4272,7 @@
         },
       }),
       h("div", { className: "flex items-center gap-2 mb-2" },
-        h(Button, {
+        h(SakugaButton, {
           size: "sm",
           variant: "outline",
           disabled: !!props.uploadBusy,
@@ -3967,7 +4292,7 @@
               key: a.id,
               className: "flex items-center justify-between gap-2 py-1 text-sm",
             },
-              h("button", {
+              h(SakugaButton, {
                 type: "button",
                 className: "qubit-kanban-attachment-link truncate",
                 title: a.filename,
@@ -3975,7 +4300,7 @@
               }, a.filename),
               h("span", { className: "text-xs text-muted-foreground whitespace-nowrap" },
                 _fmtBytes(a.size)),
-              h("button", {
+              h(SakugaButton, {
                 type: "button",
                 className: "qubit-kanban-drawer-close",
                 title: tx(i18n, "removeAttachment", "Remove attachment"),
@@ -4124,7 +4449,7 @@
               h("span", { className: "qubit-kanban-comment-author" },
                 `${child.id} · ${child.title || tx(i18n, "untitled", "(untitled)")}`),
               h(Badge, { variant: "outline" }, child.status),
-              h("button", {
+              h(SakugaButton, {
                 type: "button",
                 className: "qubit-kanban-diag-action-btn",
                 onClick: function () { if (props.onOpenTask) props.onOpenTask(child.id); },
@@ -4239,7 +4564,7 @@
         h("span", { className: "qubit-kanban-section-head" },
           `${tx(t, "runHistory", "Run history")} (${runs.length})`),
         !showAll
-          ? h("button", {
+          ? h(SakugaButton, {
               type: "button",
               onClick: function () { setExpanded(true); },
               className: "qubit-kanban-edit-link",
@@ -4320,7 +4645,7 @@
       h("div", { className: "qubit-kanban-section-head-row" },
         h("span", { className: "qubit-kanban-section-head" },
           tx(t, "workerLog", "Worker log") + (data && data.size_bytes ? ` (${data.size_bytes} B)` : "")),
-        h("button", {
+        h(SakugaButton, {
           type: "button",
           onClick: load,
           className: "qubit-kanban-edit-link",
@@ -4353,7 +4678,7 @@
       props.onSave(trimmed);
     };
     return h("div", { className: "qubit-kanban-edit-row" },
-      h(Input, {
+      h(SakugaInput, {
         value: v, autoFocus: true,
         onChange: function (e) { setV(e.target.value); },
         onKeyDown: function (e) {
@@ -4362,10 +4687,10 @@
         },
         className: "h-8 text-sm flex-1",
       }),
-      h(Button, { onClick: save,
+      h(SakugaButton, { onClick: save,
         size: "sm",
       }, tx(t, "save", "Save")),
-      h(Button, { onClick: props.onCancel,
+      h(SakugaButton, { onClick: props.onCancel,
         size: "sm",
       }, tx(t, "cancel", "Cancel")),
     );
@@ -4391,7 +4716,7 @@
     };
     return h("div", { className: "qubit-kanban-meta-row" },
       h("span", { className: "qubit-kanban-meta-label" }, tx(t, "assignee", "Assignee")),
-      h(Input, {
+      h(SakugaInput, {
         value: v, autoFocus: true,
         onChange: function (e) { setV(e.target.value); },
         onKeyDown: function (e) {
@@ -4428,7 +4753,7 @@
     };
     return h("div", { className: "qubit-kanban-meta-row" },
       h("span", { className: "qubit-kanban-meta-label" }, tx(t, "priority", "Priority")),
-      h(Input, {
+      h(SakugaInput, {
         type: "number", value: v, autoFocus: true,
         onChange: function (e) { setV(e.target.value); },
         onKeyDown: function (e) {
@@ -4544,7 +4869,7 @@
       };
       return h("div", { className: "qubit-kanban-meta-row" },
         h("span", { className: "qubit-kanban-meta-label" }, tx(t, "model", "Model")),
-        h(Input, {
+        h(SakugaInput, {
           value: freeText, autoFocus: true, disabled: busy,
           placeholder: tx(t, "modelFreeTextPlaceholder", "model name (empty = profile default)"),
           onChange: function (e) { setFreeText(e.target.value); },
@@ -4578,7 +4903,7 @@
       loading
         ? h("span", { className: "qubit-kanban-meta-value text-muted-foreground" },
             tx(t, "modelLoading", "loading models…"))
-        : h("select", {
+        : h(SakugaSelect, {
             className: "qubit-kanban-recovery-select",
             value: currentValue,
             disabled: busy,
@@ -4620,14 +4945,14 @@
         h("span", { className: "qubit-kanban-section-head" }, tx(t, "description", "Description")),
         editing
           ? h("div", { className: "flex gap-1" },
-              h(Button, { onClick: save,
+              h(SakugaButton, { onClick: save,
                 size: "sm",
               }, tx(t, "save", "Save")),
-              h(Button, { onClick: function () { setEditing(false); setV(props.task.body || ""); },
+              h(SakugaButton, { onClick: function () { setEditing(false); setV(props.task.body || ""); },
                 size: "sm",
               }, tx(t, "cancel", "Cancel")),
             )
-          : h("button", {
+          : h(SakugaButton, {
               type: "button",
               onClick: function () { setEditing(true); },
               className: "qubit-kanban-edit-link",
@@ -4672,18 +4997,19 @@
             : (links.parents || []).map(function (id) {
                 return h("span", { key: id, className: "qubit-kanban-dep-chip" },
                   id,
-                  h("button", {
-                    type: "button",
-                    className: "qubit-kanban-dep-chip-x",
-                    onClick: function () { props.onRemoveParent(id); },
-                    title: tx(t, "removeDependency", "Remove dependency"),
-                  }, "×"),
+                  h(HoverTip, { content: tx(t, "removeDependency", "Remove dependency") },
+                    h(SakugaButton, {
+                      type: "button",
+                      className: "qubit-kanban-dep-chip-x",
+                      onClick: function () { props.onRemoveParent(id); },
+                      "aria-label": tx(t, "removeDependency", "Remove dependency"),
+                    }, "×")),
                 );
               }),
         ),
       ),
       h("div", { className: "qubit-kanban-deps-row" },
-        h(Select, Object.assign({
+        h(SakugaSelect, Object.assign({
           value: newParent,
           className: "h-7 text-xs flex-1",
         }, selectChangeHandler(setNewParent)),
@@ -4693,7 +5019,7 @@
               `${tk.id} — ${(tk.title || "").slice(0, 50)}`);
           }),
         ),
-        h(Button, {
+        h(SakugaButton, {
           onClick: function () {
             if (!newParent) return;
             props.onAddParent(newParent).then(function () { setNewParent(""); });
@@ -4710,18 +5036,19 @@
             : (links.children || []).map(function (id) {
                 return h("span", { key: id, className: "qubit-kanban-dep-chip" },
                   id,
-                  h("button", {
-                    type: "button",
-                    className: "qubit-kanban-dep-chip-x",
-                    onClick: function () { props.onRemoveChild(id); },
-                    title: tx(t, "removeDependency", "Remove dependency"),
-                  }, "×"),
+                  h(HoverTip, { content: tx(t, "removeDependency", "Remove dependency") },
+                    h(SakugaButton, {
+                      type: "button",
+                      className: "qubit-kanban-dep-chip-x",
+                      onClick: function () { props.onRemoveChild(id); },
+                      "aria-label": tx(t, "removeDependency", "Remove dependency"),
+                    }, "×")),
                 );
               }),
         ),
       ),
       h("div", { className: "qubit-kanban-deps-row" },
-        h(Select, Object.assign({
+        h(SakugaSelect, Object.assign({
           value: newChild,
           className: "h-7 text-xs flex-1",
         }, selectChangeHandler(setNewChild)),
@@ -4731,7 +5058,7 @@
               `${tk.id} — ${(tk.title || "").slice(0, 50)}`);
           }),
         ),
-        h(Button, {
+        h(SakugaButton, {
           onClick: function () {
             if (!newChild) return;
             props.onAddChild(newChild).then(function () { setNewChild(""); });
@@ -4751,7 +5078,7 @@
     const [decomposeBusy, setDecomposeBusy] = useState(false);
     const [decomposeMsg, setDecomposeMsg] = useState(null);
     const b = function (label, patch, enabled, confirmMsg) {
-      return h(Button, {
+      return h(SakugaButton, {
         onClick: function () { if (enabled !== false) props.onPatch(patch, { confirm: confirmMsg }); },
         disabled: enabled === false,
         size: "sm",
@@ -4763,7 +5090,7 @@
     // the backend would return ok:false with "not in triage" anyway,
     // so hiding the button keeps the action row uncluttered.
     const specifyButton = (task.status === "triage" && props.onSpecify)
-      ? h(Button, {
+      ? h(SakugaButton, {
           onClick: function () {
             if (specifyBusy) return;
             setSpecifyBusy(true);
@@ -4800,7 +5127,7 @@
     // we render the same single-task message as Specify; when it fans
     // out we report the child count for quick at-a-glance verification.
     const decomposeButton = (task.status === "triage" && props.onDecompose)
-      ? h(Button, {
+      ? h(SakugaButton, {
           onClick: function () {
             if (decomposeBusy) return;
             setDecomposeBusy(true);
@@ -4896,7 +5223,7 @@
           const title = hc.subscribed
             ? `${tx(t, "sendingUpdates", "Sending updates to")} ${target}. Click to stop.`
             : `${tx(t, "sendNotifications", "Send completed / blocked / gave_up notifications to")} ${target}.`;
-          return h(Button, {
+          return h(SakugaButton, {
             key: hc.platform,
             size: "sm",
             title: title,
