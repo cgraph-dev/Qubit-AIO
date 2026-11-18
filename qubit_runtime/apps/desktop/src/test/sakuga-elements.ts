@@ -26,7 +26,25 @@ function boolAttr(el: Element, name: string): boolean {
   return el.hasAttribute(name)
 }
 
-class SakugaButtonDouble extends HTMLElement {
+class SakugaBaseDouble extends HTMLElement {
+  // The shared wrapper writes `disabled` as a property once the element is
+  // defined, and mirrors `aria-checked` onto the host. Keep both readable as
+  // DOM properties so tests can assert the control's real state.
+  get disabled(): boolean {
+    return this.hasAttribute('disabled')
+  }
+
+  set disabled(next: boolean) {
+    if (next) this.setAttribute('disabled', '')
+    else this.removeAttribute('disabled')
+  }
+
+  get ariaChecked(): string | null {
+    return this.getAttribute('aria-checked')
+  }
+}
+
+class SakugaButtonDouble extends SakugaBaseDouble {
   connectedCallback() {
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' })
     if (this.shadowRoot?.querySelector('button')) return
@@ -39,7 +57,7 @@ class SakugaButtonDouble extends HTMLElement {
   }
 }
 
-class SakugaToggleDouble extends HTMLElement {
+class SakugaToggleDouble extends SakugaBaseDouble {
   get checked(): boolean {
     return this.hasAttribute('checked')
   }
@@ -77,7 +95,7 @@ class SakugaToggleDouble extends HTMLElement {
 
 class SakugaCheckboxDouble extends SakugaToggleDouble {}
 
-class SakugaInputDouble extends HTMLElement {
+class SakugaInputDouble extends SakugaBaseDouble {
   get value(): string {
     return this.shadowRoot?.querySelector('input')?.value ?? this.getAttribute('value') ?? ''
   }
@@ -103,7 +121,7 @@ class SakugaInputDouble extends HTMLElement {
   }
 }
 
-class SakugaSliderDouble extends HTMLElement {
+class SakugaSliderDouble extends SakugaBaseDouble {
   get valueAsNumber(): number {
     return Number(this.shadowRoot?.querySelector('input')?.value ?? this.getAttribute('value') ?? 0)
   }
@@ -135,7 +153,7 @@ class SakugaSliderDouble extends HTMLElement {
   }
 }
 
-class SakugaRadioDouble extends HTMLElement {
+class SakugaRadioDouble extends SakugaBaseDouble {
   get value(): string {
     const checked = this.shadowRoot?.querySelector<HTMLInputElement>('input:checked')
     return checked?.value ?? this.getAttribute('value') ?? ''
@@ -170,7 +188,7 @@ class SakugaRadioDouble extends HTMLElement {
   }
 }
 
-class SakugaTabsDouble extends HTMLElement {
+class SakugaTabsDouble extends SakugaBaseDouble {
   connectedCallback() {
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' })
     if (this.shadowRoot?.querySelector('button')) return
@@ -197,7 +215,7 @@ class SakugaTabsDouble extends HTMLElement {
   }
 }
 
-class SakugaProgressDouble extends HTMLElement {
+class SakugaProgressDouble extends SakugaBaseDouble {
   connectedCallback() {
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' })
     if (this.shadowRoot?.querySelector('div')) return
@@ -206,12 +224,12 @@ class SakugaProgressDouble extends HTMLElement {
 }
 
 class SakugaRatingDouble extends SakugaToggleDouble {}
-class SakugaTooltipDouble extends HTMLElement {
+class SakugaTooltipDouble extends SakugaBaseDouble {
   connectedCallback() {
     if (!this.shadowRoot) this.attachShadow({ mode: 'open' })
   }
 }
-class SakugaToastDouble extends HTMLElement {
+class SakugaToastDouble extends SakugaBaseDouble {
   show(_text?: string): void {}
 }
 
