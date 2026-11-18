@@ -1,12 +1,13 @@
 {
   "source": "https://github.com/marmottajr/habblaud",
   "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
-  "local_commit": "9f467de1d5b8922b52ef08712aae3c918dde70fe",
+  "local_commit": "f6d7ff38d48b0e91a6c02b168ff269d0be4b3d80",
   "local_changes": [
     "2Five room surfaces/rugs/walls on core and project rooms; Habblaud desk islands/PCs, seat ids, room moves and arcade stay authoritative",
     "procedural sakura tree and paper lantern fittings (original Qubit pixel art; no raster)",
     "additive Sakuga VFX overlay and Sakuga UI controls across the office client (QUBIT_OFFICE_SAKUGA=0 rolls back)",
-    "expose the Sakuga core backLayer seam so the office overlay can join the shared frame list"
+    "expose the Sakuga core backLayer seam so the office overlay can join the shared frame list",
+    "clip Sakuga row overflow so the activity feed auto-scroll reaches the last real row"
   ],
   "licence": "MIT",
   "note": "Vendored build output of the Habblaud client. Client-side only: the server, the Claude Code mod, and the Docker setup are NOT vendored. Served from /plugin-apps/qubit-office/habblaud/. Locale pinned to en by scripts/vendor_habblaud.py (English-only authoring ruling). This tree carries documented local changes on top of the upstream pin: `commit` names the upstream commit it was built from, `local_commit` names the source checkout HEAD that added them, and `local_changes` lists them.",
@@ -222,18 +223,18 @@
       "bytes": 76799
     },
     {
-      "path": "bundle/app-8T-4d63M.css",
-      "sha256": "2a368679cb713dc2f922a2e3069b908d72ef26e3d421b11b6ce87d22e07c171c",
-      "bytes": 134354
-    },
-    {
-      "path": "bundle/app-DeFia4iL.js",
-      "sha256": "405a149f7c4714a258ff56a1961a303a88ad84ac248cf49ad56302aa7baf4953",
+      "path": "bundle/app-BupmQQND.js",
+      "sha256": "c7e44b5dbebf019f00e058c9cde0b0ca6a5aaa5d730883850df0a34141ff396e",
       "bytes": 707278
     },
     {
-      "path": "bundle/daystats-Dn96EGVn.js",
-      "sha256": "0b28ccd215bda1856e9bcde3abbeeb3ae05b104b569e40dcb44f359be37b8a17",
+      "path": "bundle/app-CD2dAj4G.css",
+      "sha256": "66251a697d57fc867488bb16371ac34495cc385aec5df023773e4deb66fc31f5",
+      "bytes": 134391
+    },
+    {
+      "path": "bundle/daystats-CS5Jq1Zr.js",
+      "sha256": "b9d51e6daf1b0fd8a97e7b4f6169740879984d4d5c4a257f8767ad01671227ce",
       "bytes": 36958
     },
     {
@@ -252,8 +253,8 @@
       "bytes": 203518
     },
     {
-      "path": "bundle/main-C8Utbdug.js",
-      "sha256": "7d407f0a62d225b3f5d9fe31ffe2f78bf58054b1c0920c2f777be17f2aaf5c65",
+      "path": "bundle/main-DzKhWy4-.js",
+      "sha256": "389c78062848043e4875e64a7f0be5331c5f1b475c3a1f09bb1635939eaf750a",
       "bytes": 15337
     },
     {
@@ -382,13 +383,13 @@
       "bytes": 3939
     },
     {
-      "path": "bundle/ptypane-DtJ9FORq.js",
-      "sha256": "c30eda4555e5effee099d4e8a6849d349dde9bf49896e9ba2d4676ccad9798ce",
+      "path": "bundle/ptypane-C820GK4Q.js",
+      "sha256": "953e7d2c7d753c9c65e0aee390cba8b8ae33902705bed7b8bdaee582eb49ed56",
       "bytes": 334656
     },
     {
       "path": "index.html",
-      "sha256": "f42b10ddb0af9721f6eb7d157d9eabddb236b5c89f1ac58f5058220db8b73da5",
+      "sha256": "8de740abec07b4f79e2148035ff0351033ab04696865b422821e8efeac6b7f0e",
       "bytes": 2796
     },
     {
@@ -447,6 +448,6 @@
       "bytes": 44691
     }
   ],
-  "total_bytes": 3046573,
+  "total_bytes": 3046610,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }
