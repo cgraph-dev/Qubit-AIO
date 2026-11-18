@@ -177,7 +177,7 @@ export const SakugaButton = forwardRef<HTMLElement, SakugaButtonProps>(function 
     el?.done?.();
   }, [done]);
 
-  const handleClick = useCallback((event: React.MouseEvent<HTMLElement>) => {
+  const handleClick = useCallback((event: ReactMouseEvent<HTMLElement>) => {
     if (fx) void emitFxAt(fx, event.currentTarget);
     onClick?.(event);
   }, [fx, onClick]);
