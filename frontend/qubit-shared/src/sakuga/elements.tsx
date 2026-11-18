@@ -369,7 +369,9 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
     },
     class: className,
     role: rest.role ?? 'textbox',
-    'aria-label': label,
+    // An explicit caller label wins; otherwise the visible field label is the
+    // accessible name.
+    'aria-label': (rest['aria-label'] as string | undefined) ?? label,
     'data-sakuga-input': '1',
     onInput: (event: Event) => {
       const target = event.target as HTMLElement | null;
@@ -452,7 +454,12 @@ export const SakugaTabs = forwardRef<HTMLElement, SakugaTabsProps>(function Saku
     role: rest.role ?? 'tablist',
     'aria-label': label,
     onChange: (event: Event) => {
-      const detail = (event as CustomEvent<{ index: number; value: string; label: string }>).detail;
+      // React wraps the native `change` in a synthetic event on a custom host,
+      // so the CustomEvent payload lives on `nativeEvent.detail`.
+      const custom = event as CustomEvent<{ index: number; value: string; label: string }>;
+      const detail = custom.detail
+        ?? (custom as unknown as { nativeEvent?: CustomEvent<{ index: number; value: string; label: string }> })
+          .nativeEvent?.detail;
       if (detail) onChange?.(detail);
     },
   }, options.map((option) => createElement('option', { key: option.value, value: option.value }, option.label)));

@@ -82,7 +82,7 @@ def test_lobby_links_exterior_to_tower_floors():
     stairs = [p for p in map_obj.portals if p.kind == "stairs"]
     assert elevator and stairs
     floors = {p.to_floor for p in (*elevator, *stairs)}
-    assert "floor-001" in floors and "floor-100" in floors
+    assert "floor-001" in floors and "floor-005" in floors
     lobby = map_obj.zone("zone-lobby")
     lobby_chunks = set(lobby.chunk_ids)
     assert all(p.from_chunk in lobby_chunks for p in (*elevator, *stairs))

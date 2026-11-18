@@ -1316,7 +1316,7 @@ export function createOfficeApp(
         ? R.createElement("div", {
             key: "loading", className: "office-game__campusState",
             "data-testid": "office-campus-loading", role: "status",
-          }, "Loading the 100-floor directory…")
+          }, "Loading the 5-floor directory…")
         : campusState === "error"
         ? R.createElement("div", {
             key: "error", className: "office-game__campusState",
@@ -1347,7 +1347,7 @@ export function createOfficeApp(
               key: "counts", "data-testid": "office-campus-counts",
             }, campusTab === "floors"
               ? "Campus world · real live floors and unstaffed templates on one camera"
-              : "100-floor directory · floors, rooms, desks and occupancy"),
+              : "5-floor directory · floors, rooms, desks and occupancy"),
             R.createElement("div", {
               key: "tabs", className: "office-game__campusTabs",
             }, [
@@ -1364,7 +1364,7 @@ export function createOfficeApp(
                 "data-testid": "office-campus-tab-directory",
                 "aria-pressed": campusTab === "directory",
                 onClick: () => setCampusTab("directory"),
-              }, "100-floor directory"),
+              }, "5-floor directory"),
             ]),
           ]),
           sakugaButton(R, {

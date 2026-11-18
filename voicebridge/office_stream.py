@@ -233,7 +233,7 @@ def template_tower(floor_id: str,
                    now: Optional[float] = None) -> Optional[Dict[str, Any]]:
     """Render one shipped template floor as a renderer tower, with no agents.
 
-    The 100-floor directory is a plan, not a drawing. This turns one plan floor
+    The five-floor directory is a plan, not a drawing. This turns one plan floor
     into the same shape the vendored renderer consumes, so an unstaffed floor
     is still a real room scene (rooms and furniture) instead of a text grid.
     It deliberately emits an empty character list: a template has no occupant,

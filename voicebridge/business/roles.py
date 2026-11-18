@@ -1066,3 +1066,11 @@ class RoleRegistry:
         from . import role_catalog
 
         return role_catalog.build_registry()
+
+    @classmethod
+    def product(cls) -> "RoleRegistry":
+        """The product office/campus catalog (100+ roles, 5 floors)."""
+        from . import role_catalog
+
+        return role_catalog.build_registry(
+            floor_count=role_catalog.PRODUCT_FLOOR_COUNT)

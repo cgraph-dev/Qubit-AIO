@@ -460,7 +460,7 @@ def command_center(
     kind_filter = _kind(kind)
     status_filter = _norm(status)
 
-    catalog = registry or RoleRegistry.default()
+    catalog = registry or RoleRegistry.product()
 
     world_rows, world_state = _source(
         lambda: list(catalog.floors), "world")
