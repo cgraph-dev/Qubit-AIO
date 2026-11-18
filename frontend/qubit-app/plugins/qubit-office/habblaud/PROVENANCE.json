@@ -1,7 +1,7 @@
 {
   "source": "https://github.com/marmottajr/habblaud",
   "commit": "4ccce2537472fe5a8d432f06974494d2e778ff15",
-  "local_commit": "5f018efeb1adc56617f0a80f0d6ab028aa2371a2",
+  "local_commit": "588d3453669bbffd8fa68c92374d86a2b0f79f03",
   "local_changes": [
     "2Five room art: floor surfaces/rugs/walls, project rooms, fittings, stable seat ids",
     "Sakuga UI controls across the office client (rows/actions; QUBIT_OFFICE_SAKUGA=0 rolls back)"
@@ -220,18 +220,18 @@
       "bytes": 76799
     },
     {
-      "path": "bundle/app-Dvcme-Gp.css",
-      "sha256": "c67f16dace8bf0fcf5f05f22f32d5ccf303303ce0aa6b167c5070e7e2ec02d4f",
-      "bytes": 134357
+      "path": "bundle/app-8T-4d63M.css",
+      "sha256": "2a368679cb713dc2f922a2e3069b908d72ef26e3d421b11b6ce87d22e07c171c",
+      "bytes": 134354
     },
     {
-      "path": "bundle/app-RWi8gXTA.js",
-      "sha256": "f0363df7f32a95df0f004792c0a32a775f2fca8ebb9388a8a1ec2b6866c4e1d2",
-      "bytes": 703252
+      "path": "bundle/app-DeFia4iL.js",
+      "sha256": "405a149f7c4714a258ff56a1961a303a88ad84ac248cf49ad56302aa7baf4953",
+      "bytes": 707278
     },
     {
-      "path": "bundle/daystats-B43PDVF0.js",
-      "sha256": "0150019da498aedcb25e3da3cce22704a4c46ced79b88f94f3079594f13aa219",
+      "path": "bundle/daystats-Dn96EGVn.js",
+      "sha256": "0b28ccd215bda1856e9bcde3abbeeb3ae05b104b569e40dcb44f359be37b8a17",
       "bytes": 36958
     },
     {
@@ -250,8 +250,8 @@
       "bytes": 203518
     },
     {
-      "path": "bundle/main-CoGSy7-M.js",
-      "sha256": "e2919315c7dca11e8bc46a1bfc97b0c094799e3eca5f3ecab1315ea508ae768b",
+      "path": "bundle/main-C8Utbdug.js",
+      "sha256": "7d407f0a62d225b3f5d9fe31ffe2f78bf58054b1c0920c2f777be17f2aaf5c65",
       "bytes": 15337
     },
     {
@@ -380,13 +380,13 @@
       "bytes": 3939
     },
     {
-      "path": "bundle/ptypane-a2O_TREr.js",
-      "sha256": "6f04a245bac2e8d45f9eb7bd8fcb68241ca6bde4b0d79c1774bca3bf0412bb88",
+      "path": "bundle/ptypane-DtJ9FORq.js",
+      "sha256": "c30eda4555e5effee099d4e8a6849d349dde9bf49896e9ba2d4676ccad9798ce",
       "bytes": 334656
     },
     {
       "path": "index.html",
-      "sha256": "66ba65a3bf8c0b67b13b651bba64761f0d74532f22ae61e970334976b8c3b09f",
+      "sha256": "f42b10ddb0af9721f6eb7d157d9eabddb236b5c89f1ac58f5058220db8b73da5",
       "bytes": 2796
     },
     {
@@ -445,6 +445,6 @@
       "bytes": 44691
     }
   ],
-  "total_bytes": 3042398,
+  "total_bytes": 3046421,
   "index_rewritten_from": "/-absolute to /plugin-apps/qubit-office/habblaud"
 }
