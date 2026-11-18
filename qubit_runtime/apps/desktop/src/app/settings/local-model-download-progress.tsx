@@ -1,5 +1,6 @@
 import { type ReactElement, useState } from 'react'
 
+import { Progress } from '@/components/ui/progress'
 import { Button } from '@/sakuga/ui'
 import { pauseLocalDownload, resumeLocalDownload } from '@/hermes'
 import { useI18n } from '@/i18n'
@@ -27,23 +28,18 @@ interface LocalModelDownloadProps {
 
 export function ProgressBar({ percent, paused = false }: ProgressBarProps) {
   const unknown = typeof percent !== 'number'
+  const value = Math.max(0, Math.min(1, (percent ?? 0) / 100))
 
   return (
-    <div
-      aria-valuemax={100}
-      aria-valuemin={0}
-      {...(unknown ? {} : { 'aria-valuenow': percent })}
-      className="h-1.5 w-full overflow-hidden rounded-full bg-(--ui-bg-tertiary)"
-      role="progressbar"
-    >
-      <div
-        className={cn(
-          'h-full rounded-full',
-          paused ? 'bg-muted-foreground/60' : 'bg-primary transition-[width] duration-300'
-        )}
-        style={{ width: `${Math.max(0, Math.min(100, percent ?? 0))}%` }}
-      />
-    </div>
+    <Progress
+      aria-label="Download progress"
+      className="h-1.5"
+      // A paused bar keeps the muted native fill; the plain determinate meter
+      // is the vendored Sakuga progress.
+      fillClassName={paused ? 'bg-muted-foreground/60' : undefined}
+      indeterminate={unknown}
+      value={value}
+    />
   )
 }
 

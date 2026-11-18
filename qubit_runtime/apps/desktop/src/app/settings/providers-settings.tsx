@@ -13,7 +13,7 @@ import {
   providerTitle,
   sortProviders
 } from '@/components/onboarding'
-import { Button } from '@/sakuga/ui'
+import { Button, HoverTooltip } from '@/sakuga/ui'
 import { RowButton } from '@/components/ui/row-button'
 import { SearchField } from '@/components/ui/search-field'
 import { Tip } from '@/components/ui/tooltip'
@@ -315,16 +315,18 @@ function ConnectedProviderRow({
           <Trail className="size-4 text-muted-foreground transition group-hover:text-foreground" />
         )}
         {canDisconnect && (
-          <Button
-            aria-label={`${t.common.remove} ${title}`}
-            disabled={disconnecting}
-            onClick={() => onDisconnect(provider)}
-            size="icon-xs"
-            type="button"
-            variant="ghost"
-          >
-            {disconnecting ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-          </Button>
+          <HoverTooltip content={`${t.common.remove} ${title}`}>
+            <Button
+              aria-label={`${t.common.remove} ${title}`}
+              disabled={disconnecting}
+              onClick={() => onDisconnect(provider)}
+              size="icon-xs"
+              type="button"
+              variant="ghost"
+            >
+              {disconnecting ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
+            </Button>
+          </HoverTooltip>
         )}
         {terminalDisconnect && (
           <Tip label={copy.disconnectInTerminal}>

@@ -35,6 +35,7 @@ import {
   Input,
   isSubmitEnter,
   Loader,
+  NumberField,
   SearchField,
   Select,
   SelectContent,
@@ -720,7 +721,13 @@ function NewTaskDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <Field label={k.priority}>
-              <Input onChange={event => setPriority(event.target.value)} type="number" value={priority} />
+              <NumberField
+                inputProps={{ 'aria-label': k.priority }}
+                label=""
+                min={0}
+                onChange={next => setPriority(String(next))}
+                value={priority}
+              />
             </Field>
             <Field label={k.workspace}>
               <Select onValueChange={setWorkspaceKind} value={workspaceKind}>
