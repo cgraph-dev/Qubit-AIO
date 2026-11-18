@@ -3,12 +3,7 @@ import {
   ExternalLink,
   KeyRound,
   MessageSquare,
-  Pencil,
-  Plus,
-  Save,
   Settings,
-  Trash2,
-  X,
   Zap,
   ChevronDown,
   ChevronRight,
@@ -21,7 +16,7 @@ import { Toast } from "@nous-research/ui/ui/components/toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { OAuthProvidersCard } from "@/components/OAuthProvidersCard";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import {
   Card,
@@ -31,7 +26,6 @@ import {
   CardTitle,
 } from "@nous-research/ui/ui/components/card";
 import { Badge } from "@nous-research/ui/ui/components/badge";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { useI18n } from "@/i18n";
 import { usePageHeader } from "@/contexts/usePageHeader";
@@ -154,8 +148,7 @@ function EnvVarRow({
           )}
           <Button
             size="sm"
-            outlined
-            prefix={<Pencil />}
+            variant="secondary"
             onClick={() => setEdits((prev) => ({ ...prev, [varKey]: "" }))}
           >
             {t.common.set}
@@ -190,8 +183,7 @@ function EnvVarRow({
           )}
           <Button
             size="sm"
-            outlined
-            prefix={<Pencil />}
+            variant="secondary"
             onClick={() => setEdits((prev) => ({ ...prev, [varKey]: "" }))}
           >
             {t.common.set}
@@ -247,8 +239,7 @@ function EnvVarRow({
 
           <Button
             size="sm"
-            outlined
-            prefix={<Pencil />}
+            variant="secondary"
             onClick={() => setEdits((prev) => ({ ...prev, [varKey]: "" }))}
           >
             {info.is_set ? t.common.replace : t.common.set}
@@ -257,9 +248,7 @@ function EnvVarRow({
           {info.is_set && (
             <Button
               size="sm"
-              outlined
-              destructive
-              prefix={<Trash2 />}
+              variant="secondary"
               onClick={() => onClear(varKey)}
               disabled={saving === varKey || clearDialogOpen}
             >
@@ -272,11 +261,11 @@ function EnvVarRow({
       {isEditing && (
         <div className="flex items-center gap-2">
           <Input
-            autoFocus
             type="text"
+            label={varKey}
             value={edits[varKey]}
-            onChange={(e) =>
-              setEdits((prev) => ({ ...prev, [varKey]: e.target.value }))
+            onChange={(value) =>
+              setEdits((prev) => ({ ...prev, [varKey]: value }))
             }
             placeholder={
               info.is_set
@@ -291,15 +280,13 @@ function EnvVarRow({
           <Button
             size="sm"
             onClick={() => onSave(varKey)}
-            prefix={<Save />}
             disabled={saving === varKey || !edits[varKey]}
           >
             {saving === varKey ? "..." : t.common.save}
           </Button>
           <Button
             size="sm"
-            outlined
-            prefix={<X />}
+            variant="secondary"
             onClick={() => onCancelEdit(varKey)}
           >
             {t.common.cancel}
@@ -362,8 +349,9 @@ function ProviderGroupCard({
         {/* The disclosure is the button; the external key link is a SIBLING.
             Nesting an <a> inside the old ListItem <button> produced invalid
             interactive-inside-interactive markup and broke keyboard use. */}
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={() => setExpanded(!expanded)}
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-3 text-left"
@@ -381,7 +369,7 @@ function ProviderGroupCard({
               {configuredCount} {t.common.set.toLowerCase()}
             </Badge>
           )}
-        </button>
+        </Button>
         <div className="flex shrink-0 items-center gap-2">
           {keyUrl && (
             <a
@@ -538,13 +526,11 @@ function CustomKeysCard({
             <div className="flex-1">
               <Input
                 type="text"
+                label={t.env.customKeyName}
                 value={newKey}
-                onChange={(e) => setNewKey(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleAdd();
-                }}
+                onChange={(value) => setNewKey(value)}
+                onEnter={handleAdd}
                 placeholder={t.env.customKeyNamePlaceholder}
-                aria-label={t.env.customKeyName}
                 className="w-full font-mono-ui text-xs"
               />
               {showInvalid && (
@@ -555,7 +541,6 @@ function CustomKeysCard({
             </div>
             <Button
               size="sm"
-              prefix={<Plus />}
               onClick={handleAdd}
               disabled={!nameValid || alreadyEditing}
             >
@@ -628,14 +613,15 @@ export default function EnvPage() {
         aria-label="Jump to section"
       >
         {sections.map((s) => (
-          <button
+          <Button
             key={s.id}
             type="button"
+            variant="secondary"
             onClick={() => scrollTo(s.id)}
             className="shrink-0 cursor-pointer px-2 py-0.5 font-mondwest text-display text-xs tracking-wider text-text-secondary hover:text-foreground border border-border/50 hover:border-foreground/30 transition-colors"
           >
             {s.label}
-          </button>
+          </Button>
         ))}
       </nav>,
     );
@@ -668,8 +654,10 @@ export default function EnvPage() {
         return n;
       });
       showToast(`${key} ${t.common.save.toLowerCase()}d`, "success");
+      emitFx("success");
     } catch (e) {
       showToast(`${t.config.failedToSave} ${key}: ${e}`, "error");
+      emitFx("error");
     } finally {
       setSaving(null);
     }
@@ -688,8 +676,10 @@ export default function EnvPage() {
             return n;
           });
           showToast(`${key} ${t.common.removed}`, "success");
+          emitFx("warning");
         } catch (e) {
           showToast(`${t.common.failedToRemove} ${key}: ${e}`, "error");
+          emitFx("error");
           throw e;
         } finally {
           setSaving(null);
@@ -868,7 +858,7 @@ export default function EnvPage() {
         </div>
         <Button
           size="sm"
-          outlined
+          variant="secondary"
           onClick={() => setShowAdvanced(!showAdvanced)}
         >
           {showAdvanced ? t.env.hideAdvanced : t.env.showAdvanced}
@@ -1001,14 +991,15 @@ function EnvCategoryCard({
           </div>
 
           {section.unsetEntries.length > 0 && (
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => setShowAll((open) => !open)}
               aria-expanded={showAll}
               className="shrink-0 cursor-pointer border-0 bg-transparent p-0 font-mondwest text-xs tracking-[0.08em] text-text-secondary transition-colors hover:text-foreground"
             >
               {showAll ? t.env.showLess : t.env.showMore}
-            </button>
+            </Button>
           )}
         </div>
 

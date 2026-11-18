@@ -42,6 +42,7 @@ import {
   type QubitHarnessTask,
 } from "@/lib/ocFamilyHarnessApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Checkbox, Input, Select, emitFx } from "@/sakuga/ui";
 
 function errText(e: unknown): string {
   if (e instanceof Error && e.message) return e.message;
@@ -108,13 +109,13 @@ function HarnessGroup({
   return (
     <div className={"hx-group" + (open ? " is-open" : "")}>
       <div className="hx-group-row">
-        <button type="button" className="hx-group-btn" aria-expanded={open} onClick={onToggle}>
+        <Button variant="secondary" type="button" className="hx-group-btn" aria-expanded={open} onClick={onToggle}>
           <span className="hx-caret" aria-hidden="true">
             {open ? "\u2304" : "\u203a"}
           </span>
           <span className="hx-group-label">{label}</span>
           <span className="hx-group-count">{count}</span>
-        </button>
+        </Button>
       </div>
       {open
         ? rows.length === 0
@@ -124,7 +125,7 @@ function HarnessGroup({
           : rows.map((h) => (
               <div key={h.id} className={"hx-proj" + (openId === h.id ? " is-current" : "")}>
                 <div className="hx-proj-row">
-                  <button
+                  <Button variant="secondary"
                     type="button"
                     className={"hx-proj-btn" + (openId === h.id ? " is-on" : "")}
                     data-testid={`harness-${h.id}`}
@@ -144,8 +145,8 @@ function HarnessGroup({
                         {h.backend || "backend"}
                       </span>
                     ) : null}
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="secondary"
                     type="button"
                     className="hx-ic"
                     title={`New task in ${h.id}`}
@@ -153,7 +154,7 @@ function HarnessGroup({
                     onClick={() => onNewTask(h.id)}
                   >
                     &#43;
-                  </button>
+                  </Button>
                 </div>
               </div>
             ))
@@ -297,6 +298,7 @@ export default function HarnessRouterPage() {
       setHarness((prev) => prev || hs.filter((r) => r.kind === "agent")[0]?.id || "");
     } catch (e) {
       setError(errText(e));
+      emitFx("error");
     }
   }, []);
 
@@ -334,10 +336,12 @@ export default function HarnessRouterPage() {
       const created = await submitHarnessTask({ prompt, harness });
       const row = normalizeHarnessTasks({ tasks: [created] })[0];
       setNotice(row?.id ? `Submitted ${row.id} on ${harness}` : `Submitted on ${harness}`);
+      emitFx("success");
       setPrompt("");
       await refreshLists();
     } catch (e) {
       setError(errText(e));
+      emitFx("error");
     }
   }
 
@@ -347,9 +351,11 @@ export default function HarnessRouterPage() {
     try {
       await cancelHarnessTask({ taskId });
       setNotice(`Cancelled ${taskId}`);
+      emitFx("warning");
       await refreshLists();
     } catch (e) {
       setError(errText(e));
+      emitFx("error");
     }
   }
 
@@ -363,9 +369,11 @@ export default function HarnessRouterPage() {
         setSession(next);
         setSessionId(next.id);
         setNotice(`Session ${next.id} created on ${harness}`);
+        emitFx("success");
       }
     } catch (e) {
       setError(errText(e));
+      emitFx("error");
     }
   }
 
@@ -379,9 +387,11 @@ export default function HarnessRouterPage() {
         setSession(next);
         setSessionId(next.id);
         setNotice(`Session ${next.id} resumed`);
+        emitFx("success");
       }
     } catch (e) {
       setError(errText(e));
+      emitFx("error");
     }
   }
 
@@ -399,6 +409,7 @@ export default function HarnessRouterPage() {
       setFiles(normalizeHarnessFiles(fl));
     } catch (e) {
       setError(errText(e));
+      emitFx("error");
     }
   }
 
@@ -411,8 +422,10 @@ export default function HarnessRouterPage() {
           ? body
           : JSON.stringify((body as { result?: unknown }).result ?? body, null, 2);
       setArtifact(text);
+      emitFx("success");
     } catch (e) {
       setError(errText(e));
+      emitFx("error");
     }
   }
 
@@ -424,6 +437,7 @@ export default function HarnessRouterPage() {
     try {
       await createHarness({ name: newName.trim(), base: newBase || undefined });
       setNotice(`Created harness ${newName.trim()}`);
+      emitFx("success");
       setAdding(false);
       setNewName("");
       setNewBase("");
@@ -441,20 +455,18 @@ export default function HarnessRouterPage() {
       <aside className="hx-side" aria-label="Harnesses and their tasks">
         <div className="hx-side-head">
           <span className="hx-side-title">Agent harnesses</span>
-          <label className="hx-search">
-            <span aria-hidden="true">&#9906;</span>
-            <input
-              type="search"
-              placeholder="Search harnesses and tasks"
-              aria-label="Search harnesses and tasks"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
+          <Input
+            type="search"
+            label="Search harnesses and tasks"
+            placeholder="Search harnesses and tasks"
+            value={query}
+            onChange={(value) => setQuery(value)}
+            autoComplete="off"
+            className="hx-search"
+          />
         </div>
         <div className="hx-side-fixed">
-          <button
+          <Button variant="secondary"
             type="button"
             className={"hx-index" + (openHarnessId ? "" : " is-on")}
             aria-current={openHarnessId ? undefined : "page"}
@@ -465,7 +477,7 @@ export default function HarnessRouterPage() {
           >
             <span>Dashboard</span>
             {sidebarHarnesses.length > 0 ? <b>{sidebarHarnesses.length}</b> : null}
-          </button>
+          </Button>
           <div className="hx-div" />
         </div>
         <div className="hx-side-scroll">
@@ -507,7 +519,7 @@ export default function HarnessRouterPage() {
               same way the Dashboard row and a harness row do. */}
           <div className={"hx-group" + (groupsOpen.kits ? " is-open" : "")}>
             <div className="hx-group-row">
-              <button
+              <Button variant="secondary"
                 type="button"
                 className="hx-group-btn"
                 aria-expanded={groupsOpen.kits}
@@ -521,11 +533,11 @@ export default function HarnessRouterPage() {
                 </span>
                 <span className="hx-group-label">Starter Kits</span>
                 <span className="hx-group-count">{kits.length}</span>
-              </button>
+              </Button>
             </div>
             {groupsOpen.kits ? (
               <div className="hx-proj-row">
-                <button
+                <Button variant="secondary"
                   type="button"
                   className={"hx-proj-btn" + (panelView === "kits" ? " is-on" : "")}
                   aria-current={panelView === "kits" ? "page" : undefined}
@@ -535,13 +547,13 @@ export default function HarnessRouterPage() {
                   <span className="hx-dot" aria-hidden="true" />
                   <span className="hx-proj-name">Browse starter kits</span>
                   <span className="hx-group-count">{kits.length}</span>
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
           <div className={"hx-group" + (groupsOpen.plugins ? " is-open" : "")}>
             <div className="hx-group-row">
-              <button
+              <Button variant="secondary"
                 type="button"
                 className="hx-group-btn"
                 aria-expanded={groupsOpen.plugins}
@@ -555,11 +567,11 @@ export default function HarnessRouterPage() {
                 </span>
                 <span className="hx-group-label">Plugins</span>
                 <span className="hx-group-count">{plugins.length}</span>
-              </button>
+              </Button>
             </div>
             {groupsOpen.plugins ? (
               <div className="hx-proj-row">
-                <button
+                <Button variant="secondary"
                   type="button"
                   className={"hx-proj-btn" + (panelView === "plugins" ? " is-on" : "")}
                   aria-current={panelView === "plugins" ? "page" : undefined}
@@ -569,7 +581,7 @@ export default function HarnessRouterPage() {
                   <span className="hx-dot" aria-hidden="true" />
                   <span className="hx-proj-name">Browse plugins</span>
                   <span className="hx-group-count">{plugins.length}</span>
-                </button>
+                </Button>
               </div>
             ) : null}
           </div>
@@ -606,10 +618,10 @@ export default function HarnessRouterPage() {
             <div className="hx-head-actions">
               {openHarnessId ? (
                 <>
-                  <button type="button" className="hx-secondary" onClick={() => setOpenHarnessId("")}>
+                  <Button variant="secondary" type="button" className="hx-secondary" onClick={() => setOpenHarnessId("")}>
                     Back to index
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="secondary"
                     type="button"
                     className="hx-primary"
                     data-testid="harness-new-task"
@@ -628,17 +640,17 @@ export default function HarnessRouterPage() {
                     }}
                   >
                     New task
-                  </button>
+                  </Button>
                 </>
               ) : (
-                <button
+                <Button variant="secondary"
                   type="button"
                   className="hx-primary"
                   data-testid="harness-new"
                   onClick={() => setAdding((v) => !v)}
                 >
                   New harness
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -700,31 +712,29 @@ export default function HarnessRouterPage() {
               {adding ? (
                 <Section title="New harness" testid="section-new-harness">
                   <div className="hx-task-row">
-                    <input
+                    <Input
                       id="harness-new-name"
                       data-testid="harness-new-name"
-                      className="hx-add-select"
+                      label="Harness name"
                       value={newName}
-                      onChange={(e) => setNewName(e.target.value)}
+                      onChange={(value) => setNewName(value)}
                       placeholder="Harness name"
-                      aria-label="Harness name"
                     />
-                    <select
+                    <Select
                       id="harness-new-base"
                       data-testid="harness-new-base"
-                      className="hx-add-select"
+                      label="Base runtime"
                       value={newBase}
-                      onChange={(e) => setNewBase(e.target.value)}
-                      aria-label="Base runtime"
-                    >
-                      <option value="">Default runtime</option>
-                      {harnesses.map((h) => (
-                        <option key={h.id} value={h.backend || h.id}>
-                          {h.backend || h.id}
-                        </option>
-                      ))}
-                    </select>
-                    <button
+                      options={[
+                        { value: "", label: "Default runtime" },
+                        ...harnesses.map((h) => ({
+                          value: h.backend || h.id,
+                          label: h.backend || h.id,
+                        })),
+                      ]}
+                      onChange={(value) => setNewBase(value)}
+                    />
+                    <Button variant="secondary"
                       type="button"
                       className="hx-primary"
                       data-testid="harness-create"
@@ -732,8 +742,8 @@ export default function HarnessRouterPage() {
                       onClick={() => void onCreateHarness()}
                     >
                       {newBusy ? "Creating…" : "Create"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button variant="secondary"
                       type="button"
                       className="hx-secondary"
                       data-testid="harness-create-cancel"
@@ -741,7 +751,7 @@ export default function HarnessRouterPage() {
                       onClick={() => setAdding(false)}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </Section>
               ) : null}
@@ -752,7 +762,7 @@ export default function HarnessRouterPage() {
                   </div>
                   <div className="hx-bases" aria-label="Created harnesses">
                     {customHarnesses.map((h) => (
-                      <button
+                      <Button variant="secondary"
                         key={h.id}
                         type="button"
                         className="hx-base"
@@ -765,7 +775,7 @@ export default function HarnessRouterPage() {
                           {h.backend ? <small>{h.backend}</small> : null}
                         </span>
                         <span className="hx-base-def">{h.state || "ready"}</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </Section>
@@ -796,7 +806,7 @@ export default function HarnessRouterPage() {
                     {harnesses.map((h) => {
                       const health = healthOf(h);
                       return (
-                        <button
+                        <Button variant="secondary"
                           key={h.id}
                           type="button"
                           className="hx-row"
@@ -829,7 +839,7 @@ export default function HarnessRouterPage() {
                           <span className="hx-num hx-th-n hx-th-cpt" title="the roster read reports no per-harness cost">—</span>
                           <span className="hx-num hx-th-last" title="the roster read reports no per-harness activity time">—</span>
                           <span className="hx-row-chev" aria-hidden="true">&#8250;</span>
-                        </button>
+                        </Button>
                       );
                     })}
                   </>
@@ -842,31 +852,28 @@ export default function HarnessRouterPage() {
               <Section title="Submit task" testid="section-submit-task">
                 <div className="hx-search">
                   <span aria-hidden="true">&#9906;</span>
-                  <input
+                  <Input
                     id="harness-task-prompt"
                     data-testid="harness-task-prompt"
+                    label="Task prompt"
                     value={prompt}
-                    onChange={(e) => setPrompt(e.target.value)}
+                    onChange={(value) => setPrompt(value)}
                     placeholder="What should the harness do?"
-                    aria-label="Task prompt"
                   />
                 </div>
                 <div className="hx-task-row">
-                  <select
+                  <Select
                     id="harness-switch"
                     data-testid="harness-switch"
-                    className="hx-add-select"
+                    label="Harness"
                     value={harness}
-                    onChange={(e) => setHarness(e.target.value)}
-                  >
-                    {[...customHarnesses, ...harnesses].map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {h.id}
-                        {h.backend ? ` (${h.backend})` : ""}
-                      </option>
-                    ))}
-                  </select>
-                  <button
+                    options={[...customHarnesses, ...harnesses].map((h) => ({
+                      value: h.id,
+                      label: `${h.id}${h.backend ? ` (${h.backend})` : ""}`,
+                    }))}
+                    onChange={(value) => setHarness(value)}
+                  />
+                  <Button variant="secondary"
                     type="button"
                     className="hx-primary"
                     data-testid="harness-submit"
@@ -874,7 +881,7 @@ export default function HarnessRouterPage() {
                     onClick={() => void onSubmit()}
                   >
                     Submit
-                  </button>
+                  </Button>
                 </div>
               </Section>
 
@@ -892,7 +899,7 @@ export default function HarnessRouterPage() {
                         </span>
                         {t.harness ? <span className="hx-row-id">{t.harness}</span> : null}
                         {t.state ? <span className="hx-pill">{t.state}</span> : null}
-                        <button
+                        <Button variant="secondary"
                           type="button"
                           className="hx-task-x"
                           data-testid={`cancel-${t.id}`}
@@ -900,7 +907,7 @@ export default function HarnessRouterPage() {
                           onClick={() => void onCancel(t.id)}
                         >
                           &#215;
-                        </button>
+                        </Button>
                         {t.failure ? <FailureRow failure={t.failure} /> : null}
                       </div>
                     ))}
@@ -910,7 +917,7 @@ export default function HarnessRouterPage() {
 
               <Section title="Sessions" testid="section-sessions">
                 <div className="hx-task-row">
-                  <button
+                  <Button variant="secondary"
                     type="button"
                     className="hx-primary"
                     data-testid="session-create"
@@ -918,17 +925,16 @@ export default function HarnessRouterPage() {
                     onClick={() => void onCreateSession()}
                   >
                     Create session
-                  </button>
-                  <input
+                  </Button>
+                  <Input
                     id="harness-session-id"
                     data-testid="harness-session-id"
-                    className="hx-add-select"
+                    label="Session"
                     value={sessionId}
-                    onChange={(e) => setSessionId(e.target.value)}
+                    onChange={(value) => setSessionId(value)}
                     placeholder="session id"
-                    aria-label="Session"
                   />
-                  <button
+                  <Button variant="secondary"
                     type="button"
                     className="hx-secondary"
                     data-testid="session-resume"
@@ -936,8 +942,8 @@ export default function HarnessRouterPage() {
                     onClick={() => void onResume()}
                   >
                     Resume
-                  </button>
-                  <button
+                  </Button>
+                  <Button variant="secondary"
                     type="button"
                     className="hx-secondary"
                     data-testid="session-inspect"
@@ -945,17 +951,15 @@ export default function HarnessRouterPage() {
                     onClick={() => void onInspect()}
                   >
                     Inspect
-                  </button>
-                  <span className="hx-add-next">
-                    <input
-                      type="checkbox"
-                      data-testid="session-live"
-                      checked={live}
-                      onChange={(e) => setLive(e.target.checked)}
-                      aria-label="Follow live"
-                    />{" "}
+                  </Button>
+                  <Checkbox
+                    data-testid="session-live"
+                    checked={live}
+                    onChange={(checked) => setLive(checked)}
+                    className="hx-add-next"
+                  >
                     Follow live
-                  </span>
+                  </Checkbox>
                 </div>
                 {session ? (
                   <div data-testid="session-detail" className="hx-bases">
@@ -985,7 +989,7 @@ export default function HarnessRouterPage() {
                 ) : (
                   <div className="hx-bases" aria-label="Session files">
                     {files.map((f) => (
-                      <button
+                      <Button variant="secondary"
                         key={f.path}
                         type="button"
                         className="hx-base"
@@ -998,7 +1002,7 @@ export default function HarnessRouterPage() {
                           {f.sizeBytes !== undefined ? <small>{f.sizeBytes} bytes</small> : null}
                         </span>
                         <span className="hx-base-def">file</span>
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 )}
