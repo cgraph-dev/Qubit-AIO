@@ -1,5 +1,5 @@
 import { AlertCircle, RotateCcw } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { Card } from "@nous-research/ui/ui/components/card";
 
 import { useI18n } from "@/i18n";
@@ -41,12 +41,11 @@ export function LoadErrorNotice({ what, detail, onRetry, className }: LoadErrorN
         <div className="text-destructive">{copy.title}</div>
         {copy.details && <div className="mt-0.5 text-muted-foreground">{copy.details}</div>}
         <Button
-          size="sm"
-          outlined
+          variant="secondary"
           className="mt-1"
           onClick={onRetry}
-          prefix={<RotateCcw className="h-3.5 w-3.5" />}
         >
+          <RotateCcw className="h-3.5 w-3.5" />
           {t.common.retry}
         </Button>
       </div>

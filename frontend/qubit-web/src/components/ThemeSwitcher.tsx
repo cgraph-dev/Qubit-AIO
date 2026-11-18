@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Palette, Check, Type } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import { BottomSheet } from "@nous-research/ui/ui/components/bottom-sheet";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
@@ -63,8 +63,7 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
   return (
     <div ref={wrapperRef} className="relative">
       <Button
-        ghost
-        size={collapsed ? "icon" : undefined}
+        variant="secondary"
         onClick={() => setOpen((o) => !o)}
         className={cn(
           collapsed
@@ -73,8 +72,8 @@ export function ThemeSwitcher({ collapsed = false, dropUp = false }: ThemeSwitch
         )}
         title={`${t.theme?.switchTheme ?? "Switch theme"}: ${label}`}
         aria-label={t.theme?.switchTheme ?? "Switch theme"}
-        aria-expanded={open}
-        aria-haspopup="listbox"
+        {...{ "aria-expanded": String(open) }}
+        {...{ "aria-haspopup": "listbox" }}
       >
         <span className="inline-flex items-center gap-1.5">
           <Palette className="h-3.5 w-3.5" />

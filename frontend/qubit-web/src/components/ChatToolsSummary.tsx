@@ -31,6 +31,7 @@
  */
 
 import { Card } from "@nous-research/ui/ui/components/card";
+import { Button } from "@/sakuga/ui";
 import { Link } from "react-router";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -111,14 +112,16 @@ function ShortList({
       {shown.map((name, i) => (
         <span key={name}>
           {i > 0 ? ", " : ""}
-          <button
+          <Button
+            variant="secondary"
             type="button"
             onClick={() => onMention(name)}
             title={`Insert @${name} into the composer`}
             className="hover:underline"
+            fx="tick"
           >
             {name}
-          </button>
+          </Button>
         </span>
       ))}
       {rest > 0 ? ` +${rest} more` : ""}

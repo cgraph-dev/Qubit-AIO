@@ -232,7 +232,7 @@ describe("ChatSessionList", () => {
     );
     await act(async () => {
       container
-        .querySelector('button[aria-label="Refresh"]')!
+        .querySelector('[aria-label="Refresh"]')!
         .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
     await vi.waitFor(() =>
@@ -457,7 +457,7 @@ describe("ChatSessionList", () => {
       expect(container.textContent).toContain("Session s-1"),
     );
 
-    const seeMore = Array.from(container.querySelectorAll("button")).find((b) =>
+    const seeMore = Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) =>
       b.textContent?.includes("See more"),
     )!;
     expect(seeMore).toBeTruthy();
@@ -480,7 +480,7 @@ describe("ChatSessionList", () => {
     expect(apiMocks.getSessions).toHaveBeenLastCalledWith(30, 1, "", "recent");
     // Nothing left to page, so the affordance goes away.
     expect(
-      Array.from(container.querySelectorAll("button")).some((b) =>
+      Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).some((b) =>
         b.textContent?.includes("See more"),
       ),
     ).toBe(false);
@@ -499,7 +499,7 @@ describe("ChatSessionList", () => {
     await renderCanonicalList();
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("older")], total: 31 });
     await act(async () => {
-      Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click();
+      Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent === "See more")!.click();
     });
     expect(container.textContent).toContain("Session older");
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [...first, canonicalSession("older")], total: 31 });
@@ -514,7 +514,7 @@ describe("ChatSessionList", () => {
     let rejectAppend!: (error: Error) => void;
     apiMocks.getSessions.mockReturnValueOnce(new Promise((_, reject) => { rejectAppend = reject; }));
     await act(async () => {
-      Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click();
+      Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent === "See more")!.click();
     });
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("fresh")], total: 1 });
     await act(async () => { window.dispatchEvent(new Event("focus")); });
@@ -535,7 +535,7 @@ describe("ChatSessionList", () => {
       expect(container.textContent).toContain("Session s-only"),
     );
     expect(
-      Array.from(container.querySelectorAll("button")).some((b) =>
+      Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).some((b) =>
         b.textContent?.includes("See more"),
       ),
     ).toBe(false);
@@ -592,7 +592,7 @@ describe("ChatSessionList", () => {
       expect(container.textContent).not.toContain("Session late");
       apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("retried")], total: 1 });
       await act(async () => {
-        Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "Retry")!.click();
+        Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent === "Retry")!.click();
       });
       expect(container.textContent).toContain("Session retried");
     } finally { vi.useRealTimers(); }
@@ -602,7 +602,7 @@ describe("ChatSessionList", () => {
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("kept")], total: 1 });
     await renderCanonicalList();
     apiMocks.getSessions.mockRejectedValueOnce(new Error("network unavailable"));
-    await act(async () => { container.querySelector<HTMLButtonElement>('[aria-label="Refresh"]')!.click(); });
+    await act(async () => { container.querySelector<HTMLElement>('[aria-label="Refresh"]')!.click(); });
     expect(container.textContent).toContain("network unavailable");
     expect(container.textContent).toContain("Session kept");
     await act(async () => { container.querySelector<HTMLElement>('[data-testid="session-row"]')!.click(); });
@@ -621,7 +621,7 @@ describe("ChatSessionList", () => {
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("one")], total: 100 });
     await renderCanonicalList();
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [], total: 100 });
-    await act(async () => { Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click(); });
+    await act(async () => { Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent === "See more")!.click(); });
     expect(container.textContent).toContain("Session one");
     expect(container.textContent).not.toContain("See more");
   });
@@ -630,9 +630,9 @@ describe("ChatSessionList", () => {
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("one")], total: 3 });
     await renderCanonicalList();
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("one")], total: 3 });
-    await act(async () => { Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click(); });
+    await act(async () => { Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent === "See more")!.click(); });
     apiMocks.getSessions.mockResolvedValueOnce({ sessions: [canonicalSession("older")], total: 3 });
-    await act(async () => { Array.from(container.querySelectorAll("button")).find((b) => b.textContent === "See more")!.click(); });
+    await act(async () => { Array.from(container.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent === "See more")!.click(); });
     expect(apiMocks.getSessions).toHaveBeenLastCalledWith(30, 2, "", "recent");
     expect(container.textContent).toContain("Session older");
     expect(container.textContent).not.toContain("See more");

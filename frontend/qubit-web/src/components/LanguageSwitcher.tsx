@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Check, Languages } from "lucide-react";
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { BottomSheet } from "@nous-research/ui/ui/components/bottom-sheet";
 import { Typography } from "@nous-research/ui/ui/components/typography/index";
 import { useBelowBreakpoint } from "@nous-research/ui/hooks/use-below-breakpoint";
@@ -85,12 +85,12 @@ export function LanguageSwitcher({ collapsed = false, dropUp = false }: Language
   return (
     <div ref={containerRef} className="relative inline-flex">
       <Button
-        ghost
+        variant="secondary"
         onClick={() => setOpen((v) => !v)}
         title={t.language.switchTo}
         aria-label={t.language.switchTo}
-        aria-haspopup="listbox"
-        aria-expanded={open}
+        {...{ "aria-haspopup": "listbox" }}
+        {...{ "aria-expanded": String(open) }}
         className={cn(
           "px-2 py-1 normal-case tracking-normal font-normal text-xs text-text-secondary hover:text-foreground",
           collapsed && "hover:bg-transparent",

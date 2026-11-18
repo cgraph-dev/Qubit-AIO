@@ -21,7 +21,7 @@
  * surface keeps working unimpaired.
  */
 
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { Badge } from "@nous-research/ui/ui/components/badge";
 import { Card } from "@nous-research/ui/ui/components/card";
 
@@ -577,8 +577,7 @@ export function ChatSidebar({
           </div>
 
           <Button
-            ghost
-            size="sm"
+            variant="secondary"
             onClick={() => setModelOpen(true)}
             className={cn(
               "max-w-full min-w-0 px-0 py-0",
@@ -634,12 +633,11 @@ export function ChatSidebar({
 
             {error && (
               <Button
-                size="sm"
-                outlined
+                variant="secondary"
                 className="mt-1"
                 onClick={reconnect}
-                prefix={<RefreshCw />}
               >
+                <RefreshCw />
                 reconnect events feed
               </Button>
             )}

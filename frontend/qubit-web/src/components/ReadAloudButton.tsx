@@ -9,6 +9,7 @@
 import { Volume2, Square } from "lucide-react";
 
 import { useReadAloud, defaultReadAloudDeps } from "@/hooks/useReadAloud";
+import { Button } from "@/sakuga/ui";
 import type { ReadAloudDeps } from "@/lib/voice";
 
 export interface ReadAloudButtonProps {
@@ -41,11 +42,11 @@ export function ReadAloudButton({
 
   return (
     <span className={className}>
-      <button
+      <Button
+        variant="secondary"
         type="button"
         data-testid={`read-aloud-${messageId}`}
-        data-state={state}
-        aria-pressed={speaking}
+        {...{ "data-state": state, "aria-pressed": String(speaking) }}
         aria-label={shortLabel(state)}
         title={shortLabel(state)}
         disabled={!text.trim()}
@@ -60,7 +61,7 @@ export function ReadAloudButton({
           <Volume2 className="h-3 w-3" aria-hidden="true" />
         )}
         {speaking ? "stop" : "read"}
-      </button>
+      </Button>
       {snapshot.error && (speaking || otherSpeaking) ? (
         <span role="alert" className="ml-1 text-xs text-destructive">
           {snapshot.error}

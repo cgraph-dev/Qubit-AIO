@@ -18,7 +18,7 @@
  * keeps the chat context focused on switching conversations quickly.
  */
 
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button, Input } from "@/sakuga/ui";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import {
   AlertCircle,
@@ -367,7 +367,8 @@ export function ChatSessionList({
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span className="wrap-break-word">{error}</span>
           </div>
-          <Button size="sm" outlined onClick={reload} prefix={<RefreshCw />}>
+          <Button variant="secondary" onClick={reload}>
+            <RefreshCw />
             {t.common.retry}
           </Button>
         </div>
@@ -385,7 +386,7 @@ export function ChatSessionList({
         {error && (
           <div role="alert" className="px-2 py-1 text-xs text-destructive">
             {error}
-            <Button size="sm" outlined onClick={reload}>{t.common.retry}</Button>
+            <Button variant="secondary" onClick={reload}>{t.common.retry}</Button>
           </div>
         )}
         {orderedSessions.map((s) => {
@@ -442,8 +443,7 @@ export function ChatSessionList({
         {source === "canonical" &&
           (total === null || nextOffsetRef.current < total) && (
             <Button
-              outlined
-              size="sm"
+              variant="secondary"
               onClick={loadMore}
               disabled={loading || loadingMore}
               className="mx-1 mt-1 justify-center"
@@ -484,8 +484,7 @@ export function ChatSessionList({
           {t.sessions.title}
         </span>
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           onClick={reload}
           aria-label={t.common.refresh}
           title={t.common.refresh}
@@ -508,33 +507,33 @@ export function ChatSessionList({
           className="pointer-events-none absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-tertiary"
           aria-hidden="true"
         />
-        <input
+        <Input
           type="search"
+          label="Search chat sessions"
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
+          onChange={setSearchInput}
           placeholder={t.common.search ?? "Search sessions"}
-          aria-label="Search chat sessions"
-          className="w-full rounded border border-midground/20 bg-transparent py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
+          className="qsk-field w-full rounded border border-midground/20 bg-transparent py-1 pl-7 pr-6 text-xs text-foreground outline-none placeholder:text-text-tertiary focus:border-primary/50"
         />
         {searchInput ? (
-          <button
+          <Button
+            variant="secondary"
             type="button"
             onClick={() => setSearchInput("")}
             aria-label="Clear session search"
             className="absolute right-4 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-foreground"
           >
             <X className="h-3.5 w-3.5" />
-          </button>
+          </Button>
         ) : null}
       </div>
 
       <Button
-        outlined
-        size="sm"
+        variant="secondary"
         onClick={startNew}
-        prefix={<MessageSquarePlus />}
         className="mx-2 mb-2 justify-center"
       >
+        <MessageSquarePlus />
         {t.sessions.newChat}
       </Button>
 

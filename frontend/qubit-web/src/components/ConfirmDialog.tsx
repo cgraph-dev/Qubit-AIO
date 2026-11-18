@@ -1,4 +1,4 @@
-import { Button } from "@nous-research/ui/ui/components/button";
+import { Button } from "@/sakuga/ui";
 import { AlertTriangle } from "lucide-react";
 import { useId } from "react";
 import { createPortal } from "react-dom";
@@ -83,13 +83,13 @@ export function ConfirmDialog({
         </div>
 
         <div className="flex items-center justify-end gap-2 p-3">
-          <Button type="button" outlined onClick={onCancel} disabled={loading}>
+          <Button variant="secondary" type="button" onClick={onCancel} disabled={loading}>
             {cancelLabel}
           </Button>
           <Button
             data-confirm
             type="button"
-            destructive={destructive}
+            variant="primary"
             onClick={onConfirm}
             disabled={loading}
           >

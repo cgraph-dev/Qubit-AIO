@@ -27,6 +27,7 @@ import { useEffect, useState } from "react";
 import { api, type AuthMeResponse } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { LogOut } from "lucide-react";
+import { Button } from "@/sakuga/ui";
 
 interface AuthWidgetProps {
   className?: string;
@@ -142,7 +143,8 @@ export function AuthWidget({ className }: AuthWidgetProps) {
           via {me.provider}
         </span>
       </div>
-      <button
+      <Button
+        variant="secondary"
         type="button"
         onClick={handleLogout}
         className={cn(
@@ -152,9 +154,10 @@ export function AuthWidget({ className }: AuthWidgetProps) {
         )}
         aria-label="Log out"
         title="Log out"
+        fx="tick"
       >
         <LogOut className="h-3.5 w-3.5" />
-      </button>
+      </Button>
     </div>
   );
 }

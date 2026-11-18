@@ -500,7 +500,7 @@ describe("ChatSidebar SSE event feed", () => {
     await flushMicrotasks();
 
     // Open the picker so ModelPickerDialog mounts and records its props.
-    const pickerButton = container.querySelector("button[title]");
+    const pickerButton = container.querySelector("sakuga-button[title]");
     await act(async () => {
       pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -526,7 +526,7 @@ describe("ChatSidebar SSE event feed", () => {
     await render(<ChatSidebar channel="chat-1" />);
     await flushMicrotasks();
 
-    const pickerButton = container.querySelector("button[title]");
+    const pickerButton = container.querySelector("sakuga-button[title]");
     await act(async () => {
       pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -557,7 +557,7 @@ describe("ChatSidebar SSE event feed", () => {
     await render(<ChatSidebar channel="chat-1" />);
     await flushMicrotasks();
 
-    const pickerButton = container.querySelector("button[title]");
+    const pickerButton = container.querySelector("sakuga-button[title]");
     await act(async () => {
       pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -589,7 +589,7 @@ describe("ChatSidebar SSE event feed", () => {
     await render(<ChatSidebar channel="chat-1" />);
     await flushMicrotasks();
 
-    const pickerButton = container.querySelector("button[title]");
+    const pickerButton = container.querySelector("sakuga-button[title]");
     await act(async () => {
       pickerButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
