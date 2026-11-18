@@ -170,8 +170,11 @@ export const Button = forwardRef<HTMLElement, QubitButtonProps>(function Button(
         imperative[key as ImperativeEventName] = value as DomHandler
       } else {
         // Custom elements receive boolean attributes as an empty string in
-        // React 19; ARIA booleans must stay the literal "true"/"false".
-        forwarded[key] = key.startsWith('aria-') && typeof value === 'boolean' ? String(value) : value
+        // React 19; ARIA/data booleans must stay the literal "true"/"false"
+        // because tests and CSS read their value, not their presence.
+        forwarded[key] = (key.startsWith('aria-') || key.startsWith('data-')) && typeof value === 'boolean'
+          ? String(value)
+          : value
       }
     }
     return { imperative, forwarded }
@@ -241,3 +244,11 @@ export const Button = forwardRef<HTMLElement, QubitButtonProps>(function Button(
     children
   )
 })
+
+/** Focus the host's real inner control (the custom elements use open shadow DOM). */
+export function focusSakuga(host: Element | null | undefined): void {
+  if (!host) return
+  const root = (host as HTMLElement).shadowRoot
+  const target = root?.querySelector<HTMLElement>('button, input, [tabindex]')
+  ;(target ?? (host as HTMLElement)).focus()
+}
