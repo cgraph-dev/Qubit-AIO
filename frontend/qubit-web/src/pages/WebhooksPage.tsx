@@ -23,12 +23,10 @@ import type {
 } from "@/lib/api";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { DeleteConfirmDialog } from "@/components/DeleteConfirmDialog";
-import { useToast } from "@nous-research/ui/hooks/use-toast";
 import { useConfirmDelete } from "@nous-research/ui/hooks/use-confirm-delete";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
-import { Toast } from "@nous-research/ui/ui/components/toast";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
-import { Button, Input } from "@/sakuga/ui";
+import { Button, Input, emitFx, showSakugaToast } from "@/sakuga/ui";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { cn, themedBody } from "@/lib/utils";
@@ -87,7 +85,10 @@ export default function WebhooksPage() {
   const [restartMessage, setRestartMessage] = useState<string | null>(null);
   const [restartError, setRestartError] = useState<string | null>(null);
   const [restarting, setRestarting] = useState(false);
-  const { toast, showToast } = useToast();
+  const showToast = useCallback((message: string, kind?: "success" | "error") => {
+    showSakugaToast(message);
+    emitFx(kind === "error" ? "error" : "success");
+  }, []);
   const { setEnd } = usePageHeader();
 
   // New subscription modal state (canonical webhook contract: id/url/events/
@@ -469,7 +470,6 @@ export default function WebhooksPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <Toast toast={toast} />
 
       <DeleteConfirmDialog
         open={webhookDelete.isOpen}
