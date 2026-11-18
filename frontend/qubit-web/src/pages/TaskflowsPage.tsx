@@ -37,6 +37,7 @@ import {
   type HookState,
 } from "@/lib/ocFamilyFlowsApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 
 interface StagedOp {
   title: string;
@@ -52,8 +53,6 @@ function formatResult(value: unknown): string {
   }
 }
 
-const INPUT_CLASS =
-  "settings-input min-w-0 border border-border bg-background-base px-2 py-1 text-sm";
 
 function FlowActions({
   flow,
@@ -66,11 +65,9 @@ function FlowActions({
 }) {
   return (
     <div className="settings-row__control">
-      <button
-        type="button"
+      <Button
         aria-label={`flow-toggle-${flow.id}`}
         disabled={busy}
-        className="btn btn--sm disabled:opacity-50"
         onClick={() =>
           onStage({
             title: flow.enabled ? "Disable flow" : "Enable flow",
@@ -80,12 +77,11 @@ function FlowActions({
         }
       >
         {flow.enabled ? "Disable" : "Enable"}
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="secondary"
         aria-label={`flow-trigger-${flow.id}`}
         disabled={busy}
-        className="btn btn--sm btn--ghost disabled:opacity-50"
         onClick={() =>
           onStage({
             title: "Trigger flow now",
@@ -95,12 +91,11 @@ function FlowActions({
         }
       >
         Trigger now
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        variant="secondary"
         aria-label={`flow-delete-${flow.id}`}
         disabled={busy}
-        className="btn btn--sm btn--ghost disabled:opacity-50"
         onClick={() =>
           onStage({
             title: "Delete flow",
@@ -110,7 +105,7 @@ function FlowActions({
         }
       >
         Delete
-      </button>
+      </Button>
     </div>
   );
 }
@@ -181,9 +176,11 @@ export default function TaskflowsPage() {
       try {
         const out = await op.run();
         setResultText(formatResult(out));
+        emitFx("success");
         await refresh();
       } catch (e) {
         setErrorText(refusalOrError(e, `Operation failed: ${e}`));
+        emitFx("error");
       } finally {
         setBusy(false);
         setPending(null);
@@ -230,15 +227,9 @@ export default function TaskflowsPage() {
             <p className="settings-section__desc">Recurring schedules that keep running.</p>
           </div>
           <div className="settings-section__actions">
-            <button
-              type="button"
-              aria-label="taskflows-refresh"
-              disabled={busy}
-              className="btn btn--sm disabled:opacity-50"
-              onClick={() => void refresh()}
-            >
+            <Button aria-label="taskflows-refresh" disabled={busy} onClick={() => void refresh()}>
               Refresh
-            </button>
+            </Button>
           </div>
         </div>
         <div className="settings-group">
@@ -283,12 +274,13 @@ export default function TaskflowsPage() {
               <div className="settings-row__title">Name</div>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
+                label="Name"
                 aria-label="flow-create-name"
-                className={INPUT_CLASS}
+                className="qsk-field"
                 placeholder="flow name"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                onChange={setNewName}
               />
             </div>
           </div>
@@ -298,12 +290,13 @@ export default function TaskflowsPage() {
               <p className="settings-row__desc">Cron expression, e.g. 0 8 * * 1-5.</p>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
+                label="Schedule"
                 aria-label="flow-create-schedule"
-                className={INPUT_CLASS}
+                className="qsk-field"
                 placeholder="schedule (0 8 * * 1-5)"
                 value={newSchedule}
-                onChange={(e) => setNewSchedule(e.target.value)}
+                onChange={setNewSchedule}
               />
             </div>
           </div>
@@ -313,12 +306,13 @@ export default function TaskflowsPage() {
               <p className="settings-row__desc">The prompt/action the flow runs.</p>
             </div>
             <div className="settings-row__control">
-              <input
+              <Input
+                label="Action"
                 aria-label="flow-create-prompt"
-                className={INPUT_CLASS}
+                className="qsk-field"
                 placeholder="action to run"
                 value={newPrompt}
-                onChange={(e) => setNewPrompt(e.target.value)}
+                onChange={setNewPrompt}
               />
             </div>
           </div>
@@ -332,12 +326,10 @@ export default function TaskflowsPage() {
               ) : null}
             </div>
             <div className="settings-row__control">
-              <button
-                type="button"
+              <Button
                 aria-label="flow-create-submit"
                 disabled={busy || !canCreate}
                 title={canCreate ? "Create this flow" : "Name, schedule, and action are required"}
-                className="btn btn--sm disabled:opacity-50"
                 onClick={() =>
                   setPending({
                     title: "Create flow",
@@ -355,7 +347,7 @@ export default function TaskflowsPage() {
                 }
               >
                 Create
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -393,12 +385,10 @@ export default function TaskflowsPage() {
                   <p className="settings-row__desc">{hook.description}</p>
                 </div>
                 <div className="settings-row__control">
-                  <button
-                    type="button"
+                  <Button
                     aria-label={`hook-enable-${hook.name}`}
                     disabled={busy || enabled}
                     title={enabled ? "Hook is already enabled" : "Enable this hook"}
-                    className="btn btn--sm disabled:opacity-50"
                     onClick={() =>
                       setPending({
                         title: "Enable hook",
@@ -408,13 +398,12 @@ export default function TaskflowsPage() {
                     }
                   >
                     Enable
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="secondary"
                     aria-label={`hook-disable-${hook.name}`}
                     disabled={busy || !enabled}
                     title={!enabled ? "Hook is already disabled" : "Disable this hook"}
-                    className="btn btn--sm btn--ghost disabled:opacity-50"
                     onClick={() =>
                       setPending({
                         title: "Disable hook",
@@ -424,13 +413,12 @@ export default function TaskflowsPage() {
                     }
                   >
                     Disable
-                  </button>
-                  <button
-                    type="button"
+                  </Button>
+                  <Button
+                    variant="secondary"
                     aria-label={`hook-cancel-${hook.name}`}
                     disabled={busy || !enabled}
                     title="Cancel this flow (disables the hook)"
-                    className="btn btn--sm btn--ghost disabled:opacity-50"
                     onClick={() =>
                       setPending({
                         title: "Cancel flow",
@@ -440,7 +428,7 @@ export default function TaskflowsPage() {
                     }
                   >
                     Cancel flow
-                  </button>
+                  </Button>
                 </div>
               </div>
             );
@@ -496,24 +484,12 @@ export default function TaskflowsPage() {
             <h2 className="text-sm font-semibold">{pending.title}</h2>
             <p className="mt-1 text-sm">{pending.detail}</p>
             <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                aria-label="confirm-staged-op"
-                disabled={busy}
-                className="btn btn--sm disabled:opacity-50"
-                onClick={() => void settle(pending)}
-              >
+              <Button aria-label="confirm-staged-op" disabled={busy} onClick={() => void settle(pending)}>
                 Confirm
-              </button>
-              <button
-                type="button"
-                aria-label="cancel-staged-op"
-                disabled={busy}
-                className="btn btn--sm btn--ghost disabled:opacity-50"
-                onClick={() => setPending(null)}
-              >
+              </Button>
+              <Button variant="secondary" aria-label="cancel-staged-op" disabled={busy} onClick={() => setPending(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>

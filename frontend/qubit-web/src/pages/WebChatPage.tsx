@@ -25,6 +25,7 @@ import {
   streamWebchatTurn,
 } from "@/lib/ocFamilyWebchatApi";
 import type { ChatStreamEvent } from "@/lib/api";
+import { Button, emitFx } from "@/sakuga/ui";
 
 interface WebchatMessage {
   role: "user" | "assistant";
@@ -182,11 +183,13 @@ export function WebChatPage() {
           }));
           setProgress([]);
           setStatus("idle");
+          emitFx("success");
         },
         onError: (event) => {
           // Transcript is kept; reconnect resumes via Retry on the same id.
           setError(event.detail || event.code || "STREAM_ERROR");
           setStatus("error");
+          emitFx("error");
         },
         onCancelled: () => {
           setStatus("idle");
@@ -196,6 +199,7 @@ export function WebChatPage() {
       // Transport-level failure (HTTP status, aborted fetch): same resume path.
       setError(e instanceof Error ? e.message : String(e));
       setStatus("error");
+      emitFx("error");
     }
   }, []);
 
@@ -245,16 +249,14 @@ export function WebChatPage() {
             {sessionId ? `Session ${sessionId}` : "Opening session…"}
           </p>
         </div>
-        <button
-          type="button"
+        <Button
           aria-label="New chat"
           data-testid="webchat-new"
           disabled={streaming || status === "loading"}
           onClick={handleNewChat}
-          className="rounded border px-3 py-1.5 text-sm"
         >
           New chat
-        </button>
+        </Button>
       </header>
 
       <div className="qb-chat-scroll" data-testid="webchat-transcript">
@@ -267,14 +269,14 @@ export function WebChatPage() {
             <div className="qb-starters">
               {["Summarize the latest session", "What changed today?", "Open a new task"].map(
                 (prompt) => (
-                  <button
+                  <Button
                     key={prompt}
-                    type="button"
-                    className="rounded border px-3 py-2 text-sm text-left"
+                    variant="secondary"
+                    className="text-left"
                     onClick={() => setInput(prompt)}
                   >
                     {prompt}
-                  </button>
+                  </Button>
                 ),
               )}
             </div>
@@ -327,15 +329,14 @@ export function WebChatPage() {
       {status === "error" && error && (
         <div data-testid="webchat-error" role="alert" className="qb-error">
           <span>{error}</span>{" "}
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             aria-label="Retry"
             data-testid="webchat-retry"
             onClick={handleRetry}
-            className="underline"
           >
             Retry
-          </button>
+          </Button>
         </div>
       )}
 
@@ -355,15 +356,14 @@ export function WebChatPage() {
           placeholder="Type a message…"
           className="qb-composer-input"
         />
-        <button
-          type="submit"
+        <Button
           aria-label="Send"
           data-testid="webchat-send"
           disabled={streaming || status === "loading" || !input.trim()}
-          className="qb-send-btn"
+          onClick={handleSend}
         >
           Send
-        </button>
+        </Button>
       </form>
 
       <p data-testid="webchat-status" className="qb-progress">

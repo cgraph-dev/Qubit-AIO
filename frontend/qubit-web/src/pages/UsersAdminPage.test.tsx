@@ -9,6 +9,8 @@ import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({
   getOperatorSelf: vi.fn(),
@@ -60,13 +62,10 @@ function byTestId(id: string): HTMLElement | null {
   return container.querySelector(`[data-testid="${id}"]`);
 }
 
-function setInput(el: HTMLElement | null, value: string) {
+async function setInput(el: HTMLElement | null, value: string) {
   if (!el) throw new Error("missing input");
-  const input = el as HTMLInputElement;
-  const proto = window.HTMLInputElement.prototype;
-  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.dispatchEvent(new Event("change", { bubbles: true }));
+  await waitForSakuga(el);
+  typeIntoSakuga(el, value);
 }
 
 beforeEach(() => {
@@ -120,7 +119,7 @@ describe("UsersAdminPage", () => {
   it("prefs set round-trips font/theme", async () => {
     await renderPage();
     await waitFor(() => byTestId("users-operator-card") !== null);
-    setInput(byTestId("users-font"), "mono");
+    await setInput(byTestId("users-font"), "mono");
     await act(async () => {
       byTestId("users-prefs-set")?.dispatchEvent(
         new MouseEvent("click", { bubbles: true }),
@@ -136,8 +135,8 @@ describe("UsersAdminPage", () => {
   it("link posts provider+keyRef and the handoff names `qubit auth login`", async () => {
     await renderPage();
     await waitFor(() => byTestId("users-operator-card") !== null);
-    setInput(byTestId("users-link-provider"), "github");
-    setInput(byTestId("users-link-keyref"), "env:GITHUB_TOKEN");
+    await setInput(byTestId("users-link-provider"), "github");
+    await setInput(byTestId("users-link-keyref"), "env:GITHUB_TOKEN");
     await act(async () => {
       byTestId("users-link")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
@@ -195,7 +194,8 @@ describe("UsersAdminPage", () => {
       expect(actions).toContain(want);
       const row = byTestId(`ua-disabled-${want}`);
       expect(row).not.toBeNull();
-      expect(row?.querySelector("button")?.disabled).toBe(true);
+      const disabled = row?.querySelector<HTMLElement>("button, sakuga-button");
+      expect(disabled?.hasAttribute("disabled")).toBe(true);
     }
     const roleRow = byTestId("ua-disabled-users.setRole");
     expect(roleRow?.textContent).toContain(

@@ -36,6 +36,7 @@ import {
   type OperatorProfile,
 } from "@/lib/ocFamilyAdminApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 
 /** Button press IS the confirmation (same pattern as the product pages). */
 const CONFIRM_YES = () => true;
@@ -127,9 +128,11 @@ export default function UsersAdminPage() {
     try {
       await fn();
       setNotice(`${verb} settled ✓`);
+      emitFx("success");
       if (after) await after();
     } catch (e) {
       setError(errText(e, `${verb} failed`));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -160,15 +163,14 @@ export default function UsersAdminPage() {
             credentials.
           </p>
         </div>
-        <button
-          type="button"
+        <Button
           data-testid="users-refresh"
-          className="h-8 border border-border px-3 text-xs uppercase"
+          className="uppercase"
           disabled={loading}
           onClick={() => void load()}
         >
           {loading ? "Loading…" : "Refresh"}
-        </button>
+        </Button>
       </header>
 
       {error && (
@@ -272,32 +274,28 @@ export default function UsersAdminPage() {
           <label htmlFor="ua-font" className="text-xs text-muted-foreground">
             Font
           </label>
-          <input
+          <Input
             id="ua-font"
             data-testid="users-font"
-            className="h-8 border border-border bg-background px-2 text-xs"
+            label="Font"
+            className="qsk-field"
             value={font}
-            onChange={(e) => setFont(e.target.value)}
+            onChange={setFont}
           />
           <label htmlFor="ua-theme" className="text-xs text-muted-foreground">
             Theme
           </label>
-          <input
+          <Input
             id="ua-theme"
             data-testid="users-theme"
-            className="h-8 border border-border bg-background px-2 text-xs"
+            label="Theme"
+            className="qsk-field"
             value={theme}
-            onChange={(e) => setTheme(e.target.value)}
+            onChange={setTheme}
           />
-          <button
-            type="button"
-            data-testid="users-prefs-set"
-            className="border border-border px-2 py-1 text-xs"
-            disabled={busy !== null}
-            onClick={() => void handlePrefsSet()}
-          >
+          <Button data-testid="users-prefs-set" disabled={busy !== null} onClick={() => void handlePrefsSet()}>
             Save prefs
-          </button>
+          </Button>
         </div>
         {unsupported.length > 0 && (
           <p className="text-xs text-muted-foreground">
@@ -323,34 +321,32 @@ export default function UsersAdminPage() {
           </ul>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            aria-label="Provider"
+          <Input
+            label="Provider"
             data-testid="users-link-provider"
-            className="h-8 border border-border bg-background px-2 text-xs"
+            className="qsk-field"
             placeholder="provider"
             value={linkProvider}
-            onChange={(e) => setLinkProvider(e.target.value)}
+            onChange={setLinkProvider}
           />
-          <input
-            aria-label="Credential reference"
+          <Input
+            label="Credential reference"
             data-testid="users-link-keyref"
-            className="h-8 border border-border bg-background px-2 font-mono text-xs"
+            className="qsk-field font-mono"
             placeholder="env:NAME or file:/path"
             value={linkKeyRef}
-            onChange={(e) => setLinkKeyRef(e.target.value)}
+            onChange={setLinkKeyRef}
           />
-          <input
-            aria-label="Label"
+          <Input
+            label="Label"
             data-testid="users-link-label"
-            className="h-8 border border-border bg-background px-2 text-xs"
+            className="qsk-field"
             placeholder="label (optional)"
             value={linkLabel}
-            onChange={(e) => setLinkLabel(e.target.value)}
+            onChange={setLinkLabel}
           />
-          <button
-            type="button"
+          <Button
             data-testid="users-link"
-            className="border border-border px-2 py-1 text-xs"
             disabled={busy !== null || !linkProvider.trim() || !linkKeyRef.trim()}
             onClick={() =>
               void runOp(
@@ -367,28 +363,26 @@ export default function UsersAdminPage() {
             }
           >
             Link
-          </button>
+          </Button>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            aria-label="Unlink provider"
+          <Input
+            label="Unlink provider"
             data-testid="users-unlink-provider"
-            className="h-8 border border-border bg-background px-2 text-xs"
+            className="qsk-field"
             placeholder="provider"
             value={unlinkProvider}
-            onChange={(e) => setUnlinkProvider(e.target.value)}
+            onChange={setUnlinkProvider}
           />
-          <input
-            aria-label="Entry index"
+          <Input
+            label="Entry index"
             data-testid="users-unlink-index"
-            className="h-8 w-20 border border-border bg-background px-2 font-mono text-xs"
+            className="qsk-field font-mono"
             value={unlinkIndex}
-            onChange={(e) => setUnlinkIndex(e.target.value)}
+            onChange={setUnlinkIndex}
           />
-          <button
-            type="button"
+          <Button
             data-testid="users-unlink"
-            className="border border-border px-2 py-1 text-xs"
             disabled={busy !== null || !unlinkProvider.trim()}
             onClick={() =>
               void runOp(
@@ -404,7 +398,7 @@ export default function UsersAdminPage() {
             }
           >
             Unlink
-          </button>
+          </Button>
         </div>
 
         <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -423,26 +417,24 @@ export default function UsersAdminPage() {
           </ul>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <input
-            aria-label="Session"
+          <Input
+            label="Session"
             data-testid="users-select-session"
-            className="h-8 border border-border bg-background px-2 text-xs"
+            className="qsk-field"
             placeholder="session"
             value={selectSession}
-            onChange={(e) => setSelectSession(e.target.value)}
+            onChange={setSelectSession}
           />
-          <input
-            aria-label="Account id"
+          <Input
+            label="Account id"
             data-testid="users-select-account"
-            className="h-8 border border-border bg-background px-2 font-mono text-xs"
+            className="qsk-field font-mono"
             placeholder="profile / account id"
             value={selectAccount}
-            onChange={(e) => setSelectAccount(e.target.value)}
+            onChange={setSelectAccount}
           />
-          <button
-            type="button"
+          <Button
             data-testid="users-select"
-            className="border border-border px-2 py-1 text-xs"
             disabled={busy !== null || !selectSession.trim() || !selectAccount.trim()}
             onClick={() =>
               void runOp(`select ${selectAccount.trim()}`, () =>
@@ -455,7 +447,7 @@ export default function UsersAdminPage() {
             }
           >
             Select account
-          </button>
+          </Button>
         </div>
 
         <h3 className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
@@ -496,16 +488,13 @@ export default function UsersAdminPage() {
             >
               <div className="flex flex-wrap items-center gap-2">
                 <code className="font-mono text-xs">{d.action}</code>
-                <button
-                  type="button"
+                <Button
                   disabled
                   title={d.reason}
-                  aria-disabled="true"
                   aria-label={`${d.action} unavailable: ${d.reason}`}
-                  className="cursor-not-allowed border border-border px-2 py-1 text-xs"
                 >
                   Disabled
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-muted-foreground" data-testid={`ua-disabled-reason-${d.action}`}>
                 Prerequisite: {d.reason}. Counterpart: {d.counterpart}.

@@ -38,6 +38,7 @@ import type {
   WorktreeRow,
 } from "@/lib/ocFamilySessionsApi";
 import { refusalOrError } from "@/lib/policy-refusal";
+import { Button, Input, emitFx } from "@/sakuga/ui";
 
 interface StagedOp {
   title: string;
@@ -119,9 +120,11 @@ export default function WorktreesPage() {
     try {
       const out = await op.run();
       setResultText(formatResult(out));
+      emitFx("success");
       await refresh();
     } catch (e) {
       setErrorText(refusalOrError(e, "The worktree operation failed."));
+      emitFx("error");
     } finally {
       setBusy(false);
       setPending(null);
@@ -148,16 +151,14 @@ export default function WorktreesPage() {
             </p>
           </div>
           <div className="settings-section__actions">
-            <button
-              type="button"
+            <Button
               aria-label="worktrees-refresh"
               disabled={busy}
               title={busy ? "Refreshing the worktree listing." : undefined}
-              className="btn"
               onClick={() => void refresh()}
             >
               Refresh
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -176,8 +177,8 @@ export default function WorktreesPage() {
                 }
                 control={
                   <>
-                    <button
-                      type="button"
+                    <Button
+                      variant="secondary"
                       aria-label={`worktree-remove-${w.path}`}
                       disabled={busy || w.is_main}
                       title={
@@ -187,7 +188,6 @@ export default function WorktreesPage() {
                             ? "Another worktree operation is running."
                             : undefined
                       }
-                      className="btn danger"
                       onClick={() =>
                         setPending({
                           title: "Remove worktree",
@@ -197,13 +197,11 @@ export default function WorktreesPage() {
                       }
                     >
                       Remove
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
                       aria-label={`worktree-restore-${w.path}`}
                       disabled={busy}
                       title={busy ? "Another worktree operation is running." : undefined}
-                      className="btn"
                       onClick={() =>
                         setPending({
                           title: "Restore worktree (local re-add)",
@@ -213,7 +211,7 @@ export default function WorktreesPage() {
                       }
                     >
                       Restore (local re-add)
-                    </button>
+                    </Button>
                   </>
                 }
               />
@@ -266,12 +264,13 @@ export default function WorktreesPage() {
             title="Path"
             description="Filesystem path for the new worktree."
             control={
-              <input
+              <Input
+                label="Worktree path"
                 aria-label="worktree-new-path"
-                className="settings-input"
+                className="qsk-field"
                 placeholder="path"
                 value={newPath}
-                onChange={(e) => setNewPath(e.target.value)}
+                onChange={setNewPath}
               />
             }
           />
@@ -279,24 +278,23 @@ export default function WorktreesPage() {
             title="Branch"
             description="Branch to check out in the worktree."
             control={
-              <input
+              <Input
+                label="Worktree branch"
                 aria-label="worktree-new-branch"
-                className="settings-input"
+                className="qsk-field"
                 placeholder="branch"
                 value={newBranch}
-                onChange={(e) => setNewBranch(e.target.value)}
+                onChange={setNewBranch}
               />
             }
           />
           <SettingsRow
             title="New worktree"
             control={
-              <button
-                type="button"
+              <Button
                 aria-label="worktree-create-submit"
                 disabled={busy || !newPath.trim() || !newBranch.trim()}
                 title={busy ? "Another worktree operation is running." : createDisabledReason ?? undefined}
-                className="btn"
                 onClick={() =>
                   setPending({
                     title: "Create worktree",
@@ -306,7 +304,7 @@ export default function WorktreesPage() {
                 }
               >
                 Create
-              </button>
+              </Button>
             }
           />
         </div>
@@ -333,12 +331,10 @@ export default function WorktreesPage() {
             title="Prune (local prune)"
             description={`Runs a local worktree prune (${WORKTREES_PRUNE_CODE}).`}
             control={
-              <button
-                type="button"
+              <Button
                 aria-label="worktree-prune-submit"
                 disabled={busy}
                 title={busy ? "Another worktree operation is running." : undefined}
-                className="btn"
                 onClick={() =>
                   setPending({
                     title: "Prune worktrees",
@@ -348,7 +344,7 @@ export default function WorktreesPage() {
                 }
               >
                 Prune (local prune)
-              </button>
+              </Button>
             }
           />
         </div>
@@ -376,24 +372,17 @@ export default function WorktreesPage() {
             <h2 className="text-sm font-semibold">{pending.title}</h2>
             <p className="mt-1 text-sm">{pending.detail}</p>
             <div className="mt-3 flex gap-2">
-              <button
-                type="button"
+              <Button
                 aria-label="confirm-staged-op"
                 disabled={busy}
                 title={busy ? "The operation is already running." : undefined}
-                className="rounded border px-3 py-1 text-sm disabled:opacity-50"
                 onClick={() => void settle(pending)}
               >
                 Confirm
-              </button>
-              <button
-                type="button"
-                aria-label="cancel-staged-op"
-                className="rounded border px-3 py-1 text-sm"
-                onClick={() => setPending(null)}
-              >
+              </Button>
+              <Button variant="secondary" aria-label="cancel-staged-op" onClick={() => setPending(null)}>
                 Cancel
-              </button>
+              </Button>
             </div>
           </div>
         </div>

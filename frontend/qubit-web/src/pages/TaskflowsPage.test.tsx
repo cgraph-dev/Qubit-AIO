@@ -9,6 +9,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({ fetchJSON: vi.fn() }));
 
@@ -34,19 +36,16 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 }
 
 function click(label: string) {
-  const el = document.querySelector(`button[aria-label="${label}"]`);
+  const el = document.querySelector(`button[aria-label="${label}"], sakuga-button[aria-label="${label}"]`);
   if (!el) throw new Error(`button not rendered: ${label}`);
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 }
 
-function setInput(label: string, value: string) {
-  const el = document.querySelector(`input[aria-label="${label}"]`);
+async function setInput(label: string, value: string) {
+  const el = document.querySelector(`input[aria-label="${label}"], sakuga-input[aria-label="${label}"]`);
   if (!el) throw new Error(`input not rendered: ${label}`);
-  const input = el as HTMLInputElement;
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-  setter?.call(input, value);
-  input.dispatchEvent(new Event("input", { bubbles: true }));
-  input.dispatchEvent(new Event("change", { bubbles: true }));
+  await waitForSakuga(el);
+  typeIntoSakuga(el, value);
 }
 
 async function renderPage() {
@@ -132,12 +131,12 @@ describe("TaskflowsPage", () => {
     );
     expect(document.querySelector('[aria-label="hook-state-session-memory"]')?.textContent).toBe("enabled");
     const enable = document.querySelector(
-      'button[aria-label="hook-enable-command-logger"]',
+      'button[aria-label="hook-enable-command-logger"], sakuga-button[aria-label="hook-enable-command-logger"]',
     ) as HTMLButtonElement;
     expect(enable.disabled).toBe(false);
     expect(enable.title).toMatch("Enable this hook");
     const disableOn = document.querySelector(
-      'button[aria-label="hook-disable-session-memory"]',
+      'button[aria-label="hook-disable-session-memory"], sakuga-button[aria-label="hook-disable-session-memory"]',
     ) as HTMLButtonElement;
     expect(disableOn.disabled).toBe(false);
   });
@@ -184,9 +183,9 @@ describe("TaskflowsPage", () => {
     await renderPage();
     await waitFor(() => document.querySelector('[aria-label="flow-create-submit"]') !== null);
     await act(async () => {
-      setInput("flow-create-name", "evening-ops");
-      setInput("flow-create-schedule", "0 18 * * *");
-      setInput("flow-create-prompt", "Run the evening ops routine");
+      await setInput("flow-create-name", "evening-ops");
+      await setInput("flow-create-schedule", "0 18 * * *");
+      await setInput("flow-create-prompt", "Run the evening ops routine");
     });
     await act(async () => {
       click("flow-create-submit");

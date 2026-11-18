@@ -369,7 +369,9 @@ export const SakugaInput = forwardRef<HTMLElement, SakugaInputProps>(function Sa
     },
     class: className,
     role: rest.role ?? 'textbox',
-    'aria-label': label,
+    // An explicit caller label wins; otherwise the visible field label is the
+    // accessible name.
+    'aria-label': (rest['aria-label'] as string | undefined) ?? label,
     'data-sakuga-input': '1',
     onInput: (event: Event) => {
       const target = event.target as HTMLElement | null;

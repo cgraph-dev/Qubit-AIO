@@ -2,6 +2,8 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga, waitForSakuga } from "@qubit/shared/sakuga";
 
 const apiMocks = vi.hoisted(() => ({ fetchJSON: vi.fn() }));
 
@@ -27,17 +29,16 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 }
 
 function click(label: string) {
-  const el = document.querySelector(`button[aria-label="${label}"]`);
+  const el = document.querySelector(`button[aria-label="${label}"], sakuga-button[aria-label="${label}"]`);
   if (!el) throw new Error(`button not rendered: ${label}`);
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 }
 
-function setInput(label: string, value: string) {
-  const el = document.querySelector(`input[aria-label="${label}"]`) as HTMLInputElement | null;
+async function setInput(label: string, value: string) {
+  const el = document.querySelector(`input[aria-label="${label}"], sakuga-input[aria-label="${label}"]`);
   if (!el) throw new Error(`input not rendered: ${label}`);
-  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
-  setter?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+  await waitForSakuga(el);
+  typeIntoSakuga(el, value);
 }
 
 async function renderPage() {
@@ -118,8 +119,8 @@ describe("WorktreesPage", () => {
     await renderPage();
     await waitFor(() => document.querySelector('[aria-label="worktree-create-submit"]') !== null);
     await act(async () => {
-      setInput("worktree-new-path", "/repo/wt2");
-      setInput("worktree-new-branch", "b2");
+      await setInput("worktree-new-path", "/repo/wt2");
+      await setInput("worktree-new-branch", "b2");
     });
     await act(async () => {
       click("worktree-create-submit");
