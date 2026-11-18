@@ -212,9 +212,16 @@ export const Button = forwardRef<HTMLElement, QubitButtonProps>(function Button(
     }
     onClick?.(event)
     if (type === 'submit' && !event.defaultPrevented) {
-      const owner = event.currentTarget as HTMLElement
-      const target = (form ? document.getElementById(form) : owner.closest('form')) as HTMLFormElement | null
-      target?.requestSubmit?.()
+      // A click that starts inside the shadow button is already submitted by
+      // the upstream component (button.js: type=submit -> requestSubmit), so
+      // only submitting for a direct host click avoids a double submit.
+      const path = (event.nativeEvent as Event).composedPath?.() ?? []
+      const fromShadow = path.length > 0 && path[0] !== event.currentTarget
+      if (!fromShadow) {
+        const owner = event.currentTarget as HTMLElement
+        const target = (form ? document.getElementById(form) : owner.closest('form')) as HTMLFormElement | null
+        target?.requestSubmit?.()
+      }
     }
   }
 
