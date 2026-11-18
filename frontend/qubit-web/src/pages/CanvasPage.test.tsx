@@ -8,6 +8,8 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "./sakuga-test-dom";
+import { typeIntoSakuga } from "@qubit/shared/sakuga";
 
 let container: HTMLDivElement;
 let root: Root;
@@ -103,21 +105,21 @@ async function renderCanvasPage() {
   await waitFor(() => Boolean(container.querySelector('[aria-label="Canvas file roster"]')));
 }
 
-function setInput(el: HTMLInputElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-  setter?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+async function setInput(el: Element | null, value: string) {
+  await act(async () => typeIntoSakuga(el, value));
 }
 
-function setTextarea(el: HTMLTextAreaElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-  setter?.call(el, value);
-  el.dispatchEvent(new Event("input", { bubbles: true }));
+async function setTextarea(el: HTMLTextAreaElement, value: string) {
+  await act(async () => {
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+    setter?.call(el, value);
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  });
 }
 
-function dialogButton(text: string): HTMLButtonElement | null {
+function dialogButton(text: string): HTMLElement | null {
   return (
-    [...document.querySelectorAll("button")].find((b) => b.textContent?.trim() === text) ?? null
+    [...document.querySelectorAll<HTMLElement>("button, sakuga-button")].find((b) => b.textContent?.trim() === text) ?? null
   );
 }
 
@@ -158,11 +160,11 @@ describe("CanvasPage roster + preview", () => {
 describe("CanvasPage confirm-gated add (staged-then-settle)", () => {
   it("stages on first POST, then settles after Confirm and reports completion", async () => {
     await renderCanvasPage();
-    setInput(
-      container.querySelector('[aria-label="New canvas file name"]') as HTMLInputElement,
+    await setInput(
+      container.querySelector('[aria-label="New canvas file name"]'),
       "hello.html",
     );
-    setTextarea(
+    await setTextarea(
       container.querySelector('[aria-label="New canvas file content"]') as HTMLTextAreaElement,
       "<h1>hi</h1>",
     );
@@ -182,8 +184,8 @@ describe("CanvasPage client-side traversal refusal", () => {
   it("refuses ../ names without issuing any mutation", async () => {
     await renderCanvasPage();
     const before = postCalls.length;
-    setInput(
-      container.querySelector('[aria-label="New canvas file name"]') as HTMLInputElement,
+    await setInput(
+      container.querySelector('[aria-label="New canvas file name"]'),
       "../evil.html",
     );
     const add = container.querySelector('[aria-label="Add canvas file"]') as HTMLButtonElement;
@@ -197,8 +199,8 @@ describe("CanvasPage client-side traversal refusal", () => {
   it("refuses absolute paths without issuing any mutation", async () => {
     await renderCanvasPage();
     const before = postCalls.length;
-    setInput(
-      container.querySelector('[aria-label="New canvas file name"]') as HTMLInputElement,
+    await setInput(
+      container.querySelector('[aria-label="New canvas file name"]'),
       "/etc/passwd",
     );
     const add = container.querySelector('[aria-label="Add canvas file"]') as HTMLButtonElement;

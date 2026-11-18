@@ -27,7 +27,7 @@ async function waitFor(cond: () => boolean, timeoutMs = 5000) {
 }
 
 function click(label: string) {
-  const el = document.querySelector(`button[aria-label="${label}"]`);
+  const el = document.querySelector(`[aria-label="${label}"]`);
   if (!el) throw new Error(`button not rendered: ${label}`);
   el.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
 }
@@ -67,7 +67,7 @@ describe("CheckpointsPage", () => {
     const notice = document.querySelector('[aria-label="verify-only-notice"]')?.textContent ?? "";
     expect(notice).toMatch("verify-only");
     expect(notice).toMatch("no restore button");
-    const restoreButtons = [...document.querySelectorAll("button")].filter((b) =>
+    const restoreButtons = [...document.querySelectorAll<HTMLElement>("button, sakuga-button")].filter((b) =>
       (b.getAttribute("aria-label") ?? "").includes("restore"),
     );
     expect(restoreButtons).toHaveLength(0);

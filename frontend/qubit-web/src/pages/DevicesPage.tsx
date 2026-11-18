@@ -38,6 +38,8 @@ import {
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
+import { Button, Input, emitFx } from "@/sakuga/ui";
+
 import {
   approveDevicePairing,
   enrollDevice,
@@ -94,6 +96,7 @@ export default function DevicesPage() {
   const confirmPrompt = useCallback(
     (detailText: string) =>
       new Promise<boolean>((resolve) => {
+        emitFx("approval");
         setPendingConfirm({ detail: detailText, resolve });
       }),
     [],
@@ -131,10 +134,12 @@ export default function DevicesPage() {
         await fn(confirmPrompt);
         setNoticeKind("success");
         setNotice(`${label} completed.`);
+        emitFx(/reject|remove|revoke/i.test(label) ? "warning" : "success");
         load();
       } catch (err: unknown) {
         setNoticeKind("info");
         setNotice(refusalOrError(err, `${label} failed.`));
+        emitFx("error");
       } finally {
         setBusy(null);
       }
@@ -162,11 +167,13 @@ export default function DevicesPage() {
         setMinted(res);
         setNoticeKind("success");
         setNotice("Setup code minted.");
+        emitFx("success");
         load();
       })
       .catch((err: unknown) => {
         setNoticeKind("info");
         setNotice(refusalOrError(err, "Setup code mint failed."));
+        emitFx("error");
       })
       .finally(() => setBusy(null));
   }, [confirmPrompt, load, mintLabel, mintScopes, mintTtl]);
@@ -179,6 +186,7 @@ export default function DevicesPage() {
       .catch((err: unknown) => {
         setNoticeKind("info");
         setNotice(refusalOrError(err, "Identity read failed."));
+        emitFx("error");
       });
   }, []);
 
@@ -289,7 +297,7 @@ export default function DevicesPage() {
 
         {p.manageable ? (
           <div className="device-entry__token-actions settings-row__control">
-            <button
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() =>
@@ -301,8 +309,8 @@ export default function DevicesPage() {
               aria-label={`Approve pairing ${p.id}`}
             >
               {busy === `approve:${p.id}` ? <Spinner /> : "approve"}
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() =>
@@ -314,8 +322,8 @@ export default function DevicesPage() {
               aria-label={`Reject pairing ${p.id}`}
             >
               {busy === `reject:${p.id}` ? <Spinner /> : "reject"}
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() =>
@@ -328,8 +336,8 @@ export default function DevicesPage() {
             >
               {busy === `remove:${p.id}` ? <Spinner /> : <Trash2 />}
               {busy === `remove:${p.id}` ? null : <span>remove</span>}
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() =>
@@ -341,8 +349,8 @@ export default function DevicesPage() {
               aria-label={`Rotate token for ${p.id}`}
             >
               {busy === `rotate:${p.id}` ? <Spinner /> : "rotate token"}
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() =>
@@ -354,19 +362,19 @@ export default function DevicesPage() {
               aria-label={`Revoke token for ${p.id}`}
             >
               {busy === `revoke:${p.id}` ? <Spinner /> : "revoke token"}
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() => showIdentity(p.id)}
               aria-label={`Show identity for ${p.id}`}
             >
               identity
-            </button>
+            </Button>
           </div>
         ) : (
           <div className="device-entry__token-actions settings-row__control">
-            <button
+            <Button variant="secondary"
               type="button"
               disabled
               data-state="refused"
@@ -376,7 +384,7 @@ export default function DevicesPage() {
               className="btn btn--ghost btn--sm"
             >
               manage unavailable
-            </button>
+            </Button>
             <span className="settings-row__desc">
               {p.manage_reason ?? "This pairing cannot be managed from the dashboard."}
             </span>
@@ -404,7 +412,7 @@ export default function DevicesPage() {
             </p>
           </div>
           <div className="settings-section__actions">
-            <button
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={load}
@@ -413,7 +421,7 @@ export default function DevicesPage() {
             >
               {pairingsState === "loading" ? <Spinner /> : <RefreshCw />}
               {pairingsState === "loading" ? null : <span>refresh</span>}
-            </button>
+            </Button>
           </div>
         </div>
         <div className="settings-group">
@@ -453,22 +461,26 @@ export default function DevicesPage() {
               </span>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
-                value={mintLabel}
-                onChange={(e) => setMintLabel(e.target.value)}
-                placeholder="label"
-                aria-label="Setup code label"
-                className="settings-input"
-              />
-              <input
-                type="text"
-                value={mintScopes}
-                onChange={(e) => setMintScopes(e.target.value)}
-                placeholder="scopes, comma separated"
-                aria-label="Setup code scopes"
-                className="settings-input"
-              />
+              <div className="qsk-field">
+                <Input
+                  type="text"
+                  value={mintLabel}
+                  onChange={(value) => setMintLabel(value)}
+                  placeholder="label"
+                  label="Setup code label"
+                  className="settings-input"
+                />
+              </div>
+              <div className="qsk-field">
+                <Input
+                  type="text"
+                  value={mintScopes}
+                  onChange={(value) => setMintScopes(value)}
+                  placeholder="scopes, comma separated"
+                  label="Setup code scopes"
+                  className="settings-input"
+                />
+              </div>
               <input
                 type="number"
                 min={1}
@@ -478,7 +490,7 @@ export default function DevicesPage() {
                 aria-label="Setup code TTL seconds"
                 className="settings-input"
               />
-              <button
+              <Button variant="secondary"
                 type="button"
                 className="btn btn--ghost btn--sm"
                 onClick={mint}
@@ -487,7 +499,7 @@ export default function DevicesPage() {
               >
                 {busy === "mint" ? <Spinner /> : <CopyIcon />}
                 {busy === "mint" ? null : <span>mint</span>}
-              </button>
+              </Button>
             </div>
           </div>
           {minted ? (
@@ -561,23 +573,27 @@ export default function DevicesPage() {
               </span>
             </div>
             <div className="settings-row__control">
-              <input
-                type="text"
-                value={enrollCodeId}
-                onChange={(e) => setEnrollCodeId(e.target.value)}
-                placeholder="setup code id"
-                aria-label="Enroll setup code id"
-                className="settings-input font-mono"
-              />
-              <input
-                type="text"
-                value={enrollLabel}
-                onChange={(e) => setEnrollLabel(e.target.value)}
-                placeholder="label (optional)"
-                aria-label="Enroll device label"
-                className="settings-input"
-              />
-              <button
+              <div className="qsk-field">
+                <Input
+                  type="text"
+                  value={enrollCodeId}
+                  onChange={(value) => setEnrollCodeId(value)}
+                  placeholder="setup code id"
+                  label="Enroll setup code id"
+                  className="settings-input font-mono"
+                />
+              </div>
+              <div className="qsk-field">
+                <Input
+                  type="text"
+                  value={enrollLabel}
+                  onChange={(value) => setEnrollLabel(value)}
+                  placeholder="label (optional)"
+                  label="Enroll device label"
+                  className="settings-input"
+                />
+              </div>
+              <Button variant="secondary"
                 type="button"
                 className="btn btn--ghost btn--sm"
                 onClick={() =>
@@ -593,7 +609,7 @@ export default function DevicesPage() {
               >
                 {busy === "enroll" ? <Spinner /> : <ShieldCheck />}
                 {busy === "enroll" ? null : <span>enroll</span>}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -660,22 +676,22 @@ export default function DevicesPage() {
         >
           <p className="settings-row__desc">{pendingConfirm.detail}</p>
           <div className="flex gap-2">
-            <button
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() => settleConfirm(true)}
               aria-label="Confirm"
             >
               Confirm
-            </button>
-            <button
+            </Button>
+            <Button variant="secondary"
               type="button"
               className="btn btn--ghost btn--sm"
               onClick={() => settleConfirm(false)}
               aria-label="Cancel"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : null}

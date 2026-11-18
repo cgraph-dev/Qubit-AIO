@@ -23,6 +23,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 
+import { Button, Input, Select, emitFx } from "@/sakuga/ui";
+
 import {
   CANVAS_ROOT_LABEL,
   addCanvasFile,
@@ -91,6 +93,7 @@ export default function CanvasPage() {
   const confirmPrompt = useCallback(
     (detailText: string) =>
       new Promise<boolean>((resolve) => {
+        emitFx("approval");
         setPendingConfirm({ detail: detailText, resolve });
       }),
     [],
@@ -112,6 +115,7 @@ export default function CanvasPage() {
     } catch (e) {
       setError(refusalOrError(e, CANVAS_READ_FALLBACK));
       setState("error");
+      emitFx("error");
     }
   }, []);
 
@@ -165,9 +169,11 @@ export default function CanvasPage() {
       setNotice("Add completed.");
       setAddName("");
       setAddContent("");
+      emitFx("success");
       await refresh();
     } catch (e) {
       setFormError(refusalOrError(e, "Add failed."));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -183,6 +189,7 @@ export default function CanvasPage() {
     try {
       await removeCanvasFile(path, confirm);
       setNotice("Remove completed.");
+      emitFx("warning");
       if (selectedPath === path) {
         setSelectedPath(null);
         setPreviewContent(null);
@@ -190,6 +197,7 @@ export default function CanvasPage() {
       await refresh();
     } catch (e) {
       setNotice(refusalOrError(e, "Remove failed."));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -216,8 +224,10 @@ export default function CanvasPage() {
         confirm,
       );
       setNotice("Present completed.");
+      emitFx("success");
     } catch (e) {
       setNotice(refusalOrError(e, "Present failed."));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -233,8 +243,10 @@ export default function CanvasPage() {
     try {
       await hideCanvas(nodeId, confirm);
       setNotice("Hide completed.");
+      emitFx("success");
     } catch (e) {
       setNotice(refusalOrError(e, "Hide failed."));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -250,8 +262,10 @@ export default function CanvasPage() {
     try {
       await snapshotCanvas(nodeId, confirm);
       setNotice("Snapshot completed.");
+      emitFx("success");
     } catch (e) {
       setNotice(refusalOrError(e, "Snapshot failed."));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -272,8 +286,10 @@ export default function CanvasPage() {
     try {
       await navigateCanvas(nodeId, safe, confirm);
       setNotice("Navigate completed.");
+      emitFx("success");
     } catch (e) {
       setNotice(refusalOrError(e, "Navigate failed."));
+      emitFx("error");
     } finally {
       setBusy(null);
     }
@@ -314,14 +330,15 @@ export default function CanvasPage() {
                     ? "live reload on"
                     : "live reload off"}
               </span>
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 className="btn btn--ghost btn--sm"
                 onClick={() => void refresh()}
                 aria-label="Refresh canvas files"
               >
                 Refresh
-              </button>
+              </Button>
             </>
           }
         />
@@ -357,24 +374,26 @@ export default function CanvasPage() {
                   }
                   control={
                     <>
-                      <button
+                      <Button
                         type="button"
+                        variant="secondary"
                         className="btn btn--ghost btn--sm"
                         aria-label={`Open canvas file ${f.name || f.path}`}
                         disabled={busy === `open:${f.path}`}
                         onClick={() => void openPreview(f.path || f.name)}
                       >
                         {busy === `open:${f.path}` ? <Spinner /> : "Open"}
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="secondary"
                         className="btn btn--ghost btn--sm"
                         aria-label={`Remove canvas file ${f.name || f.path}`}
                         disabled={busy === `remove:${f.path}`}
                         onClick={() => void handleRemove(f.path || f.name)}
                       >
                         {busy === `remove:${f.path}` ? <Spinner /> : "Remove"}
-                      </button>
+                      </Button>
                     </>
                   }
                 />
@@ -392,13 +411,15 @@ export default function CanvasPage() {
             title="Name"
             description="Canvas-root relative, no traversal."
             control={
-              <input
-                aria-label="New canvas file name"
-                className="settings-input"
-                value={addName}
-                placeholder="index.html"
-                onChange={(e) => setAddName(e.target.value)}
-              />
+              <div className="qsk-field">
+                <Input
+                  label="New canvas file name"
+                  className="settings-input"
+                  value={addName}
+                  placeholder="index.html"
+                  onChange={(value) => setAddName(value)}
+                />
+              </div>
             }
           />
           <SettingsRow
@@ -423,15 +444,16 @@ export default function CanvasPage() {
             title="Write file"
             description="The write is confirm-gated."
             control={
-              <button
+              <Button
                 type="button"
+                variant="secondary"
                 className="btn btn--ghost btn--sm"
                 aria-label="Add canvas file"
                 disabled={busy === "add"}
                 onClick={() => void handleAdd()}
               >
                 {busy === "add" ? <Spinner /> : "Add (confirm)"}
-              </button>
+              </Button>
             }
           />
         </SettingsSection>
@@ -484,26 +506,28 @@ export default function CanvasPage() {
             description="Node identity comes from the existing node roster."
             control={
               <>
-                <select
-                  aria-label="Presentation node"
+                <Select
+                  label="Presentation node"
                   className="settings-select"
                   value={nodeId}
-                  onChange={(e) => setNodeId(e.target.value)}
-                >
-                  <option value="">— pick a node —</option>
-                  {nodes.map((n) => (
-                    <option key={n.id} value={n.id}>
-                      {n.name ? `${n.name} (${n.id})` : n.id}
-                    </option>
-                  ))}
-                </select>
-                <input
-                  aria-label="Scoped base URL"
-                  className="settings-input"
-                  value={scopedBase}
-                  placeholder="scoped base URL (optional)"
-                  onChange={(e) => setScopedBase(e.target.value)}
+                  options={[
+                    { value: "", label: "— pick a node —" },
+                    ...nodes.map((n) => ({
+                      value: n.id,
+                      label: n.name ? `${n.name} (${n.id})` : n.id,
+                    })),
+                  ]}
+                  onChange={(value) => setNodeId(value)}
                 />
+                <div className="qsk-field">
+                  <Input
+                    label="Scoped base URL"
+                    className="settings-input"
+                    value={scopedBase}
+                    placeholder="scoped base URL (optional)"
+                    onChange={(value) => setScopedBase(value)}
+                  />
+                </div>
               </>
             }
           />
@@ -516,43 +540,47 @@ export default function CanvasPage() {
             }
             control={
               <>
-                <button
+                <Button
                   type="button"
+                  variant="secondary"
                   className="btn btn--ghost btn--sm"
                   aria-label="Present on node"
                   disabled={busy === "present"}
                   onClick={() => void handlePresent()}
                 >
                   {busy === "present" ? <Spinner /> : "Present (confirm)"}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="secondary"
                   className="btn btn--ghost btn--sm"
                   aria-label="Hide node canvas"
                   disabled={busy === "hide"}
                   onClick={() => void handleHide()}
                 >
                   {busy === "hide" ? <Spinner /> : "Hide (confirm)"}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
+                  variant="secondary"
                   className="btn btn--ghost btn--sm"
                   aria-label="Snapshot node canvas"
                   disabled={busy === "snapshot"}
                   onClick={() => void handleSnapshot()}
                 >
                   {busy === "snapshot" ? <Spinner /> : "Snapshot (confirm)"}
-                </button>
+                </Button>
                 {selectedPath ? (
-                  <button
+                  <Button
                     type="button"
+                    variant="secondary"
                     className="btn btn--ghost btn--sm"
                     aria-label="Navigate node canvas to open file"
                     disabled={busy === "navigate"}
                     onClick={() => void handleNavigate(canvasEntryPath(selectedPath))}
                   >
                     {busy === "navigate" ? <Spinner /> : "Navigate to open file (confirm)"}
-                  </button>
+                  </Button>
                 ) : null}
               </>
             }
@@ -577,8 +605,9 @@ export default function CanvasPage() {
               description={pendingConfirm.detail}
               control={
                 <>
-                  <button
+                  <Button
                     type="button"
+                    variant="primary"
                     className="btn btn--ghost btn--sm"
                     onClick={() => {
                       const p = pendingConfirm;
@@ -587,9 +616,10 @@ export default function CanvasPage() {
                     }}
                   >
                     Confirm
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
+                    variant="secondary"
                     className="btn btn--ghost btn--sm"
                     onClick={() => {
                       const p = pendingConfirm;
@@ -598,7 +628,7 @@ export default function CanvasPage() {
                     }}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </>
               }
             />
