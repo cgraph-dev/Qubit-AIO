@@ -1,0 +1,285 @@
+/* The Sakuga gallery page (/sakuga-gallery).
+ *
+ * Scoped to the gallery: the surrounding dashboard keeps its own theme, while
+ * every card is the upstream "white paper" surface so the controls and their
+ * effects read exactly as the upstream gallery. The --sk-* variables reach the
+ * shadow roots by inheritance, so this is the original palette, not a theme.
+ */
+
+.skg {
+  /* The button/progress back-canvas reaches 160px past the control (upstream
+   * documents that it can be clipped). Without this, those canvases inflate
+   * the dashboard's inner scroller and create a horizontal scrollbar. `clip`
+   * stops the layout overflow without establishing a scroll container, so the
+   * vertical page scroll and the page-wide effects canvas are untouched. */
+  overflow-x: clip;
+  --skg-paper: #ffffff;
+  --skg-page: #f4f3fc;
+  --skg-ink: #1d1a4a;
+  --skg-dim: #8580b0;
+  --skg-line: #dcdaf0;
+  --skg-chip: #f4f3fc;
+  --skg-accent: #ff5fa8;
+}
+
+.skg__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
+  gap: 18px;
+  margin-top: 22px;
+  grid-auto-flow: dense;
+}
+
+.skg-card {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1.5px solid var(--skg-line);
+  border-radius: 18px;
+  background: var(--skg-paper);
+  color: var(--skg-ink);
+}
+
+.skg-card--wide {
+  grid-column: span 2;
+}
+
+@media (max-width: 680px) {
+  .skg-card--wide {
+    grid-column: auto;
+  }
+}
+
+.skg-card__head {
+  padding: 14px 16px 0;
+}
+
+.skg-card__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 6px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.skg-card__tag {
+  color: var(--skg-dim);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.skg-card__note {
+  margin: 5px 0 0;
+  color: var(--skg-dim);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+
+.skg-card__note strong {
+  color: var(--skg-ink);
+  font-weight: 600;
+}
+
+.skg-card__stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px 22px;
+  min-height: 132px;
+  /* Upstream's progress reserves 70px above and ~110px below its bar; the
+     stage exists so that art is not clipped by a neighbouring card. */
+  padding: 28px 16px;
+}
+
+.skg-card__stage--tall {
+  min-height: 230px;
+}
+
+.skg-card__stage--stack {
+  flex-direction: column;
+}
+
+.skg-card__stage--start {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.skg-card__said {
+  min-height: 1.4em;
+  margin: 0;
+  padding: 0 16px;
+  color: var(--skg-dim);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.skg-card__acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 16px 14px;
+  border-top: 1.5px solid var(--skg-line);
+}
+
+.skg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 4px 12px;
+  border: 1.5px solid var(--skg-line);
+  border-radius: 999px;
+  background: var(--skg-paper);
+  color: var(--skg-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.skg-pill:hover {
+  border-color: var(--skg-ink);
+}
+
+.skg-pill:focus-visible {
+  outline: 2.5px solid var(--skg-accent);
+  outline-offset: 2px;
+}
+
+.skg-pill[aria-pressed='true'] {
+  border-color: var(--skg-ink);
+  background: var(--skg-ink);
+  color: var(--skg-paper);
+}
+
+.skg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.skg-field > span {
+  color: var(--skg-dim);
+  font-weight: 500;
+}
+
+.skg-rows {
+  /* The shared ListItem rule paints its active row with the dashboard's
+     --midground (a warm cream on the dark shell). Inside the white gallery
+     card that is near-invisible, so scope the token to the paper ink. */
+  --midground: var(--skg-ink);
+  width: 100%;
+  max-width: 340px;
+  border: 1.5px solid var(--skg-line);
+  border-radius: 12px;
+  background: var(--skg-paper);
+  color: var(--skg-ink);
+  overflow: hidden;
+}
+
+.skg-rows + .skg-rows {
+  margin-top: 10px;
+}
+
+.skg-rows__title {
+  margin: 0;
+  padding: 8px 12px 6px;
+  border-bottom: 1.5px solid var(--skg-line);
+  color: var(--skg-dim);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* ListItem rows stay dense: the shared stylesheet flattens the Sakuga button. */
+.skg-rows .qsk-list-item {
+  border-radius: 0;
+  border-bottom: 1px solid var(--skg-line);
+}
+
+.skg-rows .qsk-list-item:last-child {
+  border-bottom: 0;
+}
+
+.skg-toast-stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 56px;
+  width: 236px;
+  max-width: 100%;
+}
+
+.skg-live {
+  margin: 22px 0 0;
+  color: var(--skg-dim);
+  font-size: 12.5px;
+}
+
+.skg-live code {
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--skg-chip);
+  color: var(--skg-ink);
+  font-size: 12px;
+}
+
+/* The gallery is a component showcase, so it shows the upstream chrome size
+ * (the owner's reference is the upstream gallery). sakuga.css compacts the
+ * same chrome for Qubit's dense pages; these rules restore only those metrics
+ * inside `.skg`. They never touch the drawing, the checkbox box, the toggle
+ * art or the canvas effects. */
+.skg .skg-card__stage > sakuga-button::part(button) {
+  padding: 14px 30px;
+  font-size: 19px;
+  line-height: 1.1;
+  border-width: var(--sk-bw, 3.2px);
+  border-radius: var(--sk-r, 15px);
+  box-shadow: var(--sk-btn-sh, 6px 7px 0 var(--sk-soft, #b8b3ff));
+}
+
+.skg sakuga-input::part(input) {
+  width: 230px;
+  max-width: 100%;
+  padding: 13px 16px;
+  font-size: 16px;
+  line-height: 1.4;
+  border-width: var(--sk-bw, 3.2px);
+  border-radius: var(--sk-r, 15px);
+  box-shadow: var(--sk-sh, 6px 7px 0 var(--sk-soft, #b8b3ff));
+}
+
+.skg sakuga-tabs::part(tabs) {
+  box-shadow: var(--sk-sh, 6px 7px 0 var(--sk-soft, #b8b3ff));
+}
+
+.skg sakuga-tabs::part(tab) {
+  padding: 10px 15px;
+  font-size: 15px;
+  line-height: 1.2;
+}
+
+.skg sakuga-progress::part(label) {
+  padding: 3px 13px 4px;
+  font-size: 21px;
+}
+
+.skg .qsk-field,
+.skg .qsk-field sakuga-input {
+  --sk-input-width: 100%;
+}

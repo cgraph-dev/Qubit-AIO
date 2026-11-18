@@ -107,8 +107,10 @@ export const ROUTE_TITLES: Record<string, string> = {
   // OmniRoute: local AI-gateway console (status + wiring page).
   "/omniroute": "OmniRoute Gateway",
   // Qubit TV: streaming launcher + YouTube embed (web variant of the MIT
-  // HermesTV desktop plugin).
+  // HermesTV desktop plugin; DRM services open in the browser).
   "/qubit-tv": "Qubit TV",
+  // Hidden component gallery for the vendored Sakuga VFX kit.
+  "/sakuga-gallery": "Sakuga Gallery",
 };
 
 export function resolvePageTitle(

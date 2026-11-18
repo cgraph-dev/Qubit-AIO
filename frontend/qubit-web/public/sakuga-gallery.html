@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sakuga VFX — standalone gallery</title>
+<style>
+  :root { --page: #ffffff; --text: #1d1a4a; --mute: #8580b0; --line: #dcdaf0; --chip: #f4f3fc; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; overflow-x: clip; background: var(--page); }
+  body { margin: 0; color: var(--text); background: var(--page); font: 500 15px/1.45 -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; overflow-x: clip; }
+  a { color: inherit; }
+  button { font: inherit; color: inherit; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 16px 80px; }
+  header { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px 24px; margin-bottom: 14px; }
+  h1 { margin: 0; font: italic 800 28px/1.1 "Avenir Next", "Nunito", -apple-system, "Segoe UI", system-ui, sans-serif; letter-spacing: -.01em; }
+  .lede { max-width: 680px; margin: 8px 0 0; color: var(--mute); }
+  .links { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 0; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 13px; border: 1.5px solid var(--line); border-radius: 999px; background: none; font-size: 13px; font-weight: 600; text-decoration: none; cursor: pointer; }
+  .pill:hover { border-color: var(--text); }
+  :focus-visible { outline: 2.5px solid #ff5fa8; outline-offset: 3px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-top: 28px; grid-auto-flow: dense; }
+  .card { display: flex; flex-direction: column; min-width: 0; border: 1.5px solid var(--line); border-radius: 18px; }
+  .card.wide { grid-column: span 2; }
+  .card h2 { margin: 0; padding: 14px 16px 0; font-size: 15px; font-weight: 700; }
+  .card h2 span { margin-left: 6px; color: var(--mute); font-weight: 500; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+  .card .how { margin: 4px 0 0; padding: 0 16px; color: var(--mute); font-size: 13px; }
+  .card .how strong { color: var(--text); font-weight: 600; }
+  .stage { flex: 1; display: grid; place-items: center; min-height: 200px; padding: 24px 16px; }
+  .stage.row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 22px; }
+  .said { min-height: 1.45em; margin: 0; padding: 0 16px 12px; color: var(--mute); font-size: 13px; text-align: center; }
+  .note { margin: 40px 0 0; color: var(--mute); font-size: 13px; }
+  .note code { padding: 1px 5px; border-radius: 5px; background: var(--chip); font-size: 12.5px; }
+  .toastwrap { position: relative; display: grid; justify-items: center; gap: 22px; }
+  @media (max-width: 680px) { .card.wide { grid-column: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Sakuga VFX — standalone gallery</h1>
+      <p class="lede">The twelve upstream cards, loaded exactly as upstream's gallery does: one plain script tag per vendored file, no build step. The Qubit-only extras (SakugaSelect, ListItem rows, SakugaLoading, the emitFx bus) are in the dashboard gallery.</p>
+      <p class="links">
+        <a class="pill" href="/sakuga-gallery">Dashboard gallery (with Qubit extras) &#8599;</a>
+        <a class="pill" href="https://sakuga-vfx.vercel.app/gallery/" target="_blank" rel="noopener">Upstream gallery &#8599;</a>
+        <a class="pill" href="https://github.com/finktheartist/sakuga-vfx" target="_blank" rel="noopener">Upstream repo &#8599;</a>
+      </p>
+    </div>
+  </header>
+  <main class="grid" id="grid"></main>
+  <p class="note">Effects are drawn on one canvas over the page and switch off for <code>prefers-reduced-motion</code>. Every colour is a <code>--sk-*</code> variable you can override. MIT, pin <code>c3dabb173928</code>; the vendored files are untouched.</p>
+</div>
+<script src="/sakuga-vfx/button/button.js"></script>
+<script src="/sakuga-vfx/toggle/toggle.js"></script>
+<script src="/sakuga-vfx/slider/slider.js"></script>
+<script src="/sakuga-vfx/checkbox/checkbox.js"></script>
+<script src="/sakuga-vfx/radio/radio.js"></script>
+<script src="/sakuga-vfx/input/input.js"></script>
+<script src="/sakuga-vfx/tabs/tabs.js"></script>
+<script src="/sakuga-vfx/progress/progress.js"></script>
+<script src="/sakuga-vfx/rating/rating.js"></script>
+<script src="/sakuga-vfx/toast/toast.js"></script>
+<script src="/sakuga-vfx/tooltip/tooltip.js"></script>
+<script>
+const ITEMS = [
+  { name: 'Primary button', tag: 'sakuga-button', how: 'Press and release: squash, impact frame, burst and ドン!.', html: '<sakuga-button data-demo="primary">Confirm</sakuga-button>' },
+  { name: 'Secondary button', tag: 'sakuga-button', how: 'The quiet variant: a small squash and three wedges.', html: '<sakuga-button variant="secondary">Cancel</sakuga-button>' },
+  { name: 'Toggle', tag: 'sakuga-toggle', how: 'Flip on (43 frames), then off (a 12-frame dash back).', html: '<sakuga-toggle label="Notifications"></sakuga-toggle>' },
+  { name: 'Slider', tag: 'sakuga-slider', how: 'Drag it fast, and let go while it is moving.', html: '<sakuga-slider value="30" label="Volume"></sakuga-slider>' },
+  { name: 'Checkbox', tag: 'sakuga-checkbox', how: 'Tick it, then untick it.', html: '<sakuga-checkbox>Remember me</sakuga-checkbox>' },
+  { name: 'Radio', tag: 'sakuga-radio', how: 'Pick the other one, then use the arrow keys.', html: '<sakuga-radio label="Plan"><option value="a" selected>Option A</option><option value="b">Option B</option></sakuga-radio>' },
+  { name: 'Text input', tag: 'sakuga-input', how: 'Click it and type; every key kicks dust.', html: '<sakuga-input label="Text" placeholder="Type something"></sakuga-input>' },
+  { name: 'Tabs', tag: 'sakuga-tabs', how: 'Pick another tab, or use the arrow keys.', html: '<sakuga-tabs label="Sections"><option>Home</option><option>Profile</option><option>Settings</option></sakuga-tabs>' },
+  { name: 'Progress', tag: 'sakuga-progress', how: 'It plays a load by itself, in surges. Click it to start again.', html: '<sakuga-progress demo label="Loading"></sakuga-progress>', wide: true },
+  { name: 'Rating', tag: 'sakuga-rating', how: 'Give it five; click the lit star to clear.', html: '<sakuga-rating label="Rating"></sakuga-rating>' },
+  { name: 'Toast', tag: 'sakuga-toast', how: 'Press Save. Press it again while visible to replace.', html: '<div class="toastwrap"><sakuga-button variant="secondary" data-demo="save">Save</sakuga-button><sakuga-toast duration="4"></sakuga-toast></div>' },
+  { name: 'Tooltip', tag: 'sakuga-tooltip', how: 'Hover, focus or tap the button; Escape closes it.', html: '<sakuga-tooltip text="Helpful hint!"></sakuga-tooltip>' },
+];
+
+const grid = document.getElementById('grid');
+for (const it of ITEMS) {
+  const card = document.createElement('section');
+  card.className = 'card' + (it.wide ? ' wide' : '');
+  card.innerHTML = `<h2>${it.name}<span>&lt;${it.tag}&gt;</span></h2><p class="how">${it.how}</p><div class="stage">${it.html}</div><p class="said" aria-live="polite"></p>`;
+  grid.append(card);
+  const el = card.querySelector(it.tag);
+  const said = card.querySelector('.said');
+  const say = (t) => { said.textContent = t; };
+  if (it.tag === 'sakuga-button' && el.dataset.demo === 'primary') {
+    el.addEventListener('click', () => { say('Clicked'); setTimeout(() => el.done(), 760); });
+  } else if (it.tag === 'sakuga-button') {
+    el.addEventListener('click', () => say('Clicked'));
+  } else if (it.tag === 'sakuga-toast') {
+    card.querySelector('[data-demo=save]').addEventListener('click', () => { el.show('Saved successfully!'); say('show()'); });
+  } else if (it.tag === 'sakuga-progress') {
+    el.addEventListener('sakuga:done', () => say('sakuga:done'));
+  } else if (it.tag === 'sakuga-tabs') {
+    el.addEventListener('change', (e) => say(`Tab: ${e.detail.label}`));
+  } else {
+    el.addEventListener('change', () => say(`change: ${it.tag === 'sakuga-toggle' || it.tag === 'sakuga-checkbox' ? (el.checked ? 'on' : 'off') : el.value}`));
+  }
+}
+</script>
+</body>
+</html>

@@ -223,3 +223,76 @@ Owner review fixes for the shared wrappers and control density.
 - **Status indicators.** The Config "configured" check icons and other
   `Check`/`CheckCircle` glyphs are status/selection indicators, not
   checkboxes; they were left unchanged deliberately.
+
+## Component gallery + wrapper fidelity (2026-11-18, fidelity lane)
+
+The owner asked for a live gallery ("all 12 must work and be nice") and a fix
+for every control, not only the checkbox. Two surfaces ship:
+
+- **Dashboard route `/sakuga-gallery`** — a hidden route (lazy
+  `src/pages/SakugaGalleryPage.tsx`, no sidebar row). 18 cards: the twelve
+  upstream gallery cards (primary/secondary button, toggle off/on, slider,
+  checkbox, radio, input, tabs, progress, rating, toast, tooltip), the Qubit
+  extras (`SakugaSelect`, `ListItem` rows, `SakugaLoading` busy and
+  determinate, the `emitFx` bus), and a disabled/focus state card. Each card
+  states what the control does and how Qubit uses it, and prints the real
+  value/change the control emitted.
+- **Standalone `/sakuga-gallery.html`** — `public/sakuga-gallery.html`, which
+  loads the eleven vendored files with plain script tags exactly like the
+  upstream gallery. It links to the dashboard gallery for the Qubit extras.
+  It is deliberately outside `public/sakuga-vfx/` so the vendor manifest stays
+  exact.
+
+Real-browser verification (Chromium, 1440/900/390):
+`npx tsc -b` clean; `npx vitest run` **168 files / 1333 tests passed**; the
+focused `src/sakuga/*.test.tsx` set **20 passed**; the standalone and dashboard
+galleries each upgraded every component with **0 Sakuga console errors / 0
+failed `/sakuga-vfx/` requests**. `scripts/check_sakuga_vendor.py` and
+`scripts/sync_sakuga_shared.py --check` are green. Details:
+`docs/STATUS.md` (Sakuga fidelity entry).
+
+### Wrapper fixes that a real browser exposed
+
+The jsdom test helpers dispatch `composed: true` input events, so they could
+not see two of these. The vendored files are untouched.
+
+- **Button variant was too late.** `variant`/`type` are read once in the
+  element's first `render()` and are not observed attributes. The wrapper wrote
+  them in a layout effect, after `connectedCallback`, so
+  `<sakuga-button variant="secondary">` stayed primary in the browser. They
+  (and `disabled`) are now initial attributes, which React writes before
+  insertion.
+- **Input `type` was too late.** Same class for `type`, `label`,
+  `placeholder`, `autocomplete`; every `type="email"`/`password` field rendered
+  as `type="text"`. Now initial attributes.
+- **Radio/tabs/rating labels.** `label` is not observed and is read during the
+  first render; a late write left the inner `radiogroup`/`tablist` named
+  "Options"/"Tabs". Now an initial attribute, and a label change remounts.
+- **Real keystrokes never reached React.** The vendored input dispatches its
+  `input` event with `bubbles: true` but `composed: false`, so it never crosses
+  the shadow boundary. The wrapper now listens on the inner input and
+  re-publishes the event on the host (not the input, which would double the
+  vendored dust). `SakugaSelect`'s filter depends on this; it was unusable for
+  typing before.
+- **Document reset zeroed `:host` margins.** A document-level `* { margin: 0 }`
+  wins over a shadow-tree `:host` rule. `sakuga.css` restates the documented
+  upstream margins for the slider (30px, the value bubble), tabs (10px) and
+  tooltip (60px, the hint); without them the bubble/hint overlapped the content
+  above in the gallery.
+- **Gallery layout.** The back-canvas the button/progress draw reaches 160px
+  past the control (upstream documents it can be clipped); it inflated the
+  dashboard's inner scroller at 390/900/1440. The gallery root uses
+  `overflow-x: clip` so the page-wide effects and vertical scroll are
+  untouched. The select filter fills its panel, and the dense `ListItem` rows
+  keep the gallery ink for their active row instead of inheriting the dark
+  shell's `--midground`.
+
+### Upstream limitations that remain
+
+- Effects are drawn on one page-wide canvas at the highest z-index; lettering
+  can fly over a card header (the tooltip's カチッ does). The hint itself is
+  reserved inside the stage.
+- The button/progress back-canvas is clipped by a parent with `overflow:
+  hidden`; the gallery keeps it visible and clips only the layout overflow.
+- Reduced motion plays no effects and jumps animations to their end frame
+  (`fx.calm`; the toggle's sequence is still 43 frames with `pos === 42`).

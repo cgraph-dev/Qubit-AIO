@@ -212,6 +212,9 @@ const OmniRoutePage = lazy(() => import("@/pages/OmniRoutePage"));
 // Qubit TV: streaming launcher + YouTube embed (web variant of the MIT
 // HermesTV desktop plugin; DRM services open in the browser).
 const QubitTvPage = lazy(() => import("@/pages/QubitTvPage"));
+// Hidden component gallery for the vendored Sakuga VFX kit. No sidebar row:
+// it exists so every control can be exercised in the built dashboard.
+const SakugaGalleryPage = lazy(() => import("@/pages/SakugaGalleryPage"));
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useI18n } from "@/i18n";
@@ -382,6 +385,8 @@ const BUILTIN_ROUTES_CORE: Record<string, ComponentType> = {
   "/kitchen": KitchenPage,
   "/omniroute": OmniRoutePage,
   "/qubit-tv": QubitTvPage,
+  // Hidden developer/owner surface: the live Sakuga VFX component gallery.
+  "/sakuga-gallery": SakugaGalleryPage,
   "/qubit-office": () => <PluginPage name="qubit-office" />,
   "/qubit-office2": () => <PluginPage name="qubit-office2" />,
   "/qubit-office3": () => <PluginPage name="qubit-office3" />,
