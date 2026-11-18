@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 
 import { BrandMark } from '@/components/brand-mark'
 import { SyncStatusCard } from '@/components/sync-status-card'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { CopyButton, writeClipboardText } from '@/components/ui/copy-button'
 import {
   Dialog,
@@ -410,7 +410,7 @@ function ManualView({
         </DialogDescription>
       </div>
 
-      <button
+      <Button variant="secondary"
         className={cn(
           'group flex w-full items-center justify-between gap-3 rounded-md border px-4 py-3 text-left transition-colors',
           copied ? 'border-primary/50' : 'border-(--stroke-nous) hover:border-(--ui-stroke-secondary)'
@@ -431,7 +431,7 @@ function ManualView({
           {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
           {copied ? u.copied : u.copy}
         </span>
-      </button>
+      </Button>
 
       {!guidance && (
         <p className="text-center text-xs text-muted-foreground">

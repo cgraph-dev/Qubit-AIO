@@ -9,11 +9,10 @@ import {
   useState
 } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button, Toggle } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { RowButton } from '@/components/ui/row-button'
-import { Switch } from '@/components/ui/switch'
 import { Tip } from '@/components/ui/tooltip'
 import { useI18n } from '@/i18n'
 import { cn } from '@/lib/utils'
@@ -377,12 +376,12 @@ export function ListStripMenu({
             }}
           >
             <span className="min-w-0 flex-1 truncate">{toggle.label}</span>
-            <Switch
+            <Toggle
               checked={toggle.checked}
               className={cn('pointer-events-none shrink-0', !toggle.checked && 'opacity-60')}
-              size="xs"
               tabIndex={-1}
-            />
+          label={toggle.label}
+        />
           </DropdownMenuItem>
         )}
         {items.map(item => (
@@ -407,7 +406,7 @@ export function ListStripButton({
   onClick: () => void
 }) {
   return (
-    <button
+    <Button variant="secondary"
       className={cn(
         'cursor-pointer text-[0.68rem] font-medium transition-colors disabled:opacity-40',
         active ? 'text-foreground' : 'text-muted-foreground/70 hover:text-foreground'
@@ -417,7 +416,7 @@ export function ListStripButton({
       type="button"
     >
       {children}
-    </button>
+    </Button>
   )
 }
 
@@ -495,14 +494,14 @@ export function CapRow({
       {action != null ? (
         <span className="mr-1.5 flex shrink-0 items-center">{action}</span>
       ) : (
-        <Switch
+        <Toggle
           aria-label={toggleLabel ?? title}
           checked={enabled}
           className={cn('mr-1.5 shrink-0 cursor-pointer', !enabled && 'opacity-60')}
           disabled={busy}
-          onCheckedChange={onToggle}
-          size="xs"
+          onChange={onToggle}
           title={toggleLabel ?? title}
+          label={toggleLabel ?? title}
         />
       )}
     </div>

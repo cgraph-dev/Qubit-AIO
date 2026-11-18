@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { cn } from '@/lib/utils'
 
 interface OverlayIconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

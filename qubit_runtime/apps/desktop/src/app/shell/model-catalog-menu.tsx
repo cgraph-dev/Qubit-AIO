@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import type { ModelOptionProvider, ModelOptionsResult, ModelPricing } from '@qubit/shared'
 import { DEFAULT_REASONING_EFFORT } from '@qubit/shared'
 import { useStore } from '@nanostores/react'
@@ -1078,7 +1079,7 @@ function ModelFamilyRow({
             neither selects the model nor closes the menu. Not a tab stop —
             the search field owns keyboard focus (Shift+Enter stars). */}
         <Tip label={<TipHintLabel hint={favorite ? undefined : copy.favoriteShortcut} text={favoriteLabel} />}>
-          <button
+          <Button variant="secondary"
             aria-label={favoriteLabel}
             aria-pressed={favorite}
             className={cn(
@@ -1096,7 +1097,7 @@ function ModelFamilyRow({
             type="button"
           >
             <Codicon name={favorite ? 'star-full' : 'star-empty'} size="0.75rem" />
-          </button>
+          </Button>
         </Tip>
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           {decoration.icon !== undefined ? <ModelMenuRowIcon icon={decoration.icon} /> : null}

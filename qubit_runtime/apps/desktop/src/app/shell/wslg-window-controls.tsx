@@ -1,3 +1,4 @@
+import { Button } from '@/sakuga/ui'
 import type { CSSProperties, PointerEvent } from 'react'
 
 import { Codicon } from '@/components/ui/codicon'
@@ -46,7 +47,7 @@ export function WslgWindowControls({ isFullscreen, isMaximized }: WslgWindowCont
       // contextually zeroed inside the contrib shell, so read the constant.
       style={{ height: `${TITLEBAR_HEIGHT}px` } as CSSProperties}
     >
-      <button
+      <Button variant="secondary"
         aria-label="Minimize window"
         className={buttonClass}
         onClick={() => controls.minimize()}
@@ -54,8 +55,8 @@ export function WslgWindowControls({ isFullscreen, isMaximized }: WslgWindowCont
         type="button"
       >
         <Codicon name="chrome-minimize" size={10} />
-      </button>
-      <button
+      </Button>
+      <Button variant="secondary"
         aria-label={isMaximized ? 'Restore window' : 'Maximize window'}
         className={buttonClass}
         onClick={() => controls.toggleMaximize()}
@@ -63,8 +64,8 @@ export function WslgWindowControls({ isFullscreen, isMaximized }: WslgWindowCont
         type="button"
       >
         <Codicon name={isMaximized ? 'chrome-restore' : 'chrome-maximize'} size={10} />
-      </button>
-      <button
+      </Button>
+      <Button variant="secondary"
         aria-label="Close window"
         className={cn(
           buttonClass,
@@ -75,7 +76,7 @@ export function WslgWindowControls({ isFullscreen, isMaximized }: WslgWindowCont
         type="button"
       >
         <Codicon name="chrome-close" size={10} />
-      </button>
+      </Button>
     </div>
   )
 }

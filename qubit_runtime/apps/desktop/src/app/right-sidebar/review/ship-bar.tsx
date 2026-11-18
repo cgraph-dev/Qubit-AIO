@@ -2,7 +2,7 @@ import { useStore } from '@nanostores/react'
 import { useState } from 'react'
 
 import { requestComposerSubmit } from '@/app/chat/composer/focus'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { GenerateButton } from '@/components/ui/generate-button'
 import { SplitButton } from '@/components/ui/split-button'

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/sakuga/ui'
 import { Codicon } from '@/components/ui/codicon'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { FieldHint } from '@/components/ui/field'
@@ -197,7 +197,7 @@ export function RemoteFolderPicker() {
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="shrink-0 flex flex-wrap items-center gap-1 border-b border-border/50 px-3 py-2 text-xs text-muted-foreground">
             {crumbs.map((crumb, index) => (
-              <button
+              <Button variant="secondary"
                 className={cn(
                   'rounded px-1.5 py-0.5 hover:bg-muted hover:text-foreground',
                   index === crumbs.length - 1 && 'text-foreground'
@@ -207,7 +207,7 @@ export function RemoteFolderPicker() {
                 type="button"
               >
                 {crumb.label}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -297,7 +297,7 @@ export function RemoteFolderPicker() {
 
 function FolderRow({ disabled = false, name, onClick }: { disabled?: boolean; name: string; onClick: () => void }) {
   return (
-    <button
+    <Button variant="secondary"
       className="row-hover flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs text-(--ui-text-secondary) hover:text-foreground disabled:pointer-events-none disabled:opacity-40"
       disabled={disabled}
       onClick={onClick}
@@ -305,6 +305,6 @@ function FolderRow({ disabled = false, name, onClick }: { disabled?: boolean; na
     >
       <Codicon name="folder" size="0.875rem" />
       <span className="min-w-0 truncate">{name}</span>
-    </button>
+    </Button>
   )
 }

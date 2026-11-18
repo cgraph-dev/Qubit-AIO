@@ -375,7 +375,7 @@ describe('the catalog owns favorite models', () => {
     const select = renderMenu()
     const key = favoriteModelKey('google', 'gemini-2.5-flash')
     const row = () => screen.getByText('Gemini 2.5').closest('[role="menuitem"]')!
-    const star = () => row().querySelector('button[aria-pressed]')!
+    const star = () => row().querySelector('[role="button"][aria-pressed]')!
 
     await screen.findByText('Gemini 2.5')
     fireEvent.click(star())
