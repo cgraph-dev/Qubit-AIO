@@ -1,10 +1,8 @@
-import { Button } from "@nous-research/ui/ui/components/button";
-import { Checkbox } from "@nous-research/ui/ui/components/checkbox";
 import { ListItem } from "@nous-research/ui/ui/components/list-item";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { Button, Checkbox, Input } from "@/sakuga/ui";
 import type { GatewayClient } from "@/lib/gatewayClient";
 import { Check, RefreshCw, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -384,8 +382,7 @@ export function ModelPickerDialog(props: Props) {
     >
       <div className={cn(themedBody, "qmodel-picker relative flex max-h-[84vh] w-full max-w-4xl flex-col overflow-hidden")}>
         <Button
-          ghost
-          size="icon"
+          variant="secondary"
           onClick={onClose}
           className="qmodel-picker__close absolute right-3 top-3 text-muted-foreground hover:text-foreground"
           aria-label="Close"
@@ -414,12 +411,11 @@ export function ModelPickerDialog(props: Props) {
           <div className="qmodel-picker__search">
             <Search className="qmodel-picker__search-icon" aria-hidden="true" />
             <Input
-              autoFocus
+              label="Filter providers and models"
               placeholder="Filter providers and models…"
-              aria-label="Filter providers and models"
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              className="qmodel-picker__input"
+              onChange={setQuery}
+              className="qsk-field qmodel-picker__input"
             />
           </div>
         </div>
@@ -469,9 +465,8 @@ export function ModelPickerDialog(props: Props) {
               <Checkbox
                 checked={persistGlobal}
                 id="model-picker-persist-global"
-                onCheckedChange={(checked) =>
-                  setPersistGlobal(checked === true)
-                }
+                aria-label="Persist globally (otherwise this session only)"
+                onChange={(checked) => setPersistGlobal(checked === true)}
               />
 
               <Label
@@ -485,7 +480,7 @@ export function ModelPickerDialog(props: Props) {
 
           <div className="qmodel-picker__actions">
             <Button
-              outlined
+              variant="secondary"
               className="qmodel-picker__action qmodel-picker__action--refresh"
               onClick={refreshOptions}
               disabled={applying || loading || refreshing}
@@ -493,7 +488,7 @@ export function ModelPickerDialog(props: Props) {
               {refreshing ? <Spinner /> : <RefreshCw className="h-3.5 w-3.5" />}
               Refresh Models
             </Button>
-            <Button outlined className="qmodel-picker__action" onClick={onClose} disabled={applying}>
+            <Button variant="secondary" className="qmodel-picker__action" onClick={onClose} disabled={applying}>
               Cancel
             </Button>
             <Button className="qmodel-picker__action qmodel-picker__action--confirm" onClick={confirm} disabled={!canConfirm}>
@@ -575,8 +570,7 @@ function ProviderColumn({
               <span>{NO_PROVIDERS_MESSAGE}</span>
               <div className="qmodel-picker__no-provider-links">
                 <Button
-                  ghost
-                  size="sm"
+                  variant="secondary"
                   onClick={() => {
                     onClose();
                     navigate("/env");
@@ -585,8 +579,7 @@ function ProviderColumn({
                   Open Keys
                 </Button>
                 <Button
-                  ghost
-                  size="sm"
+                  variant="secondary"
                   onClick={() => {
                     onClose();
                     navigate("/models");

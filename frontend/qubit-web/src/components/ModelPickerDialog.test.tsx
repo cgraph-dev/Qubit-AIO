@@ -11,6 +11,7 @@
 import { act, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "../pages/sakuga-test-dom";
 
 const navigate = vi.hoisted(() => vi.fn());
 
@@ -89,7 +90,7 @@ describe("ModelPickerDialog empty-provider recovery", () => {
     await vi.waitFor(() =>
       expect(document.body.textContent).toContain(NO_PROVIDERS_MESSAGE),
     );
-    const labels = Array.from(document.body.querySelectorAll("button")).map(
+    const labels = Array.from(document.body.querySelectorAll("button, sakuga-button")).map(
       (b) => b.textContent,
     );
     expect(labels).toContain("Open Keys");
@@ -109,8 +110,8 @@ describe("ModelPickerDialog empty-provider recovery", () => {
     );
 
     const openKeys = Array.from(
-      document.body.querySelectorAll("button"),
-    ).find((b) => b.textContent === "Open Keys") as HTMLButtonElement;
+      document.body.querySelectorAll("button, sakuga-button"),
+    ).find((b) => b.textContent === "Open Keys") as HTMLElement;
     await act(async () => {
       openKeys.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
