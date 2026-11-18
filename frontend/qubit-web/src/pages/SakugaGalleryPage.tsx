@@ -129,7 +129,7 @@ type ToastApi = { show?: (text?: string) => void; hide?: () => void; open?: bool
 
 function ButtonDemos() {
   const [said, setSaid] = useState("Click either button.");
-  const primary = useRef<HTMLElement | null>(null);
+  const primaryWrap = useRef<HTMLDivElement | null>(null);
   const doneTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => () => {
@@ -137,7 +137,9 @@ function ButtonDemos() {
   }, []);
 
   const callDone = useCallback(() => {
-    const el = primary.current as unknown as { done?: () => void } | null;
+    const el = primaryWrap.current?.querySelector("sakuga-button") as
+      | (HTMLElement & { done?: () => void })
+      | null;
     el?.done?.();
     setSaid("done() called — check lands for 1.8s.");
   }, []);
@@ -158,17 +160,18 @@ function ButtonDemos() {
           </>
         }
       >
-        <Button
-          fx={false}
-          onClick={(event) => {
-            primary.current = event.currentTarget as HTMLElement;
-            setSaid("click — reaction plays; done() lands the check.");
-            if (doneTimer.current) clearTimeout(doneTimer.current);
-            doneTimer.current = setTimeout(callDone, 760);
-          }}
-        >
-          Confirm
-        </Button>
+        <div ref={primaryWrap} style={{ display: "contents" }}>
+          <Button
+            fx={false}
+            onClick={() => {
+              setSaid("click — reaction plays; done() lands the check.");
+              if (doneTimer.current) clearTimeout(doneTimer.current);
+              doneTimer.current = setTimeout(callDone, 760);
+            }}
+          >
+            Confirm
+          </Button>
+        </div>
       </DemoCard>
 
       <DemoCard
