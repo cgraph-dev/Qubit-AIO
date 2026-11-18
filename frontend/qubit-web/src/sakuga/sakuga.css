@@ -1,0 +1,39 @@
+/* Layout glue for the Sakuga custom elements.
+ *
+ * The components own their drawing and their internal metrics; this file only
+ * fixes the host box so they fit Qubit layouts (the upstream elements are
+ * `display:inline-block` and default to their own fixed widths). It never
+ * pierces a shadow root and never changes the palette.
+ */
+
+sakuga-button {
+  display: inline-block;
+}
+
+/* Form fields in Qubit are usually full-width; the upstream default is 230px. */
+.qsk-field,
+.qsk-field sakuga-input,
+.qsk-field sakuga-select,
+.qsk-field sakuga-toggle {
+  --sk-input-width: 100%;
+  width: 100%;
+}
+
+sakuga-input,
+sakuga-slider,
+sakuga-tabs,
+sakuga-progress {
+  max-width: 100%;
+}
+
+.qsk-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Qubit's shell already has a focus ring language; the component's own
+ * :focus-visible is preserved, this only aligns its offset with dense rows. */
+sakuga-button::part(button) {
+  min-height: 24px;
+}

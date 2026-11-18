@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 import "./index.css";
+import "./sakuga/sakuga.css";
 import App from "./App";
 import { SystemActionsProvider } from "./contexts/SystemActions";
 import {
