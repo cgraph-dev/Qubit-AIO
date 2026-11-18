@@ -19,6 +19,7 @@ import {
   useEffect,
   useLayoutEffect,
   useRef,
+  useState,
   type CSSProperties,
   type FocusEventHandler,
   type KeyboardEventHandler,
@@ -161,33 +162,55 @@ function isDefined(tag: string): boolean {
   return typeof window !== 'undefined' && Boolean(window.customElements?.get(tag));
 }
 
-function writeValue(el: HTMLElement, key: string, value: AttrValue): void {
-  const element = el as unknown as Record<string, unknown>;
-  const defined = isDefined(el.tagName.toLowerCase());
-  const live = defined ? element[key] : undefined;
-  if (
-    (key === 'value' || key === 'checked' || key === 'selected' || key === 'disabled')
-    && defined
-    && typeof live !== 'undefined'
-  ) {
-    if (value === false || value === undefined || value === null) {
-      if (key === 'value' || key === 'selected') el.setAttribute(key, '');
-      else el.removeAttribute(key);
-      if (typeof live === 'boolean') element[key] = false;
-      return;
+/** A property can be assigned only when its descriptor has a setter (or is a data property). */
+function writableProperty(el: HTMLElement, key: string): boolean {
+  let proto: object | null = el;
+  while (proto) {
+    const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+    if (descriptor) {
+      return 'set' in descriptor ? typeof descriptor.set === 'function' : descriptor.writable === true;
     }
-    const next = typeof live === 'boolean' ? Boolean(value) : value;
-    if (live !== next) element[key] = next;
-    if (typeof next === 'boolean') {
-      if (next) el.setAttribute(key, '');
-      else el.removeAttribute(key);
-    } else {
-      el.setAttribute(key, String(next));
-    }
-    return;
+    proto = Object.getPrototypeOf(proto);
   }
-  if (value === undefined || value === null || value === false) el.removeAttribute(key);
-  else el.setAttribute(key, value === true ? '' : String(value));
+  return false;
+}
+
+/**
+ * Sync one value onto the host, mutating only what actually changes.
+ *
+ * `setAttribute` fires `attributeChangedCallback` even when the new value is
+ * identical. The vendored controls treat that callback as a real change: the
+ * toggle resets `seq` to a one-frame jump when `checked` is rewritten, so a
+ * redundant write on every React render killed its 43-frame ON animation.
+ * (Removing an absent attribute is a no-op, which is why OFF appeared to work.)
+ *
+ * The writable-property guard matters too: progress exposes a read-only
+ * `value` getter, and assigning it throws in strict mode. Its attribute is the
+ * documented input, so the attribute path still drives it.
+ */
+function writeValue(el: HTMLElement, key: string, value: AttrValue): void {
+  const booleanKey = key === 'checked' || key === 'disabled';
+  const clearing = value === undefined || value === null || value === false;
+  const nextAttr = clearing ? null : value === true ? '' : String(value);
+
+  if (isDefined(el.tagName.toLowerCase())) {
+    const element = el as unknown as Record<string, unknown>;
+    const live = element[key];
+    if (typeof live !== 'undefined' && writableProperty(el, key)) {
+      if (clearing) {
+        if (typeof live === 'boolean' && live) element[key] = false;
+      } else {
+        const nextProp = booleanKey ? Boolean(value) : value;
+        if (live !== nextProp) element[key] = nextProp;
+      }
+    }
+  }
+
+  if (nextAttr === null) {
+    if (el.hasAttribute(key)) el.removeAttribute(key);
+  } else if (el.getAttribute(key) !== nextAttr) {
+    el.setAttribute(key, nextAttr);
+  }
 }
 
 function useSakuga(
@@ -658,6 +681,73 @@ export const SakugaProgress = forwardRef<HTMLElement, SakugaProgressProps>(funct
     'aria-valuemax': 100,
     'aria-valuenow': Math.round(Math.max(0, Math.min(1, value)) * 100),
   });
+});
+
+/* ──────────────────────────────── Loading ───────────────────────────── */
+
+export interface SakugaLoadingProps {
+  /** Visible + accessible name. */
+  label?: string;
+  /** 0..1 when the work can report progress; omit for a busy crawl toward 90%. */
+  value?: number;
+  doneLabel?: string;
+  /** Hide the visible caption (the progress bar keeps its accessible label). */
+  showLabel?: boolean;
+  className?: string;
+  style?: CSSProperties;
+  id?: string;
+  'data-testid'?: string;
+  onDone?: () => void;
+}
+
+/**
+ * A loading pattern built on the upstream progress bar.
+ *
+ * Loading screens have no meaningful completion number, so with no `value`
+ * the bar eases toward 90% and stops there — the same non-linear crawl the
+ * upstream `demo` uses, but owned by Qubit so `demo` is never shipped. Give it
+ * a `value` for a real long job and it becomes a determinate bar.
+ */
+export const SakugaLoading = forwardRef<HTMLElement, SakugaLoadingProps>(function SakugaLoading(props, ref) {
+  const {
+    label = 'Loading…', value, doneLabel, showLabel = true,
+    className, style, id, onDone,
+  } = props;
+  const controlled = value !== undefined;
+  const clamped = controlled ? Math.max(0, Math.min(1, value)) : undefined;
+  const [crawl, setCrawl] = useState(clamped ?? 0.08);
+
+  useEffect(() => {
+    if (controlled) return;
+    setCrawl(0.08);
+    const timer = setInterval(() => {
+      setCrawl((current) => (current >= 0.9 ? current : Math.min(0.9, current + (0.9 - current) * 0.12)));
+    }, 350);
+    return () => clearInterval(timer);
+  }, [controlled]);
+
+  const current = controlled ? (clamped as number) : crawl;
+
+  return createElement(
+    'div',
+    {
+      id,
+      className: ['qsk-loading', className].filter(Boolean).join(' '),
+      style,
+      role: 'status',
+      'aria-live': 'polite',
+      'aria-label': label,
+      'data-testid': props['data-testid'],
+    },
+    showLabel ? createElement('div', { className: 'qsk-loading__label' }, label) : null,
+    createElement(SakugaProgress, {
+      ref,
+      label,
+      value: current,
+      doneLabel,
+      onDone,
+    }),
+  );
 });
 
 /* ──────────────────────────────── Rating ────────────────────────────── */

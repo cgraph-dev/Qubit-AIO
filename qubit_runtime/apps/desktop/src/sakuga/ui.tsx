@@ -9,6 +9,7 @@
 export {
   SakugaCheckbox as Checkbox,
   SakugaInput as Input,
+  SakugaLoading,
   SakugaProgress as Progress,
   SakugaRadio as Radio,
   SakugaRating as Rating,
@@ -40,6 +41,7 @@ export {
   type SakugaButtonProps,
   type SakugaCheckboxProps,
   type SakugaInputProps,
+  type SakugaLoadingProps,
   type SakugaProgressProps,
   type SakugaRadioOption,
   type SakugaRadioProps,
