@@ -376,3 +376,61 @@ They supersede the documented native-control exceptions for `<textarea>`,
 `type=number`, `type=date`/`type=time` and hidden-file proxies wherever a page
 owner adopts them; the gallery's own combobox/command-palette exceptions are
 unchanged.
+
+## Composed-controls adoption sweep (2026-11-18, `feat/sakuga-use-web`)
+
+The extras are now adopted on the dashboard pages rather than only in the
+gallery. The native elements that remain are named with the reason.
+
+- **Textarea (22 sites):** Profiles (description, description editor, soul
+  editor), Profile Builder MCP env, Skills learn/notes, Skills Review payload,
+  MCP env + invoke args, MCP calls args, Cron context ids + prompt, Voice Edit
+  prompt / try-it text / import JSON, Canvas content, OpenViking memory text,
+  the skill editor body, Voice Edit preview, AutoField text, the om field/
+  workspace editors. Labels stay attached via the caller's existing `Label` or
+  the textarea's own label. Hidden test ids were moved to a wrapper where a
+  test depended on them.
+- **NumberField:** Cron repeat/interval/day-of-month, Devices setup-code TTL,
+  AutoField numeric values, om numeric fields. Raw number inputs that remain:
+  - Voice Edit's tuning grid (17 inputs) is a dense label+hint+`data-testid`
+    layout whose tests read `.value` from those exact nodes and whose values
+    are string-typed update payloads; the number composition's own label and
+    stepper row would duplicate the label and change the grid. Left native,
+    tracked here rather than silently half-converted.
+  - `SessionsPage` prune days uses the Sakuga `Input` with `type=number` (the
+    host input, not a raw one).
+- **DateField / TimeField:** Schedule Builder (once uses the date+time pair and
+  still emits `YYYY-MM-DDTHH:MM`) and the automation blueprint time field.
+- **Pagination:** Sessions page (overview and list) now uses `SakugaPagination`;
+  the range label (`1–20 of N`) stays beside it.
+- **Select:** the language switcher is now the Sakuga select; the bespoke
+  desktop listbox, mobile bottom sheet and drop-up portal are gone.
+- **Input + ListItem:** the command palette keeps Arrow/Enter/Escape and the
+  active row, with the search field on `SakugaInput` and option rows on
+  `ListItem` (`role=option`, `data-testid` preserved).
+- **HoverTooltip:** config export/import/reset, session resume/rename/export/
+  delete, files refresh/download/delete, chat terminal/debug/side-panel
+  toggles. Hover and focus open the bubble, Escape closes it (browser-verified
+  on `/config`: bubble text, then closed on Escape).
+
+Documented native exceptions after this sweep:
+
+- The three chat composers (`TerminalChatPage`, `WebChatPage`, `QubitBotPage`)
+  stay native `<textarea>`: Enter-to-send, Shift+Enter newline, image paste/
+  drop, auto-resize and composer-only CSS are not exposed by `SakugaTextarea`,
+  and wrapping them would either lose those handlers or add a second frame.
+- The six hidden `type=file` inputs stay native: each is a programmatic picker
+  behind an existing icon button (config import, chat attach, system import,
+  files upload, kitchen folder including `webkitdirectory`, sessions import).
+  `SakugaFile` always renders its own visible trigger and chips, which would
+  duplicate the real button; the folder picker also needs `webkitdirectory`,
+  which the composition does not expose.
+- No `type=color` inputs exist in the dashboard.
+- `MultiSelect` was not adopted: the only multi-value checkbox surface is the
+  sessions source filter, which carries per-source counts and icons and a
+  null-means-all default; the generic select would drop that information.
+- Tabs: existing `Tabs` strips already animate; the gallery verifies selection
+  lands (`selected`/`aria-selected` move on click). Three custom tab-strip
+  buttons in Agent Workspace / Agent Cards / Kitchen stayed native because
+  their tests address real `button[role=tab]` nodes and their strips carry
+  counts/icons that the Sakuga tab options cannot express.
