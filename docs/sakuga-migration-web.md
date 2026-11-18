@@ -328,3 +328,51 @@ keep native `<select>` controls (composite filter/seat pickers) and the
 controlled search `<input>`s, which the upstream input cannot replace without
 piercing its shadow event contract; the shell's own inputs/selects are
 compact-sized to the same row height.
+
+## Composed extras (2026-11-18, combos lane)
+
+Owner directive: use the upstream source to build Qubit-owned compositions, so
+Sakuga can reach controls upstream does not ship. The vendored files are
+untouched; these are native elements in the Sakuga frame, plus the vendored
+Button/Input/Checkbox/Tooltip around them. Import them from the shared layer
+(`@qubit/shared/sakuga`) or, inside the dashboard, from `@/sakuga/ui` (the
+re-export aliases are in parentheses):
+
+| Extra (`@/sakuga/ui` alias) | Composes | Replaces | Native contract |
+|---|---|---|---|
+| `SakugaTextarea` (`Textarea`) | native `<textarea>` + `--sk-*` frame; `type` cue on input, `focus` cue on focus | multi-line prompts, notes, skill bodies, descriptions | value/defaultValue, name, rows, required, maxLength, autoFocus, disabled |
+| `SakugaNumber` (`NumberField`) | native `type=number` (spinner hidden) + two compact `SakugaButton` steppers | retry counts, thresholds, row limits, numeric config fields | value, min/max/step, name; onChange gets a number, or the raw string while empty |
+| `SakugaDate` (`DateField`) / `SakugaTime` (`TimeField`) | native `type=date` / `type=time` + a Sakuga button calling `showPicker()` where supported | schedules, deadlines, automation times | value/min/max/name; graceful fallback when `showPicker` is absent |
+| `SakugaFile` (`FileField`) | `SakugaButton` trigger + hidden native file input + removable chips | upload pickers, import dialogs | hidden input keeps `name` and the real `FileList`; `accept`, `multiple`, `onFiles(File[])`; pick fires `impact`, remove fires `pop` |
+| `SakugaMultiSelect` (`MultiSelect`) | combobox trigger + panel with a filtering `SakugaInput` and `SakugaCheckbox` rows | tags, enabled toolsets, notification channels, any multi-value setting | one hidden input per value under `name`; Escape/outside click close; focus returns to the trigger |
+| `SakugaFormRow` (`FormRow`) | label + a control + the upstream click-help `SakugaTooltip` + optional description | dense settings rows that currently lack an explanation | `label`, `help`, `htmlFor`, `description`, children |
+| `SakugaPagination` (`Pagination`) | `SakugaButton` prev/next + a compact `SakugaInput` page field + "of N" | long list pagination (sessions, logs, calls) | `page`, `pageCount`, `onChange`; commits on Enter/blur and clamps to the real range |
+
+All of them keep the upstream palette and the compact chrome from
+`sakuga.css` (buttons ~34px, fields ~37px). The extra CSS is limited to the
+focus ring, the hidden number spinner, the help-bubble margin inside a row and
+the page-field width; no canvas effect is scaled.
+
+Gallery: `/sakuga-gallery` gained one card per extra (date and time share a
+card), each printing the real emitted value. The standalone
+`/sakuga-gallery.html` cannot run React, so it names the extras and links to
+the dashboard gallery. Focused tests live in `src/sakuga/extras.test.tsx`
+(render, typing, form values, steppers, showPicker, file chips/removal,
+multi-select open/filter/toggle/Escape, form row help, pagination clamp).
+
+Import paths for page work:
+
+```ts
+import {
+  Textarea, NumberField, DateField, TimeField, FileField,
+  MultiSelect, FormRow, Pagination,
+} from "@/sakuga/ui";
+// or, from the shared layer:
+import { SakugaTextarea, SakugaNumber, SakugaDate, SakugaTime,
+  SakugaFile, SakugaMultiSelect, SakugaFormRow, SakugaPagination } from "@qubit/shared/sakuga";
+```
+
+They supersede the documented native-control exceptions for `<textarea>`,
+`type=number`, `type=date`/`type=time` and hidden-file proxies wherever a page
+owner adopts them; the gallery's own combobox/command-palette exceptions are
+unchanged.

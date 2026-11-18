@@ -25,8 +25,14 @@ import {
 import {
   Button,
   Checkbox,
+  DateField,
+  FileField,
+  FormRow,
   Input,
   ListItem,
+  MultiSelect,
+  NumberField,
+  Pagination,
   Progress,
   Radio,
   Rating,
@@ -34,6 +40,8 @@ import {
   Select,
   Slider,
   Tabs,
+  Textarea,
+  TimeField,
   Toggle,
   Tooltip,
   emitFx,
@@ -561,6 +569,171 @@ function SelectDemo() {
   );
 }
 
+function TextareaDemo() {
+  const [notes, setNotes] = useState("");
+  return (
+    <DemoCard
+      title="SakugaTextarea"
+      tag="<SakugaTextarea>"
+      how="Qubit extra: a real native textarea in the Sakuga frame, with the engine's dust on input and wedges on focus. No upstream multi-line control exists."
+      qubit="Long text (prompts, notes, skill bodies, descriptions). value/name, required, maxLength and form submission are native."
+      said={`value: ${notes.length} chars`}
+      tall
+    >
+      <Textarea
+        label="Notes"
+        name="notes"
+        placeholder="Write a few lines…"
+        rows={3}
+        value={notes}
+        onChange={setNotes}
+      />
+    </DemoCard>
+  );
+}
+
+function NumberDemo() {
+  const [retries, setRetries] = useState(2);
+  return (
+    <DemoCard
+      title="SakugaNumber"
+      tag="<SakugaNumber>"
+      how="Qubit extra: a native number input with the spinner hidden and two compact Sakuga steppers. onChange reports a number, or the raw string while the field is empty."
+      qubit="Numeric settings (retries, thresholds, row limits). min/max/step and form submission are native."
+      said={`value: ${retries}`}
+    >
+      <NumberField
+        label="Retries"
+        name="retries"
+        min={0}
+        max={10}
+        step={1}
+        value={retries}
+        onChange={(value) => setRetries(typeof value === "number" ? value : 0)}
+      />
+    </DemoCard>
+  );
+}
+
+function DateTimeDemo() {
+  const [date, setDate] = useState("2026-11-18");
+  const [time, setTime] = useState("09:30");
+  return (
+    <DemoCard
+      title="SakugaDate / SakugaTime"
+      tag="<SakugaDate> <SakugaTime>"
+      how="Qubit extras: native date and time inputs in the Sakuga frame, plus a small Sakuga button that calls the browser's showPicker() where it exists."
+      qubit="Schedules and deadlines. The native picker owns validation; the button is an optional shortcut."
+      said={`date: ${date} · time: ${time}`}
+      tall
+    >
+      <div className="skg-field">
+        <span>Date</span>
+        <DateField label="Run date" name="run_date" value={date} onChange={setDate} />
+      </div>
+      <div className="skg-field">
+        <span>Time</span>
+        <TimeField label="Run time" name="run_time" value={time} onChange={setTime} />
+      </div>
+    </DemoCard>
+  );
+}
+
+function FileDemo() {
+  const [files, setFiles] = useState<string[]>([]);
+  return (
+    <DemoCard
+      title="SakugaFile"
+      tag="<SakugaFile>"
+      how="Qubit extra: a Sakuga button opens the hidden native file input; the picked files appear as removable chips. Picking fires impact, removing fires pop."
+      qubit="Uploads and imports. The hidden input carries name and the real FileList, so the form submits exactly what was picked."
+      said={files.length ? files.join(", ") : "No files selected."}
+      tall
+    >
+      <FileField
+        label="Attachments"
+        name="attachments"
+        multiple
+        accept=".md,.txt,.json"
+        onFiles={(picked) => setFiles(picked.map((file) => file.name))}
+      />
+    </DemoCard>
+  );
+}
+
+function MultiSelectDemo() {
+  const [values, setValues] = useState<string[]>(["sessions"]);
+  return (
+    <DemoCard
+      title="SakugaMultiSelect"
+      tag="<SakugaMultiSelect>"
+      how="Qubit extra: a combobox trigger plus a panel with a filtering SakugaInput and SakugaCheckbox rows. Escape/outside click closes it; one hidden input per value carries the form data."
+      qubit="Any multi-value setting (tags, enabled toolsets, notification channels). Upstream ships no multi-select."
+      said={`values: ${values.length ? values.join(", ") : "(none)"}`}
+      tall
+    >
+      <MultiSelect
+        label="Notify on"
+        name="notify"
+        values={values}
+        onChange={setValues}
+        options={[
+          { value: "sessions", label: "Sessions" },
+          { value: "files", label: "Files" },
+          { value: "models", label: "Models" },
+          { value: "errors", label: "Errors" },
+          { value: "approvals", label: "Approvals" },
+        ]}
+      />
+    </DemoCard>
+  );
+}
+
+function FormRowDemo() {
+  const [retention, setRetention] = useState("30");
+  return (
+    <DemoCard
+      title="SakugaFormRow"
+      tag="<SakugaFormRow>"
+      how="Qubit extra: a label, a control and the upstream click-help bubble in one dense row, with an optional description."
+      qubit="Settings rows that need an explanation without a permanent paragraph. The help text is never the only place required information lives."
+      said={`retention: ${retention || "(empty)"} days`}
+      tall
+    >
+      <FormRow
+        label="Retention"
+        htmlFor="skg-retention"
+        help="How long completed sessions are kept before the nightly prune removes them."
+        description="Used by the nightly prune job."
+      >
+        <Input
+          id="skg-retention"
+          label="Retention days"
+          name="retention"
+          value={retention}
+          onChange={setRetention}
+        />
+      </FormRow>
+    </DemoCard>
+  );
+}
+
+function PaginationDemo() {
+  const [page, setPage] = useState(3);
+  return (
+    <DemoCard
+      title="SakugaPagination"
+      tag="<SakugaPagination>"
+      how="Qubit extra: previous/next Sakuga buttons and a compact Sakuga page field. The field commits on Enter or blur and clamps to the real range."
+      qubit="Long lists (sessions, logs, calls). onChange only fires when the committed page changes."
+      said={`page ${page} of 12`}
+      tall
+    >
+      <Pagination page={page} pageCount={12} onChange={setPage} />
+    </DemoCard>
+  );
+}
+
 const FX_CUES: FxCue[] = [
   "impact",
   "success",
@@ -638,6 +811,13 @@ export default function SakugaGalleryPage() {
         <ToastDemo />
         <TooltipDemo />
         <SelectDemo />
+        <TextareaDemo />
+        <NumberDemo />
+        <DateTimeDemo />
+        <FileDemo />
+        <MultiSelectDemo />
+        <FormRowDemo />
+        <PaginationDemo />
         <FxBusDemo />
       </div>
       <p className="skg-live">

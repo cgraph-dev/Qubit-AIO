@@ -169,3 +169,50 @@ sakuga-input.qsk-select-filter {
   cursor: not-allowed;
   opacity: 0.5;
 }
+
+/* ── Qubit extras ───────────────────────────────────────────────────────
+ * Compositions built from the vendored controls (shared layer:
+ * `extras/`). They wrap native elements, so this file adds only the focus
+ * ring, the hidden number spinner, the dense row spacing and the pagination
+ * field width. The palette and the engine are untouched. */
+
+.qsk-extra__control:focus-visible {
+  outline: 2.5px solid var(--sk-acc, #ff5fa8);
+  outline-offset: 2px;
+}
+
+.qsk-number__input {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.qsk-number__input::-webkit-outer-spin-button,
+.qsk-number__input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.qsk-stepper::part(button) {
+  padding: 4px 9px;
+  min-width: 32px;
+}
+
+/* The tooltip's upstream 60px gallery margin is dead space inside a dense row;
+ * the bubble still draws above the help button. */
+.qsk-form-row sakuga-tooltip,
+.qsk-form-row .qsk-form-row__help {
+  margin-top: 0;
+}
+
+.qsk-pagination__page {
+  width: var(--sk-input-width, 70px);
+}
+
+.qsk-pagination .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

@@ -62,6 +62,13 @@ describe("Sakuga gallery", () => {
       "Tooltip",
       "SakugaSelect",
       "ListItem rows",
+      "SakugaTextarea",
+      "SakugaNumber",
+      "SakugaDate / SakugaTime",
+      "SakugaFile",
+      "SakugaMultiSelect",
+      "SakugaFormRow",
+      "SakugaPagination",
       "Disabled states",
       "Effect bus (emitFx)",
     ];
@@ -89,6 +96,13 @@ describe("Sakuga gallery", () => {
     expect(tree.querySelector('[role="combobox"]')).not.toBeNull();
     expect(tree.querySelector(".qsk-list-item")).not.toBeNull();
     expect(tree.querySelector(".qsk-loading")).not.toBeNull();
+    expect(tree.querySelector("textarea")).not.toBeNull();
+    expect(tree.querySelector('input[type="number"]')).not.toBeNull();
+    expect(tree.querySelector('input[type="date"]')).not.toBeNull();
+    expect(tree.querySelector('input[type="time"]')).not.toBeNull();
+    expect(tree.querySelector('input[type="file"]')).not.toBeNull();
+    expect(tree.querySelector(".qsk-form-row")).not.toBeNull();
+    expect(tree.querySelector(".qsk-pagination")).not.toBeNull();
     expect(tree.textContent).toContain("emitFx");
   });
 
@@ -113,5 +127,18 @@ describe("Sakuga gallery", () => {
       expect(html).toContain(`<script src="/sakuga-vfx/${name}/${name}.js"></script>`);
     }
     expect(html).toContain("/sakuga-gallery");
+    // The standalone copy cannot run the React extras, so it names them and
+    // links to the dashboard gallery where they are live.
+    for (const extra of [
+      "SakugaMultiSelect",
+      "SakugaTextarea",
+      "SakugaNumber",
+      "SakugaDate/SakugaTime",
+      "SakugaFile",
+      "SakugaFormRow",
+      "SakugaPagination",
+    ]) {
+      expect(html).toContain(extra);
+    }
   });
 });
