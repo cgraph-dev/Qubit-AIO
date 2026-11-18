@@ -26,7 +26,7 @@ describe("page load errors", () => {
         expect(probe.result.text).toContain("Retry");
         const before = vi.mocked(api[method]).mock.calls.length;
         await act(async () => {
-          const retry = Array.from(document.querySelectorAll("button")).find((b) => b.textContent === "Retry");
+          const retry = Array.from(document.querySelectorAll<HTMLElement>("button, sakuga-button")).find((b) => b.textContent === "Retry");
           retry!.click();
         });
         await act(async () => { await new Promise((r) => setTimeout(r, 10)); });
